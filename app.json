@@ -1,0 +1,101 @@
+{
+  "name": "Count",
+  "slug": "count",
+  "scheme": "count",
+  "version": "1.0.0",
+  "runtimeVersion": {
+    "policy": "appVersion"
+  },
+  "orientation": "default",
+  "userInterfaceStyle": "automatic",
+  "icon": "./assets/images/app-icon-all.png",
+  "updates": {
+    "fallbackToCacheTimeout": 0,
+    "url": "https://u.expo.dev/1e4ab9fb-230c-421d-a659-a4aaa4355d82"
+  },
+  "newArchEnabled": true,
+  "jsEngine": "hermes",
+  "assetBundlePatterns": ["**/*"],
+  "android": {
+    "icon": "./assets/images/app-icon-android-legacy.png",
+    "package": "com.sowinghope.count",
+    "adaptiveIcon": {
+      "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
+      "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
+    },
+    "allowBackup": false,
+    "edgeToEdgeEnabled": true,
+    "intentFilters": [],
+    "permissions": ["android.permission.CAMERA"]
+  },
+  "ios": {
+    "icon": "./assets/images/app-icon-ios.png",
+    "supportsTablet": true,
+    "infoPlist": {
+      "NSCameraUsageDescription": "Scan Count game invitation QR codes. Count does not capture, store, or upload images.",
+      "ITSAppUsesNonExemptEncryption": false
+    },
+    "bundleIdentifier": "com.sowinghope.count",
+    "associatedDomains": [],
+    "privacyManifests": {
+      "NSPrivacyAccessedAPITypes": [
+        {
+          "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+        },
+        {
+          "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+        }
+      ]
+    }
+  },
+  "web": {
+    "favicon": "./assets/images/app-icon-web-favicon.png",
+    "bundler": "metro"
+  },
+  "plugins": [
+    "@clerk/expo",
+    "expo-secure-store",
+    "expo-localization",
+    "expo-font",
+    [
+      "expo-camera",
+      {
+        "cameraPermission": "Scan Count game invitation QR codes. Count does not capture, store, or upload images.",
+        "recordAudioAndroid": false,
+        "barcodeScannerEnabled": true
+      }
+    ],
+    [
+      "expo-splash-screen",
+      {
+        "image": "./assets/images/app-icon-android-adaptive-foreground.png",
+        "imageWidth": 300,
+        "resizeMode": "contain",
+        "backgroundColor": "#191015"
+      }
+    ],
+    [
+      "react-native-edge-to-edge",
+      {
+        "android": {
+          "parentTheme": "Light",
+          "enforceNavigationBarContrast": false
+        }
+      }
+    ],
+    "expo-build-properties"
+  ],
+  "experiments": {
+    "tsconfigPaths": true
+  },
+  "extra": {
+    "ignite": {
+      "version": "UNKNOWN"
+    },
+    "eas": {
+      "projectId": "1e4ab9fb-230c-421d-a659-a4aaa4355d82"
+    }
+  }
+}

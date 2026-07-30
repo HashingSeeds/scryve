@@ -1,0 +1,22 @@
+# flow: Complete local-game smoke test
+# intent: Start, play, undo, finish, and inspect a local game without an account.
+
+appId: ${MAESTRO_APP_ID}
+onFlowStart:
+  - runFlow: ../shared/_OnFlowStart.yaml
+---
+- assertVisible: "Life totals, without the fuss."
+- tapOn: "New local game"
+- assertVisible: "New local game"
+- tapOn: "Start game"
+- assertVisible: "Local game"
+- tapOn:
+    id: "life-seat-1--5"
+- assertVisible: "Seat 1, Player 1, 15 life"
+- tapOn: "Undo"
+- assertVisible: "Seat 1, Player 1, 20 life"
+- tapOn: "Finish"
+- assertVisible: "Finish this game and save its final totals?"
+- tapOn: "Finish game"
+- assertVisible: "Game summary"
+- assertVisible: "Finished"

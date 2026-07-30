@@ -1,0 +1,67 @@
+import type { ConfigContext, ExpoConfig } from "expo/config"
+
+/**
+ * Use tsx/cjs here so we can use TypeScript for our Config Plugins
+ * and not have to compile them to JavaScript.
+ *
+ * See https://docs.expo.dev/config-plugins/plugins/#add-typescript-support-and-convert-to-dynamic-app-config
+ */
+import "tsx/cjs"
+import { normalizeHttpsOrigin } from "./app/utils/httpsOrigin"
+
+/**
+ * @param config ExpoConfig coming from the static config app.json if it exists
+ *
+ * You can read more about Expo's Configuration Resolution Rules here:
+ * https://docs.expo.dev/workflow/configuration/#configuration-resolution-rules
+ */
+export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
+  const existingPlugins = config.plugins ?? []
+
+  const requiredPlugins = ["@clerk/expo", "expo-secure-store"]
+  const plugins = [...existingPlugins]
+  for (const plugin of requiredPlugins) {
+    if (!plugins.some((entry) => (Array.isArray(entry) ? entry[0] : entry) === plugin)) {
+      plugins.push(plugin)
+    }
+  }
+
+  const normalizedInviteOrigin = normalizeHttpsOrigin(process.env.EXPO_PUBLIC_INVITE_ORIGIN)
+  const inviteUrl = normalizedInviteOrigin ? new URL(normalizedInviteOrigin) : undefined
+
+  return {
+    ...config,
+    ios: {
+      ...config.ios,
+      associatedDomains: inviteUrl ? [`applinks:${inviteUrl.host}`] : [],
+      // This privacyManifests is to get you started.
+      // See Expo's guide on apple privacy manifests here:
+      // https://docs.expo.dev/guides/apple-privacy/
+      // You may need to add more privacy manifests depending on your app's usage of APIs.
+      // More details and a list of "required reason" APIs can be found in the Apple Developer Documentation.
+      // https://developer.apple.com/documentation/bundleresources/privacy-manifest-files
+      privacyManifests: {
+        NSPrivacyAccessedAPITypes: [
+          {
+            NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryUserDefaults",
+            NSPrivacyAccessedAPITypeReasons: ["CA92.1"], // CA92.1 = "Access info from same app, per documentation"
+          },
+        ],
+      },
+    },
+    android: {
+      ...config.android,
+      intentFilters: inviteUrl
+        ? [
+            {
+              action: "VIEW",
+              autoVerify: true,
+              data: [{ scheme: "https", host: inviteUrl.host, pathPrefix: "/join" }],
+              category: ["BROWSABLE", "DEFAULT"],
+            },
+          ]
+        : [],
+    },
+    plugins,
+  }
+}

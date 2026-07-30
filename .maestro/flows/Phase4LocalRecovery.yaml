@@ -1,0 +1,19 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../shared/_OnFlowStart.yaml
+- tapOn:
+    id: "new-game-button"
+- assertVisible: "New local game"
+- tapOn: "6"
+- tapOn:
+    id: "start-game-button"
+- assertVisible:
+    id: "player-grid"
+- tapOn:
+    id: "life-seat-1-1"
+- tapOn:
+    id: "undo-button"
+- stopApp
+- launchApp
+- assertVisible:
+    id: "resume-game-button"

@@ -1,0 +1,58 @@
+{
+  "cli": {
+    "version": ">= 20.2.0",
+    "appVersionSource": "remote",
+    "requireCommit": false
+  },
+  "build": {
+    "development": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "development",
+      "environment": "development",
+      "autoIncrement": false,
+      "android": {
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "ios": {
+        "buildConfiguration": "Debug",
+        "simulator": true
+      }
+    },
+    "development:device": {
+      "extends": "development",
+      "distribution": "internal",
+      "ios": {
+        "buildConfiguration": "Debug",
+        "simulator": false
+      }
+    },
+    "preview": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "preview",
+      "environment": "preview",
+      "autoIncrement": false,
+      "ios": { "simulator": true },
+      "android": { "buildType": "apk" }
+    },
+    "preview:device": {
+      "extends": "preview",
+      "ios": { "simulator": false }
+    },
+    "production": {
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": true,
+      "environment": "production",
+      "ios": { "resourceClass": "m-medium" },
+      "android": { "buildType": "app-bundle" }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {},
+      "android": { "track": "internal", "releaseStatus": "draft" }
+    }
+  }
+}

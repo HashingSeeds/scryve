@@ -1,0 +1,13 @@
+{
+  "name": "eslint-plugin-self-explanatory-code",
+  "version": "0.1.0",
+  "description": "Prefer self-explanatory code over explanatory comments.",
+  "main": "index.cjs",
+  "files": [
+    "index.cjs"
+  ],
+  "peerDependencies": {
+    "eslint": ">=8.57.0 <10"
+  },
+  "license": "MIT"
+}
