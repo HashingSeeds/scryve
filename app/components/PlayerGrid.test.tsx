@@ -5,7 +5,7 @@ import { asPlayerId } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 import { accessibleForeground } from "@/utils/colorContrast"
 
-import { getPlayerGridLayout, PlayerGrid } from "./PlayerGrid"
+import { getCellSize, getLifeFontSize, getPlayerGridLayout, PlayerGrid } from "./PlayerGrid"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -56,6 +56,55 @@ describe("PlayerGrid", () => {
       })
     },
   )
+
+  describe("life total sizing", () => {
+    const board = { width: 390, height: 690 }
+
+    function sizeFor(playerCount: number, digits = 2) {
+      const layout = getPlayerGridLayout({ playerCount, width: 390, height: 844 })
+      return getLifeFontSize({ ...getCellSize({ board, layout, gap: 4 }), digits })
+    }
+
+    it("stays unset until the board has been measured", () => {
+      const layout = getPlayerGridLayout({ playerCount: 6, width: 390, height: 844 })
+      expect(
+        getLifeFontSize({
+          ...getCellSize({ board: { width: 0, height: 0 }, layout, gap: 4 }),
+          digits: 2,
+        }),
+      ).toBeUndefined()
+    })
+
+    it("never grows as seats are added, and shrinks once rows get tight", () => {
+      const [two, four, six] = [2, 4, 6].map((count) => sizeFor(count)!)
+      expect(two).toBeGreaterThanOrEqual(four)
+      expect(six).toBeLessThan(four)
+      expect(six).toBeGreaterThanOrEqual(22)
+      expect(two).toBeLessThanOrEqual(80)
+    })
+
+    it("shrinks for longer totals once width rather than height binds", () => {
+      expect(sizeFor(4, 3)!).toBeLessThan(sizeFor(4, 2)!)
+      expect(sizeFor(6, 4)!).toBeLessThan(sizeFor(6, 2)!)
+    })
+
+    it("keeps every seat on one shared size so the board reads as a scoreboard", () => {
+      const layout = getPlayerGridLayout({ playerCount: 3, width: 390, height: 844 })
+      const { cellWidth } = getCellSize({ board, layout, gap: 4 })
+      expect(layout.layout).toBe("three-featured")
+      expect(cellWidth).toBe((board.width - 8 - 4) / 2)
+    })
+
+    it("never drops below the readable floor on an extreme board", () => {
+      const layout = getPlayerGridLayout({ playerCount: 6, width: 390, height: 844 })
+      expect(
+        getLifeFontSize({
+          ...getCellSize({ board: { width: 60, height: 60 }, layout, gap: 4 }),
+          digits: 9,
+        }),
+      ).toBe(22)
+    })
+  })
 
   it("increases reachability height at large text sizes without reducing touch targets", () => {
     const normal = getPlayerGridLayout({ playerCount: 4, width: 390, height: 844, fontScale: 1 })

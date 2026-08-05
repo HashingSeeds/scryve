@@ -1,6 +1,5 @@
 import { router } from "expo-router"
 
-import { AccountButton } from "@/features/auth/AccountControls"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { HomeScreen } from "@/screens/HomeScreen"
@@ -17,7 +16,7 @@ export default function Index() {
       onSettings={() => router.push("/settings")}
       onConnected={() => router.push("/connected")}
       onAccount={auth.isSignedIn ? () => router.push("/account") : auth.openAuth}
-      AccountControl={auth.isSignedIn ? <AccountButton /> : undefined}
+      isSignedIn={auth.isSignedIn}
     />
   )
 }

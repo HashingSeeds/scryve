@@ -18,6 +18,7 @@ export interface LifeCardProps {
   life: number
   color: string
   compact?: boolean
+  lifeFontSize?: number
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
   pendingCount?: number
@@ -31,6 +32,7 @@ export function LifeCard({
   life,
   color,
   compact,
+  lifeFontSize,
   disabled,
   ownership,
   pendingCount = 0,
@@ -112,9 +114,14 @@ export function LifeCard({
             accessibilityLabel={`${identity}, ${life} life`}
             accessibilityLiveRegion="polite"
             maxFontSizeMultiplier={1.3}
-            adjustsFontSizeToFit
             numberOfLines={1}
-            style={[themed(compact ? $compactLife : $life), { color: foreground }]}
+            style={[
+              themed(compact ? $compactLife : $life),
+              lifeFontSize
+                ? { fontSize: lifeFontSize, lineHeight: Math.ceil(lifeFontSize * 1.1) }
+                : null,
+              { color: foreground },
+            ]}
           />
           <Text
             testID={`life-delta-seat-${seatNumber}`}
@@ -183,6 +190,7 @@ const $compactName: ThemedStyle<TextStyle> = () => ({
 })
 
 const $life: ThemedStyle<TextStyle> = () => ({
+  width: "100%",
   fontSize: 60,
   lineHeight: 66,
   textAlign: "center",
@@ -190,6 +198,7 @@ const $life: ThemedStyle<TextStyle> = () => ({
 })
 
 const $compactLife: ThemedStyle<TextStyle> = () => ({
+  width: "100%",
   fontSize: 42,
   lineHeight: 48,
   textAlign: "center",

@@ -30,6 +30,9 @@ export function GameSetupScreen({ defaults, onBack, onStart }: GameSetupScreenPr
   const [playerCount, setPlayerCount] = useState(defaults.defaultPlayerCount)
   const [names, setNames] = useState(() => Array.from({ length: 6 }, (_, i) => `Player ${i + 1}`))
   const [lifeText, setLifeText] = useState(String(defaults.defaultStartingLife))
+  const [showCustomStartingLife, setShowCustomStartingLife] = useState(() =>
+    STARTING_LIFE_PRESETS.every((life) => life !== defaults.defaultStartingLife),
+  )
   const startingLife = Number(lifeText)
   const validLife = validateStartingLife(startingLife)
   const nameValidation = validatePlayerNames(names.slice(0, playerCount))
@@ -69,16 +72,26 @@ export function GameSetupScreen({ defaults, onBack, onStart }: GameSetupScreenPr
             onPress={() => setLifeText(String(life))}
           />
         ))}
+        {!showCustomStartingLife ? (
+          <Button
+            text="…"
+            accessibilityLabel="Use custom starting life"
+            style={themed($choice)}
+            onPress={() => setShowCustomStartingLife(true)}
+          />
+        ) : null}
       </View>
-      <TextField
-        testID="custom-starting-life"
-        labelTx="localGame:customStartingLife"
-        value={lifeText}
-        keyboardType="number-pad"
-        status={validLife ? undefined : "error"}
-        helper={validLife ? "Whole number from 1 to 999." : "Enter a whole number from 1 to 999."}
-        onChangeText={setLifeText}
-      />
+      {showCustomStartingLife ? (
+        <TextField
+          testID="custom-starting-life"
+          labelTx="localGame:customStartingLife"
+          value={lifeText}
+          keyboardType="number-pad"
+          status={validLife ? undefined : "error"}
+          helper={validLife ? "Whole number from 1 to 999." : "Enter a whole number from 1 to 999."}
+          onChangeText={setLifeText}
+        />
+      ) : null}
       <Text tx="localGame:playerNames" preset="subheading" accessibilityRole="header" />
       <View style={themed($nameList)}>
         {players.map((player, index) => (

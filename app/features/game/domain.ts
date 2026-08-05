@@ -16,7 +16,7 @@ import type {
   PlayerId,
 } from "./types"
 
-export const PLAYER_COLORS = ["#C76542", "#41476E", "#39755C", "#94632D", "#77558A", "#A33A52"]
+export const PLAYER_COLORS = ["#B85636", "#41476E", "#39755C", "#94632D", "#77558A", "#A33A52"]
 export const LIFE_DELTAS: readonly LifeDelta[] = [-5, -1, 1, 5]
 export const STARTING_LIFE_PRESETS = [20, 30, 40] as const
 export const MIN_PLAYERS = 2

@@ -14,6 +14,7 @@ describe("GameSetupScreen", () => {
       </ThemeProvider>,
     )
     fireEvent.press(view.getByLabelText("6 players"))
+    fireEvent.press(view.getByLabelText("Use custom starting life"))
     fireEvent.changeText(view.getByTestId("custom-starting-life"), "37")
     fireEvent.changeText(view.getByTestId("player-name-6"), "Six")
     fireEvent.press(view.getByTestId("start-game-button"))
@@ -30,8 +31,21 @@ describe("GameSetupScreen", () => {
         <GameSetupScreen defaults={DEFAULT_LOCAL_SETTINGS} onBack={jest.fn()} onStart={jest.fn()} />
       </ThemeProvider>,
     )
+    fireEvent.press(view.getByLabelText("Use custom starting life"))
     fireEvent.changeText(view.getByTestId("custom-starting-life"), "0")
     expect(view.getByTestId("start-game-button").props.accessibilityState.disabled).toBe(true)
+  })
+
+  it("hides custom starting life behind an ellipsis until requested", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <GameSetupScreen defaults={DEFAULT_LOCAL_SETTINGS} onBack={jest.fn()} onStart={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    expect(view.queryByTestId("custom-starting-life")).toBeNull()
+    fireEvent.press(view.getByLabelText("Use custom starting life"))
+    expect(view.getByTestId("custom-starting-life")).toBeTruthy()
   })
 
   it("shows seat-specific name errors and submits trimmed unique names", () => {

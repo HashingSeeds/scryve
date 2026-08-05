@@ -35,4 +35,21 @@ describe("HomeScreen", () => {
     expect(callbacks.onResumeGame).toHaveBeenCalledTimes(1)
     expect(view.queryByTestId("new-game-button")).toBeNull()
   })
+
+  it("labels the account action for the current authentication state", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <HomeScreen hasActiveGame={false} isSignedIn={false} {...callbacks} />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("localGame:signUpOrLogIn")).toBeTruthy()
+
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <HomeScreen hasActiveGame={false} isSignedIn {...callbacks} />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("localGame:account")).toBeTruthy()
+    expect(view.queryByText("localGame:signUpOrLogIn")).toBeNull()
+  })
 })

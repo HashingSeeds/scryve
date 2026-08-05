@@ -1,5 +1,6 @@
 import { fireEvent, render } from "@testing-library/react-native"
 
+import { Screen } from "@/components/Screen"
 import { ThemeProvider } from "@/theme/context"
 
 import AccountRoute from "../src/app/account"
@@ -7,6 +8,7 @@ import InviteRoute from "../src/app/join/[token]"
 
 const mockOpenAuth = jest.fn()
 const mockToken = "bad"
+let mockIsSignedIn = false
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), replace: jest.fn(), push: jest.fn() },
@@ -15,12 +17,15 @@ jest.mock("expo-router", () => ({
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({
     configured: true,
-    isSignedIn: false,
+    isSignedIn: mockIsSignedIn,
     openAuth: mockOpenAuth,
     configurationMessage: undefined,
   }),
 }))
-jest.mock("@/features/auth/AccountControls", () => ({ AccountProfile: () => null }))
+jest.mock("@/features/auth/AccountControls", () => {
+  const { View } = jest.requireActual("react-native")
+  return { AccountProfile: () => <View testID="account-profile" /> }
+})
 jest.mock("@/features/connected/ConnectedGate", () => ({
   ConnectedGate: ({ children }: { children: React.ReactNode }) => children,
 }))
@@ -31,7 +36,10 @@ function themed(element: React.ReactElement) {
 }
 
 describe("Router recovery fallbacks", () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockIsSignedIn = false
+  })
 
   it("offers re-authentication and home recovery from a rejected account route", () => {
     const view = render(themed(<AccountRoute />))
@@ -48,5 +56,12 @@ describe("Router recovery fallbacks", () => {
     const replace = jest.requireMock("expo-router").router.replace
     expect(replace).toHaveBeenNthCalledWith(1, "/connected/join")
     expect(replace).toHaveBeenNthCalledWith(2, "/")
+  })
+
+  it("gives the signed-in account profile the remaining route height", () => {
+    mockIsSignedIn = true
+    const view = render(themed(<AccountRoute />))
+    expect(view.getByTestId("account-profile")).toBeTruthy()
+    expect(view.UNSAFE_getByType(Screen).props.contentContainerStyle).toEqual({ flex: 1 })
   })
 })

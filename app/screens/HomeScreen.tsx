@@ -1,9 +1,7 @@
-import type { ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
-import { ConnectionBadge } from "@/components/ConnectionBadge"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
@@ -17,7 +15,7 @@ export interface HomeScreenProps {
   onSettings: () => void
   onConnected?: () => void
   onAccount?: () => void
-  AccountControl?: ReactNode
+  isSignedIn?: boolean
 }
 
 export function HomeScreen({
@@ -28,15 +26,11 @@ export function HomeScreen({
   onSettings,
   onConnected,
   onAccount,
-  AccountControl,
+  isSignedIn = false,
 }: HomeScreenProps) {
   const { themed } = useAppTheme()
   return (
     <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentContainerStyle={themed($screen)}>
-      <View style={themed($topBar)}>
-        <ConnectionBadge />
-        {AccountControl}
-      </View>
       <View style={themed($hero)}>
         <Text tx="localGame:appName" preset="formLabel" style={themed($eyebrow)} />
         <Text
@@ -96,7 +90,7 @@ export function HomeScreen({
       <View style={themed($footer)}>
         <Button
           testID="account-button"
-          tx="localGame:account"
+          tx={isSignedIn ? "localGame:account" : "localGame:signUpOrLogIn"}
           style={themed($accountButton)}
           textStyle={themed($accountText)}
           pressedStyle={themed($accountPressed)}
@@ -116,15 +110,6 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.lg,
   paddingTop: spacing.sm,
   paddingBottom: spacing.md,
-})
-
-const $topBar: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: "100%",
-  minHeight: 44,
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: spacing.sm,
 })
 
 const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({

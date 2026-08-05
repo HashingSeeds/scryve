@@ -13,7 +13,6 @@ jest.mock("expo-router", () => ({
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ isSignedIn: false, openAuth: mockOpenAuth }),
 }))
-jest.mock("@/features/auth/AccountControls", () => ({ AccountButton: () => null }))
 jest.mock("@/features/game/localPersistence", () => ({
   localGameRepository: { loadActiveGame: () => null },
 }))
@@ -30,6 +29,10 @@ describe("shipping index route", () => {
       "Local play stays available without an account or network.",
     )
     expect(view.queryByTestId("quick-local-game-button")).toBeNull()
+    expect(view.queryByText("On this device")).toBeNull()
+    expect(view.getByText("localGame:signUpOrLogIn")).toBeTruthy()
+    expect(en.localGame.signUpOrLogIn).toBe("Sign up / log in")
+    expect(en.localGame.account).toBe("Account")
     fireEvent.press(view.getByTestId("new-game-button"))
     expect(jest.requireMock("expo-router").router.push).toHaveBeenCalledWith("/game/new")
   })

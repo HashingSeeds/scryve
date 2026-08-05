@@ -5,7 +5,6 @@ import { useKeepAwake } from "expo-keep-awake"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
-import { ConnectionBadge } from "@/components/ConnectionBadge"
 import { Header } from "@/components/Header"
 import { PlayerGrid } from "@/components/PlayerGrid"
 import { Screen } from "@/components/Screen"
@@ -17,7 +16,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-const HEADER_HEIGHT = 56
+const HEADER_HEIGHT = 48
 
 type PendingAction = "finish" | "abandon" | null
 
@@ -62,6 +61,7 @@ export function CurrentGameScreen({
           titleTx="localGame:localGame"
           leftTx="localGame:home"
           onLeftPress={onHome}
+          style={$compactHeader}
           RightActionComponent={
             <View style={themed($headerActions)}>
               <Button
@@ -92,9 +92,6 @@ export function CurrentGameScreen({
             </View>
           }
         />
-        <View style={themed($statusRow)}>
-          <ConnectionBadge />
-        </View>
         <PlayerGrid
           players={runtime.game.players}
           disabled={pendingAction !== null}
@@ -170,6 +167,7 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
+const $compactHeader: ViewStyle = { height: HEADER_HEIGHT }
 
 const $headerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
@@ -201,11 +199,6 @@ const $menuGlyph: ThemedStyle<TextStyle> = ({ colors }) => ({
   fontSize: 24,
   lineHeight: 28,
   color: colors.text,
-})
-
-const $statusRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  alignItems: "center",
-  paddingBottom: spacing.xs,
 })
 
 const $menuBackdrop: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({

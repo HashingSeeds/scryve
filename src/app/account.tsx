@@ -11,7 +11,7 @@ export default function AccountRoute() {
   const auth = useAuthAccess()
   if (!auth.configured || !auth.isSignedIn)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["bottom"]}>
         <Header title="Account" leftTx="common:back" onLeftPress={() => router.back()} />
         <Text
           accessibilityRole="alert"
@@ -24,9 +24,11 @@ export default function AccountRoute() {
       </Screen>
     )
   return (
-    <Screen preset="fixed" safeAreaEdges={["top", "bottom"]}>
+    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$profileScreen}>
       <Header title="Account" leftTx="common:back" onLeftPress={() => router.back()} />
       <AccountProfile />
     </Screen>
   )
 }
+
+const $profileScreen = { flex: 1 } as const
