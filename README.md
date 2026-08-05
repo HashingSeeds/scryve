@@ -71,7 +71,18 @@ const MyComponent = () => {
 
 ## Running Maestro end-to-end tests
 
-Follow our [Maestro Setup](https://ignitecookbook.com/docs/recipes/MaestroSetup) recipe.
+Maestro drives the installed iOS or Android development build through native accessibility, so no
+Maestro npm package is linked into the app. Install the
+[Maestro CLI](https://docs.maestro.dev/maestro-cli), boot a simulator/emulator with the Count
+development build installed, and start Metro before running:
+
+```bash
+pnpm run test:maestro:check  # fast Jest validation of flow selectors
+pnpm run test:maestro:smoke  # one local-game journey
+pnpm run test:maestro        # all flows
+```
+
+The flows, conventions, and troubleshooting notes live in [`.maestro/README.md`](.maestro/README.md).
 
 ## Next Steps
 
