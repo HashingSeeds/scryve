@@ -9,7 +9,8 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
-import { buildInviteUrl } from "@/features/connected/inviteLinks"
+import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 
 import { api } from "../../convex/_generated/api"
 
@@ -24,7 +25,8 @@ export function ConnectedLobbyScreen({
   onBack?: () => void
   onLeft?: () => void
 }) {
-  const lobby = useQuery(api.games.lobbyProjection, { publicId })
+  const deviceId = useRef(new LocalGameRepository().getDeviceId()).current
+  const lobby = useQuery(api.games.lobbyProjection, { publicId, deviceId })
   const { isWebSocketConnected } = useConvexConnectionState()
   const start = useMutation(api.games.startGame)
   const leave = useMutation(api.games.leaveMyGame)
@@ -45,6 +47,9 @@ export function ConnectedLobbyScreen({
     lobby?.invitation?.token && origin.configured
       ? buildInviteUrl(origin.value.inviteOrigin, lobby.invitation.token)
       : undefined
+  const inviteQrPayload = lobby?.invitation?.token
+    ? buildInviteQrPayload(lobby.invitation.token, lobby.invitation.manualCode)
+    : null
   if (lobby === undefined)
     return (
       <Screen preset="auto">
@@ -93,9 +98,18 @@ export function ConnectedLobbyScreen({
           />
         </>
       ) : null}
-      {inviteUrl ? (
-        <View accessible accessibilityLabel="Invite QR code" style={$qr}>
-          <QRCode value={inviteUrl} size={180} />
+      {inviteQrPayload ? (
+        <View style={$qr}>
+          <QRCode
+            testID="invite-qr"
+            value={inviteQrPayload}
+            size={220}
+            quietZone={24}
+            color="#000000"
+            backgroundColor="#FFFFFF"
+            ecl="H"
+          />
+          <Text text="On the other device, open Join with code → Scan invite QR." />
         </View>
       ) : null}
       {inviteUrl ? (
@@ -148,7 +162,7 @@ export function ConnectedLobbyScreen({
                 setLeaving(true)
                 setActionError(undefined)
                 if (leaveAction === "abandon") await abandon({ publicId })
-                else await leave({ publicId })
+                else await leave({ publicId, deviceId })
                 setLeaveAction(undefined)
                 onLeft?.()
               } catch (cause) {
@@ -161,12 +175,14 @@ export function ConnectedLobbyScreen({
         </View>
       ) : (
         <View style={$leaveActions}>
-          <Button
-            testID="leave-connected-lobby-button"
-            text="Leave lobby"
-            disabled={!isWebSocketConnected}
-            onPress={() => setLeaveAction("leave")}
-          />
+          {!lobby.isHost ? (
+            <Button
+              testID="leave-connected-lobby-button"
+              text="Leave lobby"
+              disabled={!isWebSocketConnected}
+              onPress={() => setLeaveAction("leave")}
+            />
+          ) : null}
           {lobby.isHost ? (
             <Button
               testID="abandon-connected-lobby-button"

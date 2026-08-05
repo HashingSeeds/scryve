@@ -24,14 +24,17 @@ export function ConnectedHistoryScreen({
     {},
     { initialNumItems: 10 },
   )
+  const uniqueResults = Array.from(
+    new Map(results.map((game: any) => [game.publicId, game])).values(),
+  )
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
       <Header title="Connected history" leftTx="common:back" onLeftPress={onBack} />
-      {results.length === 0 && status !== "LoadingFirstPage" ? (
+      {uniqueResults.length === 0 && status !== "LoadingFirstPage" ? (
         <EmptyState heading="No connected games" content="Finished connected games appear here." />
       ) : (
         <View style={themed($list)}>
-          {results.map((game: any) => (
+          {uniqueResults.map((game: any) => (
             <Card
               key={game.publicId}
               heading="Finished connected game"

@@ -24,7 +24,7 @@ export async function requireMembership(ctx: Ctx, gameId: Id<"games">) {
   const player = await ctx.db
     .query("gamePlayers")
     .withIndex("by_game_user", (q) => q.eq("gameId", gameId).eq("userId", user._id))
-    .unique()
+    .first()
   if (!player) throw new Error("Game membership required")
   return { user, player }
 }

@@ -73,14 +73,14 @@ export function BackendGate({
   if (clerkSignedIn && !isWebSocketConnected && hasOwnerScopedCache) return children
   if (!clerkLoaded)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text text="Checking your session… Local play remains available." />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </Screen>
     )
   if (!clerkSignedIn)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text
           accessibilityRole="alert"
           text="You are signed out or your session expired. Re-authenticate to resume connected play; local games remain available."
@@ -92,7 +92,7 @@ export function BackendGate({
   if (isAuthenticated && isUserLoaded && user?.id && readyUserId === user.id) return children
   if (!isWebSocketConnected)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text
           accessibilityRole="alert"
           text="Connected play is offline. Local play remains available."
@@ -102,14 +102,14 @@ export function BackendGate({
     )
   if (isLoading)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text text="Connecting to Convex… Local play remains available." />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </Screen>
     )
   if (!isAuthenticated)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text
           accessibilityRole="alert"
           text="Convex rejected this signed-in session. Check the issuer or deployment configuration, then retry."
@@ -120,7 +120,7 @@ export function BackendGate({
     )
   if (syncError)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text accessibilityRole="alert" text={syncError} />
         <Button
           text="Retry connected setup"
@@ -135,7 +135,7 @@ export function BackendGate({
       </Screen>
     )
   return (
-    <Screen preset="auto">
+    <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
       <Text text="Preparing your connected-play profile…" />
       {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
     </Screen>
@@ -156,7 +156,7 @@ export function ConnectedGate({
   const auth = useAuthAccess()
   if (!auth.configured)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text accessibilityRole="alert" text={auth.configurationMessage} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </Screen>

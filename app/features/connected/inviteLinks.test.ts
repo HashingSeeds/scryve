@@ -1,4 +1,9 @@
-import { buildInviteUrl, normalizeInvitePayload, normalizeManualCode } from "./inviteLinks"
+import {
+  buildInviteQrPayload,
+  buildInviteUrl,
+  normalizeInvitePayload,
+  normalizeManualCode,
+} from "./inviteLinks"
 
 describe("invite links", () => {
   const token = "A".repeat(43)
@@ -8,6 +13,10 @@ describe("invite links", () => {
       normalizeInvitePayload(`https://play.example/join/${token}`, "https://play.example"),
     ).toEqual({ kind: "token", token })
     expect(normalizeInvitePayload(`count://join/${token}`)).toEqual({ kind: "token", token })
+    expect(normalizeInvitePayload("count://join/AB12CD")).toEqual({
+      kind: "code",
+      code: "AB12CD",
+    })
     expect(
       normalizeInvitePayload(`https://foreign.example/join/${token}`, "https://play.example"),
     ).toBeNull()
@@ -28,5 +37,13 @@ describe("invite links", () => {
   it("builds an HTTPS invite without accepting malformed origins", () => {
     expect(buildInviteUrl("https://play.example", token)).toBe(`https://play.example/join/${token}`)
     expect(buildInviteUrl("http://play.example", token)).toBeNull()
+  })
+
+  it("prefers a compact manual-code QR payload that round-trips through invite parsing", () => {
+    const payload = buildInviteQrPayload(token, "ab-12cd")
+    expect(payload).toBe("count://join/AB12CD")
+    expect(normalizeInvitePayload(payload!)).toEqual({ kind: "code", code: "AB12CD" })
+    expect(buildInviteQrPayload(token)).toBe(`count://join/${token}`)
+    expect(buildInviteQrPayload("invalid")).toBeNull()
   })
 })

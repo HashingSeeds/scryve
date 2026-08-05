@@ -41,6 +41,7 @@ export default defineSchema({
     gameId: v.id("games"),
     seat: v.number(),
     userId: v.id("users"),
+    deviceId: v.optional(v.string()),
     displayName: v.string(),
     avatarUrl: v.optional(v.string()),
     color: v.string(),
@@ -55,6 +56,7 @@ export default defineSchema({
     .index("by_game", ["gameId"])
     .index("by_game_seat", ["gameId", "seat"])
     .index("by_game_user", ["gameId", "userId"])
+    .index("by_game_user_and_device", ["gameId", "userId", "deviceId"])
     .index("by_user", ["userId"])
     .index("by_user_resumable", ["userId", "resumable"]),
 

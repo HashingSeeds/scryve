@@ -17,7 +17,7 @@ export default function ConnectedIndex() {
         onJoin={() => router.push("/connected/join")}
         onHistory={() => router.push("/connected/history")}
         onResume={(game) =>
-          router.push({
+          router.replace({
             pathname:
               game.status === "lobby" ? "/connected/lobby/[gameId]" : "/connected/game/[gameId]",
             params: { gameId: game.publicId },

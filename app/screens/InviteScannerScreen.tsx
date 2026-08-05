@@ -7,6 +7,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { InvitePayload, normalizeInvitePayload } from "@/features/connected/inviteLinks"
+import { logInviteScanDiagnostic } from "@/features/connected/inviteScanDiagnostics"
 
 export function InviteScannerScreen({
   onInvite,
@@ -17,12 +18,18 @@ export function InviteScannerScreen({
 }) {
   const [permission, requestPermission] = useCameraPermissions()
   const [error, setError] = useState<string>()
+  const [status, setStatus] = useState("Starting camera preview…")
   const accepted = useRef(false)
   const lastPayload = useRef<{ value: string; at: number } | undefined>(undefined)
   const config = readPublicCloudConfig()
 
   function scan(result: BarcodeScanningResult) {
     if (accepted.current) return
+    logInviteScanDiagnostic("barcode_event", {
+      barcodeType: result.type,
+      dataLength: result.data.length,
+    })
+    setStatus("QR recognized · validating invitation…")
     const now = Date.now()
     if (lastPayload.current?.value === result.data && now - lastPayload.current.at < 2_000) return
     lastPayload.current = { value: result.data, at: now }
@@ -31,10 +38,14 @@ export function InviteScannerScreen({
       config.configured ? config.value.inviteOrigin : undefined,
     )
     if (!invite) {
+      logInviteScanDiagnostic("payload_rejected", { dataLength: result.data.length })
+      setStatus("QR recognized · invitation rejected")
       setError("That QR is not a trusted Count invitation. Try another code or enter it manually.")
       return
     }
     accepted.current = true
+    logInviteScanDiagnostic("payload_accepted", { inviteKind: invite.kind })
+    setStatus("Invitation accepted · opening join screen…")
     onInvite(invite)
   }
 
@@ -81,10 +92,25 @@ export function InviteScannerScreen({
           testID="invite-camera"
           style={$camera}
           facing="back"
+          autofocus="on"
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onCameraReady={() => {
+            logInviteScanDiagnostic("camera_ready")
+            setStatus("Camera ready · waiting for native QR recognition…")
+          }}
+          onMountError={(mountError) => {
+            logInviteScanDiagnostic("camera_mount_error", { message: mountError.message })
+            setStatus("Camera preview failed")
+            setError(`Camera could not start: ${mountError.message}`)
+          }}
           onBarcodeScanned={scan}
         />
       </View>
+      <Text
+        testID="scanner-debug-status"
+        accessibilityLiveRegion="polite"
+        text={`Scanner status: ${status}`}
+      />
       {error ? (
         <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" text={error} />
       ) : null}

@@ -60,6 +60,30 @@ describe("InviteScannerScreen", () => {
     expect(mockRequestPermission).toHaveBeenCalledTimes(1)
   })
 
+  it("enables autofocus for native QR recognition", () => {
+    scanner()
+    expect(screen.getByTestId("invite-camera").props.autofocus).toBe("on")
+  })
+
+  it("shows whether the native camera becomes ready", () => {
+    scanner()
+    expect(screen.getByTestId("scanner-debug-status").props.children).toContain(
+      "Starting camera preview",
+    )
+    fireEvent(screen.getByTestId("invite-camera"), "onCameraReady")
+    expect(screen.getByTestId("scanner-debug-status").props.children).toContain(
+      "Camera ready · waiting for native QR recognition",
+    )
+  })
+
+  it("surfaces native camera mount errors", () => {
+    scanner()
+    fireEvent(screen.getByTestId("invite-camera"), "onMountError", {
+      message: "Native session failed",
+    })
+    expect(screen.getByRole("alert").props.children).toContain("Native session failed")
+  })
+
   it("handles permanent denial with settings and manual fallback", async () => {
     mockPermission = { granted: false, canAskAgain: false }
     const settings = jest.spyOn(Linking, "openSettings").mockResolvedValue(undefined)
@@ -74,6 +98,7 @@ describe("InviteScannerScreen", () => {
 
   it.each([
     [`count://join/${token}`, { kind: "token", token }],
+    ["count://join/AB12CD", { kind: "code", code: "AB12CD" }],
     ["ab-12cd", { kind: "code", code: "AB12CD" }],
   ])("routes a supported scan without duplicate delivery", (data, expected) => {
     const { onInvite } = scanner()

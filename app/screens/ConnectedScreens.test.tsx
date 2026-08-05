@@ -3,9 +3,11 @@ import { Share } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
+import { Screen } from "@/components/Screen"
 import { ThemeProvider } from "@/theme/context"
 
 import { ConnectedBoardScreen } from "./ConnectedBoardScreen"
+import { ConnectedHistoryScreen } from "./ConnectedHistoryScreen"
 import { ConnectedHomeScreen } from "./ConnectedHomeScreen"
 import { ConnectedLobbyScreen } from "./ConnectedLobbyScreen"
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
@@ -93,14 +95,32 @@ jest.mock("../../convex/_generated/api", () => ({
       activeConnectedGames: "games.activeConnectedGames",
       createLobby: "games.createLobby",
       lobbyProjection: "games.lobbyProjection",
+      connectedHistory: "games.connectedHistory",
     },
   },
 }))
 jest.mock("react-native-qrcode-svg", () => ({
   __esModule: true,
-  default: ({ value }: { value: string }) => {
+  default: ({
+    value,
+    quietZone,
+    size,
+    ecl,
+  }: {
+    value: string
+    quietZone: number
+    size: number
+    ecl: string
+  }) => {
     const NativeText = jest.requireActual("react-native").Text
-    return <NativeText testID="invite-qr">{value}</NativeText>
+    return (
+      <NativeText
+        testID="invite-qr"
+        accessibilityHint={`size-${size}-quiet-zone-${quietZone}-ecl-${ecl}`}
+      >
+        {value}
+      </NativeText>
+    )
   },
 }))
 
@@ -200,8 +220,27 @@ describe("connected lobby screens", () => {
       expect.objectContaining({ playerCount: 4, startingLife: 40, ruleset: "standard" }),
     )
 
+    fireEvent.press(screen.getByLabelText("Use custom starting life"))
     fireEvent.changeText(screen.getByTestId("connected-starting-life"), "0")
     expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
+  })
+
+  it("starts connected setup at the top without duplicating the header safe area", async () => {
+    const view = render(
+      themed(<ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} />),
+    )
+
+    await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
+    expect(view.UNSAFE_getByType(Screen).props.safeAreaEdges).toEqual(["bottom"])
+  })
+
+  it("hides custom starting life behind an ellipsis until requested", async () => {
+    render(themed(<ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} />))
+
+    await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
+    expect(screen.queryByTestId("connected-starting-life")).toBeNull()
+    fireEvent.press(screen.getByLabelText("Use custom starting life"))
+    expect(screen.getByTestId("connected-starting-life")).toBeTruthy()
   })
 
   it("surfaces a cold-start active connected game for resume", async () => {
@@ -218,6 +257,44 @@ describe("connected lobby screens", () => {
     await waitFor(() => expect(mockMigrate).toHaveBeenCalledWith({ cursor: null }))
     expect(mockPaginatedArgs[0]).toBe("skip")
     expect(mockPaginatedArgs).toContainEqual({})
+  })
+
+  it("identifies an existing hosted lobby and prevents stacking another one", async () => {
+    mockActiveGames = [
+      {
+        publicId: "hosted-lobby",
+        status: "lobby",
+        ruleset: "standard",
+        playerCount: 2,
+        isHost: true,
+        updatedAt: 1_800_000_000_000,
+      },
+    ]
+    render(themed(<ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} />))
+
+    await waitFor(() => expect(screen.getByTestId("resume-connected-hosted-lobby")).toBeTruthy())
+    expect(screen.getByText(/Hosted lobby · standard · 2 seats/)).toBeTruthy()
+    expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
+    expect(screen.getByText(/Resume or finish\/abandon your hosted game/i)).toBeTruthy()
+  })
+
+  it("renders one connected history card when device memberships repeat a game", () => {
+    mockActiveGames = [
+      {
+        publicId: "finished-game",
+        players: [{}, {}],
+        eventCount: 3,
+        finishedAt: 1_800_000_000_000,
+      },
+      {
+        publicId: "finished-game",
+        players: [{}, {}],
+        eventCount: 3,
+        finishedAt: 1_800_000_000_000,
+      },
+    ]
+    render(themed(<ConnectedHistoryScreen onBack={jest.fn()} onSelect={jest.fn()} />))
+    expect(screen.getAllByText("Finished connected game")).toHaveLength(1)
   })
 
   it("does not restart a completed membership migration on the next home mount", async () => {
@@ -516,7 +593,13 @@ describe("connected lobby screens", () => {
       themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />),
     )
     const inviteUrl = `https://play.count.example/join/${inviteToken}`
-    expect(screen.getByTestId("invite-qr").props.children).toBe(inviteUrl)
+    expect(screen.getByTestId("invite-qr").props.children).toBe("count://join/AB12CD")
+    expect(screen.getByTestId("invite-qr").props.accessibilityHint).toBe(
+      "size-220-quiet-zone-24-ecl-H",
+    )
+    expect(
+      screen.getByText("On the other device, open Join with code → Scan invite QR."),
+    ).toBeTruthy()
     expect(screen.getByText("Code: AB12CD")).toBeTruthy()
     fireEvent.press(screen.getByTestId("share-invite-button"))
     await waitFor(() =>
@@ -533,7 +616,8 @@ describe("connected lobby screens", () => {
       invitation: { token: "invalid", manualCode: "ZX90QW" },
     }
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
-    expect(screen.queryByTestId("invite-qr")).toBeNull()
+    expect(screen.getByTestId("invite-qr").props.children).toBe("count://join/ZX90QW")
+    expect(screen.queryByTestId("share-invite-button")).toBeNull()
     expect(screen.getByTestId("share-manual-code-button")).toBeTruthy()
     expect(screen.getByText(/Enter code ZX90QW/i)).toBeTruthy()
   })
@@ -589,8 +673,20 @@ describe("connected lobby screens", () => {
     expect(mockLeave).not.toHaveBeenCalled()
     fireEvent.press(screen.getByTestId("leave-connected-lobby-button"))
     fireEvent.press(screen.getByTestId("confirm-connected-lobby-leave-button"))
-    await waitFor(() => expect(mockLeave).toHaveBeenCalledWith({ publicId: "game-public" }))
+    await waitFor(() =>
+      expect(mockLeave).toHaveBeenCalledWith(
+        expect.objectContaining({ publicId: "game-public", deviceId: expect.any(String) }),
+      ),
+    )
     expect(onLeft).toHaveBeenCalledTimes(1)
+  })
+
+  it("requires a host to abandon instead of hiding an unfinished lobby", () => {
+    mockProjection = { ...mockProjection, status: "lobby", isHost: true, invitation: null }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    expect(screen.queryByTestId("leave-connected-lobby-button")).toBeNull()
+    expect(screen.getByTestId("abandon-connected-lobby-button")).toBeTruthy()
   })
 
   it("explains online-only lobby exits when offline, including a dropped confirmation", () => {

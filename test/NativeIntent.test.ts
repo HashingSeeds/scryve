@@ -12,6 +12,9 @@ describe("connected invite native intent", () => {
     expect(redirectSystemPath({ path: `count://join/${token}`, initial: true })).toBe(
       `/join/${token}`,
     )
+    expect(redirectSystemPath({ path: "count://join/AB12CD", initial: true })).toBe(
+      "/connected/join?code=AB12CD",
+    )
     expect(redirectSystemPath({ path: "https://evil.example/join/short", initial: true })).toBe("/")
     expect(redirectSystemPath({ path: `https://evil.example/join/${token}`, initial: true })).toBe(
       "/",

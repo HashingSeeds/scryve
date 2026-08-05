@@ -30,6 +30,7 @@ import {
   overlayPendingDeltas,
 } from "./reconciliation"
 import { api } from "../../../convex/_generated/api"
+import type { Id } from "../../../convex/_generated/dataModel"
 
 export interface ConnectedGameRuntime {
   projection: ConnectedDisplayProjection | null
@@ -45,10 +46,13 @@ export interface ConnectedGameRuntime {
 }
 
 export function connectedLifeOptimisticUpdater(store: any, args: any): void {
-  const current = store.getQuery(api.games.lobbyProjection, { publicId: args.publicId })
+  const current = store.getQuery(api.games.lobbyProjection, {
+    publicId: args.publicId,
+    deviceId: args.deviceId,
+  })
   if (!current) return
   const optimistic = optimisticallyApplyLife(current, args)
-  store.setQuery(api.games.lobbyProjection, { publicId: args.publicId }, {
+  store.setQuery(api.games.lobbyProjection, { publicId: args.publicId, deviceId: args.deviceId }, {
     ...optimistic,
     __optimisticOperationIds: [
       ...((current as any).__optimisticOperationIds ?? []),
@@ -80,7 +84,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
   const { isWebSocketConnected } = useConvexConnectionState()
   const repository = useMemo(() => new ConnectedGameRepository(undefined, ownerId), [ownerId])
   const deviceId = useRef(asDeviceId(new LocalGameRepository().getDeviceId())).current
-  const remote = useQuery(api.games.lobbyProjection, { publicId }) as any
+  const remote = useQuery(api.games.lobbyProjection, { publicId, deviceId }) as any
   const remoteReady = Boolean(remote)
   const changeLifeBase = useMutation(api.games.changeLife)
   const changeLifeMutation = useMemo(
@@ -207,7 +211,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
           send: (queued) =>
             changeLifeMutation({
               publicId,
-              playerId: queued.event.playerId,
+              playerId: queued.event.playerId as unknown as Id<"gamePlayers">,
               operationId: queued.event.operationId,
               delta: queued.event.delta,
               deviceId: queued.event.deviceId,

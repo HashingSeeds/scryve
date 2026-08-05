@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useUser } from "@clerk/expo"
 import { useConvexConnectionState, useMutation } from "convex/react"
 
@@ -8,7 +8,9 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
+import { logInviteScanDiagnostic } from "@/features/connected/inviteScanDiagnostics"
 import { MAX_PLAYER_NAME_LENGTH, validatePlayerNames } from "@/features/game/domain"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import { api } from "../../convex/_generated/api"
@@ -30,6 +32,7 @@ export function JoinConnectedScreen({
   const { isWebSocketConnected } = useConvexConnectionState()
   const syncUser = useMutation(api.users.syncCurrent)
   const claimSeat = useMutation(api.games.claimSeat)
+  const deviceId = useState(() => new LocalGameRepository().getDeviceId())[0]
   const [code, setCode] = useState(initialCode)
   const [name, setName] = useState(user?.fullName || user?.firstName || "Player")
   const [color, setColor] = useState("#2563EB")
@@ -40,6 +43,13 @@ export function JoinConnectedScreen({
   const validColor = /^#[0-9A-Fa-f]{6}$/.test(color.trim())
   const validCode = Boolean(inviteToken || normalizeManualCode(code))
   const validInput = nameValidation.valid && validColor && validCode
+
+  useEffect(() => {
+    if (inviteToken) logInviteScanDiagnostic("join_screen_received", { inviteKind: "token" })
+    else if (normalizeManualCode(initialCode))
+      logInviteScanDiagnostic("join_screen_received", { inviteKind: "code" })
+  }, [initialCode, inviteToken])
+
   async function join() {
     const startedAt = Date.now()
     if (!isWebSocketConnected) {
@@ -59,15 +69,22 @@ export function JoinConnectedScreen({
         setError("Enter a valid 6-character invitation code.")
         return
       }
+      const inviteKind = inviteToken ? "token" : "code"
+      logInviteScanDiagnostic("claim_seat_started", { inviteKind })
       const result = await claimSeat({
         token: inviteToken,
-        manualCode,
+        manualCode: manualCode ?? undefined,
         displayName: normalizedName,
         color: color.trim().toUpperCase(),
+        deviceId,
       })
+      logInviteScanDiagnostic("claim_seat_succeeded", { inviteKind })
       emitTelemetry("join.completed", { durationMs: Date.now() - startedAt, outcome: "success" })
       onJoined(result.publicId)
     } catch (cause) {
+      logInviteScanDiagnostic("claim_seat_failed", {
+        inviteKind: inviteToken ? "token" : "code",
+      })
       emitTelemetry("join.failed", { durationMs: Date.now() - startedAt, outcome: "rejected" })
       setError(cause instanceof Error ? cause.message : "Could not join lobby")
     } finally {

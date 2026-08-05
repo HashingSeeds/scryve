@@ -11,6 +11,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   const trustedOrigin = process.env.EXPO_PUBLIC_INVITE_ORIGIN
   const invite = normalizeInvitePayload(path, trustedOrigin)
   if (invite?.kind === "token") return `/join/${encodeURIComponent(invite.token)}`
+  if (invite?.kind === "code") return `/connected/join?code=${encodeURIComponent(invite.code)}`
   // Warm intents may preserve only a deliberately small absolute in-app route grammar.
   return !initial && isSafeInternalPath(path) ? path : "/"
 }

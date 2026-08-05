@@ -29,16 +29,17 @@ export function normalizeInvitePayload(
       url.protocol === "https:" && !!normalizedOrigin && url.origin === normalizedOrigin
     if (!isCustomScheme && !isTrustedHttps) return null
     if (url.username || url.password || url.search || url.hash) return null
-    const match = (isCustomScheme ? url.pathname : url.pathname).match(
-      /^\/([A-Za-z0-9_-]{43,128})$/,
-    )
-    if (!match || (!isCustomScheme && !url.pathname.startsWith("/join/"))) {
-      const httpsMatch = isTrustedHttps
-        ? url.pathname.match(/^\/join\/([A-Za-z0-9_-]{43,128})$/)
-        : null
-      return httpsMatch ? { kind: "token", token: httpsMatch[1] } : null
+    if (isCustomScheme) {
+      const codeMatch = url.pathname.match(/^\/([A-Za-z0-9]{6})$/)
+      if (codeMatch) {
+        const pathCode = normalizeManualCode(codeMatch[1])
+        return pathCode ? { kind: "code", code: pathCode } : null
+      }
+      const tokenMatch = url.pathname.match(/^\/([A-Za-z0-9_-]{43,128})$/)
+      return tokenMatch ? { kind: "token", token: tokenMatch[1] } : null
     }
-    return isCustomScheme ? { kind: "token", token: match[1] } : null
+    const tokenMatch = url.pathname.match(/^\/join\/([A-Za-z0-9_-]{43,128})$/)
+    return tokenMatch ? { kind: "token", token: tokenMatch[1] } : null
   } catch {
     return null
   }
@@ -55,4 +56,10 @@ export function buildInviteUrl(origin: string, token: string): string | null {
   } catch {
     return null
   }
+}
+
+export function buildInviteQrPayload(token: string, manualCode?: string): string | null {
+  const code = manualCode ? normalizeManualCode(manualCode) : null
+  if (code) return `count://join/${code}`
+  return isInviteToken(token) ? `count://join/${token}` : null
 }

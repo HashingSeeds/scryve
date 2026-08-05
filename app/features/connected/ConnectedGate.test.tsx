@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
 import { Button } from "@/components/Button"
+import { Screen } from "@/components/Screen"
 import { ThemeProvider } from "@/theme/context"
 
 import { ConnectedGate } from "./ConnectedGate"
@@ -147,9 +148,10 @@ describe("connected cold-offline and authentication gate", () => {
 
   it("reserves issuer/deployment guidance for an online Convex rejection", () => {
     mockConvexAuthenticated = false
-    render(gate(<Button testID="private-cached-board" text="+1" />))
+    const view = render(gate(<Button testID="private-cached-board" text="+1" />))
     expect(screen.queryByTestId("private-cached-board")).toBeNull()
     expect(screen.getByText(/issuer or deployment configuration/i)).toBeTruthy()
+    expect(view.UNSAFE_getByType(Screen).props.safeAreaEdges).toEqual(["top", "bottom"])
   })
 
   it("offers retry, re-authentication, and a safe exit after profile setup fails", async () => {

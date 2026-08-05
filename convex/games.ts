@@ -26,6 +26,7 @@ import {
 
 const MAX_PLAYERS_PER_GAME_READ = 7
 const MAX_INVITES_PER_GAME_READ = 20
+const MAX_HOSTED_GAMES_RECOVERY_READ = 25
 
 async function gameByPublicId(ctx: any, publicId: string) {
   assertPublicId(publicId)
@@ -158,6 +159,7 @@ export const createLobby = mutation({
     manualCodeCandidates: v.array(v.string()),
     hostDisplayName: v.string(),
     hostColor: v.string(),
+    deviceId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -166,9 +168,18 @@ export const createLobby = mutation({
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
     assertAllowedColor(args.hostColor)
+    if (args.deviceId) assertDeviceId(args.deviceId)
     const ruleset = assertRuleset(args.ruleset)
     const hostDisplayName = assertDisplayName(args.hostDisplayName)
     assertPublicId(args.publicId)
+    for (const status of ["lobby", "active"] as const) {
+      const existingHostedGame = await ctx.db
+        .query("games")
+        .withIndex("by_host_status", (q) => q.eq("hostUserId", user._id).eq("status", status))
+        .first()
+      if (existingHostedGame)
+        throw new Error("You already host a lobby or active game; resume it before hosting another")
+    }
     if (
       await ctx.db
         .query("games")
@@ -213,6 +224,7 @@ export const createLobby = mutation({
       gameId,
       seat: 1,
       userId: user._id,
+      ...(args.deviceId ? { deviceId: args.deviceId } : {}),
       displayName: hostDisplayName,
       avatarUrl: user.avatarUrl,
       color: args.hostColor,
@@ -272,11 +284,13 @@ export const claimSeat = mutation({
     manualCode: v.optional(v.string()),
     displayName: v.string(),
     color: v.string(),
+    deviceId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     await consumeJoinAttempt(ctx, String(user.clerkUserId))
     assertAllowedColor(args.color)
+    if (args.deviceId) assertDeviceId(args.deviceId)
     const displayName = assertDisplayName(args.displayName)
     const invite = args.token
       ? await ctx.db
@@ -296,7 +310,11 @@ export const claimSeat = mutation({
     if (!game || game.status !== "lobby" || !(await inviteIsCurrent(ctx, game, invite, Date.now())))
       throw new Error("Invite is invalid, expired, or revoked")
     const existingPlayers = await playersForGame(ctx, game._id)
-    const duplicate = existingPlayers.find((candidate: any) => candidate.userId === user._id)
+    const duplicate = existingPlayers.find(
+      (candidate: any) =>
+        candidate.userId === user._id &&
+        (args.deviceId ? candidate.deviceId === args.deviceId : candidate.deviceId === undefined),
+    )
     if (duplicate) return { publicId: game.publicId, seat: duplicate.seat }
     const players = existingPlayers
     const occupied = new Set(players.map((player: any) => player.seat))
@@ -307,6 +325,7 @@ export const claimSeat = mutation({
       gameId: game._id,
       seat,
       userId: user._id,
+      ...(args.deviceId ? { deviceId: args.deviceId } : {}),
       displayName,
       avatarUrl: user.avatarUrl,
       color: args.color,
@@ -321,9 +340,10 @@ export const claimSeat = mutation({
 })
 
 export const lobbyProjection = query({
-  args: { publicId: v.string() },
+  args: { publicId: v.string(), deviceId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     assertPublicId(args.publicId)
+    if (args.deviceId) assertDeviceId(args.deviceId)
     const user = await requireUser(ctx)
     const game = await ctx.db
       .query("games")
@@ -376,7 +396,9 @@ export const lobbyProjection = query({
           avatarUrl: p.avatarUrl,
           color: p.color,
           currentLife: p.currentLife,
-          controlledByMe: p.userId === user._id,
+          controlledByMe:
+            p.userId === user._id &&
+            (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
         })),
     }
   },
@@ -490,9 +512,19 @@ export const changeLife = mutation({
       throw new Error("Invalid client timestamp")
 
     const game = await gameByPublicId(ctx, args.publicId)
-    const { user, player: ownedPlayer } = await requireMembership(ctx, game._id)
+    const user = await requireUser(ctx)
+    const membership = await ctx.db
+      .query("gamePlayers")
+      .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
+      .first()
+    if (!membership) throw new Error("Game membership required")
     const target = await ctx.db.get(args.playerId)
-    if (!target || target.gameId !== game._id || target._id !== ownedPlayer._id)
+    if (
+      !target ||
+      target.gameId !== game._id ||
+      target.userId !== user._id ||
+      (target.deviceId !== undefined && target.deviceId !== args.deviceId)
+    )
       throw new Error("Seat-owner permission required")
 
     const duplicate = await ctx.db
@@ -560,10 +592,23 @@ export const finishGame = mutation({
 })
 
 export const leaveMyGame = mutation({
-  args: { publicId: v.string() },
+  args: { publicId: v.string(), deviceId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    const { player } = await requireMembership(ctx, game._id)
+    if (args.deviceId) assertDeviceId(args.deviceId)
+    const user = await requireUser(ctx)
+    if (game.hostUserId === user._id && (game.status === "lobby" || game.status === "active"))
+      throw new Error("Hosts must finish or abandon an unfinished game instead of leaving it")
+    const userPlayers = await ctx.db
+      .query("gamePlayers")
+      .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
+      .take(MAX_PLAYERS_PER_GAME_READ)
+    const player = args.deviceId
+      ? userPlayers.find(
+          (candidate) => candidate.deviceId === args.deviceId || candidate.deviceId === undefined,
+        )
+      : userPlayers[0]
+    if (!player) throw new Error("Game membership required")
     if (player.resumable !== false) await ctx.db.patch(player._id as any, { resumable: false })
     return { publicId: game.publicId, left: true }
   },
@@ -627,14 +672,17 @@ export const connectedHistory = query({
       .order("desc")
       .paginate(boundedPaginationOptions(args.paginationOpts, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS))
     const page = []
+    const includedGameIds = new Set<string>()
     for (const membership of memberships.page) {
+      if (includedGameIds.has(membership.gameId)) continue
       const game = await ctx.db.get(membership.gameId)
       if (!game || (game.status !== "finished" && game.status !== "abandoned")) continue
       const summary = await ctx.db
         .query("gameSummaries")
         .withIndex("by_game", (q) => q.eq("gameId", game._id))
         .unique()
-      if (summary)
+      if (summary) {
+        includedGameIds.add(membership.gameId)
         page.push({
           publicId: game.publicId,
           startingLife: summary.startingLife,
@@ -645,6 +693,7 @@ export const connectedHistory = query({
           terminalReason: summary.terminalReason,
           players: summary.players,
         })
+      }
     }
     return { ...memberships, page }
   },
@@ -698,17 +747,46 @@ export const activeConnectedGames = query({
       .order("desc")
       .paginate(boundedPaginationOptions(args.paginationOpts, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS))
     const active = []
+    const includedGameIds = new Set<string>()
+    if (args.paginationOpts.cursor === null) {
+      for (const status of ["lobby", "active"] as const) {
+        const hostedGames = await ctx.db
+          .query("games")
+          .withIndex("by_host_status", (q) => q.eq("hostUserId", user._id).eq("status", status))
+          .order("desc")
+          .take(MAX_HOSTED_GAMES_RECOVERY_READ)
+        for (const game of hostedGames) {
+          if (includedGameIds.has(game._id)) continue
+          includedGameIds.add(game._id)
+          active.push({
+            publicId: game.publicId,
+            status: game.status,
+            isHost: true,
+            playerCount: game.playerCount,
+            ruleset: game.ruleset,
+            startingLife: game.startingLife,
+            updatedAt: game.updatedAt,
+          })
+        }
+      }
+    }
     for (const membership of memberships.page) {
+      if (includedGameIds.has(membership.gameId)) continue
       const game = await ctx.db.get(membership.gameId)
-      if (game && (game.status === "lobby" || game.status === "active"))
+      if (game && (game.status === "lobby" || game.status === "active")) {
+        includedGameIds.add(membership.gameId)
         active.push({
           publicId: game.publicId,
           status: game.status,
+          isHost: game.hostUserId === user._id,
+          playerCount: game.playerCount,
           ruleset: game.ruleset,
           startingLife: game.startingLife,
           updatedAt: game.updatedAt,
         })
+      }
     }
+    active.sort((left, right) => right.updatedAt - left.updatedAt)
     return { ...memberships, page: active }
   },
 })

@@ -15,6 +15,7 @@ import {
   validatePlayerCount,
   validateStartingLife,
 } from "@/features/game/domain"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 
 import { api } from "../../convex/_generated/api"
 
@@ -45,8 +46,10 @@ export function ConnectedHomeScreen({
   const syncUser = useMutation(api.users.syncCurrent)
   const migrateMemberships = useMutation(api.games.migrateMyGameMemberships)
   const createLobby = useMutation(api.games.createLobby)
+  const deviceId = useMemo(() => new LocalGameRepository().getDeviceId(), [])
   const [playerCount, setPlayerCount] = useState(2)
   const [startingLife, setStartingLife] = useState("20")
+  const [showCustomStartingLife, setShowCustomStartingLife] = useState(false)
   const [ruleset, setRuleset] = useState("standard")
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
@@ -66,6 +69,10 @@ export function ConnectedHomeScreen({
     projectionReady ? {} : "skip",
     { initialNumItems: 10 },
   )
+  const uniqueActiveGames = Array.from(
+    new Map(activeGames.results.map((game: any) => [game.publicId, game])).values(),
+  )
+  const hasHostedGame = uniqueActiveGames.some((game: any) => game.isHost)
 
   useEffect(() => {
     if (!isWebSocketConnected || !clerkUserId) {
@@ -136,6 +143,7 @@ export function ConnectedHomeScreen({
         ruleset: normalizedRuleset,
         hostDisplayName: displayName,
         hostColor: "#7C3AED",
+        deviceId,
       })
       onLobbyCreated(result)
     } catch (cause) {
@@ -146,7 +154,7 @@ export function ConnectedHomeScreen({
   }
 
   return (
-    <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
+    <Screen preset="scroll" safeAreaEdges={["bottom"]}>
       <Header
         title="Connected play"
         leftTx={onBack ? "common:back" : undefined}
@@ -158,14 +166,14 @@ export function ConnectedHomeScreen({
         <Text text="Preparing your connected-play profile…" />
       ) : null}
       {bootstrapError ? <Text accessibilityRole="alert" text={bootstrapError} /> : null}
-      {activeGames.results.length ? (
+      {uniqueActiveGames.length ? (
         <View style={$form}>
           <Text preset="subheading" accessibilityRole="header" text="Resume connected game" />
-          {activeGames.results.map((game: any) => (
+          {uniqueActiveGames.map((game: any) => (
             <Button
               key={game.publicId}
               testID={`resume-connected-${game.publicId}`}
-              text={`${game.status === "lobby" ? "Return to lobby" : "Resume game"} · ${game.ruleset}`}
+              text={`${game.isHost ? "Hosted" : "Joined"} ${game.status} · ${game.ruleset} · ${game.playerCount} seats · ${new Date(game.updatedAt).toLocaleString()}`}
               onPress={() => onResume?.(game)}
             />
           ))}
@@ -202,20 +210,30 @@ export function ConnectedHomeScreen({
               onPress={() => setStartingLife(String(life))}
             />
           ))}
+          {!showCustomStartingLife ? (
+            <Button
+              text="…"
+              accessibilityLabel="Use custom starting life"
+              style={$choice}
+              onPress={() => setShowCustomStartingLife(true)}
+            />
+          ) : null}
         </View>
-        <TextField
-          testID="connected-starting-life"
-          label="Custom starting life"
-          keyboardType="number-pad"
-          value={startingLife}
-          status={validStartingLife ? undefined : "error"}
-          helper={
-            validStartingLife
-              ? "Whole number from 1 to 999."
-              : "Enter a whole number from 1 to 999."
-          }
-          onChangeText={setStartingLife}
-        />
+        {showCustomStartingLife ? (
+          <TextField
+            testID="connected-starting-life"
+            label="Custom starting life"
+            keyboardType="number-pad"
+            value={startingLife}
+            status={validStartingLife ? undefined : "error"}
+            helper={
+              validStartingLife
+                ? "Whole number from 1 to 999."
+                : "Enter a whole number from 1 to 999."
+            }
+            onChangeText={setStartingLife}
+          />
+        ) : null}
         <TextField
           testID="connected-ruleset"
           label="Ruleset"
@@ -229,10 +247,18 @@ export function ConnectedHomeScreen({
         {!isWebSocketConnected ? (
           <Text accessibilityRole="alert" text="Connected actions are online-only." />
         ) : null}
+        {hasHostedGame ? (
+          <Text
+            accessibilityRole="alert"
+            text="Resume or finish/abandon your hosted game before creating another."
+          />
+        ) : null}
         <Button
           testID="host-connected-button"
           text={busy ? "Creating…" : "Host lobby"}
-          disabled={busy || !isWebSocketConnected || !projectionReady || !validSetup}
+          disabled={
+            busy || !isWebSocketConnected || !projectionReady || !validSetup || hasHostedGame
+          }
           preset="reversed"
           onPress={host}
         />

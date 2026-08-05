@@ -28,6 +28,7 @@ async function lobby(t: ReturnType<typeof convexTest>) {
     manualCodeCandidates: ["ABC234", "DEF567"],
     hostDisplayName: "Host",
     hostColor: "#7C3AED",
+    deviceId: "device-host-0001",
   })
   return { host, created }
 }
@@ -81,6 +82,62 @@ describe("Convex connected-game authorization", () => {
     await expect(
       late.mutation(api.games.claimSeat, { token, displayName: "Late", color: "#112233" }),
     ).rejects.toThrow("Lobby is full")
+  })
+
+  it("prevents a host from accumulating simultaneous lobbies", async () => {
+    const t = convexTest(schema, modules)
+    const { host } = await lobby(t)
+
+    await expect(
+      host.mutation(api.games.createLobby, {
+        publicId: "second-public-game-123456",
+        playerCount: 2,
+        startingLife: 20,
+        ruleset: "standard",
+        inviteToken: "s".repeat(43),
+        manualCodeCandidates: ["NEW234"],
+        hostDisplayName: "Host",
+        hostColor: "#7C3AED",
+        deviceId: "device-host-0001",
+      }),
+    ).rejects.toThrow("already host a lobby")
+  })
+
+  it("claims separate seats for separate devices on the same signed-in account", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await lobby(t)
+
+    await expect(
+      host.mutation(api.games.claimSeat, {
+        manualCode: "ABC234",
+        displayName: "Second device",
+        color: "#2563EB",
+        deviceId: "device-joiner-0002",
+      }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+    await expect(
+      host.mutation(api.games.claimSeat, {
+        token,
+        displayName: "Second device retry",
+        color: "#2563EB",
+        deviceId: "device-joiner-0002",
+      }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+
+    const projection = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: "device-host-0001",
+    })
+    expect(projection.players).toHaveLength(2)
+    expect(projection.players.map((player: any) => player.controlledByMe)).toEqual([true, false])
+    await expect(
+      host.mutation(api.games.startGame, { publicId: created.publicId }),
+    ).resolves.toEqual({ publicId: created.publicId })
+    await host.mutation(api.games.finishGame, { publicId: created.publicId })
+    const history = await host.query(api.games.connectedHistory, {
+      paginationOpts: { cursor: null, numItems: 10 },
+    })
+    expect(history.page.map((game: any) => game.publicId)).toEqual([created.publicId])
   })
 
   it("enforces host-only start and requires all configured seats", async () => {
@@ -159,15 +216,16 @@ describe("Convex connected-game authorization", () => {
     await expect(
       joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" }),
     ).rejects.toThrow("invalid, expired, or revoked")
+    const secondHost = await synced(t, "second-host", "Second host")
     await expect(
-      host.mutation(api.games.createLobby, {
+      secondHost.mutation(api.games.createLobby, {
         publicId: "second-public-game-123",
         playerCount: 2,
         startingLife: 20,
         ruleset: "standard",
         inviteToken: "u".repeat(43),
         manualCodeCandidates: ["ABC234"],
-        hostDisplayName: "Host",
+        hostDisplayName: "Second host",
         hostColor: "#7C3AED",
       }),
     ).rejects.toThrow("Manual code collision")
@@ -576,7 +634,28 @@ describe("Phase 4.5A lifecycle and API hardening", () => {
       displayName: "Joiner",
       color: "#2563EB",
     })
-    await host.mutation(api.games.leaveMyGame, { publicId: created.publicId })
+    await expect(
+      host.mutation(api.games.leaveMyGame, { publicId: created.publicId }),
+    ).rejects.toThrow("Hosts must finish or abandon")
+    await t.run(async (ctx) => {
+      const game = await ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", created.publicId))
+        .unique()
+      const hostSeat = await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_game_user", (q) => q.eq("gameId", game!._id).eq("userId", game!.hostUserId))
+        .first()
+      await ctx.db.patch(hostSeat!._id, { resumable: false })
+    })
+    const recoverable = await host.query(api.games.activeConnectedGames, {
+      paginationOpts: { cursor: null, numItems: 10 },
+    })
+    expect(recoverable.page).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ publicId: created.publicId, isHost: true, status: "lobby" }),
+      ]),
+    )
     await expect(
       joiner.mutation(api.games.startGame, { publicId: created.publicId }),
     ).rejects.toThrow("Host permission")
