@@ -8,6 +8,40 @@ import type { ConfigContext, ExpoConfig } from "expo/config"
  */
 import "tsx/cjs"
 import { normalizeHttpsOrigin } from "./app/utils/httpsOrigin"
+import { withIosDeploymentTarget } from "./plugins/withIosDeploymentTarget"
+
+const IS_DEV = process.env.APP_VARIANT === "development"
+const IS_PREVIEW = process.env.APP_VARIANT === "preview"
+
+const getAppName = () => {
+  if (IS_DEV) {
+    return "Count (Dev)"
+  }
+  if (IS_PREVIEW) {
+    return "Count (Preview)"
+  }
+  return "Count"
+}
+
+const getUniqueIdentifier = () => {
+  if (IS_DEV) {
+    return "com.sowinghope.count.dev"
+  }
+  if (IS_PREVIEW) {
+    return "com.sowinghpe.count.preview"
+  }
+  return "com.sowinghope.count"
+}
+
+const getAppScheme = () => {
+  if (IS_DEV) {
+    return "count-dev"
+  }
+  if (IS_PREVIEW) {
+    return "count-preview"
+  }
+  return "count"
+}
 
 /**
  * @param config ExpoConfig coming from the static config app.json if it exists
@@ -29,10 +63,13 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
   const normalizedInviteOrigin = normalizeHttpsOrigin(process.env.EXPO_PUBLIC_INVITE_ORIGIN)
   const inviteUrl = normalizedInviteOrigin ? new URL(normalizedInviteOrigin) : undefined
 
-  return {
+  const expoConfig = {
     ...config,
+    name: getAppName(),
+    scheme: getAppScheme(),
     ios: {
       ...config.ios,
+      bundleIdentifier: getUniqueIdentifier(),
       associatedDomains: inviteUrl ? [`applinks:${inviteUrl.host}`] : [],
       // This privacyManifests is to get you started.
       // See Expo's guide on apple privacy manifests here:
@@ -51,6 +88,7 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     },
     android: {
       ...config.android,
+      package: getUniqueIdentifier(),
       intentFilters: inviteUrl
         ? [
             {
@@ -64,4 +102,7 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     },
     plugins,
   }
+
+  // Expo resolves the required name and slug from app.json before evaluating this file.
+  return withIosDeploymentTarget(expoConfig as ExpoConfig, { deploymentTarget: "17.0" })
 }
