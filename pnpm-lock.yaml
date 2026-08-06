@@ -36,8 +36,8 @@ importers:
         specifier: ~55.0.9
         version: 55.0.15(expo@55.0.5)
       expo-camera:
-        specifier: ~55.0.20
-        version: 55.0.20(@types/emscripten@1.41.5)(expo@55.0.5)(react-native-web@0.21.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
+        specifier: ~55.0.21
+        version: 55.0.21(@types/emscripten@1.41.5)(expo@55.0.5)(react-native-web@0.21.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       expo-constants:
         specifier: 55.0.16
         version: 55.0.16(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))
@@ -4034,8 +4034,8 @@ packages:
     peerDependencies:
       expo: '*'
 
-  expo-camera@55.0.20:
-    resolution: {integrity: sha512-q4AxUiQo39Ra9v7SD92+vUa7rfXIqqc7ECjZV2Abnvrome8nwpTTWLa0/GQWf6EBbXdS+IED1dlpikV/KQ1qYQ==}
+  expo-camera@55.0.21:
+    resolution: {integrity: sha512-mHQchiIoRMdhNr3V8VPecdsocbnDiuY2TEtKxR0eL9CkVyQkxoS1jaDrhJMEPIOeyA6K52YkeTBMVsHkHJvR7A==}
     peerDependencies:
       expo: '*'
       react: '*'
@@ -11684,7 +11684,7 @@ snapshots:
       resolve-from: 5.0.0
       semver: 7.8.5
 
-  expo-camera@55.0.20(@types/emscripten@1.41.5)(expo@55.0.5)(react-native-web@0.21.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0):
+  expo-camera@55.0.21(@types/emscripten@1.41.5)(expo@55.0.5)(react-native-web@0.21.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0):
     dependencies:
       barcode-detector: 3.2.0(@types/emscripten@1.41.5)
       expo: 55.0.5(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.11)(bufferutil@4.1.0)(expo-router@55.0.16)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)

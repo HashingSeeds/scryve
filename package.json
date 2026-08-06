@@ -48,7 +48,7 @@
     "expo-apple-authentication": "55.0.14",
     "expo-auth-session": "55.0.17",
     "expo-build-properties": "~55.0.9",
-    "expo-camera": "~55.0.20",
+    "expo-camera": "~55.0.21",
     "expo-constants": "55.0.16",
     "expo-crypto": "55.0.16",
     "expo-dev-client": "~55.0.11",

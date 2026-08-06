@@ -1,13 +1,21 @@
-import { useRef, useState } from "react"
-import { AppState, Linking, Platform, View } from "react-native"
-import { BarcodeScanningResult, CameraView, useCameraPermissions } from "expo-camera"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { AppState, Linking, Platform } from "react-native"
+import { CameraView, ScanningResult, useCameraPermissions } from "expo-camera"
+import * as Haptics from "expo-haptics"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { InvitePayload, normalizeInvitePayload } from "@/features/connected/inviteLinks"
-import { logInviteScanDiagnostic } from "@/features/connected/inviteScanDiagnostics"
+import { delay } from "@/utils/delay"
+import { useReducedMotion } from "@/utils/useReducedMotion"
+
+const SCAN_CONFIRMATION_MS = 250
+
+function wasScannerCancellation(cause: unknown): boolean {
+  return cause instanceof Error && cause.message.toLowerCase().includes("cancel")
+}
 
 export function InviteScannerScreen({
   onInvite,
@@ -18,36 +26,83 @@ export function InviteScannerScreen({
 }) {
   const [permission, requestPermission] = useCameraPermissions()
   const [error, setError] = useState<string>()
-  const [status, setStatus] = useState("Starting camera preview…")
+  const [openingScanner, setOpeningScanner] = useState(false)
   const accepted = useRef(false)
-  const lastPayload = useRef<{ value: string; at: number } | undefined>(undefined)
+  const processing = useRef(false)
+  const autoLaunched = useRef(false)
+  const reducedMotion = useReducedMotion()
   const config = readPublicCloudConfig()
+  const inviteOrigin = config.configured ? config.value.inviteOrigin : undefined
+  const modernScannerAvailable = Platform.OS !== "web" && CameraView.isModernBarcodeScannerAvailable
+  const hasRequiredPermission = Platform.OS !== "ios" || permission?.granted === true
+  const scannerReady = modernScannerAvailable && hasRequiredPermission
 
-  function scan(result: BarcodeScanningResult) {
-    if (accepted.current) return
-    logInviteScanDiagnostic("barcode_event", {
-      barcodeType: result.type,
-      dataLength: result.data.length,
-    })
-    setStatus("QR recognized · validating invitation…")
-    const now = Date.now()
-    if (lastPayload.current?.value === result.data && now - lastPayload.current.at < 2_000) return
-    lastPayload.current = { value: result.data, at: now }
-    const invite = normalizeInvitePayload(
-      result.data,
-      config.configured ? config.value.inviteOrigin : undefined,
-    )
-    if (!invite) {
-      logInviteScanDiagnostic("payload_rejected", { dataLength: result.data.length })
-      setStatus("QR recognized · invitation rejected")
-      setError("That QR is not a trusted Count invitation. Try another code or enter it manually.")
-      return
+  const scan = useCallback(
+    async (result: ScanningResult) => {
+      if (accepted.current || processing.current) return
+      processing.current = true
+      const invite = normalizeInvitePayload(result.data, inviteOrigin)
+
+      if (!invite) {
+        if (reducedMotion === false) {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
+            () => undefined,
+          )
+        }
+        await CameraView.dismissScanner().catch(() => undefined)
+        setError(
+          "That QR is not a trusted Count invitation. Try another code or enter it manually.",
+        )
+        processing.current = false
+        return
+      }
+
+      accepted.current = true
+      if (reducedMotion === false) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+          () => undefined,
+        )
+        await delay(SCAN_CONFIRMATION_MS)
+      }
+      await CameraView.dismissScanner().catch(() => undefined)
+      onInvite(invite)
+    },
+    [inviteOrigin, onInvite, reducedMotion],
+  )
+
+  const openScanner = useCallback(async () => {
+    if (!scannerReady || openingScanner) return
+    setError(undefined)
+    setOpeningScanner(true)
+    try {
+      await CameraView.launchScanner({
+        barcodeTypes: ["qr"],
+        isGuidanceEnabled: true,
+        isHighlightingEnabled: true,
+        isPinchToZoomEnabled: true,
+      })
+    } catch (cause) {
+      if (!accepted.current && !wasScannerCancellation(cause)) {
+        const message =
+          cause instanceof Error ? cause.message : "The native scanner could not open."
+        setError(`QR scanner could not open: ${message}`)
+      }
+    } finally {
+      setOpeningScanner(false)
     }
-    accepted.current = true
-    logInviteScanDiagnostic("payload_accepted", { inviteKind: invite.kind })
-    setStatus("Invitation accepted · opening join screen…")
-    onInvite(invite)
-  }
+  }, [openingScanner, scannerReady])
+
+  useEffect(() => {
+    if (!scannerReady) return
+    const subscription = CameraView.onModernBarcodeScanned((result) => void scan(result))
+    return () => subscription.remove()
+  }, [scan, scannerReady])
+
+  useEffect(() => {
+    if (!scannerReady || autoLaunched.current) return
+    autoLaunched.current = true
+    void openScanner()
+  }, [openScanner, scannerReady])
 
   if (Platform.OS === "web") {
     return (
@@ -59,7 +114,7 @@ export function InviteScannerScreen({
     )
   }
 
-  if (!permission?.granted) {
+  if (Platform.OS === "ios" && !permission?.granted) {
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text preset="heading" accessibilityRole="header" text="Camera permission" />
@@ -83,42 +138,32 @@ export function InviteScannerScreen({
     )
   }
 
-  return (
-    <Screen preset="fixed" safeAreaEdges={["top", "bottom"]} contentContainerStyle={$screen}>
-      <Text preset="heading" accessibilityRole="header" text="Scan invite" />
-      <Text text="Point the camera at a trusted Count invite QR. No image is saved." />
-      <View accessible={false} style={$cameraFrame}>
-        <CameraView
-          testID="invite-camera"
-          style={$camera}
-          facing="back"
-          autofocus="on"
-          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-          onCameraReady={() => {
-            logInviteScanDiagnostic("camera_ready")
-            setStatus("Camera ready · waiting for native QR recognition…")
-          }}
-          onMountError={(mountError) => {
-            logInviteScanDiagnostic("camera_mount_error", { message: mountError.message })
-            setStatus("Camera preview failed")
-            setError(`Camera could not start: ${mountError.message}`)
-          }}
-          onBarcodeScanned={scan}
+  if (!modernScannerAvailable) {
+    return (
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+        <Text preset="heading" accessibilityRole="header" text="Scan invite" />
+        <Text
+          accessibilityRole="alert"
+          text="The native QR scanner is unavailable on this device. Enter the invitation code manually."
         />
-      </View>
-      <Text
-        testID="scanner-debug-status"
-        accessibilityLiveRegion="polite"
-        text={`Scanner status: ${status}`}
-      />
+        <Button text="Enter code manually" onPress={onCancel} />
+      </Screen>
+    )
+  }
+
+  return (
+    <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <Text preset="heading" accessibilityRole="header" text="Scan invite" />
+      <Text text="Use the device scanner to find a trusted Count invite QR. Recognition stays on-device and no image is saved." />
       {error ? (
         <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" text={error} />
       ) : null}
+      <Button
+        text={openingScanner ? "Opening scanner…" : "Open QR scanner"}
+        disabled={openingScanner}
+        onPress={() => void openScanner()}
+      />
       <Button text="Cancel and enter code" onPress={onCancel} />
     </Screen>
   )
 }
-
-const $screen = { flex: 1, gap: 12, padding: 16 } as const
-const $cameraFrame = { flex: 1, minHeight: 240, overflow: "hidden", borderRadius: 16 } as const
-const $camera = { flex: 1 } as const

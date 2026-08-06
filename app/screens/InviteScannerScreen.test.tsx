@@ -1,7 +1,10 @@
 import { Linking, Platform } from "react-native"
+import { CameraView } from "expo-camera"
+import * as Haptics from "expo-haptics"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { delay } from "@/utils/delay"
 
 import { InviteScannerScreen } from "./InviteScannerScreen"
 
@@ -10,13 +13,24 @@ let mockPermission: { granted: boolean; canAskAgain: boolean } | null = {
   canAskAgain: true,
 }
 const mockRequestPermission = jest.fn(async () => mockPermission)
+const mockLaunchScanner = jest.fn(async () => undefined)
+const mockDismissScanner = jest.fn(async () => undefined)
+const mockRemoveScannerListener = jest.fn()
+let mockModernScannerListener: ((result: { data: string; type: string }) => void) | undefined
 
-jest.mock("expo-camera", () => ({
-  CameraView: (props: any) => {
-    const MockView = jest.requireActual("react-native").View
-    return <MockView {...props} />
-  },
-  useCameraPermissions: () => [mockPermission, mockRequestPermission],
+jest.mock("expo-camera", () => {
+  return {
+    ...jest.requireActual("expo-camera"),
+    useCameraPermissions: () => [mockPermission, mockRequestPermission],
+  }
+})
+
+jest.mock("@/utils/delay", () => ({
+  delay: jest.fn(async () => undefined),
+}))
+
+jest.mock("@/utils/useReducedMotion", () => ({
+  useReducedMotion: () => false,
 }))
 
 function scanner(onInvite = jest.fn(), onCancel = jest.fn()) {
@@ -37,7 +51,17 @@ describe("InviteScannerScreen", () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    mockModernScannerListener = undefined
     mockPermission = { granted: true, canAskAgain: true }
+    Object.assign(CameraView, {
+      isModernBarcodeScannerAvailable: true,
+      launchScanner: mockLaunchScanner,
+      dismissScanner: mockDismissScanner,
+      onModernBarcodeScanned: (listener: typeof mockModernScannerListener) => {
+        mockModernScannerListener = listener
+        return { remove: mockRemoveScannerListener }
+      },
+    })
     Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform })
   })
 
@@ -60,28 +84,27 @@ describe("InviteScannerScreen", () => {
     expect(mockRequestPermission).toHaveBeenCalledTimes(1)
   })
 
-  it("enables autofocus for native QR recognition", () => {
+  it("opens Expo's native scanner with guidance and highlighting", async () => {
     scanner()
-    expect(screen.getByTestId("invite-camera").props.autofocus).toBe("on")
+    await waitFor(() =>
+      expect(mockLaunchScanner).toHaveBeenCalledWith({
+        barcodeTypes: ["qr"],
+        isGuidanceEnabled: true,
+        isHighlightingEnabled: true,
+        isPinchToZoomEnabled: true,
+      }),
+    )
+    expect(screen.queryByTestId("invite-camera")).toBeNull()
   })
 
-  it("shows whether the native camera becomes ready", () => {
+  it("surfaces native scanner launch errors and allows retry", async () => {
+    mockLaunchScanner.mockRejectedValueOnce(new Error("Native scanner unavailable"))
     scanner()
-    expect(screen.getByTestId("scanner-debug-status").props.children).toContain(
-      "Starting camera preview",
-    )
-    fireEvent(screen.getByTestId("invite-camera"), "onCameraReady")
-    expect(screen.getByTestId("scanner-debug-status").props.children).toContain(
-      "Camera ready · waiting for native QR recognition",
-    )
-  })
-
-  it("surfaces native camera mount errors", () => {
-    scanner()
-    fireEvent(screen.getByTestId("invite-camera"), "onMountError", {
-      message: "Native session failed",
+    await waitFor(() => {
+      expect(screen.getByRole("alert").props.children).toContain("Native scanner unavailable")
     })
-    expect(screen.getByRole("alert").props.children).toContain("Native session failed")
+    fireEvent.press(screen.getByText("Open QR scanner"))
+    await waitFor(() => expect(mockLaunchScanner).toHaveBeenCalledTimes(2))
   })
 
   it("handles permanent denial with settings and manual fallback", async () => {
@@ -100,21 +123,30 @@ describe("InviteScannerScreen", () => {
     [`count://join/${token}`, { kind: "token", token }],
     ["count://join/AB12CD", { kind: "code", code: "AB12CD" }],
     ["ab-12cd", { kind: "code", code: "AB12CD" }],
-  ])("routes a supported scan without duplicate delivery", (data, expected) => {
+  ])("acknowledges and routes a supported native scan once", async (data, expected) => {
     const { onInvite } = scanner()
-    const camera = screen.getByTestId("invite-camera")
-    fireEvent(camera, "onBarcodeScanned", { data })
-    fireEvent(camera, "onBarcodeScanned", { data })
+    await waitFor(() => expect(mockModernScannerListener).toBeDefined())
+    mockModernScannerListener?.({ data, type: "qr" })
+    mockModernScannerListener?.({ data, type: "qr" })
+    await waitFor(() => expect(onInvite).toHaveBeenCalledTimes(1))
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success)
+    expect(delay).toHaveBeenCalledWith(250)
+    expect(mockDismissScanner).toHaveBeenCalledTimes(1)
     expect(onInvite).toHaveBeenCalledTimes(1)
     expect(onInvite).toHaveBeenCalledWith(expected)
   })
 
-  it("announces malformed or foreign payloads and still allows cancellation", () => {
+  it("dismisses and explains a malformed or foreign native scan", async () => {
     const { onInvite, onCancel } = scanner()
-    fireEvent(screen.getByTestId("invite-camera"), "onBarcodeScanned", {
+    await waitFor(() => expect(mockModernScannerListener).toBeDefined())
+    mockModernScannerListener?.({
       data: `https://foreign.example/join/${token}`,
+      type: "qr",
     })
-    expect(screen.getByRole("alert").props.children).toContain("not a trusted Count invitation")
+    await waitFor(() =>
+      expect(screen.getByRole("alert").props.children).toContain("not a trusted Count invitation"),
+    )
+    expect(mockDismissScanner).toHaveBeenCalledTimes(1)
     expect(onInvite).not.toHaveBeenCalled()
     fireEvent.press(screen.getByText("Cancel and enter code"))
     expect(onCancel).toHaveBeenCalledTimes(1)

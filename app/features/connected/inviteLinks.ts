@@ -1,9 +1,17 @@
+import Constants from "expo-constants"
+
 import { normalizeHttpsOrigin } from "@/utils/httpsOrigin"
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43,128}$/
 const CODE_PATTERN = /^[A-Z0-9]{6}$/
 
 export type InvitePayload = { kind: "token"; token: string } | { kind: "code"; code: string }
+
+function getAppScheme(): string {
+  const configuredScheme = Constants.expoConfig?.scheme
+  if (Array.isArray(configuredScheme)) return configuredScheme[0] ?? "count"
+  return configuredScheme ?? "count"
+}
 
 export function normalizeManualCode(value: string): string | null {
   const code = value.trim().toUpperCase().replace(/[\s-]/g, "")
@@ -23,7 +31,7 @@ export function normalizeInvitePayload(
 
   try {
     const url = new URL(payload)
-    const isCustomScheme = url.protocol === "count:" && url.hostname === "join"
+    const isCustomScheme = url.protocol === `${getAppScheme()}:` && url.hostname === "join"
     const normalizedOrigin = normalizeHttpsOrigin(trustedOrigin)
     const isTrustedHttps =
       url.protocol === "https:" && !!normalizedOrigin && url.origin === normalizedOrigin
@@ -59,7 +67,8 @@ export function buildInviteUrl(origin: string, token: string): string | null {
 }
 
 export function buildInviteQrPayload(token: string, manualCode?: string): string | null {
+  const scheme = getAppScheme()
   const code = manualCode ? normalizeManualCode(manualCode) : null
-  if (code) return `count://join/${code}`
-  return isInviteToken(token) ? `count://join/${token}` : null
+  if (code) return `${scheme}://join/${code}`
+  return isInviteToken(token) ? `${scheme}://join/${token}` : null
 }
