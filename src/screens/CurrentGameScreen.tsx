@@ -3,8 +3,8 @@ import type { ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 
-import { AppDialog, $dialogActions, $dialogButton, $dialogText } from "@/components/AppDialog"
 import { Button } from "@/components/Button"
+import { DialogCard, $dialogActions, $dialogButton, $dialogText } from "@/components/DialogCard"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
   getPlayerGridLayoutOptions,
@@ -138,7 +138,7 @@ export function CurrentGameScreen({
       </View>
 
       {layoutPickerOpen ? (
-        <AppDialog
+        <DialogCard
           visible
           onClose={closePanel}
           backdropTestID="layout-picker-backdrop"
@@ -165,11 +165,11 @@ export function CurrentGameScreen({
             ))}
           </View>
           <Button tx="localGame:cancel" style={themed($menuItem)} onPress={closePanel} />
-        </AppDialog>
+        </DialogCard>
       ) : null}
 
       {endConfirmationOpen ? (
-        <AppDialog
+        <DialogCard
           visible
           onClose={() => setEndConfirmationOpen(false)}
           backdropTestID="end-game-backdrop"
@@ -192,7 +192,7 @@ export function CurrentGameScreen({
               onPress={confirmEnd}
             />
           </View>
-        </AppDialog>
+        </DialogCard>
       ) : null}
     </Screen>
   )

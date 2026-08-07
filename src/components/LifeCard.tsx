@@ -8,8 +8,8 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
-import { AppDialog, $dialogActions, $dialogButton } from "./AppDialog"
 import { Button } from "./Button"
+import { DialogCard, $dialogActions, $dialogButton } from "./DialogCard"
 import { LifeControls, overlayTint } from "./LifeControls"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
@@ -226,7 +226,7 @@ export function LifeCard({
         onLongChange={(direction) => openEditor(direction > 0 ? "add" : "subtract")}
       />
       {editMode ? (
-        <AppDialog
+        <DialogCard
           visible
           onClose={closeEditor}
           backdropTestID={`life-editor-backdrop-seat-${seatNumber}`}
@@ -265,7 +265,7 @@ export function LifeCard({
               onPress={applyEdit}
             />
           </View>
-        </AppDialog>
+        </DialogCard>
       ) : null}
     </View>
   )

@@ -4,9 +4,9 @@ import { ScrollView, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
-import { AppDialog, $dialogActions, $dialogButton, $dialogText } from "@/components/AppDialog"
 import { Button } from "@/components/Button"
 import { ConnectionBadge } from "@/components/ConnectionBadge"
+import { DialogCard, $dialogActions, $dialogButton, $dialogText } from "@/components/DialogCard"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import { Header } from "@/components/Header"
 import {
@@ -203,7 +203,7 @@ function ConnectedBoardRuntime({
       </View>
 
       {layoutPickerOpen ? (
-        <AppDialog
+        <DialogCard
           visible
           onClose={() => setLayoutPickerOpen(false)}
           backdropTestID="connected-layout-backdrop"
@@ -231,11 +231,11 @@ function ConnectedBoardRuntime({
             ))}
           </View>
           <Button text="Cancel" onPress={() => setLayoutPickerOpen(false)} />
-        </AppDialog>
+        </DialogCard>
       ) : null}
 
       {statusOpen ? (
-        <AppDialog
+        <DialogCard
           visible
           onClose={() => setStatusOpen(false)}
           backdropTestID="connected-status-backdrop"
@@ -306,11 +306,11 @@ function ConnectedBoardRuntime({
             ) : null}
           </ScrollView>
           <Button text="Close" onPress={() => setStatusOpen(false)} />
-        </AppDialog>
+        </DialogCard>
       ) : null}
 
       {confirmingFinish ? (
-        <AppDialog
+        <DialogCard
           visible
           onClose={() => setConfirmingFinish(false)}
           closeDisabled={runtime.finishing}
@@ -344,7 +344,7 @@ function ConnectedBoardRuntime({
               }}
             />
           </View>
-        </AppDialog>
+        </DialogCard>
       ) : null}
     </Screen>
   )

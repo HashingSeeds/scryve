@@ -2,14 +2,14 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { AppDialog } from "./AppDialog"
+import { DialogCard } from "./DialogCard"
 import { Text } from "./Text"
 
-function renderDialog(props: Partial<React.ComponentProps<typeof AppDialog>> = {}) {
+function renderDialog(props: Partial<React.ComponentProps<typeof DialogCard>> = {}) {
   const onClose = jest.fn()
   const view = render(
     <ThemeProvider initialContext="light">
-      <AppDialog
+      <DialogCard
         visible
         onClose={onClose}
         backdropTestID="dialog-backdrop"
@@ -18,14 +18,14 @@ function renderDialog(props: Partial<React.ComponentProps<typeof AppDialog>> = {
         {...props}
       >
         <Text text="Dialog body" />
-      </AppDialog>
+      </DialogCard>
     </ThemeProvider>,
   )
 
   return { view, onClose }
 }
 
-describe("AppDialog", () => {
+describe("DialogCard", () => {
   it("renders children behind the labelled backdrop and dialog testIDs", () => {
     const { view } = renderDialog()
 

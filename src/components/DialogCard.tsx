@@ -5,7 +5,7 @@ import { Modal, Pressable } from "react-native"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-export interface AppDialogProps {
+export interface DialogCardProps {
   visible: boolean
   onClose: () => void
   closeDisabled?: boolean
@@ -19,7 +19,7 @@ export interface AppDialogProps {
   children: ReactNode
 }
 
-export function AppDialog({
+export function DialogCard({
   visible,
   onClose,
   closeDisabled = false,
@@ -31,7 +31,7 @@ export function AppDialog({
   wide,
   style,
   children,
-}: AppDialogProps) {
+}: DialogCardProps) {
   const { themed } = useAppTheme()
 
   if (!visible) return null
