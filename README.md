@@ -9,7 +9,7 @@ This is the boilerplate that [Infinite Red](https://infinite.red) uses as a way 
 
 ## Toolchain
 
-The project pins Node 20.20.2 in `.nvmrc` and pnpm 10.14.0 through the `packageManager`
+The project pins Node 24.18.1 in `.nvmrc` and pnpm 10.14.0 through the `packageManager`
 field in `package.json`. Use Corepack so the project-selected pnpm version wins over any ambient
 global installation.
 

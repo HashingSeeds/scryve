@@ -8,7 +8,6 @@ import type { ConfigContext, ExpoConfig } from "expo/config"
  */
 import "tsx/cjs"
 import { normalizeHttpsOrigin } from "./app/utils/httpsOrigin"
-import { withIosDeploymentTarget } from "./plugins/withIosDeploymentTarget"
 
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
@@ -103,6 +102,5 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     plugins,
   }
 
-  // Expo resolves the required name and slug from app.json before evaluating this file.
-  return withIosDeploymentTarget(expoConfig as ExpoConfig, { deploymentTarget: "17.0" })
+  return expoConfig
 }

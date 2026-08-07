@@ -34,9 +34,9 @@
     "build:ios:preview": "npx eas-cli@latest build --profile preview --platform ios --local",
     "build:ios:prod": "npx eas-cli@latest build --profile production --platform ios --local",
     "build:android:sim": "npx eas-cli@latest build --profile development --platform android --local",
-    "build:android:device": "npx eas-cli@latest build --profile development:device --platform android --local",
+    "build:android:dev": "npx eas-cli@latest build --profile development:device --platform android --local",
     "build:android:preview": "npx eas-cli@latest build --profile preview --platform android --local",
-    "build:android:prod": "npx eas build-cli@latest --profile production --platform android --local"
+    "build:android:prod": "npx eas-cli@latest build --profile production --platform android --local"
   },
   "dependencies": {
     "@clerk/expo": "3.7.3",
@@ -116,7 +116,7 @@
     "typescript": "~5.9.2"
   },
   "engines": {
-    "node": "20.20.2",
+    "node": "24.18.1",
     "pnpm": "10.14.0"
   }
 }
