@@ -13,7 +13,8 @@ describe("shipping Maestro selectors", () => {
 
     expect(recovery).toContain('id: "new-game-button"')
     expect(recovery).toContain(`id: "${lifeControlTestId(1, 1)}"`)
-    expect(localSmoke).toContain(`id: "${lifeControlTestId(1, -5)}"`)
+    expect(localSmoke).toContain("longPressOn:")
+    expect(localSmoke).toContain(`id: "${lifeControlTestId(1, -1)}"`)
     expect(recovery).not.toContain("quick-local-game-button")
   })
 

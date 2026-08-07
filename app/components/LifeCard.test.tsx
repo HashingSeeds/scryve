@@ -28,6 +28,14 @@ describe("LifeCard", () => {
     expect(deltaOpacity(view)).toBe(0)
   })
 
+  it("uses a visual player mark while keeping the name available to assistive technology", () => {
+    const view = renderCard(20)
+
+    expect(view.queryByText("Ada")).toBeNull()
+    expect(view.getByTestId("player-mark-seat-1", { includeHiddenElements: true })).toBeTruthy()
+    expect(view.getByTestId("life-card-seat-1").props.accessibilityLabel).toBe("Seat 1, Ada")
+  })
+
   it("sums a run of changes into one signed delta chip", () => {
     const view = renderCard(20)
     view.rerender(card(21))

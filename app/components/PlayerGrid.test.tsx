@@ -3,9 +3,14 @@ import { render } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
-import { accessibleForeground } from "@/utils/colorContrast"
 
-import { getCellSize, getLifeFontSize, getPlayerGridLayout, PlayerGrid } from "./PlayerGrid"
+import {
+  getCellSize,
+  getLifeFontSize,
+  getPlayerGridLayout,
+  getPlayerGridRows,
+  PlayerGrid,
+} from "./PlayerGrid"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -36,6 +41,19 @@ describe("PlayerGrid", () => {
     },
   )
 
+  it("lets the player surface reach every screen edge", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={players(4)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    expect(StyleSheet.flatten(view.getByTestId("player-grid").props.style)).toMatchObject({
+      paddingHorizontal: 0,
+      paddingBottom: 0,
+    })
+  })
+
   it.each([
     [2, 390, 844, 1, 2, "two-stacked"],
     [2, 844, 390, 2, 1, "two-side-by-side"],
@@ -56,6 +74,64 @@ describe("PlayerGrid", () => {
       })
     },
   )
+
+  it("supports featured, even, and wide arrangements without dropping a player", () => {
+    const inputs = [
+      ["featured-first", [[0], [1, 2], [3, 4]]],
+      ["featured-last", [[0, 1], [2, 3], [4]]],
+      [
+        "even-grid",
+        [
+          [0, 1],
+          [2, 3],
+          [4, null],
+        ],
+      ],
+      [
+        "wide-grid",
+        [
+          [0, 1, 2],
+          [3, 4, null],
+        ],
+      ],
+    ] as const
+
+    for (const [layoutVariant, expectedRows] of inputs) {
+      const layout = getPlayerGridLayout({
+        playerCount: 5,
+        width: 390,
+        height: 844,
+        layoutVariant,
+      })
+      expect(getPlayerGridRows(5, layout)).toEqual(expectedRows)
+    }
+  })
+
+  it("orients tabletop players toward their nearest outside edge", () => {
+    const sixPlayerView = render(
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={players(6)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(
+      StyleSheet.flatten(sixPlayerView.getByTestId("life-total-seat-1").props.style),
+    ).toMatchObject({ transform: [{ rotate: "90deg" }] })
+    expect(
+      StyleSheet.flatten(sixPlayerView.getByTestId("life-total-seat-2").props.style),
+    ).toMatchObject({ transform: [{ rotate: "-90deg" }] })
+
+    const twoPlayerView = render(
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={players(2)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(
+      StyleSheet.flatten(twoPlayerView.getByTestId("life-total-seat-1").props.style),
+    ).toMatchObject({ transform: [{ rotate: "180deg" }] })
+    expect(
+      StyleSheet.flatten(twoPlayerView.getByTestId("life-total-seat-2").props.style).transform,
+    ).toBe(undefined)
+  })
 
   describe("life total sizing", () => {
     const board = { width: 390, height: 690 }
@@ -92,7 +168,7 @@ describe("PlayerGrid", () => {
       const layout = getPlayerGridLayout({ playerCount: 3, width: 390, height: 844 })
       const { cellWidth } = getCellSize({ board, layout, gap: 4 })
       expect(layout.layout).toBe("three-featured")
-      expect(cellWidth).toBe((board.width - 8 - 4) / 2)
+      expect(cellWidth).toBe((board.width - 4) / 2)
     })
 
     it("never drops below the readable floor on an extreme board", () => {
@@ -125,7 +201,7 @@ describe("PlayerGrid", () => {
       </ThemeProvider>,
     )
 
-    expect(view.getByText("Player 6").props.maxFontSizeMultiplier).toBe(1.4)
+    expect(view.getByTestId("player-mark-seat-6", { includeHiddenElements: true })).toBeTruthy()
     expect(view.getAllByText("20")[5].props.maxFontSizeMultiplier).toBe(1.3)
     expect(view.getByTestId("life-total-seat-6").props.accessibilityLabel).toBe(
       "Seat 6, Player 6, 20 life",
@@ -156,7 +232,7 @@ describe("PlayerGrid", () => {
     )
   })
 
-  it("uses contrasting ownership borders across player colors", () => {
+  it("marks only the owned player with a spinning icon", () => {
     const colorfulPlayers = players(2).map((player, index) => ({
       ...player,
       color: index === 0 ? "#F9E547" : "#2D195C",
@@ -170,16 +246,15 @@ describe("PlayerGrid", () => {
         />
       </ThemeProvider>,
     )
-    const owned = StyleSheet.flatten(view.getByTestId("life-card-seat-1").props.style)
-    const unowned = StyleSheet.flatten(view.getByTestId("life-card-seat-2").props.style)
-    expect(owned).toMatchObject({
-      borderStyle: "solid",
-      borderColor: accessibleForeground(colorfulPlayers[0].color),
-    })
-    expect(unowned).toMatchObject({
-      borderStyle: "dashed",
-      borderColor: accessibleForeground(colorfulPlayers[1].color),
-    })
+    expect(
+      view.getAllByTestId("player-mark-spin-line", { includeHiddenElements: true }),
+    ).toHaveLength(1)
+    expect(StyleSheet.flatten(view.getByTestId("life-card-seat-1").props.style).borderStyle).toBe(
+      undefined,
+    )
+    expect(StyleSheet.flatten(view.getByTestId("life-card-seat-2").props.style).borderStyle).toBe(
+      undefined,
+    )
   })
 
   it("announces a changed life total after initial render", () => {

@@ -1,3 +1,4 @@
+import { StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
@@ -21,12 +22,12 @@ class MemoryStorage implements StringStorage {
   }
 }
 
-function game() {
+function game(playerCount = 2) {
   return createLocalGame({
-    players: [
-      { name: "Ada", color: "#41476E" },
-      { name: "Grace", color: "#39755C" },
-    ],
+    players: Array.from({ length: playerCount }, (_, index) => ({
+      name: ["Ada", "Grace", "Katherine", "Dorothy", "Evelyn", "Mary"][index],
+      color: ["#41476E", "#39755C", "#7B5A91", "#A06A2B", "#B03A58", "#C76542"][index],
+    })),
     startingLife: 2,
     now: 1,
   })
@@ -47,10 +48,12 @@ describe("CurrentGameScreen", () => {
         />
       </ThemeProvider>,
     )
-    fireEvent.press(view.getByTestId("life-seat-1--5"))
+    fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("-3")
+    fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("undo-button"))
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("2")
+    fireEvent.press(view.getByTestId("game-menu-button"))
     expect(view.getByTestId("undo-button").props.accessibilityState.disabled).toBe(true)
     expect(useKeepAwake).toHaveBeenCalledWith("count-local-game")
   })
@@ -88,7 +91,67 @@ describe("CurrentGameScreen", () => {
     expect(Haptics.impactAsync).not.toHaveBeenCalled()
   })
 
-  it.each(["finish", "abandon"] as const)("confirms and archives %s", async (action) => {
+  it("uses a centered board menu and keeps navigation out of the play surface", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game()}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onHome={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("game-menu-button")).toBeTruthy()
+    expect(view.queryByText("Grace")).toBeNull()
+    expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
+    expect(view.queryByTestId("undo-button")).toBeNull()
+    expect(view.queryByTestId("game-home-button")).toBeNull()
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+
+    expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
+    expect(view.getByTestId("game-home-button")).toBeTruthy()
+    expect(view.getByTestId("layout-button")).toBeTruthy()
+    expect(view.getByTestId("end-game-button")).toBeTruthy()
+    expect(view.queryByTestId("finish-button")).toBeNull()
+    expect(view.queryByTestId("abandon-button")).toBeNull()
+  })
+
+  it("moves the menu to a shared four-card junction and lets the user change layouts", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game(6)}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onHome={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    const menuStyle = StyleSheet.flatten(view.getByTestId("game-menu-anchor").props.style)
+    expect(menuStyle).toMatchObject({ left: "50%", top: `${(2 / 3) * 100}%` })
+    expect(menuStyle.right).toBeUndefined()
+    expect(view.getByTestId("player-grid-row-2")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("layout-button"))
+    expect(view.getByTestId("layout-picker-dialog")).toBeTruthy()
+    expect(
+      StyleSheet.flatten(view.getByTestId("layout-picker-backdrop").props.style),
+    ).toMatchObject({
+      alignItems: "center",
+      justifyContent: "center",
+    })
+    fireEvent.press(view.getByTestId("layout-wide-grid"))
+
+    expect(view.getByTestId("player-grid-row-1")).toBeTruthy()
+    expect(view.queryByTestId("player-grid-row-2")).toBeNull()
+  })
+
+  it("confirms ending the game in a centered pop-up and archives final totals", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()
     repository.saveActiveGame(initial)
@@ -103,19 +166,22 @@ describe("CurrentGameScreen", () => {
         />
       </ThemeProvider>,
     )
-    expect(view.queryByTestId(`${action}-button`)).toBeNull()
+    expect(view.queryByTestId("end-game-button")).toBeNull()
     fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId(`${action}-button`))
+    fireEvent.press(view.getByTestId("end-game-button"))
     expect(view.getByTestId("game-board")).toBeTruthy()
-    expect(view.queryByTestId(`${action}-button`)).toBeNull()
-    expect(view.getByTestId(`confirm-${action}-button`)).toBeTruthy()
-    fireEvent.press(view.getByTestId(`confirm-${action}-button`))
+    expect(view.queryByTestId("layout-picker-dialog")).toBeNull()
+    expect(view.getByTestId("end-game-dialog")).toBeTruthy()
+    expect(StyleSheet.flatten(view.getByTestId("end-game-backdrop").props.style)).toMatchObject({
+      alignItems: "center",
+      justifyContent: "center",
+    })
+    expect(view.getByTestId("confirm-end-game-button")).toBeTruthy()
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
     await waitFor(() => {
       expect(onGameEnded).toHaveBeenCalledWith(initial.id)
       expect(repository.loadActiveGame()).toBeNull()
-      expect(repository.loadHistory()[0].status).toBe(
-        action === "finish" ? "finished" : "abandoned",
-      )
+      expect(repository.loadHistory()[0].status).toBe("finished")
     })
   })
 })

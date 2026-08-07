@@ -6,26 +6,31 @@ import { ThemeProvider } from "@/theme/context"
 import { LifeControls } from "./LifeControls"
 
 describe("LifeControls", () => {
-  const VISIBLE_LABEL_BY_DELTA = { "-5": "−5", "-1": "−", "1": "+", "5": "+5" } as const
-
-  it("maps every explicit control to its additive delta with accessible labels", () => {
+  it("maps taps to one life and long presses to five life", () => {
     const onChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeControls playerName="Ada" onChange={onChange} />
       </ThemeProvider>,
     )
-    for (const delta of [-5, -1, 1, 5] as const) {
+    for (const delta of [-1, 1] as const) {
       const button = view.getByTestId(`life-seat-1-${delta}`)
-      const label = view.getByText(VISIBLE_LABEL_BY_DELTA[`${delta}`])
+      const label = view.getByText(delta === -1 ? "−" : "+")
       expect(button.props.accessibilityRole).toBe("button")
       expect(button.props.accessibilityLabel).toContain("Seat 1, Ada")
+      expect(button.props.accessibilityHint).toContain(`Long press to change it by ${delta * 5}`)
       expect(label.props.maxFontSizeMultiplier).toBe(1.3)
       expect(label.props.adjustsFontSizeToFit).toBe(true)
       expect(label.props.numberOfLines).toBe(1)
+      fireEvent(button, "pressIn")
+      fireEvent.press(button)
+      fireEvent(button, "pressIn")
+      fireEvent(button, "longPress")
       fireEvent.press(button)
     }
-    expect(onChange.mock.calls.map(([delta]) => delta)).toEqual([-5, -1, 1, 5])
+    expect(onChange.mock.calls.map(([delta]) => delta)).toEqual([-1, -5, 1, 5])
+    expect(view.queryByText("−5")).toBeNull()
+    expect(view.queryByText("+5")).toBeNull()
   })
 
   it("keeps ±1 reachable as full card halves rather than small buttons", () => {
@@ -47,8 +52,28 @@ describe("LifeControls", () => {
         <LifeControls playerName="Ada" disabled onChange={jest.fn()} />
       </ThemeProvider>,
     )
-    for (const delta of [-5, -1, 1, 5] as const) {
+    for (const delta of [-1, 1] as const) {
       expect(view.getByTestId(`life-seat-1-${delta}`).props.accessibilityState.disabled).toBe(true)
     }
+  })
+
+  it("turns sideways controls toward each player's outside edge", () => {
+    const left = render(
+      <ThemeProvider initialContext="light">
+        <LifeControls playerName="Ada" contentRotation={90} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(StyleSheet.flatten(left.getByTestId("life-control-zones").props.style)).toMatchObject({
+      flexDirection: "column",
+    })
+
+    const right = render(
+      <ThemeProvider initialContext="light">
+        <LifeControls playerName="Grace" contentRotation={-90} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(StyleSheet.flatten(right.getByTestId("life-control-zones").props.style)).toMatchObject({
+      flexDirection: "column-reverse",
+    })
   })
 })

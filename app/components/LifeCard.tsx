@@ -8,9 +8,13 @@ import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
 import { LifeControls, overlayTint } from "./LifeControls"
+import type { LifeCardContentRotation } from "./playerCardTypes"
+import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 
 const DELTA_VISIBLE_MS = 1800
+
+export type { LifeCardContentRotation } from "./playerCardTypes"
 
 export interface LifeCardProps {
   playerName: string
@@ -18,6 +22,7 @@ export interface LifeCardProps {
   life: number
   color: string
   compact?: boolean
+  contentRotation?: LifeCardContentRotation
   lifeFontSize?: number
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
@@ -32,6 +37,7 @@ export function LifeCard({
   life,
   color,
   compact,
+  contentRotation = 0,
   lifeFontSize,
   disabled,
   ownership,
@@ -39,10 +45,18 @@ export function LifeCard({
   onChange,
   style,
 }: LifeCardProps) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { spacing },
+  } = useAppTheme()
   const foreground = accessibleForeground(color)
+  const contentRotationStyle: TextStyle | undefined = contentRotation
+    ? { transform: [{ rotate: `${contentRotation}deg` }] }
+    : undefined
   const displayName = playerName.trim() || "unnamed player"
   const identity = `Seat ${seatNumber}, ${displayName}`
+  const markSize = compact ? 36 : 44
+  const markStyle = getPlayerMarkPlacement(contentRotation, markSize, spacing.xs)
 
   const [recentDelta, setRecentDelta] = useState(0)
   const previousLife = useRef(life)
@@ -68,10 +82,7 @@ export function LifeCard({
         : ownership === "disabled"
           ? "Controls unavailable"
           : undefined
-  const seatOwnershipLabel = ownership === "disabled" ? undefined : ownershipLabel
-  const statusLabel = `${seatOwnershipLabel ?? ""}${
-    seatOwnershipLabel && pendingCount ? " · " : ""
-  }${pendingCount ? `${pendingCount} pending` : ""}`
+  const statusLabel = pendingCount ? `${pendingCount} pending` : ""
 
   return (
     <View
@@ -80,23 +91,20 @@ export function LifeCard({
       style={[
         themed($card),
         compact && themed($compactCard),
-        ownership === "owned" && themed($ownedCard),
-        ownership === "unowned" && themed($unownedCard),
         ownership === "disabled" && themed($disabledCard),
         { backgroundColor: color },
-        (ownership === "owned" || ownership === "unowned") && { borderColor: foreground },
         style,
       ]}
     >
+      <PlayerMark
+        seatNumber={seatNumber}
+        color={foreground}
+        rotation={contentRotation}
+        spinning={ownership === "owned"}
+        size={markSize}
+        style={[themed($mark), markStyle]}
+      />
       <View pointerEvents="none" style={themed($content)}>
-        <Text
-          text={displayName}
-          weight="medium"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.4}
-          adjustsFontSizeToFit
-          style={[themed($name), compact && themed($compactName), { color: foreground }]}
-        />
         {statusLabel ? (
           <Text
             text={statusLabel}
@@ -104,7 +112,12 @@ export function LifeCard({
             size="xxs"
             maxFontSizeMultiplier={1.3}
             numberOfLines={1}
-            style={[themed($status), { color: foreground }]}
+            style={[
+              themed($status),
+              contentRotation === 180 && { marginTop: markSize },
+              contentRotationStyle,
+              { color: foreground },
+            ]}
           />
         ) : null}
         <View style={themed($readout)}>
@@ -120,6 +133,7 @@ export function LifeCard({
               lifeFontSize
                 ? { fontSize: lifeFontSize, lineHeight: Math.ceil(lifeFontSize * 1.1) }
                 : null,
+              contentRotationStyle,
               { color: foreground },
             ]}
           />
@@ -133,6 +147,7 @@ export function LifeCard({
             style={[
               themed($delta),
               recentDelta === 0 ? themed($deltaIdle) : themed($deltaActive),
+              contentRotationStyle,
               { color: foreground, backgroundColor: overlayTint(foreground, 0.16) },
             ]}
           />
@@ -144,6 +159,7 @@ export function LifeCard({
         disabled={disabled}
         contrastCheckedForeground={foreground}
         compact={compact}
+        contentRotation={contentRotation}
         onChange={onChange}
       />
     </View>
@@ -155,7 +171,7 @@ const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   overflow: "hidden",
   padding: spacing.xs,
   borderWidth: 0,
-  borderRadius: spacing.md,
+  borderRadius: spacing.lg,
 })
 
 const $content: ThemedStyle<ViewStyle> = () => ({
@@ -172,22 +188,22 @@ const $readout: ThemedStyle<ViewStyle> = () => ({
 
 const $compactCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.xxs,
-  borderRadius: spacing.sm,
+  borderRadius: spacing.md,
 })
 
-const $name: ThemedStyle<TextStyle> = () => ({
-  width: "100%",
-  fontSize: 16,
-  lineHeight: 20,
-  letterSpacing: 0.4,
-  textAlign: "center",
-  opacity: 0.85,
-})
+const $mark: ThemedStyle<ViewStyle> = () => ({ position: "absolute", zIndex: 2 })
 
-const $compactName: ThemedStyle<TextStyle> = () => ({
-  fontSize: 14,
-  lineHeight: 18,
-})
+export function getPlayerMarkPlacement(
+  rotation: LifeCardContentRotation,
+  size: number,
+  edgeInset: number,
+): ViewStyle {
+  const centeredOffset = -size / 2
+  if (rotation === 90) return { left: edgeInset, top: "50%", marginTop: centeredOffset }
+  if (rotation === -90) return { right: edgeInset, top: "50%", marginTop: centeredOffset }
+  if (rotation === 180) return { top: edgeInset, left: "50%", marginLeft: centeredOffset }
+  return { bottom: edgeInset, left: "50%", marginLeft: centeredOffset }
+}
 
 const $life: ThemedStyle<TextStyle> = () => ({
   width: "100%",
@@ -218,7 +234,5 @@ const $delta: ThemedStyle<TextStyle> = ({ spacing }) => ({
 const $deltaIdle: ThemedStyle<TextStyle> = () => ({ opacity: 0 })
 const $deltaActive: ThemedStyle<TextStyle> = () => ({ opacity: 1 })
 
-const $ownedCard: ThemedStyle<ViewStyle> = () => ({ borderWidth: 4, borderStyle: "solid" })
-const $unownedCard: ThemedStyle<ViewStyle> = () => ({ borderWidth: 3, borderStyle: "dashed" })
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })

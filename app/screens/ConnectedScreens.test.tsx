@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { Share } from "react-native"
+import { Share, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
@@ -35,6 +35,20 @@ let mockSocketConnected = true
 let mockUserId = "user-a"
 let mockUserLoaded = true
 const mockMigrationOwners = new Set<string>()
+
+function openConnectedMenu() {
+  fireEvent.press(screen.getByTestId("game-menu-button"))
+}
+
+function openConnectedStatus() {
+  openConnectedMenu()
+  fireEvent.press(screen.getByTestId("connected-status-button"))
+}
+
+function openConnectedFinish() {
+  openConnectedMenu()
+  fireEvent.press(screen.getByTestId("finish-connected-game-button"))
+}
 
 jest.mock("@clerk/expo", () => ({
   useUser: () => ({
@@ -339,13 +353,21 @@ describe("connected lobby screens", () => {
 
   it("enables only the signed-in player's accessible controls", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(
+      StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style),
+    ).toMatchObject({ flex: 1, width: "100%" })
+    expect(screen.queryByTestId("connected-game-board-scroll")).toBeNull()
     const ownedAddOne = screen.getByTestId("life-seat-1-1")
     const viewOnlyAddOne = screen.getByTestId("life-seat-2-1")
     expect(ownedAddOne.props.accessibilityState.disabled).toBe(false)
     expect(ownedAddOne.props.accessibilityLabel).toBe("Seat 1, Ada, add 1 life")
     expect(viewOnlyAddOne.props.accessibilityState.disabled).toBe(true)
-    expect(screen.getByText("Your seat")).toBeTruthy()
-    expect(screen.getByText("View only")).toBeTruthy()
+    expect(screen.queryByText("Your seat")).toBeNull()
+    expect(screen.queryByText("View only")).toBeNull()
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("Your seat")
+    expect(
+      screen.getAllByTestId("player-mark-spin-line", { includeHiddenElements: true }),
+    ).toHaveLength(1)
     fireEvent.press(ownedAddOne)
     expect(mockChangeLife).toHaveBeenCalledWith("player-1", 1)
     expect(useKeepAwake).toHaveBeenCalledWith("count-connected-game")
@@ -364,7 +386,8 @@ describe("connected lobby screens", () => {
       ],
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByTestId("connected-game-board-scroll")).toBeTruthy()
+    expect(screen.getByTestId("connected-game-board")).toBeTruthy()
+    openConnectedStatus()
     expect(screen.getByLabelText("Needs attention, 1 failed change, 1 change pending")).toBeTruthy()
     expect(screen.getByTestId("connected-failed-action").props.accessibilityRole).toBe("alert")
     fireEvent.press(screen.getByText("Dismiss after reviewing"))
@@ -378,6 +401,7 @@ describe("connected lobby screens", () => {
         "The offline queue for pending changes is full. Reconnect and sync before making more changes.",
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedStatus()
     expect(screen.getByTestId("connected-change-error").props.accessibilityRole).toBe("alert")
     expect(screen.getByText(/Reconnect and sync/i)).toBeTruthy()
   })
@@ -397,6 +421,8 @@ describe("connected lobby screens", () => {
         <ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} onHistory={onHistory} />,
       ),
     )
+    expect(screen.getByTestId("connected-game-board")).toBeTruthy()
+    openConnectedStatus()
     expect(screen.getByText("Connected summary")).toBeTruthy()
     expect(screen.getByText("12 accepted life changes · final")).toBeTruthy()
     expect(
@@ -405,17 +431,19 @@ describe("connected lobby screens", () => {
       ),
     ).toBe(true)
     expect(screen.queryByTestId("finish-connected-game-button")).toBeNull()
-    fireEvent.press(screen.getByText("Connected history"))
+    fireEvent.press(screen.getByText("Close"))
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("connected-history-button"))
     expect(onHistory).toHaveBeenCalledTimes(1)
   })
 
-  it("uses an inline connected finish confirmation with cancel and confirm outcomes", async () => {
+  it("uses a connected end-game pop-up with cancel and confirm outcomes", async () => {
     mockRuntime = {
       ...mockRuntime,
       projection: { ...mockRuntime.projection, isHost: true },
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    fireEvent.press(screen.getByTestId("finish-connected-game-button"))
+    openConnectedFinish()
     expect(screen.getByTestId("connected-finish-confirmation").props.accessibilityRole).toBe(
       "alert",
     )
@@ -423,7 +451,7 @@ describe("connected lobby screens", () => {
     expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull()
     expect(mockFinish).not.toHaveBeenCalled()
 
-    fireEvent.press(screen.getByTestId("finish-connected-game-button"))
+    openConnectedFinish()
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
@@ -436,9 +464,11 @@ describe("connected lobby screens", () => {
       projection: { ...mockRuntime.projection, isHost: true },
     }
     const offline = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
     expect(
       screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
     ).toBe(true)
+    fireEvent.press(screen.getByTestId("connected-status-button"))
     expect(screen.getByText(/Reconnect before finishing/i)).toBeTruthy()
     offline.unmount()
 
@@ -449,11 +479,13 @@ describe("connected lobby screens", () => {
       projection: { ...mockRuntime.projection, isHost: true },
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
     expect(
       screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
     ).toBe(true)
+    fireEvent.press(screen.getByTestId("connected-status-button"))
     expect(screen.getByText(/Wait for 1 pending change/i)).toBeTruthy()
-    expect(screen.getByText("Your seat · 1 pending")).toBeTruthy()
+    expect(screen.getByText("1 pending")).toBeTruthy()
   })
 
   it("does not imply an in-flight connected finish can be cancelled", () => {
@@ -462,13 +494,13 @@ describe("connected lobby screens", () => {
       projection: { ...mockRuntime.projection, isHost: true },
     }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    fireEvent.press(screen.getByTestId("finish-connected-game-button"))
+    openConnectedFinish()
     mockRuntime = { ...mockRuntime, finishing: true }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(
       screen.getByTestId("cancel-connected-finish-button").props.accessibilityState.disabled,
     ).toBe(true)
-    expect(screen.getByText("Finishing…")).toBeTruthy()
+    expect(screen.getByText("Ending…")).toBeTruthy()
   })
 
   it("surfaces a connected finish mutation error and keeps recovery/navigation available", async () => {
@@ -482,7 +514,7 @@ describe("connected lobby screens", () => {
         <ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} onHistory={onHistory} />,
       ),
     )
-    fireEvent.press(screen.getByTestId("finish-connected-game-button"))
+    openConnectedFinish()
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
 
@@ -492,8 +524,11 @@ describe("connected lobby screens", () => {
         <ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} onHistory={onHistory} />,
       ),
     )
+    openConnectedStatus()
     expect(screen.getByTestId("connected-finish-error").props.accessibilityRole).toBe("alert")
     expect(screen.getByText("Could not finish the game")).toBeTruthy()
+    fireEvent.press(screen.getByText("Close"))
+    openConnectedMenu()
     expect(screen.getByTestId("finish-connected-game-button")).toBeTruthy()
     expect(onHistory).not.toHaveBeenCalled()
   })
@@ -504,11 +539,14 @@ describe("connected lobby screens", () => {
       projection: { ...mockRuntime.projection, status: "lobby", isHost: true },
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByText("This game is lobby and is read-only on the board.")).toBeTruthy()
     const addOne = [1, 2].map((seat) => screen.getByTestId(`life-seat-${seat}-1`))
     expect(addOne.every((control) => control.props.accessibilityState.disabled)).toBe(true)
     fireEvent.press(addOne[0])
     expect(mockChangeLife).not.toHaveBeenCalled()
+    openConnectedStatus()
+    expect(screen.getByText("This game is lobby and is read-only on the board.")).toBeTruthy()
+    fireEvent.press(screen.getByText("Close"))
+    openConnectedMenu()
     expect(screen.queryByTestId("finish-connected-game-button")).toBeNull()
   })
 
@@ -529,10 +567,10 @@ describe("connected lobby screens", () => {
       }
     })
     const view = render(themed(<ConnectedBoardScreen publicId="game-a" />))
-    expect(screen.getByText("game-a")).toBeTruthy()
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("game-a")
     view.rerender(themed(<ConnectedBoardScreen publicId="game-b" />))
-    expect(screen.queryByText("game-a")).toBeNull()
-    expect(screen.getByText("game-b")).toBeTruthy()
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).not.toContain("game-a")
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("game-b")
   })
 
   it("remounts and withholds account-A runtime state after an A-to-B account switch", () => {
@@ -551,11 +589,11 @@ describe("connected lobby screens", () => {
       }
     })
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByText("user-a")).toBeTruthy()
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("user-a")
     mockUserId = "user-b"
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.queryByText("user-a")).toBeNull()
-    expect(screen.getByText("user-b")).toBeTruthy()
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).not.toContain("user-a")
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("user-b")
     expect(mockUseConnectedGame).toHaveBeenLastCalledWith("game-public", "user-b")
   })
 

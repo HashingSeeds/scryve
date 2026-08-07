@@ -7,11 +7,14 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { LifeCard } from "./LifeCard"
+import type { LifeCardContentRotation } from "./playerCardTypes"
 
 export interface PlayerGridProps {
   players: GamePlayer[]
+  layoutVariant?: PlayerGridLayoutVariant
   disabled?: boolean
   isPlayerDisabled?: (player: GamePlayer) => boolean
+  isPlayerOwned?: (player: GamePlayer) => boolean
   getPendingCount?: (player: GamePlayer) => number
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
@@ -19,8 +22,10 @@ export interface PlayerGridProps {
 
 export function PlayerGrid({
   players,
+  layoutVariant = "auto",
   disabled,
   isPlayerDisabled,
+  isPlayerOwned,
   getPendingCount,
   onChange,
   style,
@@ -36,6 +41,7 @@ export function PlayerGrid({
     width,
     height,
     fontScale,
+    layoutVariant,
   })
   const lifeFontSize = getLifeFontSize({
     ...getCellSize({ board, layout, gap: spacing.xxs }),
@@ -59,18 +65,40 @@ export function PlayerGrid({
       style={[themed($grid), style]}
     >
       {getPlayerGridRows(players.length, layout).map((row, rowIndex) => (
-        <View key={rowIndex} style={themed($row)}>
-          {row.map((index) => {
+        <View key={rowIndex} testID={`player-grid-row-${rowIndex}`} style={themed($row)}>
+          {row.map((index, columnIndex) => {
+            if (index === null) {
+              return (
+                <View
+                  key={`empty-${rowIndex}-${columnIndex}`}
+                  testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                  style={themed($cell)}
+                />
+              )
+            }
             const player = players[index]
             const seatNumber = index + 1
             const playerDisabled = Boolean(isPlayerDisabled?.(player))
-            const ownership = disabled
-              ? "disabled"
-              : isPlayerDisabled
-                ? playerDisabled
-                  ? "unowned"
-                  : "owned"
-                : undefined
+            const playerOwned = Boolean(isPlayerOwned?.(player))
+            const contentRotation = getPlayerContentRotation({
+              playerCount: players.length,
+              layout,
+              row,
+              rowIndex,
+              columnIndex,
+              playerIndex: index,
+            })
+            const ownership = isPlayerOwned
+              ? playerOwned
+                ? "owned"
+                : "unowned"
+              : disabled
+                ? "disabled"
+                : isPlayerDisabled
+                  ? playerDisabled
+                    ? "unowned"
+                    : "owned"
+                  : undefined
             return (
               <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={themed($cell)}>
                 <LifeCard
@@ -79,6 +107,7 @@ export function PlayerGrid({
                   life={player.life}
                   color={player.color}
                   compact={layout.compact}
+                  contentRotation={contentRotation}
                   lifeFontSize={lifeFontSize}
                   disabled={disabled || playerDisabled}
                   ownership={ownership}
@@ -94,8 +123,39 @@ export function PlayerGrid({
   )
 }
 
-const SEAT_ONE_FEATURED_ROW = [0]
-const REMAINING_SEATS_ROW = [1, 2]
+export type PlayerGridLayoutVariant =
+  "auto" | "featured-first" | "featured-last" | "even-grid" | "wide-grid"
+
+export interface PlayerGridLayoutOption {
+  variant: PlayerGridLayoutVariant
+  label: string
+}
+
+export function getPlayerGridLayoutOptions(playerCount: number): PlayerGridLayoutOption[] {
+  if (playerCount === 2)
+    return [
+      { variant: "auto", label: "Stacked" },
+      { variant: "wide-grid", label: "Side by side" },
+    ]
+  if (playerCount % 2 === 0)
+    return [
+      { variant: "auto", label: "Balanced" },
+      { variant: "wide-grid", label: "Wide" },
+    ]
+  return playerCount === 3
+    ? [
+        { variant: "auto", label: "Top focus" },
+        { variant: "featured-last", label: "Bottom focus" },
+        { variant: "even-grid", label: "Even grid" },
+        { variant: "wide-grid", label: "Wide" },
+      ]
+    : [
+        { variant: "auto", label: "Bottom focus" },
+        { variant: "featured-first", label: "Top focus" },
+        { variant: "even-grid", label: "Even grid" },
+        { variant: "wide-grid", label: "Wide" },
+      ]
+}
 
 const LIFE_CONTROL_GUTTER = 40
 const LIFE_DIGIT_ASPECT = 0.62
@@ -112,8 +172,8 @@ export function getCellSize(input: {
   const rowGaps = gap * (layout.rowCount - 1)
   const columnGaps = gap * (layout.columnCount - 1)
   return {
-    cellWidth: (board.width - gap * 2 - columnGaps) / layout.columnCount,
-    cellHeight: (board.height - gap - rowGaps) / layout.rowCount,
+    cellWidth: (board.width - columnGaps) / layout.columnCount,
+    cellHeight: (board.height - rowGaps) / layout.rowCount,
   }
 }
 
@@ -132,16 +192,69 @@ export function getLifeFontSize(input: {
 export function getPlayerGridRows(
   playerCount: number,
   layout: ReturnType<typeof getPlayerGridLayout>,
-): number[][] {
-  if (layout.layout === "three-featured") return [SEAT_ONE_FEATURED_ROW, REMAINING_SEATS_ROW]
-  const rows: number[][] = []
-  for (let index = 0; index < playerCount; index += layout.columnCount) {
-    rows.push(
-      Array.from(
-        { length: Math.min(layout.columnCount, playerCount - index) },
-        (_, offset) => index + offset,
-      ),
-    )
+): (number | null)[][] {
+  const seats = Array.from({ length: playerCount }, (_, index) => index)
+  if (layout.variant === "featured-first") return [[0], ...chunkSeats(seats.slice(1), 2)]
+  if (layout.variant === "featured-last")
+    return [...chunkSeats(seats.slice(0, -1), 2), [playerCount - 1]]
+  if (layout.variant === "even-grid") return chunkSeats(seats, 2, true)
+  if (layout.variant === "wide-grid") return chunkSeats(seats, 3, true)
+  if (layout.layout === "three-featured") return [[0], [1, 2]]
+  return chunkSeats(seats, layout.columnCount)
+}
+
+export function getPlayerGridMenuAnchor(
+  playerCount: number,
+  layout: ReturnType<typeof getPlayerGridLayout>,
+): { x: number; y: number } {
+  const rows = getPlayerGridRows(playerCount, layout)
+  for (let boundary = rows.length - 1; boundary > 0; boundary -= 1) {
+    const upper = rows[boundary - 1]
+    const lower = rows[boundary]
+    const columnCount = Math.max(upper.length, lower.length)
+    for (let column = columnCount - 1; column > 0; column -= 1) {
+      const fourCardsMeet = [
+        upper[column - 1],
+        upper[column],
+        lower[column - 1],
+        lower[column],
+      ].every((seat) => seat !== null && seat !== undefined)
+      if (fourCardsMeet) return { x: column / columnCount, y: boundary / rows.length }
+    }
+  }
+  return { x: 0.5, y: 0.5 }
+}
+
+export function getPlayerContentRotation(input: {
+  playerCount: number
+  layout: ReturnType<typeof getPlayerGridLayout>
+  row: (number | null)[]
+  rowIndex: number
+  columnIndex: number
+  playerIndex: number
+}): LifeCardContentRotation {
+  if (input.playerCount === 2 && input.layout.layout === "two-stacked")
+    return input.playerIndex === 0 ? 180 : 0
+
+  const occupiedColumns = input.row.flatMap((seat, column) => (seat === null ? [] : [column]))
+  if (occupiedColumns.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
+  if (input.columnIndex === occupiedColumns[0]) return 90
+  if (input.columnIndex === occupiedColumns[occupiedColumns.length - 1]) return -90
+  return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
+}
+
+function chunkSeats(
+  seats: number[],
+  columnCount: number,
+  fillLastRow = false,
+): (number | null)[][] {
+  const rows: (number | null)[][] = []
+  for (let index = 0; index < seats.length; index += columnCount) {
+    const row: (number | null)[] = seats.slice(index, index + columnCount)
+    if (fillLastRow) {
+      while (row.length < columnCount) row.push(null)
+    }
+    rows.push(row)
   }
   return rows
 }
@@ -150,8 +263,8 @@ const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   width: "100%",
   gap: spacing.xxs,
-  paddingHorizontal: spacing.xxs,
-  paddingBottom: spacing.xxs,
+  paddingHorizontal: 0,
+  paddingBottom: 0,
 })
 
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -167,11 +280,12 @@ export function getPlayerGridLayout(input: {
   width: number
   height: number
   fontScale?: number
+  layoutVariant?: PlayerGridLayoutVariant
 }) {
   const landscape = input.width > input.height
   const tablet = Math.min(input.width, input.height) >= 600
   const largeText = (input.fontScale ?? 1) >= 1.4
-  const columnCount =
+  const automaticColumnCount =
     input.playerCount === 2
       ? landscape
         ? 2
@@ -181,8 +295,23 @@ export function getPlayerGridLayout(input: {
         : input.playerCount >= 5 && landscape
           ? 3
           : 2
+  const variant = input.layoutVariant ?? "auto"
+  const columnCount =
+    variant === "wide-grid"
+      ? Math.min(3, input.playerCount)
+      : variant === "featured-first" || variant === "featured-last" || variant === "even-grid"
+        ? 2
+        : automaticColumnCount
   const rowCount =
-    input.playerCount === 3 && !landscape ? 2 : Math.ceil(input.playerCount / columnCount)
+    variant === "featured-first" || variant === "featured-last"
+      ? 1 + Math.ceil((input.playerCount - 1) / 2)
+      : variant === "even-grid"
+        ? Math.ceil(input.playerCount / 2)
+        : variant === "wide-grid"
+          ? Math.ceil(input.playerCount / 3)
+          : input.playerCount === 3 && !landscape
+            ? 2
+            : Math.ceil(input.playerCount / columnCount)
   const layout =
     input.playerCount === 2
       ? landscape
@@ -201,6 +330,7 @@ export function getPlayerGridLayout(input: {
   const baseCellHeight = Math.max(148, Math.floor(availableHeight / rowCount))
   const minCellHeight = largeText ? Math.ceil(baseCellHeight * 1.25) : baseCellHeight
   return {
+    variant,
     columnCount,
     rowCount,
     layout,

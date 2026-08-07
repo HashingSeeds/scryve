@@ -10,13 +10,16 @@ onFlowStart:
 - assertVisible: "New local game"
 - tapOn: "Start game"
 - assertVisible: "Local game"
-- tapOn:
-    id: "life-seat-1--5"
+- longPressOn:
+    id: "life-seat-1--1"
 - assertVisible: "Seat 1, Player 1, 15 life"
+- tapOn: "Game options"
 - tapOn: "Undo"
 - assertVisible: "Seat 1, Player 1, 20 life"
-- tapOn: "Finish"
-- assertVisible: "Finish this game and save its final totals?"
-- tapOn: "Finish game"
+- tapOn: "Game options"
+- tapOn: "End game"
+- assertVisible: "End this game and save its final totals?"
+- tapOn:
+    id: "confirm-end-game-button"
 - assertVisible: "Game summary"
 - assertVisible: "Finished"

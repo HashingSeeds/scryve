@@ -38,6 +38,9 @@ jest.mock("react-native-keyboard-controller", () => ({
   KeyboardProvider: ({ children }: { children: ReactNode }) => children,
 }))
 
+jest.mock("react-native-worklets", () => require("react-native-worklets/src/mock"))
+jest.mock("react-native-reanimated", () => require("react-native-reanimated/mock"))
+
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
   SafeAreaProvider: ({ children }: { children: ReactNode }) => children,

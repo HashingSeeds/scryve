@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 
@@ -5,6 +6,7 @@ import type { LifeDelta } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import type { LifeCardContentRotation } from "./playerCardTypes"
 import { Text } from "./Text"
 
 export interface LifeControlsProps {
@@ -13,6 +15,7 @@ export interface LifeControlsProps {
   disabled?: boolean
   contrastCheckedForeground?: string
   compact?: boolean
+  contentRotation?: LifeCardContentRotation
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -20,10 +23,6 @@ export interface LifeControlsProps {
 const HALF_CARD_ZONES: readonly { delta: LifeDelta; glyph: string; edge: "left" | "right" }[] = [
   { delta: -1, glyph: "−", edge: "left" },
   { delta: 1, glyph: "+", edge: "right" },
-]
-const CORNER_PILLS: readonly { delta: LifeDelta; label: string }[] = [
-  { delta: -5, label: "−5" },
-  { delta: 5, label: "+5" },
 ]
 
 export function lifeControlTestId(seatNumber: number, delta: LifeDelta) {
@@ -40,12 +39,18 @@ export function LifeControls({
   disabled,
   contrastCheckedForeground: foreground = "#FFFFFF",
   compact,
+  contentRotation = 0,
   onChange,
   style,
 }: LifeControlsProps) {
   const { themed } = useAppTheme()
+  const longPressHandled = useRef<LifeDelta | null>(null)
   const displayName = playerName.trim() || "unnamed player"
+  const contentRotationStyle: TextStyle | undefined = contentRotation
+    ? { transform: [{ rotate: `${contentRotation}deg` }] }
+    : undefined
   const identity = `Seat ${seatNumber}, ${displayName}`
+  const sideways = Math.abs(contentRotation) === 90
 
   function labelFor(delta: LifeDelta) {
     return `${identity}, ${delta > 0 ? "add" : "subtract"} ${Math.abs(delta)} life`
@@ -53,7 +58,17 @@ export function LifeControls({
 
   return (
     <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, style]}>
-      <View pointerEvents="box-none" style={themed($zones)}>
+      <View
+        testID="life-control-zones"
+        pointerEvents="box-none"
+        style={themed(
+          contentRotation === 90
+            ? $zonesFacingLeft
+            : contentRotation === -90
+              ? $zonesFacingRight
+              : $zones,
+        )}
+      >
         {HALF_CARD_ZONES.map(({ delta, glyph, edge }) => (
           <Pressable
             key={delta}
@@ -62,51 +77,48 @@ export function LifeControls({
             accessibilityRole="button"
             accessibilityState={{ disabled: !!disabled }}
             accessibilityLabel={labelFor(delta)}
-            accessibilityHint={`Changes ${identity}'s life total by ${delta}`}
+            accessibilityHint={`Tap to change ${identity}'s life by ${delta}. Long press to change it by ${delta * 5}`}
+            accessibilityActions={[
+              { name: "longpress", label: labelFor((delta * 5) as LifeDelta) },
+            ]}
             style={({ pressed }) => [
               themed($zone),
-              edge === "left" ? themed($zoneLeft) : themed($zoneRight),
+              sideways
+                ? themed($zoneSideways)
+                : edge === "left"
+                  ? themed($zoneLeft)
+                  : themed($zoneRight),
               pressed && !disabled && { backgroundColor: overlayTint(foreground, 0.14) },
             ]}
-            onPress={() => onChange(delta)}
+            delayLongPress={450}
+            onPressIn={() => {
+              longPressHandled.current = null
+            }}
+            onLongPress={() => {
+              longPressHandled.current = delta
+              onChange((delta * 5) as LifeDelta)
+            }}
+            onAccessibilityAction={({ nativeEvent }) => {
+              if (nativeEvent.actionName === "longpress") onChange((delta * 5) as LifeDelta)
+            }}
+            onPress={() => {
+              if (longPressHandled.current === delta) {
+                longPressHandled.current = null
+                return
+              }
+              onChange(delta)
+            }}
           >
             <Text
               text={glyph}
               maxFontSizeMultiplier={1.3}
               adjustsFontSizeToFit
               numberOfLines={1}
-              style={[themed(compact ? $compactGlyph : $glyph), { color: foreground }]}
-            />
-          </Pressable>
-        ))}
-      </View>
-      <View pointerEvents="box-none" style={themed($pillRow)}>
-        {CORNER_PILLS.map(({ delta, label }) => (
-          <Pressable
-            key={delta}
-            testID={lifeControlTestId(seatNumber, delta)}
-            disabled={disabled}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !!disabled }}
-            accessibilityLabel={labelFor(delta)}
-            accessibilityHint={`Changes ${identity}'s life total by ${delta}`}
-            style={({ pressed }) => [
-              themed($pill),
-              compact && themed($compactPill),
-              {
-                backgroundColor: overlayTint(foreground, pressed && !disabled ? 0.28 : 0.14),
-                borderColor: overlayTint(foreground, 0.24),
-              },
-            ]}
-            onPress={() => onChange(delta)}
-          >
-            <Text
-              text={label}
-              weight="medium"
-              maxFontSizeMultiplier={1.3}
-              adjustsFontSizeToFit
-              numberOfLines={1}
-              style={[themed($pillText), { color: foreground }]}
+              style={[
+                themed(compact ? $compactGlyph : $glyph),
+                contentRotationStyle,
+                { color: foreground },
+              ]}
             />
           </Pressable>
         ))}
@@ -119,6 +131,14 @@ const $zones: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFillObject,
   flexDirection: "row",
 })
+const $zonesFacingLeft: ThemedStyle<ViewStyle> = () => ({
+  ...StyleSheet.absoluteFillObject,
+  flexDirection: "column",
+})
+const $zonesFacingRight: ThemedStyle<ViewStyle> = () => ({
+  ...StyleSheet.absoluteFillObject,
+  flexDirection: "column-reverse",
+})
 
 const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
@@ -128,6 +148,11 @@ const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $zoneLeft: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-start" })
 const $zoneRight: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-end" })
+const $zoneSideways: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "center",
+  paddingHorizontal: 0,
+  paddingVertical: spacing.sm,
+})
 
 const $glyph: ThemedStyle<TextStyle> = () => ({
   fontSize: 44,
@@ -139,34 +164,4 @@ const $compactGlyph: ThemedStyle<TextStyle> = () => ({
   fontSize: 30,
   lineHeight: 34,
   opacity: 0.6,
-})
-
-const $pillRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  left: 0,
-  right: 0,
-  bottom: 0,
-  flexDirection: "row",
-  justifyContent: "space-between",
-  padding: spacing.xs,
-})
-
-const $pill: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minWidth: 52,
-  minHeight: 44,
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: spacing.xs,
-  borderRadius: spacing.lg,
-  borderWidth: 1,
-})
-
-const $compactPill: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minWidth: 44,
-  paddingHorizontal: spacing.xxs,
-})
-
-const $pillText: ThemedStyle<TextStyle> = () => ({
-  fontSize: 15,
-  lineHeight: 19,
 })
