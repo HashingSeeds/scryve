@@ -18,6 +18,7 @@ import type {
 
 export const PLAYER_COLORS = ["#B85636", "#41476E", "#39755C", "#94632D", "#77558A", "#A33A52"]
 export const LIFE_DELTAS: readonly LifeDelta[] = [-5, -1, 1, 5]
+export const MAX_LIFE_DELTA = 999_999
 export const STARTING_LIFE_PRESETS = [20, 30, 40] as const
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
@@ -70,7 +71,12 @@ export function validateStartingLife(life: number): boolean {
 }
 
 export function isLifeDelta(value: unknown): value is LifeDelta {
-  return LIFE_DELTAS.includes(value as LifeDelta)
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value !== 0 &&
+    Math.abs(value) <= MAX_LIFE_DELTA
+  )
 }
 
 export function createLocalGame(input: {

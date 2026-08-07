@@ -43,8 +43,8 @@ function assertPublicId(publicId: string) {
 }
 
 function assertLifeDelta(delta: number) {
-  if (!Number.isInteger(delta) || ![-5, -1, 1, 5].includes(delta))
-    throw new Error("Life delta must be one of -5, -1, 1, or 5")
+  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 999_999)
+    throw new Error("Life delta must be a non-zero whole number from -999999 to 999999")
 }
 
 function assertOperationId(operationId: string) {

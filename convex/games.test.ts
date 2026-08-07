@@ -404,7 +404,7 @@ describe("Convex realtime life writes", () => {
     await expect(
       game.host.mutation(
         api.games.changeLife,
-        lifeArgs(game.publicId, game.hostPlayerId, "operation-bad-delta-1", 2),
+        lifeArgs(game.publicId, game.hostPlayerId, "operation-bad-delta-1", 0),
       ),
     ).rejects.toThrow("Life delta")
     await expect(
@@ -445,7 +445,7 @@ describe("Convex realtime life writes", () => {
     await Promise.all([
       game.host.mutation(
         api.games.changeLife,
-        lifeArgs(game.publicId, game.hostPlayerId, "operation-same-host-1", 5),
+        lifeArgs(game.publicId, game.hostPlayerId, "operation-same-host-1", 17),
       ),
       game.host.mutation(
         api.games.changeLife,
@@ -469,11 +469,11 @@ describe("Convex realtime life writes", () => {
       ),
     ])
     const projection = await game.host.query(api.games.lobbyProjection, { publicId: game.publicId })
-    expect(projection.players.map((player: any) => player.currentLife)).toEqual([45, 35])
+    expect(projection.players.map((player: any) => player.currentLife)).toEqual([57, 35])
     expect(projection.eventSequence).toBe(4)
     const allEvents = await t.run((ctx) => ctx.db.query("gameEvents").collect())
     expect(allEvents).toHaveLength(4)
-    expect(allEvents[0]).toMatchObject({ kind: "life.changed", delta: 5 })
+    expect(allEvents[0]).toMatchObject({ kind: "life.changed", delta: 17 })
     expect(allEvents[0].sequence).toBeUndefined()
     const gameRowAfter = await t.run((ctx) => ctx.db.get(gameRowBefore!._id))
     expect(gameRowAfter).toEqual(gameRowBefore)

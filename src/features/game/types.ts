@@ -6,7 +6,7 @@ export type OperationId = Brand<string, "OperationId">
 export type ActorId = Brand<string, "ActorId">
 export type DeviceId = Brand<string, "DeviceId">
 
-export type LifeDelta = -5 | -1 | 1 | 5
+export type LifeDelta = number
 export type StartingLife = 20 | 30 | 40 | number
 export type GameStatus = "active" | "finished" | "abandoned"
 

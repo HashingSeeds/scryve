@@ -6,11 +6,12 @@ import { ThemeProvider } from "@/theme/context"
 import { LifeControls } from "./LifeControls"
 
 describe("LifeControls", () => {
-  it("maps taps to one life and long presses to five life", () => {
+  it("maps taps to one life and delegates long presses to custom amount editing", () => {
     const onChange = jest.fn()
+    const onLongChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Ada" onChange={onChange} />
+        <LifeControls playerName="Ada" onChange={onChange} onLongChange={onLongChange} />
       </ThemeProvider>,
     )
     for (const delta of [-1, 1] as const) {
@@ -18,7 +19,7 @@ describe("LifeControls", () => {
       const label = view.getByText(delta === -1 ? "−" : "+")
       expect(button.props.accessibilityRole).toBe("button")
       expect(button.props.accessibilityLabel).toContain("Seat 1, Ada")
-      expect(button.props.accessibilityHint).toContain(`Long press to change it by ${delta * 5}`)
+      expect(button.props.accessibilityHint).toContain("Long press to enter a custom amount")
       expect(label.props.maxFontSizeMultiplier).toBe(1.3)
       expect(label.props.adjustsFontSizeToFit).toBe(true)
       expect(label.props.numberOfLines).toBe(1)
@@ -28,9 +29,8 @@ describe("LifeControls", () => {
       fireEvent(button, "longPress")
       fireEvent.press(button)
     }
-    expect(onChange.mock.calls.map(([delta]) => delta)).toEqual([-1, -5, 1, 5])
-    expect(view.queryByText("−5")).toBeNull()
-    expect(view.queryByText("+5")).toBeNull()
+    expect(onChange.mock.calls.map(([delta]) => delta)).toEqual([-1, 1])
+    expect(onLongChange.mock.calls.map(([direction]) => direction)).toEqual([-1, 1])
   })
 
   it("keeps ±1 reachable as full card halves rather than small buttons", () => {

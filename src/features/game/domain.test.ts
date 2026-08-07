@@ -70,15 +70,15 @@ describe("local game domain", () => {
     })
   })
 
-  it("allows life below zero and applies every additive delta", () => {
+  it("allows life below zero and applies preset or custom additive deltas", () => {
     const context = makeContext()
     let game = makeGame(2, 1)
     const playerId = game.players[0].id
-    for (const delta of [-5, -1, 1, 5] as LifeDelta[]) {
+    for (const delta of [-5, -1, 1, 5, 17] as LifeDelta[]) {
       game = applyGameCommand(game, { type: "life.change", playerId, delta }, context)
     }
-    game = applyGameCommand(game, { type: "life.change", playerId, delta: -5 }, context)
-    expect(game.players[0].life).toBe(-4)
+    game = applyGameCommand(game, { type: "life.change", playerId, delta: -23 }, context)
+    expect(game.players[0].life).toBe(-5)
   })
 
   it("deduplicates operation IDs", () => {

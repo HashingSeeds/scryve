@@ -17,10 +17,15 @@ export interface LifeControlsProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   onChange: (delta: LifeDelta) => void
+  onLongChange?: (direction: -1 | 1) => void
   style?: StyleProp<ViewStyle>
 }
 
-const HALF_CARD_ZONES: readonly { delta: LifeDelta; glyph: string; edge: "left" | "right" }[] = [
+const HALF_CARD_ZONES: readonly {
+  delta: -1 | 1
+  glyph: string
+  edge: "left" | "right"
+}[] = [
   { delta: -1, glyph: "−", edge: "left" },
   { delta: 1, glyph: "+", edge: "right" },
 ]
@@ -41,6 +46,7 @@ export function LifeControls({
   compact,
   contentRotation = 0,
   onChange,
+  onLongChange,
   style,
 }: LifeControlsProps) {
   const { themed } = useAppTheme()
@@ -77,9 +83,12 @@ export function LifeControls({
             accessibilityRole="button"
             accessibilityState={{ disabled: !!disabled }}
             accessibilityLabel={labelFor(delta)}
-            accessibilityHint={`Tap to change ${identity}'s life by ${delta}. Long press to change it by ${delta * 5}`}
+            accessibilityHint={`Tap to change ${identity}'s life by ${delta}. Long press to enter a custom amount.`}
             accessibilityActions={[
-              { name: "longpress", label: labelFor((delta * 5) as LifeDelta) },
+              {
+                name: "longpress",
+                label: `${identity}, ${delta > 0 ? "add" : "subtract"} a custom amount`,
+              },
             ]}
             style={({ pressed }) => [
               themed($zone),
@@ -96,10 +105,10 @@ export function LifeControls({
             }}
             onLongPress={() => {
               longPressHandled.current = delta
-              onChange((delta * 5) as LifeDelta)
+              onLongChange?.(delta)
             }}
             onAccessibilityAction={({ nativeEvent }) => {
-              if (nativeEvent.actionName === "longpress") onChange((delta * 5) as LifeDelta)
+              if (nativeEvent.actionName === "longpress") onLongChange?.(delta)
             }}
             onPress={() => {
               if (longPressHandled.current === delta) {

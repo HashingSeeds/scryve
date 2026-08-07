@@ -49,6 +49,8 @@ describe("CurrentGameScreen", () => {
       </ThemeProvider>,
     )
     fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
+    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "5")
+    fireEvent.press(view.getByTestId("life-editor-apply-seat-1"))
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("-3")
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("undo-button"))
