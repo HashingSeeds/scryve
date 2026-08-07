@@ -1,20 +1,12 @@
 import { createContext, ReactNode, useContext, useMemo, useState } from "react"
-import {
-  Modal,
-  Platform,
-  Pressable,
-  // Auth providers intentionally sit above the themed component provider.
-  // eslint-disable-next-line no-restricted-imports
-  Text as NativeText,
-  View,
-} from "react-native"
 import { ClerkProvider, useAuth } from "@clerk/expo"
-import { AuthView } from "@clerk/expo/native"
 import { tokenCache } from "@clerk/expo/token-cache"
 import { ConvexReactClient } from "convex/react"
 import { ConvexProviderWithClerk } from "convex/react-clerk"
 
 import { readPublicCloudConfig } from "@/features/auth/config"
+
+import { ClerkAuthModal } from "./ClerkAuthModal"
 
 interface AuthAccess {
   configured: boolean
@@ -64,36 +56,11 @@ export function ConfiguredAuth({
       <AuthAccessContext.Provider value={value}>
         {children}
         {/* Intentionally always mounted beside app content; visibility alone is toggled. */}
-        <Modal
-          testID="auth-modal"
-          visible={visible}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setVisible(false)}
-        >
-          <View style={$modal}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close sign in"
-              onPress={() => setVisible(false)}
-              style={$closeButton}
-            >
-              <NativeText>Close</NativeText>
-            </Pressable>
-            {Platform.OS === "web" ? (
-              <NativeText>Native sign-in requires an iOS or Android development build.</NativeText>
-            ) : (
-              <AuthView mode="signInOrUp" isDismissible onDismiss={() => setVisible(false)} />
-            )}
-          </View>
-        </Modal>
+        <ClerkAuthModal visible={visible} onDismiss={() => setVisible(false)} />
       </AuthAccessContext.Provider>
     </ConvexProviderWithClerk>
   )
 }
-
-const $modal = { flex: 1, paddingTop: 12 } as const
-const $closeButton = { minHeight: 44, padding: 12 } as const
 
 export function CloudProviders({ children }: { children: ReactNode }) {
   const config = readPublicCloudConfig()
