@@ -102,3 +102,5 @@ app-dependency-graph.png
 docs/
 builds/
 dist/
+.env.local
+build-*.tar.gz

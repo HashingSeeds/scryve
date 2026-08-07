@@ -1,9 +1,6 @@
-import { emitTelemetry } from "./telemetry"
+import * as Sentry from "@sentry/react-native"
 
-/** Vendor initialization remains intentionally empty until privacy/product approval. */
-export const initCrashReporting = () => {
-  // Install an approved adapter through app/utils/telemetry.ts; never inline credentials here.
-}
+import { emitTelemetry } from "./telemetry"
 
 /**
  * Error classifications used to sort errors on error reporting services.
@@ -23,7 +20,7 @@ export enum ErrorType {
 /**
  * Manually report a handled error.
  */
-export const reportCrash = (_error: Error, type: ErrorType = ErrorType.FATAL) => {
+export const reportCrash = (error: Error, type: ErrorType = ErrorType.FATAL) => {
   emitTelemetry("error.handled", {
     outcome: "rejected",
     errorCode: type === ErrorType.FATAL ? "FATAL" : "HANDLED",
@@ -32,10 +29,6 @@ export const reportCrash = (_error: Error, type: ErrorType = ErrorType.FATAL) =>
     // Never print raw error text: it may contain auth, invite, or identity values.
     console.error(`[Count ${type}] Error details omitted by privacy policy`)
   } else {
-    // In production, utilize crash reporting service of choice below:
-    // RN
-    // Sentry.captureException(error)
-    // crashlytics().recordError(error)
-    // Bugsnag.notify(error)
+    Sentry.captureException(error, { tags: { errorType: type } })
   }
 }

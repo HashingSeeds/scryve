@@ -85,7 +85,15 @@
         }
       }
     ],
-    "expo-build-properties"
+    "expo-build-properties",
+    [
+      "@sentry/react-native/expo",
+      {
+        "url": "https://sentry.io/",
+        "project": "count",
+        "organization": "matthew-chisolm"
+      }
+    ]
   ],
   "experiments": {
     "tsconfigPaths": true

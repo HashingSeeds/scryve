@@ -42,6 +42,7 @@
     "@clerk/expo": "3.7.3",
     "@expo-google-fonts/space-grotesk": "^0.4.0",
     "@expo/metro-runtime": "~55.0.6",
+    "@sentry/react-native": "^8.22.0",
     "convex": "1.42.3",
     "date-fns": "^4.1.0",
     "expo": "55.0.5",

@@ -1,16 +1,27 @@
 import type { ConfigContext, ExpoConfig } from "expo/config"
 
-/**
- * Use tsx/cjs here so we can use TypeScript for our Config Plugins
- * and not have to compile them to JavaScript.
- *
- * See https://docs.expo.dev/config-plugins/plugins/#add-typescript-support-and-convert-to-dynamic-app-config
- */
-import "tsx/cjs"
-import { normalizeHttpsOrigin } from "./app/utils/httpsOrigin"
-
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
+
+function normalizeHttpsOrigin(value: string | undefined): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value.trim())
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== "/"
+    )
+      return null
+    const port = url.port ? `:${url.port}` : ""
+    return `https://${url.hostname.toLowerCase()}${port}`
+  } catch {
+    return null
+  }
+}
 
 const getAppName = () => {
   if (IS_DEV) {

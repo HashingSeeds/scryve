@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
@@ -47,5 +48,33 @@ describe("EAS release profile isolation", () => {
     ).toBe(3)
     const app = JSON.parse(fs.readFileSync(path.join(process.cwd(), "app.json"), "utf8"))
     expect(app.runtimeVersion).toEqual({ policy: "appVersion" })
+  })
+
+  it("keeps Expo configuration compatible with Node and Bun config loaders", () => {
+    const app = JSON.parse(fs.readFileSync(path.join(process.cwd(), "app.json"), "utf8"))
+    const dynamicConfig = fs.readFileSync(path.join(process.cwd(), "app.config.ts"), "utf8")
+
+    expect(app).not.toHaveProperty("expo")
+    expect(app.plugins).toContainEqual(
+      expect.arrayContaining(["@sentry/react-native/expo", expect.any(Object)]),
+    )
+    expect(dynamicConfig).not.toContain("tsx/cjs")
+  })
+
+  it("evaluates the dynamic Expo config through Expo's Node CLI", () => {
+    const result = spawnSync(
+      process.execPath,
+      [path.join(process.cwd(), "node_modules/expo/bin/cli"), "config", "--json"],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: { ...process.env, EXPO_NO_DOTENV: "1" },
+      },
+    )
+
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: "" })
+    expect(JSON.parse(result.stdout).extra.eas.projectId).toBe(
+      "1e4ab9fb-230c-421d-a659-a4aaa4355d82",
+    )
   })
 })
