@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react"
-import { Share, View } from "react-native"
+import { Share, TextStyle, View, ViewStyle } from "react-native"
 import { useConvexConnectionState, useMutation, useQuery } from "convex/react"
 import QRCode from "react-native-qrcode-svg"
 
 import { Button } from "@/components/Button"
-import { Card } from "@/components/Card"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -50,6 +49,21 @@ export function ConnectedLobbyScreen({
   const inviteQrPayload = lobby?.invitation?.token
     ? buildInviteQrPayload(lobby.invitation.token, lobby.invitation.manualCode)
     : null
+  const manualCode = lobby?.invitation?.manualCode
+
+  async function shareInvite() {
+    try {
+      setActionError(undefined)
+      if (inviteUrl) {
+        await Share.share({ message: `Join my Count game: ${inviteUrl}`, url: inviteUrl })
+      } else if (manualCode) {
+        await Share.share({ message: `Join my Count game with code ${manualCode}` })
+      }
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Could not open sharing")
+    }
+  }
+
   if (lobby === undefined)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]} contentInset="standard">
@@ -62,68 +76,50 @@ export function ConnectedLobbyScreen({
       </Screen>
     )
   return (
-    <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
+    <Screen
+      preset="auto"
+      safeAreaEdges={["bottom"]}
+      contentInset="standard"
+      contentContainerStyle={$content}
+    >
       <Header
         title="Connected lobby"
         leftTx={onBack ? "common:back" : undefined}
         onLeftPress={onBack}
       />
-      <Text preset="heading" accessibilityRole="header" text="Connected lobby" />
       <Text
         text={`${lobby.players.length} of ${lobby.playerCount} seats claimed · ${lobby.startingLife} life · ${lobby.ruleset}`}
       />
-      {lobby.invitation?.manualCode ? (
-        <>
-          <Text
-            testID="manual-code"
-            preset="subheading"
-            text={`Code: ${lobby.invitation.manualCode}`}
-          />
-          <Text
-            text={`Can't scan the QR? Enter code ${lobby.invitation.manualCode} on the join screen.`}
-          />
-          <Button
-            testID="share-manual-code-button"
-            text="Share manual code"
-            onPress={async () => {
-              try {
-                setActionError(undefined)
-                await Share.share({
-                  message: `Join my Count game with code ${lobby.invitation?.manualCode}`,
-                })
-              } catch (cause) {
-                setActionError(cause instanceof Error ? cause.message : "Could not open sharing")
-              }
-            }}
-          />
-        </>
+      {manualCode ? (
+        <Text
+          testID="manual-code"
+          preset="subheading"
+          text={`Code: ${manualCode}`}
+          style={$centeredText}
+        />
       ) : null}
       {inviteQrPayload ? (
         <View style={$qr}>
           <QRCode
             testID="invite-qr"
             value={inviteQrPayload}
-            size={220}
-            quietZone={24}
+            size={184}
+            quietZone={16}
             color="#000000"
             backgroundColor="#FFFFFF"
             ecl="H"
           />
-          <Text text="On the other device, open Join with code → Scan invite QR." />
         </View>
       ) : null}
-      {inviteUrl ? (
+      {manualCode ? (
+        <Text size="xs" text={`Scan to join or enter code ${manualCode}.`} style={$centeredText} />
+      ) : null}
+      {inviteUrl || manualCode ? (
         <Button
           testID="share-invite-button"
-          text="Share HTTPS invite"
-          onPress={async () => {
-            try {
-              setActionError(undefined)
-              await Share.share({ message: `Join my Count game: ${inviteUrl}`, url: inviteUrl })
-            } catch (cause) {
-              setActionError(cause instanceof Error ? cause.message : "Could not open sharing")
-            }
-          }}
+          text="Share invite"
+          style={$compactButton}
+          onPress={shareInvite}
         />
       ) : null}
       {actionError ? (
@@ -133,6 +129,29 @@ export function ConnectedLobbyScreen({
           text={`${actionError} Check your connection and current lobby state, then try again.`}
         />
       ) : null}
+      {lobby.isHost ? (
+        <Button
+          testID="start-connected-game-button"
+          text="Start game"
+          preset="reversed"
+          style={$primaryAction}
+          disabled={lobby.players.length !== lobby.playerCount || !isWebSocketConnected}
+          onPress={async () => {
+            if (!isWebSocketConnected) {
+              setActionError("Reconnect before starting; this action is not queued.")
+              return
+            }
+            try {
+              setActionError(undefined)
+              await start({ publicId })
+            } catch (cause) {
+              setActionError(cause instanceof Error ? cause.message : "Could not start the game")
+            }
+          }}
+        />
+      ) : (
+        <Text text="Waiting for the host to start." style={$centeredText} />
+      )}
       {leaveAction ? (
         <View
           testID="connected-lobby-leave-confirmation"
@@ -147,11 +166,17 @@ export function ConnectedLobbyScreen({
                 : "Leave this lobby from your resume list? Other players and history remain unchanged."
             }
           />
-          <Button text="Cancel" disabled={leaving} onPress={() => setLeaveAction(undefined)} />
+          <Button
+            text="Cancel"
+            style={$compactButton}
+            disabled={leaving}
+            onPress={() => setLeaveAction(undefined)}
+          />
           <Button
             testID={`confirm-connected-lobby-${leaveAction}-button`}
             text={leaveAction === "abandon" ? "Abandon lobby" : "Leave lobby"}
             preset="reversed"
+            style={$compactButton}
             disabled={leaving || !isWebSocketConnected}
             onPress={async () => {
               if (!isWebSocketConnected) {
@@ -179,6 +204,8 @@ export function ConnectedLobbyScreen({
             <Button
               testID="leave-connected-lobby-button"
               text="Leave lobby"
+              style={$secondaryAction}
+              textStyle={$secondaryActionText}
               disabled={!isWebSocketConnected}
               onPress={() => setLeaveAction("leave")}
             />
@@ -186,7 +213,9 @@ export function ConnectedLobbyScreen({
           {lobby.isHost ? (
             <Button
               testID="abandon-connected-lobby-button"
-              text="Abandon lobby for everyone"
+              text="Abandon lobby"
+              style={$secondaryAction}
+              textStyle={$secondaryActionText}
               disabled={!isWebSocketConnected}
               onPress={() => setLeaveAction("abandon")}
             />
@@ -207,49 +236,27 @@ export function ConnectedLobbyScreen({
           text="Reconnect before starting. Start is online-only and will not be queued."
         />
       ) : null}
-      <View style={$players}>
-        {lobby.players.map((player: any) => (
-          <Card
-            key={player.seat}
-            heading={`Seat ${player.seat}: ${player.displayName}`}
-            content={`${player.currentLife} life`}
-          />
-        ))}
-      </View>
-      {lobby.isHost ? (
-        <Button
-          testID="start-connected-game-button"
-          text="Start game"
-          preset="reversed"
-          disabled={lobby.players.length !== lobby.playerCount || !isWebSocketConnected}
-          onPress={async () => {
-            if (!isWebSocketConnected) {
-              setActionError("Reconnect before starting; this action is not queued.")
-              return
-            }
-            try {
-              setActionError(undefined)
-              await start({ publicId })
-            } catch (cause) {
-              setActionError(cause instanceof Error ? cause.message : "Could not start the game")
-            }
-          }}
-        />
-      ) : (
-        <Text text="Waiting for the host to start." />
-      )}
     </Screen>
   )
 }
 
-const $qr = { alignItems: "center", marginVertical: 16 } as const
-const $players = { gap: 8, marginVertical: 16 }
+const $content: ViewStyle = { gap: 12 }
+const $qr: ViewStyle = { alignItems: "center", marginVertical: 4 }
+const $centeredText: TextStyle = { textAlign: "center" }
+const $compactButton: ViewStyle = { minHeight: 48 }
+const $primaryAction: ViewStyle = { minHeight: 52, marginTop: 4 }
+const $secondaryAction: ViewStyle = {
+  minHeight: 44,
+  borderWidth: 0,
+  backgroundColor: "transparent",
+}
+const $secondaryActionText: TextStyle = { textDecorationLine: "underline" }
 const $confirmation = {
   gap: 8,
   padding: 12,
-  marginVertical: 12,
+  marginVertical: 4,
   borderWidth: 1,
   borderColor: "#C03403",
   borderRadius: 8,
 } as const
-const $leaveActions = { gap: 8, marginVertical: 12 } as const
+const $leaveActions = { gap: 8 } as const

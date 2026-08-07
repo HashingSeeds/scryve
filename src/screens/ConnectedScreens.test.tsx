@@ -626,19 +626,21 @@ describe("connected lobby screens", () => {
       status: "lobby",
       invitation: { token: inviteToken, manualCode: "AB12CD" },
     }
-    const share = jest.spyOn(Share, "share").mockResolvedValueOnce({ action: "sharedAction" })
+    const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" })
     const view = render(
       themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />),
     )
     const inviteUrl = `https://play.count.example/join/${inviteToken}`
+    expect(view.UNSAFE_getByType(Screen).props.preset).toBe("auto")
     expect(screen.getByTestId("invite-qr").props.children).toBe("count://join/AB12CD")
     expect(screen.getByTestId("invite-qr").props.accessibilityHint).toBe(
-      "size-220-quiet-zone-24-ecl-H",
+      "size-184-quiet-zone-16-ecl-H",
     )
-    expect(
-      screen.getByText("On the other device, open Join with code → Scan invite QR."),
-    ).toBeTruthy()
+    expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
     expect(screen.getByText("Code: AB12CD")).toBeTruthy()
+    expect(screen.queryByText("Ada")).toBeNull()
+    expect(screen.queryByText("Grace")).toBeNull()
+    expect(screen.queryByTestId("share-manual-code-button")).toBeNull()
     fireEvent.press(screen.getByTestId("share-invite-button"))
     await waitFor(() =>
       expect(share).toHaveBeenCalledWith({
@@ -655,8 +657,10 @@ describe("connected lobby screens", () => {
     }
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
     expect(screen.getByTestId("invite-qr").props.children).toBe("count://join/ZX90QW")
-    expect(screen.queryByTestId("share-invite-button")).toBeNull()
-    expect(screen.getByTestId("share-manual-code-button")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("share-invite-button"))
+    await waitFor(() =>
+      expect(share).toHaveBeenLastCalledWith({ message: "Join my Count game with code ZX90QW" }),
+    )
     expect(screen.getByText(/Enter code ZX90QW/i)).toBeTruthy()
   })
 
