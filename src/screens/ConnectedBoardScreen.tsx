@@ -1,9 +1,10 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Modal, Pressable, ScrollView, useWindowDimensions, View } from "react-native"
+import { ScrollView, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
+import { AppDialog, $dialogActions, $dialogButton, $dialogText } from "@/components/AppDialog"
 import { Button } from "@/components/Button"
 import { ConnectionBadge } from "@/components/ConnectionBadge"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
@@ -202,170 +203,148 @@ function ConnectedBoardRuntime({
       </View>
 
       {layoutPickerOpen ? (
-        <Modal transparent animationType="fade" onRequestClose={() => setLayoutPickerOpen(false)}>
-          <Pressable
-            testID="connected-layout-backdrop"
-            accessibilityRole="button"
-            accessibilityLabel="Close layout chooser"
-            style={themed($dialogBackdrop)}
-            onPress={() => setLayoutPickerOpen(false)}
-          >
-            <Pressable
-              testID="connected-layout-dialog"
-              accessibilityViewIsModal
-              style={[themed($dialog), themed($wideDialog)]}
-              onPress={() => {}}
-            >
-              <Text text="Layout" preset="subheading" style={themed($dialogText)} />
-              <View style={themed($layoutOptions)}>
-                {layoutOptions.map((option) => (
-                  <Button
-                    key={option.variant}
-                    testID={`connected-layout-${option.variant}`}
-                    text={option.label}
-                    accessibilityState={{ selected: layoutVariant === option.variant }}
-                    preset={layoutVariant === option.variant ? "reversed" : "default"}
-                    style={themed($layoutOption)}
-                    onPress={() => {
-                      setLayoutVariant(option.variant)
-                      setLayoutPickerOpen(false)
-                    }}
-                  />
-                ))}
-              </View>
-              <Button text="Cancel" onPress={() => setLayoutPickerOpen(false)} />
-            </Pressable>
-          </Pressable>
-        </Modal>
+        <AppDialog
+          visible
+          onClose={() => setLayoutPickerOpen(false)}
+          backdropTestID="connected-layout-backdrop"
+          backdropAccessibilityLabel="Close layout chooser"
+          dialogTestID="connected-layout-dialog"
+          accessibilityViewIsModal
+          wide
+          style={themed($boardDialog)}
+        >
+          <Text text="Layout" preset="subheading" style={themed($dialogText)} />
+          <View style={themed($layoutOptions)}>
+            {layoutOptions.map((option) => (
+              <Button
+                key={option.variant}
+                testID={`connected-layout-${option.variant}`}
+                text={option.label}
+                accessibilityState={{ selected: layoutVariant === option.variant }}
+                preset={layoutVariant === option.variant ? "reversed" : "default"}
+                style={themed($layoutOption)}
+                onPress={() => {
+                  setLayoutVariant(option.variant)
+                  setLayoutPickerOpen(false)
+                }}
+              />
+            ))}
+          </View>
+          <Button text="Cancel" onPress={() => setLayoutPickerOpen(false)} />
+        </AppDialog>
       ) : null}
 
       {statusOpen ? (
-        <Modal transparent animationType="fade" onRequestClose={() => setStatusOpen(false)}>
-          <Pressable
-            testID="connected-status-backdrop"
-            accessibilityRole="button"
-            accessibilityLabel="Close connected-game status"
-            style={themed($dialogBackdrop)}
-            onPress={() => setStatusOpen(false)}
-          >
-            <Pressable
-              testID="connected-status-dialog"
-              accessibilityViewIsModal
-              style={[themed($dialog), themed($wideDialog)]}
-              onPress={() => {}}
-            >
+        <AppDialog
+          visible
+          onClose={() => setStatusOpen(false)}
+          backdropTestID="connected-status-backdrop"
+          backdropAccessibilityLabel="Close connected-game status"
+          dialogTestID="connected-status-dialog"
+          accessibilityViewIsModal
+          wide
+          style={themed($boardDialog)}
+        >
+          <Text
+            text={finished ? "Connected summary" : "Connected game"}
+            preset="subheading"
+            style={themed($dialogText)}
+          />
+          <ConnectionBadge
+            status={runtime.connectionStatus}
+            pendingCount={runtime.pending.length}
+            failedCount={runtime.failed.length}
+          />
+          <Text
+            text={
+              finished
+                ? `${game.eventSequence} accepted life changes · final`
+                : `${game.ruleset} · ${game.startingLife} starting life`
+            }
+            size="xs"
+            style={themed($muted)}
+          />
+          <ScrollView style={themed($statusScroll)} contentContainerStyle={themed($statusList)}>
+            {runtime.failed.map((failure) => (
+              <View
+                key={failure.action.event.operationId}
+                testID="connected-failed-action"
+                accessibilityRole="alert"
+                style={themed($failure)}
+              >
+                <Text
+                  text={`A ${failure.action.event.delta > 0 ? "+" : ""}${failure.action.event.delta} life change could not sync: ${failure.reason}`}
+                />
+                <Button
+                  text="Dismiss after reviewing"
+                  onPress={() => runtime.dismissFailed(failure.action.event.operationId)}
+                />
+              </View>
+            ))}
+            {runtime.changeError ? (
               <Text
-                text={finished ? "Connected summary" : "Connected game"}
-                preset="subheading"
-                style={themed($dialogText)}
+                testID="connected-change-error"
+                accessibilityRole="alert"
+                text={runtime.changeError}
               />
-              <ConnectionBadge
-                status={runtime.connectionStatus}
-                pendingCount={runtime.pending.length}
-                failedCount={runtime.failed.length}
-              />
+            ) : null}
+            {runtime.finishError ? (
               <Text
-                text={
-                  finished
-                    ? `${game.eventSequence} accepted life changes · final`
-                    : `${game.ruleset} · ${game.startingLife} starting life`
-                }
-                size="xs"
-                style={themed($muted)}
+                testID="connected-finish-error"
+                accessibilityRole="alert"
+                text={runtime.finishError}
               />
-              <ScrollView style={themed($statusScroll)} contentContainerStyle={themed($statusList)}>
-                {runtime.failed.map((failure) => (
-                  <View
-                    key={failure.action.event.operationId}
-                    testID="connected-failed-action"
-                    accessibilityRole="alert"
-                    style={themed($failure)}
-                  >
-                    <Text
-                      text={`A ${failure.action.event.delta > 0 ? "+" : ""}${failure.action.event.delta} life change could not sync: ${failure.reason}`}
-                    />
-                    <Button
-                      text="Dismiss after reviewing"
-                      onPress={() => runtime.dismissFailed(failure.action.event.operationId)}
-                    />
-                  </View>
-                ))}
-                {runtime.changeError ? (
-                  <Text
-                    testID="connected-change-error"
-                    accessibilityRole="alert"
-                    text={runtime.changeError}
-                  />
-                ) : null}
-                {runtime.finishError ? (
-                  <Text
-                    testID="connected-finish-error"
-                    accessibilityRole="alert"
-                    text={runtime.finishError}
-                  />
-                ) : null}
-                {!active && !finished ? (
-                  <Text
-                    accessibilityRole="alert"
-                    text={`This game is ${game.status} and is read-only on the board.`}
-                  />
-                ) : null}
-                {finishBlockedReason ? (
-                  <Text accessibilityRole="alert" text={finishBlockedReason} />
-                ) : null}
-              </ScrollView>
-              <Button text="Close" onPress={() => setStatusOpen(false)} />
-            </Pressable>
-          </Pressable>
-        </Modal>
+            ) : null}
+            {!active && !finished ? (
+              <Text
+                accessibilityRole="alert"
+                text={`This game is ${game.status} and is read-only on the board.`}
+              />
+            ) : null}
+            {finishBlockedReason ? (
+              <Text accessibilityRole="alert" text={finishBlockedReason} />
+            ) : null}
+          </ScrollView>
+          <Button text="Close" onPress={() => setStatusOpen(false)} />
+        </AppDialog>
       ) : null}
 
       {confirmingFinish ? (
-        <Modal
-          transparent
-          animationType="fade"
-          onRequestClose={() => !runtime.finishing && setConfirmingFinish(false)}
+        <AppDialog
+          visible
+          onClose={() => setConfirmingFinish(false)}
+          closeDisabled={runtime.finishing}
+          backdropTestID="connected-finish-backdrop"
+          backdropAccessibilityLabel="Cancel ending the connected game"
+          dialogTestID="connected-finish-confirmation"
+          dialogAccessibilityRole="alert"
+          style={themed($boardDialog)}
         >
-          <Pressable
-            testID="connected-finish-backdrop"
-            accessibilityRole="button"
-            accessibilityLabel="Cancel ending the connected game"
-            style={themed($dialogBackdrop)}
-            onPress={() => !runtime.finishing && setConfirmingFinish(false)}
-          >
-            <Pressable
-              testID="connected-finish-confirmation"
-              accessibilityRole="alert"
-              style={themed($dialog)}
-              onPress={() => {}}
-            >
-              <Text
-                weight="bold"
-                text="End this connected game and save an immutable final summary?"
-                style={themed($dialogText)}
-              />
-              <View style={themed($dialogActions)}>
-                <Button
-                  testID="cancel-connected-finish-button"
-                  text="Cancel"
-                  disabled={runtime.finishing}
-                  style={themed($dialogButton)}
-                  onPress={() => setConfirmingFinish(false)}
-                />
-                <Button
-                  testID="confirm-connected-finish-button"
-                  text={runtime.finishing ? "Ending…" : "End game"}
-                  preset="reversed"
-                  disabled={runtime.finishing || Boolean(finishBlockedReason)}
-                  style={themed($dialogButton)}
-                  onPress={() => {
-                    void runtime.finish().finally(() => setConfirmingFinish(false))
-                  }}
-                />
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
+          <Text
+            weight="bold"
+            text="End this connected game and save an immutable final summary?"
+            style={themed($dialogText)}
+          />
+          <View style={themed($dialogActions)}>
+            <Button
+              testID="cancel-connected-finish-button"
+              text="Cancel"
+              disabled={runtime.finishing}
+              style={themed($dialogButton)}
+              onPress={() => setConfirmingFinish(false)}
+            />
+            <Button
+              testID="confirm-connected-finish-button"
+              text={runtime.finishing ? "Ending…" : "End game"}
+              preset="reversed"
+              disabled={runtime.finishing || Boolean(finishBlockedReason)}
+              style={themed($dialogButton)}
+              onPress={() => {
+                void runtime.finish().finally(() => setConfirmingFinish(false))
+              }}
+            />
+          </View>
+        </AppDialog>
       ) : null}
     </Screen>
   )
@@ -373,36 +352,10 @@ function ConnectedBoardRuntime({
 
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
-const $dialogBackdrop: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-  padding: spacing.lg,
-  backgroundColor: colors.palette.overlay50,
-})
-const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: "100%",
-  maxWidth: 420,
+const $boardDialog: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxHeight: "82%",
   gap: spacing.md,
-  padding: spacing.lg,
-  borderRadius: spacing.lg,
-  borderWidth: 1,
-  borderColor: colors.separator,
-  backgroundColor: colors.background,
-  shadowColor: colors.palette.neutral900,
-  shadowOffset: { width: 0, height: spacing.xxs },
-  shadowOpacity: 0.35,
-  shadowRadius: spacing.md,
-  elevation: 16,
 })
-const $wideDialog: ThemedStyle<ViewStyle> = () => ({ maxWidth: 520 })
-const $dialogText: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
-const $dialogActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.xs,
-})
-const $dialogButton: ThemedStyle<ViewStyle> = () => ({ flex: 1, minHeight: 48 })
 const $layoutOptions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",

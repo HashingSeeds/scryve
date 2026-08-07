@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
-import { AccessibilityInfo, Modal, Platform, Pressable, StyleSheet, View } from "react-native"
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import type { LifeDelta } from "@/features/game/types"
@@ -8,6 +8,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
+import { AppDialog, $dialogActions, $dialogButton } from "./AppDialog"
 import { Button } from "./Button"
 import { LifeControls, overlayTint } from "./LifeControls"
 import type { LifeCardContentRotation } from "./playerCardTypes"
@@ -225,54 +226,46 @@ export function LifeCard({
         onLongChange={(direction) => openEditor(direction > 0 ? "add" : "subtract")}
       />
       {editMode ? (
-        <Modal transparent animationType="fade" onRequestClose={closeEditor}>
-          <Pressable
-            testID={`life-editor-backdrop-seat-${seatNumber}`}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel life edit"
-            style={themed($dialogBackdrop)}
-            onPress={closeEditor}
-          >
-            <Pressable
-              testID={`life-editor-dialog-seat-${seatNumber}`}
-              accessibilityViewIsModal
-              style={themed($dialog)}
-              onPress={() => {}}
-            >
-              <Text text={editTitle} preset="subheading" style={themed($dialogTitle)} />
-              <TextField
-                testID={`life-editor-input-seat-${seatNumber}`}
-                autoFocus
-                selectTextOnFocus
-                label={editMode === "set" ? "New life total" : "Amount"}
-                value={editValue}
-                keyboardType={editMode === "set" ? "numbers-and-punctuation" : "number-pad"}
-                returnKeyType="done"
-                status={editValue && !validEdit ? "error" : undefined}
-                helper={
-                  editValue && !validEdit
-                    ? editMode === "set"
-                      ? `Enter a whole number within ${MAX_LIFE_DELTA} of the current total.`
-                      : `Enter a whole number from 1 to ${MAX_LIFE_DELTA}.`
-                    : undefined
-                }
-                onChangeText={setEditValue}
-                onSubmitEditing={applyEdit}
-              />
-              <View style={themed($dialogActions)}>
-                <Button text="Cancel" style={themed($dialogButton)} onPress={closeEditor} />
-                <Button
-                  testID={`life-editor-apply-seat-${seatNumber}`}
-                  text={editMode === "set" ? "Set life" : editTitle}
-                  preset="reversed"
-                  disabled={!validEdit}
-                  style={themed($dialogButton)}
-                  onPress={applyEdit}
-                />
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
+        <AppDialog
+          visible
+          onClose={closeEditor}
+          backdropTestID={`life-editor-backdrop-seat-${seatNumber}`}
+          backdropAccessibilityLabel="Cancel life edit"
+          dialogTestID={`life-editor-dialog-seat-${seatNumber}`}
+          accessibilityViewIsModal
+        >
+          <Text text={editTitle} preset="subheading" style={themed($dialogTitle)} />
+          <TextField
+            testID={`life-editor-input-seat-${seatNumber}`}
+            autoFocus
+            selectTextOnFocus
+            label={editMode === "set" ? "New life total" : "Amount"}
+            value={editValue}
+            keyboardType={editMode === "set" ? "numbers-and-punctuation" : "number-pad"}
+            returnKeyType="done"
+            status={editValue && !validEdit ? "error" : undefined}
+            helper={
+              editValue && !validEdit
+                ? editMode === "set"
+                  ? `Enter a whole number within ${MAX_LIFE_DELTA} of the current total.`
+                  : `Enter a whole number from 1 to ${MAX_LIFE_DELTA}.`
+                : undefined
+            }
+            onChangeText={setEditValue}
+            onSubmitEditing={applyEdit}
+          />
+          <View style={themed($dialogActions)}>
+            <Button text="Cancel" style={themed($dialogButton)} onPress={closeEditor} />
+            <Button
+              testID={`life-editor-apply-seat-${seatNumber}`}
+              text={editMode === "set" ? "Set life" : editTitle}
+              preset="reversed"
+              disabled={!validEdit}
+              style={themed($dialogButton)}
+              onPress={applyEdit}
+            />
+          </View>
+        </AppDialog>
       ) : null}
     </View>
   )
@@ -399,31 +392,4 @@ const $deltaActive: ThemedStyle<TextStyle> = () => ({ opacity: 1 })
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
-const $dialogBackdrop: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-  padding: spacing.lg,
-  backgroundColor: colors.palette.overlay50,
-})
-const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: "100%",
-  maxWidth: 420,
-  gap: spacing.lg,
-  padding: spacing.lg,
-  borderRadius: spacing.lg,
-  borderWidth: 1,
-  borderColor: colors.separator,
-  backgroundColor: colors.background,
-  shadowColor: colors.palette.neutral900,
-  shadowOffset: { width: 0, height: spacing.xxs },
-  shadowOpacity: 0.35,
-  shadowRadius: spacing.md,
-  elevation: 16,
-})
 const $dialogTitle: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
-const $dialogActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.xs,
-})
-const $dialogButton: ThemedStyle<ViewStyle> = () => ({ flex: 1, minHeight: 48 })

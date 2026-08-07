@@ -1,8 +1,9 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
-import { Modal, Pressable, useWindowDimensions, View } from "react-native"
+import type { ViewStyle } from "react-native"
+import { useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 
+import { AppDialog, $dialogActions, $dialogButton, $dialogText } from "@/components/AppDialog"
 import { Button } from "@/components/Button"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
@@ -137,80 +138,61 @@ export function CurrentGameScreen({
       </View>
 
       {layoutPickerOpen ? (
-        <Modal transparent animationType="fade" onRequestClose={closePanel}>
-          <Pressable
-            testID="layout-picker-backdrop"
-            accessibilityRole="button"
-            accessibilityLabel="Close layout chooser"
-            style={themed($dialogBackdrop)}
-            onPress={closePanel}
-          >
-            <Pressable
-              testID="layout-picker-dialog"
-              accessibilityViewIsModal
-              style={[themed($dialog), themed($layoutDialog)]}
-              onPress={() => {}}
-            >
-              <Text text="Layout" preset="subheading" style={themed($dialogText)} />
-              <View style={themed($layoutOptions)}>
-                {layoutOptions.map((option) => (
-                  <Button
-                    key={option.variant}
-                    testID={`layout-${option.variant}`}
-                    text={option.label}
-                    accessibilityState={{ selected: layoutVariant === option.variant }}
-                    preset={layoutVariant === option.variant ? "reversed" : "default"}
-                    style={themed($layoutOption)}
-                    onPress={() => {
-                      setLayoutVariant(option.variant)
-                      closePanel()
-                    }}
-                  />
-                ))}
-              </View>
-              <Button tx="localGame:cancel" style={themed($menuItem)} onPress={closePanel} />
-            </Pressable>
-          </Pressable>
-        </Modal>
+        <AppDialog
+          visible
+          onClose={closePanel}
+          backdropTestID="layout-picker-backdrop"
+          backdropAccessibilityLabel="Close layout chooser"
+          dialogTestID="layout-picker-dialog"
+          accessibilityViewIsModal
+          wide
+        >
+          <Text text="Layout" preset="subheading" style={themed($dialogText)} />
+          <View style={themed($layoutOptions)}>
+            {layoutOptions.map((option) => (
+              <Button
+                key={option.variant}
+                testID={`layout-${option.variant}`}
+                text={option.label}
+                accessibilityState={{ selected: layoutVariant === option.variant }}
+                preset={layoutVariant === option.variant ? "reversed" : "default"}
+                style={themed($layoutOption)}
+                onPress={() => {
+                  setLayoutVariant(option.variant)
+                  closePanel()
+                }}
+              />
+            ))}
+          </View>
+          <Button tx="localGame:cancel" style={themed($menuItem)} onPress={closePanel} />
+        </AppDialog>
       ) : null}
 
       {endConfirmationOpen ? (
-        <Modal
-          transparent
-          animationType="fade"
-          onRequestClose={() => setEndConfirmationOpen(false)}
+        <AppDialog
+          visible
+          onClose={() => setEndConfirmationOpen(false)}
+          backdropTestID="end-game-backdrop"
+          backdropAccessibilityLabel="Cancel ending the game"
+          dialogTestID="end-game-dialog"
+          dialogAccessibilityRole="alert"
         >
-          <Pressable
-            testID="end-game-backdrop"
-            accessibilityRole="button"
-            accessibilityLabel="Cancel ending the game"
-            style={themed($dialogBackdrop)}
-            onPress={() => setEndConfirmationOpen(false)}
-          >
-            <Pressable
-              testID="end-game-dialog"
-              accessibilityRole="alert"
-              style={themed($dialog)}
-              onPress={() => {}}
-            >
-              <Text tx="localGame:endConfirmation" weight="bold" style={themed($dialogText)} />
-              <View style={themed($dialogActions)}>
-                <Button
-                  tx="localGame:cancel"
-                  style={themed($dialogButton)}
-                  onPress={() => setEndConfirmationOpen(false)}
-                />
-                <Button
-                  testID="confirm-end-game-button"
-                  tx="localGame:endGame"
-                  preset="reversed"
-                  style={themed($dialogButton)}
-                  onPress={confirmEnd}
-                />
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
+          <Text tx="localGame:endConfirmation" weight="bold" style={themed($dialogText)} />
+          <View style={themed($dialogActions)}>
+            <Button
+              tx="localGame:cancel"
+              style={themed($dialogButton)}
+              onPress={() => setEndConfirmationOpen(false)}
+            />
+            <Button
+              testID="confirm-end-game-button"
+              tx="localGame:endGame"
+              preset="reversed"
+              style={themed($dialogButton)}
+              onPress={confirmEnd}
+            />
+          </View>
+        </AppDialog>
       ) : null}
     </Screen>
   )
@@ -233,32 +215,3 @@ const $layoutOption: ThemedStyle<ViewStyle> = () => ({
   flexGrow: 1,
 })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
-const $dialogBackdrop: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-  padding: spacing.lg,
-  backgroundColor: colors.palette.overlay50,
-})
-const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: "100%",
-  maxWidth: 420,
-  gap: spacing.lg,
-  padding: spacing.lg,
-  borderRadius: spacing.lg,
-  borderWidth: 1,
-  borderColor: colors.separator,
-  backgroundColor: colors.background,
-  shadowColor: colors.palette.neutral900,
-  shadowOffset: { width: 0, height: spacing.xxs },
-  shadowOpacity: 0.35,
-  shadowRadius: spacing.md,
-  elevation: 16,
-})
-const $layoutDialog: ThemedStyle<ViewStyle> = () => ({ maxWidth: 520 })
-const $dialogText: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
-const $dialogActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.xs,
-})
-const $dialogButton: ThemedStyle<ViewStyle> = () => ({ flex: 1, minHeight: 48 })
