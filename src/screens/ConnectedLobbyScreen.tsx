@@ -87,17 +87,6 @@ export function ConnectedLobbyScreen({
         leftTx={onBack ? "common:back" : undefined}
         onLeftPress={onBack}
       />
-      <Text
-        text={`${lobby.players.length} of ${lobby.playerCount} seats claimed · ${lobby.startingLife} life · ${lobby.ruleset}`}
-      />
-      {manualCode ? (
-        <Text
-          testID="manual-code"
-          preset="subheading"
-          text={`Code: ${manualCode}`}
-          style={$centeredText}
-        />
-      ) : null}
       {inviteQrPayload ? (
         <View style={$qr}>
           <QRCode
@@ -112,8 +101,20 @@ export function ConnectedLobbyScreen({
         </View>
       ) : null}
       {manualCode ? (
+        <Text
+          testID="manual-code"
+          preset="subheading"
+          text={`Code: ${manualCode}`}
+          style={$centeredText}
+        />
+      ) : null}
+      {manualCode ? (
         <Text size="xs" text={`Scan to join or enter code ${manualCode}.`} style={$centeredText} />
       ) : null}
+      <Text
+        style={$centeredText}
+        text={`${lobby.players.length} of ${lobby.playerCount} seats claimed · ${lobby.startingLife} life · ${lobby.ruleset}`}
+      />
       {inviteUrl || manualCode ? (
         <Button
           testID="share-invite-button"
