@@ -154,7 +154,7 @@ export function ConnectedHomeScreen({
   }
 
   return (
-    <Screen preset="scroll" safeAreaEdges={["bottom"]}>
+    <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
       <Header
         title="Connected play"
         leftTx={onBack ? "common:back" : undefined}

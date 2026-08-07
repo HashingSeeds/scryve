@@ -79,7 +79,7 @@ export function JoinConnectedScreen({
     }
   }
   return (
-    <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
+    <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
       <Header
         title={inviteToken ? "Join invited lobby" : "Join with code"}
         leftTx={onBack ? "common:back" : undefined}

@@ -17,6 +17,7 @@ import {
 
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
+import type { ThemedStyle } from "@/theme/types"
 import { ExtendedEdge, useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 export const DEFAULT_BOTTOM_OFFSET = 50
@@ -34,6 +35,7 @@ interface BaseScreenProps {
    * Style for the inner content container useful for padding & margin.
    */
   contentContainerStyle?: StyleProp<ViewStyle>
+  contentInset?: "standard"
   /**
    * Override the default edges for the safe area.
    */
@@ -174,10 +176,18 @@ function useAutoPreset(props: AutoScreenProps): {
  * @returns {JSX.Element} - The rendered `ScreenWithoutScrolling` component.
  */
 function ScreenWithoutScrolling(props: ScreenProps) {
-  const { style, contentContainerStyle, children, preset } = props
+  const { themed } = useAppTheme()
+  const { style, contentContainerStyle, contentInset, children, preset } = props
   return (
     <View style={[$outerStyle, style]}>
-      <View style={[$innerStyle, preset === "fixed" && $justifyFlexEnd, contentContainerStyle]}>
+      <View
+        style={[
+          $innerStyle,
+          contentInset === "standard" && themed($standardContent),
+          preset === "fixed" && $justifyFlexEnd,
+          contentContainerStyle,
+        ]}
+      >
         {children}
       </View>
     </View>
@@ -194,11 +204,13 @@ function ScreenWithScrolling(props: ScreenProps) {
     keyboardShouldPersistTaps = "handled",
     keyboardBottomOffset = DEFAULT_BOTTOM_OFFSET,
     contentContainerStyle,
+    contentInset,
     ScrollViewProps,
     style,
   } = props as ScrollScreenProps
 
   const ref = useRef<KeyboardAwareScrollViewRef>(null)
+  const { themed } = useAppTheme()
 
   const { scrollEnabled, onContentSizeChange, onLayout } = useAutoPreset(props as AutoScreenProps)
 
@@ -218,6 +230,7 @@ function ScreenWithScrolling(props: ScreenProps) {
       style={[$outerStyle, ScrollViewProps?.style, style]}
       contentContainerStyle={[
         $innerStyle,
+        contentInset === "standard" && themed($standardContent),
         ScrollViewProps?.contentContainerStyle,
         contentContainerStyle,
       ]}
@@ -300,3 +313,12 @@ const $innerStyle: ViewStyle = {
   justifyContent: "flex-start",
   alignItems: "stretch",
 }
+
+const $standardContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: "100%",
+  maxWidth: 720,
+  alignSelf: "center",
+  gap: spacing.md,
+  paddingHorizontal: spacing.lg,
+  paddingBottom: spacing.xl,
+})

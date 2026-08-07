@@ -52,7 +52,7 @@ export function ConnectedLobbyScreen({
     : null
   if (lobby === undefined)
     return (
-      <Screen preset="auto">
+      <Screen preset="auto" safeAreaEdges={["bottom"]} contentInset="standard">
         <Header
           title="Connected lobby"
           leftTx={onBack ? "common:back" : undefined}
@@ -62,7 +62,7 @@ export function ConnectedLobbyScreen({
       </Screen>
     )
   return (
-    <Screen preset="scroll" safeAreaEdges={["top", "bottom"]}>
+    <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
       <Header
         title="Connected lobby"
         leftTx={onBack ? "common:back" : undefined}
