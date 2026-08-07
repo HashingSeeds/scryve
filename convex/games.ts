@@ -1,6 +1,8 @@
 import { paginationOptsValidator } from "convex/server"
 import { v } from "convex/values"
 
+import type { Doc, Id } from "./_generated/dataModel"
+import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { internalMutation, mutation, query } from "./_generated/server"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import {
@@ -28,11 +30,11 @@ const MAX_PLAYERS_PER_GAME_READ = 7
 const MAX_INVITES_PER_GAME_READ = 20
 const MAX_HOSTED_GAMES_RECOVERY_READ = 25
 
-async function gameByPublicId(ctx: any, publicId: string) {
+async function gameByPublicId(ctx: QueryCtx, publicId: string) {
   assertPublicId(publicId)
   const game = await ctx.db
     .query("games")
-    .withIndex("by_public_id", (q: any) => q.eq("publicId", publicId))
+    .withIndex("by_public_id", (q) => q.eq("publicId", publicId))
     .unique()
   if (!game) throw new Error("Game not found")
   return game
@@ -55,11 +57,11 @@ function assertDeviceId(deviceId: string) {
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId)) throw new Error("Invalid device identifier")
 }
 
-async function consumeJoinAttempt(ctx: any, clerkUserId: string) {
+async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string) {
   const now = Date.now()
   const record = await ctx.db
     .query("joinAttempts")
-    .withIndex("by_clerk_user", (q: any) => q.eq("clerkUserId", clerkUserId))
+    .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", clerkUserId))
     .unique()
   if (!record || now - record.windowStartedAt >= 60_000) {
     if (record) await ctx.db.patch(record._id, { windowStartedAt: now, attempts: 1 })
@@ -70,36 +72,81 @@ async function consumeJoinAttempt(ctx: any, clerkUserId: string) {
   await ctx.db.patch(record._id, { attempts: record.attempts + 1 })
 }
 
-async function playersForGame(ctx: any, gameId: any) {
+async function playersForGame(ctx: QueryCtx, gameId: Id<"games">) {
   const players = await ctx.db
     .query("gamePlayers")
-    .withIndex("by_game", (q: any) => q.eq("gameId", gameId))
+    .withIndex("by_game", (q) => q.eq("gameId", gameId))
     .take(MAX_PLAYERS_PER_GAME_READ)
   if (players.length > 6) throw new Error("Game has more than six seats")
   return players
 }
 
-function totalEventCount(game: any, players: any[]) {
+function totalEventCount(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
   return (
     (game.eventSequence ?? 0) +
     players.reduce((total, player) => total + (player.eventCount ?? 0), 0)
   )
 }
 
-async function currentUsableInvite(ctx: any, game: any, now: number) {
+async function findInvite(
+  ctx: QueryCtx,
+  args: { token?: string; manualCode?: string },
+): Promise<Doc<"invitations"> | null> {
+  if (args.token)
+    return await ctx.db
+      .query("invitations")
+      .withIndex("by_token", (q) => q.eq("token", args.token!))
+      .unique()
+  if (args.manualCode)
+    return await ctx.db
+      .query("invitations")
+      .withIndex("by_manual_code", (q) => q.eq("manualCode", normalizeManualCode(args.manualCode!)))
+      .unique()
+  return null
+}
+
+async function allocateInvite(ctx: QueryCtx, inviteToken: string, manualCodeCandidates: string[]) {
+  if (
+    await ctx.db
+      .query("invitations")
+      .withIndex("by_token", (q) => q.eq("token", inviteToken))
+      .unique()
+  )
+    throw new Error("Invite collision; retry")
+  for (const candidate of manualCodeCandidates) {
+    const code = normalizeManualCode(candidate)
+    const found = await ctx.db
+      .query("invitations")
+      .withIndex("by_manual_code", (q) => q.eq("manualCode", code))
+      .unique()
+    if (!found) return code
+  }
+  throw new Error("Manual code collision; retry with fresh candidates")
+}
+
+async function currentUsableInvite(
+  ctx: QueryCtx,
+  game: Doc<"games">,
+  now: number,
+): Promise<Doc<"invitations"> | null> {
   if (game.currentInvitationId) {
     const invite = await ctx.db.get(game.currentInvitationId)
     return invite && invite.gameId === game._id && inviteIsUsable(invite, now) ? invite : null
   }
   const invites = await ctx.db
     .query("invitations")
-    .withIndex("by_game", (q: any) => q.eq("gameId", game._id))
+    .withIndex("by_game", (q) => q.eq("gameId", game._id))
     .order("desc")
     .take(MAX_INVITES_PER_GAME_READ)
-  return invites.find((invite: any) => inviteIsUsable(invite, now)) ?? null
+  return invites.find((invite) => inviteIsUsable(invite, now)) ?? null
 }
 
-async function inviteIsCurrent(ctx: any, game: any, invite: any, now: number) {
+async function inviteIsCurrent(
+  ctx: QueryCtx,
+  game: Doc<"games">,
+  invite: Doc<"invitations">,
+  now: number,
+) {
   if (!inviteIsUsable(invite, now) || invite.gameId !== game._id) return false
   if (game.currentInvitationId) return game.currentInvitationId === invite._id
   const current = await currentUsableInvite(ctx, game, now)
@@ -107,15 +154,15 @@ async function inviteIsCurrent(ctx: any, game: any, invite: any, now: number) {
 }
 
 async function terminalizeGame(
-  ctx: any,
-  game: any,
+  ctx: MutationCtx,
+  game: Doc<"games">,
   status: "finished" | "abandoned",
   reason: "host_finished" | "host_abandoned" | "stale_inactivity",
-  endedByUserId?: any,
-) {
+  endedByUserId?: Id<"users">,
+): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
     .query("gameSummaries")
-    .withIndex("by_game", (q: any) => q.eq("gameId", game._id))
+    .withIndex("by_game", (q) => q.eq("gameId", game._id))
     .unique()
   if (existing) {
     if ((existing.terminalStatus ?? "finished") !== status)
@@ -135,8 +182,8 @@ async function terminalizeGame(
     eventCount: totalEventCount(game, players),
     finishedAt: now,
     players: players
-      .sort((a: any, b: any) => a.seat - b.seat)
-      .map((player: any) => ({
+      .sort((a, b) => a.seat - b.seat)
+      .map((player) => ({
         playerId: player._id,
         seat: player.seat,
         displayName: player.displayName,
@@ -187,26 +234,7 @@ export const createLobby = mutation({
         .unique()
     )
       throw new Error("Game identifier collision; retry")
-    if (
-      await ctx.db
-        .query("invitations")
-        .withIndex("by_token", (q) => q.eq("token", args.inviteToken))
-        .unique()
-    )
-      throw new Error("Invite collision; retry")
-    let manualCode: string | undefined
-    for (const candidate of args.manualCodeCandidates) {
-      const code = normalizeManualCode(candidate)
-      const found = await ctx.db
-        .query("invitations")
-        .withIndex("by_manual_code", (q) => q.eq("manualCode", code))
-        .unique()
-      if (!found) {
-        manualCode = code
-        break
-      }
-    }
-    if (!manualCode) throw new Error("Manual code collision; retry with fresh candidates")
+    const manualCode = await allocateInvite(ctx, args.inviteToken, args.manualCodeCandidates)
     const now = Date.now()
     const gameId = await ctx.db.insert("games", {
       publicId: args.publicId,
@@ -256,19 +284,7 @@ export const resolveInvite = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     await consumeJoinAttempt(ctx, String(user.clerkUserId))
-    const invite = args.token
-      ? await ctx.db
-          .query("invitations")
-          .withIndex("by_token", (q) => q.eq("token", args.token!))
-          .unique()
-      : args.manualCode
-        ? await ctx.db
-            .query("invitations")
-            .withIndex("by_manual_code", (q) =>
-              q.eq("manualCode", normalizeManualCode(args.manualCode!)),
-            )
-            .unique()
-        : null
+    const invite = await findInvite(ctx, args)
     if (!invite) return { valid: false }
     const game = await ctx.db.get(invite.gameId)
     if (!game || game.status !== "lobby" || !(await inviteIsCurrent(ctx, game, invite, Date.now())))
@@ -292,32 +308,20 @@ export const claimSeat = mutation({
     assertAllowedColor(args.color)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const displayName = assertDisplayName(args.displayName)
-    const invite = args.token
-      ? await ctx.db
-          .query("invitations")
-          .withIndex("by_token", (q) => q.eq("token", args.token!))
-          .unique()
-      : args.manualCode
-        ? await ctx.db
-            .query("invitations")
-            .withIndex("by_manual_code", (q) =>
-              q.eq("manualCode", normalizeManualCode(args.manualCode!)),
-            )
-            .unique()
-        : null
+    const invite = await findInvite(ctx, args)
     if (!invite) throw new Error("Invite is invalid, expired, or revoked")
     const game = await ctx.db.get(invite.gameId)
     if (!game || game.status !== "lobby" || !(await inviteIsCurrent(ctx, game, invite, Date.now())))
       throw new Error("Invite is invalid, expired, or revoked")
     const existingPlayers = await playersForGame(ctx, game._id)
     const duplicate = existingPlayers.find(
-      (candidate: any) =>
+      (candidate) =>
         candidate.userId === user._id &&
         (args.deviceId ? candidate.deviceId === args.deviceId : candidate.deviceId === undefined),
     )
     if (duplicate) return { publicId: game.publicId, seat: duplicate.seat }
     const players = existingPlayers
-    const occupied = new Set(players.map((player: any) => player.seat))
+    const occupied = new Set(players.map((player) => player.seat))
     let seat = 1
     while (occupied.has(seat)) seat += 1
     if (seat > game.playerCount) throw new Error("Lobby is full")
@@ -347,25 +351,24 @@ export const lobbyProjection = query({
     const user = await requireUser(ctx)
     const game = await ctx.db
       .query("games")
-      .withIndex("by_public_id", (q: any) => q.eq("publicId", args.publicId))
+      .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
       .unique()
     if (!game) throw new Error("Game unavailable")
     const players = await playersForGame(ctx, game._id)
-    if (!players.some((player: any) => player.userId === user._id))
-      throw new Error("Game unavailable")
+    if (!players.some((player) => player.userId === user._id)) throw new Error("Game unavailable")
     const isHost = game.hostUserId === user._id
     const recentEvents =
       game.status === "active"
         ? await ctx.db
             .query("gameEvents")
-            .withIndex("by_game_server_time", (q: any) => q.eq("gameId", game._id))
+            .withIndex("by_game_server_time", (q) => q.eq("gameId", game._id))
             .order("desc")
             .take(100)
         : []
     const invite = isHost ? await currentUsableInvite(ctx, game, Date.now()) : null
     const eventCount = totalEventCount(game, players)
     const serverUpdatedAt = players.reduce(
-      (latest: number, player: any) => Math.max(latest, player.lastEventAt ?? 0),
+      (latest, player) => Math.max(latest, player.lastEventAt ?? 0),
       game.updatedAt,
     )
     return {
@@ -378,7 +381,7 @@ export const lobbyProjection = query({
       isHost,
       eventSequence: eventCount,
       serverUpdatedAt,
-      recentOperationIds: recentEvents.map((event: any) => event.operationId),
+      recentOperationIds: recentEvents.map((event) => event.operationId),
       invitation:
         invite && inviteIsUsable(invite, Date.now())
           ? {
@@ -388,8 +391,8 @@ export const lobbyProjection = query({
             }
           : null,
       players: players
-        .sort((a: any, b: any) => a.seat - b.seat)
-        .map((p: any) => ({
+        .sort((a, b) => a.seat - b.seat)
+        .map((p) => ({
           playerId: p._id,
           seat: p.seat,
           displayName: p.displayName,
@@ -433,7 +436,7 @@ export const updateMySeat = mutation({
     const { player } = await requireSeatOwner(ctx, game._id, args.seat)
     const displayName = assertDisplayName(args.displayName)
     assertAllowedColor(args.color)
-    await ctx.db.patch(player._id as any, { displayName, color: args.color })
+    await ctx.db.patch(player._id, { displayName, color: args.color })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
   },
 })
@@ -460,26 +463,7 @@ export const rotateInvite = mutation({
     if (game.status !== "lobby") throw new Error("Only a lobby invite can be rotated")
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
-    if (
-      await ctx.db
-        .query("invitations")
-        .withIndex("by_token", (q) => q.eq("token", args.inviteToken))
-        .unique()
-    )
-      throw new Error("Invite collision; retry")
-    let manualCode: string | undefined
-    for (const candidate of args.manualCodeCandidates) {
-      const code = normalizeManualCode(candidate)
-      const found = await ctx.db
-        .query("invitations")
-        .withIndex("by_manual_code", (q) => q.eq("manualCode", code))
-        .unique()
-      if (!found) {
-        manualCode = code
-        break
-      }
-    }
-    if (!manualCode) throw new Error("Manual code collision; retry with fresh candidates")
+    const manualCode = await allocateInvite(ctx, args.inviteToken, args.manualCodeCandidates)
     const now = Date.now()
     const previous = await currentUsableInvite(ctx, game, now)
     const invitationId = await ctx.db.insert("invitations", {
@@ -529,7 +513,7 @@ export const changeLife = mutation({
 
     const duplicate = await ctx.db
       .query("gameEvents")
-      .withIndex("by_game_operation", (q: any) =>
+      .withIndex("by_game_operation", (q) =>
         q.eq("gameId", game._id).eq("operationId", args.operationId),
       )
       .unique()
@@ -609,7 +593,7 @@ export const leaveMyGame = mutation({
         )
       : userPlayers[0]
     if (!player) throw new Error("Game membership required")
-    if (player.resumable !== false) await ctx.db.patch(player._id as any, { resumable: false })
+    if (player.resumable !== false) await ctx.db.patch(player._id, { resumable: false })
     return { publicId: game.publicId, left: true }
   },
 })
@@ -619,11 +603,7 @@ export const abandonGame = mutation({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireHost(ctx, game)
-    if (game.status === "abandoned") {
-      const summary = await terminalizeGame(ctx, game, "abandoned", "host_abandoned", user._id)
-      return { publicId: game.publicId, summaryId: summary._id, abandonedAt: summary.finishedAt }
-    }
-    if (game.status !== "lobby" && game.status !== "active")
+    if (game.status !== "lobby" && game.status !== "active" && game.status !== "abandoned")
       throw new Error("Only a lobby or active game can be abandoned")
     const summary = await terminalizeGame(ctx, game, "abandoned", "host_abandoned", user._id)
     return { publicId: game.publicId, summaryId: summary._id, abandonedAt: summary.finishedAt }
@@ -640,14 +620,14 @@ export const cleanupStaleGames = internalMutation({
     for (const status of ["lobby", "active"] as const) {
       const games = await ctx.db
         .query("games")
-        .withIndex("by_status_updated", (q: any) => q.eq("status", status).lte("updatedAt", cutoff))
+        .withIndex("by_status_updated", (q) => q.eq("status", status).lte("updatedAt", cutoff))
         .order("asc")
         .take(STALE_GAME_CLEANUP_BATCH_SIZE)
       for (const game of games) {
         examined += 1
         const players = await playersForGame(ctx, game._id)
         const latestActivityAt = players.reduce(
-          (latest: number, player: any) => Math.max(latest, player.lastEventAt ?? 0),
+          (latest, player) => Math.max(latest, player.lastEventAt ?? 0),
           game.updatedAt,
         )
         if (latestActivityAt > cutoff) {
@@ -743,7 +723,7 @@ export const activeConnectedGames = query({
     const user = await requireUser(ctx)
     const memberships = await ctx.db
       .query("gamePlayers")
-      .withIndex("by_user_resumable", (q: any) => q.eq("userId", user._id).eq("resumable", true))
+      .withIndex("by_user_resumable", (q) => q.eq("userId", user._id).eq("resumable", true))
       .order("desc")
       .paginate(boundedPaginationOptions(args.paginationOpts, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS))
     const active = []
