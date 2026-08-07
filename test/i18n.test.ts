@@ -1,6 +1,6 @@
 import { exec } from "child_process"
 
-import en from "../app/i18n/en"
+import en from "../src/i18n/en"
 
 // Use this array for keys that for whatever reason aren't greppable so they
 // don't hold your test suite hostage by always failing.
@@ -9,7 +9,7 @@ const EXCEPTIONS: string[] = [
 
   /**
    * This translation key actually shows up in a comment describing the usage of the translate
-   * function in the app/i18n/translate.ts file. Because the grep command in the i18n test below
+   * function in the src/i18n/translate.ts file. Because the grep command in the i18n test below
    * doesn't account for commented out code, we must manually exclude it so tests don't fail
    * because of a comment.
    */
@@ -56,8 +56,8 @@ function iterate(obj: Record<string, unknown>, stack: string, array: string[]): 
 describe("i18n", () => {
   test("There are no missing keys", (done) => {
     // Actual command output:
-    // grep "[T\|t]x=[{]\?\"\S*\"[}]\?\|translate(\"\S*\"" -ohr './app' | grep -o "\".*\""
-    const command = `grep "[T\\|t]x=[{]\\?\\"\\S*\\"[}]\\?\\|translate(\\"\\S*\\"" -ohr './app' | grep -o "\\".*\\""`
+    // grep "[T\|t]x=[{]\?\"\S*\"[}]\?\|translate(\"\S*\"" -ohr './src' | grep -o "\".*\""
+    const command = `grep "[T\\|t]x=[{]\\?\\"\\S*\\"[}]\\?\\|translate(\\"\\S*\\"" -ohr './src' | grep -o "\\".*\\""`
     exec(command, (_, stdout) => {
       const allTranslationsDefinedOld = iterate(en, "", [])
       // Replace first instance of "." because of i18next namespace separator

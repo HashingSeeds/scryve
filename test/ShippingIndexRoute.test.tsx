@@ -2,8 +2,8 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import en from "../app/i18n/en"
 import Index from "../src/app/index"
+import en from "../src/i18n/en"
 
 const mockOpenAuth = jest.fn()
 

@@ -1,9 +1,12 @@
 const metroConfig = require("./metro.config.js")
 
 const platforms = ["ios", "android", "web", "native"]
-const extensions = metroConfig?.resolver?.sourceExts.flatMap((pExt) =>
-  platforms.map((platform) => `.${platform}.${pExt}`).concat(`.${pExt}`),
-)
+const extensions = [
+  ".d.ts",
+  ...metroConfig.resolver.sourceExts.flatMap((pExt) =>
+    platforms.map((platform) => `.${platform}.${pExt}`).concat(`.${pExt}`),
+  ),
+]
 
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
@@ -126,7 +129,7 @@ module.exports = {
         "section of your package.json. If this module is development only - add it to the " +
         "from.pathNot re of the not-to-dev-dep rule in the dependency-cruiser configuration",
       from: {
-        path: "^(app|src)",
+        path: "^src",
         pathNot: "\\.(spec|test)\\.(js|mjs|cjs|ts|tsx)$",
       },
       to: {
@@ -186,7 +189,7 @@ module.exports = {
         collapsePattern: "node_modules/(@[^/]+/[^/]+|[^/]+)",
       },
       archi: {
-        collapsePattern: "^(app|src|test)/[^/]+",
+        collapsePattern: "^(src|test)/[^/]+",
       },
       text: {
         highlightFocused: true,
