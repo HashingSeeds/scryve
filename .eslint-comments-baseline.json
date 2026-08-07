@@ -13,7 +13,6 @@
     },
     "app.config.ts": {
       "15cc2bfe7ec99b6f0564f9de3687fcb5bc7f120155ca9cb3a36f07a35391bdb8": 1,
-      "173c103699c3c735499b453ae2b12c41829163ccbada1baa8f242a5867d6a3a8": 1,
       "3091511ab1ea4a8f9ee3b6399d2fcf473d4a4df78936af78c0b2ec48eb362ef0": 1,
       "44831ed2275d4199cfbced25c4daa2a948a0e810dd9fa0c7cb9217435eb7a554": 1,
       "641c9ed5f6ac92c177091c1867f2edd444dbbeea4f610672e3e7643ae421bd84": 1,
@@ -22,13 +21,51 @@
       "d7130b5314130f32a680951e1734ef6f05f4ed00b08e8076533d166283ec6942": 1,
       "fb24f5d212102fe737a1fe36cbbf4eb04a50de5e3f4f666b169b037191204238": 1
     },
-    "app/components/AutoImage.tsx": {
+    "babel.config.js": {
+      "c6a5bf7b49ff487548fe804ebbb4f8966bb974bf4a5956b34e09882eba528096": 1
+    },
+    "convex/games.ts": {
+      "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1
+    },
+    "convex/schema.ts": {
+      "2dfdaa01c8a3339d91d525f33c860c1c812f89dda466bd183c4d0f2402e689b5": 1,
+      "60e7c32fcb68ac7f6c595d524d03dbe2fc48e9ffccdaa3c2b336a3c42d17b61d": 1,
+      "aeccc44d13a6f8fcbc0ba6db7ee64acdd62d164577991bc53708177570aacee5": 1,
+      "b3d78a4cd1d17d3268b48482d0f6635b2b13aeee88dd5c72ac22b29d2c449b60": 1,
+      "cdf00d1ccff33a2492ccd20452c443422abec83754004e0949cef61f6fc80e5d": 1
+    },
+    "jest.config.js": {
+      "530730d6c7f712f77b68e001b4b038a3f09b8ab1ae620d02bc853e8446ec864a": 1
+    },
+    "metro.config.js": {
+      "050c5590b9170b996ece35226b4129354ac91fec294713f9f43e61efc90e50d1": 1,
+      "1bb3653a38baea88d0cd307b88a3e95ed7978043761b706b6e16e9753683a678": 1,
+      "205d1a8c9d9478122a83abc35e157fd458890c17b78711f1f97c1affada84e1b": 1,
+      "27ff87df7c2a1e72c122bdf284d7809d312e6d403fd39ad0935f5f85dfef3cf4": 1,
+      "6ad97ce1ae74d4a1b03c9f7d36c712a344343749e971d48a71a0e9f085445012": 1,
+      "770e5fb311330a3c6b152b9a6ea0e108f74d40d97cc38259134fae269d164e0c": 1,
+      "78aa0097c838503bf803bfc6222f8966e5c115dffd8f374639cdce64162195c7": 1,
+      "ccb7c098bc05a920541352099df8a37c625da36a01831d741d09fa3cafe804f8": 1
+    },
+    "src/app/_layout.tsx": {
+      "45bd01fad91b26032592c9581f712a57d870d5d29bf873142854d23e50486743": 1,
+      "4c9cf8a7e9148036ca0a447a4589c5595800107bc46872cef595710f1388814c": 1,
+      "597b0b1dd9a97a330c48544c34ce4fdfa04a5b0aea606087503dfbddc832b8ab": 1,
+      "98ac1829f0c1b0bceb5a560ef01b305a99ec15d05275234ac935d7feaa53bef6": 1,
+      "ae439fe3ee43d7e1ad600cf7a0d0525afa43dad60c0f806fc1adfe46d85cf473": 1,
+      "e22ad56ba08688932ba2221350ea03bd8034fc943d750c10882f7b7d4dcf3949": 1,
+      "e41aa88874e63bb3d4eab9cf83bc73e9ec290aeb3aacadc5c262aa8a53cc5852": 1
+    },
+    "src/app/+native-intent.tsx": {
+      "abc7c7005430b10d1ad37a4b72f8de0c0561fd4519f370d4f26afc5401dd168b": 1
+    },
+    "src/components/AutoImage.tsx": {
       "3fc8afb297f24f4516a73520c919cf890c121fa7fd2b813b5d55c9bdb9387c81": 1,
       "5c1cb5b1153acf3147a68983906bd9fcbaf6ed611bc64a5da8c4eacae7e75f36": 1,
       "80aab2f1a7d79481abbc952097895f2b6c6db4a1f5423cf84ab7311b47491ed3": 1,
       "9dad48f6d0e6b42cf08ac6f7a29aa2b382a49e0b4b0971ed464cf49c3d412f67": 1
     },
-    "app/components/Button.tsx": {
+    "src/components/Button.tsx": {
       "02af114c9b34af944d1ae0128eb838cc51b6949ee02782b4474f69378f365bf5": 1,
       "0372db9ceb565a703f6b75f2fc707c92e87fc0cff1a3d2c541b19384a66e86c2": 1,
       "058af45ea3d7e2b28a7b03428229508de8511b971553fc892b911e38e819802f": 1,
@@ -47,7 +84,7 @@
       "e8b044497f44ac0c9745556687b35139607666238754bdd319e8b27e9fbcf375": 1,
       "f585e193b92dc12bdb286b555b3ea0db38a4b74d77136ad9708281e7e2b02bc0": 1
     },
-    "app/components/Card.tsx": {
+    "src/components/Card.tsx": {
       "09f381aa41b18052403084798c99ead36979a80f3a2e19a5f71703ae66c35556": 1,
       "0f0b404a4d96697d59188af9d77967eb944c9141449175a072ef2a1dcc04675f": 1,
       "12655829711af1209e5ab1a534e8849ca4fc48ef734e8ce46e0075d52ff1f3e3": 1,
@@ -72,7 +109,7 @@
       "ea9a74618c8d23df0657283ccdbd32228ddec185cd6abd6fa996fe64305ee727": 1,
       "ec8d28716957af6c2a5767dfc301c80c125686c12bf5ae29944898e8722883ee": 1
     },
-    "app/components/EmptyState.tsx": {
+    "src/components/EmptyState.tsx": {
       "0b63ce97ec3149ab3f78e9146046b9b9dc594483a4dc31bd71865626ffcb629a": 1,
       "121f5ec99332ad297e187a07a1c3bdd304e70c3b7e1eee2ef0f56271fa0a6ce2": 1,
       "18daae2a8c91e22212362a4fc8cc3c5a07fc4394bf8a2027141272385dfbb092": 1,
@@ -97,7 +134,7 @@
       "ea9a74618c8d23df0657283ccdbd32228ddec185cd6abd6fa996fe64305ee727": 1,
       "ec8d28716957af6c2a5767dfc301c80c125686c12bf5ae29944898e8722883ee": 1
     },
-    "app/components/Header.tsx": {
+    "src/components/Header.tsx": {
       "097d5ce272f22bcf927cc4c59f3e3275aaf68e9bf430a1c05c9bca9415f7289c": 1,
       "09f9ad7a655361647fe57794266ce23a01ab50890af390b6656a82a99b073d73": 1,
       "163e9e8420ee7ed7fe089662a3c21af1907209c020456819e34406dab6fa01f2": 1,
@@ -123,7 +160,7 @@
       "e3b4192cf7870e161cae803590883d60f7b1a7345fdc47c1fa2539048ab7aa2a": 1,
       "f585e193b92dc12bdb286b555b3ea0db38a4b74d77136ad9708281e7e2b02bc0": 3
     },
-    "app/components/Icon.tsx": {
+    "src/components/Icon.tsx": {
       "08d067a10b97876c8ac10b160adffc5e08afaf48faecd0790577acdee92af6e3": 1,
       "19ce78d32f9de1a899c45113c7ead93e286532f52ec3bf60219180347baa467a": 1,
       "635f403d4ff3ebc720029eaac44cfab2f065b94c96f059aefa642dc92bf041b1": 1,
@@ -133,7 +170,7 @@
       "9fd238a02b4df451cb3386ceb70e7c553e827fd32117384539490402c757d589": 9,
       "b78b5d4da742dddbd6485100bd90899b11c22e52ad628c94955ed0fa9a6a6582": 1
     },
-    "app/components/ListItem.tsx": {
+    "src/components/ListItem.tsx": {
       "32e6411a8e8a30ef4814d4fecb2b10a83a1c585e26ce17df4e8ee271cb1ea2bd": 1,
       "3aee462f1e3f6f3409e9a9af5a66021f72e306f65a60add790bc92bbe7df2fa5": 1,
       "3e138483f79b9d27f1cc2b14b3e4fa2de27ee286d9f74ca17edc51689b4e4cdc": 1,
@@ -154,7 +191,7 @@
       "f585e193b92dc12bdb286b555b3ea0db38a4b74d77136ad9708281e7e2b02bc0": 1,
       "fa6f40ada09db826d8d0909ade4d3ec96271463de4da318815e63eb86698c7e5": 1
     },
-    "app/components/Screen.tsx": {
+    "src/components/Screen.tsx": {
       "071fd9b148aaab00ae6a8a44c2b2d2e5206f64db3baf88fe544fbe53692d6dc4": 1,
       "08f346e3791f830bbda96e58ed113abd38a9f4fabfc9d9dc26f687907b9d0af8": 1,
       "0b1bf4d11ad97aa4585dbf5b7d33d6d58e97c53866da5195473e6eb5a857fbc1": 1,
@@ -182,10 +219,10 @@
       "ceb0afae66763c5152a030eee78d39d7694a8a668ee6ae4f51e5f5914e041e18": 1,
       "e3b4192cf7870e161cae803590883d60f7b1a7345fdc47c1fa2539048ab7aa2a": 1
     },
-    "app/components/Text.test.tsx": {
+    "src/components/Text.test.tsx": {
       "d58ce64eb44387fb655d65d69f5b1da7a1f82b1c57d262a2e96974d02224147f": 1
     },
-    "app/components/Text.tsx": {
+    "src/components/Text.tsx": {
       "058af45ea3d7e2b28a7b03428229508de8511b971553fc892b911e38e819802f": 1,
       "334d53fc97abacd619c5b9b7989e44c26e8beac814bdad61a1a3c97ebd735ca7": 1,
       "3aee462f1e3f6f3409e9a9af5a66021f72e306f65a60add790bc92bbe7df2fa5": 1,
@@ -196,7 +233,7 @@
       "f585e193b92dc12bdb286b555b3ea0db38a4b74d77136ad9708281e7e2b02bc0": 1,
       "fa9922eacdd6ab6893c482809564e8d886040eeef360df8cb4528db828ec08e9": 1
     },
-    "app/components/TextField.tsx": {
+    "src/components/TextField.tsx": {
       "1bfd71ddb97290093e8cbfb31f88deb3dee67e0aceb3b815c1f5a99704dd3596": 1,
       "25f59d3ab07a0881688a7aa3742af1b898564a45cb8bf3db1ed97f507326b643": 1,
       "2c9c889f447f07cde597ed0947740c4b95258a1699ff4894b57be72117695a24": 1,
@@ -218,16 +255,16 @@
       "e41bfa0cac6bdc806bbe27d34f4cf8f8461da2aa37d5fae85e6cafe53419e671": 1,
       "f23de36da044e5faf67873b2078bff59ff71d0bf09e3b6f1e7ef65bd9b24c8a2": 1
     },
-    "app/components/Toggle/Checkbox.tsx": {
+    "src/components/Toggle/Checkbox.tsx": {
       "265efb85d4dff12efe329642605059e881b6c2f5adb97e25fb47e3e47b4fa1bc": 1,
       "62d56b3ee0cd7514f54b695fcd86987ded745d809b660ed80b7f4e1fd059e30a": 1,
       "d85d924b7095cb6567db8ed280d628b91dc0325f78c1f200a44244291b9f170d": 1
     },
-    "app/components/Toggle/Radio.tsx": {
+    "src/components/Toggle/Radio.tsx": {
       "6ef72dcbe441d92baa755ceb78765e0869e8ff58a0f35aa4fe3185164a27b714": 1,
       "720c6ad947fd50c91a9ecbedc64463b8bab9620dbffaf4067fe997660e8269fa": 1
     },
-    "app/components/Toggle/Switch.tsx": {
+    "src/components/Toggle/Switch.tsx": {
       "13e2cf4e981bc897fe72eab66b63854e82c647f45baf0307d6e23c4212c5af9f": 1,
       "3ebe6314b0648053e8d8b15c017c7eae87722eae2cdfcf204682ead2da828dd4": 1,
       "65b961baba30f576c470f7e80190a701b4f135a1496d25d0fc130b4a819ec744": 1,
@@ -235,7 +272,7 @@
       "b948f1c9d1b7f35f7b933394bc9500cb74ee850e26282b7201295d0f8264a3d5": 1,
       "ec63725c9926e757b0718c61297ac602df3828a0666d52a26ff5277cc87f5f12": 1
     },
-    "app/components/Toggle/Toggle.tsx": {
+    "src/components/Toggle/Toggle.tsx": {
       "0bd373663d725af99ad094bef0f7ff9571c9a2213d6965f86f36027213964d53": 1,
       "16c95dda568bec4beda20895343a971e89ae406776206d4c78f3d2ec3b7e6755": 1,
       "1a51bbdec167cbe19495542714661f9a17318b7ce898d088abd1fff4b1eae4a1": 1,
@@ -260,13 +297,13 @@
       "d720704d533c1df6d76d32036a7cac6aa92ea945109b9d7cc1e2c2660b963cfb": 1,
       "f23de36da044e5faf67873b2078bff59ff71d0bf09e3b6f1e7ef65bd9b24c8a2": 1
     },
-    "app/devtools/ReactotronClient.ts": {
+    "src/devtools/ReactotronClient.ts": {
       "620b71469265b7ba6e6e59e9f41256c8496d2a65b566476589f9bfafda36e7ef": 1
     },
-    "app/devtools/ReactotronClient.web.ts": {
+    "src/devtools/ReactotronClient.web.ts": {
       "02da0c1968abe4192f8b84f7a4c6b1995519b4167606ee17fe0e06b334759e3c": 1
     },
-    "app/devtools/ReactotronConfig.ts": {
+    "src/devtools/ReactotronConfig.ts": {
       "0920d0cd3d674f35afc2cd6def11c33d4a63b8a3aee3e4b04e3f69d49ebcd636": 1,
       "10b673b87347bfd94c917d0c99a37326e8d08359529696e79a00cf688b2d2883": 1,
       "186823ab2f7100f7b9b9ade9f6db66bce38f3046f28497006cba2c8fe865d9c2": 1,
@@ -275,22 +312,21 @@
       "a5e9295d2bb47e1b296528b8a4e4754ed3f0fad25fae13da52de3ae5af172fe7": 1,
       "a6b0b8e2850258d66975baae5c82a2fec816f743b0ee5ce341fc544ade3dfeda": 1
     },
-    "app/features/auth/AuthContext.test.tsx": {
+    "src/features/auth/AuthContext.test.tsx": {
       "17f9bafd6b44bcd62f93b9aecbd55d6165d710df6dfc38eac3f1ce00516e59e3": 1
     },
-    "app/features/auth/AuthContext.tsx": {
+    "src/features/auth/AuthContext.tsx": {
       "41036096b14e92f4a6d2396987a899fa080a1abec9cbbbd89ec76c57c7eef9ff": 1,
-      "9c2bf55bd8198abea8f5192672b088170d6e7a9ec6721ca90719804b580a9f7a": 1,
       "df56494b9d5cdb0ae27b7cbb2bf82e2e1b1eb9fb7077068fae90801570c80a87": 1
     },
-    "app/features/auth/config.ts": {
+    "src/features/auth/config.ts": {
       "f3cf7c21cc75c12db9853a1f0238e4bc1c5f2f3dff251e455b14c00e8cf8cbfc": 1
     },
-    "app/features/connected/ConnectedErrorBoundary.tsx": {
+    "src/features/connected/ConnectedErrorBoundary.tsx": {
       "9d7635916369df656ca365a2adc138afc59cdfbd49d36efcbca63369d6fb96d3": 1,
       "adaf0dd26d07abfbaf141122f1cca8fca3207a8e459e1c9df246f790bdfce7d5": 1
     },
-    "app/i18n/index.ts": {
+    "src/i18n/index.ts": {
       "0cfe3f07f37ec1394440aacda34e3d29fe4cee939e1fae1c7373ce585d7cceec": 1,
       "5c490291c4667a674cead2b843f3ab03d143829b49964321a42912a16cf1ce6c": 1,
       "a50d87e9582c98d71a3999bd1c0f1a5a392ed464182a452fa48f39dc029884b7": 1,
@@ -298,29 +334,10 @@
       "d69081620684db87355bec9d6de177c9cc2c07e10f4f95d31d47fbcb261b106d": 1,
       "fed05f3c771e97ee9f706bb7d1604836eb9c4fdb888e818c29073d884e2561b8": 1
     },
-    "app/i18n/translate.ts": {
+    "src/i18n/translate.ts": {
       "ea755fc2a1c071dd7dca50d2b21ca38c3ca18db779742961bf0ca220101ff73b": 1
     },
-    "app/screens/ErrorScreen/ErrorBoundary.tsx": {
-      "151b197648faac7857a0ae4a26f61ddb8e1e00e4a253930a8a4bb258e83bf640": 1,
-      "379e5e9ae4fbf701c6b0fa491a47d49e7252677f3bcef71db47a50a5aa79c891": 1,
-      "51052b8cd2fa25728ca046afea20f3a0d8cdb3c42b7da5bd674c9dd0b759fbc6": 1,
-      "69ea271967944ada96f06ff76aef1ae0d48658f1ea028c226fd7031005945e73": 1,
-      "7f3a92b0c363516c9f4cf67145201e360891c84aae55c07d83ac8f3b24909979": 1,
-      "84a8cc91bea11b7aa769309a1f64385c2559b11734aac565374ae26ebe64cebd": 1,
-      "970962669a7c8b6f3553119bbac724de2d2ba81dc83a8290005d0897a88c58ce": 1,
-      "c1ca2e33f6a865b1d9da689c1be4adf5314a7536433a89bd65cd0006bee577c6": 1,
-      "c2fe1d4e78475f9b98da9d1fa131790b8ade6ac8eef11cb885ec3a49bcdad9de": 1,
-      "f93608d068f7436b6d96ef8d3d6b1da731ac6a7eb4879b9ed165a3fffd210c54": 1,
-      "fc1f2343293d84fbb2a5ecbd06183ab7236a53d2d953166e9fddfda7d13fcc81": 1
-    },
-    "app/screens/ErrorScreen/ErrorDetails.tsx": {
-      "d1891d8a39a5170b8d8759f7630ea0c4b3e98545abd0e23ac32b9666f18dfbe6": 1
-    },
-    "app/screens/LandingScreen.tsx": {
-      "674d86cc7b73ef9c8f516de7b1ec48f8fd05885d33715ae3c9456cde9a34384a": 1
-    },
-    "app/theme/colors.ts": {
+    "src/theme/colors.ts": {
       "0908db82b7643e1d786131884b03a333f385e9b985a6bfd62b5992a4c363c876": 1,
       "24677eead7dcf8f4115801af3cd71bbc9ae5d700dae63c33f79189fac3b2ab07": 1,
       "3f911805387c2fadb780ab79c121c91b589d8384e552d7cfce74f16502304c0a": 1,
@@ -334,7 +351,7 @@
       "d3b9c83465120f511607ad4c4a173832b392d9c0ebc21fafb088fe10eb17856d": 1,
       "de098319aa8a43f39095e0aaf2d15b11b05311a0c86ac51e3d91648ce03d3173": 1
     },
-    "app/theme/context.tsx": {
+    "src/theme/context.tsx": {
       "4124555166b3b578bb238c8fae05d345bcae75dd5b05f158f3ba1459ef343614": 1,
       "8ce18d4fb5c6dfd4aa48760b203add8c7302d5e737b438d4be5adbb09feacbbf": 1,
       "9213f599cd4e171b84de427efddcd96955fa89a54cf60b6a62bee6b3b3fa59ed": 1,
@@ -343,29 +360,29 @@
       "e15dabbe56a9e3cfc87eda6c6ba2b16c2958b948096f762f062fd52935b8bb58": 1,
       "f2ef488764caf6def899bbdc9dc2b43aa0e9c508a0a2d9166dfbf4ce6a4011b9": 1
     },
-    "app/theme/context.utils.ts": {
+    "src/theme/context.utils.ts": {
       "56b06c88f9c8caccb1459dd29b92b760414ff229c082b2485d28ec147543ddf2": 1,
       "dd6d76bfa343e460d61122d6c3c296e7bb0b0b87270c2663ab13166de392ef5b": 1
     },
-    "app/theme/spacing.ts": {
+    "src/theme/spacing.ts": {
       "5243b962092a9553f155676fc2a03535ebd449a1da1b90e614fd3ca35a23438c": 1
     },
-    "app/theme/spacingDark.ts": {
+    "src/theme/spacingDark.ts": {
       "e33e372215cde53650724388097be2e5327059727e7663115640cc4839e952b6": 1
     },
-    "app/theme/styles.ts": {
+    "src/theme/styles.ts": {
       "0663fa67759ad309d3d78e4be71b21d0aabf16938ae1e1493d9a64ee30fa75e6": 1,
       "51f6f4e89501cdbd8654db8f31e48567a1c084af1c75263efa07d4b2c638251e": 1,
       "9fd238a02b4df451cb3386ceb70e7c553e827fd32117384539490402c757d589": 1,
       "a01ea7d4ebe9a1b297828c2daf7e5637664b597fed4ca75b1e7fa3e1a6e22a98": 1
     },
-    "app/theme/theme.ts": {
+    "src/theme/theme.ts": {
       "6c1cb96d2fd81fa9b112b9ce8eb90bd9d8bbc1eedd0c81beb0d2cb2ac4b3ff34": 1
     },
-    "app/theme/timing.ts": {
+    "src/theme/timing.ts": {
       "9d0b7d655e9cf856531dabd0b14e0d68dd649bbff4274db3ba24f88af178d9ad": 1
     },
-    "app/theme/types.ts": {
+    "src/theme/types.ts": {
       "3a4326eddd783195cc26ad0f3fb8983821b0c6986000aad6b126979f3e8b765f": 2,
       "488e6cda20fcefb898ad14f04de87e652ce207a0da6fec96a47f7cf5d86f26e9": 1,
       "525b30599112dcfbbfdbac189506dfc2243fa33ce60bd6420620a04591a82251": 1,
@@ -375,7 +392,7 @@
       "de83659d299215875def2b4706dbb47200afe8348076ffd1be645c54f0594cbc": 1,
       "f45d3d313ae92ff7c15a4d2fa146cf7378d984f3f09bd6baf19ad75059de1cd4": 1
     },
-    "app/theme/typography.ts": {
+    "src/theme/typography.ts": {
       "1f9406b24a22a860ee4c158994fe4042fdeae0cd469102e4379c8bfcf1a00a0d": 1,
       "22bb06e56baaca7ec0683adb8ba662de9e0876dce0978a5e6471d75ccc15a0eb": 1,
       "2d30ed767b27184f26853fed52367a53830afaea85bb318997684c4114f9f0a9": 1,
@@ -386,43 +403,36 @@
       "952e0d9cd92d4789561be1d35dd7d0445c9c95dbe8a28dbb22a6d06fe77bb2ec": 1,
       "eb3e6df201ce808fb454f0fba97dfb13a610f5fd5d696b15fc56dba72287aaa0": 2
     },
-    "app/utils/crashReporting.ts": {
+    "src/utils/crashReporting.ts": {
       "14262c5f27bbdd27e9bd16f8b4fe3e19724ccd29a14b3e0afdf1473909ef1a79": 1,
       "200eca2789d884f0f4a727b123bf6a5678b98510a93a4616675dbb6d1b793e62": 1,
       "37cb8d3ec429b6c87e3f4f92634f0f277a341031d130a110b96f98482977930e": 1,
-      "4c52531f205986e82ae341cbddf1fce944dde5b1ca9c76bb40defe9e62df5e4e": 1,
       "a352faa33ca43131569c5ecc89201632b1592b3225886e5fa4f2369b90477111": 1,
-      "ae8bd6ec15b8dbadd33741592f961fec8efede60f1db0d0fc2daf9ac7ccbf75f": 1,
-      "b808580ba7f04aaa5126d98612193e6b8e233c5f95997d5720111af8c1d2d5c9": 1,
-      "bd241e2ae0c4a08e5aa6f507b834c9eac66c39e4e290c60871f37368e6bbf748": 1,
-      "d7cdde26c5074ec765e1f14419962715b1ab0c4200d5fe374398b4cd07d343b3": 1,
-      "e7f42b52ce4f24f10acacd3d4ab6c354d7361b01d2f812610a1d72ed3431c43b": 1,
-      "e9df4fea08616a69d0e71214e0482c7db4a63f426429c84166a40df2c9604d22": 1,
       "f18aeaef35b29dd2a7138ea75579ced4668e8b28d7c8d9ebe72c059d5e208375": 1
     },
-    "app/utils/delay.ts": {
+    "src/utils/delay.ts": {
       "41062ca4dadeaf9c48637920da90584433726667100e0a2683ba5c065a310d46": 1
     },
-    "app/utils/formatDate.ts": {
+    "src/utils/formatDate.ts": {
       "069c551ea4b59e9150b7180f767d2d00ab281f0368001fa345a4e2eeb9fd6217": 1,
       "0819514e281c8bf64d6e7ab5dee68dc14eb9bd9a55f66535c7419789afddbf66": 1,
       "0d7966230c8940168408e368e2d6e1f03241560572d0b848beacdef927cddbcf": 1,
       "5946163b16f89a8d07e0375ba1dc087949f08bc40208db84a8cadf6f399b578e": 1
     },
-    "app/utils/gestureHandler.native.ts": {
+    "src/utils/gestureHandler.native.ts": {
       "45aa26c40d5087170b472283af5d455a67f37a66e775a90fc4dcc6c3075a3c6d": 1,
       "5cef1dd60744ef6e9d67a8603c707c1f171647be421904a068ed55177b49fc02": 1
     },
-    "app/utils/gestureHandler.ts": {
+    "src/utils/gestureHandler.ts": {
       "4850e46ec7c95a69f946df10f286acddf74bf2625533bbdd77309444cdf32405": 1,
       "5cef1dd60744ef6e9d67a8603c707c1f171647be421904a068ed55177b49fc02": 1,
       "afe2c689f4bb20a6f599fc8b7b45d293ae6fc26aa73ee8a06d704506526cf864": 1,
       "ba06d3c1408a8d1545dcacba24f01ec4e655f4b5d3829d7d47c7988149c59b56": 1
     },
-    "app/utils/openLinkInBrowser.ts": {
+    "src/utils/openLinkInBrowser.ts": {
       "86210e257bb33cb758b4de456c799842f267d4f391c6a3f3ff2d5485d02b0841": 1
     },
-    "app/utils/storage/index.ts": {
+    "src/utils/storage/index.ts": {
       "16149044a247f87d52eefd493bbe2c97f21c745cce9b8c14daf4bb3f0484d15c": 1,
       "2410b0d8d3abd57570ab902889c4e275db87b06be331924ae313f305ac9b9ec7": 1,
       "3346f408099449d9dfc72ceabb748d229d2b5a85a8fff3015df0328fc77381e6": 1,
@@ -431,62 +441,21 @@
       "a99c76eb2df306778ac512e8f7d3e32203ce25a4eb506d084cda8e9749f4771d": 1,
       "ef51995ce65845a7f3ac2604dc8b664cf23b6b25d3e699c876580c7cbb113d8c": 1
     },
-    "app/utils/useIsMounted.ts": {
+    "src/utils/useIsMounted.ts": {
       "6d89ca456a493799974a5d7bc9697c26c77210e2436db068ccc4119caa425137": 1
     },
-    "app/utils/useReducedMotion.ts": {
+    "src/utils/useReducedMotion.ts": {
       "895b7895dd81e7d7ec596c931a1d65316a80453750c5aec979e6bb6bb8f167f0": 1
     },
-    "app/utils/useSafeAreaInsetsStyle.ts": {
+    "src/utils/useSafeAreaInsetsStyle.ts": {
       "9d886ae1e6fd806af94630b87021bba614076c31a53c5210e4e1eca20f601f8c": 1
-    },
-    "babel.config.js": {
-      "c6a5bf7b49ff487548fe804ebbb4f8966bb974bf4a5956b34e09882eba528096": 1
-    },
-    "convex/_generated/api.ts": {
-      "a21e394d44d30b561066f517fd5643c0d9c9d9fa5e0bffeb16c0f7741890d222": 1
-    },
-    "convex/_generated/server.ts": {
-      "b7c8f6cf1405c988c01e88c15575aaa4262d0e9afd8dcb1a2e6624319b06c1b1": 1
-    },
-    "convex/games.ts": {
-      "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1
-    },
-    "convex/schema.ts": {
-      "2dfdaa01c8a3339d91d525f33c860c1c812f89dda466bd183c4d0f2402e689b5": 1,
-      "60e7c32fcb68ac7f6c595d524d03dbe2fc48e9ffccdaa3c2b336a3c42d17b61d": 1,
-      "aeccc44d13a6f8fcbc0ba6db7ee64acdd62d164577991bc53708177570aacee5": 1,
-      "b3d78a4cd1d17d3268b48482d0f6635b2b13aeee88dd5c72ac22b29d2c449b60": 1,
-      "cdf00d1ccff33a2492ccd20452c443422abec83754004e0949cef61f6fc80e5d": 1
-    },
-    "jest.config.js": {
-      "530730d6c7f712f77b68e001b4b038a3f09b8ab1ae620d02bc853e8446ec864a": 1
-    },
-    "metro.config.js": {
-      "050c5590b9170b996ece35226b4129354ac91fec294713f9f43e61efc90e50d1": 1,
-      "1bb3653a38baea88d0cd307b88a3e95ed7978043761b706b6e16e9753683a678": 1,
-      "205d1a8c9d9478122a83abc35e157fd458890c17b78711f1f97c1affada84e1b": 1,
-      "27ff87df7c2a1e72c122bdf284d7809d312e6d403fd39ad0935f5f85dfef3cf4": 1,
-      "6ad97ce1ae74d4a1b03c9f7d36c712a344343749e971d48a71a0e9f085445012": 1,
-      "770e5fb311330a3c6b152b9a6ea0e108f74d40d97cc38259134fae269d164e0c": 1,
-      "78aa0097c838503bf803bfc6222f8966e5c115dffd8f374639cdce64162195c7": 1,
-      "ca74845da55478702bf64df6ca64968396b0d65fbeb59b70fdf2f063ef16409d": 1,
-      "ccb7c098bc05a920541352099df8a37c625da36a01831d741d09fa3cafe804f8": 1
-    },
-    "src/app/_layout.tsx": {
-      "45bd01fad91b26032592c9581f712a57d870d5d29bf873142854d23e50486743": 1,
-      "98ac1829f0c1b0bceb5a560ef01b305a99ec15d05275234ac935d7feaa53bef6": 1,
-      "e22ad56ba08688932ba2221350ea03bd8034fc943d750c10882f7b7d4dcf3949": 1
-    },
-    "src/app/+native-intent.tsx": {
-      "abc7c7005430b10d1ad37a4b72f8de0c0561fd4519f370d4f26afc5401dd168b": 1
     },
     "test/i18n.test.ts": {
       "08d6836e719689ffc2ee5c34d93531fa4a63541ef907238645d72d954b99438b": 1,
+      "11a838df5969e96768adc026a5538ec88cca9385179d8998a88072b3cacd6d9f": 1,
       "47a1f7fb9faec15a3eab121856cb40320e87a7b90be11321a52a081f5565ac07": 1,
-      "5a916ce8d6bc7bd54d6d96adeccc2815e31f53b809a92d4d8fcf0118e7b62c2d": 1,
+      "64efed8704209af4a1951ba1ba81892352921190d573432cde14dbc73ec57359": 1,
       "888a3ea13da7643b470c085f564031929ddd93366d078ea8ab3ba552dd6132d0": 1,
-      "9692cd5e9330ff751ce9cd01621b446d9674fcf7477028f906249450d4e1e9fb": 1,
       "bc417362715f37a41593c607cb9d1976dde449d5994bab34c0ae0fada14d4337": 1,
       "bfc5e66a4100125e7579d5feb911b6af31b38d73a57c2d2637c1c9c36f815c98": 1,
       "c59818e94d9ba0e0fb2c9bc9104e8b85190deaf970ce853f76f70098c174fa5a": 1,

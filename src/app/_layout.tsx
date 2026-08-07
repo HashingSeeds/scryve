@@ -1,7 +1,7 @@
 import "react-native-url-polyfill/auto"
 
 import { useEffect, useState } from "react"
-import { Slot, SplashScreen } from "expo-router"
+import { Slot, SplashScreen, type ErrorBoundaryProps } from "expo-router"
 import { useFonts } from "@expo-google-fonts/space-grotesk"
 import * as Sentry from "@sentry/react-native"
 import { KeyboardProvider } from "react-native-keyboard-controller"
@@ -9,8 +9,10 @@ import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-c
 
 import { CloudProviders } from "@/features/auth/AuthContext"
 import { initI18n } from "@/i18n"
+import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
 import { ThemeProvider } from "@/theme/context"
 import { customFontsToLoad } from "@/theme/typography"
+import { reportCrash } from "@/utils/crashReporting"
 import { loadDateFnsLocale } from "@/utils/formatDate"
 
 Sentry.init({
@@ -36,6 +38,12 @@ if (__DEV__) {
   // include this in our production bundle, so we are using `if (__DEV__)`
   // to only execute this in development.
   require("@/devtools/ReactotronConfig")
+}
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => reportCrash(error), [error])
+
+  return <RootErrorFallback error={error} onRetry={retry} />
 }
 
 export default function Root() {
