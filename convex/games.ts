@@ -372,7 +372,7 @@ export const lobbyProjection = query({
       game.updatedAt,
     )
     return {
-      schemaVersion: 1,
+      schemaVersion: 1 as const,
       publicId: game.publicId,
       status: game.status,
       playerCount: game.playerCount,

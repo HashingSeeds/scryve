@@ -1,3 +1,5 @@
+import type { OptimisticLocalStore } from "convex/browser"
+
 import { drainConnectedOutbox } from "./drainOutbox"
 import type { ConnectedProjection, PendingLifeAction } from "./model"
 import { ConnectedGameRepository } from "./persistence"
@@ -114,11 +116,12 @@ describe("subscription/ack reconciliation ordering", () => {
       const repository = new ConnectedGameRepository(storage, "user-a")
       repository.enqueue(pending, [])
       let query: any = base
-      const store = {
+      const store: OptimisticLocalStore = {
         getQuery: jest.fn(() => query),
-        setQuery: jest.fn((_reference, _args, value) => {
+        getAllQueries: jest.fn(() => []),
+        setQuery: jest.fn((_reference: unknown, _args: unknown, value: unknown) => {
           query = value
-        }),
+        }) as OptimisticLocalStore["setQuery"],
       }
 
       connectedLifeOptimisticUpdater(store, {

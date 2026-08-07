@@ -317,6 +317,9 @@
       "9d7635916369df656ca365a2adc138afc59cdfbd49d36efcbca63369d6fb96d3": 1,
       "adaf0dd26d07abfbaf141122f1cca8fca3207a8e459e1c9df246f790bdfce7d5": 1
     },
+    "src/features/connected/OutboxSyncController.ts": {
+      "1487abcf2f5a09ce6fd570ee7d715e8b8bc031e4414bc5f15c804b576374b967": 1
+    },
     "src/i18n/index.ts": {
       "0cfe3f07f37ec1394440aacda34e3d29fe4cee939e1fae1c7373ce585d7cceec": 1,
       "5c490291c4667a674cead2b843f3ab03d143829b49964321a42912a16cf1ce6c": 1,
