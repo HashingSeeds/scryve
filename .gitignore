@@ -100,3 +100,5 @@ app-dependency-graph.svg
 app-dependency-graph.png
 
 docs/
+builds/
+dist/
