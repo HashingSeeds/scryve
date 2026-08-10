@@ -1,0 +1,23 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../shared/_OnFlowStart.yaml
+- assertVisible: "Life totals, without the fuss."
+- tapOn:
+    id: "new-game-button"
+- assertVisible: "New local game"
+- tapOn: "${PLAYER_COUNT}"
+- scrollUntilVisible:
+    element:
+      id: "start-game-button"
+    direction: DOWN
+- tapOn:
+    id: "start-game-button"
+- assertVisible:
+    id: "player-grid"
+- waitForAnimationToEnd
+- tapOn:
+    id: "life-seat-1-1"
+- tapOn:
+    id: "life-seat-2--1"
+- waitForAnimationToEnd
+- takeScreenshot: ${SCREENSHOT_NAME}

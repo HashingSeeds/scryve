@@ -1,0 +1,20 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    file: _CaptureGame.yaml
+    env:
+      PLAYER_COUNT: "2"
+      SCREENSHOT_NAME: 01-two-player-game
+- runFlow:
+    file: _CaptureGame.yaml
+    env:
+      PLAYER_COUNT: "5"
+      SCREENSHOT_NAME: 02-five-player-game
+- runFlow:
+    file: _CaptureGame.yaml
+    env:
+      PLAYER_COUNT: "6"
+      SCREENSHOT_NAME: 03-six-player-game
+- tapOn: "Game options"
+- waitForAnimationToEnd
+- takeScreenshot: 04-six-player-controls

@@ -1,0 +1,28 @@
+allprojects {
+  configurations {
+    bundletoolCli
+  }
+
+  dependencies {
+    bundletoolCli "com.android.tools.build:bundletool:1.18.3"
+  }
+}
+
+gradle.projectsEvaluated {
+  rootProject.tasks.register("runBundletool", JavaExec) {
+    classpath = rootProject.configurations.bundletoolCli
+    mainClass = "com.android.tools.build.bundletool.BundleToolMain"
+    args = [
+      "build-apks",
+      "--bundle=${rootProject.projectDir}/../build-1786139980865.aab",
+      "--output=${rootProject.projectDir}/../play-store-assets/working/count.apks",
+      "--mode=universal",
+      "--aapt2=/Users/mcc/Library/Android/sdk/build-tools/37.0.0/aapt2",
+      "--ks=${rootProject.projectDir}/../play-store-assets/working/capture.keystore",
+      "--ks-key-alias=capture",
+      "--ks-pass=pass:android",
+      "--key-pass=pass:android",
+      "--overwrite",
+    ]
+  }
+}

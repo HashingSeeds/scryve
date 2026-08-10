@@ -104,3 +104,6 @@ builds/
 dist/
 .env.local
 build-*.tar.gz
+
+# Android app bundles from local release builds
+*.aab
