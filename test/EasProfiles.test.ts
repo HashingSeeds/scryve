@@ -22,19 +22,19 @@ describe("EAS release profile isolation", () => {
       environment: "development",
       channel: "development",
       autoIncrement: false,
-      env: { EXPO_NO_DOTENV: "1", APP_VARIANT: "development" },
+      env: { APP_VARIANT: "development" },
     })
     expect(eas.build.preview).toMatchObject({
       environment: "preview",
       channel: "preview",
       autoIncrement: false,
-      env: { EXPO_NO_DOTENV: "1", APP_VARIANT: "preview" },
+      env: { APP_VARIANT: "preview" },
     })
     expect(eas.build.production).toMatchObject({
       environment: "production",
       channel: "production",
       autoIncrement: true,
-      env: { EXPO_NO_DOTENV: "1", APP_VARIANT: "production" },
+      env: { APP_VARIANT: "production" },
     })
     for (const profile of ["development", "preview", "production"]) {
       expect(eas.build[profile].env).not.toHaveProperty("NODE_ENV")

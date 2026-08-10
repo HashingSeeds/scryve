@@ -7,7 +7,7 @@
   "build": {
     "development": {
       "extends": "production",
-      "env": { "EXPO_NO_DOTENV": "1", "APP_VARIANT": "development" },
+      "env": { "APP_VARIANT": "development" },
       "distribution": "internal",
       "channel": "development",
       "environment": "development",
@@ -30,7 +30,7 @@
     },
     "preview": {
       "extends": "production",
-      "env": { "EXPO_NO_DOTENV": "1", "APP_VARIANT": "preview" },
+      "env": { "APP_VARIANT": "preview" },
       "distribution": "internal",
       "channel": "preview",
       "environment": "preview",
@@ -44,7 +44,7 @@
     },
     "production": {
       "node": "24.18.1",
-      "env": { "EXPO_NO_DOTENV": "1", "APP_VARIANT": "production" },
+      "env": { "APP_VARIANT": "production" },
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
