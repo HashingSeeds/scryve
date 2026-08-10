@@ -115,7 +115,8 @@ describe("CurrentGameScreen", () => {
 
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.getByTestId("game-home-button")).toBeTruthy()
-    expect(view.queryByTestId("layout-button")).toBeNull()
+    expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
+    expect(view.getByTestId("status-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.queryByTestId("finish-button")).toBeNull()
     expect(view.queryByTestId("abandon-button")).toBeNull()
@@ -139,7 +140,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("player-grid-row-2")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("layout-button")).toBeNull()
+    expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
   })
 
   it("keeps the useful odd-player layout choices without offering wide", () => {

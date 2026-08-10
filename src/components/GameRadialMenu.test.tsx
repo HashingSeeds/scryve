@@ -1,9 +1,11 @@
 import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
+import { Polygon } from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
+import { lightTheme } from "@/theme/theme"
 
-import { GameRadialMenu, getRadialActionOffsets, type RadialMenuAction } from "./GameRadialMenu"
+import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./GameRadialMenu"
 
 describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
@@ -11,7 +13,6 @@ describe("GameRadialMenu", () => {
     (label, index) => ({
       id: label.toLowerCase(),
       label,
-      glyph: String(index + 1),
       color: "#FBC878",
       onPress: callbacks[index],
     }),
@@ -43,6 +44,15 @@ describe("GameRadialMenu", () => {
     for (const action of actions) expect(view.getByTestId(`${action.id}-button`)).toBeTruthy()
   })
 
+  it("draws the pentagon button outlined in the screen background color", () => {
+    const view = render(menu(false))
+
+    expect(view.getByTestId("game-menu-pentagon")).toBeTruthy()
+    const pentagon = view.UNSAFE_getByType(Polygon)
+    expect(pentagon.props.stroke).toBe(lightTheme.colors.background)
+    expect(pentagon.props.points.split(" ")).toHaveLength(5)
+  })
+
   it("keeps the menu glyph in centered square bounds", () => {
     const view = render(menu(false))
     const glyph = view.getByTestId("game-menu-glyph")
@@ -67,9 +77,10 @@ describe("GameRadialMenu", () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it("fans inward when a layout moves the anchor toward a screen edge", () => {
-    expect(getRadialActionOffsets({ x: 0.33, y: 0.5 })[2].x).toBeGreaterThan(0)
-    expect(getRadialActionOffsets({ x: 0.67, y: 0.5 })[2].x).toBeLessThan(0)
-    expect(getRadialActionOffsets({ x: 0.5, y: 0.5 }, 4)).toHaveLength(4)
+  it("poses every action toward open space when the anchor nears a screen edge", () => {
+    expect(getRadialActionPoses({ x: 0.33, y: 0.5 }).every((pose) => pose.x >= 0)).toBe(true)
+    expect(getRadialActionPoses({ x: 0.67, y: 0.5 }).every((pose) => pose.x <= 0)).toBe(true)
+    expect(getRadialActionPoses({ x: 0.5, y: 0.5 }, 4)).toHaveLength(4)
+    expect(getRadialActionPoses({ x: 0.5, y: 0.5 })).toHaveLength(5)
   })
 })

@@ -48,7 +48,6 @@ export function ConnectedBoardScreen(props: {
 function ConnectedBoardRuntime({
   publicId,
   onBack,
-  onHistory,
   ownerId,
 }: {
   publicId: string
@@ -111,17 +110,23 @@ function ConnectedBoardRuntime({
     {
       id: "connected-layout",
       label: "Layout",
-      glyph: "▦",
       color: "#FBC878",
+      disabled: layoutOptions.length < 2,
       onPress: () => {
         setMenuOpen(false)
         setLayoutPickerOpen(true)
       },
     },
     {
+      id: "connected-undo",
+      label: "Undo",
+      color: "#55C894",
+      disabled: true,
+      onPress: () => undefined,
+    },
+    {
       id: "connected-status",
       label: runtime.connectionStatus === "connected" ? "Status" : runtime.connectionStatus,
-      glyph: "●",
       color:
         runtime.connectionStatus === "connected"
           ? "#55C894"
@@ -133,43 +138,27 @@ function ConnectedBoardRuntime({
         setStatusOpen(true)
       },
     },
-  ]
-  if (onBack) {
-    radialActions.push({
+    {
       id: "connected-back",
-      label: "Back",
-      glyph: "←",
+      label: "Home",
       color: "#7DB7E8",
+      disabled: !onBack,
       onPress: () => {
         setMenuOpen(false)
-        onBack()
+        onBack?.()
       },
-    })
-  }
-  if (active && game.isHost) {
-    radialActions.push({
+    },
+    {
       id: "finish-connected-game",
       label: "End game",
-      glyph: "✓",
       color: "#D96767",
-      disabled: runtime.finishing || Boolean(finishBlockedReason),
+      disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
       onPress: () => {
         setMenuOpen(false)
         setConfirmingFinish(true)
       },
-    })
-  } else if (finished && onHistory) {
-    radialActions.push({
-      id: "connected-history",
-      label: "History",
-      glyph: "↶",
-      color: "#A995E8",
-      onPress: () => {
-        setMenuOpen(false)
-        onHistory()
-      },
-    })
-  }
+    },
+  ]
 
   const overlayOpen = menuOpen || statusOpen || layoutPickerOpen || confirmingFinish
 

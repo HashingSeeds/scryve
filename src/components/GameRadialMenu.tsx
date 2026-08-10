@@ -2,24 +2,28 @@ import { useEffect } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
-  Easing,
-  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSpring,
   withTiming,
 } from "react-native-reanimated"
+import Svg, { Polygon } from "react-native-svg"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
-import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
+import {
+  motionDuration,
+  useReducedMotion,
+  type ReducedMotionPreference,
+} from "@/utils/useReducedMotion"
 
 import { Text } from "./Text"
 
 export interface RadialMenuAction {
   id: string
   label: string
-  glyph: string
   color: string
   disabled?: boolean
   onPress: () => void
@@ -34,34 +38,115 @@ export interface GameRadialMenuProps {
   onClose: () => void
 }
 
-const CENTER_ACTION_OFFSETS = [
-  { x: -112, y: -68 },
-  { x: 0, y: -126 },
-  { x: 112, y: -68 },
-  { x: -112, y: 68 },
-  { x: 112, y: 68 },
-] as const
-const LEFT_ACTION_OFFSETS = [
-  { x: 104, y: -98 },
-  { x: 0, y: -126 },
-  { x: 148, y: 0 },
-  { x: 104, y: 98 },
-  { x: 0, y: 126 },
-] as const
-const RIGHT_ACTION_OFFSETS = LEFT_ACTION_OFFSETS.map(({ x, y }) => ({ x: -x, y }))
-const FOUR_CENTER_ACTION_OFFSETS = [
-  { x: -108, y: -72 },
-  { x: 108, y: -72 },
-  { x: -108, y: 72 },
-  { x: 108, y: 72 },
-] as const
-const FOUR_LEFT_ACTION_OFFSETS = [
-  { x: 0, y: -116 },
-  { x: 132, y: -54 },
-  { x: 132, y: 54 },
-  { x: 0, y: 116 },
-] as const
-const FOUR_RIGHT_ACTION_OFFSETS = FOUR_LEFT_ACTION_OFFSETS.map(({ x, y }) => ({ x: -x, y }))
+export interface RadialActionPose {
+  x: number
+  y: number
+  rotationDeg: number
+  delayMs: number
+}
+
+const MENU_BUTTON_SIZE = 80
+const COMPACT_MENU_BUTTON_SIZE = 70
+const MENU_FALLBACK_ANIMATION_MS = 220
+
+const PENTAGON_SIDES = 5
+const PENTAGON_VIEWBOX = 100
+const PENTAGON_RADIUS = 46
+const PENTAGON_FILL = "#050505"
+const PENTAGON_STROKE_WIDTH = 7
+export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
+
+const ACTION_WIDTH = 116
+const ACTION_HEIGHT = 52
+
+const ACTION_STAGGER_MS = 35
+const ACTION_START_DISTANCE = 40
+const ACTION_START_SCALE = 0.5
+const ACTION_START_ROTATION_LAG_DEG = 25
+const ACTION_POSE_SPRING = { damping: 13, stiffness: 210, mass: 0.8 } as const
+const PENTAGON_SPIN_SPRING = {
+  damping: 18,
+  stiffness: 220,
+  mass: 0.6,
+  overshootClamping: true,
+} as const
+
+const BASE_ACTION_POSE = { x: -30, y: -86, rotationDeg: 22 } as const
+const CENTER_ACTION_SIDE_STEPS = [-1, 0, 1, -2, 2] as const
+
+function rotateBasePoseToSide(stepsFromTopSide: number): RadialActionPose {
+  const angleDeg = stepsFromTopSide * (360 / PENTAGON_SIDES)
+  const angleRad = (angleDeg * Math.PI) / 180
+  const clockwiseRank = ((stepsFromTopSide % PENTAGON_SIDES) + PENTAGON_SIDES) % PENTAGON_SIDES
+  return {
+    x: BASE_ACTION_POSE.x * Math.cos(angleRad) - BASE_ACTION_POSE.y * Math.sin(angleRad),
+    y: BASE_ACTION_POSE.x * Math.sin(angleRad) + BASE_ACTION_POSE.y * Math.cos(angleRad),
+    rotationDeg: BASE_ACTION_POSE.rotationDeg + angleDeg,
+    delayMs: clockwiseRank * ACTION_STAGGER_MS,
+  }
+}
+
+const CENTER_ACTION_POSES: readonly RadialActionPose[] =
+  CENTER_ACTION_SIDE_STEPS.map(rotateBasePoseToSide)
+const EDGE_POSE_DISTANCE = 112
+const LEFT_EDGE_POSE_ANGLES = [0, 45, 90, 135, 180] as const
+const FOUR_CENTER_POSE_ANGLES = [-54, 54, -126, 126] as const
+const FOUR_LEFT_EDGE_POSE_ANGLES = [0, 60, 120, 180] as const
+
+function poseAlongAngle(angleDeg: number, order: number): RadialActionPose {
+  const angleRad = (angleDeg * Math.PI) / 180
+  return {
+    x: Math.sin(angleRad) * EDGE_POSE_DISTANCE,
+    y: -Math.cos(angleRad) * EDGE_POSE_DISTANCE,
+    rotationDeg: angleDeg / 2,
+    delayMs: order * ACTION_STAGGER_MS,
+  }
+}
+
+function mirrorPose(pose: RadialActionPose): RadialActionPose {
+  return { ...pose, x: -pose.x, rotationDeg: -pose.rotationDeg }
+}
+
+export function getRadialActionPoses(
+  anchor: { x: number; y: number },
+  actionCount = 5,
+): readonly RadialActionPose[] {
+  const anchorNearLeftEdge = anchor.x < 0.4
+  const anchorNearRightEdge = anchor.x > 0.6
+  const edgeAngles = actionCount === 4 ? FOUR_LEFT_EDGE_POSE_ANGLES : LEFT_EDGE_POSE_ANGLES
+  if (anchorNearLeftEdge) return edgeAngles.map(poseAlongAngle)
+  if (anchorNearRightEdge) return edgeAngles.map(poseAlongAngle).map(mirrorPose)
+  if (actionCount === 4) return FOUR_CENTER_POSE_ANGLES.map(poseAlongAngle)
+  return CENTER_ACTION_POSES
+}
+
+export function getRadialActionStart(pose: RadialActionPose): { x: number; y: number } {
+  const distance = Math.hypot(pose.x, pose.y) || 1
+  return {
+    x: (pose.x / distance) * ACTION_START_DISTANCE,
+    y: (pose.y / distance) * ACTION_START_DISTANCE,
+  }
+}
+
+export function buildRegularPolygonPoints(input: {
+  sides: number
+  center: number
+  radius: number
+}): string {
+  const pointingUp = -Math.PI / 2
+  return Array.from({ length: input.sides }, (_, corner) => {
+    const angle = pointingUp + (Math.PI * 2 * corner) / input.sides
+    const x = input.center + input.radius * Math.cos(angle)
+    const y = input.center + input.radius * Math.sin(angle)
+    return `${x.toFixed(2)},${y.toFixed(2)}`
+  }).join(" ")
+}
+
+const PENTAGON_POINTS = buildRegularPolygonPoints({
+  sides: PENTAGON_SIDES,
+  center: PENTAGON_VIEWBOX / 2,
+  radius: PENTAGON_RADIUS,
+})
 
 export function GameRadialMenu({
   open,
@@ -76,15 +161,22 @@ export function GameRadialMenu({
     theme: { colors },
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const progress = useSharedValue(open ? 1 : 0)
-  const actionOffsets = getRadialActionOffsets(anchor, actions.length)
+  const animateFully = reducedMotion === false
+  const pentagonRotation = useSharedValue(open ? PENTAGON_OPEN_ROTATION_DEG : 0)
+  const poses = getRadialActionPoses(anchor, actions.length)
 
   useEffect(() => {
-    progress.value = withTiming(open ? 1 : 0, {
-      duration: motionDuration(reducedMotion, 220),
-      easing: Easing.out(Easing.cubic),
-    })
-  }, [open, progress, reducedMotion])
+    const spinTarget = open ? PENTAGON_OPEN_ROTATION_DEG : 0
+    pentagonRotation.value = animateFully
+      ? withSpring(spinTarget, PENTAGON_SPIN_SPRING)
+      : withTiming(spinTarget, {
+          duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS),
+        })
+  }, [animateFully, open, pentagonRotation, reducedMotion])
+
+  const pentagonSpinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${pentagonRotation.value}deg` }],
+  }))
 
   const anchorStyle: ViewStyle = {
     left: `${anchor.x * 100}%`,
@@ -105,14 +197,14 @@ export function GameRadialMenu({
 
       {open
         ? actions
-            .slice(0, actionOffsets.length)
+            .slice(0, poses.length)
             .map((action, index) => (
               <RadialAction
                 key={action.id}
                 action={action}
                 anchorStyle={anchorStyle}
-                offset={actionOffsets[index]}
-                progress={progress}
+                pose={poses[index]}
+                reducedMotion={reducedMotion}
               />
             ))
         : null}
@@ -132,12 +224,25 @@ export function GameRadialMenu({
           accessibilityLabel={open ? "Close game options" : "Game options"}
           accessibilityHint={open ? "Collapses the game controls" : "Expands the game controls"}
           accessibilityState={{ expanded: open }}
-          style={({ pressed }) => [
-            themed($menuButton),
-            pressed && { backgroundColor: colors.separator },
-          ]}
+          style={({ pressed }) => [themed($menuButton), pressed && $menuButtonPressed]}
           onPress={onToggle}
         >
+          <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
+            <Svg
+              testID="game-menu-pentagon"
+              width="100%"
+              height="100%"
+              viewBox={`0 0 ${PENTAGON_VIEWBOX} ${PENTAGON_VIEWBOX}`}
+            >
+              <Polygon
+                points={PENTAGON_POINTS}
+                fill={PENTAGON_FILL}
+                stroke={colors.background}
+                strokeWidth={PENTAGON_STROKE_WIDTH}
+                strokeLinejoin="round"
+              />
+            </Svg>
+          </Animated.View>
           <MenuGlyph open={open} />
         </Pressable>
       </Animated.View>
@@ -164,36 +269,36 @@ function MenuGlyph({ open }: { open: boolean }) {
   )
 }
 
-export function getRadialActionOffsets(anchor: { x: number; y: number }, actionCount = 5) {
-  if (actionCount === 4) {
-    if (anchor.x < 0.4) return FOUR_LEFT_ACTION_OFFSETS
-    if (anchor.x > 0.6) return FOUR_RIGHT_ACTION_OFFSETS
-    return FOUR_CENTER_ACTION_OFFSETS
-  }
-  if (anchor.x < 0.4) return LEFT_ACTION_OFFSETS
-  if (anchor.x > 0.6) return RIGHT_ACTION_OFFSETS
-  return CENTER_ACTION_OFFSETS
-}
-
 function RadialAction({
   action,
   anchorStyle,
-  offset,
-  progress,
+  pose,
+  reducedMotion,
 }: {
   action: RadialMenuAction
   anchorStyle: ViewStyle
-  offset: { x: number; y: number }
-  progress: SharedValue<number>
+  pose: RadialActionPose
+  reducedMotion: ReducedMotionPreference
 }) {
   const { themed } = useAppTheme()
   const foreground = accessibleForeground(action.color)
+  const animateFully = reducedMotion === false
+  const arrive = useSharedValue(0)
+  const start = getRadialActionStart(pose)
+
+  useEffect(() => {
+    arrive.value = animateFully
+      ? withDelay(pose.delayMs, withSpring(1, ACTION_POSE_SPRING))
+      : withTiming(1, { duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS) })
+  }, [animateFully, arrive, pose.delayMs, reducedMotion])
+
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
+    opacity: arrive.value,
     transform: [
-      { translateX: offset.x * progress.value },
-      { translateY: offset.y * progress.value },
-      { scale: 0.65 + progress.value * 0.35 },
+      { translateX: start.x + (pose.x - start.x) * arrive.value },
+      { translateY: start.y + (pose.y - start.y) * arrive.value },
+      { rotate: `${pose.rotationDeg - ACTION_START_ROTATION_LAG_DEG * (1 - arrive.value)}deg` },
+      { scale: ACTION_START_SCALE + (1 - ACTION_START_SCALE) * arrive.value },
     ],
   }))
 
@@ -214,7 +319,7 @@ function RadialAction({
         onPress={action.onPress}
       >
         <Text
-          text={`${action.glyph}  ${action.label}`}
+          text={action.label}
           weight="bold"
           numberOfLines={1}
           maxFontSizeMultiplier={1.2}
@@ -235,31 +340,25 @@ const $anchor: ThemedStyle<ViewStyle> = () => ({
   zIndex: 30,
 })
 const $largeAnchor: ThemedStyle<ViewStyle> = () => ({
-  width: 68,
-  height: 68,
-  marginLeft: -34,
-  marginTop: -34,
+  width: MENU_BUTTON_SIZE,
+  height: MENU_BUTTON_SIZE,
+  marginLeft: -MENU_BUTTON_SIZE / 2,
+  marginTop: -MENU_BUTTON_SIZE / 2,
 })
 const $compactAnchor: ThemedStyle<ViewStyle> = () => ({
-  width: 60,
-  height: 60,
-  marginLeft: -30,
-  marginTop: -30,
+  width: COMPACT_MENU_BUTTON_SIZE,
+  height: COMPACT_MENU_BUTTON_SIZE,
+  marginLeft: -COMPACT_MENU_BUTTON_SIZE / 2,
+  marginTop: -COMPACT_MENU_BUTTON_SIZE / 2,
 })
 const $menuButton: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: 999,
-  borderWidth: 5,
-  borderColor: "rgba(255,255,255,0.78)",
-  backgroundColor: "#050505",
-  shadowColor: "#000000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.35,
-  shadowRadius: 6,
-  elevation: 12,
 })
+const $menuButtonPressed: ViewStyle = {
+  transform: [{ scale: 0.93 }],
+}
 const $menuGlyph: ViewStyle = {
   width: 24,
   height: 24,
@@ -284,28 +383,27 @@ const $closeGlyphBackward: ViewStyle = {
 const $actionAnchor: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
   zIndex: 20,
-  width: 112,
-  height: 48,
-  marginLeft: -56,
-  marginTop: -24,
+  width: ACTION_WIDTH,
+  height: ACTION_HEIGHT,
+  marginLeft: -ACTION_WIDTH / 2,
+  marginTop: -ACTION_HEIGHT / 2,
 })
 const $action: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
-  paddingHorizontal: 10,
-  borderRadius: 24,
-  borderWidth: 2,
-  borderColor: "rgba(255,255,255,0.72)",
+  paddingHorizontal: 12,
+  borderRadius: ACTION_HEIGHT / 2,
   shadowColor: "#000000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.28,
-  shadowRadius: 4,
-  elevation: 10,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.35,
+  shadowRadius: 7,
+  elevation: 12,
 })
 const $actionText: ThemedStyle<TextStyle> = () => ({
-  fontSize: 14,
-  lineHeight: 18,
+  fontSize: 16,
+  lineHeight: 20,
+  letterSpacing: 0.3,
   textAlign: "center",
 })
 const $disabledAction: ThemedStyle<ViewStyle> = () => ({ opacity: 0.42 })

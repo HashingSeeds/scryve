@@ -41,6 +41,7 @@ export function CurrentGameScreen({
   const [menuOpen, setMenuOpen] = useState(false)
   const [endConfirmationOpen, setEndConfirmationOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
+  const [statusOpen, setStatusOpen] = useState(false)
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
   const playerCount = runtime.game.players.length
   const layoutOptions = getPlayerGridLayoutOptions(playerCount)
@@ -73,24 +74,19 @@ export function CurrentGameScreen({
   }
 
   const radialActions: readonly RadialMenuAction[] = [
-    ...(layoutOptions.length > 1
-      ? [
-          {
-            id: "layout",
-            label: "Layout",
-            glyph: "▦",
-            color: "#FBC878",
-            onPress: () => {
-              setMenuOpen(false)
-              setLayoutPickerOpen(true)
-            },
-          } satisfies RadialMenuAction,
-        ]
-      : []),
+    {
+      id: "layout",
+      label: "Layout",
+      color: "#FBC878",
+      disabled: layoutOptions.length < 2,
+      onPress: () => {
+        setMenuOpen(false)
+        setLayoutPickerOpen(true)
+      },
+    },
     {
       id: "undo",
       label: "Undo",
-      glyph: "↶",
       color: "#55C894",
       disabled: !runtime.canUndo,
       onPress: () => {
@@ -99,9 +95,17 @@ export function CurrentGameScreen({
       },
     },
     {
+      id: "status",
+      label: "Status",
+      color: "#B48CE0",
+      onPress: () => {
+        setMenuOpen(false)
+        setStatusOpen(true)
+      },
+    },
+    {
       id: "game-home",
       label: "Home",
-      glyph: "⌂",
       color: "#7DB7E8",
       onPress: () => {
         closeMenu()
@@ -111,7 +115,6 @@ export function CurrentGameScreen({
     {
       id: "end-game",
       label: "End game",
-      glyph: "✓",
       color: "#D96767",
       onPress: showEndConfirmation,
     },
@@ -169,6 +172,30 @@ export function CurrentGameScreen({
             ))}
           </View>
           <Button tx="localGame:cancel" style={themed($menuItem)} onPress={closePanel} />
+        </DialogCard>
+      ) : null}
+
+      {statusOpen ? (
+        <DialogCard
+          visible
+          onClose={() => setStatusOpen(false)}
+          backdropTestID="game-status-backdrop"
+          backdropAccessibilityLabel="Close game status"
+          dialogTestID="game-status-dialog"
+          accessibilityViewIsModal
+        >
+          <Text text="Game status" preset="subheading" style={themed($dialogText)} />
+          <Text
+            testID="game-status-summary"
+            text={`${playerCount} players · started at ${runtime.game.startingLife} life`}
+            style={themed($dialogText)}
+          />
+          <Text
+            text="Local game — everything is saved on this device."
+            size="xs"
+            style={themed($dialogText)}
+          />
+          <Button text="Close" style={themed($menuItem)} onPress={() => setStatusOpen(false)} />
         </DialogCard>
       ) : null}
 

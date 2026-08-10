@@ -406,7 +406,7 @@ describe("connected lobby screens", () => {
     expect(screen.getByText(/Reconnect and sync/i)).toBeTruthy()
   })
 
-  it("renders a resumed finished summary read-only and links to paginated history", () => {
+  it("renders a resumed finished summary read-only with the shared menu actions disabled", () => {
     const onHistory = jest.fn()
     mockRuntime = {
       ...mockRuntime,
@@ -433,8 +433,11 @@ describe("connected lobby screens", () => {
     expect(screen.queryByTestId("finish-connected-game-button")).toBeNull()
     fireEvent.press(screen.getByText("Close"))
     openConnectedMenu()
-    fireEvent.press(screen.getByTestId("connected-history-button"))
-    expect(onHistory).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId("connected-history-button")).toBeNull()
+    expect(
+      screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
+    ).toBe(true)
+    expect(screen.getByTestId("connected-undo-button").props.accessibilityState.disabled).toBe(true)
   })
 
   it("uses a connected end-game pop-up with cancel and confirm outcomes", async () => {
@@ -547,7 +550,9 @@ describe("connected lobby screens", () => {
     expect(screen.getByText("This game is lobby and is read-only on the board.")).toBeTruthy()
     fireEvent.press(screen.getByText("Close"))
     openConnectedMenu()
-    expect(screen.queryByTestId("finish-connected-game-button")).toBeNull()
+    expect(
+      screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
+    ).toBe(true)
   })
 
   it("remounts runtime state when the dynamic route switches games", () => {
