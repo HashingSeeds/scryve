@@ -115,13 +115,13 @@ describe("CurrentGameScreen", () => {
 
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.getByTestId("game-home-button")).toBeTruthy()
-    expect(view.getByTestId("layout-button")).toBeTruthy()
+    expect(view.queryByTestId("layout-button")).toBeNull()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.queryByTestId("finish-button")).toBeNull()
     expect(view.queryByTestId("abandon-button")).toBeNull()
   })
 
-  it("moves the menu to a shared four-card junction and lets the user change layouts", () => {
+  it("moves the menu to a shared four-card junction", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <CurrentGameScreen
@@ -139,6 +139,22 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("player-grid-row-2")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.queryByTestId("layout-button")).toBeNull()
+  })
+
+  it("keeps the useful odd-player layout choices without offering wide", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game(5)}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onHome={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("layout-button"))
     expect(view.getByTestId("layout-picker-dialog")).toBeTruthy()
     expect(
@@ -147,10 +163,8 @@ describe("CurrentGameScreen", () => {
       alignItems: "center",
       justifyContent: "center",
     })
-    fireEvent.press(view.getByTestId("layout-wide-grid"))
-
-    expect(view.getByTestId("player-grid-row-1")).toBeTruthy()
-    expect(view.queryByTestId("player-grid-row-2")).toBeNull()
+    expect(view.queryByTestId("layout-wide-grid")).toBeNull()
+    expect(view.getByTestId("layout-featured-first")).toBeTruthy()
   })
 
   it("confirms ending the game in a centered pop-up and archives final totals", async () => {

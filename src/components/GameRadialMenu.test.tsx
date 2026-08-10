@@ -1,3 +1,4 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -40,6 +41,19 @@ describe("GameRadialMenu", () => {
 
     expect(view.getByTestId("game-menu-button").props.accessibilityState.expanded).toBe(true)
     for (const action of actions) expect(view.getByTestId(`${action.id}-button`)).toBeTruthy()
+  })
+
+  it("keeps the menu glyph in centered square bounds", () => {
+    const view = render(menu(false))
+    const glyph = view.getByTestId("game-menu-glyph")
+    const glyphStyle = StyleSheet.flatten(glyph.props.style)
+
+    expect(glyphStyle).toMatchObject({
+      width: 24,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
+    })
   })
 
   it("runs radial actions and closes from the dimmed board", () => {

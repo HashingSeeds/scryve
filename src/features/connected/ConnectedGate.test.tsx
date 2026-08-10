@@ -1,11 +1,12 @@
 import type { ReactNode } from "react"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native"
+import { ActivityIndicator } from "react-native"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { ThemeProvider } from "@/theme/context"
 
-import { ConnectedGate } from "./ConnectedGate"
+import { ConnectedGate, resetSyncedProfileCacheForTests } from "./ConnectedGate"
 
 let mockSocketConnected = true
 let mockConvexAuthenticated = true
@@ -68,6 +69,7 @@ function gate(children: ReactNode, onBack = jest.fn()) {
 describe("connected cold-offline and authentication gate", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    resetSyncedProfileCacheForTests()
     mockCachedGames.clear()
     mockCachedProjectionPublicId = undefined
     mockSocketConnected = true
@@ -152,6 +154,39 @@ describe("connected cold-offline and authentication gate", () => {
     expect(screen.queryByTestId("private-cached-board")).toBeNull()
     expect(screen.getByText(/issuer or deployment configuration/i)).toBeTruthy()
     expect(view.UNSAFE_getByType(Screen).props.safeAreaEdges).toEqual(["top", "bottom"])
+  })
+
+  it("skips the profile gate when re-entering after an earlier successful sync", async () => {
+    const child = <Button testID="warm-connected-board" text="Board" />
+    const first = render(gate(child))
+    await waitFor(() => expect(screen.getByTestId("warm-connected-board")).toBeTruthy())
+    first.unmount()
+
+    mockSyncCurrent.mockImplementationOnce(() => new Promise<string>(() => undefined))
+    render(gate(child))
+
+    expect(screen.getByTestId("warm-connected-board")).toBeTruthy()
+    expect(screen.queryByText("Preparing your connected-play profile…")).toBeNull()
+  })
+
+  it("withholds the loading interstitial until the reveal delay elapses", () => {
+    jest.useFakeTimers()
+    try {
+      mockClerkLoaded = false
+      mockSyncCurrent.mockImplementationOnce(() => new Promise<string>(() => undefined))
+      render(gate(<Button testID="delayed-board" text="Board" />))
+
+      expect(screen.queryByText("Checking your session… Local play remains available.")).toBeNull()
+      expect(screen.queryByText("Back to local play")).toBeNull()
+      expect(screen.UNSAFE_queryByType(ActivityIndicator)).toBeNull()
+
+      act(() => jest.advanceTimersByTime(200))
+
+      expect(screen.getByText("Checking your session… Local play remains available.")).toBeTruthy()
+      expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it("offers retry, re-authentication, and a safe exit after profile setup fails", async () => {

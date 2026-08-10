@@ -1,12 +1,9 @@
-import {
-  Modal,
-  Pressable,
-  // eslint-disable-next-line no-restricted-imports
-  Text as NativeText,
-  View,
-} from "react-native"
+import type { ViewStyle } from "react-native"
+import { Modal, Pressable, View } from "react-native"
 
-import { colors } from "@/theme/colorsDark"
+import { Text } from "@/components/Text"
+import { useAppTheme } from "@/theme/context"
+import type { ThemedStyle } from "@/theme/types"
 
 import { ClerkAuthView } from "./ClerkAuthView"
 
@@ -17,6 +14,8 @@ export function ClerkAuthModal({
   visible: boolean
   onDismiss: () => void
 }) {
+  const { themed } = useAppTheme()
+
   return (
     <Modal
       testID="auth-modal"
@@ -25,21 +24,38 @@ export function ClerkAuthModal({
       presentationStyle="pageSheet"
       onRequestClose={onDismiss}
     >
-      <View style={$modal}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close sign in"
-          onPress={onDismiss}
-          style={$closeButton}
-        >
-          <NativeText style={$closeText}>Close</NativeText>
-        </Pressable>
+      <View style={themed($modal)}>
+        <View style={themed($header)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close sign in"
+            onPress={onDismiss}
+            style={themed($closeButton)}
+          >
+            <Text preset="bold" text="Close" />
+          </Pressable>
+        </View>
         <ClerkAuthView onDismiss={onDismiss} />
       </View>
     </Modal>
   )
 }
 
-const $modal = { flex: 1, paddingTop: 12, backgroundColor: colors.background } as const
-const $closeButton = { minHeight: 44, padding: 12, alignSelf: "flex-start" } as const
-const $closeText = { color: colors.text, fontFamily: "spaceGroteskMedium", fontSize: 16 } as const
+const $modal: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  flex: 1,
+  backgroundColor: colors.background,
+})
+const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: spacing.xs,
+  paddingVertical: spacing.xxs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $closeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  minWidth: 44,
+  justifyContent: "center",
+  paddingHorizontal: spacing.sm,
+})

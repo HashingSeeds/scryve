@@ -11,7 +11,12 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { Button } from "./Button"
 import { DialogCard, $dialogActions, $dialogButton } from "./DialogCard"
 import { LifeControls, overlayTint } from "./LifeControls"
-import type { LifeCardContentRotation } from "./playerCardTypes"
+import {
+  COMPACT_LIFE_TARGET_SIZE,
+  LIFE_MAX_FONT_SCALE,
+  LIFE_TARGET_SIZE,
+  type LifeCardContentRotation,
+} from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
@@ -61,7 +66,7 @@ export function LifeCard({
   const displayName = playerName.trim() || "unnamed player"
   const identity = `Seat ${seatNumber}, ${displayName}`
   const markSize = compact ? 36 : 44
-  const lifeTargetRadius = compact ? 42 : 58
+  const lifeTargetRadius = (compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE) / 2
   const cardPadding = compact ? spacing.xxs : spacing.xs
   const markStyle = getPlayerMarkPlacement(
     contentRotation,
@@ -186,7 +191,8 @@ export function LifeCard({
               accessible={false}
               accessibilityLabel={`${identity}, ${life} life`}
               accessibilityLiveRegion="polite"
-              maxFontSizeMultiplier={1.3}
+              maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
+              adjustsFontSizeToFit
               numberOfLines={1}
               style={[
                 themed(compact ? $compactLife : $life),
@@ -352,17 +358,17 @@ const $compactLife: ThemedStyle<TextStyle> = () => ({
 })
 
 const $lifeButton: ThemedStyle<ViewStyle> = () => ({
-  width: 116,
-  height: 116,
-  borderRadius: 58,
+  width: LIFE_TARGET_SIZE,
+  height: LIFE_TARGET_SIZE,
+  borderRadius: LIFE_TARGET_SIZE / 2,
   alignItems: "center",
   justifyContent: "center",
 })
 
 const $compactLifeButton: ThemedStyle<ViewStyle> = () => ({
-  width: 84,
-  height: 84,
-  borderRadius: 42,
+  width: COMPACT_LIFE_TARGET_SIZE,
+  height: COMPACT_LIFE_TARGET_SIZE,
+  borderRadius: COMPACT_LIFE_TARGET_SIZE / 2,
   alignItems: "center",
   justifyContent: "center",
 })

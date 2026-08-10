@@ -1,5 +1,6 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render, within } from "@testing-library/react-native"
 
+import { Screen } from "@/components/Screen"
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -46,6 +47,20 @@ describe("GameSetupScreen", () => {
     expect(view.queryByTestId("custom-starting-life")).toBeNull()
     fireEvent.press(view.getByLabelText("Use custom starting life"))
     expect(view.getByTestId("custom-starting-life")).toBeTruthy()
+  })
+
+  it("keeps the start button pinned outside the scrollable form", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <GameSetupScreen defaults={DEFAULT_LOCAL_SETTINGS} onBack={jest.fn()} onStart={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByLabelText("6 players"))
+    const scrollableForm = view.UNSAFE_getByType(Screen)
+    expect(within(scrollableForm).queryByTestId("start-game-button")).toBeNull()
+    expect(within(scrollableForm).getByTestId("player-name-6")).toBeTruthy()
+    expect(view.getByTestId("start-game-button")).toBeTruthy()
   })
 
   it("shows seat-specific name errors and submits trimmed unique names", () => {

@@ -1,11 +1,9 @@
 import type { ReactNode } from "react"
-import {
-  Pressable,
-  // Test harness is outside the app theme provider.
-  // eslint-disable-next-line no-restricted-imports
-  Text,
-} from "react-native"
+import { Pressable } from "react-native"
 import { fireEvent, render, screen } from "@testing-library/react-native"
+
+import { Text } from "@/components/Text"
+import { ThemeProvider } from "@/theme/context"
 
 import { ConfiguredAuth, useAuthAccess } from "./AuthContext"
 
@@ -35,7 +33,7 @@ function Harness() {
   const auth = useAuthAccess()
   return (
     <Pressable testID="open-auth" onPress={auth.openAuth}>
-      <Text>Open</Text>
+      <Text text="Open" />
     </Pressable>
   )
 }
@@ -43,9 +41,11 @@ function Harness() {
 describe("native auth experience", () => {
   it("keeps AuthView mounted while the modal is hidden and preserves pending sessions", () => {
     render(
-      <ConfiguredAuth convexUrl="https://example.convex.cloud">
-        <Harness />
-      </ConfiguredAuth>,
+      <ThemeProvider initialContext="light">
+        <ConfiguredAuth convexUrl="https://example.convex.cloud">
+          <Harness />
+        </ConfiguredAuth>
+      </ThemeProvider>,
     )
     expect(screen.getByTestId("native-auth-view")).toBeTruthy()
     expect(screen.getByTestId("auth-modal").props.visible).toBe(false)

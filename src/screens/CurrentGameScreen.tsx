@@ -73,16 +73,20 @@ export function CurrentGameScreen({
   }
 
   const radialActions: readonly RadialMenuAction[] = [
-    {
-      id: "layout",
-      label: "Layout",
-      glyph: "▦",
-      color: "#FBC878",
-      onPress: () => {
-        setMenuOpen(false)
-        setLayoutPickerOpen(true)
-      },
-    },
+    ...(layoutOptions.length > 1
+      ? [
+          {
+            id: "layout",
+            label: "Layout",
+            glyph: "▦",
+            color: "#FBC878",
+            onPress: () => {
+              setMenuOpen(false)
+              setLayoutPickerOpen(true)
+            },
+          } satisfies RadialMenuAction,
+        ]
+      : []),
     {
       id: "undo",
       label: "Undo",

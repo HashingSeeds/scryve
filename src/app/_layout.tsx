@@ -73,14 +73,14 @@ export default function Root() {
   }
 
   return (
-    <CloudProviders>
-      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-        <ThemeProvider>
+    <ThemeProvider>
+      <CloudProviders>
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <KeyboardProvider>
             <Slot />
           </KeyboardProvider>
-        </ThemeProvider>
-      </SafeAreaProvider>
-    </CloudProviders>
+        </SafeAreaProvider>
+      </CloudProviders>
+    </ThemeProvider>
   )
 }

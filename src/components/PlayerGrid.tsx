@@ -7,7 +7,13 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { LifeCard } from "./LifeCard"
-import type { LifeCardContentRotation } from "./playerCardTypes"
+import {
+  COMPACT_LIFE_TARGET_SIZE,
+  LIFE_MAX_FONT_SCALE,
+  LIFE_TARGET_SIZE,
+  LIFE_TARGET_TEXT_INSET,
+  type LifeCardContentRotation,
+} from "./playerCardTypes"
 
 export interface PlayerGridProps {
   players: GamePlayer[]
@@ -46,6 +52,8 @@ export function PlayerGrid({
   const lifeFontSize = getLifeFontSize({
     ...getCellSize({ board, layout, gap: spacing.xxs }),
     digits: Math.max(...players.map((player) => String(player.life).length)),
+    fontScale,
+    targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
   })
 
   function measureBoard(event: LayoutChangeEvent) {
@@ -57,6 +65,8 @@ export function PlayerGrid({
     )
   }
 
+  const rows = getPlayerGridRows(players.length, layout)
+
   return (
     <View
       testID="player-grid"
@@ -64,7 +74,7 @@ export function PlayerGrid({
       onLayout={measureBoard}
       style={[themed($grid), style]}
     >
-      {getPlayerGridRows(players.length, layout).map((row, rowIndex) => (
+      {rows.map((row, rowIndex) => (
         <View key={rowIndex} testID={`player-grid-row-${rowIndex}`} style={themed($row)}>
           {row.map((index, columnIndex) => {
             if (index === null) {
@@ -113,6 +123,7 @@ export function PlayerGrid({
                   ownership={ownership}
                   pendingCount={getPendingCount?.(player)}
                   onChange={(delta) => onChange(player.id, delta)}
+                  style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
                 />
               </View>
             )
@@ -123,8 +134,7 @@ export function PlayerGrid({
   )
 }
 
-export type PlayerGridLayoutVariant =
-  "auto" | "featured-first" | "featured-last" | "even-grid" | "wide-grid"
+export type PlayerGridLayoutVariant = "auto" | "featured-first" | "featured-last" | "even-grid"
 
 export interface PlayerGridLayoutOption {
   variant: PlayerGridLayoutVariant
@@ -132,35 +142,25 @@ export interface PlayerGridLayoutOption {
 }
 
 export function getPlayerGridLayoutOptions(playerCount: number): PlayerGridLayoutOption[] {
-  if (playerCount === 2)
-    return [
-      { variant: "auto", label: "Stacked" },
-      { variant: "wide-grid", label: "Side by side" },
-    ]
-  if (playerCount % 2 === 0)
-    return [
-      { variant: "auto", label: "Balanced" },
-      { variant: "wide-grid", label: "Wide" },
-    ]
+  if (playerCount === 2) return [{ variant: "auto", label: "Responsive" }]
+  if (playerCount % 2 === 0) return [{ variant: "auto", label: "Balanced" }]
   return playerCount === 3
     ? [
         { variant: "auto", label: "Top focus" },
         { variant: "featured-last", label: "Bottom focus" },
         { variant: "even-grid", label: "Even grid" },
-        { variant: "wide-grid", label: "Wide" },
       ]
     : [
         { variant: "auto", label: "Bottom focus" },
         { variant: "featured-first", label: "Top focus" },
         { variant: "even-grid", label: "Even grid" },
-        { variant: "wide-grid", label: "Wide" },
       ]
 }
 
 const LIFE_CONTROL_GUTTER = 40
 const LIFE_DIGIT_ASPECT = 0.62
 const LIFE_HEIGHT_RATIO = 0.24
-const LIFE_FONT_MIN = 22
+const LIFE_FONT_MIN = 12
 const LIFE_FONT_MAX = 80
 
 export function getCellSize(input: {
@@ -181,11 +181,16 @@ export function getLifeFontSize(input: {
   cellWidth: number
   cellHeight: number
   digits: number
+  fontScale: number
+  targetSize: number
 }): number | undefined {
   if (!(input.cellWidth > 0) || !(input.cellHeight > 0)) return undefined
-  const usableWidth = Math.max(input.cellWidth - LIFE_CONTROL_GUTTER * 2, 24)
-  const byWidth = usableWidth / (Math.max(input.digits, 2) * LIFE_DIGIT_ASPECT)
-  const byHeight = input.cellHeight * LIFE_HEIGHT_RATIO
+  const effectiveFontScale = Math.min(Math.max(input.fontScale, 0.1), LIFE_MAX_FONT_SCALE)
+  const targetSpace = Math.max(input.targetSize - LIFE_TARGET_TEXT_INSET * 2, 1)
+  const usableWidth = Math.max(Math.min(input.cellWidth - LIFE_CONTROL_GUTTER * 2, targetSpace), 1)
+  const usableHeight = Math.max(Math.min(input.cellHeight * LIFE_HEIGHT_RATIO, targetSpace), 1)
+  const byWidth = usableWidth / (Math.max(input.digits, 2) * LIFE_DIGIT_ASPECT * effectiveFontScale)
+  const byHeight = usableHeight / (1.1 * effectiveFontScale)
   return Math.max(LIFE_FONT_MIN, Math.min(LIFE_FONT_MAX, Math.floor(Math.min(byWidth, byHeight))))
 }
 
@@ -198,7 +203,6 @@ export function getPlayerGridRows(
   if (layout.variant === "featured-last")
     return [...chunkSeats(seats.slice(0, -1), 2), [playerCount - 1]]
   if (layout.variant === "even-grid") return chunkSeats(seats, 2, true)
-  if (layout.variant === "wide-grid") return chunkSeats(seats, 3, true)
   if (layout.layout === "three-featured") return [[0], [1, 2]]
   return chunkSeats(seats, layout.columnCount)
 }
@@ -223,6 +227,24 @@ export function getPlayerGridMenuAnchor(
     }
   }
   return { x: 0.5, y: 0.5 }
+}
+
+export function getScreenCornerSquaringStyle(input: {
+  rows: (number | null)[][]
+  rowIndex: number
+  columnIndex: number
+}): ViewStyle | undefined {
+  const touchesTopEdge = input.rowIndex === 0
+  const touchesBottomEdge = input.rowIndex === input.rows.length - 1
+  const touchesLeftEdge = input.columnIndex === 0
+  const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
+  const squared: ViewStyle = {
+    ...(touchesTopEdge && touchesLeftEdge ? { borderTopLeftRadius: 0 } : null),
+    ...(touchesTopEdge && touchesRightEdge ? { borderTopRightRadius: 0 } : null),
+    ...(touchesBottomEdge && touchesLeftEdge ? { borderBottomLeftRadius: 0 } : null),
+    ...(touchesBottomEdge && touchesRightEdge ? { borderBottomRightRadius: 0 } : null),
+  }
+  return Object.keys(squared).length ? squared : undefined
 }
 
 export function getPlayerContentRotation(input: {
@@ -297,21 +319,17 @@ export function getPlayerGridLayout(input: {
           : 2
   const variant = input.layoutVariant ?? "auto"
   const columnCount =
-    variant === "wide-grid"
-      ? Math.min(3, input.playerCount)
-      : variant === "featured-first" || variant === "featured-last" || variant === "even-grid"
-        ? 2
-        : automaticColumnCount
+    variant === "featured-first" || variant === "featured-last" || variant === "even-grid"
+      ? 2
+      : automaticColumnCount
   const rowCount =
     variant === "featured-first" || variant === "featured-last"
       ? 1 + Math.ceil((input.playerCount - 1) / 2)
       : variant === "even-grid"
         ? Math.ceil(input.playerCount / 2)
-        : variant === "wide-grid"
-          ? Math.ceil(input.playerCount / 3)
-          : input.playerCount === 3 && !landscape
-            ? 2
-            : Math.ceil(input.playerCount / columnCount)
+        : input.playerCount === 3 && !landscape
+          ? 2
+          : Math.ceil(input.playerCount / columnCount)
   const layout =
     input.playerCount === 2
       ? landscape

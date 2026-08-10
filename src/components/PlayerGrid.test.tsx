@@ -4,10 +4,12 @@ import { render } from "@testing-library/react-native"
 import { asPlayerId } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 
+import { COMPACT_LIFE_TARGET_SIZE, LIFE_TARGET_SIZE } from "./playerCardTypes"
 import {
   getCellSize,
   getLifeFontSize,
   getPlayerGridLayout,
+  getPlayerGridLayoutOptions,
   getPlayerGridRows,
   PlayerGrid,
 } from "./PlayerGrid"
@@ -54,6 +56,35 @@ describe("PlayerGrid", () => {
     })
   })
 
+  it("squares only the corners that meet the device's rounded screen corners", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={players(4)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    const cardStyle = (seat: number) =>
+      StyleSheet.flatten(view.getByTestId(`life-card-seat-${seat}`).props.style)
+    expect(cardStyle(1)).toMatchObject({ borderTopLeftRadius: 0 })
+    expect(cardStyle(1).borderTopRightRadius).toBeUndefined()
+    expect(cardStyle(2)).toMatchObject({ borderTopRightRadius: 0 })
+    expect(cardStyle(3)).toMatchObject({ borderBottomLeftRadius: 0 })
+    expect(cardStyle(4)).toMatchObject({ borderBottomRightRadius: 0 })
+    expect(cardStyle(4).borderTopLeftRadius).toBeUndefined()
+  })
+
+  it("squares both top corners of a full-width featured card", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={players(3)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    const featuredStyle = StyleSheet.flatten(view.getByTestId("life-card-seat-1").props.style)
+    expect(featuredStyle).toMatchObject({ borderTopLeftRadius: 0, borderTopRightRadius: 0 })
+    expect(featuredStyle.borderBottomLeftRadius).toBeUndefined()
+  })
+
   it.each([
     [2, 390, 844, 1, 2, "two-stacked"],
     [2, 844, 390, 2, 1, "two-side-by-side"],
@@ -75,7 +106,7 @@ describe("PlayerGrid", () => {
     },
   )
 
-  it("supports featured, even, and wide arrangements without dropping a player", () => {
+  it("supports featured and even arrangements without dropping a player", () => {
     const inputs = [
       ["featured-first", [[0], [1, 2], [3, 4]]],
       ["featured-last", [[0, 1], [2, 3], [4]]],
@@ -85,13 +116,6 @@ describe("PlayerGrid", () => {
           [0, 1],
           [2, 3],
           [4, null],
-        ],
-      ],
-      [
-        "wide-grid",
-        [
-          [0, 1, 2],
-          [3, 4, null],
         ],
       ],
     ] as const
@@ -104,6 +128,14 @@ describe("PlayerGrid", () => {
         layoutVariant,
       })
       expect(getPlayerGridRows(5, layout)).toEqual(expectedRows)
+    }
+  })
+
+  it("does not offer a forced wide layout at any player count", () => {
+    for (const playerCount of [2, 3, 4, 5, 6]) {
+      expect(getPlayerGridLayoutOptions(playerCount).map(({ variant }) => variant)).not.toContain(
+        "wide-grid",
+      )
     }
   })
 
@@ -136,9 +168,14 @@ describe("PlayerGrid", () => {
   describe("life total sizing", () => {
     const board = { width: 390, height: 690 }
 
-    function sizeFor(playerCount: number, digits = 2) {
+    function sizeFor(playerCount: number, digits = 2, fontScale = 1) {
       const layout = getPlayerGridLayout({ playerCount, width: 390, height: 844 })
-      return getLifeFontSize({ ...getCellSize({ board, layout, gap: 4 }), digits })
+      return getLifeFontSize({
+        ...getCellSize({ board, layout, gap: 4 }),
+        digits,
+        fontScale,
+        targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
+      })
     }
 
     it("stays unset until the board has been measured", () => {
@@ -147,6 +184,8 @@ describe("PlayerGrid", () => {
         getLifeFontSize({
           ...getCellSize({ board: { width: 0, height: 0 }, layout, gap: 4 }),
           digits: 2,
+          fontScale: 1,
+          targetSize: COMPACT_LIFE_TARGET_SIZE,
         }),
       ).toBeUndefined()
     })
@@ -164,6 +203,18 @@ describe("PlayerGrid", () => {
       expect(sizeFor(6, 4)!).toBeLessThan(sizeFor(6, 2)!)
     })
 
+    it("fits compact two-digit totals inside the readout at large Android text sizes", () => {
+      const layout = getPlayerGridLayout({ playerCount: 6, width: 390, height: 844 })
+      const size = getLifeFontSize({
+        ...getCellSize({ board, layout, gap: 4 }),
+        digits: 2,
+        fontScale: 1.3,
+        targetSize: COMPACT_LIFE_TARGET_SIZE,
+      })!
+
+      expect(size * 1.3 * 2 * 0.62).toBeLessThanOrEqual(COMPACT_LIFE_TARGET_SIZE - 16)
+    })
+
     it("keeps every seat on one shared size so the board reads as a scoreboard", () => {
       const layout = getPlayerGridLayout({ playerCount: 3, width: 390, height: 844 })
       const { cellWidth } = getCellSize({ board, layout, gap: 4 })
@@ -177,8 +228,10 @@ describe("PlayerGrid", () => {
         getLifeFontSize({
           ...getCellSize({ board: { width: 60, height: 60 }, layout, gap: 4 }),
           digits: 9,
+          fontScale: 1,
+          targetSize: COMPACT_LIFE_TARGET_SIZE,
         }),
-      ).toBe(22)
+      ).toBe(12)
     })
   })
 

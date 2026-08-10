@@ -109,6 +109,7 @@ describe("LifeCard", () => {
       left: 0,
       justifyContent: "center",
     })
+    expect(view.getByTestId("life-total-seat-1").props.adjustsFontSizeToFit).toBe(true)
     expect(StyleSheet.flatten(view.getByTestId("life-delta-seat-1").props.style).position).toBe(
       "absolute",
     )

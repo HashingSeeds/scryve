@@ -138,9 +138,28 @@ export function GameRadialMenu({
           ]}
           onPress={onToggle}
         >
-          <Text text={open ? "×" : "≡"} style={themed($menuGlyph)} />
+          <MenuGlyph open={open} />
         </Pressable>
       </Animated.View>
+    </View>
+  )
+}
+
+function MenuGlyph({ open }: { open: boolean }) {
+  return (
+    <View testID="game-menu-glyph" style={$menuGlyph}>
+      {open ? (
+        <>
+          <View style={[$menuGlyphBar, $closeGlyphForward]} />
+          <View style={[$menuGlyphBar, $closeGlyphBackward]} />
+        </>
+      ) : (
+        <>
+          <View style={$menuGlyphBar} />
+          <View style={$menuGlyphBar} />
+          <View style={$menuGlyphBar} />
+        </>
+      )}
     </View>
   )
 }
@@ -241,11 +260,27 @@ const $menuButton: ThemedStyle<ViewStyle> = () => ({
   shadowRadius: 6,
   elevation: 12,
 })
-const $menuGlyph: ThemedStyle<TextStyle> = () => ({
-  color: "#FFFFFF",
-  fontSize: 38,
-  lineHeight: 42,
-})
+const $menuGlyph: ViewStyle = {
+  width: 24,
+  height: 24,
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+}
+const $menuGlyphBar: ViewStyle = {
+  width: 16,
+  height: 2,
+  borderRadius: 1,
+  backgroundColor: "#FFFFFF",
+}
+const $closeGlyphForward: ViewStyle = {
+  position: "absolute",
+  transform: [{ rotate: "45deg" }],
+}
+const $closeGlyphBackward: ViewStyle = {
+  position: "absolute",
+  transform: [{ rotate: "-45deg" }],
+}
 const $actionAnchor: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
   zIndex: 20,

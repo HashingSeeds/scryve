@@ -1,4 +1,6 @@
-import { ReactNode, useEffect, useState } from "react"
+import { ReactNode, useEffect, useRef, useState } from "react"
+import type { ViewStyle } from "react-native"
+import { ActivityIndicator, Animated } from "react-native"
 import { useUser } from "@clerk/expo"
 import { useConvexAuth, useConvexConnectionState, useMutation } from "convex/react"
 
@@ -7,9 +9,64 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ConnectedErrorBoundary } from "@/features/connected/ConnectedErrorBoundary"
+import { useAppTheme } from "@/theme/context"
+import type { ThemedStyle } from "@/theme/types"
 
 import { ConnectedGameRepository } from "./persistence"
 import { api } from "../../../convex/_generated/api"
+
+const LOADING_REVEAL_DELAY_MS = 200
+const LOADING_FADE_DURATION_MS = 150
+
+const syncedProfile: { userId?: string } = { userId: undefined }
+
+export function resetSyncedProfileCacheForTests() {
+  syncedProfile.userId = undefined
+}
+
+function useRevealAfterDelay(delayMs: number) {
+  const [revealed, setRevealed] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setRevealed(true), delayMs)
+    return () => clearTimeout(timer)
+  }, [delayMs])
+  return revealed
+}
+
+function GateScreen({ busy = false, children }: { busy?: boolean; children: ReactNode }) {
+  const {
+    theme: { colors },
+    themed,
+  } = useAppTheme()
+  const revealedAfterDelay = useRevealAfterDelay(LOADING_REVEAL_DELAY_MS)
+  const visible = !busy || revealedAfterDelay
+  const opacity = useRef(new Animated.Value(busy ? 0 : 1)).current
+
+  useEffect(() => {
+    if (!visible) return
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: LOADING_FADE_DURATION_MS,
+      useNativeDriver: true,
+    }).start()
+  }, [opacity, visible])
+
+  return (
+    <Screen
+      preset="auto"
+      safeAreaEdges={["top", "bottom"]}
+      contentInset="standard"
+      contentContainerStyle={themed($gate)}
+    >
+      {visible ? (
+        <Animated.View style={[themed($gateContent), { opacity }]}>
+          {busy ? <ActivityIndicator color={colors.tint} /> : null}
+          {children}
+        </Animated.View>
+      ) : null}
+    </Screen>
+  )
+}
 
 export function BackendGate({
   children,
@@ -32,7 +89,7 @@ export function BackendGate({
   const { isWebSocketConnected } = useConvexConnectionState()
   const { isLoaded: isUserLoaded, user } = useUser()
   const syncCurrent = useMutation(api.users.syncCurrent)
-  const [readyUserId, setReadyUserId] = useState<string>()
+  const [readyUserId, setReadyUserId] = useState<string | undefined>(syncedProfile.userId)
   const [syncError, setSyncError] = useState<string>()
   const [syncAttempt, setSyncAttempt] = useState(0)
   const cachedProjection =
@@ -48,13 +105,17 @@ export function BackendGate({
     void syncCurrent({ displayName, avatarUrl: user.imageUrl })
       .then(() => {
         if (!cancelled) {
+          syncedProfile.userId = user.id
           setReadyUserId(user.id)
           setSyncError(undefined)
         }
       })
       .catch((cause) => {
-        if (!cancelled)
+        if (!cancelled) {
+          syncedProfile.userId = undefined
+          setReadyUserId(undefined)
           setSyncError(cause instanceof Error ? cause.message : "Could not prepare connected play")
+        }
       })
     return () => {
       cancelled = true
@@ -73,54 +134,54 @@ export function BackendGate({
   if (clerkSignedIn && !isWebSocketConnected && hasOwnerScopedCache) return children
   if (!clerkLoaded)
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <GateScreen busy>
         <Text text="Checking your session… Local play remains available." />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
-      </Screen>
+      </GateScreen>
     )
   if (!clerkSignedIn)
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <GateScreen>
         <Text
           accessibilityRole="alert"
           text="You are signed out or your session expired. Re-authenticate to resume connected play; local games remain available."
         />
         <Button text="Re-authenticate" preset="reversed" onPress={onReauthenticate} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
-      </Screen>
+      </GateScreen>
     )
   if (isAuthenticated && isUserLoaded && user?.id && readyUserId === user.id) return children
   if (!isWebSocketConnected)
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <GateScreen>
         <Text
           accessibilityRole="alert"
           text="Connected play is offline. Local play remains available."
         />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
-      </Screen>
+      </GateScreen>
     )
   if (isLoading)
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <GateScreen busy>
         <Text text="Connecting to Convex… Local play remains available." />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
-      </Screen>
+      </GateScreen>
     )
   if (!isAuthenticated)
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <GateScreen>
         <Text
           accessibilityRole="alert"
           text="Convex rejected this signed-in session. Check the issuer or deployment configuration, then retry."
         />
         <Button text="Re-authenticate" preset="reversed" onPress={onReauthenticate} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
-      </Screen>
+      </GateScreen>
     )
   if (syncError)
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <GateScreen>
         <Text accessibilityRole="alert" text={syncError} />
         <Button
           text="Retry connected setup"
@@ -132,13 +193,13 @@ export function BackendGate({
         />
         <Button text="Re-authenticate" onPress={onReauthenticate} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
-      </Screen>
+      </GateScreen>
     )
   return (
-    <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+    <GateScreen busy>
       <Text text="Preparing your connected-play profile…" />
       {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
-    </Screen>
+    </GateScreen>
   )
 }
 
@@ -156,10 +217,10 @@ export function ConnectedGate({
   const auth = useAuthAccess()
   if (!auth.configured)
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
+      <GateScreen>
         <Text accessibilityRole="alert" text={auth.configurationMessage} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
-      </Screen>
+      </GateScreen>
     )
   return (
     <ConnectedErrorBoundary onBack={onBack}>
@@ -176,3 +237,10 @@ export function ConnectedGate({
     </ConnectedErrorBoundary>
   )
 }
+
+const $gate: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexGrow: 1,
+  justifyContent: "center",
+  paddingVertical: spacing.xl,
+})
+const $gateContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })

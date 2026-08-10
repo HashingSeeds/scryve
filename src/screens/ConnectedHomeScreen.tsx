@@ -162,9 +162,6 @@ export function ConnectedHomeScreen({
       />
       <Text preset="heading" accessibilityRole="header" text="Connected play" />
       <Text text="Host a resilient live game, or join an existing lobby." />
-      {!projectionReady && isWebSocketConnected ? (
-        <Text text="Preparing your connected-play profile…" />
-      ) : null}
       {bootstrapError ? <Text accessibilityRole="alert" text={bootstrapError} /> : null}
       {uniqueActiveGames.length ? (
         <View style={$form}>
