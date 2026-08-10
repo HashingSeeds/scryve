@@ -11,6 +11,11 @@ export async function requireIdentity(ctx: Ctx) {
 
 export async function requireUser(ctx: Ctx): Promise<Doc<"users">> {
   const identity = await requireIdentity(ctx)
+  const deletionRequest = await ctx.db
+    .query("accountDeletionRequests")
+    .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
+    .unique()
+  if (deletionRequest) throw new Error("Account deletion is in progress")
   const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))

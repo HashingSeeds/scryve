@@ -10,6 +10,7 @@ export default function SettingsRoute() {
     <SettingsScreen
       initialSettings={localGameRepository.loadSettings()}
       onBack={() => router.back()}
+      onRequestAccountDeletion={() => router.push("/delete-account")}
       onSave={(settings) => {
         localGameRepository.saveSettings(settings)
         setThemeContextOverride(

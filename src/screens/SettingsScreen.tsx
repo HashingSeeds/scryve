@@ -16,9 +16,15 @@ export interface SettingsScreenProps {
   initialSettings: LocalSettings
   onBack: () => void
   onSave: (settings: LocalSettings) => void
+  onRequestAccountDeletion?: () => void
 }
 
-export function SettingsScreen({ initialSettings, onBack, onSave }: SettingsScreenProps) {
+export function SettingsScreen({
+  initialSettings,
+  onBack,
+  onSave,
+  onRequestAccountDeletion,
+}: SettingsScreenProps) {
   const { themed } = useAppTheme()
   const [settings, setSettings] = useState(initialSettings)
   const update = (next: Partial<LocalSettings>) =>
@@ -81,6 +87,24 @@ export function SettingsScreen({ initialSettings, onBack, onSave }: SettingsScre
         size="xs"
         style={themed($muted)}
       />
+      {onRequestAccountDeletion ? (
+        <View style={themed($accountSection)}>
+          <Text text="Account & data" preset="subheading" accessibilityRole="header" />
+          <Text
+            text="Manage the cloud data tied to your Count account. Local games stay on this device."
+            size="xs"
+            style={themed($muted)}
+          />
+          <Button
+            testID="request-account-deletion-button"
+            text="Request account deletion"
+            accessibilityHint="Opens the account deletion request page"
+            style={themed($dangerButton)}
+            textStyle={themed($dangerText)}
+            onPress={onRequestAccountDeletion}
+          />
+        </View>
+      ) : null}
       <Button
         testID="save-settings-button"
         tx="localGame:saveSettings"
@@ -107,3 +131,16 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $choice: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, minWidth: 56, minHeight: 48 })
 const $label: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $accountSection: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.sm,
+  marginTop: spacing.sm,
+  paddingTop: spacing.lg,
+  borderTopWidth: 1,
+  borderColor: colors.separator,
+})
+const $dangerButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  minHeight: 50,
+  borderColor: colors.error,
+  backgroundColor: colors.transparent,
+})
+const $dangerText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })

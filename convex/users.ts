@@ -8,6 +8,11 @@ export const syncCurrent = mutation({
   args: { displayName: v.string(), avatarUrl: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
+    const deletionRequest = await ctx.db
+      .query("accountDeletionRequests")
+      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
+      .unique()
+    if (deletionRequest) throw new Error("Account deletion is in progress")
     const displayName = assertDisplayName(args.displayName)
     const avatarUrl = assertAvatarUrl(args.avatarUrl)
     const now = Date.now()

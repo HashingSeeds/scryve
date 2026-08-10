@@ -157,7 +157,7 @@ async function terminalizeGame(
   ctx: MutationCtx,
   game: Doc<"games">,
   status: "finished" | "abandoned",
-  reason: "host_finished" | "host_abandoned" | "stale_inactivity",
+  reason: "host_finished" | "host_abandoned" | "stale_inactivity" | "account_deleted",
   endedByUserId?: Id<"users">,
 ): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
@@ -194,6 +194,11 @@ async function terminalizeGame(
   await ctx.db.patch(game._id, { status, updatedAt: now })
   for (const player of players) await ctx.db.patch(player._id, { resumable: false })
   return (await ctx.db.get(summaryId))!
+}
+
+export async function terminalizeGameForAccountDeletion(ctx: MutationCtx, game: Doc<"games">) {
+  if (game.status !== "lobby" && game.status !== "active") return null
+  return await terminalizeGame(ctx, game, "abandoned", "account_deleted")
 }
 
 export const createLobby = mutation({

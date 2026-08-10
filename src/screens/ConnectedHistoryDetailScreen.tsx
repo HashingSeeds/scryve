@@ -1,4 +1,5 @@
-import { View } from "react-native"
+import type { ImageStyle } from "react-native"
+import { Image, View } from "react-native"
 import { usePaginatedQuery, useQuery } from "convex/react"
 
 import { Button } from "@/components/Button"
@@ -37,6 +38,15 @@ export function ConnectedHistoryDetailScreen({
                 heading={player.displayName}
                 content={`${player.finalLife} life`}
                 style={{ borderColor: player.color }}
+                LeftComponent={
+                  player.deletedAt ? (
+                    <Image
+                      accessibilityLabel="Deleted player avatar"
+                      source={require("@assets/images/deleted-player.png")}
+                      style={$deletedPlayerAvatar}
+                    />
+                  ) : undefined
+                }
               />
             ))}
           </View>
@@ -70,3 +80,4 @@ const $screen: ThemedStyle<any> = ({ spacing }) => ({
   paddingBottom: spacing.xl,
 })
 const $list: ThemedStyle<any> = ({ spacing }) => ({ gap: spacing.sm })
+const $deletedPlayerAvatar: ImageStyle = { width: 44, height: 44, alignSelf: "center" }

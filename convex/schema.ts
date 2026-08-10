@@ -14,7 +14,7 @@ export default defineSchema({
 
   games: defineTable({
     publicId: v.string(),
-    hostUserId: v.id("users"),
+    hostUserId: v.optional(v.id("users")),
     mode: v.literal("connected"),
     status: v.union(
       v.literal("lobby"),
@@ -40,10 +40,11 @@ export default defineSchema({
   gamePlayers: defineTable({
     gameId: v.id("games"),
     seat: v.number(),
-    userId: v.id("users"),
+    userId: v.optional(v.id("users")),
     deviceId: v.optional(v.string()),
     displayName: v.string(),
     avatarUrl: v.optional(v.string()),
+    deletedAt: v.optional(v.number()),
     color: v.string(),
     currentLife: v.number(),
     // Optional during the staged Phase 4.5A rollout. Counts only post-hot-path events.
@@ -84,8 +85,8 @@ export default defineSchema({
     operationId: v.string(),
     kind: v.string(),
     delta: v.optional(v.number()),
-    actorUserId: v.id("users"),
-    deviceId: v.string(),
+    actorUserId: v.optional(v.id("users")),
+    deviceId: v.optional(v.string()),
     clientCreatedAt: v.number(),
     serverCreatedAt: v.number(),
     undoOfOperationId: v.optional(v.string()),
@@ -94,7 +95,8 @@ export default defineSchema({
   })
     .index("by_game_server_time", ["gameId", "serverCreatedAt"])
     .index("by_game_operation", ["gameId", "operationId"])
-    .index("by_operation_id", ["operationId"]),
+    .index("by_operation_id", ["operationId"])
+    .index("by_actor_user", ["actorUserId"]),
 
   gameSummaries: defineTable({
     gameId: v.id("games"),
@@ -113,9 +115,20 @@ export default defineSchema({
         displayName: v.string(),
         color: v.string(),
         finalLife: v.number(),
+        deletedAt: v.optional(v.number()),
       }),
     ),
   })
     .index("by_game", ["gameId"])
     .index("by_public_id", ["publicId"]),
+
+  accountDeletionRequests: defineTable({
+    clerkUserId: v.string(),
+    userId: v.optional(v.id("users")),
+    status: v.union(v.literal("processing"), v.literal("identity_pending"), v.literal("failed")),
+    attempts: v.number(),
+    requestedAt: v.number(),
+    updatedAt: v.number(),
+    lastError: v.optional(v.string()),
+  }).index("by_clerk_user", ["clerkUserId"]),
 })
