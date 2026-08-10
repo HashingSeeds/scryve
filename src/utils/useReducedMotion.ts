@@ -3,15 +3,25 @@ import { AccessibilityInfo } from "react-native"
 
 export type ReducedMotionPreference = boolean | null
 
+// Unknown is fail-safe: suppress optional motion/haptics until the OS preference resolves.
+let lastKnownPreference: ReducedMotionPreference = null
+
+export function resetReducedMotionCacheForTests() {
+  lastKnownPreference = null
+}
+
 export function useReducedMotion(): ReducedMotionPreference {
-  // Unknown is fail-safe: suppress optional motion/haptics until the OS preference resolves.
-  const [enabled, setEnabled] = useState<ReducedMotionPreference>(null)
+  const [enabled, setEnabled] = useState<ReducedMotionPreference>(lastKnownPreference)
   useEffect(() => {
     let active = true
     void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
+      lastKnownPreference = value
       if (active) setEnabled(value)
     })
-    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setEnabled)
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (value) => {
+      lastKnownPreference = value
+      setEnabled(value)
+    })
     return () => {
       active = false
       subscription.remove()

@@ -10,6 +10,7 @@ import {
   getLifeFontSize,
   getPlayerGridLayout,
   getPlayerGridLayoutOptions,
+  getPlayerGridMenuAnchor,
   getPlayerGridRows,
   PlayerGrid,
 } from "./PlayerGrid"
@@ -129,6 +130,34 @@ describe("PlayerGrid", () => {
       })
       expect(getPlayerGridRows(5, layout)).toEqual(expectedRows)
     }
+  })
+
+  it("gives a full-width odd player less height than paired player rows", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={players(5)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    expect(StyleSheet.flatten(view.getByTestId("player-grid-row-0").props.style).flex).toBe(1)
+    expect(StyleSheet.flatten(view.getByTestId("player-grid-row-1").props.style).flex).toBe(1)
+    expect(StyleSheet.flatten(view.getByTestId("player-grid-row-2").props.style).flex).toBe(0.8)
+  })
+
+  it("anchors the game menu to weighted row intersections", () => {
+    const threePlayerLayout = getPlayerGridLayout({ playerCount: 3, width: 390, height: 844 })
+    const fivePlayerLayout = getPlayerGridLayout({ playerCount: 5, width: 390, height: 844 })
+    const fourPlayerLayout = getPlayerGridLayout({ playerCount: 4, width: 390, height: 844 })
+
+    expect(getPlayerGridMenuAnchor(3, threePlayerLayout)).toEqual({
+      x: 0.5,
+      y: expect.closeTo(4 / 9),
+    })
+    expect(getPlayerGridMenuAnchor(5, fivePlayerLayout)).toEqual({
+      x: 0.5,
+      y: expect.closeTo(5 / 14),
+    })
+    expect(getPlayerGridMenuAnchor(4, fourPlayerLayout)).toEqual({ x: 0.5, y: 0.5 })
   })
 
   it("does not offer a forced wide layout at any player count", () => {

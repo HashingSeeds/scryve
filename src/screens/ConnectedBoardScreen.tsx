@@ -1,12 +1,18 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
 import { Button } from "@/components/Button"
 import { ConnectionBadge } from "@/components/ConnectionBadge"
-import { DialogCard, $dialogActions, $dialogButton, $dialogText } from "@/components/DialogCard"
+import {
+  DialogCard,
+  $dialogActions,
+  $dialogButton,
+  $dialogText,
+  type DialogOrigin,
+} from "@/components/DialogCard"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import { Header } from "@/components/Header"
 import {
@@ -64,7 +70,14 @@ function ConnectedBoardRuntime({
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
+  const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const game = runtime.projection
+
+  function captureMenuDialogOrigin(event?: GestureResponderEvent) {
+    setMenuDialogOrigin(
+      event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
+    )
+  }
   if (!game)
     return (
       <Screen preset="auto">
@@ -112,7 +125,8 @@ function ConnectedBoardRuntime({
       label: "Layout",
       color: "#FBC878",
       disabled: layoutOptions.length < 2,
-      onPress: () => {
+      onPress: (event) => {
+        captureMenuDialogOrigin(event)
         setMenuOpen(false)
         setLayoutPickerOpen(true)
       },
@@ -133,7 +147,8 @@ function ConnectedBoardRuntime({
           : runtime.connectionStatus === "offline"
             ? "#D96767"
             : "#FBC878",
-      onPress: () => {
+      onPress: (event) => {
+        captureMenuDialogOrigin(event)
         setMenuOpen(false)
         setStatusOpen(true)
       },
@@ -153,7 +168,8 @@ function ConnectedBoardRuntime({
       label: "End game",
       color: "#D96767",
       disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
-      onPress: () => {
+      onPress: (event) => {
+        captureMenuDialogOrigin(event)
         setMenuOpen(false)
         setConfirmingFinish(true)
       },
@@ -195,6 +211,7 @@ function ConnectedBoardRuntime({
         <DialogCard
           visible
           onClose={() => setLayoutPickerOpen(false)}
+          origin={menuDialogOrigin}
           backdropTestID="connected-layout-backdrop"
           backdropAccessibilityLabel="Close layout chooser"
           dialogTestID="connected-layout-dialog"
@@ -227,6 +244,7 @@ function ConnectedBoardRuntime({
         <DialogCard
           visible
           onClose={() => setStatusOpen(false)}
+          origin={menuDialogOrigin}
           backdropTestID="connected-status-backdrop"
           backdropAccessibilityLabel="Close connected-game status"
           dialogTestID="connected-status-dialog"
@@ -303,6 +321,7 @@ function ConnectedBoardRuntime({
           visible
           onClose={() => setConfirmingFinish(false)}
           closeDisabled={runtime.finishing}
+          origin={menuDialogOrigin}
           backdropTestID="connected-finish-backdrop"
           backdropAccessibilityLabel="Cancel ending the connected game"
           dialogTestID="connected-finish-confirmation"

@@ -1,10 +1,16 @@
 import { useState } from "react"
-import type { ViewStyle } from "react-native"
+import type { GestureResponderEvent, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 
 import { Button } from "@/components/Button"
-import { DialogCard, $dialogActions, $dialogButton, $dialogText } from "@/components/DialogCard"
+import {
+  DialogCard,
+  $dialogActions,
+  $dialogButton,
+  $dialogText,
+  type DialogOrigin,
+} from "@/components/DialogCard"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
   getPlayerGridLayoutOptions,
@@ -42,6 +48,13 @@ export function CurrentGameScreen({
   const [endConfirmationOpen, setEndConfirmationOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
+  const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
+
+  function captureMenuDialogOrigin(event?: GestureResponderEvent) {
+    setMenuDialogOrigin(
+      event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
+    )
+  }
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
   const playerCount = runtime.game.players.length
   const layoutOptions = getPlayerGridLayoutOptions(playerCount)
@@ -79,7 +92,8 @@ export function CurrentGameScreen({
       label: "Layout",
       color: "#FBC878",
       disabled: layoutOptions.length < 2,
-      onPress: () => {
+      onPress: (event) => {
+        captureMenuDialogOrigin(event)
         setMenuOpen(false)
         setLayoutPickerOpen(true)
       },
@@ -98,7 +112,8 @@ export function CurrentGameScreen({
       id: "status",
       label: "Status",
       color: "#B48CE0",
-      onPress: () => {
+      onPress: (event) => {
+        captureMenuDialogOrigin(event)
         setMenuOpen(false)
         setStatusOpen(true)
       },
@@ -116,7 +131,10 @@ export function CurrentGameScreen({
       id: "end-game",
       label: "End game",
       color: "#D96767",
-      onPress: showEndConfirmation,
+      onPress: (event) => {
+        captureMenuDialogOrigin(event)
+        showEndConfirmation()
+      },
     },
   ]
 
@@ -148,6 +166,7 @@ export function CurrentGameScreen({
         <DialogCard
           visible
           onClose={closePanel}
+          origin={menuDialogOrigin}
           backdropTestID="layout-picker-backdrop"
           backdropAccessibilityLabel="Close layout chooser"
           dialogTestID="layout-picker-dialog"
@@ -179,6 +198,7 @@ export function CurrentGameScreen({
         <DialogCard
           visible
           onClose={() => setStatusOpen(false)}
+          origin={menuDialogOrigin}
           backdropTestID="game-status-backdrop"
           backdropAccessibilityLabel="Close game status"
           dialogTestID="game-status-dialog"
@@ -203,6 +223,7 @@ export function CurrentGameScreen({
         <DialogCard
           visible
           onClose={() => setEndConfirmationOpen(false)}
+          origin={menuDialogOrigin}
           backdropTestID="end-game-backdrop"
           backdropAccessibilityLabel="Cancel ending the game"
           dialogTestID="end-game-dialog"

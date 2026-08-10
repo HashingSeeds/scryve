@@ -74,6 +74,44 @@ describe("LifeCard", () => {
     })
   })
 
+  it("keeps a player marker inside a cramped card edge", () => {
+    expect(getPlayerMarkPlacement(90, 44, 66, 8, 181)).toMatchObject({
+      left: "50%",
+      marginLeft: 38.5,
+      marginTop: -14,
+    })
+    expect(getPlayerMarkPlacement(180, 44, 66, 8, 170)).toMatchObject({
+      top: "50%",
+      marginTop: 33,
+      marginLeft: -14,
+    })
+  })
+
+  it("repositions the marker after measuring a cramped sideways card", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={90}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 181, height: 400, x: 0, y: 0 } },
+    })
+
+    const marker = view.getByTestId("player-mark-seat-1", { includeHiddenElements: true })
+    expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
+      left: "50%",
+      marginLeft: 38.5,
+    })
+  })
+
   it("sums a run of changes into one signed delta chip", () => {
     const view = renderCard(20)
     view.rerender(card(21))

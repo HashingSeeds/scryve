@@ -1,9 +1,27 @@
 import { AccessibilityInfo } from "react-native"
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 
-import { motionDuration, useReducedMotion } from "./useReducedMotion"
+import {
+  motionDuration,
+  resetReducedMotionCacheForTests,
+  useReducedMotion,
+} from "./useReducedMotion"
 
 describe("useReducedMotion", () => {
+  beforeEach(() => {
+    resetReducedMotionCacheForTests()
+  })
+
+  it("initializes later mounts from the last known preference without waiting", async () => {
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false)
+    const first = renderHook(() => useReducedMotion())
+    await waitFor(() => expect(first.result.current).toBe(false))
+    first.unmount()
+
+    const second = renderHook(() => useReducedMotion())
+    expect(second.result.current).toBe(false)
+  })
+
   it("is fail-safe while loading and follows runtime preference changes", async () => {
     let resolve!: (value: boolean) => void
     jest

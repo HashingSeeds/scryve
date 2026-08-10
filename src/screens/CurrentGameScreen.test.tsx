@@ -161,8 +161,11 @@ describe("CurrentGameScreen", () => {
     expect(
       StyleSheet.flatten(view.getByTestId("layout-picker-backdrop").props.style),
     ).toMatchObject({
-      alignItems: "center",
-      justifyContent: "center",
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
     })
     expect(view.queryByTestId("layout-wide-grid")).toBeNull()
     expect(view.getByTestId("layout-featured-first")).toBeTruthy()
@@ -190,8 +193,11 @@ describe("CurrentGameScreen", () => {
     expect(view.queryByTestId("layout-picker-dialog")).toBeNull()
     expect(view.getByTestId("end-game-dialog")).toBeTruthy()
     expect(StyleSheet.flatten(view.getByTestId("end-game-backdrop").props.style)).toMatchObject({
-      alignItems: "center",
-      justifyContent: "center",
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
     })
     expect(view.getByTestId("confirm-end-game-button")).toBeTruthy()
     fireEvent.press(view.getByTestId("confirm-end-game-button"))

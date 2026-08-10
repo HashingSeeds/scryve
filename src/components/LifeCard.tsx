@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { StyleProp, TextStyle, ViewStyle } from "react-native"
+import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
@@ -68,11 +68,15 @@ export function LifeCard({
   const markSize = compact ? 36 : 44
   const lifeTargetRadius = (compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE) / 2
   const cardPadding = compact ? spacing.xxs : spacing.xs
+  const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
+  const markAxisLength =
+    contentRotation === 90 || contentRotation === -90 ? cardSize.width : cardSize.height
   const markStyle = getPlayerMarkPlacement(
     contentRotation,
     markSize,
     lifeTargetRadius + spacing.xs,
     cardPadding,
+    markAxisLength,
   )
 
   const [recentDelta, setRecentDelta] = useState(0)
@@ -127,6 +131,13 @@ export function LifeCard({
     closeEditor()
   }
 
+  function measureCard(event: LayoutChangeEvent) {
+    const { width, height } = event.nativeEvent.layout
+    setCardSize((current) =>
+      current.width === width && current.height === height ? current : { width, height },
+    )
+  }
+
   const editTitle =
     editMode === "add" ? "Add life" : editMode === "subtract" ? "Subtract life" : "Set life"
 
@@ -134,6 +145,7 @@ export function LifeCard({
     <View
       testID={`life-card-seat-${seatNumber}`}
       accessibilityLabel={`${identity}${ownershipLabel ? `, ${ownershipLabel}` : ""}`}
+      onLayout={measureCard}
       style={[
         themed($card),
         compact && themed($compactCard),
@@ -309,9 +321,15 @@ export function getPlayerMarkPlacement(
   size: number,
   distanceFromLifeCenter: number,
   cardPadding = 0,
+  cardAxisLength = 0,
 ): ViewStyle {
   const centeredOffset = -size / 2 + cardPadding
-  const directionalOffset = distanceFromLifeCenter + cardPadding
+  const preferredDirectionalOffset = distanceFromLifeCenter + cardPadding
+  const maximumDirectionalOffset = cardAxisLength / 2 - size - cardPadding
+  const directionalOffset =
+    cardAxisLength > 0
+      ? Math.max(0, Math.min(preferredDirectionalOffset, maximumDirectionalOffset))
+      : preferredDirectionalOffset
   if (rotation === 90)
     return {
       left: "50%",

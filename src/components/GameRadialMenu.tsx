@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
   useAnimatedStyle,
@@ -26,7 +26,7 @@ export interface RadialMenuAction {
   label: string
   color: string
   disabled?: boolean
-  onPress: () => void
+  onPress: (event?: GestureResponderEvent) => void
 }
 
 export interface GameRadialMenuProps {

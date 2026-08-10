@@ -26,6 +26,8 @@ export interface PlayerGridProps {
   style?: StyleProp<ViewStyle>
 }
 
+const SINGLE_PLAYER_ROW_FLEX = 0.8
+
 export function PlayerGrid({
   players,
   layoutVariant = "auto",
@@ -75,7 +77,14 @@ export function PlayerGrid({
       style={[themed($grid), style]}
     >
       {rows.map((row, rowIndex) => (
-        <View key={rowIndex} testID={`player-grid-row-${rowIndex}`} style={themed($row)}>
+        <View
+          key={rowIndex}
+          testID={`player-grid-row-${rowIndex}`}
+          style={[
+            themed($row),
+            getPlayerGridRowFlex(row, layout.columnCount) < 1 && $singlePlayerRow,
+          ]}
+        >
           {row.map((index, columnIndex) => {
             if (index === null) {
               return (
@@ -212,6 +221,13 @@ export function getPlayerGridMenuAnchor(
   layout: ReturnType<typeof getPlayerGridLayout>,
 ): { x: number; y: number } {
   const rows = getPlayerGridRows(playerCount, layout)
+  const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout.columnCount))
+  const totalRowFlex = rowFlexes.reduce((total, flex) => total + flex, 0)
+  let cumulativeFlex = 0
+  const boundaryPositions = rowFlexes.slice(0, -1).map((flex) => {
+    cumulativeFlex += flex
+    return cumulativeFlex / totalRowFlex
+  })
   for (let boundary = rows.length - 1; boundary > 0; boundary -= 1) {
     const upper = rows[boundary - 1]
     const lower = rows[boundary]
@@ -223,10 +239,21 @@ export function getPlayerGridMenuAnchor(
         lower[column - 1],
         lower[column],
       ].every((seat) => seat !== null && seat !== undefined)
-      if (fourCardsMeet) return { x: column / columnCount, y: boundary / rows.length }
+      if (fourCardsMeet) return { x: column / columnCount, y: boundaryPositions[boundary - 1] }
     }
   }
-  return { x: 0.5, y: 0.5 }
+  const nearestCentralBoundary = boundaryPositions.reduce<number | undefined>(
+    (nearest, position) =>
+      nearest === undefined || Math.abs(position - 0.5) < Math.abs(nearest - 0.5)
+        ? position
+        : nearest,
+    undefined,
+  )
+  return { x: 0.5, y: nearestCentralBoundary ?? 0.5 }
+}
+
+function getPlayerGridRowFlex(row: (number | null)[], columnCount: number): number {
+  return row.length === 1 && columnCount > 1 ? SINGLE_PLAYER_ROW_FLEX : 1
 }
 
 export function getScreenCornerSquaringStyle(input: {
@@ -294,6 +321,8 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xxs,
 })
+
+const $singlePlayerRow: ViewStyle = { flex: SINGLE_PLAYER_ROW_FLEX }
 
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 
