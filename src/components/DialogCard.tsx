@@ -12,6 +12,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-na
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
+import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 export interface DialogOrigin {
   x: number
@@ -36,7 +37,7 @@ export interface DialogCardProps {
 const ENTRANCE_START_SCALE = 0.5
 const ENTRANCE_SPRING = { damping: 16, stiffness: 200, mass: 0.7 } as const
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
+const claimTouchesSoTheBackdropNeverSeesThem = () => true
 
 export function DialogCard({
   visible,
@@ -53,6 +54,7 @@ export function DialogCard({
   children,
 }: DialogCardProps) {
   const { themed } = useAppTheme()
+  const safeAreaInsets = useSafeAreaInsetsStyle(["top", "bottom"], "margin")
   const reducedMotion = useReducedMotion()
   const animateFromOrigin = Boolean(origin) && reducedMotion === false
   const entrance = useSharedValue(animateFromOrigin ? 0 : 1)
@@ -100,17 +102,17 @@ export function DialogCard({
           style={[StyleSheet.absoluteFill, themed($dialogBackdrop)]}
           onPress={requestClose}
         />
-        <View pointerEvents="box-none" style={themed($dialogLayout)}>
-          <AnimatedPressable
+        <View pointerEvents="box-none" style={[themed($dialogLayout), safeAreaInsets]}>
+          <Animated.View
             testID={dialogTestID}
             accessibilityRole={dialogAccessibilityRole}
             accessibilityViewIsModal={accessibilityViewIsModal}
             style={[themed($dialog), wide ? themed($wideDialog) : undefined, style, entranceStyle]}
             onLayout={launchFromOrigin}
-            onPress={() => {}}
+            onStartShouldSetResponder={claimTouchesSoTheBackdropNeverSeesThem}
           >
             {children}
-          </AnimatedPressable>
+          </Animated.View>
         </View>
       </View>
     </Modal>
@@ -130,6 +132,7 @@ const $dialogLayout: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   width: "100%",
   maxWidth: 420,
+  maxHeight: "100%",
   gap: spacing.lg,
   padding: spacing.lg,
   borderRadius: spacing.lg,

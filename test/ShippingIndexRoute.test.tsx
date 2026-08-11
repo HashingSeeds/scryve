@@ -35,5 +35,7 @@ describe("shipping index route", () => {
     expect(en.localGame.account).toBe("Account")
     fireEvent.press(view.getByTestId("new-game-button"))
     expect(jest.requireMock("expo-router").router.push).toHaveBeenCalledWith("/game/new")
+    fireEvent.press(view.getByTestId("decks-button"))
+    expect(jest.requireMock("expo-router").router.push).toHaveBeenCalledWith("/connected/decks")
   })
 })

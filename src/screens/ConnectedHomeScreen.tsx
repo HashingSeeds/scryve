@@ -23,6 +23,7 @@ export interface ConnectedHomeScreenProps {
   onLobbyCreated: (lobby: { publicId: string; inviteToken: string; manualCode: string }) => void
   onJoin: () => void
   onHistory?: () => void
+  onDecks?: () => void
   onResume?: (game: { publicId: string; status: "lobby" | "active" }) => void
   onBack?: () => void
 }
@@ -31,6 +32,7 @@ export function ConnectedHomeScreen({
   onLobbyCreated,
   onJoin,
   onHistory,
+  onDecks,
   onResume,
   onBack,
 }: ConnectedHomeScreenProps) {
@@ -266,6 +268,7 @@ export function ConnectedHomeScreen({
           onPress={onJoin}
         />
         <Button text="Connected history" disabled={!projectionReady} onPress={onHistory} />
+        <Button text="Decks" disabled={!projectionReady} onPress={onDecks} />
       </View>
     </Screen>
   )

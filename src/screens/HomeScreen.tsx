@@ -12,6 +12,7 @@ export interface HomeScreenProps {
   onNewGame: () => void
   onResumeGame: () => void
   onHistory: () => void
+  onDecks: () => void
   onSettings: () => void
   onConnected?: () => void
   onAccount?: () => void
@@ -23,6 +24,7 @@ export function HomeScreen({
   onNewGame,
   onResumeGame,
   onHistory,
+  onDecks,
   onSettings,
   onConnected,
   onAccount,
@@ -71,6 +73,13 @@ export function HomeScreen({
           style={themed($secondaryButton)}
           textStyle={themed($secondaryText)}
           onPress={onConnected}
+        />
+        <Button
+          testID="decks-button"
+          text="Decks"
+          style={themed($secondaryButton)}
+          textStyle={themed($secondaryText)}
+          onPress={onDecks}
         />
         <View style={themed($utilityRow)}>
           <Button

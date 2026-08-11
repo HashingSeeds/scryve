@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { createElement, type ReactNode } from "react"
 import "react-native-url-polyfill/auto"
 // we always make sure 'react-native' gets included first
 // eslint-disable-next-line no-restricted-imports
@@ -17,17 +17,22 @@ jest.doMock("react-native", () => {
         isReduceMotionEnabled: jest.fn(() => new Promise<boolean>(() => undefined)),
         addEventListener: jest.fn(() => ({ remove: jest.fn() })),
       },
-      Image: {
-        ...ReactNative.Image,
-        resolveAssetSource: jest.fn((_source) => mockFile), // eslint-disable-line @typescript-eslint/no-unused-vars
-        getSize: jest.fn(
-          (
-            uri: string, // eslint-disable-line @typescript-eslint/no-unused-vars
-            success: (width: number, height: number) => void,
-            failure?: (_error: any) => void, // eslint-disable-line @typescript-eslint/no-unused-vars
-          ) => success(100, 100),
-        ),
-      },
+      Image: Object.assign(
+        function Image(props: ReactNative.ImageProps) {
+          return createElement(ReactNative.Image, props)
+        },
+        ReactNative.Image,
+        {
+          resolveAssetSource: jest.fn((_source) => mockFile), // eslint-disable-line @typescript-eslint/no-unused-vars
+          getSize: jest.fn(
+            (
+              uri: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+              success: (width: number, height: number) => void,
+              failure?: (_error: any) => void, // eslint-disable-line @typescript-eslint/no-unused-vars
+            ) => success(100, 100),
+          ),
+        },
+      ),
     },
     ReactNative,
   )

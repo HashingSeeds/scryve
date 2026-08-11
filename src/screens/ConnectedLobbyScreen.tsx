@@ -4,12 +4,14 @@ import { useConvexConnectionState, useMutation, useQuery } from "convex/react"
 import QRCode from "react-native-qrcode-svg"
 
 import { Button } from "@/components/Button"
+import { Card } from "@/components/Card"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 
@@ -26,10 +28,12 @@ export function ConnectedLobbyScreen({
 }) {
   const deviceId = useRef(new LocalGameRepository().getDeviceId()).current
   const lobby = useQuery(api.games.lobbyProjection, { publicId, deviceId })
+  const decks = useQuery(api.decks.listMine)?.decks
   const { isWebSocketConnected } = useConvexConnectionState()
   const start = useMutation(api.games.startGame)
   const leave = useMutation(api.games.leaveMyGame)
   const abandon = useMutation(api.games.abandonGame)
+  const selectDeck = useMutation(api.decks.selectForSeat)
   const [actionError, setActionError] = useState<string>()
   const [leaveAction, setLeaveAction] = useState<"leave" | "abandon">()
   const [leaving, setLeaving] = useState(false)
@@ -115,6 +119,47 @@ export function ConnectedLobbyScreen({
         style={$centeredText}
         text={`${lobby.players.length} of ${lobby.playerCount} seats claimed · ${lobby.startingLife} life · ${lobby.ruleset}`}
       />
+      <View style={$players}>
+        {lobby.players
+          .filter((player) => player.controlledByMe)
+          .map((player) => (
+            <Card
+              key={player.playerId ?? `seat-${player.seat}`}
+              heading={`Your seat ${player.seat}`}
+              content={
+                player.deckVersionId
+                  ? `Seat ${player.seat} · deck selected`
+                  : `Seat ${player.seat} · no deck selected`
+              }
+              RightComponent={
+                player.controlledByMe && decks?.length ? (
+                  <View style={$deckChoices}>
+                    {decks
+                      .filter((deck) => deck.latestVersionId)
+                      .map((deck) => (
+                        <Button
+                          key={deck._id}
+                          text={deck.name}
+                          onPress={async () => {
+                            try {
+                              setActionError(undefined)
+                              await selectDeck({
+                                publicId,
+                                seat: player.seat,
+                                deckVersionId: deck.latestVersionId!,
+                              })
+                            } catch (cause) {
+                              setActionError(convexErrorMessage(cause, "Could not select deck"))
+                            }
+                          }}
+                        />
+                      ))}
+                  </View>
+                ) : undefined
+              }
+            />
+          ))}
+      </View>
       {inviteUrl || manualCode ? (
         <Button
           testID="share-invite-button"
@@ -261,3 +306,5 @@ const $confirmation = {
   borderRadius: 8,
 } as const
 const $leaveActions = { gap: 8 } as const
+const $players = { gap: 8 } as const
+const $deckChoices = { gap: 4, minWidth: 120 } as const

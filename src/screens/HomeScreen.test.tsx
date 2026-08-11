@@ -9,6 +9,7 @@ const callbacks = {
   onResumeGame: jest.fn(),
   onHistory: jest.fn(),
   onSettings: jest.fn(),
+  onDecks: jest.fn(),
 }
 
 describe("HomeScreen", () => {
@@ -51,5 +52,15 @@ describe("HomeScreen", () => {
     )
     expect(view.getByText("localGame:account")).toBeTruthy()
     expect(view.queryByText("localGame:signUpOrLogIn")).toBeNull()
+  })
+
+  it("exposes deck building directly from the landing screen", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <HomeScreen hasActiveGame={false} {...callbacks} />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("decks-button"))
+    expect(callbacks.onDecks).toHaveBeenCalledTimes(1)
   })
 })

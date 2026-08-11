@@ -13,6 +13,7 @@ export default function Index() {
       onNewGame={() => router.push("/game/new")}
       onResumeGame={() => router.push("/game/current")}
       onHistory={() => router.push("/history")}
+      onDecks={() => router.push("/connected/decks")}
       onSettings={() => router.push("/settings")}
       onConnected={() => router.push("/connected")}
       onAccount={auth.isSignedIn ? () => router.push("/account") : auth.openAuth}

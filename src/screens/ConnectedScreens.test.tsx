@@ -65,10 +65,17 @@ jest.mock("convex/react", () => ({
     if (name.includes("leaveMyGame")) return mockLeave
     if (name.includes("abandonGame")) return mockAbandon
     if (name.includes("createLobby")) return mockCreateLobby
-    if (name.includes("migrateMyGameMemberships")) return mockMigrate
+    if (name.includes("migrateMyGameMemberships") || name.includes("migrateMyHistoryEntries"))
+      return mockMigrate
     return mockSyncUser
   },
-  useQuery: () => mockProjection,
+  useQuery: (reference: unknown) => {
+    const name = String(reference)
+    if (name.includes("listMine")) return []
+    if (name.includes("entitlements.current"))
+      return { fullHistory: false, unlimitedDecks: false, deckAnalytics: false }
+    return mockProjection
+  },
   usePaginatedQuery: (_reference: unknown, args: unknown) => {
     mockPaginatedArgs.push(args)
     return {
@@ -110,7 +117,10 @@ jest.mock("../../convex/_generated/api", () => ({
       createLobby: "games.createLobby",
       lobbyProjection: "games.lobbyProjection",
       connectedHistory: "games.connectedHistory",
+      migrateMyHistoryEntries: "games.migrateMyHistoryEntries",
     },
+    decks: { listMine: "decks.listMine", selectForSeat: "decks.selectForSeat" },
+    entitlements: { current: "entitlements.current" },
   },
 }))
 jest.mock("react-native-qrcode-svg", () => ({
