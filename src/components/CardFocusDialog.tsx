@@ -1,5 +1,6 @@
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { Image, ScrollView, View } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
+import { ScrollView, View } from "react-native"
+import { Image, type ImageStyle } from "expo-image"
 
 import { $alert, $alertText } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
@@ -61,6 +62,7 @@ export function CardFocusDialog({
   const { themed } = useAppTheme()
   const printing = details ? printingLine(details) : ""
   const displayImageUrl = card.imageUrl ?? card.smallImageUrl
+  const cachedThumbnailUrl = displayImageUrl === card.smallImageUrl ? undefined : card.smallImageUrl
 
   return (
     <DialogCard
@@ -81,9 +83,12 @@ export function CardFocusDialog({
           <Image
             testID="card-focus-image"
             accessibilityLabel={card.name}
-            source={{ uri: displayImageUrl }}
+            source={displayImageUrl}
+            placeholder={cachedThumbnailUrl}
             style={themed($cardImage)}
-            resizeMode="contain"
+            contentFit="contain"
+            transition={150}
+            cachePolicy="memory-disk"
           />
         ) : (
           <View style={themed($imagePlaceholder)}>
@@ -141,15 +146,13 @@ export function CardFocusDialog({
 const $scrollBody = { flexGrow: 0, flexShrink: 1 } as const
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.lg })
 const $cardImage: ThemedStyle<ImageStyle> = ({ spacing }) => ({
-  width: "100%",
+  alignSelf: "stretch",
   aspectRatio: CARD_ASPECT_RATIO,
-  alignSelf: "center",
   borderRadius: spacing.sm,
 })
 const $imagePlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: "100%",
+  alignSelf: "stretch",
   aspectRatio: CARD_ASPECT_RATIO,
-  alignSelf: "center",
   alignItems: "center",
   justifyContent: "center",
   padding: spacing.md,

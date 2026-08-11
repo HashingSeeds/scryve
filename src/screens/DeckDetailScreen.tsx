@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { Image, SectionList, View } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
+import { SectionList, View } from "react-native"
+import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 
 import { $alert, $alertText, BottomActionBar } from "@/components/BottomActionBar"
@@ -194,7 +195,9 @@ export function DeckDetailScreen({ deckId, onBack }: { deckId: string; onBack: (
     const thumbnailUrl = card.smallImageUrl ?? card.imageUrl
     return (
       <View style={themed($thumbnailSlot)}>
-        {thumbnailUrl ? <Image source={{ uri: thumbnailUrl }} style={themed($thumbnail)} /> : null}
+        {thumbnailUrl ? (
+          <Image source={thumbnailUrl} style={themed($thumbnail)} cachePolicy="memory-disk" />
+        ) : null}
       </View>
     )
   }

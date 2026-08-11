@@ -62,7 +62,7 @@ const getAppScheme = () => {
 export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
   const existingPlugins = config.plugins ?? []
 
-  const requiredPlugins = ["@clerk/expo", "expo-secure-store"]
+  const requiredPlugins = ["@clerk/expo", "expo-secure-store", "expo-image"]
   const plugins = [...existingPlugins]
   for (const plugin of requiredPlugins) {
     if (!plugins.some((entry) => (Array.isArray(entry) ? entry[0] : entry) === plugin)) {

@@ -1,5 +1,6 @@
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { FlatList, Image, TouchableOpacity, View } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
+import { FlatList, TouchableOpacity, View } from "react-native"
+import { Image, type ImageStyle } from "expo-image"
 import { useQuery } from "convex/react"
 
 import { Header } from "@/components/Header"
@@ -41,7 +42,7 @@ function DeckTile({ deck, onPress }: { deck: ShelfDeck; onPress: () => void }) {
       onPress={onPress}
     >
       {deck.coverImageUrl ? (
-        <Image source={{ uri: deck.coverImageUrl }} style={themed($cover)} />
+        <Image source={deck.coverImageUrl} style={themed($cover)} cachePolicy="memory-disk" />
       ) : (
         <View style={themed($coverPlaceholder)}>
           <Text
