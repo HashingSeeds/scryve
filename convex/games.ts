@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { internalMutation, mutation, query } from "./_generated/server"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
+import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import {
   boundedPaginationOptions,
   CONNECTED_EVENT_PAGE_MAX_ITEMS,
@@ -18,6 +19,8 @@ import {
   assertPlayerCount,
   assertRuleset,
   assertStartingLife,
+  FREE_CONNECTED_HISTORY_GAMES,
+  HISTORY_MIGRATION_VERSION,
   inviteIsUsable,
   INVITE_LIFETIME_MS,
   MEMBERSHIP_MIGRATION_VERSION,
@@ -159,6 +162,12 @@ async function terminalizeGame(
   status: "finished" | "abandoned",
   reason: "host_finished" | "host_abandoned" | "stale_inactivity" | "account_deleted",
   endedByUserId?: Id<"users">,
+  result:
+    | { kind: "win"; winnerPlayerIds: Id<"gamePlayers">[] }
+    | { kind: "draw" }
+    | { kind: "unknown" } = {
+    kind: "unknown",
+  },
 ): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
     .query("gameSummaries")
@@ -170,7 +179,48 @@ async function terminalizeGame(
     return existing
   }
   const players = await playersForGame(ctx, game._id)
+  const playerIds = new Set(players.map((player) => player._id))
+  if (status !== "finished") result = { kind: "unknown" }
+  if (result.kind === "win") {
+    if (result.winnerPlayerIds.length < 1) throw new Error("Choose at least one winner")
+    if (new Set(result.winnerPlayerIds).size !== result.winnerPlayerIds.length)
+      throw new Error("A winning seat may only be selected once")
+    if (result.winnerPlayerIds.some((playerId) => !playerIds.has(playerId)))
+      throw new Error("Winner must belong to this game")
+  }
+  const winnerIds = new Set(result.kind === "win" ? result.winnerPlayerIds : [])
+  const outcomeFor = (playerId: Id<"gamePlayers">): "win" | "loss" | "draw" | "unknown" =>
+    result.kind === "draw"
+      ? "draw"
+      : result.kind === "unknown"
+        ? "unknown"
+        : winnerIds.has(playerId)
+          ? "win"
+          : "loss"
   const now = Date.now()
+  const summaryPlayers = await Promise.all(
+    players
+      .sort((a, b) => a.seat - b.seat)
+      .map(async (player) => {
+        const user = player.userId ? await ctx.db.get(player.userId) : null
+        const version = player.deckVersionId ? await ctx.db.get(player.deckVersionId) : null
+        const deck = version ? await ctx.db.get(version.deckId) : null
+        return {
+          playerId: player._id,
+          seat: player.seat,
+          displayName: player.displayName,
+          ...(player.userId ? { userId: player.userId } : {}),
+          ...(user?.username ? { usernameAtFinish: user.username } : {}),
+          ...(deck ? { deckId: deck._id, deckNameAtFinish: deck.name } : {}),
+          ...(version
+            ? { deckVersionId: version._id, deckVersionNumber: version.versionNumber }
+            : {}),
+          outcome: outcomeFor(player._id),
+          color: player.color,
+          finalLife: player.currentLife,
+        }
+      }),
+  )
   const summaryId = await ctx.db.insert("gameSummaries", {
     gameId: game._id,
     publicId: game.publicId,
@@ -181,19 +231,63 @@ async function terminalizeGame(
     ruleset: game.ruleset,
     eventCount: totalEventCount(game, players),
     finishedAt: now,
-    players: players
-      .sort((a, b) => a.seat - b.seat)
-      .map((player) => ({
-        playerId: player._id,
-        seat: player.seat,
-        displayName: player.displayName,
-        color: player.color,
-        finalLife: player.currentLife,
-      })),
+    players: summaryPlayers,
+    resultKind: result.kind,
+    ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
   })
+  const summary = (await ctx.db.get(summaryId))!
+  const playersByUser = new Map<Id<"users">, typeof summaryPlayers>()
+  for (const player of summaryPlayers) {
+    if (!player.userId) continue
+    const group = playersByUser.get(player.userId) ?? []
+    group.push(player)
+    playersByUser.set(player.userId, group)
+  }
+  for (const [userId, userPlayers] of playersByUser) {
+    const outcome = userPlayers.some((player) => player.outcome === "win")
+      ? "win"
+      : userPlayers.every((player) => player.outcome === "draw")
+        ? "draw"
+        : userPlayers.every((player) => player.outcome === "unknown")
+          ? "unknown"
+          : "loss"
+    await ctx.db.insert("gameHistoryEntries", {
+      userId,
+      gameId: game._id,
+      summaryId,
+      finishedAt: now,
+      outcome,
+    })
+  }
+  for (const player of summaryPlayers) {
+    if (!player.userId || !player.deckId || !player.deckVersionId) continue
+    await ctx.db.insert("deckGameResults", {
+      deckId: player.deckId,
+      deckVersionId: player.deckVersionId,
+      gameId: game._id,
+      playerId: player.playerId,
+      userId: player.userId,
+      outcome: player.outcome,
+      finishedAt: now,
+    })
+    const stats = await ctx.db
+      .query("deckStats")
+      .withIndex("by_deck", (q) => q.eq("deckId", player.deckId!))
+      .unique()
+    const increment = {
+      games: (stats?.games ?? 0) + 1,
+      wins: (stats?.wins ?? 0) + (player.outcome === "win" ? 1 : 0),
+      losses: (stats?.losses ?? 0) + (player.outcome === "loss" ? 1 : 0),
+      draws: (stats?.draws ?? 0) + (player.outcome === "draw" ? 1 : 0),
+      unknown: (stats?.unknown ?? 0) + (player.outcome === "unknown" ? 1 : 0),
+      updatedAt: now,
+    }
+    if (stats) await ctx.db.patch(stats._id, increment)
+    else await ctx.db.insert("deckStats", { deckId: player.deckId, ...increment })
+  }
   await ctx.db.patch(game._id, { status, updatedAt: now })
   for (const player of players) await ctx.db.patch(player._id, { resumable: false })
-  return (await ctx.db.get(summaryId))!
+  return summary
 }
 
 export async function terminalizeGameForAccountDeletion(ctx: MutationCtx, game: Doc<"games">) {
@@ -260,6 +354,7 @@ export const createLobby = mutation({
       ...(args.deviceId ? { deviceId: args.deviceId } : {}),
       displayName: hostDisplayName,
       avatarUrl: user.avatarUrl,
+      usernameAtJoin: user.username,
       color: args.hostColor,
       currentLife: args.startingLife,
       eventCount: 0,
@@ -337,6 +432,7 @@ export const claimSeat = mutation({
       ...(args.deviceId ? { deviceId: args.deviceId } : {}),
       displayName,
       avatarUrl: user.avatarUrl,
+      usernameAtJoin: user.username,
       color: args.color,
       currentLife: game.startingLife,
       eventCount: 0,
@@ -401,6 +497,8 @@ export const lobbyProjection = query({
           playerId: p._id,
           seat: p.seat,
           displayName: p.displayName,
+          username: p.usernameAtJoin,
+          deckVersionId: p.deckVersionId,
           avatarUrl: p.avatarUrl,
           color: p.color,
           currentLife: p.currentLife,
@@ -570,12 +668,28 @@ export const changeLife = mutation({
 })
 
 export const finishGame = mutation({
-  args: { publicId: v.string() },
+  args: {
+    publicId: v.string(),
+    result: v.optional(
+      v.union(
+        v.object({ kind: v.literal("win"), winnerPlayerIds: v.array(v.id("gamePlayers")) }),
+        v.object({ kind: v.literal("draw") }),
+        v.object({ kind: v.literal("unknown") }),
+      ),
+    ),
+  },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireHost(ctx, game)
     if (game.status !== "active") throw new Error("Only an active game can be finished")
-    const summary = await terminalizeGame(ctx, game, "finished", "host_finished", user._id)
+    const summary = await terminalizeGame(
+      ctx,
+      game,
+      "finished",
+      "host_finished",
+      user._id,
+      args.result ?? { kind: "unknown" },
+    )
     return { publicId: game.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
   },
 })
@@ -651,36 +765,94 @@ export const connectedHistory = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
-    const memberships = await ctx.db
-      .query("gamePlayers")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+    const premium = await hasFeature(ctx, user, PREMIUM_FEATURES.fullHistory)
+    const history = await ctx.db
+      .query("gameHistoryEntries")
+      .withIndex("by_user_and_finished_at", (q) => q.eq("userId", user._id))
       .order("desc")
-      .paginate(boundedPaginationOptions(args.paginationOpts, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS))
+      .paginate(
+        boundedPaginationOptions(
+          args.paginationOpts,
+          premium
+            ? CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS
+            : Math.min(FREE_CONNECTED_HISTORY_GAMES, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS),
+        ),
+      )
     const page = []
-    const includedGameIds = new Set<string>()
-    for (const membership of memberships.page) {
-      if (includedGameIds.has(membership.gameId)) continue
-      const game = await ctx.db.get(membership.gameId)
-      if (!game || (game.status !== "finished" && game.status !== "abandoned")) continue
-      const summary = await ctx.db
-        .query("gameSummaries")
-        .withIndex("by_game", (q) => q.eq("gameId", game._id))
-        .unique()
+    for (const entry of history.page) {
+      const summary = await ctx.db.get(entry.summaryId)
       if (summary) {
-        includedGameIds.add(membership.gameId)
         page.push({
-          publicId: game.publicId,
+          publicId: summary.publicId,
           startingLife: summary.startingLife,
           ruleset: summary.ruleset,
           eventCount: summary.eventCount,
           finishedAt: summary.finishedAt,
+          outcome: entry.outcome,
           terminalStatus: summary.terminalStatus ?? "finished",
           terminalReason: summary.terminalReason,
           players: summary.players,
         })
       }
     }
-    return { ...memberships, page }
+    return {
+      ...history,
+      page,
+      isDone: premium ? history.isDone : true,
+      premium,
+      hasLockedHistory: !premium && !history.isDone,
+      migrationRequired: (user.historyMigrationVersion ?? 0) < HISTORY_MIGRATION_VERSION,
+    }
+  },
+})
+
+export const migrateMyHistoryEntries = mutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    if ((user.historyMigrationVersion ?? 0) >= HISTORY_MIGRATION_VERSION)
+      return { migratedCount: 0, isDone: true, continueCursor: "", alreadyComplete: true }
+    const cursor = user.historyMigrationCursor ?? args.cursor
+    const memberships = await ctx.db
+      .query("gamePlayers")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .paginate({ cursor, numItems: 25 })
+    let migratedCount = 0
+    for (const membership of memberships.page) {
+      const existing = await ctx.db
+        .query("gameHistoryEntries")
+        .withIndex("by_user_and_game", (q) =>
+          q.eq("userId", user._id).eq("gameId", membership.gameId),
+        )
+        .unique()
+      if (existing) continue
+      const summary = await ctx.db
+        .query("gameSummaries")
+        .withIndex("by_game", (q) => q.eq("gameId", membership.gameId))
+        .unique()
+      if (!summary) continue
+      const summaryPlayer = summary.players.find((player) => player.playerId === membership._id)
+      await ctx.db.insert("gameHistoryEntries", {
+        userId: user._id,
+        gameId: membership.gameId,
+        summaryId: summary._id,
+        finishedAt: summary.finishedAt,
+        outcome: summaryPlayer?.outcome ?? "unknown",
+      })
+      migratedCount += 1
+    }
+    await ctx.db.patch(
+      user._id,
+      memberships.isDone
+        ? { historyMigrationVersion: HISTORY_MIGRATION_VERSION, historyMigrationCursor: undefined }
+        : { historyMigrationCursor: memberships.continueCursor },
+    )
+    return {
+      migratedCount,
+      isDone: memberships.isDone,
+      continueCursor: memberships.continueCursor,
+      alreadyComplete: false,
+    }
   },
 })
 
