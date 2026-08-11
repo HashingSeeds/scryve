@@ -5,6 +5,11 @@ export const MAX_MANUAL_CODE_CANDIDATES = 8
 export const MAX_RULESET_LENGTH = 32
 export const MAX_AVATAR_URL_LENGTH = 512
 export const MEMBERSHIP_MIGRATION_VERSION = 1
+export const HISTORY_MIGRATION_VERSION = 1
+export const FREE_CONNECTED_HISTORY_GAMES = 10
+export const FREE_DECK_LIMIT = 1
+export const MAX_PREMIUM_DECKS = 100
+export const MAX_DECK_CARDS = 300
 export const STALE_GAME_INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000
 export const STALE_GAME_CLEANUP_BATCH_SIZE = 25
 
@@ -56,6 +61,29 @@ export function assertAllowedColor(color: string) {
 export function assertDisplayName(name: string) {
   const value = name.trim()
   if (value.length < 1 || value.length > 32) throw new Error("Display name must be 1–32 characters")
+  return value
+}
+
+export function assertUsername(username: string) {
+  const value = username.trim()
+  if (value.length < 4 || value.length > 64 || !/^[A-Za-z0-9_-]+$/.test(value))
+    throw new Error("Username must be 4–64 letters, numbers, underscores, or hyphens")
+  return value
+}
+
+export function normalizeUsername(username: string) {
+  return assertUsername(username).toLowerCase()
+}
+
+export function assertDeckName(name: string) {
+  const value = name.trim()
+  if (value.length < 1 || value.length > 80) throw new Error("Deck name must be 1–80 characters")
+  return value
+}
+
+export function assertDeckFormat(format: string) {
+  const value = format.trim().toLowerCase()
+  if (value.length < 1 || value.length > 32) throw new Error("Deck format must be 1–32 characters")
   return value
 }
 

@@ -10,6 +10,7 @@ import { requireIdentity } from "./lib/auth"
 const DELETED_PLAYER_NAME = "Deleted player"
 const MEMBERSHIP_BATCH_SIZE = 5
 const EVENT_BATCH_SIZE = 50
+const USER_DATA_BATCH_SIZE = 50
 
 async function requestByClerkUser(ctx: MutationCtx, clerkUserId: string) {
   return await ctx.db
@@ -97,7 +98,17 @@ function anonymizedSummaryPlayers(
 ) {
   return summary.players.map((player) =>
     player.playerId === playerId
-      ? { ...player, displayName: DELETED_PLAYER_NAME, deletedAt }
+      ? {
+          ...player,
+          displayName: DELETED_PLAYER_NAME,
+          userId: undefined,
+          usernameAtFinish: undefined,
+          deckId: undefined,
+          deckVersionId: undefined,
+          deckNameAtFinish: undefined,
+          deckVersionNumber: undefined,
+          deletedAt,
+        }
       : player,
   )
 }
@@ -127,6 +138,8 @@ async function anonymizeMembership(
     deviceId: undefined,
     displayName: DELETED_PLAYER_NAME,
     avatarUrl: undefined,
+    usernameAtJoin: undefined,
+    deckVersionId: undefined,
     deletedAt,
     resumable: false,
   })
@@ -176,7 +189,7 @@ export const processEvents = internalMutation({
         .withIndex("by_actor_user", (q) => q.eq("actorUserId", request.userId))
         .take(EVENT_BATCH_SIZE)
       if (events.length === 0) {
-        await ctx.scheduler.runAfter(0, internal.accountDeletion.finalizeAppData, {
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, {
           requestId: request._id,
         })
         return null
@@ -192,6 +205,97 @@ export const processEvents = internalMutation({
       await ctx.db.patch(request._id, {
         status: "failed",
         lastError: cause instanceof Error ? cause.message : "Could not anonymize game events",
+        updatedAt: Date.now(),
+      })
+    }
+    return null
+  },
+})
+
+export const processUserLinkedData = internalMutation({
+  args: { requestId: v.id("accountDeletionRequests") },
+  handler: async (ctx, args) => {
+    const request = await ctx.db.get(args.requestId)
+    if (!request || request.status !== "processing" || !request.userId) return null
+    try {
+      const history = await ctx.db
+        .query("gameHistoryEntries")
+        .withIndex("by_user_and_finished_at", (q) => q.eq("userId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (history.length) {
+        for (const entry of history) await ctx.db.delete(entry._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      const results = await ctx.db
+        .query("deckGameResults")
+        .withIndex("by_user", (q) => q.eq("userId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (results.length) {
+        for (const result of results) await ctx.db.delete(result._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      const entitlements = await ctx.db
+        .query("userEntitlements")
+        .withIndex("by_user", (q) => q.eq("userId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (entitlements.length) {
+        for (const entitlement of entitlements) await ctx.db.delete(entitlement._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
+    } catch (cause) {
+      await ctx.db.patch(request._id, {
+        status: "failed",
+        lastError: cause instanceof Error ? cause.message : "Could not delete user-linked data",
+        updatedAt: Date.now(),
+      })
+    }
+    return null
+  },
+})
+
+export const processDecks = internalMutation({
+  args: { requestId: v.id("accountDeletionRequests") },
+  handler: async (ctx, args) => {
+    const request = await ctx.db.get(args.requestId)
+    if (!request || request.status !== "processing" || !request.userId) return null
+    try {
+      const deck = await ctx.db
+        .query("decks")
+        .withIndex("by_owner_and_updated_at", (q) => q.eq("ownerUserId", request.userId!))
+        .first()
+      if (!deck) {
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.finalizeAppData, args)
+        return null
+      }
+      const version = await ctx.db
+        .query("deckVersions")
+        .withIndex("by_deck_and_version_number", (q) => q.eq("deckId", deck._id))
+        .first()
+      if (version) {
+        const cards = await ctx.db
+          .query("deckCards")
+          .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version._id))
+          .take(USER_DATA_BATCH_SIZE)
+        if (cards.length) for (const card of cards) await ctx.db.delete(card._id)
+        else await ctx.db.delete(version._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
+        return null
+      }
+      const stats = await ctx.db
+        .query("deckStats")
+        .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
+        .unique()
+      if (stats) await ctx.db.delete(stats._id)
+      await ctx.db.delete(deck._id)
+      await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
+    } catch (cause) {
+      await ctx.db.patch(request._id, {
+        status: "failed",
+        lastError: cause instanceof Error ? cause.message : "Could not delete decks",
         updatedAt: Date.now(),
       })
     }

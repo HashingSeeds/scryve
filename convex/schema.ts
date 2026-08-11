@@ -5,12 +5,18 @@ export default defineSchema({
   users: defineTable({
     clerkUserId: v.string(),
     displayName: v.string(),
+    username: v.optional(v.string()),
+    usernameNormalized: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
     membershipMigrationVersion: v.optional(v.number()),
     membershipMigrationCursor: v.optional(v.string()),
+    historyMigrationVersion: v.optional(v.number()),
+    historyMigrationCursor: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_clerk_user", ["clerkUserId"]),
+  })
+    .index("by_clerk_user", ["clerkUserId"])
+    .index("by_username_normalized", ["usernameNormalized"]),
 
   games: defineTable({
     publicId: v.string(),
@@ -44,6 +50,8 @@ export default defineSchema({
     deviceId: v.optional(v.string()),
     displayName: v.string(),
     avatarUrl: v.optional(v.string()),
+    usernameAtJoin: v.optional(v.string()),
+    deckVersionId: v.optional(v.id("deckVersions")),
     deletedAt: v.optional(v.number()),
     color: v.string(),
     currentLife: v.number(),
@@ -113,14 +121,132 @@ export default defineSchema({
         playerId: v.id("gamePlayers"),
         seat: v.number(),
         displayName: v.string(),
+        userId: v.optional(v.id("users")),
+        usernameAtFinish: v.optional(v.string()),
+        deckId: v.optional(v.id("decks")),
+        deckVersionId: v.optional(v.id("deckVersions")),
+        deckNameAtFinish: v.optional(v.string()),
+        deckVersionNumber: v.optional(v.number()),
+        outcome: v.optional(
+          v.union(v.literal("win"), v.literal("loss"), v.literal("draw"), v.literal("unknown")),
+        ),
         color: v.string(),
         finalLife: v.number(),
         deletedAt: v.optional(v.number()),
       }),
     ),
+    resultKind: v.optional(v.union(v.literal("win"), v.literal("draw"), v.literal("unknown"))),
+    winnerPlayerIds: v.optional(v.array(v.id("gamePlayers"))),
   })
     .index("by_game", ["gameId"])
     .index("by_public_id", ["publicId"]),
+
+  gameHistoryEntries: defineTable({
+    userId: v.id("users"),
+    gameId: v.id("games"),
+    summaryId: v.id("gameSummaries"),
+    finishedAt: v.number(),
+    outcome: v.union(v.literal("win"), v.literal("loss"), v.literal("draw"), v.literal("unknown")),
+  })
+    .index("by_user_and_finished_at", ["userId", "finishedAt"])
+    .index("by_user_and_game", ["userId", "gameId"]),
+
+  decks: defineTable({
+    ownerUserId: v.id("users"),
+    name: v.string(),
+    format: v.string(),
+    game: v.optional(v.string()),
+    archivedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_and_updated_at", ["ownerUserId", "updatedAt"])
+    .index("by_owner_and_archived_at", ["ownerUserId", "archivedAt"]),
+
+  deckVersions: defineTable({
+    deckId: v.id("decks"),
+    versionNumber: v.number(),
+    fingerprint: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_deck_and_version_number", ["deckId", "versionNumber"])
+    .index("by_deck_and_created_at", ["deckId", "createdAt"]),
+
+  deckCards: defineTable({
+    deckVersionId: v.id("deckVersions"),
+    oracleId: v.string(),
+    scryfallId: v.string(),
+    name: v.string(),
+    imageUrl: v.optional(v.string()),
+    smallImageUrl: v.optional(v.string()),
+    quantity: v.number(),
+    board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
+  }).index("by_deck_version", ["deckVersionId"]),
+
+  deckGameResults: defineTable({
+    deckId: v.id("decks"),
+    deckVersionId: v.id("deckVersions"),
+    gameId: v.id("games"),
+    playerId: v.id("gamePlayers"),
+    userId: v.id("users"),
+    outcome: v.union(v.literal("win"), v.literal("loss"), v.literal("draw"), v.literal("unknown")),
+    finishedAt: v.number(),
+  })
+    .index("by_deck_and_finished_at", ["deckId", "finishedAt"])
+    .index("by_version_and_finished_at", ["deckVersionId", "finishedAt"])
+    .index("by_user", ["userId"])
+    .index("by_game_and_player", ["gameId", "playerId"]),
+
+  deckStats: defineTable({
+    deckId: v.id("decks"),
+    games: v.number(),
+    wins: v.number(),
+    losses: v.number(),
+    draws: v.number(),
+    unknown: v.number(),
+    updatedAt: v.number(),
+  }).index("by_deck", ["deckId"]),
+
+  cardReferences: defineTable({
+    scryfallId: v.string(),
+    oracleId: v.string(),
+    name: v.string(),
+    imageUrl: v.optional(v.string()),
+    smallImageUrl: v.optional(v.string()),
+    manaCost: v.optional(v.string()),
+    typeLine: v.optional(v.string()),
+    oracleText: v.optional(v.string()),
+    setName: v.optional(v.string()),
+    setCode: v.optional(v.string()),
+    collectorNumber: v.optional(v.string()),
+    rarity: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_scryfall_id", ["scryfallId"])
+    .index("by_oracle_id", ["oracleId"]),
+
+  preconCatalogs: defineTable({
+    fetchedAt: v.number(),
+    decks: v.array(
+      v.object({
+        fileName: v.string(),
+        name: v.string(),
+        code: v.optional(v.string()),
+        releaseDate: v.optional(v.string()),
+        type: v.optional(v.string()),
+      }),
+    ),
+  }),
+
+  userEntitlements: defineTable({
+    userId: v.id("users"),
+    feature: v.string(),
+    enabled: v.boolean(),
+    source: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_and_feature", ["userId", "feature"])
+    .index("by_user", ["userId"]),
 
   accountDeletionRequests: defineTable({
     clerkUserId: v.string(),
