@@ -4,6 +4,7 @@ import {
   asDeviceId,
   asGameId,
   asOperationId,
+  asPlayerId,
   createLocalGame,
   createClientId,
   reduceGameEvent,
@@ -147,6 +148,55 @@ describe("local game domain", () => {
       )
     }
     expect(game.players.map(({ life }) => life)).toEqual(expected)
+  })
+
+  it("records the winners chosen when a game is finished", () => {
+    const game = makeGame(3)
+    const winner = game.players[1].id
+    const ended = applyGameCommand(
+      game,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [winner] } },
+      makeContext(),
+    )
+    expect(ended.result).toEqual({ kind: "win", winnerPlayerIds: [winner] })
+    expect(ended.events.at(-1)).toMatchObject({
+      type: "game.finished",
+      result: { kind: "win", winnerPlayerIds: [winner] },
+    })
+  })
+
+  it("records a draw and leaves an unreported result off the game", () => {
+    const game = makeGame()
+    expect(
+      applyGameCommand(game, { type: "game.finish", result: { kind: "draw" } }, makeContext())
+        .result,
+    ).toEqual({ kind: "draw" })
+    expect(applyGameCommand(game, { type: "game.finish" }, makeContext()).result).toBeUndefined()
+  })
+
+  it("drops winners who never played and deduplicates the rest", () => {
+    const game = makeGame(3)
+    const winner = game.players[0].id
+    const ended = applyGameCommand(
+      game,
+      {
+        type: "game.finish",
+        result: { kind: "win", winnerPlayerIds: [winner, winner, asPlayerId("stranger")] },
+      },
+      makeContext(),
+    )
+    expect(ended.result).toEqual({ kind: "win", winnerPlayerIds: [winner] })
+  })
+
+  it("treats a win with no surviving winners as no result recorded", () => {
+    const game = makeGame()
+    const ended = applyGameCommand(
+      game,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [asPlayerId("stranger")] } },
+      makeContext(),
+    )
+    expect(ended.status).toBe("finished")
+    expect(ended.result).toBeUndefined()
   })
 
   it("freezes life changes after finish or abandon", () => {

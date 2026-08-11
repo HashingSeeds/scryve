@@ -43,7 +43,7 @@ describe("connected invite native intent", () => {
     expect(redirectSystemPath({ path, initial: false })).toBe("/")
   })
 
-  it.each(["/", "/settings", "/connected/history", "/connected/game/game-public"])(
+  it.each(["/", "/settings", "/history", "/connected/game/game-public"])(
     "preserves safe absolute internal warm route %s",
     (path) => expect(redirectSystemPath({ path, initial: false })).toBe(path),
   )

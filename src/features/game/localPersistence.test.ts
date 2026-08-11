@@ -92,6 +92,39 @@ describe("LocalGameRepository", () => {
     expect(repository.loadHistoryDetail(finished.id)?.game.status).toBe("finished")
   })
 
+  it("keeps the recorded winner on the archived summary and its detail", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const active = makeGame()
+    const winner = active.players[1].id
+    const finished = applyGameCommand(
+      active,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [winner] } },
+      defaultCommandContext(asDeviceId("device")),
+    )
+    repository.archiveGame(finished)
+    expect(repository.loadHistory()[0].result).toEqual({ kind: "win", winnerPlayerIds: [winner] })
+    expect(repository.loadHistoryDetail(finished.id)?.game.result).toEqual({
+      kind: "win",
+      winnerPlayerIds: [winner],
+    })
+  })
+
+  it("ignores a stored result that no longer parses", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const finished = applyGameCommand(
+      makeGame(),
+      { type: "game.finish", result: { kind: "draw" } },
+      defaultCommandContext(asDeviceId("device")),
+    )
+    repository.archiveGame(finished)
+    const detail = JSON.parse(storage.getString(LOCAL_KEYS.historyDetail(finished.id))!)
+    detail.game.result = { kind: "win", winnerPlayerIds: [] }
+    storage.set(LOCAL_KEYS.historyDetail(finished.id), JSON.stringify(detail))
+    expect(repository.loadHistoryDetail(finished.id)?.game.result).toBeUndefined()
+  })
+
   it("bounds history and removes evicted details", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)

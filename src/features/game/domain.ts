@@ -11,6 +11,7 @@ import type {
   LifeChangedEvent,
   LifeDelta,
   LocalGame,
+  LocalGameResult,
   NewPlayerInput,
   OperationId,
   PlayerId,
@@ -159,13 +160,26 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
   }
 
   const status = event.type === "game.finished" ? "finished" : "abandoned"
+  const result = event.type === "game.finished" ? sanitizeGameResult(game, event.result) : undefined
   return {
     ...game,
     status,
     events: [...game.events, event],
     updatedAt: Math.max(game.updatedAt, event.clientCreatedAt),
     finishedAt: event.clientCreatedAt,
+    ...(result ? { result } : {}),
   }
+}
+
+export function sanitizeGameResult(
+  game: LocalGame,
+  result: LocalGameResult | undefined,
+): LocalGameResult | undefined {
+  if (!result) return undefined
+  if (result.kind === "draw") return { kind: "draw" }
+  const playerIds = new Set(game.players.map(({ id }) => id))
+  const winnerPlayerIds = [...new Set(result.winnerPlayerIds)].filter((id) => playerIds.has(id))
+  return winnerPlayerIds.length > 0 ? { kind: "win", winnerPlayerIds } : undefined
 }
 
 export function reduceGameEvents(game: LocalGame, events: readonly GameEvent[]): LocalGame {
@@ -217,7 +231,11 @@ export function commandToEvent(
         }
       : null
   }
-  return { ...base, type: command.type === "game.finish" ? "game.finished" : "game.abandoned" }
+  if (command.type === "game.finish") {
+    const result = sanitizeGameResult(game, command.result)
+    return { ...base, type: "game.finished", ...(result ? { result } : {}) }
+  }
+  return { ...base, type: "game.abandoned" }
 }
 
 export function applyGameCommand(

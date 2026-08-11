@@ -14,7 +14,7 @@ export default function ConnectedGameRoute() {
       <ConnectedBoardScreen
         publicId={gameId}
         onBack={() => router.replace("/connected")}
-        onHistory={() => router.push("/connected/history")}
+        onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
       />
     </ConnectedGate>
   )

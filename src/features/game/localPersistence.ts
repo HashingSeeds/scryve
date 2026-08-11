@@ -9,7 +9,7 @@ import {
   createClientId,
   isLifeDelta,
 } from "./domain"
-import type { GameEvent, GamePlayer, LocalGame, LocalGameSummary } from "./types"
+import type { GameEvent, GamePlayer, LocalGame, LocalGameResult, LocalGameSummary } from "./types"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -101,6 +101,20 @@ function parsePlayers(value: unknown): GamePlayer[] | null {
   return players
 }
 
+function parseResult(value: unknown): LocalGameResult | undefined {
+  if (!isRecord(value)) return undefined
+  if (value.kind === "draw") return { kind: "draw" }
+  if (
+    value.kind !== "win" ||
+    !Array.isArray(value.winnerPlayerIds) ||
+    value.winnerPlayerIds.length < 1 ||
+    value.winnerPlayerIds.some((id) => typeof id !== "string")
+  ) {
+    return undefined
+  }
+  return { kind: "win", winnerPlayerIds: (value.winnerPlayerIds as string[]).map(asPlayerId) }
+}
+
 function parseEvent(value: unknown): GameEvent | null {
   if (
     !isRecord(value) ||
@@ -120,8 +134,12 @@ function parseEvent(value: unknown): GameEvent | null {
     deviceId: asDeviceId(value.deviceId),
     clientCreatedAt: value.clientCreatedAt,
   }
-  if (value.type === "game.finished" || value.type === "game.abandoned") {
-    return { ...base, type: value.type }
+  if (value.type === "game.finished") {
+    const result = parseResult(value.result)
+    return { ...base, type: "game.finished", ...(result ? { result } : {}) }
+  }
+  if (value.type === "game.abandoned") {
+    return { ...base, type: "game.abandoned" }
   }
   if (
     value.type !== "life.changed" ||
@@ -156,6 +174,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   }
   const players = parsePlayers(value.players)
   if (!players || events.some((event) => event.gameId !== value.id)) return null
+  const result = parseResult(value.result)
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -166,6 +185,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     ...(typeof value.finishedAt === "number" ? { finishedAt: value.finishedAt } : {}),
+    ...(result ? { result } : {}),
   }
 }
 
@@ -209,6 +229,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
   )
     return null
   const players = parsePlayers(value.players)
+  const result = parseResult(value.result)
   return players
     ? {
         schemaVersion: 1,
@@ -219,6 +240,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         eventCount: value.eventCount,
         createdAt: value.createdAt,
         finishedAt: value.finishedAt,
+        ...(result ? { result } : {}),
       }
     : null
 }
@@ -322,6 +344,7 @@ export class LocalGameRepository {
       eventCount: game.events.length,
       createdAt: game.createdAt,
       finishedAt: game.finishedAt,
+      ...(game.result ? { result: game.result } : {}),
     }
     const current = this.loadHistory().filter(({ id }) => id !== game.id)
     const next = [summary, ...current].slice(0, MAX_HISTORY_GAMES)

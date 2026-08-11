@@ -5,7 +5,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { applyGameCommand, canUndo, defaultCommandContext } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
-import type { GameCommand, LifeDelta, LocalGame, PlayerId } from "./types"
+import type { GameCommand, LifeDelta, LocalGame, LocalGameResult, PlayerId } from "./types"
 
 function defer(work: () => void) {
   setTimeout(work, 0)
@@ -53,7 +53,7 @@ export function useLocalGame(
     canUndo: canUndo(game, context.actorId),
     changeLife,
     undo: () => dispatch({ type: "life.undo" }),
-    finish: () => dispatch({ type: "game.finish" }),
+    finish: (result?: LocalGameResult) => dispatch({ type: "game.finish", result }),
     abandon: () => dispatch({ type: "game.abandon" }),
   }
 }

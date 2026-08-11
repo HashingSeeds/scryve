@@ -7,7 +7,6 @@ import { Screen } from "@/components/Screen"
 import { ThemeProvider } from "@/theme/context"
 
 import { ConnectedBoardScreen } from "./ConnectedBoardScreen"
-import { ConnectedHistoryScreen } from "./ConnectedHistoryScreen"
 import { ConnectedHomeScreen } from "./ConnectedHomeScreen"
 import { ConnectedLobbyScreen } from "./ConnectedLobbyScreen"
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
@@ -300,25 +299,6 @@ describe("connected lobby screens", () => {
     expect(screen.getByText(/Hosted lobby · standard · 2 seats/)).toBeTruthy()
     expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
     expect(screen.getByText(/Resume or finish\/abandon your hosted game/i)).toBeTruthy()
-  })
-
-  it("renders one connected history card when device memberships repeat a game", () => {
-    mockActiveGames = [
-      {
-        publicId: "finished-game",
-        players: [{}, {}],
-        eventCount: 3,
-        finishedAt: 1_800_000_000_000,
-      },
-      {
-        publicId: "finished-game",
-        players: [{}, {}],
-        eventCount: 3,
-        finishedAt: 1_800_000_000_000,
-      },
-    ]
-    render(themed(<ConnectedHistoryScreen onBack={jest.fn()} onSelect={jest.fn()} />))
-    expect(screen.getAllByText("Finished connected game")).toHaveLength(1)
   })
 
   it("does not restart a completed membership migration on the next home mount", async () => {

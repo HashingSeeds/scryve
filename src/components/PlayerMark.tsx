@@ -102,6 +102,23 @@ export function PlayerMark({
   )
 }
 
+export function DrawMark({ color, size = 44 }: { color: string; size?: number }) {
+  return (
+    <View
+      testID="draw-mark"
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={{ width: size, height: size }}
+    >
+      <Svg width="100%" height="100%" viewBox="0 0 44 44">
+        <Rect fill={color} x="10" y="20" width="24" height="4" rx="2" />
+      </Svg>
+    </View>
+  )
+}
+
 function MarkShape({ shape, color }: { shape: PlayerMarkShape; color: string }) {
   const common = { fill: color, testID: `player-mark-shape-${shape}` }
   switch (shape) {

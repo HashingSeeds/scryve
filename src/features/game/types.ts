@@ -33,8 +33,11 @@ export interface LifeChangedEvent extends BaseGameEvent {
   compensatesOperationId?: OperationId
 }
 
+export type LocalGameResult = { kind: "win"; winnerPlayerIds: PlayerId[] } | { kind: "draw" }
+
 export interface GameFinishedEvent extends BaseGameEvent {
   type: "game.finished"
+  result?: LocalGameResult
 }
 
 export interface GameAbandonedEvent extends BaseGameEvent {
@@ -53,6 +56,7 @@ export interface LocalGame {
   createdAt: number
   updatedAt: number
   finishedAt?: number
+  result?: LocalGameResult
 }
 
 export interface NewPlayerInput {
@@ -63,7 +67,7 @@ export interface NewPlayerInput {
 export type GameCommand =
   | { type: "life.change"; playerId: PlayerId; delta: LifeDelta }
   | { type: "life.undo" }
-  | { type: "game.finish" }
+  | { type: "game.finish"; result?: LocalGameResult }
   | { type: "game.abandon" }
 
 export interface CommandContext {
@@ -82,4 +86,5 @@ export interface LocalGameSummary {
   eventCount: number
   createdAt: number
   finishedAt: number
+  result?: LocalGameResult
 }

@@ -15,7 +15,7 @@ export default function ConnectedIndex() {
           })
         }
         onJoin={() => router.push("/connected/join")}
-        onHistory={() => router.push("/connected/history")}
+        onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
         onDecks={() => router.push("/connected/decks")}
         onResume={(game) =>
           router.replace({

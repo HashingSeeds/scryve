@@ -1,16 +1,11 @@
 import { useState } from "react"
-import type { GestureResponderEvent, ViewStyle } from "react-native"
+import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 
 import { Button } from "@/components/Button"
-import {
-  DialogCard,
-  $dialogActions,
-  $dialogButton,
-  $dialogText,
-  type DialogOrigin,
-} from "@/components/DialogCard"
+import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
+import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
   getPlayerGridLayoutOptions,
@@ -19,10 +14,11 @@ import {
   PlayerGrid,
   type PlayerGridLayoutVariant,
 } from "@/components/PlayerGrid"
+import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
-import type { LocalGame } from "@/features/game/types"
+import type { LocalGame, PlayerId } from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -41,11 +37,16 @@ export function CurrentGameScreen({
   repository,
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game")
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)
   const { width, height, fontScale } = useWindowDimensions()
   const [menuOpen, setMenuOpen] = useState(false)
   const [endConfirmationOpen, setEndConfirmationOpen] = useState(false)
+  const [winnerPlayerIds, setWinnerPlayerIds] = useState<PlayerId[]>([])
+  const [drawSelected, setDrawSelected] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
@@ -68,13 +69,33 @@ export function CurrentGameScreen({
   const menuAnchor = getPlayerGridMenuAnchor(playerCount, gridLayout)
 
   function confirmEnd() {
-    const ended = runtime.finish()
+    const ended = runtime.finish(
+      winnerPlayerIds.length > 0
+        ? { kind: "win", winnerPlayerIds }
+        : drawSelected
+          ? { kind: "draw" }
+          : undefined,
+    )
     setEndConfirmationOpen(false)
     if (ended.status !== "active") setTimeout(() => onGameEnded(ended.id), 0)
   }
 
+  function toggleWinner(playerId: PlayerId) {
+    setDrawSelected(false)
+    setWinnerPlayerIds((current) =>
+      current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId],
+    )
+  }
+
+  function selectDraw() {
+    setWinnerPlayerIds([])
+    setDrawSelected((current) => !current)
+  }
+
   function showEndConfirmation() {
     setMenuOpen(false)
+    setWinnerPlayerIds([])
+    setDrawSelected(false)
     setEndConfirmationOpen(true)
   }
 
@@ -229,18 +250,53 @@ export function CurrentGameScreen({
           dialogTestID="end-game-dialog"
           dialogAccessibilityRole="alert"
         >
-          <Text tx="localGame:endConfirmation" weight="bold" style={themed($dialogText)} />
+          <View style={themed($dialogHeader)}>
+            <Text text="Who won?" preset="subheading" />
+            <Text
+              text="Skip to end without recording a result."
+              size="xs"
+              style={themed($dialogSubtitle)}
+            />
+          </View>
+          <View style={themed($resultChoices)}>
+            {runtime.game.players.map((player) => {
+              const selected = winnerPlayerIds.includes(player.id)
+              return (
+                <ChoiceButton
+                  key={player.id}
+                  testID={`end-game-winner-${player.seat}`}
+                  text={player.name}
+                  detail={`${player.life} life`}
+                  accentColor={player.color}
+                  Leading={({ color }) => (
+                    <PlayerMark seatNumber={player.seat} color={color} size={28} />
+                  )}
+                  accessibilityLabel={`${player.name}, ${player.life} life${selected ? ", winner" : ""}`}
+                  selected={selected}
+                  onPress={() => toggleWinner(player.id)}
+                />
+              )
+            })}
+            <ChoiceButton
+              testID="end-game-result-draw"
+              text="Draw"
+              accentColor={colors.palette.neutral400}
+              Leading={({ color }) => <DrawMark color={color} />}
+              selected={drawSelected}
+              onPress={selectDraw}
+            />
+          </View>
           <View style={themed($dialogActions)}>
             <Button
               tx="localGame:cancel"
-              style={themed($dialogButton)}
+              style={themed($dialogAction)}
               onPress={() => setEndConfirmationOpen(false)}
             />
             <Button
               testID="confirm-end-game-button"
               tx="localGame:endGame"
               preset="reversed"
-              style={themed($dialogButton)}
+              style={themed($dialogAction)}
               onPress={confirmEnd}
             />
           </View>
@@ -267,3 +323,11 @@ const $layoutOption: ThemedStyle<ViewStyle> = () => ({
   flexGrow: 1,
 })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
+const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $dialogAction: ThemedStyle<ViewStyle> = () => ({
+  flex: 1,
+  minHeight: 48,
+  borderRadius: CHOICE_RADIUS,
+})

@@ -207,4 +207,116 @@ describe("CurrentGameScreen", () => {
       expect(repository.loadHistory()[0].status).toBe("finished")
     })
   })
+
+  it("records the winner the host picks before ending the game", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onHome={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-1"))
+    expect(view.getByLabelText("Grace, 2 life, winner")).toBeTruthy()
+    expect(view.getByLabelText("Ada, 2 life")).toBeTruthy()
+    expect(view.getByTestId("end-game-winner-1").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("end-game-winner-0").props.accessibilityState.selected).toBe(false)
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    await waitFor(() => {
+      expect(repository.loadHistory()[0].result).toEqual({
+        kind: "win",
+        winnerPlayerIds: [initial.players[1].id],
+      })
+    })
+  })
+
+  it("records no result once the last picked winner is unpicked", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onHome={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(
+      false,
+    )
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    await waitFor(() => {
+      expect(repository.loadHistory()[0].result).toBeUndefined()
+    })
+  })
+
+  it("records a draw and drops any picked winner", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onHome={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("end-game-result-draw"))
+    expect(view.getByTestId("end-game-winner-0").props.accessibilityState.selected).toBe(false)
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    await waitFor(() => {
+      expect(repository.loadHistory()[0].result).toEqual({ kind: "draw" })
+    })
+  })
+
+  it("ends without a result when the host declines to record one", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onHome={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    await waitFor(() => {
+      expect(repository.loadHistory()[0].result).toBeUndefined()
+    })
+  })
 })

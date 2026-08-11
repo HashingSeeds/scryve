@@ -5,14 +5,9 @@ import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
 import { Button } from "@/components/Button"
+import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { ConnectionBadge } from "@/components/ConnectionBadge"
-import {
-  DialogCard,
-  $dialogActions,
-  $dialogButton,
-  $dialogText,
-  type DialogOrigin,
-} from "@/components/DialogCard"
+import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import { Header } from "@/components/Header"
 import {
@@ -22,6 +17,7 @@ import {
   PlayerGrid,
   type PlayerGridLayoutVariant,
 } from "@/components/PlayerGrid"
+import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
@@ -62,18 +58,33 @@ function ConnectedBoardRuntime({
   ownerId: string
 }) {
   useKeepAwake("count-connected-game")
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const { width, height, fontScale } = useWindowDimensions()
   const runtime = useConnectedGame(publicId, ownerId)
   const [menuOpen, setMenuOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
-  const [finishResultKind, setFinishResultKind] = useState<"win" | "draw" | "unknown">("unknown")
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
+  const [drawSelected, setDrawSelected] = useState(false)
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const game = runtime.projection
+
+  function toggleWinner(playerId: string) {
+    setDrawSelected(false)
+    setWinnerPlayerIds((current) =>
+      current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId],
+    )
+  }
+
+  function selectDraw() {
+    setWinnerPlayerIds([])
+    setDrawSelected((current) => !current)
+  }
 
   function captureMenuDialogOrigin(event?: GestureResponderEvent) {
     setMenuDialogOrigin(
@@ -330,53 +341,38 @@ function ConnectedBoardRuntime({
           dialogAccessibilityRole="alert"
           style={themed($boardDialog)}
         >
-          <Text
-            weight="bold"
-            text="End this connected game and save an immutable final summary?"
-            style={themed($dialogText)}
-          />
-          <Text text="Record the result" weight="bold" />
+          <View style={themed($dialogHeader)}>
+            <Text text="Who won?" preset="subheading" />
+            <Text
+              size="xs"
+              text="Skip to end without recording a result. The summary is final for everyone."
+              style={themed($dialogSubtitle)}
+            />
+          </View>
           <View style={themed($resultChoices)}>
             {game.players.map((player) => {
-              const selected =
-                finishResultKind === "win" && winnerPlayerIds.includes(player.playerId)
+              const selected = winnerPlayerIds.includes(player.playerId)
               return (
-                <Button
+                <ChoiceButton
                   key={player.playerId}
-                  text={`${selected ? "Winner: " : ""}${player.displayName}`}
-                  accessibilityState={{ selected }}
-                  preset={selected ? "reversed" : "default"}
-                  style={themed($resultChoice)}
-                  onPress={() => {
-                    setFinishResultKind("win")
-                    setWinnerPlayerIds((current) =>
-                      current.includes(player.playerId)
-                        ? current.filter((id) => id !== player.playerId)
-                        : [...current, player.playerId],
-                    )
-                  }}
+                  text={player.displayName}
+                  detail={`${player.currentLife} life`}
+                  accentColor={player.color}
+                  Leading={({ color }) => (
+                    <PlayerMark seatNumber={player.seat} color={color} size={28} />
+                  )}
+                  accessibilityLabel={`${player.displayName}, ${player.currentLife} life${selected ? ", winner" : ""}`}
+                  selected={selected}
+                  onPress={() => toggleWinner(player.playerId)}
                 />
               )
             })}
-            <Button
+            <ChoiceButton
               text="Draw"
-              accessibilityState={{ selected: finishResultKind === "draw" }}
-              preset={finishResultKind === "draw" ? "reversed" : "default"}
-              style={themed($resultChoice)}
-              onPress={() => {
-                setFinishResultKind("draw")
-                setWinnerPlayerIds([])
-              }}
-            />
-            <Button
-              text="Don't record"
-              accessibilityState={{ selected: finishResultKind === "unknown" }}
-              preset={finishResultKind === "unknown" ? "reversed" : "default"}
-              style={themed($resultChoice)}
-              onPress={() => {
-                setFinishResultKind("unknown")
-                setWinnerPlayerIds([])
-              }}
+              accentColor={colors.palette.neutral400}
+              Leading={({ color }) => <DrawMark color={color} />}
+              selected={drawSelected}
+              onPress={selectDraw}
             />
           </View>
           <View style={themed($dialogActions)}>
@@ -384,24 +380,20 @@ function ConnectedBoardRuntime({
               testID="cancel-connected-finish-button"
               text="Cancel"
               disabled={runtime.finishing}
-              style={themed($dialogButton)}
+              style={themed($dialogAction)}
               onPress={() => setConfirmingFinish(false)}
             />
             <Button
               testID="confirm-connected-finish-button"
               text={runtime.finishing ? "Ending…" : "End game"}
               preset="reversed"
-              disabled={
-                runtime.finishing ||
-                Boolean(finishBlockedReason) ||
-                (finishResultKind === "win" && winnerPlayerIds.length === 0)
-              }
-              style={themed($dialogButton)}
+              disabled={runtime.finishing || Boolean(finishBlockedReason)}
+              style={themed($dialogAction)}
               onPress={() => {
                 const result =
-                  finishResultKind === "win"
+                  winnerPlayerIds.length > 0
                     ? { kind: "win" as const, winnerPlayerIds }
-                    : { kind: finishResultKind }
+                    : { kind: drawSelected ? ("draw" as const) : ("unknown" as const) }
                 void runtime.finish(result).finally(() => setConfirmingFinish(false))
               }}
             />
@@ -432,12 +424,14 @@ const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
   textAlign: "center",
 })
-const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: spacing.xs,
+const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $dialogAction: ThemedStyle<ViewStyle> = () => ({
+  flex: 1,
+  minHeight: 48,
+  borderRadius: CHOICE_RADIUS,
 })
-const $resultChoice: ThemedStyle<ViewStyle> = () => ({ minWidth: 120, flexGrow: 1 })
 const $statusScroll: ThemedStyle<ViewStyle> = () => ({ flexGrow: 0 })
 const $statusList: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $failure: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
