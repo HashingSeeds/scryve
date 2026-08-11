@@ -35,8 +35,12 @@ export function ConnectedHistoryDetailScreen({
             {summary.players.map((player: any) => (
               <Card
                 key={player.playerId}
-                heading={player.displayName}
-                content={`${player.finalLife} life`}
+                heading={
+                  player.usernameAtFinish
+                    ? `${player.displayName} · @${player.usernameAtFinish}`
+                    : player.displayName
+                }
+                content={`${player.outcome === "win" ? "Winner · " : player.outcome === "draw" ? "Draw · " : ""}${player.finalLife} life${player.deckNameAtFinish ? ` · ${player.deckNameAtFinish} v${player.deckVersionNumber}` : ""}`}
                 style={{ borderColor: player.color }}
                 LeftComponent={
                   player.deletedAt ? (

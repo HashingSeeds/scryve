@@ -158,7 +158,7 @@ export function GameRadialMenu({
 }: GameRadialMenuProps) {
   const {
     themed,
-    theme: { colors },
+    theme: { colors, isDark },
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
@@ -236,8 +236,8 @@ export function GameRadialMenu({
             >
               <Polygon
                 points={PENTAGON_POINTS}
-                fill={PENTAGON_FILL}
-                stroke={colors.background}
+                fill={isDark ? colors.palette.neutral300 : PENTAGON_FILL}
+                stroke={isDark ? colors.border : colors.background}
                 strokeWidth={PENTAGON_STROKE_WIDTH}
                 strokeLinejoin="round"
               />

@@ -69,6 +69,8 @@ function ConnectedBoardRuntime({
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
+  const [finishResultKind, setFinishResultKind] = useState<"win" | "draw" | "unknown">("unknown")
+  const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const game = runtime.projection
@@ -333,6 +335,50 @@ function ConnectedBoardRuntime({
             text="End this connected game and save an immutable final summary?"
             style={themed($dialogText)}
           />
+          <Text text="Record the result" weight="bold" />
+          <View style={themed($resultChoices)}>
+            {game.players.map((player) => {
+              const selected =
+                finishResultKind === "win" && winnerPlayerIds.includes(player.playerId)
+              return (
+                <Button
+                  key={player.playerId}
+                  text={`${selected ? "Winner: " : ""}${player.displayName}`}
+                  accessibilityState={{ selected }}
+                  preset={selected ? "reversed" : "default"}
+                  style={themed($resultChoice)}
+                  onPress={() => {
+                    setFinishResultKind("win")
+                    setWinnerPlayerIds((current) =>
+                      current.includes(player.playerId)
+                        ? current.filter((id) => id !== player.playerId)
+                        : [...current, player.playerId],
+                    )
+                  }}
+                />
+              )
+            })}
+            <Button
+              text="Draw"
+              accessibilityState={{ selected: finishResultKind === "draw" }}
+              preset={finishResultKind === "draw" ? "reversed" : "default"}
+              style={themed($resultChoice)}
+              onPress={() => {
+                setFinishResultKind("draw")
+                setWinnerPlayerIds([])
+              }}
+            />
+            <Button
+              text="Don't record"
+              accessibilityState={{ selected: finishResultKind === "unknown" }}
+              preset={finishResultKind === "unknown" ? "reversed" : "default"}
+              style={themed($resultChoice)}
+              onPress={() => {
+                setFinishResultKind("unknown")
+                setWinnerPlayerIds([])
+              }}
+            />
+          </View>
           <View style={themed($dialogActions)}>
             <Button
               testID="cancel-connected-finish-button"
@@ -345,10 +391,18 @@ function ConnectedBoardRuntime({
               testID="confirm-connected-finish-button"
               text={runtime.finishing ? "Ending…" : "End game"}
               preset="reversed"
-              disabled={runtime.finishing || Boolean(finishBlockedReason)}
+              disabled={
+                runtime.finishing ||
+                Boolean(finishBlockedReason) ||
+                (finishResultKind === "win" && winnerPlayerIds.length === 0)
+              }
               style={themed($dialogButton)}
               onPress={() => {
-                void runtime.finish().finally(() => setConfirmingFinish(false))
+                const result =
+                  finishResultKind === "win"
+                    ? { kind: "win" as const, winnerPlayerIds }
+                    : { kind: finishResultKind }
+                void runtime.finish(result).finally(() => setConfirmingFinish(false))
               }}
             />
           </View>
@@ -378,6 +432,12 @@ const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
   textAlign: "center",
 })
+const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: spacing.xs,
+})
+const $resultChoice: ThemedStyle<ViewStyle> = () => ({ minWidth: 120, flexGrow: 1 })
 const $statusScroll: ThemedStyle<ViewStyle> = () => ({ flexGrow: 0 })
 const $statusList: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $failure: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({

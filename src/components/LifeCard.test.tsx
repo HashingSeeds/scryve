@@ -24,7 +24,9 @@ function interactiveCard(life: number, onChange: jest.Mock) {
 const renderCard = (life: number) => render(card(life))
 
 function deltaOpacity(view: ReturnType<typeof renderCard>) {
-  return StyleSheet.flatten(view.getByTestId("life-delta-seat-1").props.style).opacity
+  return StyleSheet.flatten(
+    view.getByTestId("life-delta-seat-1", { includeHiddenElements: true }).props.style,
+  ).opacity
 }
 
 describe("LifeCard", () => {
@@ -73,6 +75,34 @@ describe("LifeCard", () => {
       marginTop: -14,
     })
   })
+
+  it.each([0, 90, -90, 180] as const)(
+    "keeps life status below the total at %s degrees",
+    (contentRotation) => {
+      const view = render(
+        <ThemeProvider initialContext="light">
+          <LifeCard
+            playerName="Ada"
+            seatNumber={1}
+            life={20}
+            color="#41476E"
+            contentRotation={contentRotation}
+            pendingCount={1}
+            onChange={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+
+      const statusLayer = StyleSheet.flatten(
+        view.getByTestId("life-status-layer-seat-1").props.style,
+      )
+      expect(statusLayer.transform).toEqual([{ rotate: `${contentRotation}deg` }])
+      expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
+        top: "50%",
+        marginTop: 62,
+      })
+    },
+  )
 
   it("keeps a player marker inside a cramped card edge", () => {
     expect(getPlayerMarkPlacement(90, 44, 66, 8, 181)).toMatchObject({
@@ -148,7 +178,7 @@ describe("LifeCard", () => {
       justifyContent: "center",
     })
     expect(view.getByTestId("life-total-seat-1").props.adjustsFontSizeToFit).toBe(true)
-    expect(StyleSheet.flatten(view.getByTestId("life-delta-seat-1").props.style).position).toBe(
+    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style).position).toBe(
       "absolute",
     )
     fireEvent(target, "longPress")

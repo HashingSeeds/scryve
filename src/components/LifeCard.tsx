@@ -163,21 +163,6 @@ export function LifeCard({
         style={[themed($mark), markStyle]}
       />
       <View pointerEvents="box-none" style={themed($content)}>
-        {statusLabel ? (
-          <Text
-            text={statusLabel}
-            weight="bold"
-            size="xxs"
-            maxFontSizeMultiplier={1.3}
-            numberOfLines={1}
-            style={[
-              themed($status),
-              contentRotation === 180 && { marginTop: markSize },
-              contentRotationStyle,
-              { color: foreground },
-            ]}
-          />
-        ) : null}
         <View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="box-none"
@@ -216,21 +201,40 @@ export function LifeCard({
               ]}
             />
           </Pressable>
-          <Text
-            testID={`life-delta-seat-${seatNumber}`}
-            text={recentDelta > 0 ? `+${recentDelta}` : String(recentDelta)}
-            weight="bold"
-            size="xs"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
-            style={[
-              themed($delta),
-              themed(compact ? $compactDeltaPosition : $deltaPosition),
-              recentDelta === 0 ? themed($deltaIdle) : themed($deltaActive),
-              contentRotationStyle,
-              { color: foreground, backgroundColor: overlayTint(foreground, 0.16) },
-            ]}
-          />
+          <View
+            testID={`life-status-layer-seat-${seatNumber}`}
+            pointerEvents="none"
+            style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
+          >
+            <View
+              testID={`life-status-seat-${seatNumber}`}
+              style={themed(compact ? $compactStatusPosition : $statusPosition)}
+            >
+              <Text
+                testID={`life-delta-seat-${seatNumber}`}
+                text={recentDelta > 0 ? `+${recentDelta}` : String(recentDelta)}
+                weight="bold"
+                size="xs"
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+                style={[
+                  themed($delta),
+                  recentDelta === 0 ? themed($deltaIdle) : themed($deltaActive),
+                  { color: foreground, backgroundColor: overlayTint(foreground, 0.16) },
+                ]}
+              />
+              {statusLabel ? (
+                <Text
+                  text={statusLabel}
+                  weight="bold"
+                  size="xxs"
+                  maxFontSizeMultiplier={1.3}
+                  numberOfLines={1}
+                  style={[themed($status), { color: foreground }]}
+                />
+              ) : null}
+            </View>
+          </View>
         </View>
       </View>
       <LifeControls
@@ -392,7 +396,6 @@ const $compactLifeButton: ThemedStyle<ViewStyle> = () => ({
 })
 
 const $delta: ThemedStyle<TextStyle> = ({ spacing }) => ({
-  position: "absolute",
   paddingHorizontal: spacing.xs,
   paddingVertical: spacing.xxxs,
   borderRadius: spacing.sm,
@@ -401,17 +404,30 @@ const $delta: ThemedStyle<TextStyle> = ({ spacing }) => ({
   fontVariant: ["tabular-nums"],
 })
 
-const $deltaPosition: ThemedStyle<TextStyle> = ({ spacing }) => ({
+const $statusLayer: ThemedStyle<ViewStyle> = () => ({
+  ...StyleSheet.absoluteFillObject,
+  alignItems: "center",
+})
+
+const $statusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
   top: "50%",
   marginTop: 58 + spacing.xxs,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xxs,
 })
 
-const $compactDeltaPosition: ThemedStyle<TextStyle> = ({ spacing }) => ({
+const $compactStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   top: "50%",
   marginTop: 42 + spacing.xxs,
+  position: "absolute",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xxxs,
 })
 
-const $deltaIdle: ThemedStyle<TextStyle> = () => ({ opacity: 0 })
+const $deltaIdle: ThemedStyle<TextStyle> = () => ({ opacity: 0, display: "none" })
 const $deltaActive: ThemedStyle<TextStyle> = () => ({ opacity: 1 })
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })

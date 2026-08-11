@@ -7,6 +7,7 @@ import { useConvexAuth, useConvexConnectionState, useMutation } from "convex/rea
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { TextField } from "@/components/TextField"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ConnectedErrorBoundary } from "@/features/connected/ConnectedErrorBoundary"
 import { useAppTheme } from "@/theme/context"
@@ -92,6 +93,9 @@ export function BackendGate({
   const [readyUserId, setReadyUserId] = useState<string | undefined>(syncedProfile.userId)
   const [syncError, setSyncError] = useState<string>()
   const [syncAttempt, setSyncAttempt] = useState(0)
+  const [username, setUsername] = useState("")
+  const [usernameError, setUsernameError] = useState<string>()
+  const [savingUsername, setSavingUsername] = useState(false)
   const cachedProjection =
     allowOfflineBootstrap && !isWebSocketConnected && offlineGameId && isUserLoaded && user?.id
       ? new ConnectedGameRepository(undefined, user.id).loadProjection(offlineGameId)
@@ -147,6 +151,39 @@ export function BackendGate({
           text="You are signed out or your session expired. Re-authenticate to resume connected play; local games remain available."
         />
         <Button text="Re-authenticate" preset="reversed" onPress={onReauthenticate} />
+        {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
+      </GateScreen>
+    )
+  if (isAuthenticated && isUserLoaded && user?.id && user.username === null)
+    return (
+      <GateScreen>
+        <Text preset="heading" text="Choose your player username" />
+        <Text text="Your unique @username identifies you in connected game history." />
+        <TextField
+          label="Username"
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={username}
+          maxLength={64}
+          onChangeText={setUsername}
+        />
+        {usernameError ? <Text accessibilityRole="alert" text={usernameError} /> : null}
+        <Button
+          text={savingUsername ? "Saving…" : "Save username"}
+          preset="reversed"
+          disabled={savingUsername || username.trim().length < 4}
+          onPress={async () => {
+            try {
+              setSavingUsername(true)
+              setUsernameError(undefined)
+              await user.update({ username: username.trim() })
+            } catch (cause) {
+              setUsernameError(cause instanceof Error ? cause.message : "Could not save username")
+            } finally {
+              setSavingUsername(false)
+            }
+          }}
+        />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )

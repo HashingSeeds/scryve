@@ -44,11 +44,14 @@ export interface OutboxSyncControllerOptions {
   ownerId: string
   deviceId: DeviceId
   send: (action: PendingLifeAction) => Promise<OutboxAcknowledgement>
-  finishGame: () => Promise<unknown>
+  finishGame: (result?: ConnectedGameResult) => Promise<unknown>
   now?: () => number
   setTimeoutFn?: (handler: () => void, delay: number) => ReturnType<typeof setTimeout>
   clearTimeoutFn?: (handle: ReturnType<typeof setTimeout>) => void
 }
+
+export type ConnectedGameResult =
+  { kind: "win"; winnerPlayerIds: string[] } | { kind: "draw" } | { kind: "unknown" }
 
 export function mergeDrainSnapshot(
   currentPending: readonly PendingLifeAction[],
@@ -205,7 +208,7 @@ export class OutboxSyncController {
     this.publish()
   }
 
-  finish = async (): Promise<void> => {
+  finish = async (result?: ConnectedGameResult): Promise<void> => {
     this.finishError = undefined
     if (!this.canSync()) {
       this.finishError = "Connect and sign in before finishing this game."
@@ -220,7 +223,7 @@ export class OutboxSyncController {
     try {
       this.finishing = true
       this.publish()
-      await this.options.finishGame()
+      await this.options.finishGame(result)
     } catch (cause) {
       this.finishError = cause instanceof Error ? cause.message : "Could not finish the game"
     } finally {

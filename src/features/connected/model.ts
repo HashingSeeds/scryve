@@ -7,6 +7,8 @@ export interface ConnectedPlayerProjection {
   playerId: string
   seat: number
   displayName: string
+  username?: string
+  deckVersionId?: string
   avatarUrl?: string
   color: string
   currentLife: number
@@ -80,6 +82,8 @@ export function toConnectedProjection(value: any): ConnectedProjection | null {
       playerId: player.playerId,
       seat: player.seat,
       displayName: player.displayName,
+      ...(typeof player.username === "string" ? { username: player.username } : {}),
+      ...(typeof player.deckVersionId === "string" ? { deckVersionId: player.deckVersionId } : {}),
       ...(typeof player.avatarUrl === "string" ? { avatarUrl: player.avatarUrl } : {}),
       color: player.color,
       currentLife: player.currentLife,

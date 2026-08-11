@@ -10,6 +10,7 @@ import type { LifeDelta } from "@/features/game/types"
 
 import type { ConnectedDisplayProjection, FailedLifeAction, PendingLifeAction } from "./model"
 import { OutboxSyncController } from "./OutboxSyncController"
+import type { ConnectedGameResult } from "./OutboxSyncController"
 import { ConnectedGameRepository } from "./persistence"
 import { optimisticallyApplyLife } from "./reconciliation"
 import { api } from "../../../convex/_generated/api"
@@ -23,7 +24,7 @@ export interface ConnectedGameRuntime {
   failed: FailedLifeAction[]
   connectionStatus: ConnectionStatus
   changeLife: (playerId: string, delta: LifeDelta) => void
-  finish: () => Promise<void>
+  finish: (result?: ConnectedGameResult) => Promise<void>
   dismissFailed: (operationId: string) => void
   changeError?: string
   finishError?: string
@@ -91,7 +92,21 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
             deviceId: action.event.deviceId,
             clientCreatedAt: action.event.clientCreatedAt,
           }),
-        finishGame: () => mutations.current.finishMutation({ publicId }),
+        finishGame: (result) =>
+          mutations.current.finishMutation({
+            publicId,
+            ...(result
+              ? {
+                  result:
+                    result.kind === "win"
+                      ? {
+                          kind: "win" as const,
+                          winnerPlayerIds: result.winnerPlayerIds as Id<"gamePlayers">[],
+                        }
+                      : result,
+                }
+              : {}),
+          }),
       }),
     [deviceId, ownerId, publicId, repository],
   )

@@ -3,7 +3,7 @@ import { fireEvent, render } from "@testing-library/react-native"
 import { Polygon } from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
-import { lightTheme } from "@/theme/theme"
+import { darkTheme, lightTheme } from "@/theme/theme"
 
 import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./GameRadialMenu"
 
@@ -51,6 +51,26 @@ describe("GameRadialMenu", () => {
     const pentagon = view.UNSAFE_getByType(Polygon)
     expect(pentagon.props.stroke).toBe(lightTheme.colors.background)
     expect(pentagon.props.points.split(" ")).toHaveLength(5)
+  })
+
+  it("uses distinct charcoal fill and border colors in dark mode", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <GameRadialMenu
+          open={false}
+          anchor={{ x: 0.5, y: 0.5 }}
+          actions={actions}
+          onToggle={jest.fn()}
+          onClose={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    const pentagon = view.UNSAFE_getByType(Polygon)
+    expect(pentagon.props.fill).toBe(darkTheme.colors.palette.neutral300)
+    expect(pentagon.props.stroke).toBe(darkTheme.colors.border)
+    expect(pentagon.props.fill).not.toBe(darkTheme.colors.background)
+    expect(pentagon.props.stroke).not.toBe(darkTheme.colors.background)
   })
 
   it("keeps the menu glyph in centered square bounds", () => {
