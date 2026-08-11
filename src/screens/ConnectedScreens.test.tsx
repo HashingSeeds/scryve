@@ -4,12 +4,15 @@ import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
 import { Screen } from "@/components/Screen"
+import { ConnectedHostSource } from "@/features/connected/ConnectedHostSource"
+import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
 import { ConnectedBoardScreen } from "./ConnectedBoardScreen"
 import { ConnectedHomeScreen } from "./ConnectedHomeScreen"
 import { ConnectedLobbyScreen } from "./ConnectedLobbyScreen"
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
+import { NewGameScreen } from "./NewGameScreen"
 
 const mockClaimSeat = jest.fn(async () => ({ publicId: "game-public", seat: 2 }))
 const mockSyncUser = jest.fn(async () => "user")
@@ -151,6 +154,23 @@ function themed(children: ReactNode) {
   return <ThemeProvider initialContext="light">{children}</ThemeProvider>
 }
 
+function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
+  return themed(
+    <ConnectedHostSource onLobbyCreated={onLobbyCreated}>
+      {(connected) => (
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="connected"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={jest.fn()}
+          connected={connected}
+        />
+      )}
+    </ConnectedHostSource>,
+  )
+}
+
 describe("connected lobby screens", () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -231,9 +251,9 @@ describe("connected lobby screens", () => {
     expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(true)
   })
 
-  it("hosts with validated 2–6 seat and 20/30/40/custom life presets", async () => {
+  it("hosts from the shared setup screen with validated seats and life presets", async () => {
     const onLobbyCreated = jest.fn()
-    render(themed(<ConnectedHomeScreen onLobbyCreated={onLobbyCreated} onJoin={jest.fn()} />))
+    render(hostSetup(onLobbyCreated))
     await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
     fireEvent.press(screen.getByLabelText("4 seats"))
     fireEvent.press(screen.getByLabelText("Start at 40 life"))
@@ -248,31 +268,28 @@ describe("connected lobby screens", () => {
     expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
   })
 
+  it("blocks hosting a second lobby from the setup screen", async () => {
+    mockActiveGames = [
+      { publicId: "hosted-lobby", status: "lobby", ruleset: "standard", isHost: true },
+    ]
+    render(hostSetup(jest.fn()))
+
+    await waitFor(() => expect(screen.getByText(/Resume or finish your hosted game/i)).toBeTruthy())
+    expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
+  })
+
   it("starts connected setup at the top without duplicating the header safe area", async () => {
-    const view = render(
-      themed(<ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} />),
-    )
+    const view = render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
 
     await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
     expect(view.UNSAFE_getByType(Screen).props.safeAreaEdges).toEqual(["bottom"])
-  })
-
-  it("hides custom starting life behind an ellipsis until requested", async () => {
-    render(themed(<ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} />))
-
-    await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
-    expect(screen.queryByTestId("connected-starting-life")).toBeNull()
-    fireEvent.press(screen.getByLabelText("Use custom starting life"))
-    expect(screen.getByTestId("connected-starting-life")).toBeTruthy()
   })
 
   it("surfaces a cold-start active connected game for resume", async () => {
     mockActiveGames = [{ publicId: "resumable-game", status: "active", ruleset: "commander" }]
     const onResume = jest.fn()
     render(
-      themed(
-        <ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} onResume={onResume} />,
-      ),
+      themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} onResume={onResume} />),
     )
     await waitFor(() => expect(screen.getByTestId("resume-connected-resumable-game")).toBeTruthy())
     fireEvent.press(screen.getByTestId("resume-connected-resumable-game"))
@@ -293,7 +310,7 @@ describe("connected lobby screens", () => {
         updatedAt: 1_800_000_000_000,
       },
     ]
-    render(themed(<ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} />))
+    render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
 
     await waitFor(() => expect(screen.getByTestId("resume-connected-hosted-lobby")).toBeTruthy())
     expect(screen.getByText(/Hosted lobby · standard · 2 seats/)).toBeTruthy()
@@ -302,14 +319,12 @@ describe("connected lobby screens", () => {
   })
 
   it("does not restart a completed membership migration on the next home mount", async () => {
-    const first = render(
-      themed(<ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} />),
-    )
+    const first = render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
     await waitFor(() => expect(mockMigrate).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(mockMigrationOwners).toContain("user-a"))
     first.unmount()
     mockSyncUser.mockClear()
-    render(themed(<ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} />))
+    render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
     await waitFor(() => expect(mockSyncUser).toHaveBeenCalled())
     expect(mockMigrate).toHaveBeenCalledTimes(1)
   })
@@ -322,7 +337,7 @@ describe("connected lobby screens", () => {
     })
     const view = render(
       themed(
-        <ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} onHistory={jest.fn()} />,
+        <ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} onHistory={jest.fn()} />,
       ),
     )
     await waitFor(() => expect(screen.getByTestId("resume-connected-account-a-game")).toBeTruthy())
@@ -330,7 +345,7 @@ describe("connected lobby screens", () => {
     mockUserId = "user-b"
     view.rerender(
       themed(
-        <ConnectedHomeScreen onLobbyCreated={jest.fn()} onJoin={jest.fn()} onHistory={jest.fn()} />,
+        <ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} onHistory={jest.fn()} />,
       ),
     )
     expect(screen.queryByTestId("resume-connected-account-a-game")).toBeNull()

@@ -8,12 +8,7 @@ export default function ConnectedIndex() {
     <ConnectedGate onBack={() => router.replace("/")}>
       <ConnectedHomeScreen
         onBack={() => router.replace("/")}
-        onLobbyCreated={(lobby) =>
-          router.replace({
-            pathname: "/connected/lobby/[gameId]",
-            params: { gameId: lobby.publicId },
-          })
-        }
+        onHostNew={() => router.push("/connected/new")}
         onJoin={() => router.push("/connected/join")}
         onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
         onDecks={() => router.push("/connected/decks")}

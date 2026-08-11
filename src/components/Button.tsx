@@ -133,7 +133,7 @@ export function Button(props: ButtonProps) {
       themed($viewPresets[preset]),
       $viewStyleOverride,
       !!pressed && themed([$pressedViewPresets[preset], $pressedViewStyleOverride]),
-      !!disabled && themed($disabledViewStyle),
+      !!disabled && themed($disabledViewPresets[preset]),
       !!disabled && $disabledViewStyleOverride,
     ]
   }
@@ -147,7 +147,7 @@ export function Button(props: ButtonProps) {
       themed($textPresets[preset]),
       $textStyleOverride,
       !!pressed && themed([$pressedTextPresets[preset], $pressedTextStyleOverride]),
-      !!disabled && themed($disabledTextStyle),
+      !!disabled && themed($disabledTextPresets[preset]),
       !!disabled && $disabledTextStyleOverride,
     ]
   }
@@ -264,6 +264,23 @@ const $disabledViewStyle: ThemedStyle<ViewStyle> = ({ colors }) => ({
   opacity: 0.55,
 })
 
+const $disabledSolidViewStyle: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.palette.neutral400,
+  opacity: 0.8,
+})
+
+const $disabledViewPresets: Record<Presets, ThemedStyle<ViewStyle>> = {
+  default: $disabledViewStyle,
+  filled: $disabledViewStyle,
+  reversed: $disabledSolidViewStyle,
+}
+
 const $disabledTextStyle: ThemedStyle<TextStyle> = () => ({
   textDecorationLine: "line-through",
 })
+
+const $disabledTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
+  default: $disabledTextStyle,
+  filled: $disabledTextStyle,
+  reversed: ({ colors }) => ({ color: colors.palette.neutral800 }),
+}

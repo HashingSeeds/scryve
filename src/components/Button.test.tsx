@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native"
 import { render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { contrastRatio } from "@/utils/colorContrast"
 
 import { Button, ButtonProps } from "./Button"
 
@@ -65,6 +66,26 @@ describe("Button", () => {
       disabled: true,
     })
   })
+
+  it.each(["light", "dark"] as const)(
+    "keeps a disabled primary button readable and unstruck in the %s theme",
+    (mode) => {
+      const view = render(
+        <ThemeProvider initialContext={mode}>
+          <Button testID="cta" text="Start game" preset="reversed" disabled />
+        </ThemeProvider>,
+      )
+
+      const button = StyleSheet.flatten(view.getByTestId("cta").props.style)
+      const label = StyleSheet.flatten(view.getByText("Start game").props.style)
+
+      expect(label.textDecorationLine).toBeUndefined()
+      expect(button.borderStyle).toBeUndefined()
+      expect(
+        contrastRatio(label.color as string, button.backgroundColor as string),
+      ).toBeGreaterThan(4.5)
+    },
+  )
 })
 
 const $buttonOverride = { marginTop: 7 }

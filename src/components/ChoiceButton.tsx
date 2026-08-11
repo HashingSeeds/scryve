@@ -19,6 +19,7 @@ export interface ChoiceButtonProps extends Omit<
   accentColor?: string
   detail?: string
   Leading?: (props: { color: string }) => ReactNode
+  compact?: boolean
 }
 
 export function ChoiceButton(props: ChoiceButtonProps) {
@@ -27,6 +28,7 @@ export function ChoiceButton(props: ChoiceButtonProps) {
     accentColor,
     detail,
     Leading,
+    compact,
     style: $styleOverride,
     TextProps,
     accessibilityState,
@@ -45,9 +47,14 @@ export function ChoiceButton(props: ChoiceButtonProps) {
     <Button
       {...rest}
       accessibilityState={{ ...accessibilityState, selected }}
-      style={[themed($choice), selected && selectedStyle, $styleOverride]}
+      style={[
+        themed($choice),
+        compact && themed($compactChoice),
+        selected && selectedStyle,
+        $styleOverride,
+      ]}
       pressedStyle={themed(selected ? $choiceSelectedPressed : $choicePressed)}
-      textStyle={[themed($choiceLabel), { color: foreground }]}
+      textStyle={[themed(compact ? $compactLabel : $choiceLabel), { color: foreground }]}
       TextProps={{ numberOfLines: 1, ...TextProps }}
       LeftAccessory={
         Leading
@@ -58,14 +65,18 @@ export function ChoiceButton(props: ChoiceButtonProps) {
             )
           : undefined
       }
-      RightAccessory={() => (
-        <View style={themed($trailing)}>
-          {detail ? (
-            <Text size="xs" text={detail} style={[themed($detail), { color: foreground }]} />
-          ) : null}
-          <CheckBadge selected={selected} color={foreground} />
-        </View>
-      )}
+      RightAccessory={
+        compact
+          ? undefined
+          : () => (
+              <View style={themed($trailing)}>
+                {detail ? (
+                  <Text size="xs" text={detail} style={[themed($detail), { color: foreground }]} />
+                ) : null}
+                <CheckBadge selected={selected} color={foreground} />
+              </View>
+            )
+      }
     />
   )
 }
@@ -91,6 +102,13 @@ const $choice: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.border,
   backgroundColor: colors.palette.neutral100,
 })
+const $compactChoice: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 48,
+  minWidth: 56,
+  justifyContent: "center",
+  paddingHorizontal: spacing.xs,
+})
+const $compactLabel: ThemedStyle<TextStyle> = () => ({ textAlign: "center", flexShrink: 1 })
 const $choicePressed: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.palette.neutral200,
 })
