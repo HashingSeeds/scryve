@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/theme/context"
 import { ConfiguredAuth, useAuthAccess } from "./AuthContext"
 
 const mockUseAuth = jest.fn((_options?: unknown) => ({ isLoaded: true, isSignedIn: false }))
+const mockUseUser = jest.fn(() => ({ user: { id: "user_test" } }))
 jest.mock("react-native/Libraries/Modal/Modal", () => {
   const React = jest.requireActual("react")
   const NativeView = jest.requireActual("react-native").View
@@ -18,6 +19,7 @@ jest.mock("react-native/Libraries/Modal/Modal", () => {
 jest.mock("@clerk/expo", () => ({
   ClerkProvider: ({ children }: { children: ReactNode }) => children,
   useAuth: (options: unknown) => mockUseAuth(options),
+  useUser: () => mockUseUser(),
 }))
 jest.mock("@clerk/expo/token-cache", () => ({ tokenCache: {} }))
 jest.mock("@clerk/expo/native", () => {
@@ -27,6 +29,9 @@ jest.mock("@clerk/expo/native", () => {
 jest.mock("convex/react", () => ({ ConvexReactClient: jest.fn() }))
 jest.mock("convex/react-clerk", () => ({
   ConvexProviderWithClerk: ({ children }: { children: ReactNode }) => children,
+}))
+jest.mock("@/features/billing/RevenueCatContext", () => ({
+  RevenueCatProvider: ({ children }: { children: ReactNode }) => children,
 }))
 
 function Harness() {

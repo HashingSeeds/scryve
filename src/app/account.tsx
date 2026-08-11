@@ -6,6 +6,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { AccountProfile } from "@/features/auth/AccountControls"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { SubscriptionControls } from "@/features/billing/SubscriptionControls"
 
 export default function AccountRoute() {
   const auth = useAuthAccess()
@@ -26,6 +27,7 @@ export default function AccountRoute() {
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$profileScreen}>
       <Header title="Account" leftTx="common:back" onLeftPress={() => router.back()} />
+      <SubscriptionControls />
       <AccountProfile />
     </Screen>
   )

@@ -1,10 +1,12 @@
 import { createContext, ReactNode, useContext, useMemo, useState } from "react"
-import { ClerkProvider, useAuth } from "@clerk/expo"
+import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
 import { tokenCache } from "@clerk/expo/token-cache"
 import { ConvexReactClient } from "convex/react"
 import { ConvexProviderWithClerk } from "convex/react-clerk"
 
 import { readPublicCloudConfig } from "@/features/auth/config"
+import { readRevenueCatConfig } from "@/features/billing/config"
+import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
 
@@ -38,6 +40,8 @@ export function ConfiguredAuth({
 }) {
   // Keeping pending sessions signed in prevents required session tasks from tearing down auth UI.
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false })
+  const { user } = useUser()
+  const revenueCat = readRevenueCatConfig()
   const [visible, setVisible] = useState(false)
   const value = useMemo<AuthAccess>(
     () => ({
@@ -53,11 +57,17 @@ export function ConfiguredAuth({
 
   return (
     <ConvexProviderWithClerk client={client} useAuth={useAuth}>
-      <AuthAccessContext.Provider value={value}>
-        {children}
-        {/* Intentionally always mounted beside app content; visibility alone is toggled. */}
-        <ClerkAuthModal visible={visible} onDismiss={() => setVisible(false)} />
-      </AuthAccessContext.Provider>
+      <RevenueCatProvider
+        apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
+        appUserID={user?.id}
+        configurationMessage={revenueCat.configured ? undefined : revenueCat.message}
+      >
+        <AuthAccessContext.Provider value={value}>
+          {children}
+          {/* Intentionally always mounted beside app content; visibility alone is toggled. */}
+          <ClerkAuthModal visible={visible} onDismiss={() => setVisible(false)} />
+        </AuthAccessContext.Provider>
+      </RevenueCatProvider>
     </ConvexProviderWithClerk>
   )
 }
