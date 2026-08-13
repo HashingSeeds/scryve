@@ -2,7 +2,7 @@
   "name": "Count",
   "slug": "count",
   "scheme": "count",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "runtimeVersion": {
     "policy": "appVersion"
   },
@@ -13,8 +13,6 @@
     "fallbackToCacheTimeout": 0,
     "url": "https://u.expo.dev/1e4ab9fb-230c-421d-a659-a4aaa4355d82"
   },
-  "newArchEnabled": true,
-  "jsEngine": "hermes",
   "assetBundlePatterns": ["**/*"],
   "android": {
     "icon": "./assets/images/app-icon-android-legacy.png",
@@ -24,7 +22,6 @@
       "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
     },
     "allowBackup": false,
-    "edgeToEdgeEnabled": true,
     "intentFilters": [],
     "permissions": ["android.permission.CAMERA"]
   },

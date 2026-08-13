@@ -5,7 +5,7 @@ appId: ${MAESTRO_APP_ID}
 - tapOn:
     id: "new-game-button"
 - assertVisible: "New local game"
-- tapOn: "${PLAYER_COUNT}"
+- tapOn: "${PLAYER_COUNT} players"
 - scrollUntilVisible:
     element:
       id: "start-game-button"

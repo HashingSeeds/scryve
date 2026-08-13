@@ -1,0 +1,22 @@
+appId: ${MAESTRO_APP_ID}
+onFlowStart:
+  - runFlow: ../shared/_OnCaptureStart.yaml
+---
+# Prerequisite: the installed production-identifier build is signed into a non-Pro test account.
+- assertVisible:
+    id: "account-button"
+- tapOn:
+    id: "account-button"
+- extendedWaitUntil:
+    visible:
+      id: "count-pro-paywall-button"
+    timeout: 15000
+- tapOn:
+    id: "count-pro-paywall-button"
+- extendedWaitUntil:
+    visible: "Monthly"
+    timeout: 15000
+- assertVisible: "Yearly"
+- assertVisible: "Lifetime"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/apple-review/count-pro-paywall

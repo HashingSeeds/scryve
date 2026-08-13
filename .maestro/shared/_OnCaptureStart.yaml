@@ -1,0 +1,17 @@
+appId: ${MAESTRO_APP_ID}
+---
+# Store-review captures intentionally preserve authentication and other app state.
+- launchApp:
+    clearState: false
+    clearKeychain: false
+    stopApp: true
+
+- waitForAnimationToEnd
+
+- runFlow:
+    when:
+      visible: "Development servers"
+    commands:
+      - tapOn: "http://.*:.*"
+      - waitForAnimationToEnd
+      - tapOn: "Close"

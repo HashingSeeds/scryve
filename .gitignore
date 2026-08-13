@@ -54,6 +54,7 @@ buck-out/
 **/fastlane/report.xml
 **/fastlane/Preview.html
 **/fastlane/screenshots
+.maestro/screenshots/
 **/fastlane/test_output
 
 # Bundle artifact
@@ -101,6 +102,8 @@ app-dependency-graph.png
 
 docs/
 builds/
+app-store-assets/
+play-store-assets/
 dist/
 .env.local
 build-*.tar.gz

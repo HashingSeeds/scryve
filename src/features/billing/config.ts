@@ -13,6 +13,12 @@ export const COUNT_PRODUCT_IDS = {
 
 export type CountProductId = (typeof COUNT_PRODUCT_IDS)[keyof typeof COUNT_PRODUCT_IDS]
 
+export const COUNT_PACKAGE_IDS: Record<CountProductId, string> = {
+  lifetime: "$rc_lifetime",
+  yearly: "$rc_annual",
+  monthly: "$rc_monthly",
+}
+
 export interface RevenueCatConfig {
   apiKey: string
 }

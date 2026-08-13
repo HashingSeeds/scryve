@@ -18,7 +18,7 @@ const customerInfo = {
 } as never
 const monthlyPackage = {
   identifier: "$rc_monthly",
-  product: { identifier: "monthly" },
+  product: { identifier: "monthly:base-monthly-plan" },
 } as never
 const offering = { availablePackages: [monthlyPackage] } as never
 

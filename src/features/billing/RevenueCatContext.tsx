@@ -16,7 +16,12 @@ import Purchases, {
   type PurchasesPackage,
 } from "react-native-purchases"
 
-import { COUNT_PRODUCT_IDS, COUNT_PRO_ENTITLEMENT_ID, type CountProductId } from "./config"
+import {
+  COUNT_PACKAGE_IDS,
+  COUNT_PRODUCT_IDS,
+  COUNT_PRO_ENTITLEMENT_ID,
+  type CountProductId,
+} from "./config"
 import {
   presentCountCustomerCenter,
   presentCountProPaywall,
@@ -112,10 +117,8 @@ async function configureForUser(apiKey: string, appUserID: string) {
 }
 
 function packageForProduct(offering: PurchasesOffering | null, productId: CountProductId) {
-  return (
-    offering?.availablePackages.find((candidate) => candidate.product.identifier === productId) ??
-    null
-  )
+  const packageId = COUNT_PACKAGE_IDS[productId]
+  return offering?.availablePackages.find((candidate) => candidate.identifier === packageId) ?? null
 }
 
 export function RevenueCatProvider({

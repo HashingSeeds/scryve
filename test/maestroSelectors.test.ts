@@ -36,5 +36,17 @@ describe("shipping Maestro selectors", () => {
     expect(packageJson.scripts["test:maestro:check"]).toContain("maestroSelectors.test.ts")
     expect(packageJson.scripts["test:maestro:smoke"]).toContain("Landing.yaml")
     expect(packageJson.scripts["test:maestro"]).toContain(".maestro/flows")
+    expect(packageJson.scripts["capture:apple-review"]).toContain("CaptureAppleReview.yaml")
+  })
+
+  it("captures the live Count Pro paywall for Apple review", () => {
+    const capture = readFileSync(
+      join(process.cwd(), ".maestro/store-assets/CaptureAppleReview.yaml"),
+      "utf8",
+    )
+
+    expect(capture).toContain('id: "account-button"')
+    expect(capture).toContain('id: "count-pro-paywall-button"')
+    expect(capture).toContain("takeScreenshot: screenshots/apple-review/count-pro-paywall")
   })
 })
