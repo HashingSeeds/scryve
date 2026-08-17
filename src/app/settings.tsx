@@ -11,6 +11,10 @@ export default function SettingsRoute() {
       initialSettings={localGameRepository.loadSettings()}
       onBack={() => router.back()}
       onRequestAccountDeletion={() => router.push("/delete-account")}
+      onOpenPrivacy={() => router.push("/privacy")}
+      onOpenTerms={() => router.push("/terms")}
+      onOpenEula={() => router.push("/eula")}
+      onOpenCookiePolicy={() => router.push("/cookie-policy")}
       onSave={(settings) => {
         localGameRepository.saveSettings(settings)
         setThemeContextOverride(

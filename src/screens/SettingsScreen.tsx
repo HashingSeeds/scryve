@@ -4,6 +4,7 @@ import { View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
+import { ListItem } from "@/components/ListItem"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
@@ -17,6 +18,10 @@ export interface SettingsScreenProps {
   onBack: () => void
   onSave: (settings: LocalSettings) => void
   onRequestAccountDeletion?: () => void
+  onOpenPrivacy?: () => void
+  onOpenTerms?: () => void
+  onOpenEula?: () => void
+  onOpenCookiePolicy?: () => void
 }
 
 export function SettingsScreen({
@@ -24,6 +29,10 @@ export function SettingsScreen({
   onBack,
   onSave,
   onRequestAccountDeletion,
+  onOpenPrivacy,
+  onOpenTerms,
+  onOpenEula,
+  onOpenCookiePolicy,
 }: SettingsScreenProps) {
   const { themed } = useAppTheme()
   const [settings, setSettings] = useState(initialSettings)
@@ -105,6 +114,29 @@ export function SettingsScreen({
           />
         </View>
       ) : null}
+      {onOpenPrivacy && onOpenTerms ? (
+        <View style={themed($legalSection)}>
+          <Text text="Legal" preset="subheading" accessibilityRole="header" />
+          <ListItem text="Privacy Policy" rightIcon="caretRight" onPress={onOpenPrivacy} />
+          <ListItem text="Terms of Use" rightIcon="caretRight" topSeparator onPress={onOpenTerms} />
+          {onOpenEula ? (
+            <ListItem
+              text="End User License Agreement"
+              rightIcon="caretRight"
+              topSeparator
+              onPress={onOpenEula}
+            />
+          ) : null}
+          {onOpenCookiePolicy ? (
+            <ListItem
+              text="Cookie Policy"
+              rightIcon="caretRight"
+              topSeparator
+              onPress={onOpenCookiePolicy}
+            />
+          ) : null}
+        </View>
+      ) : null}
       <Button
         testID="save-settings-button"
         tx="localGame:saveSettings"
@@ -133,6 +165,12 @@ const $label: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $accountSection: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.sm,
+  marginTop: spacing.sm,
+  paddingTop: spacing.lg,
+  borderTopWidth: 1,
+  borderColor: colors.separator,
+})
+const $legalSection: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   marginTop: spacing.sm,
   paddingTop: spacing.lg,
   borderTopWidth: 1,
