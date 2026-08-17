@@ -28,7 +28,7 @@ export const cookiePolicyContent = {
         },
         {
           type: "paragraph",
-          text: 'Cookies set by the website owner (in this case, __________) are called "first-party cookies." Cookies set by parties other than the website owner are called "third-party cookies." Third-party cookies enable third-party features or functionality to be provided on or through the website (e.g., advertising, interactive content, and analytics). The parties that set these third-party cookies can recognize your computer both when it visits the website in question and also when it visits certain other websites.',
+          text: 'Cookies set by the website owner (in this case, Hashing Seeds LLC) are called "first-party cookies." Cookies set by parties other than the website owner are called "third-party cookies." Third-party cookies enable third-party features or functionality to be provided on or through the website (e.g., advertising, interactive content, and analytics). The parties that set these third-party cookies can recognize your computer both when it visits the website in question and also when it visits certain other websites.',
         },
       ],
     },
@@ -37,7 +37,7 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'We use first- and third-party cookies for several reasons. Some cookies are required for technical reasons in order for our Website to operate, and we refer to these as "essential" or "strictly necessary" cookies. Other cookies also enable us to track and target the interests of our users to enhance the experience on our Online Properties. Third parties serve cookies through our Website for advertising, analytics, and other purposes. This is described in more detail below.',
+          text: 'We use first-party and third-party cookies for several reasons. Some cookies are required for technical reasons in order for our Website to operate, and we refer to these as "essential" or "strictly necessary" cookies. Other cookies also enable us to track and target the interests of our users to enhance the experience on our Online Properties. Third parties serve cookies through our Website for analytics, and other purposes. This is described in more detail below.',
         },
       ],
     },
@@ -54,7 +54,7 @@ export const cookiePolicyContent = {
         },
         {
           type: "paragraph",
-          text: "The specific types of first- and third-party cookies served through our Website and the purposes they perform are described in the table below (please note that the specific cookies served may vary depending on the specific Online Properties you visit):",
+          text: "The specific types of first-party and third-party cookies served through our Website and the purposes they perform are described in the table below (please note that the specific cookies served may vary depending on the specific Online Properties you visit):",
         },
       ],
     },
