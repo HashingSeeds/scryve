@@ -1,6 +1,7 @@
-import { Linking } from "react-native"
+import { Linking, Platform } from "react-native"
 import { router } from "expo-router"
 
+import { APPLE_STANDARD_EULA_URL } from "@/content/legalLinks"
 import { SupportScreen } from "@/screens/SupportScreen"
 
 export default function SupportRoute() {
@@ -10,7 +11,9 @@ export default function SupportRoute() {
       onEmailSupport={() => void Linking.openURL("mailto:support@sow.care?subject=Count%20Support")}
       onOpenPrivacy={() => router.push("/privacy")}
       onOpenTerms={() => router.push("/terms")}
-      onOpenEula={() => router.push("/eula")}
+      onOpenLicenseAgreement={
+        Platform.OS === "ios" ? () => void Linking.openURL(APPLE_STANDARD_EULA_URL) : undefined
+      }
       onOpenCookiePolicy={() => router.push("/cookie-policy")}
     />
   )

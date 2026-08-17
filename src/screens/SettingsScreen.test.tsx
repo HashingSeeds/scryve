@@ -36,7 +36,6 @@ describe("SettingsScreen", () => {
     const handlers = {
       onOpenPrivacy: jest.fn(),
       onOpenTerms: jest.fn(),
-      onOpenEula: jest.fn(),
       onOpenCookiePolicy: jest.fn(),
     }
     const view = render(
@@ -52,12 +51,30 @@ describe("SettingsScreen", () => {
 
     fireEvent.press(view.getByText("Privacy Policy"))
     fireEvent.press(view.getByText("Terms of Use"))
-    fireEvent.press(view.getByText("End User License Agreement"))
     fireEvent.press(view.getByText("Cookie Policy"))
 
     expect(handlers.onOpenPrivacy).toHaveBeenCalledTimes(1)
     expect(handlers.onOpenTerms).toHaveBeenCalledTimes(1)
-    expect(handlers.onOpenEula).toHaveBeenCalledTimes(1)
     expect(handlers.onOpenCookiePolicy).toHaveBeenCalledTimes(1)
+    expect(view.queryByText("License Agreement")).toBeNull()
+  })
+
+  it("exposes the license agreement when a handler is provided", () => {
+    const onOpenLicenseAgreement = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          onBack={jest.fn()}
+          onSave={jest.fn()}
+          onOpenPrivacy={jest.fn()}
+          onOpenTerms={jest.fn()}
+          onOpenLicenseAgreement={onOpenLicenseAgreement}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByText("License Agreement"))
+    expect(onOpenLicenseAgreement).toHaveBeenCalledTimes(1)
   })
 })

@@ -20,7 +20,7 @@ export interface SettingsScreenProps {
   onRequestAccountDeletion?: () => void
   onOpenPrivacy?: () => void
   onOpenTerms?: () => void
-  onOpenEula?: () => void
+  onOpenLicenseAgreement?: () => void
   onOpenCookiePolicy?: () => void
 }
 
@@ -31,7 +31,7 @@ export function SettingsScreen({
   onRequestAccountDeletion,
   onOpenPrivacy,
   onOpenTerms,
-  onOpenEula,
+  onOpenLicenseAgreement,
   onOpenCookiePolicy,
 }: SettingsScreenProps) {
   const { themed } = useAppTheme()
@@ -119,12 +119,13 @@ export function SettingsScreen({
           <Text text="Legal" preset="subheading" accessibilityRole="header" />
           <ListItem text="Privacy Policy" rightIcon="caretRight" onPress={onOpenPrivacy} />
           <ListItem text="Terms of Use" rightIcon="caretRight" topSeparator onPress={onOpenTerms} />
-          {onOpenEula ? (
+          {onOpenLicenseAgreement ? (
             <ListItem
-              text="End User License Agreement"
+              text="License Agreement"
+              accessibilityHint="Opens Apple's standard license agreement in your browser"
               rightIcon="caretRight"
               topSeparator
-              onPress={onOpenEula}
+              onPress={onOpenLicenseAgreement}
             />
           ) : null}
           {onOpenCookiePolicy ? (

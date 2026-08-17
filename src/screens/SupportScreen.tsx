@@ -13,7 +13,7 @@ export interface SupportScreenProps {
   onEmailSupport: () => void
   onOpenPrivacy: () => void
   onOpenTerms: () => void
-  onOpenEula: () => void
+  onOpenLicenseAgreement?: () => void
   onOpenCookiePolicy: () => void
 }
 
@@ -22,7 +22,7 @@ export function SupportScreen({
   onEmailSupport,
   onOpenPrivacy,
   onOpenTerms,
-  onOpenEula,
+  onOpenLicenseAgreement,
   onOpenCookiePolicy,
 }: SupportScreenProps) {
   const { themed } = useAppTheme()
@@ -82,7 +82,9 @@ export function SupportScreen({
       <View style={themed($legal)}>
         <Button text="Privacy Policy" onPress={onOpenPrivacy} />
         <Button text="Terms of Use" onPress={onOpenTerms} />
-        <Button text="EULA" onPress={onOpenEula} />
+        {onOpenLicenseAgreement ? (
+          <Button text="License Agreement" onPress={onOpenLicenseAgreement} />
+        ) : null}
         <Button text="Cookie Policy" onPress={onOpenCookiePolicy} />
       </View>
     </Screen>
