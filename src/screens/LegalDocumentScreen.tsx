@@ -33,10 +33,7 @@ export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenPro
           {updatedAt ? <Text text={updatedAt} size="xs" style={themed($metadata)} /> : null}
         </View>
         {sections.map((section, index) => (
-          <View
-            key={`${section.heading ?? "section"}-${index}`}
-            style={[themed($section), index > 0 && themed($sectionSpacing)]}
-          >
+          <View key={`${section.heading ?? "section"}-${index}`} style={themed($section)}>
             {section.heading ? (
               <Text
                 text={section.heading}
@@ -90,9 +87,13 @@ function prepareDocument(document: LegalDocumentContent) {
   const updatedMatch = firstBlock.text.match(/^(Last updated [^\n]+)$/i)
   if (!updatedMatch) return { sections: document.sections }
 
+  const remainingFirstBlocks = firstSection.blocks.slice(1)
   return {
     updatedAt: updatedMatch[1],
-    sections: [{ ...firstSection, blocks: firstSection.blocks.slice(1) }, ...remainingSections],
+    sections:
+      remainingFirstBlocks.length > 0
+        ? [{ ...firstSection, blocks: remainingFirstBlocks }, ...remainingSections]
+        : remainingSections,
   }
 }
 
@@ -107,7 +108,7 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
-  maxWidth: 760,
+  maxWidth: 680,
   alignSelf: "center",
   gap: spacing.xl,
 })
@@ -119,7 +120,6 @@ const $documentHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 const $metadata: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
-const $sectionSpacing: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingTop: spacing.xl })
 const $sectionHeading: ThemedStyle<TextStyle> = () => ({ letterSpacing: -0.2 })
 const $body: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.text,
