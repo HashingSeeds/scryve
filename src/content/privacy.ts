@@ -7,7 +7,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Last updated August 14, 2026",
+          text: "Last updated August 17, 2026",
         },
         {
           type: "paragraph",
@@ -18,7 +18,7 @@ export const privacyContent = {
           items: [
             "Visit our website at https://count.sow.care or any website of ours that links to this Privacy Notice",
             "Download and use our mobile application (Count), or any other application of ours that links to this Privacy Notice",
-            "Engage with us in other related ways, including any marketing or events",
+            "Contact us for support or otherwise communicate with us",
           ],
         },
         {
@@ -44,7 +44,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Do we collect any information from third parties? We do not collect any information from third parties.",
+          text: "Do we receive information from third parties? Yes. We receive account information from Clerk, our authentication provider, and purchase and subscription information from Apple or Google through RevenueCat. We do not receive your complete payment card number or card security code.",
         },
         {
           type: "paragraph",
@@ -97,51 +97,47 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "6. HOW DO WE HANDLE YOUR SOCIAL LOGINS?",
+          text: "6. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?",
         },
         {
           type: "paragraph",
-          text: "7. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?",
+          text: "7. HOW LONG DO WE KEEP YOUR INFORMATION?",
         },
         {
           type: "paragraph",
-          text: "8. HOW LONG DO WE KEEP YOUR INFORMATION?",
+          text: "8. HOW DO WE KEEP YOUR INFORMATION SAFE?",
         },
         {
           type: "paragraph",
-          text: "9. HOW DO WE KEEP YOUR INFORMATION SAFE?",
+          text: "9. DO WE COLLECT INFORMATION FROM MINORS?",
         },
         {
           type: "paragraph",
-          text: "10. DO WE COLLECT INFORMATION FROM MINORS?",
+          text: "10. WHAT ARE YOUR PRIVACY RIGHTS?",
         },
         {
           type: "paragraph",
-          text: "11. WHAT ARE YOUR PRIVACY RIGHTS?",
+          text: "11. CONTROLS FOR DO-NOT-TRACK FEATURES",
         },
         {
           type: "paragraph",
-          text: "12. CONTROLS FOR DO-NOT-TRACK FEATURES",
+          text: "12. DO UNITED STATES RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?",
         },
         {
           type: "paragraph",
-          text: "13. DO UNITED STATES RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?",
+          text: "13. DO OTHER REGIONS HAVE SPECIFIC PRIVACY RIGHTS?",
         },
         {
           type: "paragraph",
-          text: "14. DO OTHER REGIONS HAVE SPECIFIC PRIVACY RIGHTS?",
+          text: "14. DO WE MAKE UPDATES TO THIS NOTICE?",
         },
         {
           type: "paragraph",
-          text: "15. DO WE MAKE UPDATES TO THIS NOTICE?",
+          text: "15. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?",
         },
         {
           type: "paragraph",
-          text: "16. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?",
-        },
-        {
-          type: "paragraph",
-          text: "17. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?",
+          text: "16. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?",
         },
       ],
     },
@@ -166,7 +162,14 @@ export const privacyContent = {
         },
         {
           type: "list",
-          items: ["email addresses", "usernames", "passwords"],
+          items: [
+            "email address",
+            "username and display name",
+            "profile image, if provided",
+            "account identifier",
+            "games, players, decks, counters, game history, and other content and settings associated with your account",
+            "messages and information you provide when contacting support",
+          ],
         },
         {
           type: "paragraph",
@@ -174,11 +177,11 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Payment Data. We may collect data necessary to process your payment if you choose to make purchases, such as your payment instrument number, and the security code associated with your payment instrument. All payment data is handled and stored by RevenueCat. You may find their privacy notice link(s) here: https://www.revenuecat.com/privacy.",
+          text: "Authentication Credentials. Clerk, our authentication provider, processes the credentials you use to create and access your account. Count does not receive or store your plaintext password.",
         },
         {
           type: "paragraph",
-          text: 'Social Media Login Data. We may provide you with the option to register with us using your existing social media account details, like your Facebook, X, or other social media account. If you choose to register in this way, we will collect certain profile information about you from the social media provider, as described in the section called "HOW DO WE HANDLE YOUR SOCIAL LOGINS? " below.',
+          text: "Purchase and Subscription Information. Purchases made through the mobile application are processed by Apple through the App Store or Google through Google Play. We do not receive or store your complete payment card number or card security code. We use RevenueCat to verify purchases and manage subscription access. RevenueCat may process an application user identifier, transaction and receipt information, the product purchased, subscription status, purchase and expiration dates, and renewal or cancellation information. For more information, review the privacy notices of Apple (https://www.apple.com/legal/privacy/), Google (https://policies.google.com/privacy), and RevenueCat (https://www.revenuecat.com/privacy/).",
         },
         {
           type: "paragraph",
@@ -187,7 +190,7 @@ export const privacyContent = {
         {
           type: "list",
           items: [
-            "Mobile Device Access. We may request access or permission to certain features from your mobile device, including your mobile device's camera, and other features. If you wish to change our access or permissions, you may do so in your device's settings.",
+            "Camera Access. We request camera access only when you choose to scan a QR code for a connected game. Count does not capture, store, or upload camera images. You can change camera permission in your device settings.",
             "Mobile Device Data. We automatically collect device information (such as your mobile device ID, model, and manufacturer), operating system, version information and system configuration information, device and application identification numbers, browser type and version, hardware model Internet service provider and/or mobile carrier, and Internet Protocol (IP) address (or proxy server). If you are using our application(s), we may also collect information about the phone network associated with your mobile device, your mobile device’s operating system or platform, the type of mobile device you use, your mobile device’s unique device ID, and information about the features of our application(s) you accessed.",
           ],
         },
@@ -198,6 +201,23 @@ export const privacyContent = {
         {
           type: "paragraph",
           text: "All personal information that you provide to us must be true, complete, and accurate, and you must notify us of any changes to such personal information.",
+        },
+      ],
+    },
+    {
+      heading: "Information we receive from other sources",
+      blocks: [
+        {
+          type: "paragraph",
+          text: "We receive limited information from service providers that help us operate the Services:",
+        },
+        {
+          type: "list",
+          items: [
+            "Authentication. Clerk provides us with account information such as your account identifier, email address, username, display name, and profile image.",
+            "Purchases. Apple or Google processes your transaction. Through RevenueCat, we receive information needed to verify and manage your subscription entitlement, such as an application user identifier, product purchased, transaction or receipt information, subscription status, purchase and expiration dates, and renewal or cancellation status.",
+            "Diagnostics. Sentry processes and provides us with technical, device, usage, crash, feedback, and session replay information so we can identify errors and improve reliability.",
+          ],
         },
       ],
     },
@@ -214,7 +234,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Like many businesses, we also collect information through cookies and similar technologies. You can find out more about this in our Cookie Notice: https://count.sow.care/cookies.",
+          text: "On our website, essential cookies and similar technologies may be used for authentication, security, preferences, and basic site operation. You can find out more in our Cookie Notice: https://count.sow.care/cookie-policy.",
         },
         {
           type: "paragraph",
@@ -225,8 +245,12 @@ export const privacyContent = {
           items: [
             'Log and Usage Data. Log and usage data is service-related, diagnostic, usage, and performance information our servers automatically collect when you access or use our Services and which we record in log files. Depending on how you interact with us, this log data may include your IP address, device information, browser type, and settings and information about your activity in the Services (such as the date/time stamps associated with your usage, pages and files viewed, searches, and other actions you take such as which features you use), device event information (such as system activity, error reports (sometimes called "crash dumps"), and hardware settings).',
             "Device Data. We collect device data such as information about your computer, phone, tablet, or other device you use to access the Services. Depending on the device used, this device data may include information such as your IP address (or proxy server), device and application identification numbers, location, browser type, hardware model, Internet service provider and/or mobile carrier, operating system, and system configuration information.",
-            "Location Data. We collect location data such as information about your device's location, which can be either precise or imprecise. How much information we collect depends on the type and settings of the device you use to access the Services. For example, we may use GPS and other technologies to collect geolocation data that tells us your current location (based on your IP address). You can opt out of allowing us to collect this information either by refusing access to the information or by disabling your Location setting on your device. However, if you choose to opt out, you may not be able to use certain aspects of the Services.",
+            "Approximate Location. Our service providers may infer a general location, such as country or region, from your IP address for security, fraud prevention, diagnostics, and service operation. Count does not request access to your device's GPS location.",
           ],
+        },
+        {
+          type: "paragraph",
+          text: "Diagnostics and Session Replay. We use Sentry to identify crashes, diagnose technical problems, collect user feedback, and improve the reliability of the Services. When an error occurs, Sentry may collect diagnostic information such as the app version, device and operating system information, the time of the error, application activity leading up to the error, and technical identifiers. We may also collect a privacy-protected replay of interactions with the application associated with an error. Text, images, and other potentially sensitive screen content are masked or excluded from these recordings. We use this information only for debugging, security, and service improvement, and not for advertising. For more information, review Sentry's privacy notice: https://sentry.io/privacy/.",
         },
       ],
     },
@@ -244,20 +268,19 @@ export const privacyContent = {
         {
           type: "list",
           items: [
-            "To facilitate account creation and authentication and otherwise manage user accounts. We may process your information so you can create and log in to your account, as well as keep your account in working order. (Retention period: 3 years from last contact with the user)",
-            "To deliver and facilitate delivery of services to the user. We may process your information to provide you with the requested service. (Retention period: 3 years from last contact with the user)",
-            "To respond to user inquiries/offer support to users. We may process your information to respond to your inquiries and solve any potential issues you might have with the requested service. (Retention period: 3 years from last contact with the user)",
-            "To fulfill and manage your orders. We may process your information to fulfill and manage your orders, payments, returns, and exchanges made through the Services. (Retention period: 3 years from last contact with the user)",
-            "To request feedback. We may process your information when necessary to request feedback and to contact you about your use of our Services. (Retention period: 3 years from last contact with the user)",
-            "To protect our Services. We may process your information as part of our efforts to keep our Services safe and secure, including fraud monitoring and prevention. (Retention period: 3 years from last contact with the user)",
-            "To identify usage trends. We may process information about how you use our Services to better understand how they are being used so we can improve them. (Retention period: 3 years from last contact with the user)",
+            "To create, authenticate, and manage user accounts.",
+            "To provide connected games, game history, decks, subscription features, and the other functionality you request.",
+            "To respond to support requests and user feedback.",
+            "To verify purchases and manage subscription access.",
+            "To protect the Services, prevent abuse, and maintain account security.",
+            "To diagnose crashes, troubleshoot problems, and improve performance and reliability.",
             "To save or protect an individual's vital interest. We may process your information when necessary to save or protect an individual’s vital interest, such as to prevent harm.",
           ],
         },
       ],
     },
     {
-      heading: "3. WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR INFORMATION?",
+      heading: "3. WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR PERSONAL INFORMATION?",
       blocks: [
         {
           type: "paragraph",
@@ -320,7 +343,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "In Short: We may share information in specific situations described in this section and/or with the following third parties.",
+          text: "In Short: We disclose information to service providers that help us operate Count and in the other limited situations described below.",
         },
         {
           type: "paragraph",
@@ -329,9 +352,18 @@ export const privacyContent = {
         {
           type: "list",
           items: [
-            "Business Transfers. We may share or transfer your information in connection with, or during negotiations of, any merger, sale of company assets, financing, or acquisition of all or a portion of our business to another company.",
-            "Business Partners. We may share your information with our business partners to offer you certain products, services, or promotions.",
+            "Clerk, for account registration, authentication, and account management.",
+            "Convex, for application hosting, database storage, synchronization, and backend services.",
+            "RevenueCat, for verifying purchases and managing subscription entitlements.",
+            "Apple and Google, when you purchase a subscription or use their platform services.",
+            "Sentry, for crash reporting, diagnostic logging, user feedback, and privacy-protected session replay.",
+            "Legal and Safety Disclosures. We may disclose information when required by law or when reasonably necessary to protect users, the Services, or our legal rights.",
+            "Business Transfers. We may share or transfer information in connection with a merger, financing, acquisition, reorganization, or sale of all or part of our business or assets.",
           ],
+        },
+        {
+          type: "paragraph",
+          text: "These providers process information on our behalf to provide their services or as otherwise permitted by their agreements and applicable law. We do not sell personal information or disclose it for cross-context behavioral advertising.",
         },
       ],
     },
@@ -340,45 +372,24 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "In Short: We may use cookies and other tracking technologies to collect and store your information.",
+          text: "In Short: Our website may use essential cookies and similar technologies for authentication, security, preferences, and basic site operation.",
         },
         {
           type: "paragraph",
-          text: "We may use cookies and similar tracking technologies (like web beacons and pixels) to gather information when you interact with our Services. Some online tracking technologies help us maintain the security of our Services and your account, prevent crashes, fix bugs, save your preferences, and assist with basic site functions.",
+          text: "Our website may use cookies and similar technologies that are necessary to authenticate users, maintain security, save preferences, prevent crashes, fix bugs, and provide basic site functions.",
         },
         {
           type: "paragraph",
-          text: "We also permit third parties and service providers to use online tracking technologies on our Services for analytics and advertising, including to help manage and display advertisements or to tailor advertisements to your interests. The third parties and service providers use their technology to provide advertising about products and services tailored to your interests which may appear either on our Services or on other websites.",
+          text: "We do not use cookies or similar technologies for targeted advertising or cross-context behavioral advertising.",
         },
         {
           type: "paragraph",
-          text: 'To the extent these online tracking technologies are deemed to be a "sale"/"sharing" (which includes targeted advertising, as defined under the applicable laws) under applicable US state laws, you can opt out of these online tracking technologies by submitting a request as described below under section " DO UNITED STATES RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS? "',
-        },
-        {
-          type: "paragraph",
-          text: "Specific information about how we use such technologies and how you can refuse certain cookies is set out in our Cookie Notice: https://count.sow.care/cookies.",
+          text: "More information is available in our Cookie Notice: https://count.sow.care/cookie-policy.",
         },
       ],
     },
     {
-      heading: "6. HOW DO WE HANDLE YOUR SOCIAL LOGINS?",
-      blocks: [
-        {
-          type: "paragraph",
-          text: "In Short: If you choose to register or log in to our Services using a social media account, we may have access to certain information about you.",
-        },
-        {
-          type: "paragraph",
-          text: "Our Services offer you the ability to register and log in using your third-party social media account details (like your Facebook or X logins). Where you choose to do this, we will receive certain profile information about you from your social media provider. The profile information we receive may vary depending on the social media provider concerned, but will often include your name, email address, friends list, and profile picture, as well as other information you choose to make public on such a social media platform.",
-        },
-        {
-          type: "paragraph",
-          text: "We will use the information we receive only for the purposes that are described in this Privacy Notice or that are otherwise made clear to you on the relevant Services. Please note that we do not control, and are not responsible for, other uses of your personal information by your third-party social media provider. We recommend that you review their privacy notice to understand how they collect, use, and share your personal information, and how you can set your privacy preferences on their sites and apps.",
-        },
-      ],
-    },
-    {
-      heading: "7. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?",
+      heading: "6. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?",
       blocks: [
         {
           type: "paragraph",
@@ -394,16 +405,12 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "European Commission's Standard Contractual Clauses:",
-        },
-        {
-          type: "paragraph",
-          text: "We have implemented measures to protect your personal information, including by using the European Commission's Standard Contractual Clauses for transfers of personal information between our group companies and between us and our third-party providers. These clauses require all recipients to protect all personal information that they process originating from the EEA or UK in accordance with European data protection laws and regulations. Our Standard Contractual Clauses can be provided upon request. We have implemented similar appropriate safeguards with our third-party service providers and partners and further details can be provided upon request.",
+          text: "Where required, we rely on transfer safeguards offered by our service providers and other lawful mechanisms for international transfers of personal information.",
         },
       ],
     },
     {
-      heading: "8. HOW LONG DO WE KEEP YOUR INFORMATION?",
+      heading: "7. HOW LONG DO WE KEEP YOUR INFORMATION?",
       blocks: [
         {
           type: "paragraph",
@@ -411,7 +418,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: 'We will only keep your personal information for as long as it is necessary for the purposes set out in this Privacy Notice, unless a longer retention period is required or permitted by law (such as tax, accounting, or other legal requirements). If you are located in the EU or UK, see section " HOW DO WE PROCESS YOUR INFORMATION? " for our retention periods by purpose.',
+          text: "We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. We may retain limited records longer when reasonably necessary for security, fraud prevention, legal compliance, dispute resolution, backups, or enforcement of our agreements.",
         },
         {
           type: "paragraph",
@@ -420,7 +427,7 @@ export const privacyContent = {
       ],
     },
     {
-      heading: "9. HOW DO WE KEEP YOUR INFORMATION SAFE?",
+      heading: "8. HOW DO WE KEEP YOUR INFORMATION SAFE?",
       blocks: [
         {
           type: "paragraph",
@@ -433,20 +440,20 @@ export const privacyContent = {
       ],
     },
     {
-      heading: "10. DO WE COLLECT INFORMATION FROM MINORS?",
+      heading: "9. DO WE COLLECT INFORMATION FROM MINORS?",
       blocks: [
         {
           type: "paragraph",
-          text: "In Short: We do not knowingly collect data from or market to children under 18 years of age or the equivalent age as specified by law in your jurisdiction.",
+          text: "In Short: The Services are not directed to children under 13, and we do not knowingly collect personal information from children under 13.",
         },
         {
           type: "paragraph",
-          text: "We do not knowingly collect, solicit data from, or market to children under 18 years of age or the equivalent age as specified by law in your jurisdiction, nor do we knowingly sell such personal information. By using the Services, you represent that you are at least 18 or the equivalent age as specified by law in your jurisdiction or that you are the parent or guardian of such a minor and consent to such minor dependent’s use of the Services. If we learn that personal information from users less than 18 years of age or the equivalent age as specified by law in your jurisdiction has been collected, we will deactivate the account and take reasonable measures to promptly delete such data from our records. If you become aware of any data we may have collected from children under age 18 or the equivalent age as specified by law in your jurisdiction, please contact us at privacy@sowinghope.how.",
+          text: "The Services are intended for users who are at least 13 years old. Minors must have permission from and be supervised by a parent or guardian as described in our Terms of Use. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has provided personal information, we will take reasonable steps to delete it. If you believe a child under 13 has provided us with personal information, contact us at privacy@sowinghope.how.",
         },
       ],
     },
     {
-      heading: "11. WHAT ARE YOUR PRIVACY RIGHTS?",
+      heading: "10. WHAT ARE YOUR PRIVACY RIGHTS?",
       blocks: [
         {
           type: "paragraph",
@@ -535,7 +542,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Cookies and similar technologies: Most Web browsers are set to accept cookies by default. If you prefer, you can usually choose to set your browser to remove cookies and to reject cookies. If you choose to remove cookies or reject cookies, this could affect certain features or services of our Services. For further information, please see our Cookie Notice: https://count.sow.care/cookies.",
+          text: "Cookies and similar technologies: Most web browsers accept cookies by default. You can usually configure your browser to remove or reject cookies, though doing so may affect website authentication or other features. For more information, see our Cookie Notice: https://count.sow.care/cookie-policy.",
         },
         {
           type: "paragraph",
@@ -544,7 +551,7 @@ export const privacyContent = {
       ],
     },
     {
-      heading: "12. CONTROLS FOR DO-NOT-TRACK FEATURES",
+      heading: "11. CONTROLS FOR DO-NOT-TRACK FEATURES",
       blocks: [
         {
           type: "paragraph",
@@ -554,14 +561,10 @@ export const privacyContent = {
           type: "paragraph",
           text: "California law requires us to let you know how we respond to web browser DNT signals. Because there currently is not an industry or legal standard for recognizing or honoring DNT signals, we do not respond to them at this time.",
         },
-        {
-          type: "paragraph",
-          text: "Global Privacy Control: We recognize and honor Global Privacy Control (GPC) signals. If you use a browser or extension that supports GPC, we will treat this as a valid request to opt out of the sale or sharing of your personal information for targeted advertising purposes under applicable state privacy laws, including the California Consumer Privacy Act (CCPA). When we detect a GPC signal from your browser, we will automatically apply your opt-out preference without requiring you to take any additional action. For more information about GPC and how to enable it, visit globalprivacycontrol.org (http://globalprivacycontrol.org).",
-        },
       ],
     },
     {
-      heading: "13. DO UNITED STATES RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?",
+      heading: "12. DO UNITED STATES RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?",
       blocks: [
         {
           type: "paragraph",
@@ -593,9 +596,9 @@ export const privacyContent = {
           type: "table",
           rows: [
             "C. Protected classification characteristics under state or federal law Gender, age, date of birth, race and ethnicity, national origin, marital status, and other demographic data NO",
-            "D. Commercial information Transaction information, purchase history, financial details, and payment information NO",
+            "D. Commercial information Products purchased and subscription status YES",
             "E. Biometric information Fingerprints and voiceprints NO",
-            "F. Internet or other similar network activity Browsing history, search history, online behavior, interest data, and interactions with our and other websites, applications, systems, and advertisements NO",
+            "F. Internet or other similar network activity Interactions with our website and application, diagnostic logs, crashes, and privacy-protected session replay YES",
             "G. Geolocation data Device location NO",
             "H. Audio, electronic, sensory, or similar information Images and audio, video or call recordings created in connection with our business activities NO",
             "I. Professional or employment-related information Business contact details in order to provide you our Services at a business level or job title, work history, and professional qualifications if you apply for a job with us NO",
@@ -622,7 +625,9 @@ export const privacyContent = {
         },
         {
           type: "list",
-          items: ["Category A - 3 years from last contact with the user"],
+          items: [
+            "Categories A, D, and F - for the periods described in the section HOW LONG DO WE KEEP YOUR INFORMATION?",
+          ],
         },
       ],
     },
@@ -631,7 +636,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'Learn more about the sources of personal information we collect in " WHAT INFORMATION DO WE COLLECT? "',
+          text: "We collect personal information directly from you, automatically from your device and use of the Services, from Clerk for authentication, from Apple or Google through RevenueCat for purchases and subscription status, and from Sentry for diagnostics and error-related session replay.",
         },
       ],
     },
@@ -656,7 +661,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "We have not disclosed, sold, or shared any personal information to third parties for a business or commercial purpose in the preceding twelve (12) months. We will not sell or share personal information in the future belonging to website visitors, users, and other consumers.",
+          text: "We disclose identifiers, commercial information, and internet or application activity to the service providers described in the section WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION? for business purposes. We do not sell personal information or share it for cross-context behavioral advertising.",
         },
       ],
     },
@@ -706,7 +711,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "We will honor your opt-out preferences if you enact the Global Privacy Control (https://globalprivacycontrol.org/) (GPC) opt-out signal on your browser.",
+          text: "Because we do not sell personal information or share it for cross-context behavioral advertising, there is no sale or targeted-advertising activity to opt out of.",
         },
         {
           type: "paragraph",
@@ -742,7 +747,7 @@ export const privacyContent = {
       ],
     },
     {
-      heading: "14. DO OTHER REGIONS HAVE SPECIFIC PRIVACY RIGHTS?",
+      heading: "13. DO OTHER REGIONS HAVE SPECIFIC PRIVACY RIGHTS?",
       blocks: [
         {
           type: "paragraph",
@@ -810,7 +815,7 @@ export const privacyContent = {
       ],
     },
     {
-      heading: "15. DO WE MAKE UPDATES TO THIS NOTICE?",
+      heading: "14. DO WE MAKE UPDATES TO THIS NOTICE?",
       blocks: [
         {
           type: "paragraph",
@@ -823,7 +828,7 @@ export const privacyContent = {
       ],
     },
     {
-      heading: "16. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?",
+      heading: "15. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?",
       blocks: [
         {
           type: "paragraph",
@@ -848,7 +853,7 @@ export const privacyContent = {
       ],
     },
     {
-      heading: "17. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?",
+      heading: "16. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?",
       blocks: [
         {
           type: "paragraph",
