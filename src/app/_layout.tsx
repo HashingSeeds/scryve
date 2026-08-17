@@ -18,15 +18,13 @@ import { loadDateFnsLocale } from "@/utils/formatDate"
 Sentry.init({
   dsn: "https://fb85fd67adf134394a15190b8a488404@o4507118738669568.ingest.us.sentry.io/4511870328635392",
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
+  sendDefaultPii: false,
 
   // Enable Logs
   enableLogs: true,
 
   // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
+  replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 1,
   integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
 })
