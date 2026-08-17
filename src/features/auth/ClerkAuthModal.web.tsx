@@ -1,29 +1,7 @@
 import { useEffect } from "react"
 import { useClerk } from "@clerk/expo"
 
-import { colors } from "@/theme/colorsDark"
-
-const countAppearance = {
-  theme: "simple",
-  variables: {
-    colorPrimary: colors.palette.primary500,
-    colorForeground: colors.text,
-    colorMutedForeground: colors.textDim,
-    colorBackground: colors.background,
-    colorInput: colors.palette.neutral300,
-    colorInputForeground: colors.text,
-    colorNeutral: colors.palette.neutral700,
-    colorBorder: colors.border,
-    colorDanger: colors.error,
-    colorRing: colors.tint,
-    colorShadow: colors.palette.neutral100,
-    colorModalBackdrop: colors.palette.overlay50,
-    fontFamily: "spaceGroteskRegular, system-ui, sans-serif",
-    fontFamilyButtons: "spaceGroteskSemiBold, system-ui, sans-serif",
-    borderRadius: "8px",
-    fontSize: "0.95rem",
-  },
-} as const
+import { clerkAppearance } from "./clerkAppearance"
 
 export function ClerkAuthModal({
   visible,
@@ -37,7 +15,7 @@ export function ClerkAuthModal({
   useEffect(() => {
     if (!visible) return
     clerk.openSignIn({
-      appearance: countAppearance,
+      appearance: clerkAppearance,
       withSignUp: true,
       oauthFlow: "popup",
       fallbackRedirectUrl: "/",

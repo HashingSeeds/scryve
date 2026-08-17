@@ -11,7 +11,7 @@ const mockToken = "bad"
 let mockIsSignedIn = false
 
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), replace: jest.fn(), push: jest.fn() },
+  router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn(), push: jest.fn() },
   useLocalSearchParams: () => ({ token: mockToken }),
 }))
 jest.mock("@/features/auth/AuthContext", () => ({
@@ -24,7 +24,11 @@ jest.mock("@/features/auth/AuthContext", () => ({
 }))
 jest.mock("@/features/auth/AccountControls", () => {
   const { View } = jest.requireActual("react-native")
-  return { AccountProfile: () => <View testID="account-profile" /> }
+  return {
+    AccountProfile: ({ onBack }: { onBack: () => void }) => (
+      <View testID="account-profile" onTouchEnd={onBack} />
+    ),
+  }
 })
 jest.mock("@/features/connected/ConnectedGate", () => ({
   ConnectedGate: ({ children }: { children: React.ReactNode }) => children,

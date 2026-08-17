@@ -10,6 +10,7 @@ import { SubscriptionControls } from "@/features/billing/SubscriptionControls"
 
 export default function AccountRoute() {
   const auth = useAuthAccess()
+  const leaveAccount = () => (router.canGoBack() ? router.back() : router.replace("/"))
   if (!auth.configured || !auth.isSignedIn)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
@@ -25,10 +26,9 @@ export default function AccountRoute() {
       </Screen>
     )
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={$profileScreen}>
-      <Header title="Account" leftTx="common:back" onLeftPress={() => router.back()} />
+    <Screen preset="fixed" contentContainerStyle={$profileScreen}>
+      <AccountProfile onBack={leaveAccount} />
       <SubscriptionControls />
-      <AccountProfile />
     </Screen>
   )
 }

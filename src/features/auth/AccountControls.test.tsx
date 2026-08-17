@@ -1,4 +1,6 @@
-import { render } from "@testing-library/react-native"
+import { fireEvent, render } from "@testing-library/react-native"
+
+import { ThemeProvider } from "@/theme/context"
 
 import { AccountProfile } from "./AccountControls"
 
@@ -10,9 +12,16 @@ jest.mock("@clerk/expo/native", () => {
 })
 
 describe("AccountControls", () => {
-  it("fills the account route without adding a second native dismiss control", () => {
-    const view = render(<AccountProfile />)
+  it("fills the account route and owns its back navigation", () => {
+    const onBack = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <AccountProfile onBack={onBack} />
+      </ThemeProvider>,
+    )
     expect(view.getByTestId("native-user-profile")).toHaveStyle({ flex: 1 })
     expect(view.getByTestId("native-user-profile").props.isDismissible).toBe(false)
+    fireEvent.press(view.getByRole("button", { name: "Back" }))
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 })
