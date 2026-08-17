@@ -4,6 +4,14 @@ export const termsContent = {
   title: "TERMS OF USE",
   sections: [
     {
+      blocks: [
+        {
+          type: "paragraph",
+          text: "Last updated August 17, 2026",
+        },
+      ],
+    },
+    {
       heading: "AGREEMENT TO OUR LEGAL TERMS",
       blocks: [
         {
@@ -12,7 +20,19 @@ export const termsContent = {
         },
         {
           type: "paragraph",
-          text: 'We operate the website https://count.sow.care (the "Site"), the mobile application Count (the "App"), as well as any other related products and services that refer or link to these legal terms (the "Legal Terms") (collectively, the "Services"). You can contact us by phone at 7313333462‬, email at contact@sowinghope.how, or by mail to 901 Broadway #24210, Nashville, TN 37202, United States. These Legal Terms constitute a legally binding agreement made between you, whether personally or on behalf of an entity ("you"), and Hashing Seeds LLC, concerning your access to and use of the Services. You agree that by accessing the Services, you have read, understood, and agreed to be bound by all of these Legal Terms. IF YOU DO NOT AGREE WITH ALL OF THESE LEGAL TERMS, THEN YOU ARE EXPRESSLY PROHIBITED FROM USING THE SERVICES AND YOU MUST DISCONTINUE USE IMMEDIATELY. Supplemental terms and conditions or documents that may be posted on the Services from time to time are hereby expressly incorporated herein by reference. We reserve the right, in our sole discretion, to make changes or modifications to these Legal Terms from time to time. We will alert you about any changes by updating the "Last updated" date of these Legal Terms, and you waive any right to receive specific notice of each such change. It is your responsibility to periodically review these Legal Terms to stay informed of updates. You will be subject to, and will be deemed to have been made aware of and to have accepted, the changes in any revised Legal Terms by your continued use of the Services after the date such revised Legal Terms are posted.',
+          text: 'We operate the website https://count.sow.care (the "Site") and the Count mobile application (the "App"), together with related products and services that link to these terms (collectively, the "Services"). Our contact information appears in Section 27.',
+        },
+        {
+          type: "paragraph",
+          text: 'These Terms of Use ("Legal Terms") form a legally binding agreement between you and Hashing Seeds LLC concerning your access to and use of the Services. By accessing the Services, you agree to these Legal Terms.',
+        },
+        {
+          type: "paragraph",
+          text: "IF YOU DO NOT AGREE TO THESE LEGAL TERMS, YOU MUST NOT USE THE SERVICES.",
+        },
+        {
+          type: "paragraph",
+          text: 'Additional terms or policies posted through the Services are incorporated into these Legal Terms by reference. We may update these Legal Terms from time to time. We will identify changes by updating the "Last updated" date, and your continued use of the Services after revised terms are posted constitutes acceptance of those revisions.',
         },
         {
           type: "paragraph",
@@ -61,15 +81,15 @@ export const termsContent = {
         },
         {
           type: "paragraph",
-          text: "9. USER GENERATED CONTRIBUTIONS",
+          text: "9. USER CONTENT",
         },
         {
           type: "paragraph",
-          text: "10. CONTRIBUTION LICENSE",
+          text: "10. LICENSE TO OPERATE THE SERVICES",
         },
         {
           type: "paragraph",
-          text: "11. GUIDELINES FOR REVIEWS",
+          text: "11. FEEDBACK",
         },
         {
           type: "paragraph",
@@ -208,52 +228,51 @@ export const termsContent = {
       ],
     },
     {
-      heading: "Your submissions and contributions",
+      heading: "User content and feedback",
       blocks: [
         {
           type: "paragraph",
-          text: 'Please review this section and the "PROHIBITED ACTIVITIES " section carefully prior to using our Services to understand the (a) rights you give us and (b) obligations you have when you post or upload any content through the Services.',
+          text: "You retain ownership of content you create or store through the Services. The limited rights you grant us and your responsibilities for that content are described in the USER CONTENT and LICENSE TO OPERATE THE SERVICES sections below.",
         },
         {
           type: "paragraph",
-          text: 'Submissions: By directly sending us any question, comment, suggestion, idea, feedback, or other information about the Services ("Submissions"), you agree to assign to us all intellectual property rights in such Submission. You agree that we shall own this Submission and be entitled to its unrestricted use and dissemination for any lawful purpose, commercial or otherwise, without acknowledgment or compensation to you.',
+          text: "If you send us ideas, suggestions, or feedback about the Services, you permit us to use that feedback without restriction or compensation to you.",
         },
         {
           type: "paragraph",
-          text: 'Contributions: The Services may invite you to chat, contribute to, or participate in blogs, message boards, online forums, and other functionality during which you may create, submit, post, display, transmit, publish, distribute, or broadcast content and materials to us or through the Services, including but not limited to text, writings, video, audio, photographs, music, graphics, comments, reviews, rating suggestions, personal information, or other material ("Contributions"). Any Submission that is publicly posted shall also be treated as a Contribution.',
+          text: "User Content includes usernames, display names, player names, game data, deck information, profile images, and other information you choose to store through the Services.",
         },
         {
           type: "paragraph",
-          text: "You understand that Contributions may be viewable by other users of the Services.",
+          text: "Some User Content may be visible to people who join a connected game with you or view game information you choose to share.",
         },
         {
           type: "paragraph",
-          text: "When you post Contributions, you grant us a license (including use of your name, trademarks, and logos): By posting any Contributions, you grant us an unrestricted, unlimited, irrevocable, perpetual, non-exclusive, transferable, royalty-free, fully-paid, worldwide right, and license to: use, copy, reproduce, distribute, sell, resell, publish, broadcast, retitle, store, publicly perform, publicly display, reformat, translate, excerpt (in whole or in part), and exploit your Contributions (including, without limitation, your image, name, and voice) for any purpose, commercial, advertising, or otherwise, to prepare derivative works of, or incorporate into other works, your Contributions, and to sublicense the licenses granted in this section. Our use and distribution may occur in any media formats and through any media channels.",
+          text: "You grant us only the limited license reasonably necessary to host, process, display, secure, and provide User Content through the Services.",
         },
         {
           type: "paragraph",
-          text: "This license includes our use of your name, company name, and franchise name, as applicable, and any of the trademarks, service marks, trade names, logos, and personal and commercial images you provide.",
+          text: "This license does not permit us to sell your User Content or use it in advertising.",
         },
         {
           type: "paragraph",
-          text: "You are responsible for what you post or upload: By sending us Submissions and/or posting Contributions through any part of the Services or making Contributions accessible through the Services by linking your account through the Services to any of your social networking accounts, you:",
+          text: "You are responsible for User Content you provide and represent that:",
         },
         {
           type: "list",
           items: [
-            'confirm that you have read and agree with our "PROHIBITED ACTIVITIES " and will not post, send, publish, upload, or transmit through the Services any Submission nor post any Contribution that is illegal, harassing, hateful, harmful, defamatory, obscene, bullying, abusive, discriminatory, threatening to any person or group, sexually explicit, false, inaccurate, deceitful, or misleading;',
-            "to the extent permissible by applicable law, waive any and all moral rights to any such Submission and/or Contribution;",
-            "warrant that any such Submission and/or Contributions are original to you or that you have the necessary rights and licenses to submit such Submissions and/or Contributions and that you have full authority to grant us the above-mentioned rights in relation to your Submissions and/or Contributions; and",
-            "warrant and represent that your Submissions and/or Contributions do not constitute confidential information.",
+            "you own it or have permission to use it;",
+            "it does not violate another person's rights or applicable law; and",
+            "it does not include sensitive information that is unnecessary to use the Services.",
           ],
         },
         {
           type: "paragraph",
-          text: "You are solely responsible for your Submissions and/or Contributions and you expressly agree to reimburse us for any and all losses that we may suffer because of your breach of (a) this section, (b) any third party’s intellectual property rights, or (c) applicable law.",
+          text: "You are responsible for the consequences of sharing User Content through the Services.",
         },
         {
           type: "paragraph",
-          text: "We may remove or edit your Content: Although we have no obligation to monitor any Contributions, we shall have the right to remove or edit any Contributions at any time without notice if in our reasonable opinion we consider such Contributions harmful or in breach of these Legal Terms. If we remove or edit any such Contributions, we may also suspend or disable your account and report you to the authorities.",
+          text: "We may remove or restrict User Content when reasonably necessary to comply with law, enforce these Legal Terms, protect users, or maintain the Services.",
         },
       ],
     },
@@ -284,15 +303,15 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "We accept the following forms of payment: - Apple In-App Purchase - Google Play Billing - Visa - Mastercard - American Express - Discover You agree to provide current, complete, and accurate purchase and account information for all purchases made via the Services. You further agree to promptly update account and payment information, including email address, payment method, and payment card expiration date, so that we can complete your transactions and contact you as needed. Sales tax will be added to the price of purchases as deemed required by us. We may change prices at any time. All payments shall be in US dollars.",
+          text: "Paid features may be offered through auto-renewable subscriptions or other in-app purchases. Purchases made through the iOS application are processed by Apple through the App Store. Purchases made through the Android application are processed by Google through Google Play. Your purchase is also subject to the applicable platform's payment terms.",
         },
         {
           type: "paragraph",
-          text: "You agree to pay all charges at the prices then in effect for your purchases and any applicable shipping fees, and you authorize us to charge your chosen payment provider for any such amounts upon placing your order. We reserve the right to correct any errors or mistakes in pricing, even if we have already requested or received payment.",
+          text: "Prices and available subscription plans are displayed before you complete a purchase and may vary by country, currency, platform, or applicable taxes. Apple or Google, as applicable, processes your payment and may collect and remit applicable taxes. We do not receive or store your complete payment card details.",
         },
         {
           type: "paragraph",
-          text: "We reserve the right to refuse any order placed through the Services. We may, in our sole discretion, limit or cancel quantities purchased per person, per household, or per order. These restrictions may include orders placed by or under the same customer account, the same payment method, and/or orders that use the same billing or shipping address. We reserve the right to limit or prohibit orders that, in our sole judgment, appear to be placed by dealers, resellers, or distributors.",
+          text: "We use RevenueCat to verify purchases and determine which paid features are available to your account.",
         },
       ],
     },
@@ -305,7 +324,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Your subscription will continue and automatically renew unless canceled. You consent to our charging your payment method on a recurring basis without requiring your prior approval for each recurring charge, until such time as you cancel the applicable order. The length of your billing cycle will depend on the type of subscription plan you choose when you subscribed to the Services.",
+          text: "Subscriptions automatically renew unless canceled at least 24 hours before the end of the current subscription period, subject to the rules of the platform through which you purchased the subscription. Your platform account may be charged for renewal within 24 hours before the end of the current period. The subscription period and price are displayed before purchase.",
         },
       ],
     },
@@ -314,7 +333,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "You can cancel your subscription at any time by logging into your account. Your cancellation will take effect at the end of the current paid term. If you have any questions or are unsatisfied with our Services, please email us at contact@sowinghope.how.",
+          text: "You may cancel a subscription through the platform where you purchased it. On iOS, subscriptions can be managed through your Apple Account subscription settings. On Android, subscriptions can be managed through Google Play. Deleting your Count account or uninstalling the application does not automatically cancel an active subscription. Cancellation ordinarily takes effect at the end of the current paid subscription period. Except where required by law or the applicable platform's rules, previously paid subscription fees are non-refundable. If you have questions, contact us at contact@sowinghope.how.",
         },
       ],
     },
@@ -323,7 +342,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "We may, from time to time, make changes to the subscription fee and will communicate any price changes to you in accordance with applicable law.",
+          text: "Subscription prices may change. Any price change will be communicated and take effect in accordance with applicable law and the rules of the platform through which you purchased the subscription.",
         },
       ],
     },
@@ -332,7 +351,15 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'We may include software for use in connection with our Services. If such software is accompanied by an end user license agreement ("EULA"), the terms of the EULA will govern your use of the software. If such software is not accompanied by a EULA, then we grant to you a non-exclusive, revocable, personal, and non-transferable license to use such software solely in connection with our services and in accordance with these Legal Terms. Any software and any related documentation is provided "AS IS" without warranty of any kind, either express or implied, including, without limitation, the implied warranties of merchantability, fitness for a particular purpose, or non-infringement. You accept any and all risk arising out of use or performance of any software. You may not reproduce or redistribute any software except in accordance with the EULA or these Legal Terms.',
+          text: "If you obtained the App from the Apple App Store, Apple's standard Licensed Application End User License Agreement (https://www.apple.com/legal/internet-services/itunes/dev/stdeula/) also applies to your use of the App software. That agreement governs your license to install and run the App software on Apple-branded devices. These Legal Terms govern every other aspect of the Services, including your account, connected games, User Content, purchases and subscriptions, and the resolution of disputes. If that agreement conflicts with these Legal Terms with respect to the App software license specifically, that agreement controls as to that license only, and these Legal Terms otherwise remain in full force and effect.",
+        },
+        {
+          type: "paragraph",
+          text: "If you obtained the App from Google Play, or if you access the Services through the Site, no separate end user license agreement applies, and the license granted in the MOBILE APPLICATION LICENSE section below governs your use of the App software.",
+        },
+        {
+          type: "paragraph",
+          text: 'Any software and any related documentation is provided "AS IS" without warranty of any kind, either express or implied, including, without limitation, the implied warranties of merchantability, fitness for a particular purpose, or non-infringement. You accept any and all risk arising out of use or performance of any software. You may not reproduce or redistribute any software except in accordance with the applicable end user license agreement or these Legal Terms.',
         },
       ],
     },
@@ -377,67 +404,54 @@ export const termsContent = {
       ],
     },
     {
-      heading: "9. USER GENERATED CONTRIBUTIONS",
+      heading: "9. USER CONTENT",
       blocks: [
         {
           type: "paragraph",
-          text: 'The Services may invite you to chat, contribute to, or participate in blogs, message boards, online forums, and other functionality, and may provide you with the opportunity to create, submit, post, display, transmit, perform, publish, distribute, or broadcast content and materials to us or on the Services, including but not limited to text, writings, video, audio, photographs, graphics, comments, suggestions, or personal information or other material (collectively, "Contributions"). Contributions may be viewable by other users of the Services and through third-party websites. As such, any Contributions you transmit may be treated as non-confidential and non-proprietary. When you create or make available any Contributions, you thereby represent and warrant that:',
+          text: 'The Services allow you to create and store information such as usernames, display names, player names, game data, deck information, and profile images ("User Content"). Some User Content may be visible to people who join a connected game with you or view game information you choose to share. You are responsible for your User Content and must have the right to provide it.',
         },
         {
           type: "list",
           items: [
-            "The creation, distribution, transmission, public display, or performance, and the accessing, downloading, or copying of your Contributions do not and will not infringe the proprietary rights, including but not limited to the copyright, patent, trademark, trade secret, or moral rights of any third party.",
-            "You are the creator and owner of or have the necessary licenses, rights, consents, releases, and permissions to use and to authorize us, the Services, and other users of the Services to use your Contributions in any manner contemplated by the Services and these Legal Terms.",
-            "You have the written consent, release, and/or permission of each and every identifiable individual person in your Contributions to use the name or likeness of each and every such identifiable individual person to enable inclusion and use of your Contributions in any manner contemplated by the Services and these Legal Terms.",
-            "Your Contributions are not false, inaccurate, or misleading.",
-            "Your Contributions are not unsolicited or unauthorized advertising, promotional materials, pyramid schemes, chain letters, spam, mass mailings, or other forms of solicitation.",
-            "Your Contributions are not obscene, lewd, lascivious, filthy, violent, harassing, libelous, slanderous, or otherwise objectionable (as determined by us).",
-            "Your Contributions do not ridicule, mock, disparage, intimidate, or abuse anyone.",
-            "Your Contributions are not used to harass or threaten (in the legal sense of those terms) any other person and to promote violence against a specific person or class of people.",
-            "Your Contributions do not violate any applicable law, regulation, or rule.",
-            "Your Contributions do not violate the privacy or publicity rights of any third party.",
-            "Your Contributions do not violate any applicable law concerning child pornography, or otherwise intended to protect the health or well-being of minors.",
-            "Your Contributions do not include any offensive comments that are connected to race, national origin, gender, sexual preference, or physical handicap.",
-            "Your Contributions do not otherwise violate, or link to material that violates, any provision of these Legal Terms, or any applicable law or regulation.",
+            "You own it or have permission to use it.",
+            "It does not violate another person's intellectual property, privacy, publicity, or other rights.",
+            "It is not unlawful, fraudulent, abusive, threatening, discriminatory, or designed to disrupt the Services.",
+            "It does not include sensitive personal information that is unnecessary to use the Services.",
           ],
         },
         {
           type: "paragraph",
-          text: "Any use of the Services in violation of the foregoing violates these Legal Terms and may result in, among other things, termination or suspension of your rights to use the Services.",
+          text: "We may remove User Content or suspend access when reasonably necessary to enforce these Legal Terms, protect users, or maintain the security and operation of the Services.",
         },
       ],
     },
     {
-      heading: "10. CONTRIBUTION LICENSE",
+      heading: "10. LICENSE TO OPERATE THE SERVICES",
       blocks: [
         {
           type: "paragraph",
-          text: "By posting your Contributions to any part of the Services, you automatically grant, and you represent and warrant that you have the right to grant, to us an unrestricted, unlimited, irrevocable, perpetual, non-exclusive, transferable, royalty-free, fully-paid, worldwide right, and license to host, use, copy, reproduce, disclose, sell, resell, publish, broadcast, retitle, archive, store, cache, publicly perform, publicly display, reformat, translate, transmit, excerpt (in whole or in part), and distribute such Contributions (including, without limitation, your image and voice) for any purpose, commercial, advertising, or otherwise, and to prepare derivative works of, or incorporate into other works, such Contributions, and grant and authorize sublicenses of the foregoing. The use and distribution may occur in any media formats and through any media channels.",
+          text: "You retain ownership of your User Content. You grant us a non-exclusive, worldwide, royalty-free license to host, store, process, reproduce, and display User Content only as reasonably necessary to operate, secure, improve, and provide the Services to you and the people with whom you choose to connect.",
         },
         {
           type: "paragraph",
-          text: "This license will apply to any form, media, or technology now known or hereafter developed, and includes our use of your name, company name, and franchise name, as applicable, and any of the trademarks, service marks, trade names, logos, and personal and commercial images you provide. You waive all moral rights in your Contributions, and you warrant that moral rights have not otherwise been asserted in your Contributions.",
+          text: "This license ends when your User Content is deleted from our active systems, except to the extent that information has been de-identified, remains in backups pending deletion, or is retained as part of another user's match history as described in our Privacy Policy.",
         },
         {
           type: "paragraph",
-          text: "We do not assert any ownership over your Contributions. You retain full ownership of all of your Contributions and any intellectual property rights or other proprietary rights associated with your Contributions. We are not liable for any statements or representations in your Contributions provided by you in any area on the Services. You are solely responsible for your Contributions to the Services and you expressly agree to exonerate us from any and all responsibility and to refrain from any legal action against us regarding your Contributions.",
+          text: "You are responsible for your User Content and the consequences of sharing it through the Services.",
         },
         {
           type: "paragraph",
-          text: "We have the right, in our sole and absolute discretion, (1) to edit, redact, or otherwise change any Contributions; (2) to re-categorize any Contributions to place them in more appropriate locations on the Services; and (3) to pre-screen or delete any Contributions at any time and for any reason, without notice. We have no obligation to monitor your Contributions.",
+          text: "We may remove or restrict User Content when reasonably necessary to comply with law, enforce these Legal Terms, protect users, or maintain the Services.",
         },
       ],
     },
     {
-      heading: "11. GUIDELINES FOR REVIEWS",
+      heading: "11. FEEDBACK",
       blocks: [
         {
           type: "paragraph",
-          text: "We may provide you areas on the Services to leave reviews or ratings. When posting a review, you must comply with the following criteria: (1) you should have firsthand experience with the person/entity being reviewed; (2) your reviews should not contain offensive profanity, or abusive, racist, offensive, or hateful language; (3) your reviews should not contain discriminatory references based on religion, race, gender, national origin, age, marital status, sexual orientation, or disability; (4) your reviews should not contain references to illegal activity; (5) you should not be affiliated with competitors if posting negative reviews; (6) you should not make any conclusions as to the legality of conduct; (7) you may not post any false or misleading statements; and (8) you may not organize a campaign encouraging others to post reviews, whether positive or negative.",
-        },
-        {
-          type: "paragraph",
-          text: "We may accept, reject, or remove reviews in our sole discretion. We have absolutely no obligation to screen reviews or to delete reviews, even if anyone considers reviews objectionable or inaccurate. Reviews are not endorsed by us, and do not necessarily represent our opinions or the views of any of our affiliates or partners. We do not assume liability for any review or for any claims, liabilities, or losses resulting from any review. By posting a review, you hereby grant to us a perpetual, non-exclusive, worldwide, royalty-free, fully paid, assignable, and sublicensable right and license to reproduce, modify, translate, transmit by any means, display, perform, and/or distribute all content relating to review.",
+          text: "If you send us ideas, suggestions, or other feedback about the Services, you grant us permission to use that feedback without restriction or compensation to you. This does not transfer ownership of your User Content or personal information.",
         },
       ],
     },
@@ -468,7 +482,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "We reserve the right, but not the obligation, to: (1) monitor the Services for violations of these Legal Terms; (2) take appropriate legal action against anyone who, in our sole discretion, violates the law or these Legal Terms, including without limitation, reporting such user to law enforcement authorities; (3) in our sole discretion and without limitation, refuse, restrict access to, limit the availability of, or disable (to the extent technologically feasible) any of your Contributions or any portion thereof; (4) in our sole discretion and without limitation, notice, or liability, to remove from the Services or otherwise disable all files and content that are excessive in size or are in any way burdensome to our systems; and (5) otherwise manage the Services in a manner designed to protect our rights and property and to facilitate the proper functioning of the Services.",
+          text: "We may monitor the Services for violations of these Legal Terms, restrict or remove unlawful or harmful User Content, suspend access, cooperate with lawful requests, and otherwise manage the Services as reasonably necessary to protect users, our rights and property, and the proper operation of the Services.",
         },
       ],
     },
@@ -477,7 +491,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "We care about data privacy and security. Please review our Privacy Policy: sow.care/privacy. By using the Services, you agree to be bound by our Privacy Policy, which is incorporated into these Legal Terms. Please be advised the Services are hosted in the United States. If you access the Services from any other region of the world with laws or other requirements governing personal data collection, use, or disclosure that differ from applicable laws in the United States, then through your continued use of the Services, you are transferring your data to the United States, and you expressly consent to have your data transferred to and processed in the United States. Further, we do not knowingly accept, request, or solicit information from children or knowingly market to children. Therefore, in accordance with the U.S. Children’s Online Privacy Protection Act, if we receive actual knowledge that anyone under the age of 13 has provided personal information to us without the requisite and verifiable parental consent, we will delete that information from the Services as quickly as is reasonably practical.",
+          text: "We care about data privacy and security. Please review our Privacy Policy: https://count.sow.care/privacy. By using the Services, you agree to be bound by our Privacy Policy, which is incorporated into these Legal Terms. The Services and our service providers may process information in the United States and other countries as described in the Privacy Policy. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has provided personal information, we will take reasonable steps to delete it.",
         },
       ],
     },
@@ -596,7 +610,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "You agree to defend, indemnify, and hold us harmless, including our subsidiaries, affiliates, and all of our respective officers, agents, partners, and employees, from and against any loss, damage, liability, claim, or demand, including reasonable attorneys’ fees and expenses, made by any third party due to or arising out of: (1) your Contributions; (2) use of the Services; (3) breach of these Legal Terms; (4) any breach of your representations and warranties set forth in these Legal Terms; (5) your violation of the rights of a third party, including but not limited to intellectual property rights; or (6) any overt harmful act toward any other user of the Services with whom you connected via the Services. Notwithstanding the foregoing, we reserve the right, at your expense, to assume the exclusive defense and control of any matter for which you are required to indemnify us, and you agree to cooperate, at your expense, with our defense of such claims. We will use reasonable efforts to notify you of any such claim, action, or proceeding which is subject to this indemnification upon becoming aware of it.",
+          text: "To the extent permitted by law, you agree to defend, indemnify, and hold us and our officers, agents, partners, and employees harmless from third-party claims arising from your User Content, your material breach of these Legal Terms, your violation of another person's rights, or your unlawful or intentionally harmful use of the Services. We reserve the right to control the defense of a covered claim, and you agree to reasonably cooperate with us. We will use reasonable efforts to notify you of such a claim.",
         },
       ],
     },
@@ -645,27 +659,15 @@ export const termsContent = {
         },
         {
           type: "paragraph",
-          text: "Hashing Seeds LLC",
+          text: "Hashing Seeds LLC\n901 Broadway #24210\nNashville, TN 37202\nUnited States",
         },
         {
           type: "paragraph",
-          text: "901 Broadway #24210",
+          text: "Phone: (731) 333-3462",
         },
         {
           type: "paragraph",
-          text: "Nashville, TN 37202",
-        },
-        {
-          type: "paragraph",
-          text: "United States",
-        },
-        {
-          type: "paragraph",
-          text: "Phone: 7313333462‬",
-        },
-        {
-          type: "paragraph",
-          text: "contact@sowinghope.how",
+          text: "Email: contact@sowinghope.how",
         },
         {
           type: "paragraph",
