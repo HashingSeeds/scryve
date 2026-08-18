@@ -27,7 +27,7 @@ export default function AccountRoute() {
     )
   return (
     <Screen preset="fixed" contentContainerStyle={$profileScreen}>
-      <AccountProfile onBack={leaveAccount} />
+      <AccountProfile onBack={leaveAccount} onSignedOut={() => router.replace("/")} />
       <SubscriptionControls />
     </Screen>
   )

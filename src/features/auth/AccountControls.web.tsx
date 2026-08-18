@@ -1,29 +1,46 @@
-import { useCallback, useEffect } from "react"
-import { View } from "react-native"
-import { useClerk } from "@clerk/expo"
+import { useCallback, useState } from "react"
+import { useClerk, useUser } from "@clerk/expo"
 
-import { Button } from "@/components/Button"
-import { Header } from "@/components/Header"
+import { AccountScreen } from "@/screens/AccountScreen"
 
+import type { AccountProfileProps } from "./accountProfileProps"
 import { clerkAppearance } from "./clerkAppearance"
 
-export function AccountProfile({ onBack }: { onBack?: () => void }) {
+export function AccountProfile({ onBack, onSignedOut }: AccountProfileProps) {
   const clerk = useClerk()
-  const openProfile = useCallback(
+  const { user } = useUser()
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const [error, setError] = useState<string>()
+
+  const manageProfile = useCallback(
     () => clerk.openUserProfile({ appearance: clerkAppearance }),
     [clerk],
   )
 
-  useEffect(() => {
-    openProfile()
-  }, [openProfile])
+  const signOut = useCallback(async () => {
+    setIsSigningOut(true)
+    setError(undefined)
+    try {
+      clerk.closeUserProfile()
+      await clerk.signOut()
+      onSignedOut?.()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not sign out")
+    } finally {
+      setIsSigningOut(false)
+    }
+  }, [clerk, onSignedOut])
 
   return (
-    <View style={$profile}>
-      <Header title="Account" leftTx="common:back" onLeftPress={onBack} />
-      <Button text="Manage profile" preset="reversed" onPress={openProfile} />
-    </View>
+    <AccountScreen
+      name={user?.fullName || user?.username || undefined}
+      email={user?.primaryEmailAddress?.emailAddress}
+      avatarUrl={user?.hasImage ? user.imageUrl : undefined}
+      isSigningOut={isSigningOut}
+      error={error}
+      onBack={onBack}
+      onManageProfile={manageProfile}
+      onSignOut={() => void signOut()}
+    />
   )
 }
-
-const $profile = { flex: 1 } as const

@@ -6,7 +6,9 @@ import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-export function AccountProfile({ onBack }: { onBack?: () => void }) {
+import type { AccountProfileProps } from "./accountProfileProps"
+
+export function AccountProfile({ onBack }: AccountProfileProps) {
   const { themed } = useAppTheme()
   const insets = useSafeAreaInsets()
 
