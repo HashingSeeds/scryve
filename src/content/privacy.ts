@@ -707,7 +707,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "To exercise these rights, you can contact us by contacting us at support@sowinghope.how, or by referring to the contact details at the bottom of this document.",
+          text: "To exercise these rights, you can contact us at support@sowinghope.how, or refer to the contact details at the bottom of this document.",
         },
         {
           type: "paragraph",
@@ -823,7 +823,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: 'We may update this Privacy Notice from time to time. The updated version will be indicated by an updated "Revised" date at the top of this Privacy Notice. If we make material changes to this Privacy Notice, we may notify you either by prominently posting a notice of such changes or by directly sending you a notification. We encourage you to review this Privacy Notice frequently to be informed of how we are protecting your information.',
+          text: 'We may update this Privacy Notice from time to time. The updated version will be indicated by an updated "Last updated" date at the top of this Privacy Notice. If we make material changes to this Privacy Notice, we may notify you either by prominently posting a notice of such changes or by directly sending you a notification. We encourage you to review this Privacy Notice frequently to be informed of how we are protecting your information.',
         },
       ],
     },
@@ -857,7 +857,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Based on the applicable laws of your country or state of residence in the US, you may have the right to request access to the personal information we collect from you, details about how we have processed it, correct inaccuracies, or delete your personal information. You may also have the right to withdraw your consent to our processing of your personal information. These rights may be limited in some circumstances by applicable law. To request to review, update, or delete your personal information, please contact us at support@sowinghope.how with your request.",
+          text: "Based on the applicable laws of your country or state of residence in the US, you may have the right to request access to the personal information we collect from you, details about how we have processed it, correct inaccuracies, or delete your personal information. You may also have the right to withdraw your consent to our processing of your personal information. These rights may be limited in some circumstances by applicable law. To request deletion of your Count account and the data associated with it, visit https://count.sow.care/delete-account. To request to review or update your personal information, or to make any other request, contact us at support@sowinghope.how.",
         },
         {
           type: "paragraph",
