@@ -1,6 +1,6 @@
 import "react-native-url-polyfill/auto"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Slot, SplashScreen, type ErrorBoundaryProps } from "expo-router"
 import { useFonts } from "@expo-google-fonts/space-grotesk"
 import * as Sentry from "@sentry/react-native"
@@ -48,6 +48,8 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function Root() {
   const [fontsLoaded, fontError] = useFonts(customFontsToLoad)
   const [isI18nInitialized, setIsI18nInitialized] = useState(false)
+  const [isConsentResolved, setIsConsentResolved] = useState(false)
+  const resolveConsent = useCallback(() => setIsConsentResolved(true), [])
 
   useEffect(() => {
     initI18n()
@@ -62,10 +64,10 @@ export default function Root() {
   }, [fontError])
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && isConsentResolved) {
       SplashScreen.hideAsync()
     }
-  }, [loaded])
+  }, [loaded, isConsentResolved])
 
   if (!loaded) {
     return null
@@ -76,7 +78,7 @@ export default function Root() {
       <CloudProviders>
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <KeyboardProvider>
-            <LegalConsentGate>
+            <LegalConsentGate onResolved={resolveConsent}>
               <Slot />
             </LegalConsentGate>
           </KeyboardProvider>

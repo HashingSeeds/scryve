@@ -1,11 +1,11 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { Text } from "@/components/Text"
 import { ThemeProvider } from "@/theme/context"
 
 import { deviceAcceptanceStore } from "./acceptanceStore"
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
-import { LegalConsentGate } from "./LegalConsentGate"
+import { ACCOUNT_CONSENT_TIMEOUT_MS, LegalConsentGate } from "./LegalConsentGate"
 
 const mockPush = jest.fn()
 let mockPathname = "/"
@@ -16,12 +16,16 @@ jest.mock("expo-router", () => ({
   usePathname: () => mockPathname,
 }))
 jest.mock("@/features/auth/AuthContext", () => ({ useAuthAccess: () => mockAuth }))
-jest.mock("convex/react", () => ({ useQuery: () => [], useMutation: () => jest.fn() }))
+let mockAccountAcceptances: unknown = []
+jest.mock("convex/react", () => ({
+  useQuery: () => mockAccountAcceptances,
+  useMutation: () => jest.fn(),
+}))
 
-function renderGate() {
+function renderGate(onResolved?: () => void) {
   return render(
     <ThemeProvider initialContext="light">
-      <LegalConsentGate>
+      <LegalConsentGate onResolved={onResolved}>
         <Text text="APP CONTENT" />
       </LegalConsentGate>
     </ThemeProvider>,
@@ -32,6 +36,7 @@ describe("LegalConsentGate", () => {
   beforeEach(() => {
     mockPathname = "/"
     mockAuth = { configured: false, isLoaded: true, isSignedIn: false }
+    mockAccountAcceptances = []
     mockPush.mockClear()
     deviceAcceptanceStore.write({})
   })
@@ -80,5 +85,45 @@ describe("LegalConsentGate", () => {
     const view = renderGate()
     expect(view.queryByText("APP CONTENT")).toBeNull()
     expect(view.getByText("We have updated our terms")).toBeTruthy()
+  })
+
+  it("renders nothing while authentication is still loading", () => {
+    mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
+    const onResolved = jest.fn()
+    const view = renderGate(onResolved)
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+    expect(view.queryByText("Before you start")).toBeNull()
+    expect(onResolved).not.toHaveBeenCalled()
+  })
+
+  it("renders nothing while the account acceptances are still loading", () => {
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
+    mockAccountAcceptances = undefined
+    const onResolved = jest.fn()
+    const view = renderGate(onResolved)
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+    expect(onResolved).not.toHaveBeenCalled()
+  })
+
+  it("falls back to the device answer when the account cannot be reached", () => {
+    jest.useFakeTimers()
+    try {
+      deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+      mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
+      mockAccountAcceptances = undefined
+      const view = renderGate()
+      expect(view.queryByText("APP CONTENT")).toBeNull()
+      act(() => void jest.advanceTimersByTime(ACCOUNT_CONSENT_TIMEOUT_MS))
+      expect(view.getByText("APP CONTENT")).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("reports resolution once the gate knows what to show", () => {
+    const onResolved = jest.fn()
+    renderGate(onResolved)
+    expect(onResolved).toHaveBeenCalled()
   })
 })

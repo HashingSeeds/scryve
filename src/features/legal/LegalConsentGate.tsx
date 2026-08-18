@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useMemo, useState } from "react"
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import { Platform } from "react-native"
 import { router, usePathname } from "expo-router"
 import { useMutation, useQuery } from "convex/react"
@@ -14,18 +14,34 @@ import { api } from "../../../convex/_generated/api"
 
 const READABLE_WHILE_GATED = new Set(["/terms", "/privacy", "/cookie-policy"])
 
-export function LegalConsentGate({ children }: { children: ReactNode }) {
-  const auth = useAuthAccess()
-  const pathname = usePathname()
-  if (READABLE_WHILE_GATED.has(pathname)) return <>{children}</>
-  if (auth.configured && auth.isLoaded && auth.isSignedIn)
-    return <SignedInConsentGate>{children}</SignedInConsentGate>
-  return <DeviceConsentGate>{children}</DeviceConsentGate>
+export const ACCOUNT_CONSENT_TIMEOUT_MS = 4000
+
+interface GateProps {
+  children: ReactNode
+  onResolved?: () => void
 }
 
-function DeviceConsentGate({ children }: { children: ReactNode }) {
+export function LegalConsentGate({ children, onResolved }: GateProps) {
+  const auth = useAuthAccess()
+  const pathname = usePathname()
+  const readingDocument = READABLE_WHILE_GATED.has(pathname)
+
+  useEffect(() => {
+    if (readingDocument) onResolved?.()
+  }, [readingDocument, onResolved])
+
+  if (readingDocument) return <>{children}</>
+  if (auth.configured && !auth.isLoaded) return null
+  if (auth.configured && auth.isSignedIn)
+    return <SignedInConsentGate onResolved={onResolved}>{children}</SignedInConsentGate>
+  return <DeviceConsentGate onResolved={onResolved}>{children}</DeviceConsentGate>
+}
+
+function DeviceConsentGate({ children, onResolved }: GateProps) {
   const [accepted, setAccepted] = useState<AcceptedVersions>(() => deviceAcceptanceStore.read())
   const outstanding = useMemo(() => missingConsent(REQUIRED_CONSENT_VERSIONS, accepted), [accepted])
+
+  useEffect(() => onResolved?.(), [onResolved])
 
   const accept = useCallback(() => {
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
@@ -36,30 +52,40 @@ function DeviceConsentGate({ children }: { children: ReactNode }) {
   return <ConsentPrompt hasPriorAcceptance={hasPriorAcceptance(accepted)} onAccept={accept} />
 }
 
-function SignedInConsentGate({ children }: { children: ReactNode }) {
+function SignedInConsentGate({ children, onResolved }: GateProps) {
   const recordAcceptance = useMutation(api.legal.recordAcceptance)
   const accountAcceptances = useQuery(api.legal.currentAcceptances, {})
   const [deviceAccepted, setDeviceAccepted] = useState<AcceptedVersions>(() =>
     deviceAcceptanceStore.read(),
   )
+  const [accountUnreachable, setAccountUnreachable] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string>()
 
-  const accountAccepted = useMemo<AcceptedVersions | undefined>(() => {
-    if (accountAcceptances === undefined) return undefined
+  const isLoadingAccount = accountAcceptances === undefined && !accountUnreachable
+
+  useEffect(() => {
+    if (accountAcceptances !== undefined) return
+    const timer = setTimeout(() => setAccountUnreachable(true), ACCOUNT_CONSENT_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [accountAcceptances])
+
+  useEffect(() => {
+    if (!isLoadingAccount) onResolved?.()
+  }, [isLoadingAccount, onResolved])
+
+  const accountAccepted = useMemo<AcceptedVersions>(() => {
     const map: AcceptedVersions = {}
     for (const entry of accountAcceptances ?? []) map[entry.document] = entry.version
     return map
   }, [accountAcceptances])
 
   const outstanding = useMemo(() => {
-    if (!accountAccepted) return []
-    const combined = new Set([
-      ...missingConsent(REQUIRED_CONSENT_VERSIONS, deviceAccepted),
-      ...missingConsent(REQUIRED_CONSENT_VERSIONS, accountAccepted),
-    ])
-    return CONSENT_DOCUMENT_IDS.filter((id) => combined.has(id))
-  }, [accountAccepted, deviceAccepted])
+    const stale = new Set(missingConsent(REQUIRED_CONSENT_VERSIONS, deviceAccepted))
+    if (accountAcceptances !== undefined)
+      for (const id of missingConsent(REQUIRED_CONSENT_VERSIONS, accountAccepted)) stale.add(id)
+    return CONSENT_DOCUMENT_IDS.filter((id) => stale.has(id))
+  }, [accountAcceptances, accountAccepted, deviceAccepted])
 
   const accept = useCallback(async () => {
     setIsSubmitting(true)
@@ -80,7 +106,8 @@ function SignedInConsentGate({ children }: { children: ReactNode }) {
     }
   }, [recordAcceptance])
 
-  if (accountAccepted === undefined || outstanding.length === 0) return <>{children}</>
+  if (isLoadingAccount) return null
+  if (outstanding.length === 0) return <>{children}</>
   return (
     <ConsentPrompt
       hasPriorAcceptance={hasPriorAcceptance(deviceAccepted) || hasPriorAcceptance(accountAccepted)}
