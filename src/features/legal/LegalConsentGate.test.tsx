@@ -3,13 +3,13 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import { Text } from "@/components/Text"
 import { ThemeProvider } from "@/theme/context"
 
-import { deviceAcceptanceStore } from "./acceptanceStore"
+import { accountAcceptanceCache, deviceAcceptanceStore } from "./acceptanceStore"
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
 import { ACCOUNT_CONSENT_TIMEOUT_MS, LegalConsentGate } from "./LegalConsentGate"
 
 const mockPush = jest.fn()
 let mockPathname = "/"
-let mockAuth = { configured: false, isLoaded: true, isSignedIn: false }
+let mockAuth: Record<string, unknown> = { configured: false, isLoaded: true, isSignedIn: false }
 
 jest.mock("expo-router", () => ({
   router: { push: (path: string) => mockPush(path), replace: jest.fn(), back: jest.fn() },
@@ -37,6 +37,8 @@ describe("LegalConsentGate", () => {
     mockPathname = "/"
     mockAuth = { configured: false, isLoaded: true, isSignedIn: false }
     mockAccountAcceptances = []
+    accountAcceptanceCache.write("user-a", {})
+    accountAcceptanceCache.write("user-b", {})
     mockPush.mockClear()
     deviceAcceptanceStore.write({})
   })
@@ -79,12 +81,12 @@ describe("LegalConsentGate", () => {
     expect(mockPush).toHaveBeenCalledWith("/privacy")
   })
 
-  it("checks the account scope when signed in", () => {
+  it("asks a newly signed-in account even when this device already agreed", () => {
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
-    mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
     const view = renderGate()
     expect(view.queryByText("APP CONTENT")).toBeNull()
-    expect(view.getByText("We have updated our terms")).toBeTruthy()
+    expect(view.getByText("Before you start")).toBeTruthy()
   })
 
   it("renders nothing while authentication is still loading", () => {
@@ -98,7 +100,7 @@ describe("LegalConsentGate", () => {
 
   it("renders nothing while the account acceptances are still loading", () => {
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
-    mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
     mockAccountAcceptances = undefined
     const onResolved = jest.fn()
     const view = renderGate(onResolved)
@@ -110,7 +112,7 @@ describe("LegalConsentGate", () => {
     jest.useFakeTimers()
     try {
       deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
-      mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
+      mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
       mockAccountAcceptances = undefined
       const view = renderGate()
       expect(view.queryByText("APP CONTENT")).toBeNull()
@@ -125,5 +127,42 @@ describe("LegalConsentGate", () => {
     const onResolved = jest.fn()
     renderGate(onResolved)
     expect(onResolved).toHaveBeenCalled()
+  })
+
+  it("lets a cached account through without waiting for the backend", () => {
+    accountAcceptanceCache.write("user-a", REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = undefined
+    const onResolved = jest.fn()
+    const view = renderGate(onResolved)
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(onResolved).toHaveBeenCalled()
+  })
+
+  it("does not let one account's cached answer cover another account", () => {
+    accountAcceptanceCache.write("user-a", REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-b" }
+    mockAccountAcceptances = undefined
+    const view = renderGate()
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+  })
+
+  it("prompts when the backend contradicts a stale cache", () => {
+    accountAcceptanceCache.write("user-a", REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = [{ document: "terms", version: "1900-01-01" }]
+    const view = renderGate()
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+    expect(view.getByText("We have updated our terms")).toBeTruthy()
+  })
+
+  it("caches what the backend reports so the next launch is immediate", () => {
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-b" }
+    mockAccountAcceptances = [
+      { document: "terms", version: REQUIRED_CONSENT_VERSIONS.terms },
+      { document: "privacy", version: REQUIRED_CONSENT_VERSIONS.privacy },
+    ]
+    expect(renderGate().getByText("APP CONTENT")).toBeTruthy()
+    expect(accountAcceptanceCache.read("user-b")).toEqual(REQUIRED_CONSENT_VERSIONS)
   })
 })

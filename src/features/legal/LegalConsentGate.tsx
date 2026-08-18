@@ -8,7 +8,12 @@ import { termsContent } from "@/content/terms"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { LegalConsentScreen } from "@/screens/LegalConsentScreen"
 
-import { type AcceptedVersions, deviceAcceptanceStore, missingConsent } from "./acceptanceStore"
+import {
+  accountAcceptanceCache,
+  type AcceptedVersions,
+  deviceAcceptanceStore,
+  missingConsent,
+} from "./acceptanceStore"
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
 import { api } from "../../../convex/_generated/api"
 
@@ -33,7 +38,11 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
   if (readingDocument) return <>{children}</>
   if (auth.configured && !auth.isLoaded) return null
   if (auth.configured && auth.isSignedIn)
-    return <SignedInConsentGate onResolved={onResolved}>{children}</SignedInConsentGate>
+    return (
+      <SignedInConsentGate userId={auth.userId} onResolved={onResolved}>
+        {children}
+      </SignedInConsentGate>
+    )
   return <DeviceConsentGate onResolved={onResolved}>{children}</DeviceConsentGate>
 }
 
@@ -52,9 +61,12 @@ function DeviceConsentGate({ children, onResolved }: GateProps) {
   return <ConsentPrompt hasPriorAcceptance={hasPriorAcceptance(accepted)} onAccept={accept} />
 }
 
-function SignedInConsentGate({ children, onResolved }: GateProps) {
+function SignedInConsentGate({ children, userId, onResolved }: GateProps & { userId?: string }) {
   const recordAcceptance = useMutation(api.legal.recordAcceptance)
   const accountAcceptances = useQuery(api.legal.currentAcceptances, {})
+  const [cached, setCached] = useState<AcceptedVersions>(() =>
+    userId ? accountAcceptanceCache.read(userId) : {},
+  )
   const [deviceAccepted, setDeviceAccepted] = useState<AcceptedVersions>(() =>
     deviceAcceptanceStore.read(),
   )
@@ -62,30 +74,37 @@ function SignedInConsentGate({ children, onResolved }: GateProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string>()
 
-  const isLoadingAccount = accountAcceptances === undefined && !accountUnreachable
+  const cacheSaysAccepted = missingConsent(REQUIRED_CONSENT_VERSIONS, cached).length === 0
+  const isLoadingAccount =
+    accountAcceptances === undefined && !accountUnreachable && !cacheSaysAccepted
 
   useEffect(() => {
-    if (accountAcceptances !== undefined) return
+    if (accountAcceptances !== undefined || cacheSaysAccepted) return
     const timer = setTimeout(() => setAccountUnreachable(true), ACCOUNT_CONSENT_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [accountAcceptances])
+  }, [accountAcceptances, cacheSaysAccepted])
 
   useEffect(() => {
     if (!isLoadingAccount) onResolved?.()
   }, [isLoadingAccount, onResolved])
 
-  const accountAccepted = useMemo<AcceptedVersions>(() => {
+  const fromServer = useMemo<AcceptedVersions | undefined>(() => {
+    if (accountAcceptances === undefined) return undefined
     const map: AcceptedVersions = {}
     for (const entry of accountAcceptances ?? []) map[entry.document] = entry.version
     return map
   }, [accountAcceptances])
 
-  const outstanding = useMemo(() => {
-    const stale = new Set(missingConsent(REQUIRED_CONSENT_VERSIONS, deviceAccepted))
-    if (accountAcceptances !== undefined)
-      for (const id of missingConsent(REQUIRED_CONSENT_VERSIONS, accountAccepted)) stale.add(id)
-    return CONSENT_DOCUMENT_IDS.filter((id) => stale.has(id))
-  }, [accountAcceptances, accountAccepted, deviceAccepted])
+  useEffect(() => {
+    if (!userId || !fromServer) return
+    accountAcceptanceCache.write(userId, fromServer)
+    setCached(fromServer)
+  }, [fromServer, userId])
+
+  const accepted =
+    fromServer ??
+    acceptedWithoutBackendAnswer({ cacheSaysAccepted, cached, accountUnreachable, deviceAccepted })
+  const outstanding = useMemo(() => missingConsent(REQUIRED_CONSENT_VERSIONS, accepted), [accepted])
 
   const accept = useCallback(async () => {
     setIsSubmitting(true)
@@ -98,19 +117,21 @@ function SignedInConsentGate({ children, onResolved }: GateProps) {
           platform: Platform.OS,
         })
       deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+      if (userId) accountAcceptanceCache.write(userId, REQUIRED_CONSENT_VERSIONS)
+      setCached(REQUIRED_CONSENT_VERSIONS)
       setDeviceAccepted(REQUIRED_CONSENT_VERSIONS)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save your response")
     } finally {
       setIsSubmitting(false)
     }
-  }, [recordAcceptance])
+  }, [recordAcceptance, userId])
 
   if (isLoadingAccount) return null
   if (outstanding.length === 0) return <>{children}</>
   return (
     <ConsentPrompt
-      hasPriorAcceptance={hasPriorAcceptance(deviceAccepted) || hasPriorAcceptance(accountAccepted)}
+      hasPriorAcceptance={hasPriorAcceptance(accepted)}
       isSubmitting={isSubmitting}
       error={error}
       onAccept={() => void accept()}
@@ -140,6 +161,22 @@ function ConsentPrompt({
       onOpenPrivacy={() => router.push("/privacy")}
     />
   )
+}
+
+function acceptedWithoutBackendAnswer({
+  cacheSaysAccepted,
+  cached,
+  accountUnreachable,
+  deviceAccepted,
+}: {
+  cacheSaysAccepted: boolean
+  cached: AcceptedVersions
+  accountUnreachable: boolean
+  deviceAccepted: AcceptedVersions
+}) {
+  if (cacheSaysAccepted) return cached
+  if (accountUnreachable) return deviceAccepted
+  return cached
 }
 
 function hasPriorAcceptance(accepted: AcceptedVersions) {

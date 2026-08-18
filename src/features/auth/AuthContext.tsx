@@ -15,6 +15,7 @@ interface AuthAccess {
   configurationMessage?: string
   isLoaded: boolean
   isSignedIn: boolean
+  userId?: string
   openAuth: () => void
   closeAuth: () => void
 }
@@ -48,10 +49,11 @@ export function ConfiguredAuth({
       configured: true,
       isLoaded,
       isSignedIn: Boolean(isSignedIn),
+      userId: user?.id,
       openAuth: () => setVisible(true),
       closeAuth: () => setVisible(false),
     }),
-    [isLoaded, isSignedIn],
+    [isLoaded, isSignedIn, user?.id],
   )
   const client = useMemo(() => new ConvexReactClient(convexUrl), [convexUrl])
 

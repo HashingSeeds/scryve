@@ -1,6 +1,12 @@
 import type { StringStorage } from "@/features/game/localPersistence"
 
-import { DeviceAcceptanceStore, LEGAL_ACCEPTANCE_KEY, missingConsent } from "./acceptanceStore"
+import {
+  AccountAcceptanceCache,
+  DeviceAcceptanceStore,
+  LEGAL_ACCEPTANCE_KEY,
+  LEGAL_ACCOUNT_ACCEPTANCE_KEY,
+  missingConsent,
+} from "./acceptanceStore"
 
 function memoryStorage(seed: Record<string, string> = {}): StringStorage {
   const values = new Map(Object.entries(seed))
@@ -55,5 +61,34 @@ describe("missingConsent", () => {
     expect(missingConsent(current, { terms: "2026-01-01", privacy: "2026-08-18" })).toEqual([
       "terms",
     ])
+  })
+})
+
+describe("AccountAcceptanceCache", () => {
+  it("reads nothing for an unknown account", () => {
+    expect(new AccountAcceptanceCache(memoryStorage()).read("nobody")).toEqual({})
+  })
+
+  it("keeps accounts separate", () => {
+    const cache = new AccountAcceptanceCache(memoryStorage())
+    cache.write("user-a", current)
+    cache.write("user-b", { terms: "2026-01-01" })
+    expect(cache.read("user-a")).toEqual(current)
+    expect(cache.read("user-b")).toEqual({ terms: "2026-01-01" })
+  })
+
+  it("does not lose other accounts when one is written", () => {
+    const storage = memoryStorage()
+    new AccountAcceptanceCache(storage).write("user-a", current)
+    new AccountAcceptanceCache(storage).write("user-b", current)
+    expect(new AccountAcceptanceCache(storage).read("user-a")).toEqual(current)
+  })
+
+  it("ignores malformed stored data", () => {
+    expect(
+      new AccountAcceptanceCache(
+        memoryStorage({ [LEGAL_ACCOUNT_ACCEPTANCE_KEY]: "not json" }),
+      ).read("user-a"),
+    ).toEqual({})
   })
 })
