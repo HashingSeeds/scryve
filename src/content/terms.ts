@@ -669,10 +669,6 @@ export const termsContent = {
           type: "paragraph",
           text: "Email: contact@sowinghope.how",
         },
-        {
-          type: "paragraph",
-          text: "This Terms and Conditions was created using Termly's Terms and Conditions Generator (https://termly.io/products/terms-and-conditions-generator/)",
-        },
       ],
     },
   ],
