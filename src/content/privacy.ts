@@ -7,7 +7,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Last updated August 17, 2026",
+          text: "Last updated August 18, 2026",
         },
         {
           type: "paragraph",
@@ -64,7 +64,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "How do you exercise your rights? The easiest way to exercise your rights is by visiting userdata@sowinghope.how, or by contacting us. We will consider and act upon any request in accordance with applicable data protection laws.",
+          text: "How do you exercise your rights? The easiest way to exercise your rights is by contacting us at support@sowinghope.how. We will consider and act upon any request in accordance with applicable data protection laws.",
         },
         {
           type: "paragraph",
@@ -645,7 +645,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'Learn more about how we use your personal information in the section, " "',
+          text: 'Learn more about how we use your personal information in the section, " HOW DO WE PROCESS YOUR INFORMATION? "',
         },
         {
           type: "paragraph",
@@ -707,7 +707,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "To exercise these rights, you can contact us by visiting userdata@sowinghope.how, by emailing us at privacy@sowinghope.how, or by referring to the contact details at the bottom of this document.",
+          text: "To exercise these rights, you can contact us by contacting us at support@sowinghope.how, or by referring to the contact details at the bottom of this document.",
         },
         {
           type: "paragraph",
@@ -794,7 +794,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'At any time, you have the right to request access to or correction of your personal information. You can make such a request by contacting us by using the contact details provided in the section " "',
+          text: 'At any time, you have the right to request access to or correction of your personal information. You can make such a request by contacting us by using the contact details provided in the section " HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU? "',
         },
         {
           type: "paragraph",
@@ -857,7 +857,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Based on the applicable laws of your country or state of residence in the US, you may have the right to request access to the personal information we collect from you, details about how we have processed it, correct inaccuracies, or delete your personal information. You may also have the right to withdraw your consent to our processing of your personal information. These rights may be limited in some circumstances by applicable law. To request to review, update, or delete your personal information, please visit: userdata@sowinghope.how.",
+          text: "Based on the applicable laws of your country or state of residence in the US, you may have the right to request access to the personal information we collect from you, details about how we have processed it, correct inaccuracies, or delete your personal information. You may also have the right to withdraw your consent to our processing of your personal information. These rights may be limited in some circumstances by applicable law. To request to review, update, or delete your personal information, please contact us at support@sowinghope.how with your request.",
         },
         {
           type: "paragraph",
