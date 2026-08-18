@@ -1,16 +1,11 @@
 import type { LegalDocumentContent } from "./legal"
 
 export const termsContent = {
+  id: "terms",
   title: "TERMS OF USE",
+  version: "2026-08-18",
+  effectiveDate: "August 18, 2026",
   sections: [
-    {
-      blocks: [
-        {
-          type: "paragraph",
-          text: "Last updated August 18, 2026",
-        },
-      ],
-    },
     {
       heading: "AGREEMENT TO OUR LEGAL TERMS",
       blocks: [

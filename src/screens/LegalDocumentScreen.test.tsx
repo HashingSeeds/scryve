@@ -10,11 +10,13 @@ describe("LegalDocumentScreen", () => {
       <ThemeProvider initialContext="dark">
         <LegalDocumentScreen
           document={{
+            id: "privacy",
             title: "Privacy Policy",
+            version: "2026-08-14",
+            effectiveDate: "August 14, 2026",
             sections: [
               {
                 blocks: [
-                  { type: "paragraph", text: "Last updated August 14, 2026" },
                   { type: "paragraph", text: "Read more." },
                   { type: "list", items: ["First item", "Second item"] },
                 ],

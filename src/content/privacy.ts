@@ -1,14 +1,13 @@
 import type { LegalDocumentContent } from "./legal"
 
 export const privacyContent = {
+  id: "privacy",
   title: "PRIVACY POLICY",
+  version: "2026-08-18",
+  effectiveDate: "August 18, 2026",
   sections: [
     {
       blocks: [
-        {
-          type: "paragraph",
-          text: "Last updated August 18, 2026",
-        },
         {
           type: "paragraph",
           text: 'This Privacy Notice for Hashing Seeds LLC ("we," "us," or "our"), describes how and why we might access, collect, store, use, and/or share ("process") your personal information when you use our services ("Services"), including when you:',

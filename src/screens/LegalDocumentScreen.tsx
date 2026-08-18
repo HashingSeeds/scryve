@@ -17,7 +17,6 @@ export interface LegalDocumentScreenProps {
 export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenProps) {
   const { theme, themed } = useAppTheme()
   const backgroundColor = theme.isDark ? theme.colors.palette.neutral100 : theme.colors.background
-  const { updatedAt, sections } = prepareDocument(document)
 
   return (
     <Screen
@@ -31,9 +30,13 @@ export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenPro
       <View style={themed($content)}>
         <View style={themed($documentHeader)}>
           <Text text={document.title} preset="heading" accessibilityRole="header" />
-          {updatedAt ? <Text text={updatedAt} size="xs" style={themed($metadata)} /> : null}
+          <Text
+            text={`Last updated ${document.effectiveDate}`}
+            size="xs"
+            style={themed($metadata)}
+          />
         </View>
-        {sections.map((section, index) => (
+        {document.sections.map((section, index) => (
           <View key={`${section.heading ?? "section"}-${index}`} style={themed($section)}>
             {section.heading ? (
               <Text
@@ -78,24 +81,6 @@ function LegalBlockView({ block }: { block: LegalDocumentBlock }) {
       ))}
     </View>
   )
-}
-
-function prepareDocument(document: LegalDocumentContent) {
-  const [firstSection, ...remainingSections] = document.sections
-  const firstBlock = firstSection?.blocks[0]
-  if (!firstSection || firstBlock?.type !== "paragraph") return { sections: document.sections }
-
-  const updatedMatch = firstBlock.text.match(/^(Last updated [^\n]+)$/i)
-  if (!updatedMatch) return { sections: document.sections }
-
-  const remainingFirstBlocks = firstSection.blocks.slice(1)
-  return {
-    updatedAt: updatedMatch[1],
-    sections:
-      remainingFirstBlocks.length > 0
-        ? [{ ...firstSection, blocks: remainingFirstBlocks }, ...remainingSections]
-        : remainingSections,
-  }
 }
 
 const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({

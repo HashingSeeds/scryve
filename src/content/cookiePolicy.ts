@@ -1,14 +1,13 @@
 import type { LegalDocumentContent } from "./legal"
 
 export const cookiePolicyContent = {
+  id: "cookiePolicy",
   title: "COOKIE POLICY",
+  version: "2026-08-18",
+  effectiveDate: "August 18, 2026",
   sections: [
     {
       blocks: [
-        {
-          type: "paragraph",
-          text: "Last updated August 18, 2026",
-        },
         {
           type: "paragraph",
           text: 'This Cookie Policy explains how Hashing Seeds LLC ("Company," "we," "us," and "our") uses cookies and similar technologies when you visit our website at https://count.sow.care (the "Website"). It explains what these technologies are, why we use them, and how you can control them.',
