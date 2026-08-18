@@ -248,6 +248,16 @@ export default defineSchema({
     .index("by_user_and_feature", ["userId", "feature"])
     .index("by_user", ["userId"]),
 
+  legalAcceptances: defineTable({
+    clerkUserId: v.string(),
+    document: v.union(v.literal("terms"), v.literal("privacy")),
+    version: v.string(),
+    platform: v.string(),
+    acceptedAt: v.number(),
+  })
+    .index("by_clerk_user", ["clerkUserId"])
+    .index("by_clerk_user_and_document", ["clerkUserId", "document"]),
+
   accountDeletionRequests: defineTable({
     clerkUserId: v.string(),
     userId: v.optional(v.id("users")),

@@ -245,6 +245,15 @@ export const processUserLinkedData = internalMutation({
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }
+      const acceptances = await ctx.db
+        .query("legalAcceptances")
+        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", request.clerkUserId))
+        .take(USER_DATA_BATCH_SIZE)
+      if (acceptances.length) {
+        for (const acceptance of acceptances) await ctx.db.delete(acceptance._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
       await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
     } catch (cause) {
       await ctx.db.patch(request._id, {
