@@ -2,6 +2,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Header } from "@/components/Header"
+import { LinkedText } from "@/components/LinkedText"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { LegalDocumentBlock, LegalDocumentContent } from "@/content/legal"
@@ -56,7 +57,7 @@ export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenPro
 function LegalBlockView({ block }: { block: LegalDocumentBlock }) {
   const { themed } = useAppTheme()
   if (block.type === "paragraph") {
-    return <Text text={block.text} weight="light" style={themed($body)} />
+    return <LinkedText text={block.text} weight="light" style={themed($body)} />
   }
   if (block.type === "list") {
     return (
@@ -64,7 +65,7 @@ function LegalBlockView({ block }: { block: LegalDocumentBlock }) {
         {block.items.map((item, index) => (
           <View key={`${item}-${index}`} style={themed($listItem)}>
             <Text text="•" weight="light" style={themed($bullet)} />
-            <Text text={item} weight="light" style={themed($listText)} />
+            <LinkedText text={item} weight="light" style={themed($listText)} />
           </View>
         ))}
       </View>
@@ -73,7 +74,7 @@ function LegalBlockView({ block }: { block: LegalDocumentBlock }) {
   return (
     <View style={themed($table)}>
       {block.rows.map((row, index) => (
-        <Text key={`${row}-${index}`} text={row} weight="light" style={themed($tableRow)} />
+        <LinkedText key={`${row}-${index}`} text={row} weight="light" style={themed($tableRow)} />
       ))}
     </View>
   )
