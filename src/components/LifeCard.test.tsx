@@ -4,6 +4,7 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 
 import { getPlayerMarkPlacement, LifeCard } from "./LifeCard"
+import { LIFE_TARGET_SIZE } from "./playerCardTypes"
 
 function card(life: number) {
   return (
@@ -32,6 +33,20 @@ function deltaOpacity(view: ReturnType<typeof renderCard>) {
 describe("LifeCard", () => {
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => jest.useRealTimers())
+
+  it("sizes the life total in JavaScript rather than relying on native auto-shrink", () => {
+    const twoDigits = StyleSheet.flatten(
+      renderCard(20).getByTestId("life-total-seat-1").props.style,
+    )
+    const sixDigits = StyleSheet.flatten(
+      renderCard(123456).getByTestId("life-total-seat-1").props.style,
+    )
+
+    expect(twoDigits.fontSize).toBe(60)
+    expect(twoDigits.lineHeight).toBe(66)
+    expect(sixDigits.fontSize).toBeLessThan(twoDigits.fontSize)
+    expect(sixDigits.fontSize * 6 * 0.62).toBeLessThanOrEqual(LIFE_TARGET_SIZE)
+  })
 
   it("hides the delta chip until a life change happens", () => {
     const view = renderCard(20)
@@ -177,7 +192,7 @@ describe("LifeCard", () => {
       left: 0,
       justifyContent: "center",
     })
-    expect(view.getByTestId("life-total-seat-1").props.adjustsFontSizeToFit).toBe(true)
+    expect(view.getByTestId("life-total-seat-1").props.adjustsFontSizeToFit).toBeUndefined()
     expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style).position).toBe(
       "absolute",
     )

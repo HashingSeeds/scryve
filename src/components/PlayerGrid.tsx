@@ -9,9 +9,9 @@ import type { ThemedStyle } from "@/theme/types"
 import { LifeCard } from "./LifeCard"
 import {
   COMPACT_LIFE_TARGET_SIZE,
-  LIFE_MAX_FONT_SCALE,
+  getLifeFontSizeThatFits,
+  getLifeTargetTextSpace,
   LIFE_TARGET_SIZE,
-  LIFE_TARGET_TEXT_INSET,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
 
@@ -167,10 +167,7 @@ export function getPlayerGridLayoutOptions(playerCount: number): PlayerGridLayou
 }
 
 const LIFE_CONTROL_GUTTER = 40
-const LIFE_DIGIT_ASPECT = 0.62
 const LIFE_HEIGHT_RATIO = 0.24
-const LIFE_FONT_MIN = 12
-const LIFE_FONT_MAX = 80
 
 export function getCellSize(input: {
   board: { width: number; height: number }
@@ -194,13 +191,13 @@ export function getLifeFontSize(input: {
   targetSize: number
 }): number | undefined {
   if (!(input.cellWidth > 0) || !(input.cellHeight > 0)) return undefined
-  const effectiveFontScale = Math.min(Math.max(input.fontScale, 0.1), LIFE_MAX_FONT_SCALE)
-  const targetSpace = Math.max(input.targetSize - LIFE_TARGET_TEXT_INSET * 2, 1)
-  const usableWidth = Math.max(Math.min(input.cellWidth - LIFE_CONTROL_GUTTER * 2, targetSpace), 1)
-  const usableHeight = Math.max(Math.min(input.cellHeight * LIFE_HEIGHT_RATIO, targetSpace), 1)
-  const byWidth = usableWidth / (Math.max(input.digits, 2) * LIFE_DIGIT_ASPECT * effectiveFontScale)
-  const byHeight = usableHeight / (1.1 * effectiveFontScale)
-  return Math.max(LIFE_FONT_MIN, Math.min(LIFE_FONT_MAX, Math.floor(Math.min(byWidth, byHeight))))
+  const targetSpace = getLifeTargetTextSpace(input.targetSize)
+  return getLifeFontSizeThatFits({
+    availableWidth: Math.max(Math.min(input.cellWidth - LIFE_CONTROL_GUTTER * 2, targetSpace), 1),
+    availableHeight: Math.max(Math.min(input.cellHeight * LIFE_HEIGHT_RATIO, targetSpace), 1),
+    digits: input.digits,
+    fontScale: input.fontScale,
+  })
 }
 
 export function getPlayerGridRows(

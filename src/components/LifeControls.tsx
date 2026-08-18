@@ -121,7 +121,6 @@ export function LifeControls({
             <Text
               text={glyph}
               maxFontSizeMultiplier={1.3}
-              adjustsFontSizeToFit
               numberOfLines={1}
               style={[
                 themed(compact ? $compactGlyph : $glyph),

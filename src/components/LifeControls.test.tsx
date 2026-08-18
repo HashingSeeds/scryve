@@ -21,7 +21,7 @@ describe("LifeControls", () => {
       expect(button.props.accessibilityLabel).toContain("Seat 1, Ada")
       expect(button.props.accessibilityHint).toContain("Long press to enter a custom amount")
       expect(label.props.maxFontSizeMultiplier).toBe(1.3)
-      expect(label.props.adjustsFontSizeToFit).toBe(true)
+      expect(label.props.adjustsFontSizeToFit).toBeUndefined()
       expect(label.props.numberOfLines).toBe(1)
       fireEvent(button, "pressIn")
       fireEvent.press(button)

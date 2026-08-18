@@ -12,7 +12,12 @@ import { Button } from "./Button"
 import { DialogCard, $dialogActions, $dialogButton } from "./DialogCard"
 import { LifeControls, overlayTint } from "./LifeControls"
 import {
+  COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
+  getLifeFontSizeThatFits,
+  getLifeLineHeight,
+  getLifeTargetTextSpace,
+  LIFE_FONT_SIZE,
   LIFE_MAX_FONT_SCALE,
   LIFE_TARGET_SIZE,
   type LifeCardContentRotation,
@@ -66,7 +71,19 @@ export function LifeCard({
   const displayName = playerName.trim() || "unnamed player"
   const identity = `Seat ${seatNumber}, ${displayName}`
   const markSize = compact ? 36 : 44
-  const lifeTargetRadius = (compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE) / 2
+  const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
+  const lifeTargetRadius = lifeTargetSize / 2
+  const resolvedLifeFontSize =
+    lifeFontSize ??
+    Math.min(
+      compact ? COMPACT_LIFE_FONT_SIZE : LIFE_FONT_SIZE,
+      getLifeFontSizeThatFits({
+        availableWidth: getLifeTargetTextSpace(lifeTargetSize),
+        availableHeight: getLifeTargetTextSpace(lifeTargetSize),
+        digits: String(life).length,
+        fontScale: 1,
+      }),
+    )
   const cardPadding = compact ? spacing.xxs : spacing.xs
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const markAxisLength =
@@ -189,13 +206,13 @@ export function LifeCard({
               accessibilityLabel={`${identity}, ${life} life`}
               accessibilityLiveRegion="polite"
               maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
-              adjustsFontSizeToFit
               numberOfLines={1}
               style={[
-                themed(compact ? $compactLife : $life),
-                lifeFontSize
-                  ? { fontSize: lifeFontSize, lineHeight: Math.ceil(lifeFontSize * 1.1) }
-                  : null,
+                themed($life),
+                {
+                  fontSize: resolvedLifeFontSize,
+                  lineHeight: getLifeLineHeight(resolvedLifeFontSize),
+                },
                 contentRotationStyle,
                 { color: foreground },
               ]}
@@ -365,16 +382,6 @@ export function getPlayerMarkPlacement(
 
 const $life: ThemedStyle<TextStyle> = () => ({
   width: "100%",
-  fontSize: 60,
-  lineHeight: 66,
-  textAlign: "center",
-  fontVariant: ["tabular-nums"],
-})
-
-const $compactLife: ThemedStyle<TextStyle> = () => ({
-  width: "100%",
-  fontSize: 42,
-  lineHeight: 48,
   textAlign: "center",
   fontVariant: ["tabular-nums"],
 })
