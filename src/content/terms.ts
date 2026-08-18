@@ -7,7 +7,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Last updated August 17, 2026",
+          text: "Last updated August 18, 2026",
         },
       ],
     },
@@ -377,10 +377,8 @@ export const termsContent = {
         {
           type: "list",
           items: [
-            "Systematically retrieve data or other content from the Services to create or compile, directly or indirectly, a collection, compilation, database, or directory without written permission from us.",
             "Trick, defraud, or mislead us and other users, especially in any attempt to learn sensitive account information such as user passwords.",
             "Circumvent, disable, or otherwise interfere with security-related features of the Services, including features that prevent or restrict the use or copying of any Content or enforce limitations on the use of the Services and/or the Content contained therein.",
-            "Disparage, tarnish, or otherwise harm, in our opinion, us and/or the Services.",
             "Use any information obtained from the Services in order to harass, abuse, or harm another person.",
             "Make improper use of our support services or submit false reports of abuse or misconduct.",
             "Use the Services in a manner inconsistent with any applicable laws or regulations.",
@@ -394,11 +392,9 @@ export const termsContent = {
             "Harass, annoy, intimidate, or threaten any of our employees or agents engaged in providing any portion of the Services to you.",
             "Attempt to bypass any measures of the Services designed to prevent or restrict access to the Services, or any portion of the Services.",
             "Copy or adapt the Services' software, including but not limited to Flash, PHP, HTML, JavaScript, or other code.",
-            "Except as permitted by applicable law, decipher, decompile, disassemble, or reverse engineer any of the software comprising or in any way making up a part of the Services.",
             "Except as may be the result of standard search engine or Internet browser usage, use, launch, develop, or distribute any automated system, including without limitation, any spider, robot, cheat utility, scraper, or offline reader that accesses the Services, or use or launch any unauthorized script or other software.",
             "Use a buying agent or purchasing agent to make purchases on the Services.",
             "Make any unauthorized use of the Services, including collecting usernames and/or email addresses of users by electronic or other means for the purpose of sending unsolicited email, or creating user accounts by automated means or under false pretenses.",
-            "Use the Services as part of any effort to compete with us or otherwise use the Services and/or the Content for any revenue-generating endeavor or commercial enterprise.",
           ],
         },
       ],
@@ -528,6 +524,10 @@ export const termsContent = {
           type: "paragraph",
           text: "These Legal Terms and your use of the Services are governed by and construed in accordance with the laws of the State of Tennessee applicable to agreements made and to be entirely performed within the State of Tennessee, without regard to its conflict of law principles.",
         },
+        {
+          type: "paragraph",
+          text: "Nothing in this section, and nothing in the DISPUTE RESOLUTION section below, deprives you of the protection of any mandatory consumer protection law of the country, state, or province in which you reside. If you are a consumer resident in the European Economic Area, the United Kingdom, Switzerland, Australia, New Zealand, or any other jurisdiction whose law grants you rights that cannot be limited or waived by agreement, those rights continue to apply to you and prevail over anything in these Legal Terms that conflicts with them. You may also be entitled to bring proceedings in the courts of the place where you reside.",
+        },
       ],
     },
     {
@@ -548,11 +548,11 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'If the Parties are unable to resolve a Dispute through informal negotiations, the Dispute (except those Disputes expressly excluded below) will be finally and exclusively resolved by binding arbitration. YOU UNDERSTAND THAT WITHOUT THIS PROVISION, YOU WOULD HAVE THE RIGHT TO SUE IN COURT AND HAVE A JURY TRIAL. The arbitration shall be commenced and conducted under the Commercial Arbitration Rules of the American Arbitration Association ("AAA") and, where appropriate, the AAA’s Supplementary Procedures for Consumer Related Disputes ("AAA Consumer Rules"), both of which are available at the American Arbitration Association (AAA) website (http://www.adr.org). Your arbitration fees and your share of arbitrator compensation shall be governed by the AAA Consumer Rules and, where appropriate, limited by the AAA Consumer Rules. The arbitration may be conducted in person, through the submission of documents, by phone, or online. The arbitrator will make a decision in writing, but need not provide a statement of reasons unless requested by either Party. The arbitrator must follow applicable law, and any award may be challenged if the arbitrator fails to do so. Except where otherwise required by the applicable AAA rules or applicable law, the arbitration will take place in Davidson, Tennessee. Except as otherwise provided herein, the Parties may litigate in court to compel arbitration, stay proceedings pending arbitration, or to confirm, modify, vacate, or enter judgment on the award entered by the arbitrator.',
+          text: 'If the Parties are unable to resolve a Dispute through informal negotiations, the Dispute (except those Disputes expressly excluded below) will be finally and exclusively resolved by binding arbitration. YOU UNDERSTAND THAT WITHOUT THIS PROVISION, YOU WOULD HAVE THE RIGHT TO SUE IN COURT AND HAVE A JURY TRIAL. The arbitration shall be commenced and conducted under the Commercial Arbitration Rules of the American Arbitration Association ("AAA") and, where appropriate, the AAA’s Supplementary Procedures for Consumer Related Disputes ("AAA Consumer Rules"), both of which are available at the American Arbitration Association (AAA) website (http://www.adr.org). Your arbitration fees and your share of arbitrator compensation shall be governed by the AAA Consumer Rules and, where appropriate, limited by the AAA Consumer Rules. The arbitration may be conducted in person, through the submission of documents, by phone, or online. The arbitrator will make a decision in writing, but need not provide a statement of reasons unless requested by either Party. The arbitrator must follow applicable law, and any award may be challenged if the arbitrator fails to do so. Except where otherwise required by the applicable AAA rules or applicable law, the arbitration will take place in Davidson County, Tennessee. Except as otherwise provided herein, the Parties may litigate in court to compel arbitration, stay proceedings pending arbitration, or to confirm, modify, vacate, or enter judgment on the award entered by the arbitrator.',
         },
         {
           type: "paragraph",
-          text: "If for any reason, a Dispute proceeds in court rather than arbitration, the Dispute shall be commenced or prosecuted in the state and federal courts located in Davidson, Tennessee, and the Parties hereby consent to, and waive all defenses of lack of personal jurisdiction, and forum non conveniens with respect to venue and jurisdiction in such state and federal courts. Application of the United Nations Convention on Contracts for the International Sale of Goods and the Uniform Computer Information Transaction Act (UCITA) are excluded from these Legal Terms.",
+          text: "If for any reason, a Dispute proceeds in court rather than arbitration, the Dispute shall be commenced or prosecuted in the state and federal courts located in Davidson County, Tennessee, and the Parties hereby consent to, and waive all defenses of lack of personal jurisdiction, and forum non conveniens with respect to venue and jurisdiction in such state and federal courts. Application of the United Nations Convention on Contracts for the International Sale of Goods and the Uniform Computer Information Transaction Act (UCITA) are excluded from these Legal Terms.",
         },
         {
           type: "paragraph",
