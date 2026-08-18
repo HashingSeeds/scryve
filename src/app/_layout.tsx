@@ -8,6 +8,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
 import { CloudProviders } from "@/features/auth/AuthContext"
+import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
 import { initI18n } from "@/i18n"
 import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
 import { ThemeProvider } from "@/theme/context"
@@ -75,7 +76,9 @@ export default function Root() {
       <CloudProviders>
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <KeyboardProvider>
-            <Slot />
+            <LegalConsentGate>
+              <Slot />
+            </LegalConsentGate>
           </KeyboardProvider>
         </SafeAreaProvider>
       </CloudProviders>
