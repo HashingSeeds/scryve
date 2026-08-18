@@ -7,15 +7,24 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Last updated August 14, 2026",
+          text: "Last updated August 18, 2026",
         },
         {
           type: "paragraph",
-          text: 'This Cookie Policy explains how Hashing Seeds LLC ("Company," "we," "us," and "our") uses cookies and similar technologies to recognize you when you visit our website at https://count.sow.care ("Website"). It explains what these technologies are and why we use them, as well as your rights to control our use of them.',
+          text: 'This Cookie Policy explains how Hashing Seeds LLC ("Company," "we," "us," and "our") uses cookies and similar technologies when you visit our website at https://count.sow.care (the "Website"). It explains what these technologies are, why we use them, and how you can control them.',
         },
         {
           type: "paragraph",
-          text: "In some cases we may use cookies to collect personal information, or that becomes personal information if we combine it with other information.",
+          text: "In some cases we may use cookies to collect personal information, or information that becomes personal information if we combine it with other information. Our Privacy Notice explains how we handle personal information: https://count.sow.care/privacy.",
+        },
+      ],
+    },
+    {
+      heading: "Does the Count mobile application use cookies?",
+      blocks: [
+        {
+          type: "paragraph",
+          text: "No. This Cookie Policy applies to our Website only. The Count mobile application does not use cookies. It stores your settings, your local game history, and your sign-in token on your device so that it can work.",
         },
       ],
     },
@@ -28,7 +37,7 @@ export const cookiePolicyContent = {
         },
         {
           type: "paragraph",
-          text: 'Cookies set by the website owner (in this case, Hashing Seeds LLC) are called "first-party cookies." Cookies set by parties other than the website owner are called "third-party cookies." Third-party cookies enable third-party features or functionality to be provided on or through the website (e.g., advertising, interactive content, and analytics). The parties that set these third-party cookies can recognize your computer both when it visits the website in question and also when it visits certain other websites.',
+          text: 'Cookies set by the website owner (in this case, Hashing Seeds LLC) are called "first-party cookies." Cookies set by parties other than the website owner are called "third-party cookies." Third-party cookies enable features or functionality provided by another company to work on or through the website. The third-party cookies used on our Website are set by the providers that supply our sign-in and security infrastructure, and are described in the table below.',
         },
       ],
     },
@@ -37,7 +46,11 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'We use first-party and third-party cookies for several reasons. Some cookies are required for technical reasons in order for our Website to operate, and we refer to these as "essential" or "strictly necessary" cookies. Other cookies also enable us to track and target the interests of our users to enhance the experience on our Online Properties. Third parties serve cookies through our Website for analytics, and other purposes. This is described in more detail below.',
+          text: 'We use only cookies that are required for technical reasons in order for our Website to operate. These are commonly called "essential" or "strictly necessary" cookies. They keep you signed in, protect your account and our Website from automated abuse, and remember basic configuration so that pages load correctly.',
+        },
+        {
+          type: "paragraph",
+          text: "We do not use cookies or similar technologies for advertising, for measuring advertising, for analytics, or to build a profile of your interests. We do not allow third parties to serve advertising on our Website.",
         },
       ],
     },
@@ -46,102 +59,32 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "You have the right to decide whether to accept or reject cookies. You can exercise your cookie rights by setting your preferences in the Cookie Preference Center. The Cookie Preference Center allows you to select which categories of cookies you accept or reject. Essential cookies cannot be rejected as they are strictly necessary to provide you with services.",
+          text: "Because we use only strictly necessary cookies, we do not show a cookie consent banner and there are no optional cookie categories for you to accept or reject. Strictly necessary cookies do not require consent under applicable law, and they cannot be turned off through our Website without preventing it from working.",
         },
         {
           type: "paragraph",
-          text: "The Cookie Preference Center can be found in the notification banner and on our Website. If you choose to reject cookies, you may still use our Website though your access to some functionality and areas of our Website may be restricted. You may also set or amend your web browser controls to accept or refuse cookies.",
+          text: "You can still block or delete cookies using your web browser controls, as described below. If you block the cookies listed in this policy, you will not be able to sign in, and parts of our Website will not work.",
         },
         {
           type: "paragraph",
-          text: "The specific types of first-party and third-party cookies served through our Website and the purposes they perform are described in the table below (please note that the specific cookies served may vary depending on the specific Online Properties you visit):",
+          text: "If we ever begin using cookies that are not strictly necessary, we will ask for your consent before doing so and update this policy.",
         },
       ],
     },
     {
-      heading: "Essential website cookies:",
+      heading: "What cookies do we use?",
       blocks: [
         {
           type: "paragraph",
-          text: "These cookies are strictly necessary to provide you with services available through our Website and to use some of its features, such as access to secure areas.",
+          text: "Every cookie we use is strictly necessary, and all of them come from the two providers that supply our sign-in and security infrastructure.",
         },
-        {
-          type: "table",
-          rows: [
-            "Name: __client_uat",
-            "Provider: .sow.care",
-            "Type: server_cookie",
-            "Expires in: 9 years 11 months 28 days",
-          ],
-        },
-        {
-          type: "table",
-          rows: [
-            "Name: __client_uat_TfFRKPK8",
-            "Provider: .sow.care",
-            "Type: server_cookie",
-            "Expires in: 9 years 11 months 28 days",
-          ],
-        },
-        {
-          type: "table",
-          rows: [
-            "Name: __clerk_environment",
-            "Provider: count.sow.care",
-            "Type: html_local_storage",
-            "Expires in: Persistent",
-          ],
-        },
-        {
-          type: "table",
-          rows: [
-            "Name: __client",
-            "Provider: .clerk.count.sow.care",
-            "Type: server_cookie",
-            "Expires in: 9 years 11 months 28 days",
-          ],
-        },
-        {
-          type: "table",
-          rows: [
-            "Name: __cf_bm",
-            "Purpose: Cloudflare places the cookie on end-user devices that access customer sites protected by Bot Management or Bot Fight Mode.",
-            "Provider: .clerk.count.sow.care",
-            "Service: CloudFlare View Service Privacy Policy (https://www.cloudflare.com/privacypolicy/)",
-            "Type: http_cookie",
-            "Expires in: 29 minutes",
-          ],
-        },
-      ],
-    },
-    {
-      heading: "Performance and functionality cookies:",
-      blocks: [
         {
           type: "paragraph",
-          text: "These cookies are used to enhance the performance and functionality of our Website but are non-essential to their use. However, without these cookies, certain functionality (like videos) may become unavailable.",
+          text: "Clerk, our authentication provider, sets __client, __client_uat, and __client_uat_TfFRKPK8. These keep you signed in to your Count account and record whether you are signed in, so that pages render the correct signed-in or signed-out view. They persist for just under ten years unless you clear them. Clerk also stores __clerk_environment in your browser's local storage rather than as a cookie; it holds the sign-in configuration our Website needs in order to load its sign-in screen, and it persists until you clear it. For more information, see Clerk's privacy policy: https://clerk.com/legal/privacy.",
         },
         {
-          type: "table",
-          rows: [
-            "Name: _cfuvid",
-            "Purpose: This cookie is set by Cloudflare to enhance security and performance. It helps identify trusted web traffic and ensures a secure browsing experience for users.",
-            "Provider: .clerkprod-cloudflare.net",
-            "Service: Cloudflare View Service Privacy Policy (https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/)",
-            "Type: server_cookie",
-            "Expires in: Session",
-          ],
-        },
-        {
-          type: "table",
-          rows: [
-            "Name: _cfuvid",
-            "Purpose: This cookie is set by Cloudflare to enhance security and performance. It helps identify trusted web traffic and ensures a secure browsing experience for users.",
-            "Provider: .clerk.count.sow.care",
-            "Service: Cloudflare View Service Privacy Policy (https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/)",
-            "Type: server_cookie",
-            "Expires in: Session",
-          ],
+          type: "paragraph",
+          text: "Cloudflare, which protects our Website and our sign-in provider from automated abuse, sets __cf_bm and _cfuvid. __cf_bm tells automated traffic apart from real visitors and expires after 29 minutes. _cfuvid distinguishes individual visitors who share the same IP address, so that rate limiting applies to the right visitor, and expires at the end of your browser session. Cloudflare generates these separately for each site and does not use them to track you between sites. For more information, see Cloudflare's cookie documentation: https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/.",
         },
       ],
     },
@@ -150,29 +93,16 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "As the means by which you can refuse cookies through your web browser controls vary from browser to browser, you should visit your browser's help menu for more information. The following is information about how to manage cookies on the most popular browsers: (https://support.google.com/chrome/answer/95647#zippy=%2Callow-or-block-cookies)",
+          text: "The means by which you can refuse cookies through your web browser controls vary from browser to browser, so you should visit your browser's help menu for more information. The following is information about how to manage cookies on the most popular browsers:",
         },
         {
           type: "list",
           items: [
             "Chrome (https://support.google.com/chrome/answer/95647#zippy=%2Callow-or-block-cookies)",
-            "Internet Explorer (https://support.microsoft.com/en-us/windows/delete-and-manage-cookies-168dab11-0753-043d-7c16-ede5947fc64d)",
-            "Firefox (https://support.mozilla.org/en-US/kb/enhanced-tracking-protection-firefox-desktop?redirectslug=enable-and-disable-cookies-website-preferences&redirectlocale=en-US)",
             "Safari (https://support.apple.com/en-ie/guide/safari/sfri11471/mac)",
+            "Firefox (https://support.mozilla.org/en-US/kb/enhanced-tracking-protection-firefox-desktop)",
             "Edge (https://support.microsoft.com/en-us/windows/microsoft-edge-browsing-data-and-privacy-bb8174ba-9d73-dcf2-9b4a-c582b4e640dd)",
             "Opera (https://help.opera.com/en/latest/web-preferences/)",
-          ],
-        },
-        {
-          type: "paragraph",
-          text: "In addition, most advertising networks offer you a way to opt out of targeted advertising. If you would like to find out more information, please visit: (http://www.aboutads.info/choices/)",
-        },
-        {
-          type: "list",
-          items: [
-            "Digital Advertising Alliance (http://www.aboutads.info/choices/) (https://youradchoices.ca/)",
-            "Digital Advertising Alliance of Canada (https://youradchoices.ca/) (http://www.youronlinechoices.com/)",
-            "European Interactive Digital Advertising Alliance (http://www.youronlinechoices.com/)",
           ],
         },
       ],
@@ -182,24 +112,11 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'Cookies are not the only way to recognize or track visitors to a website. We may use other, similar technologies from time to time, like web beacons (sometimes called "tracking pixels" or "clear gifs"). These are tiny graphics files that contain a unique identifier that enables us to recognize when someone has visited our Website or opened an email including them. This allows us, for example, to monitor the traffic patterns of users from one page within a website to another, to deliver or communicate with cookies, to understand whether you have come to the website from an online advertisement displayed on a third-party website, to improve site performance, and to measure the success of email marketing campaigns. In many instances, these technologies are reliant on cookies to function properly, and so declining cookies will impair their functioning.',
-        },
-      ],
-    },
-    {
-      heading: "Do you use Flash cookies or Local Shared Objects?",
-      blocks: [
-        {
-          type: "paragraph",
-          text: 'Websites may also use so-called "Flash Cookies" (also known as Local Shared Objects or "LSOs") to, among other things, collect and store information about your use of our services, fraud prevention, and for other site operations.',
+          text: 'Cookies are not the only way to recognize or track visitors to a website. Other technologies exist, such as web beacons (sometimes called "tracking pixels" or "clear gifs"), which are tiny graphics files containing a unique identifier that can record when someone has visited a website or opened an email.',
         },
         {
           type: "paragraph",
-          text: 'If you do not want Flash Cookies stored on your computer, you can adjust the settings of your Flash player to block Flash Cookies storage using the tools contained in the Website Storage Settings Panel (http://www.macromedia.com/support/documentation/en/flashplayer/help/settings_manager07.html). You can also control Flash Cookies by going to the Global Storage Settings Panel (http://www.macromedia.com/support/documentation/en/flashplayer/help/settings_manager03.html) and following the instructions (which may include instructions that explain, for example, how to delete existing Flash Cookies (referred to "information" on the Macromedia site), how to prevent Flash LSOs from being placed on your computer without your being asked, and (for Flash Player 8 and later) how to block Flash Cookies that are not being delivered by the operator of the page you are on at the time).',
-        },
-        {
-          type: "paragraph",
-          text: "Please note that setting the Flash Player to restrict or limit acceptance of Flash Cookies may reduce or impede the functionality of some Flash applications, including, potentially, Flash applications used in connection with our services or online content.",
+          text: "We do not use web beacons, tracking pixels, or clear gifs on our Website or in our email.",
         },
       ],
     },
@@ -208,7 +125,7 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "No, we do not serve targeted advertising. We do not serve any advertising on this site.",
+          text: "No. We do not serve advertising on our Website or in the Count application, and we do not share information with advertisers or advertising networks.",
         },
       ],
     },
@@ -217,7 +134,7 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "We may update this Cookie Policy from time to time in order to reflect, for example, changes to the cookies we use or for other operational, legal, or regulatory reasons. Please therefore revisit this Cookie Policy regularly to stay informed about our use of cookies and related technologies.",
+          text: "We may update this Cookie Policy from time to time in order to reflect, for example, changes to the cookies we use or for other operational, legal, or regulatory reasons. Please revisit this Cookie Policy regularly to stay informed about our use of cookies and related technologies.",
         },
         {
           type: "paragraph",
@@ -250,11 +167,11 @@ export const cookiePolicyContent = {
         },
         {
           type: "paragraph",
-          text: "Phone: (US)(731) 333-3462‬",
+          text: "Email: privacy@sowinghope.how",
         },
         {
           type: "paragraph",
-          text: "This Cookie Policy was created using Termly's Cookie Consent Manager (https://termly.io/products/cookie-consent-manager/)",
+          text: "Phone: (US) (731) 333-3462",
         },
       ],
     },
