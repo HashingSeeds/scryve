@@ -353,7 +353,6 @@ export const createLobby = mutation({
       userId: user._id,
       ...(args.deviceId ? { deviceId: args.deviceId } : {}),
       displayName: hostDisplayName,
-      avatarUrl: user.avatarUrl,
       usernameAtJoin: user.username,
       color: args.hostColor,
       currentLife: args.startingLife,
@@ -431,7 +430,6 @@ export const claimSeat = mutation({
       userId: user._id,
       ...(args.deviceId ? { deviceId: args.deviceId } : {}),
       displayName,
-      avatarUrl: user.avatarUrl,
       usernameAtJoin: user.username,
       color: args.color,
       currentLife: game.startingLife,
@@ -499,7 +497,6 @@ export const lobbyProjection = query({
           displayName: p.displayName,
           username: p.usernameAtJoin,
           deckVersionId: p.deckVersionId,
-          avatarUrl: p.avatarUrl,
           color: p.color,
           currentLife: p.currentLife,
           controlledByMe:
