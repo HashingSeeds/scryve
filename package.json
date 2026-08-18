@@ -11,6 +11,8 @@
     "ios": "APP_VARIANT=development npx expo run:ios",
     "web": "npx expo start --web",
     "bundle:web": "npx expo export --platform web",
+    "bundle:web:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx expo export --platform web",
+    "deploy:web:prod": "wrangler pages deploy dist --project-name=count --branch=main",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
     "prebuild:clean": "expo prebuild --clean",
