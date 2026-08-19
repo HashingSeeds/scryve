@@ -20,6 +20,7 @@ import { api } from "../../../convex/_generated/api"
 const READABLE_WHILE_GATED = new Set(["/terms", "/privacy", "/cookie-policy"])
 
 export const ACCOUNT_CONSENT_TIMEOUT_MS = 4000
+export const AUTH_LOAD_TIMEOUT_MS = 4000
 
 interface GateProps {
   children: ReactNode
@@ -30,13 +31,23 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
   const auth = useAuthAccess()
   const pathname = usePathname()
   const readingDocument = READABLE_WHILE_GATED.has(pathname)
+  const isLoadingAuth = auth.configured && !auth.isLoaded && !readingDocument
+  const [authUnreachable, setAuthUnreachable] = useState(false)
 
   useEffect(() => {
     if (readingDocument) onResolved?.()
   }, [readingDocument, onResolved])
 
+  // Clerk reports isLoaded only once it has reached its backend, so an offline
+  // or misconfigured instance would otherwise hold the splash screen forever.
+  useEffect(() => {
+    if (!isLoadingAuth) return
+    const timer = setTimeout(() => setAuthUnreachable(true), AUTH_LOAD_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [isLoadingAuth])
+
   if (readingDocument) return <>{children}</>
-  if (auth.configured && !auth.isLoaded) return null
+  if (isLoadingAuth && !authUnreachable) return null
   if (auth.configured && auth.isSignedIn)
     return (
       <SignedInConsentGate userId={auth.userId} onResolved={onResolved}>

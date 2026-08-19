@@ -48,13 +48,19 @@
       "ccb7c098bc05a920541352099df8a37c625da36a01831d741d09fa3cafe804f8": 1
     },
     "src/app/_layout.tsx": {
+      "00919d4b153e898eabd8beb503054caa04bc5424702f76b306447fa75e242ba0": 1,
+      "2edb226fdcb0fd7d7c9f276608a831000dacec3a1e169b643c61750d3854f3ce": 1,
+      "3b16677f8c4287b837480d1c0ca79513468f57d9fe42853d9e0ddde38fa0b73a": 1,
+      "3cf898042c60a59ac4f008e4f9834182358017e4974fc4a3ce496bc3f75227a7": 1,
       "45bd01fad91b26032592c9581f712a57d870d5d29bf873142854d23e50486743": 1,
       "4c9cf8a7e9148036ca0a447a4589c5595800107bc46872cef595710f1388814c": 1,
       "597b0b1dd9a97a330c48544c34ce4fdfa04a5b0aea606087503dfbddc832b8ab": 1,
+      "7c96a49fe3bab22fa0f5ba4d58bf5ffd22e9cda970ef16df93764228905ce9a9": 1,
       "98ac1829f0c1b0bceb5a560ef01b305a99ec15d05275234ac935d7feaa53bef6": 1,
-      "ae439fe3ee43d7e1ad600cf7a0d0525afa43dad60c0f806fc1adfe46d85cf473": 1,
-      "e22ad56ba08688932ba2221350ea03bd8034fc943d750c10882f7b7d4dcf3949": 1,
-      "e41aa88874e63bb3d4eab9cf83bc73e9ec290aeb3aacadc5c262aa8a53cc5852": 1
+      "9fdf58939630443fb4b29e3ac69cd08e1666b260e5086be094aaa67c7c455750": 1,
+      "a907e63871c0185cbebc56f76c7ce2a9ba70ab2fe7c8e7902212d5efa94609e6": 1,
+      "b33fabc326eabb2438e8bca84bc9e744e4bc860791cb9e3b8c23ce329eaa0268": 1,
+      "e22ad56ba08688932ba2221350ea03bd8034fc943d750c10882f7b7d4dcf3949": 1
     },
     "src/app/+native-intent.tsx": {
       "abc7c7005430b10d1ad37a4b72f8de0c0561fd4519f370d4f26afc5401dd168b": 1
@@ -303,9 +309,6 @@
       "a5e9295d2bb47e1b296528b8a4e4754ed3f0fad25fae13da52de3ae5af172fe7": 1,
       "a6b0b8e2850258d66975baae5c82a2fec816f743b0ee5ce341fc544ade3dfeda": 1
     },
-    "src/features/auth/AuthContext.test.tsx": {
-      "17f9bafd6b44bcd62f93b9aecbd55d6165d710df6dfc38eac3f1ce00516e59e3": 1
-    },
     "src/features/auth/AuthContext.tsx": {
       "41036096b14e92f4a6d2396987a899fa080a1abec9cbbbd89ec76c57c7eef9ff": 1,
       "df56494b9d5cdb0ae27b7cbb2bf82e2e1b1eb9fb7077068fae90801570c80a87": 1
@@ -319,6 +322,10 @@
     },
     "src/features/connected/OutboxSyncController.ts": {
       "1487abcf2f5a09ce6fd570ee7d715e8b8bc031e4414bc5f15c804b576374b967": 1
+    },
+    "src/features/legal/LegalConsentGate.tsx": {
+      "e63352e063deaf97db321b02bf35054ca662227ce4623027857263097d88b1b1": 1,
+      "fddeee419d936617e2d0ac42ff1bc65ab5924538ce3780d97a11dfd6024ef4e3": 1
     },
     "src/i18n/index.ts": {
       "0cfe3f07f37ec1394440aacda34e3d29fe4cee939e1fae1c7373ce585d7cceec": 1,

@@ -5,7 +5,11 @@ import { ThemeProvider } from "@/theme/context"
 
 import { accountAcceptanceCache, deviceAcceptanceStore } from "./acceptanceStore"
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
-import { ACCOUNT_CONSENT_TIMEOUT_MS, LegalConsentGate } from "./LegalConsentGate"
+import {
+  ACCOUNT_CONSENT_TIMEOUT_MS,
+  AUTH_LOAD_TIMEOUT_MS,
+  LegalConsentGate,
+} from "./LegalConsentGate"
 
 const mockPush = jest.fn()
 let mockPathname = "/"
@@ -118,6 +122,22 @@ describe("LegalConsentGate", () => {
       expect(view.queryByText("APP CONTENT")).toBeNull()
       act(() => void jest.advanceTimersByTime(ACCOUNT_CONSENT_TIMEOUT_MS))
       expect(view.getByText("APP CONTENT")).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("stops waiting for authentication that never loads", () => {
+    jest.useFakeTimers()
+    try {
+      deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+      mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
+      const onResolved = jest.fn()
+      const view = renderGate(onResolved)
+      expect(view.queryByText("APP CONTENT")).toBeNull()
+      act(() => void jest.advanceTimersByTime(AUTH_LOAD_TIMEOUT_MS))
+      expect(view.getByText("APP CONTENT")).toBeTruthy()
+      expect(onResolved).toHaveBeenCalled()
     } finally {
       jest.useRealTimers()
     }

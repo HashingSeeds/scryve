@@ -40,27 +40,47 @@ if (__DEV__) {
 }
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  useEffect(() => reportCrash(error), [error])
+  // The fallback renders behind a splash screen that only the happy path hides,
+  // so without this a root error is indistinguishable from a frozen launch.
+  useEffect(() => {
+    reportCrash(error)
+    SplashScreen.hideAsync()
+  }, [error])
 
   return <RootErrorFallback error={error} onRetry={retry} />
 }
+
+export const LAUNCH_DEADLINE_MS = 8000
 
 export default function Root() {
   const [fontsLoaded, fontError] = useFonts(customFontsToLoad)
   const [isI18nInitialized, setIsI18nInitialized] = useState(false)
   const [isConsentResolved, setIsConsentResolved] = useState(false)
+  const [launchDeadlineReached, setLaunchDeadlineReached] = useState(false)
   const resolveConsent = useCallback(() => setIsConsentResolved(true), [])
+
+  // Asset and locale loading can stall without ever resolving or rejecting, and
+  // a splash screen that never lifts is worse than the system typeface or an
+  // untranslated key.
+  useEffect(() => {
+    const timer = setTimeout(() => setLaunchDeadlineReached(true), LAUNCH_DEADLINE_MS)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     initI18n()
-      .then(() => setIsI18nInitialized(true))
       .then(() => loadDateFnsLocale())
+      // Untranslated keys are a better failure than a launch that never ends.
+      .catch(reportCrash)
+      .finally(() => setIsI18nInitialized(true))
   }, [])
 
-  const loaded = fontsLoaded && isI18nInitialized
+  // A font that fails to download should degrade to the system typeface, not
+  // take down the whole app through the root error boundary.
+  const loaded = ((fontsLoaded || !!fontError) && isI18nInitialized) || launchDeadlineReached
 
   useEffect(() => {
-    if (fontError) throw fontError
+    if (fontError) reportCrash(fontError)
   }, [fontError])
 
   useEffect(() => {
