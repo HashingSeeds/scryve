@@ -33,6 +33,13 @@ describe("shipping Maestro selectors", () => {
     }
   })
 
+  it("accepts the legal consent gate in the shared startup flow so cleared installs reach Home", () => {
+    const shared = readFileSync(join(process.cwd(), ".maestro/shared/_OnFlowStart.yaml"), "utf8")
+
+    expect(shared).toContain('visible: "Before you start"')
+    expect(shared).toContain('id: "accept-legal-button"')
+  })
+
   it("exposes selector validation, smoke, and full-suite package commands", () => {
     const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"))
 

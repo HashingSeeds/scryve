@@ -2,7 +2,9 @@
 # intent: Explain the missing configuration while preserving the local-game path.
 
 appId: ${MAESTRO_APP_ID}
-tags: [local]
+# precondition: a build compiled WITHOUT cloud env (no Clerk/Convex EXPO_PUBLIC vars);
+# a configured build shows the auth gate instead, so default runs exclude this tag.
+tags: [unconfigured]
 onFlowStart:
   - runFlow: ../shared/_OnFlowStart.yaml
 ---

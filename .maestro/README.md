@@ -18,7 +18,11 @@ pnpm e2e
 pnpm e2e full
 ```
 
-`pnpm e2e` checks the local environment and runs flows tagged `smoke`. `pnpm e2e full` runs every
+`pnpm e2e` checks the local environment and runs flows tagged `smoke`. The runner auto-detects
+the installed app id (development builds use `com.sowinghope.count.dev`); set `MAESTRO_APP_ID` to
+override. The shared startup flow accepts the legal consent gate that every cleared install shows.
+Flows tagged `unconfigured` need a build compiled without cloud environment variables and are
+excluded from `pnpm e2e` runs; execute them directly with `maestro test` when testing that build. `pnpm e2e full` runs every
 flow under `.maestro/flows`. Both commands write a JUnit report and Maestro debug output to
 `artifacts/e2e/`. Set `SKIP_METRO_CHECK=1` when testing an installed release build.
 
