@@ -168,6 +168,9 @@ describe("AddDeckScreen", () => {
     expect(mockImport).not.toHaveBeenCalled()
     expect(view.getByText("Magic · Commander · 1 card")).toBeTruthy()
     expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy()
+    expect(view.getByTestId("precon-loading-progress").props.accessibilityValue).toEqual({
+      text: "Preview ready",
+    })
     expect(view.queryByTestId("deck-note-input")).toBeNull()
     fireEvent.press(view.getByTestId("import-preview-button"))
     await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))

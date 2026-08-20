@@ -3,6 +3,14 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated"
 
 import { $alert, $alertText, BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
@@ -20,6 +28,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { convexErrorMessage } from "@/utils/convexError"
+import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { api } from "../../convex/_generated/api"
 import {
@@ -40,6 +49,9 @@ const MODES: Array<{ id: CreationMode; label: string }> = [
 ]
 
 const SEARCH_DEBOUNCE_MS = 350
+const PREVIEW_PROGRESS_SEGMENT_RATIO = 0.28
+const PREVIEW_PROGRESS_TRAVEL_MS = 1100
+const PREVIEW_PROGRESS_COMPLETE_MS = 180
 
 type SetupField = "game" | "format" | "mode"
 
@@ -122,6 +134,84 @@ function previewSections(
       }
     })
     .filter((section) => section.entries.length > 0)
+}
+
+function PreviewProgressRule({
+  loading,
+  complete,
+  outlineReady,
+}: {
+  loading: boolean
+  complete: boolean
+  outlineReady: boolean
+}) {
+  const { themed } = useAppTheme()
+  const reducedMotion = useReducedMotion()
+  const trackWidth = useSharedValue(0)
+  const travel = useSharedValue(0)
+  const completion = useSharedValue(complete ? 1 : 0)
+
+  useEffect(() => {
+    cancelAnimation(travel)
+    cancelAnimation(completion)
+    if (loading) {
+      completion.value = 0
+      travel.value = 0
+      if (reducedMotion === false)
+        travel.value = withRepeat(
+          withTiming(1, {
+            duration: PREVIEW_PROGRESS_TRAVEL_MS,
+            easing: Easing.inOut(Easing.ease),
+          }),
+          -1,
+          true,
+        )
+    } else {
+      travel.value = 0
+      completion.value = complete
+        ? withTiming(1, { duration: motionDuration(reducedMotion, PREVIEW_PROGRESS_COMPLETE_MS) })
+        : 0
+    }
+    return () => {
+      cancelAnimation(travel)
+      cancelAnimation(completion)
+    }
+  }, [complete, completion, loading, reducedMotion, travel])
+
+  const segmentStyle = useAnimatedStyle(
+    () => ({
+      opacity: loading ? 1 : 0,
+      transform: [
+        { translateX: travel.value * trackWidth.value * (1 - PREVIEW_PROGRESS_SEGMENT_RATIO) },
+      ],
+    }),
+    [loading],
+  )
+  const completionStyle = useAnimatedStyle(() => ({
+    width: trackWidth.value * completion.value,
+  }))
+  const accessibilityText = loading
+    ? outlineReady
+      ? "Loading card images"
+      : "Loading official card list"
+    : complete
+      ? "Preview ready"
+      : "Preview unavailable"
+
+  return (
+    <View
+      testID="precon-loading-progress"
+      accessibilityRole="progressbar"
+      accessibilityValue={{ text: accessibilityText }}
+      style={themed($previewProgressTrack)}
+      onLayout={(event) => {
+        trackWidth.value = event.nativeEvent.layout.width
+      }}
+    >
+      <Animated.View style={[themed($previewProgressSegment), segmentStyle]} />
+      <Animated.View style={[themed($previewProgressComplete), completionStyle]} />
+    </View>
+  )
 }
 
 export function AddDeckScreen({
@@ -394,22 +484,11 @@ export function AddDeckScreen({
             {preconDetail(selectedPrecon) ? (
               <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
             ) : null}
-            {previewLoading ? (
-              <View
-                testID="precon-loading-progress"
-                accessibilityRole="progressbar"
-                accessibilityValue={{
-                  text: preconOutline ? "Loading card images" : "Loading official card list",
-                }}
-                style={themed($previewProgressTrack)}
-              >
-                <View
-                  style={themed(
-                    preconOutline ? $previewProgressOutlineReady : $previewProgressStarting,
-                  )}
-                />
-              </View>
-            ) : null}
+            <PreviewProgressRule
+              loading={previewLoading}
+              complete={resolvedPrecon !== undefined}
+              outlineReady={preconOutline !== undefined}
+            />
           </View>
 
           {error ? (
@@ -809,13 +888,16 @@ const $previewProgressTrack: ThemedStyle<ViewStyle> = ({ colors, spacing }) => (
   overflow: "hidden",
   backgroundColor: colors.separator,
 })
-const $previewProgressStarting: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  width: "35%",
+const $previewProgressSegment: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: "absolute",
+  left: 0,
+  width: `${PREVIEW_PROGRESS_SEGMENT_RATIO * 100}%`,
   height: "100%",
   backgroundColor: colors.tint,
 })
-const $previewProgressOutlineReady: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  width: "72%",
+const $previewProgressComplete: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: "absolute",
+  left: 0,
   height: "100%",
   backgroundColor: colors.tint,
 })
