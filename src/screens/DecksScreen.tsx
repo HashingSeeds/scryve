@@ -37,6 +37,14 @@ type ShelfDeck = {
   record?: DeckRecord
 }
 
+export type DeckSelection = {
+  deckId: string
+  name: string
+  game: string
+  format: string
+  cardQuantity?: number
+}
+
 type DeckSection = { title: "Recent" | "All decks"; data: ShelfDeck[] }
 
 function coverInitial(name: string) {
@@ -96,7 +104,7 @@ export function DecksScreen({
   onAddDeck,
 }: {
   onBack: () => void
-  onSelect: (deckId: string) => void
+  onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
 }) {
   const { themed } = useAppTheme()
@@ -226,7 +234,19 @@ export function DecksScreen({
             ) : null
           }
           renderItem={({ item: deck }) => (
-            <DeckRow deck={deck} game={game} onPress={() => onSelect(deck._id)} />
+            <DeckRow
+              deck={deck}
+              game={game}
+              onPress={() =>
+                onSelect({
+                  deckId: deck._id,
+                  name: deck.name,
+                  game: deck.game ?? DEFAULT_DECK_GAME,
+                  format: deck.format,
+                  cardQuantity: deck.cardQuantity,
+                })
+              }
+            />
           )}
           ListEmptyComponent={
             mine ? (

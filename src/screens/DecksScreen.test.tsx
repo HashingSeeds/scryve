@@ -85,7 +85,13 @@ describe("DecksScreen", () => {
     expect(view.getByText("Commander · 100 cards · 3 versions · 75% of 4")).toBeTruthy()
     expect(view.getByText("Recent")).toBeTruthy()
     fireEvent.press(view.getByLabelText("Existing Deck"))
-    expect(onSelect).toHaveBeenCalledWith("existing-deck")
+    expect(onSelect).toHaveBeenCalledWith({
+      deckId: "existing-deck",
+      name: "Existing Deck",
+      game: "mtg",
+      format: "commander",
+      cardQuantity: 100,
+    })
   })
 
   it("opens the add-deck route", () => {

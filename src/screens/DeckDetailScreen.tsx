@@ -9,6 +9,7 @@ import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
+import { DeckListSkeleton, DeckLoadingProgress } from "@/components/DeckLoadingState"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { DeckVersionDialog } from "@/components/DeckVersionDialog"
@@ -89,7 +90,22 @@ function totalQuantity(cards: DeckCard[]) {
   return cards.reduce((total, card) => total + card.quantity, 0)
 }
 
-export function DeckDetailScreen({ deckId, onBack }: { deckId: string; onBack: () => void }) {
+export type DeckDetailSummary = {
+  name: string
+  game: string
+  format: string
+  cardQuantity?: number
+}
+
+export function DeckDetailScreen({
+  deckId,
+  summary,
+  onBack,
+}: {
+  deckId: string
+  summary?: DeckDetailSummary
+  onBack: () => void
+}) {
   const { themed } = useAppTheme()
   const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
   const detail = useQuery(api.decks.detail, {
@@ -315,11 +331,32 @@ export function DeckDetailScreen({ deckId, onBack }: { deckId: string; onBack: (
     )
   }
 
+  const loadingGameLabel = summary ? (deckGame(summary.game)?.shortLabel ?? summary.game) : null
+  const loadingMetadata = summary
+    ? [
+        loadingGameLabel,
+        deckFormatLabel(summary.game, summary.format),
+        summary.cardQuantity !== undefined ? cardCountLabel(summary.cardQuantity) : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null
+  const loadingSections = summary ? deckSections(summary.game, summary.format) : []
+
   if (!detail)
     return (
       <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-        <Header title="Deck" leftTx="common:back" onLeftPress={onBack} />
-        <Text style={themed($loading)} text="Loading deck…" />
+        <Header title={summary?.name ?? "Deck"} leftTx="common:back" onLeftPress={onBack} />
+        <View style={themed($loadingContent)}>
+          <View style={themed($titleBlock)}>
+            {summary ? <Text preset="subheading" text={summary.name} /> : null}
+            {loadingMetadata ? (
+              <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
+            ) : null}
+            <DeckLoadingProgress state="loading" accessibilityText="Loading deck" />
+          </View>
+          <DeckListSkeleton sections={loadingSections} density="comfortable" />
+        </View>
       </Screen>
     )
 
@@ -733,6 +770,14 @@ const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.lg,
   paddingBottom: spacing.lg,
 })
+const $loadingContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: "100%",
+  maxWidth: 720,
+  alignSelf: "center",
+  paddingHorizontal: spacing.lg,
+  paddingTop: spacing.sm,
+  paddingBottom: spacing.lg,
+})
 const $block: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $headerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $titleBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
@@ -806,7 +851,6 @@ const $thumbnailSlot: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $thumbnail: ThemedStyle<ImageStyle> = () => ({ width: 48, height: 68 })
 const $boardHeading: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $loading: ThemedStyle<TextStyle> = ({ spacing }) => ({ padding: spacing.lg })
 const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.errorBackground,
   borderColor: colors.error,

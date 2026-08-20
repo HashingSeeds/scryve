@@ -3,20 +3,13 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
-import Animated, {
-  cancelAnimation,
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated"
 
 import { $alert, $alertText, BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { Card } from "@/components/Card"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
+import { DeckListSkeleton, DeckLoadingProgress } from "@/components/DeckLoadingState"
 import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
@@ -28,7 +21,6 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { convexErrorMessage } from "@/utils/convexError"
-import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { api } from "../../convex/_generated/api"
 import {
@@ -49,9 +41,6 @@ const MODES: Array<{ id: CreationMode; label: string }> = [
 ]
 
 const SEARCH_DEBOUNCE_MS = 350
-const PREVIEW_PROGRESS_SEGMENT_RATIO = 0.28
-const PREVIEW_PROGRESS_TRAVEL_MS = 1100
-const PREVIEW_PROGRESS_COMPLETE_MS = 180
 
 type SetupField = "game" | "format" | "mode"
 
@@ -134,84 +123,6 @@ function previewSections(
       }
     })
     .filter((section) => section.entries.length > 0)
-}
-
-function PreviewProgressRule({
-  loading,
-  complete,
-  outlineReady,
-}: {
-  loading: boolean
-  complete: boolean
-  outlineReady: boolean
-}) {
-  const { themed } = useAppTheme()
-  const reducedMotion = useReducedMotion()
-  const trackWidth = useSharedValue(0)
-  const travel = useSharedValue(0)
-  const completion = useSharedValue(complete ? 1 : 0)
-
-  useEffect(() => {
-    cancelAnimation(travel)
-    cancelAnimation(completion)
-    if (loading) {
-      completion.value = 0
-      travel.value = 0
-      if (reducedMotion === false)
-        travel.value = withRepeat(
-          withTiming(1, {
-            duration: PREVIEW_PROGRESS_TRAVEL_MS,
-            easing: Easing.inOut(Easing.ease),
-          }),
-          -1,
-          true,
-        )
-    } else {
-      travel.value = 0
-      completion.value = complete
-        ? withTiming(1, { duration: motionDuration(reducedMotion, PREVIEW_PROGRESS_COMPLETE_MS) })
-        : 0
-    }
-    return () => {
-      cancelAnimation(travel)
-      cancelAnimation(completion)
-    }
-  }, [complete, completion, loading, reducedMotion, travel])
-
-  const segmentStyle = useAnimatedStyle(
-    () => ({
-      opacity: loading ? 1 : 0,
-      transform: [
-        { translateX: travel.value * trackWidth.value * (1 - PREVIEW_PROGRESS_SEGMENT_RATIO) },
-      ],
-    }),
-    [loading],
-  )
-  const completionStyle = useAnimatedStyle(() => ({
-    width: trackWidth.value * completion.value,
-  }))
-  const accessibilityText = loading
-    ? outlineReady
-      ? "Loading card images"
-      : "Loading official card list"
-    : complete
-      ? "Preview ready"
-      : "Preview unavailable"
-
-  return (
-    <View
-      testID="precon-loading-progress"
-      accessibilityRole="progressbar"
-      accessibilityValue={{ text: accessibilityText }}
-      style={themed($previewProgressTrack)}
-      onLayout={(event) => {
-        trackWidth.value = event.nativeEvent.layout.width
-      }}
-    >
-      <Animated.View style={[themed($previewProgressSegment), segmentStyle]} />
-      <Animated.View style={[themed($previewProgressComplete), completionStyle]} />
-    </View>
-  )
 }
 
 export function AddDeckScreen({
@@ -484,10 +395,18 @@ export function AddDeckScreen({
             {preconDetail(selectedPrecon) ? (
               <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
             ) : null}
-            <PreviewProgressRule
-              loading={previewLoading}
-              complete={resolvedPrecon !== undefined}
-              outlineReady={preconOutline !== undefined}
+            <DeckLoadingProgress
+              testID="precon-loading-progress"
+              state={previewLoading ? "loading" : resolvedPrecon ? "complete" : "unavailable"}
+              accessibilityText={
+                previewLoading
+                  ? preconOutline
+                    ? "Loading card images"
+                    : "Loading official card list"
+                  : resolvedPrecon
+                    ? "Preview ready"
+                    : "Preview unavailable"
+              }
             />
           </View>
 
@@ -506,55 +425,43 @@ export function AddDeckScreen({
             </View>
           ) : null}
 
-          {cards.length === 0 && previewLoading
-            ? configuredSections.slice(0, 2).map((section) => (
-                <View key={section.id}>
-                  <View style={themed($previewSectionHeader)}>
-                    <Text weight="bold" text={section.label} />
-                  </View>
-                  {Array.from({ length: section.id === configuredSections[0]?.id ? 1 : 3 }).map(
-                    (_, index) => (
-                      <View key={index} style={themed($previewCardRow)}>
-                        <View style={themed($previewThumbnailSlot)} />
-                        <View style={themed($previewCardSkeletonLine)} />
-                      </View>
-                    ),
-                  )}
+          {cards.length === 0 && previewLoading ? (
+            <DeckListSkeleton sections={configuredSections} />
+          ) : (
+            sections.map((section) => (
+              <View key={section.id}>
+                <View style={themed($previewSectionHeader)}>
+                  <Text weight="bold" text={section.label} />
+                  <Text size="xs" style={themed($label)} text={`${section.quantity}`} />
                 </View>
-              ))
-            : sections.map((section) => (
-                <View key={section.id}>
-                  <View style={themed($previewSectionHeader)}>
-                    <Text weight="bold" text={section.label} />
-                    <Text size="xs" style={themed($label)} text={`${section.quantity}`} />
-                  </View>
-                  {section.entries.map((card) => (
-                    <TouchableOpacity
-                      key={`${card.board}:${card.scryfallId ?? card.name}`}
-                      accessibilityRole={card.scryfallId ? "button" : undefined}
-                      accessibilityLabel={card.scryfallId ? `Preview ${card.name}` : undefined}
-                      activeOpacity={card.scryfallId ? 0.75 : 1}
-                      style={themed($previewCardRow)}
-                      disabled={!card.scryfallId}
-                      onPress={() => focusPreviewCard(card)}
-                    >
-                      <View style={themed($previewThumbnailSlot)}>
-                        {card.smallImageUrl || card.imageUrl ? (
-                          <Image
-                            source={card.smallImageUrl ?? card.imageUrl}
-                            style={themed($previewThumbnail)}
-                            cachePolicy="memory-disk"
-                          />
-                        ) : null}
-                      </View>
-                      <Text
-                        style={themed($previewCardName)}
-                        text={`${card.quantity}× ${card.name}`}
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ))}
+                {section.entries.map((card) => (
+                  <TouchableOpacity
+                    key={`${card.board}:${card.scryfallId ?? card.name}`}
+                    accessibilityRole={card.scryfallId ? "button" : undefined}
+                    accessibilityLabel={card.scryfallId ? `Preview ${card.name}` : undefined}
+                    activeOpacity={card.scryfallId ? 0.75 : 1}
+                    style={themed($previewCardRow)}
+                    disabled={!card.scryfallId}
+                    onPress={() => focusPreviewCard(card)}
+                  >
+                    <View style={themed($previewThumbnailSlot)}>
+                      {card.smallImageUrl || card.imageUrl ? (
+                        <Image
+                          source={card.smallImageUrl ?? card.imageUrl}
+                          style={themed($previewThumbnail)}
+                          cachePolicy="memory-disk"
+                        />
+                      ) : null}
+                    </View>
+                    <Text
+                      style={themed($previewCardName)}
+                      text={`${card.quantity}× ${card.name}`}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))
+          )}
         </ScrollView>
         <BottomActionBar>
           {atCapacity ? (
@@ -882,25 +789,6 @@ const $previewSummary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.sm,
   paddingBottom: spacing.xs,
 })
-const $previewProgressTrack: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  height: 3,
-  marginTop: spacing.sm,
-  overflow: "hidden",
-  backgroundColor: colors.separator,
-})
-const $previewProgressSegment: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  position: "absolute",
-  left: 0,
-  width: `${PREVIEW_PROGRESS_SEGMENT_RATIO * 100}%`,
-  height: "100%",
-  backgroundColor: colors.tint,
-})
-const $previewProgressComplete: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  position: "absolute",
-  left: 0,
-  height: "100%",
-  backgroundColor: colors.tint,
-})
 const $previewSectionHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
@@ -926,11 +814,6 @@ const $previewThumbnailSlot: ThemedStyle<ViewStyle> = ({ colors, spacing }) => (
   backgroundColor: colors.separator,
 })
 const $previewThumbnail: ThemedStyle<ImageStyle> = () => ({ width: 36, height: 50 })
-const $previewCardSkeletonLine: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  width: "64%",
-  height: 14,
-  backgroundColor: colors.separator,
-})
 const $previewCardName: ThemedStyle<TextStyle> = () => ({ flex: 1 })
 const $previewImportButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 56,

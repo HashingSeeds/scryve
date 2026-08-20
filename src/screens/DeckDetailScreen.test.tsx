@@ -49,22 +49,24 @@ const sideboardVersion = {
   record: { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 },
 }
 
+const loadedDetail = {
+  deck: {
+    _id: "deck-1",
+    name: "Existing Deck",
+    format: "commander",
+    game: "mtg",
+    note: "Ramp into big spells",
+  },
+  versions: [mainVersion, sideboardVersion],
+  version: mainVersion,
+  cards: [solRing],
+  capacity: { used: 2, limit: 5, premium: true, canCreate: true },
+  record: { games: 6, wins: 3, losses: 3, draws: 0, unknown: 0 },
+  analyticsLocked: false,
+}
+
 const mockDetail = {
-  value: {
-    deck: {
-      _id: "deck-1",
-      name: "Existing Deck",
-      format: "commander",
-      game: "mtg",
-      note: "Ramp into big spells",
-    },
-    versions: [mainVersion, sideboardVersion],
-    version: mainVersion,
-    cards: [solRing],
-    capacity: { used: 2, limit: 5, premium: true, canCreate: true },
-    record: { games: 6, wins: 3, losses: 3, draws: 0, unknown: 0 },
-    analyticsLocked: false,
-  } as Record<string, unknown> | undefined,
+  value: loadedDetail as Record<string, unknown> | undefined,
 }
 
 jest.mock("convex/react", () => ({
@@ -111,7 +113,7 @@ describe("DeckDetailScreen", () => {
     jest.clearAllMocks()
     queryArgs.length = 0
     mockDetail.value = {
-      ...(mockDetail.value as Record<string, unknown>),
+      ...loadedDetail,
       version: mainVersion,
       capacity: { used: 2, limit: 5, premium: true, canCreate: true },
     }
@@ -128,6 +130,29 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("The list I actually sleeve")).toBeTruthy()
     expect(view.getByText("1 card · 75% win rate · 3W 1L 0D over 4 games")).toBeTruthy()
     expect(view.queryByText(/Premium/)).toBeNull()
+  })
+
+  it("shows the selected deck context while its detail loads", () => {
+    mockDetail.value = undefined
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          summary={{
+            name: "Existing Deck",
+            game: "mtg",
+            format: "commander",
+            cardQuantity: 100,
+          }}
+          onBack={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getAllByText("Existing Deck").length).toBeGreaterThan(0)
+    expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
+    expect(view.getByText("Commander")).toBeTruthy()
+    expect(view.getByText("Main deck")).toBeTruthy()
   })
 
   it("edits the list behind an explicit edit mode and saves into the same version", async () => {
