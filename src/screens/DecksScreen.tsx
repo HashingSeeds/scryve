@@ -98,6 +98,26 @@ function DeckRow({ deck, game, onPress }: { deck: ShelfDeck; game: string; onPre
   )
 }
 
+function DeckShelfSkeleton() {
+  const { themed } = useAppTheme()
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading decks">
+      <View style={themed($sectionHeader)}>
+        <View style={themed($skeletonHeading)} />
+      </View>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <View key={index} testID="deck-skeleton-row" style={themed($row)}>
+          <View style={themed($coverPlaceholder)} />
+          <View style={themed($rowCopy)}>
+            <View style={themed($skeletonName)} />
+            <View style={themed($skeletonSubtitle)} />
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+}
+
 export function DecksScreen({
   onBack,
   onSelect,
@@ -274,7 +294,9 @@ export function DecksScreen({
                   />
                 ) : null}
               </View>
-            ) : null
+            ) : (
+              <DeckShelfSkeleton />
+            )
           }
         />
       </View>
@@ -330,6 +352,21 @@ const $coverPlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   backgroundColor: colors.palette.neutral200,
 })
 const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
+const $skeletonHeading: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 72,
+  height: 12,
+  backgroundColor: colors.separator,
+})
+const $skeletonName: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "58%",
+  height: 16,
+  backgroundColor: colors.separator,
+})
+const $skeletonSubtitle: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "76%",
+  height: 10,
+  backgroundColor: colors.separator,
+})
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({

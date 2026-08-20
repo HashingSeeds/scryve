@@ -41,7 +41,7 @@ const standardDeck = {
   coverImageUrl: undefined,
 }
 
-const mockListMine: { value: ShelfState } = {
+const mockListMine: { value: ShelfState | undefined } = {
   value: {
     decks: [commanderDeck, standardDeck],
     capacity: { used: 2, limit: 100, premium: true, canCreate: true },
@@ -94,6 +94,15 @@ describe("DecksScreen", () => {
     })
   })
 
+  it("shows the deck shelf structure while decks load", () => {
+    mockListMine.value = undefined
+    const view = renderShelf()
+
+    expect(view.getByLabelText("Loading decks")).toBeTruthy()
+    expect(view.getAllByTestId("deck-skeleton-row")).toHaveLength(4)
+    expect(view.queryByText("No Magic decks yet")).toBeNull()
+  })
+
   it("opens the add-deck route", () => {
     const onAddDeck = jest.fn()
     const view = renderShelf({ onAddDeck })
@@ -139,8 +148,9 @@ describe("DecksScreen", () => {
 
   it("does not put upgrade copy on the deck shelf", () => {
     mockListMine.value = {
-      ...mockListMine.value,
+      decks: [commanderDeck, standardDeck],
       capacity: { used: 1, limit: 1, premium: false, canCreate: false },
+      analyticsLocked: false,
     }
     const view = renderShelf()
     expect(view.queryByText(/Premium/)).toBeNull()
