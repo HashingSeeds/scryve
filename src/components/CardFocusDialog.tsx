@@ -2,7 +2,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 
-import { $alert, $alertText } from "@/components/BottomActionBar"
+import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
@@ -110,11 +110,7 @@ export function CardFocusDialog({
           {!details && !detailsError ? (
             <Text size="sm" style={themed($dimText)} text="Loading details…" />
           ) : null}
-          {detailsError ? (
-            <View style={themed($alert)}>
-              <Text accessibilityRole="alert" style={themed($alertText)} text={detailsError} />
-            </View>
-          ) : null}
+          {detailsError ? <AlertNote text={detailsError} /> : null}
         </View>
       </ScrollView>
       <View style={themed($quantityRow)}>

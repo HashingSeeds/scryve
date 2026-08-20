@@ -5,7 +5,7 @@ import { View } from "react-native"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { $alert, $alertText } from "./BottomActionBar"
+import { AlertNote } from "./AlertNote"
 import { Button } from "./Button"
 import { ChoiceButton } from "./ChoiceButton"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "./DialogCard"
@@ -96,11 +96,7 @@ export function DeckVersionDialog({
           />
         </View>
       ) : null}
-      {error ? (
-        <View style={themed($alert)}>
-          <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
-        </View>
-      ) : null}
+      {error ? <AlertNote text={error} /> : null}
       <View style={themed($dialogActions)}>
         <Button text="Cancel" style={themed($dialogButton)} disabled={busy} onPress={onClose} />
         <Button

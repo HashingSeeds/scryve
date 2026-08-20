@@ -4,7 +4,8 @@ import { ScrollView, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 
-import { $alert, $alertText, BottomActionBar } from "@/components/BottomActionBar"
+import { AlertNote } from "@/components/AlertNote"
+import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { Card } from "@/components/Card"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
@@ -410,19 +411,11 @@ export function AddDeckScreen({
             />
           </View>
 
-          {error ? (
-            <View style={themed($alert)}>
-              <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
-            </View>
-          ) : null}
+          {error ? <AlertNote text={error} /> : null}
           {unresolved > 0 ? (
-            <View style={themed($alert)}>
-              <Text
-                accessibilityRole="alert"
-                style={themed($alertText)}
-                text={`This deck has ${unresolved} card${unresolved === 1 ? "" : "s"} we could not match, so it cannot be imported yet.`}
-              />
-            </View>
+            <AlertNote
+              text={`This deck has ${unresolved} card${unresolved === 1 ? "" : "s"} we could not match, so it cannot be imported yet.`}
+            />
           ) : null}
 
           {cards.length === 0 && previewLoading ? (
@@ -465,13 +458,7 @@ export function AddDeckScreen({
         </ScrollView>
         <BottomActionBar>
           {atCapacity ? (
-            <View style={themed($alert)}>
-              <Text
-                accessibilityRole="alert"
-                style={themed($alertText)}
-                text="You've reached your deck limit. Archive a deck to import this one."
-              />
-            </View>
+            <AlertNote text="You've reached your deck limit. Archive a deck to import this one." />
           ) : null}
           <TouchableOpacity
             testID="import-preview-button"
@@ -690,23 +677,15 @@ export function AddDeckScreen({
           </View>
         ) : null}
 
-        {error ? (
-          <View style={themed($alert)}>
-            <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
-          </View>
-        ) : null}
+        {error ? <AlertNote text={error} /> : null}
         {atCapacity ? (
-          <View style={themed($alert)}>
-            <Text
-              accessibilityRole="alert"
-              style={themed($alertText)}
-              text={
-                capacity?.premium
-                  ? "You've reached the deck limit. Archive a deck to add another."
-                  : "You've reached your deck limit. Archive a deck to add another."
-              }
-            />
-          </View>
+          <AlertNote
+            text={
+              capacity?.premium
+                ? "You've reached the deck limit. Archive a deck to add another."
+                : "You've reached your deck limit. Archive a deck to add another."
+            }
+          />
         ) : null}
       </View>
     </Screen>

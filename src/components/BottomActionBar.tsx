@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
@@ -17,11 +17,3 @@ const $bar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderTopColor: colors.separator,
   backgroundColor: colors.background,
 })
-
-export const $alert: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  gap: spacing.xs,
-  padding: spacing.sm,
-  borderRadius: spacing.xs,
-  backgroundColor: colors.errorBackground,
-})
-export const $alertText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
