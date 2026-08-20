@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { SectionList, TouchableOpacity, View } from "react-native"
+import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 
@@ -346,17 +346,69 @@ export function DeckDetailScreen({
   if (!detail)
     return (
       <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-        <Header title={summary?.name ?? "Deck"} leftTx="common:back" onLeftPress={onBack} />
-        <View style={themed($loadingContent)}>
-          <View style={themed($titleBlock)}>
-            {summary ? <Text preset="subheading" text={summary.name} /> : null}
-            {loadingMetadata ? (
-              <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
-            ) : null}
-            <DeckLoadingProgress state="loading" accessibilityText="Loading deck" />
+        <Header
+          title=""
+          leftTx="common:back"
+          onLeftPress={onBack}
+          RightActionComponent={
+            <View style={themed($headerAction)}>
+              <Text size="lg" text="•••" />
+            </View>
+          }
+        />
+        <ScrollView
+          style={$styles.flex1}
+          contentContainerStyle={themed($loadingContent)}
+          scrollEnabled={false}
+        >
+          <View style={themed($headerBlock)}>
+            <View style={themed($titleBlock)}>
+              <Text preset="heading" text={summary?.name ?? "Deck"} />
+              {loadingMetadata ? (
+                <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
+              ) : null}
+              <DeckLoadingProgress state="loading" accessibilityText="Loading deck" />
+            </View>
+            <View style={themed($tabs)} accessibilityRole="tablist">
+              {(["cards", "versions", "notes"] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  testID={`deck-tab-${tab}`}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: tab === "cards", disabled: true }}
+                  style={[themed($tab), tab === "cards" && themed($selectedTab)]}
+                  disabled
+                >
+                  <Text
+                    size="sm"
+                    weight={tab === "cards" ? "bold" : "normal"}
+                    text={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              testID="current-version-button"
+              style={themed($currentVersion)}
+              disabled
+            >
+              <Text size="xs" style={themed($dimmedText)} text="Version" />
+              <Text weight="medium" text="Current  ›" />
+            </TouchableOpacity>
           </View>
           <DeckListSkeleton sections={loadingSections} density="comfortable" />
-        </View>
+        </ScrollView>
+        <BottomActionBar>
+          <View style={themed($actionRow)}>
+            <Button
+              testID="edit-deck-button"
+              text="Edit list"
+              preset="reversed"
+              style={$actionButton}
+              disabled
+            />
+          </View>
+        </BottomActionBar>
       </Screen>
     )
 
@@ -774,8 +826,8 @@ const $loadingContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 720,
   alignSelf: "center",
+  gap: spacing.sm,
   paddingHorizontal: spacing.lg,
-  paddingTop: spacing.sm,
   paddingBottom: spacing.lg,
 })
 const $block: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })

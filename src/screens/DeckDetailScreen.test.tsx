@@ -134,12 +134,13 @@ describe("DeckDetailScreen", () => {
 
   it("shows the selected deck context while its detail loads", () => {
     mockDetail.value = undefined
+    const name = "Scions & Spellcraft Collector's Edition (FINAL FANTASY XIV)"
     const view = render(
       <ThemeProvider initialContext="light">
         <DeckDetailScreen
           deckId="deck-1"
           summary={{
-            name: "Existing Deck",
+            name,
             game: "mtg",
             format: "commander",
             cardQuantity: 100,
@@ -149,10 +150,13 @@ describe("DeckDetailScreen", () => {
       </ThemeProvider>,
     )
 
-    expect(view.getAllByText("Existing Deck").length).toBeGreaterThan(0)
+    expect(view.getAllByText(name)).toHaveLength(1)
     expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
+    expect(view.getByTestId("deck-tab-cards")).toBeTruthy()
+    expect(view.getByTestId("current-version-button")).toBeTruthy()
     expect(view.getByText("Commander")).toBeTruthy()
     expect(view.getByText("Main deck")).toBeTruthy()
+    expect(view.getByTestId("edit-deck-button")).toBeDisabled()
   })
 
   it("edits the list behind an explicit edit mode and saves into the same version", async () => {
