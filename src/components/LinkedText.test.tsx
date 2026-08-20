@@ -15,9 +15,9 @@ describe("splitLinks", () => {
   })
 
   it("leaves sentence punctuation outside the link", () => {
-    expect(splitLinks("See https://count.sow.care/privacy.")).toEqual([
+    expect(splitLinks("See https://scryve.sow.care/privacy.")).toEqual([
       { content: "See " },
-      { content: "https://count.sow.care/privacy", href: "https://count.sow.care/privacy" },
+      { content: "https://scryve.sow.care/privacy", href: "https://scryve.sow.care/privacy" },
       { content: "." },
     ])
   })
@@ -69,12 +69,12 @@ describe("LinkedText", () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true)
     const view = render(
       <ThemeProvider initialContext="light">
-        <LinkedText text="Read https://count.sow.care/privacy for details." />
+        <LinkedText text="Read https://scryve.sow.care/privacy for details." />
       </ThemeProvider>,
     )
 
-    fireEvent.press(view.getByText("https://count.sow.care/privacy"))
-    expect(openURL).toHaveBeenCalledWith("https://count.sow.care/privacy")
+    fireEvent.press(view.getByText("https://scryve.sow.care/privacy"))
+    expect(openURL).toHaveBeenCalledWith("https://scryve.sow.care/privacy")
     openURL.mockRestore()
   })
 

@@ -100,7 +100,7 @@ export function SettingsScreen({
         <View style={themed($accountSection)}>
           <Text text="Account & data" preset="subheading" accessibilityRole="header" />
           <Text
-            text="Manage the cloud data tied to your Count account. Local games stay on this device."
+            text="Manage the cloud data tied to your Scryve account. Local games stay on this device."
             size="xs"
             style={themed($muted)}
           />

@@ -10,7 +10,7 @@ jest.mock("@clerk/expo", () => ({
 describe("web auth experience", () => {
   beforeEach(() => mockOpenSignIn.mockClear())
 
-  it("opens Clerk's virtual modal with Count styling and popup OAuth", () => {
+  it("opens Clerk's virtual modal with Scryve styling and popup OAuth", () => {
     const onDismiss = jest.fn()
     const { rerender } = render(<ClerkAuthModal visible={false} onDismiss={onDismiss} />)
 

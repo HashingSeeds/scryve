@@ -27,7 +27,7 @@ export const reportCrash = (error: Error, type: ErrorType = ErrorType.FATAL) => 
   })
   if (__DEV__) {
     // Never print raw error text: it may contain auth, invite, or identity values.
-    console.error(`[Count ${type}] Error details omitted by privacy policy`)
+    console.error(`[Scryve ${type}] Error details omitted by privacy policy`)
   } else {
     Sentry.captureException(error, { tags: { errorType: type } })
   }

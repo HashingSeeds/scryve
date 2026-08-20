@@ -16,7 +16,7 @@ All files are PNGs and are comfortably below the Google Play file-size limits.
 
 ## Notes
 
-- The app icon is a Count-specific mark based on the app's four-player board, controls, and production color palette. The launcher, adaptive Android, iOS, and web icon assets now use this mark; it will appear in the next application build.
+- The app icon is a Scryve-specific mark based on the app's four-player board, controls, and production color palette. The launcher, adaptive Android, iOS, and web icon assets now use this mark; it will appear in the next application build.
 - Video is optional and is not included. A public or unlisted, ad-free, non-age-restricted YouTube upload is still needed if a promo video is desired.
 - Reproducible Maestro capture flows live in `.maestro/store-assets/`.
 - The final screenshot sets prioritize live 2-, 5-, and 6-player boards. The phone set also includes the six-player controls overlay.

@@ -51,7 +51,7 @@ export function InviteScannerScreen({
         }
         await CameraView.dismissScanner().catch(() => undefined)
         setError(
-          "That QR is not a trusted Count invitation. Try another code or enter it manually.",
+          "That QR is not a trusted Scryve invitation. Try another code or enter it manually.",
         )
         processing.current = false
         return
@@ -118,7 +118,7 @@ export function InviteScannerScreen({
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
         <Text preset="heading" accessibilityRole="header" text="Camera permission" />
-        <Text text="Count uses the camera only while this screen is open to read an invitation QR. Images are not captured, stored, or uploaded." />
+        <Text text="Scryve uses the camera only while this screen is open to read an invitation QR. Images are not captured, stored, or uploaded." />
         {permission?.canAskAgain !== false ? (
           <Button text="Allow camera" onPress={() => void requestPermission()} />
         ) : (
@@ -154,7 +154,7 @@ export function InviteScannerScreen({
   return (
     <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
       <Text preset="heading" accessibilityRole="header" text="Scan invite" />
-      <Text text="Use the device scanner to find a trusted Count invite QR. Recognition stays on-device and no image is saved." />
+      <Text text="Use the device scanner to find a trusted Scryve invite QR. Recognition stays on-device and no image is saved." />
       {error ? (
         <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" text={error} />
       ) : null}

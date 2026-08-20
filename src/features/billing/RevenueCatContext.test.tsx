@@ -80,7 +80,7 @@ describe("RevenueCatProvider", () => {
     purchasesMock.restorePurchases.mockResolvedValue(customerInfo)
   })
 
-  it("identifies the Clerk user and derives Count Pro from CustomerInfo", async () => {
+  it("identifies the Clerk user and derives Scryve Pro from CustomerInfo", async () => {
     const { result } = renderHook(() => useRevenueCat(), { wrapper })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(Purchases.configure).toHaveBeenCalledWith(

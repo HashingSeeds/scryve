@@ -59,9 +59,9 @@ export function ConnectedLobbyScreen({
     try {
       setActionError(undefined)
       if (inviteUrl) {
-        await Share.share({ message: `Join my Count game: ${inviteUrl}`, url: inviteUrl })
+        await Share.share({ message: `Join my Scryve game: ${inviteUrl}`, url: inviteUrl })
       } else if (manualCode) {
-        await Share.share({ message: `Join my Count game with code ${manualCode}` })
+        await Share.share({ message: `Join my Scryve game with code ${manualCode}` })
       }
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Could not open sharing")

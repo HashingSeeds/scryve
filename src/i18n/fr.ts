@@ -23,13 +23,13 @@ const fr: Translations = {
     signInAccessibilityHint: "Connectez-vous pour jouer en ligne. Bientôt disponible.",
     status: "La base du produit est prête. La configuration et le jeu connecté arrivent ensuite.",
     comingSoonTitle: "Bientôt disponible",
-    comingSoonMessage: "Cette entrée est prête pour la prochaine phase d’implémentation de Count.",
+    comingSoonMessage: "Cette entrée est prête pour la prochaine phase d’implémentation de Scryve.",
     dismissComingSoon: "Compris",
   },
   errorScreen: {
     title: "Un problème est survenu",
     friendlySubtitle:
-      "Count a rencontré une erreur inattendue. Réinitialisez l’application pour repartir d’un état propre. Si le problème persiste, redémarrez le client de développement.",
+      "Scryve a rencontré une erreur inattendue. Réinitialisez l’application pour repartir d’un état propre. Si le problème persiste, redémarrez le client de développement.",
     reset: "Réinitialiser l’application",
   },
   emptyStateComponent: {

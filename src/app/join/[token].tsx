@@ -17,7 +17,7 @@ export default function InviteRoute() {
         <Text preset="heading" accessibilityRole="header" text="Invalid invitation" />
         <Text
           accessibilityRole="alert"
-          text="This Count invitation is malformed or incomplete. Ask the host for a new link or enter the 6-character code."
+          text="This Scryve invitation is malformed or incomplete. Ask the host for a new link or enter the 6-character code."
         />
         <Button text="Enter a manual code" onPress={() => router.replace("/connected/join")} />
         <Button text="Return home" onPress={() => router.replace("/")} />

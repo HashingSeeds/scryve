@@ -23,7 +23,7 @@ export function SubscriptionControls() {
       style={[themed($container), { paddingBottom: Math.max(insets.bottom, theme.spacing.xs) }]}
     >
       <View style={$headingText}>
-        <Text preset="subheading" text="Count Pro" accessibilityRole="header" />
+        <Text preset="subheading" text="Scryve Pro" accessibilityRole="header" />
         {billing.isCountPro && entitlement ? (
           <Text
             size="xs"
@@ -53,14 +53,14 @@ export function SubscriptionControls() {
       ) : null}
 
       <View style={$loading}>
-        {billing.isLoading ? <ActivityIndicator accessibilityLabel="Loading Count Pro" /> : null}
+        {billing.isLoading ? <ActivityIndicator accessibilityLabel="Loading Scryve Pro" /> : null}
       </View>
 
       {!billing.configured ? (
         <Text
           accessibilityRole="alert"
           size="xs"
-          text={billing.configurationMessage || "Count Pro purchases are not configured."}
+          text={billing.configurationMessage || "Scryve Pro purchases are not configured."}
         />
       ) : null}
       {billing.error ? <Text accessibilityRole="alert" size="xs" text={billing.error} /> : null}

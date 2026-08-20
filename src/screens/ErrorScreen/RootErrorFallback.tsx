@@ -19,7 +19,7 @@ export function RootErrorFallback({
           Something went wrong
         </Text>
         <Text style={styles.message}>
-          Count hit an unexpected error. Try again, or restart the app if the problem continues.
+          Scryve hit an unexpected error. Try again, or restart the app if the problem continues.
         </Text>
 
         {showDetails ? (

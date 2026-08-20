@@ -1,4 +1,4 @@
-# RevenueCat setup for Count
+# RevenueCat setup for Scryve
 
 The app integration expects one RevenueCat project shared by iOS, Android, and web. Clerk's
 `user.id` is the RevenueCat App User ID on every platform so a customer's access follows the
@@ -24,11 +24,11 @@ Play Store purchases. Rebuild the development client after adding or updating na
 
 ## 2. Add the RevenueCat apps and public SDK keys
 
-In RevenueCat, add the stores used by Count:
+In RevenueCat, add the stores used by Scryve:
 
 - iOS bundle ID: `com.sowinghope.count`
 - Android package: `com.sowinghope.count`
-- Web: configure a RevenueCat Web Billing app if Count will sell on the web
+- Web: configure a RevenueCat Web Billing app if Scryve will sell on the web
 - Test Store: use this while developing with the supplied `test_...` public SDK key
 
 The local, ignored `.env.development` contains the supplied Test Store key. For production, use
@@ -43,7 +43,7 @@ EXPO_PUBLIC_REVENUECAT_WEB_API_KEY=rcb_...
 `EXPO_PUBLIC_REVENUECAT_API_KEY` is a shared fallback intended for the Test Store. Public SDK
 keys are designed to ship in apps. Never put a RevenueCat secret API key in an Expo variable.
 
-Count's development and preview variants have different native identifiers. Add matching
+Scryve's development and preview variants have different native identifiers. Add matching
 RevenueCat/store apps if those variants will talk to Apple or Google instead of the Test Store.
 Check `app.config.ts` before doing that; the existing preview identifier is
 `com.sowinghpe.count.preview`.
@@ -70,7 +70,8 @@ same app code.
 
 In RevenueCat:
 
-1. Use the existing entitlement with lookup key `Count Pro` and display name **Count Pro**.
+1. Keep the existing entitlement lookup key `Count Pro` for purchase compatibility, but change its
+   display name to **Scryve Pro**.
 2. Attach `lifetime`, `yearly`, and `monthly` to that entitlement for every configured store.
 3. Create an offering with identifier `default` and make it the current offering.
 4. Add these packages to `default`:
@@ -84,18 +85,18 @@ The code deliberately looks up products in the current offering instead of hard-
 RevenueCat and the stores remain the source of truth for localized price, currency, trials, and
 availability.
 
-## 5. How Count uses the integration
+## 5. How Scryve uses the integration
 
 - `RevenueCatProvider` configures the SDK only after Clerk has a stable signed-in user ID.
 - `useCountPro()` derives access from `CustomerInfo.entitlements.active["Count Pro"]`.
 - A customer-info listener keeps access current after purchases, renewals, cancellations, or
   changes from another device.
-- `presentPaywall()` uses `presentPaywallIfNeeded`, so an active Count Pro customer is not shown
+- `presentPaywall()` uses `presentPaywallIfNeeded`, so an active Scryve Pro customer is not shown
   the sales paywall.
 - `purchase("monthly" | "yearly" | "lifetime")` supports a custom purchase UI if one is added
   later.
 - `restorePurchases()` is user initiated and available from Account.
-- Customer Center is available to active Count Pro customers. Native apps use RevenueCat's
+- Customer Center is available to active Scryve Pro customers. Native apps use RevenueCat's
   Customer Center; web opens RevenueCat's validated subscription-management URL.
 
 The Account screen contains the initial subscription controls. Feature UI can gate presentation
@@ -123,23 +124,23 @@ Keep Apple's required restore path visible even if Customer Center is also prese
 ## 7. Backend enforcement
 
 `CustomerInfo` is appropriate for responsive UI, but a client entitlement must not authorize a
-privileged Convex mutation by itself. Configure RevenueCat webhooks to update Count's existing
+privileged Convex mutation by itself. Configure RevenueCat webhooks to update Scryve's existing
 server-side entitlement record, keyed by the same Clerk user ID, and keep Convex authorization as
 the final authority for paid server features. Verify webhook authenticity/idempotency and process
 purchase, renewal, expiration, cancellation, billing issue, and transfer events.
 
-Until that webhook projection is implemented, the new SDK can sell and display Count Pro, but it
+Until that webhook projection is implemented, the new SDK can sell and display Scryve Pro, but it
 should not be treated as the server-side source of truth.
 
 ## 8. Test checklist
 
-1. Sign into Count before opening the paywall; confirm the RevenueCat customer ID is the Clerk
+1. Sign into Scryve before opening the paywall; confirm the RevenueCat customer ID is the Clerk
    user ID.
 2. Test monthly, yearly, and lifetime purchases with RevenueCat Test Store.
 3. Confirm cancel leaves access unchanged and errors show a recoverable message.
-4. Confirm restore updates Count Pro on a second installation signed into the same account.
+4. Confirm restore updates Scryve Pro on a second installation signed into the same account.
 5. Confirm active users do not see the paywall.
-6. Confirm Customer Center opens and returning to Count refreshes `CustomerInfo`.
+6. Confirm Customer Center opens and returning to Scryve refreshes `CustomerInfo`.
 7. Repeat with Apple Sandbox/TestFlight and a Play license tester using development builds.
 8. Verify expiration and billing-issue events remove server access after the webhook projection is
    installed.

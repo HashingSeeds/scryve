@@ -50,7 +50,7 @@ describe("SubscriptionControls", () => {
     })
   })
 
-  it("sends a subscriber without Count Pro to the paywall", () => {
+  it("sends a subscriber without Scryve Pro to the paywall", () => {
     const view = renderControls()
 
     fireEvent.press(view.getByTestId("count-pro-paywall-button"))
@@ -60,7 +60,7 @@ describe("SubscriptionControls", () => {
     expect(view.queryByTestId("count-pro-customer-center-button")).toBeNull()
   })
 
-  it("sends a Count Pro subscriber to the customer center and shows the renewal date", () => {
+  it("sends a Scryve Pro subscriber to the customer center and shows the renewal date", () => {
     mockBilling.isCountPro = true
     mockBilling.customerInfo = entitledCustomerInfo({
       expirationDate: "2026-09-01T00:00:00Z",
@@ -104,16 +104,16 @@ describe("SubscriptionControls", () => {
     fireEvent.press(view.getByTestId("count-pro-paywall-button"))
 
     expect(presentPaywall).not.toHaveBeenCalled()
-    expect(view.getByLabelText("Loading Count Pro")).toBeTruthy()
+    expect(view.getByLabelText("Loading Scryve Pro")).toBeTruthy()
   })
 
   it("explains why purchases are unavailable when RevenueCat is not configured", () => {
     mockBilling.configured = false
-    mockBilling.configurationMessage = "Count Pro purchases are unavailable in this build."
+    mockBilling.configurationMessage = "Scryve Pro purchases are unavailable in this build."
     const view = renderControls()
 
     expect(view.queryByTestId("count-pro-paywall-button")).toBeNull()
-    expect(view.getByText("Count Pro purchases are unavailable in this build.")).toBeTruthy()
+    expect(view.getByText("Scryve Pro purchases are unavailable in this build.")).toBeTruthy()
   })
 
   it("surfaces billing errors to the subscriber", () => {

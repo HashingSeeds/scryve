@@ -21,13 +21,13 @@ const ja: Translations = {
     signInAccessibilityHint: "接続プレイのためにサインインします。近日公開予定です。",
     status: "製品基盤の準備が整いました。ゲーム設定と接続プレイは次に実装されます。",
     comingSoonTitle: "近日公開",
-    comingSoonMessage: "この入口はCountの次の実装フェーズに向けて準備済みです。",
+    comingSoonMessage: "この入口はScryveの次の実装フェーズに向けて準備済みです。",
     dismissComingSoon: "了解",
   },
   errorScreen: {
     title: "問題が発生しました",
     friendlySubtitle:
-      "Countで予期しないエラーが発生しました。アプリをリセットして正常な状態に戻してください。問題が続く場合は開発クライアントを再起動してください。",
+      "Scryveで予期しないエラーが発生しました。アプリをリセットして正常な状態に戻してください。問題が続く場合は開発クライアントを再起動してください。",
     reset: "アプリをリセット",
   },
   emptyStateComponent: {

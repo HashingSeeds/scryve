@@ -10,20 +10,20 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: 'This Cookie Policy explains how Hashing Seeds LLC ("Company," "we," "us," and "our") uses cookies and similar technologies when you visit our website at https://count.sow.care (the "Website"). It explains what these technologies are, why we use them, and how you can control them.',
+          text: 'This Cookie Policy explains how Hashing Seeds LLC ("Company," "we," "us," and "our") uses cookies and similar technologies when you visit our website at https://scryve.sow.care (the "Website"). It explains what these technologies are, why we use them, and how you can control them.',
         },
         {
           type: "paragraph",
-          text: "In some cases we may use cookies to collect personal information, or information that becomes personal information if we combine it with other information. Our Privacy Notice explains how we handle personal information: https://count.sow.care/privacy.",
+          text: "In some cases we may use cookies to collect personal information, or information that becomes personal information if we combine it with other information. Our Privacy Notice explains how we handle personal information: https://scryve.sow.care/privacy.",
         },
       ],
     },
     {
-      heading: "Does the Count mobile application use cookies?",
+      heading: "Does the Scryve mobile application use cookies?",
       blocks: [
         {
           type: "paragraph",
-          text: "No. This Cookie Policy applies to our Website only. The Count mobile application does not use cookies. It stores your settings, your local game history, and your sign-in token on your device so that it can work.",
+          text: "No. This Cookie Policy applies to our Website only. The Scryve mobile application does not use cookies. It stores your settings, your local game history, and your sign-in token on your device so that it can work.",
         },
       ],
     },
@@ -79,7 +79,7 @@ export const cookiePolicyContent = {
         },
         {
           type: "paragraph",
-          text: "Clerk, our authentication provider, sets __client, __client_uat, and __client_uat_TfFRKPK8. These keep you signed in to your Count account and record whether you are signed in, so that pages render the correct signed-in or signed-out view. They persist for just under ten years unless you clear them. Clerk also stores __clerk_environment in your browser's local storage rather than as a cookie; it holds the sign-in configuration our Website needs in order to load its sign-in screen, and it persists until you clear it. For more information, see Clerk's privacy policy: https://clerk.com/legal/privacy.",
+          text: "Clerk, our authentication provider, sets __client, __client_uat, and __client_uat_TfFRKPK8. These keep you signed in to your Scryve account and record whether you are signed in, so that pages render the correct signed-in or signed-out view. They persist for just under ten years unless you clear them. Clerk also stores __clerk_environment in your browser's local storage rather than as a cookie; it holds the sign-in configuration our Website needs in order to load its sign-in screen, and it persists until you clear it. For more information, see Clerk's privacy policy: https://clerk.com/legal/privacy.",
         },
         {
           type: "paragraph",
@@ -124,7 +124,7 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "No. We do not serve advertising on our Website or in the Count application, and we do not share information with advertisers or advertising networks.",
+          text: "No. We do not serve advertising on our Website or in the Scryve application, and we do not share information with advertisers or advertising networks.",
         },
       ],
     },

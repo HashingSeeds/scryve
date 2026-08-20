@@ -21,13 +21,13 @@ const ko: Translations = {
     signInAccessibilityHint: "연결 플레이를 위해 로그인합니다. 곧 제공됩니다.",
     status: "제품 기반이 준비되었습니다. 게임 설정과 연결 플레이가 다음에 추가됩니다.",
     comingSoonTitle: "곧 제공 예정",
-    comingSoonMessage: "이 진입점은 Count의 다음 구현 단계를 위해 준비되었습니다.",
+    comingSoonMessage: "이 진입점은 Scryve의 다음 구현 단계를 위해 준비되었습니다.",
     dismissComingSoon: "확인",
   },
   errorScreen: {
     title: "문제가 발생했습니다",
     friendlySubtitle:
-      "Count에서 예기치 않은 오류가 발생했습니다. 앱을 초기화해 정상 상태로 돌아가세요. 문제가 계속되면 개발 클라이언트를 다시 시작하세요.",
+      "Scryve에서 예기치 않은 오류가 발생했습니다. 앱을 초기화해 정상 상태로 돌아가세요. 문제가 계속되면 개발 클라이언트를 다시 시작하세요.",
     reset: "앱 초기화",
   },
   emptyStateComponent: {

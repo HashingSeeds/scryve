@@ -15,8 +15,8 @@ export const privacyContent = {
         {
           type: "list",
           items: [
-            "Visit our website at https://count.sow.care or any website of ours that links to this Privacy Notice",
-            "Download and use our mobile application (Count), or any other application of ours that links to this Privacy Notice",
+            "Visit our website at https://scryve.sow.care or any website of ours that links to this Privacy Notice",
+            "Download and use our mobile application (Scryve), or any other application of ours that links to this Privacy Notice",
             "Contact us for support or otherwise communicate with us",
           ],
         },
@@ -176,7 +176,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Authentication Credentials. Clerk, our authentication provider, processes the credentials you use to create and access your account. Count does not receive or store your plaintext password.",
+          text: "Authentication Credentials. Clerk, our authentication provider, processes the credentials you use to create and access your account. Scryve does not receive or store your plaintext password.",
         },
         {
           type: "paragraph",
@@ -189,7 +189,7 @@ export const privacyContent = {
         {
           type: "list",
           items: [
-            "Camera Access. We request camera access only when you choose to scan a QR code for a connected game. Count does not capture, store, or upload camera images. You can change camera permission in your device settings.",
+            "Camera Access. We request camera access only when you choose to scan a QR code for a connected game. Scryve does not capture, store, or upload camera images. You can change camera permission in your device settings.",
             "Mobile Device Data. We automatically collect device information (such as your mobile device ID, model, and manufacturer), operating system, version information and system configuration information, device and application identification numbers, browser type and version, hardware model Internet service provider and/or mobile carrier, and Internet Protocol (IP) address (or proxy server). If you are using our application(s), we may also collect information about the phone network associated with your mobile device, your mobile device’s operating system or platform, the type of mobile device you use, your mobile device’s unique device ID, and information about the features of our application(s) you accessed.",
           ],
         },
@@ -233,7 +233,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "On our website, essential cookies and similar technologies may be used for authentication, security, preferences, and basic site operation. You can find out more in our Cookie Notice: https://count.sow.care/cookie-policy.",
+          text: "On our website, essential cookies and similar technologies may be used for authentication, security, preferences, and basic site operation. You can find out more in our Cookie Notice: https://scryve.sow.care/cookie-policy.",
         },
         {
           type: "paragraph",
@@ -244,7 +244,7 @@ export const privacyContent = {
           items: [
             'Log and Usage Data. Log and usage data is service-related, diagnostic, usage, and performance information our servers automatically collect when you access or use our Services and which we record in log files. Depending on how you interact with us, this log data may include your IP address, device information, browser type, and settings and information about your activity in the Services (such as the date/time stamps associated with your usage, pages and files viewed, searches, and other actions you take such as which features you use), device event information (such as system activity, error reports (sometimes called "crash dumps"), and hardware settings).',
             "Device Data. We collect device data such as information about your computer, phone, tablet, or other device you use to access the Services. Depending on the device used, this device data may include information such as your IP address (or proxy server), device and application identification numbers, location, browser type, hardware model, Internet service provider and/or mobile carrier, operating system, and system configuration information.",
-            "Approximate Location. Our service providers may infer a general location, such as country or region, from your IP address for security, fraud prevention, diagnostics, and service operation. Count does not request access to your device's GPS location.",
+            "Approximate Location. Our service providers may infer a general location, such as country or region, from your IP address for security, fraud prevention, diagnostics, and service operation. Scryve does not request access to your device's GPS location.",
           ],
         },
         {
@@ -342,7 +342,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "In Short: We disclose information to service providers that help us operate Count and in the other limited situations described below.",
+          text: "In Short: We disclose information to service providers that help us operate Scryve and in the other limited situations described below.",
         },
         {
           type: "paragraph",
@@ -383,7 +383,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "More information is available in our Cookie Notice: https://count.sow.care/cookie-policy.",
+          text: "More information is available in our Cookie Notice: https://scryve.sow.care/cookie-policy.",
         },
       ],
     },
@@ -541,7 +541,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Cookies and similar technologies: Most web browsers accept cookies by default. You can usually configure your browser to remove or reject cookies, though doing so may affect website authentication or other features. For more information, see our Cookie Notice: https://count.sow.care/cookie-policy.",
+          text: "Cookies and similar technologies: Most web browsers accept cookies by default. You can usually configure your browser to remove or reject cookies, though doing so may affect website authentication or other features. For more information, see our Cookie Notice: https://scryve.sow.care/cookie-policy.",
         },
         {
           type: "paragraph",
@@ -856,7 +856,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Based on the applicable laws of your country or state of residence in the US, you may have the right to request access to the personal information we collect from you, details about how we have processed it, correct inaccuracies, or delete your personal information. You may also have the right to withdraw your consent to our processing of your personal information. These rights may be limited in some circumstances by applicable law. To request deletion of your Count account and the data associated with it, visit https://count.sow.care/delete-account. To request to review or update your personal information, or to make any other request, contact us at support@sowinghope.how.",
+          text: "Based on the applicable laws of your country or state of residence in the US, you may have the right to request access to the personal information we collect from you, details about how we have processed it, correct inaccuracies, or delete your personal information. You may also have the right to withdraw your consent to our processing of your personal information. These rights may be limited in some circumstances by applicable law. To request deletion of your Scryve account and the data associated with it, visit https://scryve.sow.care/delete-account. To request to review or update your personal information, or to make any other request, contact us at support@sowinghope.how.",
         },
       ],
     },

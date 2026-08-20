@@ -2,7 +2,7 @@ export const SCRYFALL_BASE_URL = "https://api.scryfall.com"
 
 export const SCRYFALL_HEADERS = {
   "Accept": "application/json;q=0.9,*/*;q=0.8",
-  "User-Agent": "CountDeckBuilder/1.0 (https://count.sowinghope.co)",
+  "User-Agent": "ScryveDeckBuilder/1.0 (https://scryve.sow.care)",
 }
 
 const FACE_ORACLE_SEPARATOR = "\n—\n"

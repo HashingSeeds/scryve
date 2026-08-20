@@ -140,7 +140,7 @@ describe("account deletion", () => {
     ).rejects.toThrow("Account deletion is in progress")
   })
 
-  it("accepts deletion for a Clerk identity that has no Count projection", async () => {
+  it("accepts deletion for a Clerk identity that has no Scryve projection", async () => {
     const t = convexTest(schema, modules)
     const actor = t.withIdentity({ subject: "clerk-only-user" })
     const result = await actor.mutation(api.accountDeletion.requestCurrentAccountDeletion, {

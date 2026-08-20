@@ -1,6 +1,6 @@
-# Count
+# Scryve
 
-Count is an Expo Router life-counter app built on Ignite's component and theme foundation.
+Scryve is an Expo Router life-counter app built on Ignite's component and theme foundation.
 
 This is the boilerplate that [Infinite Red](https://infinite.red) uses as a way to test bleeding-edge changes to our React Native stack.
 
@@ -73,7 +73,7 @@ const MyComponent = () => {
 
 Maestro drives the installed iOS or Android development build through native accessibility, so no
 Maestro npm package is linked into the app. Install the
-[Maestro CLI](https://docs.maestro.dev/maestro-cli), boot a simulator/emulator with the Count
+[Maestro CLI](https://docs.maestro.dev/maestro-cli), boot a simulator/emulator with the Scryve
 development build installed, and start Metro before running:
 
 ```bash
