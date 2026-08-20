@@ -51,14 +51,26 @@ type PreconstructedDeck = {
   type?: string
 }
 
-type ImportedCard = {
-  oracleId: string
-  scryfallId: string
+type PreviewCard = {
+  oracleId?: string
+  scryfallId?: string
   name: string
   imageUrl?: string
   smallImageUrl?: string
   quantity: number
   board: "main" | "sideboard" | "commander"
+}
+
+type ImportedCard = PreviewCard & {
+  oracleId: string
+  scryfallId: string
+}
+
+type FocusedPreviewCard = PreviewCard & { scryfallId: string }
+
+type PreconstructedDeckOutline = {
+  name: string
+  cards: PreviewCard[]
 }
 
 type ResolvedPreconstructedDeck = {
@@ -85,12 +97,12 @@ function preconDetail(deck: PreconstructedDeck) {
     .join(" · ")
 }
 
-function totalQuantity(cards: ImportedCard[]) {
+function totalQuantity(cards: PreviewCard[]) {
   return cards.reduce((total, card) => total + card.quantity, 0)
 }
 
 function previewSections(
-  cards: ImportedCard[],
+  cards: PreviewCard[],
   configured: readonly { id: string; label: string }[],
 ) {
   const knownIds = new Set(configured.map((section) => section.id))
@@ -126,6 +138,7 @@ export function AddDeckScreen({
   const createDeck = useMutation(api.decks.create)
   const createImportedDeck = useMutation(api.decks.importResolved)
   const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
+  const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
   const fetchCardById = useAction(api.cards.byId)
@@ -140,9 +153,10 @@ export function AddDeckScreen({
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
   const [selectedPrecon, setSelectedPrecon] = useState<PreconstructedDeck>()
+  const [preconOutline, setPreconOutline] = useState<PreconstructedDeckOutline>()
   const [resolvedPrecon, setResolvedPrecon] = useState<ResolvedPreconstructedDeck>()
   const [previewLoading, setPreviewLoading] = useState(false)
-  const [focusedPreviewCard, setFocusedPreviewCard] = useState<ImportedCard>()
+  const [focusedPreviewCard, setFocusedPreviewCard] = useState<FocusedPreviewCard>()
   const [previewDetailsByScryfallId, setPreviewDetailsByScryfallId] = useState<
     Record<string, FocusedCardDetails>
   >({})
@@ -225,9 +239,13 @@ export function AddDeckScreen({
     previewToken.current = token
     try {
       setSelectedPrecon(deck)
+      setPreconOutline(undefined)
       setResolvedPrecon(undefined)
       setError(undefined)
       setPreviewLoading(true)
+      const outline = await previewPreconstructed({ fileName: deck.fileName })
+      if (previewToken.current !== token) return
+      setPreconOutline(outline)
       const resolved = await resolvePreconstructed({ fileName: deck.fileName })
       if (previewToken.current === token) setResolvedPrecon(resolved)
     } catch (cause) {
@@ -240,6 +258,7 @@ export function AddDeckScreen({
   function closePreview() {
     previewToken.current += 1
     setSelectedPrecon(undefined)
+    setPreconOutline(undefined)
     setResolvedPrecon(undefined)
     setFocusedPreviewCard(undefined)
     setPreviewDetailsError(undefined)
@@ -260,8 +279,9 @@ export function AddDeckScreen({
     }
   }
 
-  function focusPreviewCard(card: ImportedCard) {
-    setFocusedPreviewCard(card)
+  function focusPreviewCard(card: PreviewCard) {
+    if (!card.scryfallId) return
+    setFocusedPreviewCard({ ...card, scryfallId: card.scryfallId })
     setPreviewDetailsError(undefined)
     void loadPreviewCardDetails(card.scryfallId)
   }
@@ -336,12 +356,10 @@ export function AddDeckScreen({
     const previewFormat = preconSearchFormat(format)
       ? format
       : preconstructedFormat(selectedPrecon.type)
-    const cards = resolvedPrecon?.cards ?? []
+    const cards = resolvedPrecon?.cards ?? preconOutline?.cards ?? []
     const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game
-    const sections = previewSections(cards, deckSections(game, previewFormat))
-    const cover =
-      cards.find((card) => card.board === "commander" && (card.imageUrl || card.smallImageUrl)) ??
-      cards.find((card) => card.imageUrl || card.smallImageUrl)
+    const configuredSections = deckSections(game, previewFormat)
+    const sections = previewSections(cards, configuredSections)
     const unresolved = resolvedPrecon?.unresolved.length ?? 0
     const cannotImport = busy || atCapacity || previewLoading || !resolvedPrecon || unresolved > 0
 
@@ -357,49 +375,75 @@ export function AddDeckScreen({
           contentContainerStyle={themed($previewContent)}
           showsVerticalScrollIndicator={false}
         >
-          {previewLoading ? (
-            <Text style={themed($previewLoading)} text="Loading deck list…" />
-          ) : (
-            <>
-              <View style={themed($previewHero)}>
-                <View style={themed($previewCoverSlot)}>
-                  {cover ? (
-                    <Image
-                      source={cover.imageUrl ?? cover.smallImageUrl}
-                      style={themed($previewCover)}
-                      cachePolicy="memory-disk"
-                    />
-                  ) : null}
-                </View>
-                <View style={themed($previewTitle)}>
-                  <Text preset="heading" text={resolvedPrecon?.name || selectedPrecon.name} />
-                  <Text
-                    size="sm"
-                    style={themed($label)}
-                    text={`${gameLabel} · ${deckFormatLabel(game, previewFormat)} · ${cardCountLabel(totalQuantity(cards))}`}
-                  />
-                  {preconDetail(selectedPrecon) ? (
-                    <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
-                  ) : null}
-                </View>
+          <View style={themed($previewSummary)}>
+            <Text
+              preset="subheading"
+              text={resolvedPrecon?.name || preconOutline?.name || selectedPrecon.name}
+            />
+            <Text
+              size="sm"
+              style={themed($label)}
+              text={[
+                gameLabel,
+                deckFormatLabel(game, previewFormat),
+                cards.length ? cardCountLabel(totalQuantity(cards)) : undefined,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            />
+            {preconDetail(selectedPrecon) ? (
+              <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
+            ) : null}
+            {previewLoading ? (
+              <View
+                testID="precon-loading-progress"
+                accessibilityRole="progressbar"
+                accessibilityValue={{
+                  text: preconOutline ? "Loading card images" : "Loading official card list",
+                }}
+                style={themed($previewProgressTrack)}
+              >
+                <View
+                  style={themed(
+                    preconOutline ? $previewProgressOutlineReady : $previewProgressStarting,
+                  )}
+                />
               </View>
+            ) : null}
+          </View>
 
-              {error ? (
-                <View style={themed($alert)}>
-                  <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
-                </View>
-              ) : null}
-              {unresolved > 0 ? (
-                <View style={themed($alert)}>
-                  <Text
-                    accessibilityRole="alert"
-                    style={themed($alertText)}
-                    text={`This deck has ${unresolved} card${unresolved === 1 ? "" : "s"} we could not match, so it cannot be imported yet.`}
-                  />
-                </View>
-              ) : null}
+          {error ? (
+            <View style={themed($alert)}>
+              <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
+            </View>
+          ) : null}
+          {unresolved > 0 ? (
+            <View style={themed($alert)}>
+              <Text
+                accessibilityRole="alert"
+                style={themed($alertText)}
+                text={`This deck has ${unresolved} card${unresolved === 1 ? "" : "s"} we could not match, so it cannot be imported yet.`}
+              />
+            </View>
+          ) : null}
 
-              {sections.map((section) => (
+          {cards.length === 0 && previewLoading
+            ? configuredSections.slice(0, 2).map((section) => (
+                <View key={section.id}>
+                  <View style={themed($previewSectionHeader)}>
+                    <Text weight="bold" text={section.label} />
+                  </View>
+                  {Array.from({ length: section.id === configuredSections[0]?.id ? 1 : 3 }).map(
+                    (_, index) => (
+                      <View key={index} style={themed($previewCardRow)}>
+                        <View style={themed($previewThumbnailSlot)} />
+                        <View style={themed($previewCardSkeletonLine)} />
+                      </View>
+                    ),
+                  )}
+                </View>
+              ))
+            : sections.map((section) => (
                 <View key={section.id}>
                   <View style={themed($previewSectionHeader)}>
                     <Text weight="bold" text={section.label} />
@@ -407,11 +451,12 @@ export function AddDeckScreen({
                   </View>
                   {section.entries.map((card) => (
                     <TouchableOpacity
-                      key={`${card.board}:${card.scryfallId}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Preview ${card.name}`}
-                      activeOpacity={0.75}
+                      key={`${card.board}:${card.scryfallId ?? card.name}`}
+                      accessibilityRole={card.scryfallId ? "button" : undefined}
+                      accessibilityLabel={card.scryfallId ? `Preview ${card.name}` : undefined}
+                      activeOpacity={card.scryfallId ? 0.75 : 1}
                       style={themed($previewCardRow)}
+                      disabled={!card.scryfallId}
                       onPress={() => focusPreviewCard(card)}
                     >
                       <View style={themed($previewThumbnailSlot)}>
@@ -431,8 +476,6 @@ export function AddDeckScreen({
                   ))}
                 </View>
               ))}
-            </>
-          )}
         </ScrollView>
         <BottomActionBar>
           {atCapacity ? (
@@ -755,22 +798,27 @@ const $previewContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.lg,
   paddingBottom: spacing.lg,
 })
-const $previewLoading: ThemedStyle<TextStyle> = ({ spacing }) => ({ paddingVertical: spacing.xl })
-const $previewHero: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "flex-start",
-  gap: spacing.md,
-  paddingVertical: spacing.sm,
+const $previewSummary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xxxs,
+  paddingTop: spacing.sm,
+  paddingBottom: spacing.xs,
 })
-const $previewCoverSlot: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: 108,
-  height: 151,
-  borderRadius: spacing.xxs,
+const $previewProgressTrack: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  height: 3,
+  marginTop: spacing.sm,
   overflow: "hidden",
   backgroundColor: colors.separator,
 })
-const $previewCover: ThemedStyle<ImageStyle> = () => ({ width: 108, height: 151 })
-const $previewTitle: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxs })
+const $previewProgressStarting: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "35%",
+  height: "100%",
+  backgroundColor: colors.tint,
+})
+const $previewProgressOutlineReady: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "72%",
+  height: "100%",
+  backgroundColor: colors.tint,
+})
 const $previewSectionHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
@@ -796,6 +844,11 @@ const $previewThumbnailSlot: ThemedStyle<ViewStyle> = ({ colors, spacing }) => (
   backgroundColor: colors.separator,
 })
 const $previewThumbnail: ThemedStyle<ImageStyle> = () => ({ width: 36, height: 50 })
+const $previewCardSkeletonLine: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "64%",
+  height: 14,
+  backgroundColor: colors.separator,
+})
 const $previewCardName: ThemedStyle<TextStyle> = () => ({ flex: 1 })
 const $previewImportButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 56,

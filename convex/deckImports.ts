@@ -46,6 +46,11 @@ type ResolvedPreconstructedDeck = {
   unresolved: string[]
 }
 
+type PreconstructedDeckOutline = {
+  name: string
+  cards: ParsedEntry[]
+}
+
 const MTGJSON_BASE_URL = "https://mtgjson.com/api/v5"
 const MAX_PASTED_LIST_LENGTH = 50_000
 const MAX_PRECON_RESULTS = 30
@@ -75,6 +80,13 @@ const cachedPreconstructedCardValidator = v.object({
   smallImageUrl: v.optional(v.string()),
   quantity: v.number(),
   board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
+})
+
+const preconstructedOutlineCardValidator = v.object({
+  name: v.string(),
+  quantity: v.number(),
+  board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
+  scryfallId: v.optional(v.string()),
 })
 
 async function requireActionIdentity(ctx: { auth: { getUserIdentity: () => Promise<unknown> } }) {
@@ -276,6 +288,24 @@ function cachedPreconstructedDeck(
   return { name: cached.name, cards: cached.cards, unresolved: cached.unresolved }
 }
 
+function outlineFromResolved(
+  cached: Doc<"resolvedPreconstructedDecks">,
+): PreconstructedDeckOutline {
+  return {
+    name: cached.name,
+    cards: cached.cards.map(({ name, quantity, board, scryfallId }) => ({
+      name,
+      quantity,
+      board,
+      scryfallId,
+    })),
+  }
+}
+
+function outlineFromCache(cached: Doc<"preconstructedDeckOutlines">): PreconstructedDeckOutline {
+  return { name: cached.name, cards: cached.cards }
+}
+
 export const resolvedPreconstructedCache = internalQuery({
   args: { fileName: v.string() },
   handler: async (ctx, args) =>
@@ -308,6 +338,40 @@ export const storeResolvedPreconstructed = internalMutation({
       return existing._id
     }
     return await ctx.db.insert("resolvedPreconstructedDecks", value)
+  },
+})
+
+export const preconstructedOutlineCache = internalQuery({
+  args: { fileName: v.string() },
+  handler: async (ctx, args) =>
+    await ctx.db
+      .query("preconstructedDeckOutlines")
+      .withIndex("by_file_name", (query) => query.eq("fileName", args.fileName))
+      .unique(),
+})
+
+export const storePreconstructedOutline = internalMutation({
+  args: {
+    fileName: v.string(),
+    name: v.string(),
+    cards: v.array(preconstructedOutlineCardValidator),
+  },
+  handler: async (ctx, args) => {
+    if (args.cards.length > MAX_DECK_CARDS)
+      throw new ConvexError({
+        code: "deck_too_large",
+        message: `A deck may contain at most ${MAX_DECK_CARDS} entries`,
+      })
+    const existing = await ctx.db
+      .query("preconstructedDeckOutlines")
+      .withIndex("by_file_name", (query) => query.eq("fileName", args.fileName))
+      .unique()
+    const value = { ...args, fetchedAt: Date.now() }
+    if (existing) {
+      await ctx.db.replace(existing._id, value)
+      return existing._id
+    }
+    return await ctx.db.insert("preconstructedDeckOutlines", value)
   },
 })
 
@@ -370,12 +434,16 @@ export const coldPreconstructedFetchStatus = internalQuery({
       .query("resolvedPreconstructedDecks")
       .withIndex("by_file_name", (query) => query.eq("fileName", args.fileName))
       .unique()
-    if (cached) return { cached, leaseUntil: null }
+    if (cached) return { cached, outline: null, leaseUntil: null }
+    const outline = await ctx.db
+      .query("preconstructedDeckOutlines")
+      .withIndex("by_file_name", (query) => query.eq("fileName", args.fileName))
+      .unique()
     const fetch = await ctx.db
       .query("preconstructedDeckFetches")
       .withIndex("by_file_name", (query) => query.eq("fileName", args.fileName))
       .unique()
-    return { cached: null, leaseUntil: fetch?.leaseUntil ?? null }
+    return { cached: null, outline, leaseUntil: fetch?.leaseUntil ?? null }
   },
 })
 
@@ -401,7 +469,14 @@ export const pruneResolvedPreconstructedCache = internalMutation({
       )
       .take(MAX_CACHE_PRUNE)
     for (const cached of expired) await ctx.db.delete(cached._id)
-    return expired.length
+    const expiredOutlines = await ctx.db
+      .query("preconstructedDeckOutlines")
+      .withIndex("by_fetched_at", (query) =>
+        query.lt("fetchedAt", Date.now() - RESOLVED_PRECON_RETENTION_MS),
+      )
+      .take(MAX_CACHE_PRUNE - expired.length)
+    for (const outline of expiredOutlines) await ctx.db.delete(outline._id)
+    return expired.length + expiredOutlines.length
   },
 })
 
@@ -452,10 +527,37 @@ async function preconCatalog(ctx: ActionCtx) {
   }
 }
 
-async function fetchAndCachePreconstructed(
+function normalizedPreconstructedFileName(fileName: string) {
+  if (!/^[A-Za-z0-9_.-]{1,200}$/.test(fileName))
+    throw new ConvexError({ code: "invalid_deck_identifier", message: "Invalid deck identifier" })
+  return fileName.endsWith(".json") ? fileName : `${fileName}.json`
+}
+
+async function cachedPreconstructedOutline(
   ctx: ActionCtx,
   fileName: string,
-): Promise<ResolvedPreconstructedDeck> {
+): Promise<PreconstructedDeckOutline | null> {
+  const resolved: Doc<"resolvedPreconstructedDecks"> | null = await ctx.runQuery(
+    internal.deckImports.resolvedPreconstructedCache,
+    { fileName },
+  )
+  if (resolved) return outlineFromResolved(resolved)
+  const outline: Doc<"preconstructedDeckOutlines"> | null = await ctx.runQuery(
+    internal.deckImports.preconstructedOutlineCache,
+    { fileName },
+  )
+  return outline ? outlineFromCache(outline) : null
+}
+
+async function fetchAndCachePreconstructedOutline(
+  ctx: ActionCtx,
+  fileName: string,
+  forceRefresh = false,
+): Promise<PreconstructedDeckOutline> {
+  if (!forceRefresh) {
+    const cached = await cachedPreconstructedOutline(ctx, fileName)
+    if (cached) return cached
+  }
   const response = await fetch(`${MTGJSON_BASE_URL}/decks/${encodeURIComponent(fileName)}`)
   if (!response.ok)
     throw new ConvexError({
@@ -463,7 +565,21 @@ async function fetchAndCachePreconstructed(
       message: `Official deck import is temporarily unavailable (${response.status})`,
     })
   const deck = mtgJsonEntries((await response.json()) as unknown)
-  const resolved = await resolveEntries(ctx, deck.entries)
+  const outline = { name: deck.name, cards: deck.entries }
+  await ctx.runMutation(internal.deckImports.storePreconstructedOutline, {
+    fileName,
+    ...outline,
+  })
+  return outline
+}
+
+async function fetchAndCachePreconstructed(
+  ctx: ActionCtx,
+  fileName: string,
+  refreshOutline = false,
+): Promise<ResolvedPreconstructedDeck> {
+  const deck = await fetchAndCachePreconstructedOutline(ctx, fileName, refreshOutline)
+  const resolved = await resolveEntries(ctx, deck.cards)
   const result = {
     name: deck.name,
     cards: resolved.cards.map(cachedCard),
@@ -474,6 +590,43 @@ async function fetchAndCachePreconstructed(
     ...result,
   })
   return result
+}
+
+async function previewColdPreconstructed(
+  ctx: ActionCtx,
+  fileName: string,
+): Promise<PreconstructedDeckOutline> {
+  const claimId = crypto.randomUUID()
+  let pollMs = 100
+
+  while (true) {
+    const claimed: boolean = await ctx.runMutation(
+      internal.deckImports.claimColdPreconstructedFetch,
+      { fileName, claimId },
+    )
+    if (claimed) {
+      try {
+        return await fetchAndCachePreconstructedOutline(ctx, fileName)
+      } finally {
+        await ctx.runMutation(internal.deckImports.releaseColdPreconstructedFetch, {
+          fileName,
+          claimId,
+        })
+      }
+    }
+
+    const status: {
+      cached: Doc<"resolvedPreconstructedDecks"> | null
+      outline: Doc<"preconstructedDeckOutlines"> | null
+      leaseUntil: number | null
+    } = await ctx.runQuery(internal.deckImports.coldPreconstructedFetchStatus, { fileName })
+    if (status.cached) return outlineFromResolved(status.cached)
+    if (status.outline) return outlineFromCache(status.outline)
+    if (status.leaseUntil === null || status.leaseUntil <= Date.now()) continue
+
+    await new Promise((resolve) => setTimeout(resolve, pollMs))
+    pollMs = Math.min(pollMs * 2, PRECON_COLD_FETCH_POLL_MAX_MS)
+  }
 }
 
 async function resolveColdPreconstructed(
@@ -501,6 +654,7 @@ async function resolveColdPreconstructed(
 
     const status: {
       cached: Doc<"resolvedPreconstructedDecks"> | null
+      outline: Doc<"preconstructedDeckOutlines"> | null
       leaseUntil: number | null
     } = await ctx.runQuery(internal.deckImports.coldPreconstructedFetchStatus, { fileName })
     if (status.cached) return cachedPreconstructedDeck(status.cached)
@@ -515,7 +669,7 @@ export const refreshResolvedPreconstructed = internalAction({
   args: { fileName: v.string() },
   handler: async (ctx, args): Promise<null> => {
     try {
-      await fetchAndCachePreconstructed(ctx, args.fileName)
+      await fetchAndCachePreconstructed(ctx, args.fileName, true)
     } finally {
       await ctx.runMutation(internal.deckImports.releaseResolvedPreconstructedRefresh, args)
     }
@@ -546,13 +700,21 @@ export const searchPreconstructed = action({
   },
 })
 
+export const previewPreconstructed = action({
+  args: { fileName: v.string() },
+  handler: async (ctx, args): Promise<PreconstructedDeckOutline> => {
+    await requireActionIdentity(ctx)
+    const fileName = normalizedPreconstructedFileName(args.fileName)
+    const cached = await cachedPreconstructedOutline(ctx, fileName)
+    return cached ?? (await previewColdPreconstructed(ctx, fileName))
+  },
+})
+
 export const resolvePreconstructed = action({
   args: { fileName: v.string() },
   handler: async (ctx, args): Promise<ResolvedPreconstructedDeck> => {
     await requireActionIdentity(ctx)
-    if (!/^[A-Za-z0-9_.-]{1,200}$/.test(args.fileName))
-      throw new ConvexError({ code: "invalid_deck_identifier", message: "Invalid deck identifier" })
-    const fileName = args.fileName.endsWith(".json") ? args.fileName : `${args.fileName}.json`
+    const fileName = normalizedPreconstructedFileName(args.fileName)
     const cached: Doc<"resolvedPreconstructedDecks"> | null = await ctx.runQuery(
       internal.deckImports.resolvedPreconstructedCache,
       { fileName },

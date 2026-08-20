@@ -290,6 +290,22 @@ export default defineSchema({
     .index("by_file_name", ["fileName"])
     .index("by_fetched_at", ["fetchedAt"]),
 
+  preconstructedDeckOutlines: defineTable({
+    fileName: v.string(),
+    name: v.string(),
+    cards: v.array(
+      v.object({
+        name: v.string(),
+        quantity: v.number(),
+        board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
+        scryfallId: v.optional(v.string()),
+      }),
+    ),
+    fetchedAt: v.number(),
+  })
+    .index("by_file_name", ["fileName"])
+    .index("by_fetched_at", ["fetchedAt"]),
+
   preconstructedDeckFetches: defineTable({
     fileName: v.string(),
     claimId: v.string(),

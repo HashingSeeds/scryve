@@ -27,6 +27,17 @@ const mockResolvePrecon = jest.fn(async () => ({
     },
   ],
 }))
+const mockPreviewPrecon = jest.fn(async () => ({
+  name: "Explorers of the Deep",
+  cards: [
+    {
+      scryfallId: "22222222-2222-2222-2222-222222222222",
+      name: "Hakbal of the Surging Soul",
+      quantity: 1,
+      board: "commander",
+    },
+  ],
+}))
 const mockResolvePasted = jest.fn()
 const mockCardById = jest.fn(async () => ({
   manaCost: "{1}{G}{U}",
@@ -61,6 +72,7 @@ jest.mock("convex/react", () => ({
   useAction: (reference: string) => {
     if (reference === "cards.byId") return mockCardById
     if (reference === "deckImports.searchPreconstructed") return mockSearch
+    if (reference === "deckImports.previewPreconstructed") return mockPreviewPrecon
     if (reference === "deckImports.resolvePreconstructed") return mockResolvePrecon
     return mockResolvePasted
   },
@@ -75,6 +87,7 @@ jest.mock("../../convex/_generated/api", () => ({
     },
     deckImports: {
       searchPreconstructed: "deckImports.searchPreconstructed",
+      previewPreconstructed: "deckImports.previewPreconstructed",
       resolvePreconstructed: "deckImports.resolvePreconstructed",
       resolvePasted: "deckImports.resolvePasted",
     },
@@ -166,6 +179,41 @@ describe("AddDeckScreen", () => {
       }),
     )
     expect(onCreated).toHaveBeenCalledWith("deck-imported")
+  })
+
+  it("keeps the selected deck visible while its outline loads", async () => {
+    mockPreviewPrecon.mockImplementationOnce(() => new Promise(() => undefined))
+    const view = renderAddDeck()
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+    await waitFor(() => expect(view.getByText("Explorers of the Deep")).toBeTruthy())
+
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+
+    expect(view.getByTestId("precon-preview")).toBeTruthy()
+    expect(view.getByText("Explorers of the Deep")).toBeTruthy()
+    expect(view.getByTestId("precon-loading-progress")).toBeTruthy()
+  })
+
+  it("shows the official card outline before Scryfall hydration finishes", async () => {
+    mockResolvePrecon.mockImplementationOnce(() => new Promise(() => undefined))
+    const view = renderAddDeck()
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+    await waitFor(() => expect(view.getByText("Explorers of the Deep")).toBeTruthy())
+
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+
+    await waitFor(() => expect(mockPreviewPrecon).toHaveBeenCalledTimes(1))
+    expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy()
+    expect(view.getByTestId("precon-loading-progress")).toBeTruthy()
+    expect(view.getByTestId("import-preview-button").props.accessibilityState.disabled).toBe(true)
   })
 
   it("opens a read-only card preview from the deck preview", async () => {

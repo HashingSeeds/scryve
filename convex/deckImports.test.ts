@@ -165,6 +165,81 @@ describe("preconstructed catalog caching", () => {
     }
   })
 
+  it("reuses the MTGJSON outline when hydrating a cold preview", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) => resolvedPreconResponse(String(input)))
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "progressive-precon-user" })
+
+      const outline = await actor.action(api.deckImports.previewPreconstructed, {
+        fileName: "AvengersAssemble",
+      })
+      expect(outline).toMatchObject({
+        name: "Avengers Assemble",
+        cards: [{ name: "Captain America, Team Leader", board: "commander", quantity: 1 }],
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+
+      await actor.action(api.deckImports.resolvePreconstructed, {
+        fileName: "AvengersAssemble",
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("coalesces concurrent cold outline requests", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) => resolvedPreconResponse(String(input)))
+    try {
+      const t = convexTest(schema, modules)
+      const users = Array.from({ length: 5 }, (_, index) =>
+        t.withIdentity({ subject: `concurrent-outline-user-${index}` }),
+      )
+
+      const outlines = await Promise.all(
+        users.map((user) =>
+          user.action(api.deckImports.previewPreconstructed, {
+            fileName: "AvengersAssemble",
+          }),
+        ),
+      )
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(outlines.every((outline) => outline.name === "Avengers Assemble")).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("keeps the hydration lease visible after the outline is ready", async () => {
+    const t = convexTest(schema, modules)
+    const fileName = "HydratingDeck.json"
+    await expect(
+      t.mutation(internal.deckImports.claimColdPreconstructedFetch, {
+        fileName,
+        claimId: "hydrating-owner",
+      }),
+    ).resolves.toBe(true)
+    await t.mutation(internal.deckImports.storePreconstructedOutline, {
+      fileName,
+      name: "Hydrating Deck",
+      cards: [],
+    })
+
+    await expect(
+      t.query(internal.deckImports.coldPreconstructedFetchStatus, { fileName }),
+    ).resolves.toMatchObject({
+      cached: null,
+      outline: { name: "Hydrating Deck" },
+      leaseUntil: expect.any(Number),
+    })
+  })
+
   it("coalesces concurrent cold requests for the same deck", async () => {
     const fetchSpy = jest
       .spyOn(global, "fetch")
