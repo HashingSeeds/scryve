@@ -107,7 +107,10 @@ function DeckShelfSkeleton() {
       </View>
       {Array.from({ length: 4 }).map((_, index) => (
         <View key={index} testID="deck-skeleton-row" style={themed($row)}>
-          <View style={themed($coverPlaceholder)} />
+          <View
+            testID="deck-skeleton-cover"
+            style={[themed($coverPlaceholder), themed($skeletonCover)]}
+          />
           <View style={themed($rowCopy)}>
             <View style={themed($skeletonName)} />
             <View style={themed($skeletonSubtitle)} />
@@ -355,6 +358,9 @@ const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spaci
 const $skeletonHeading: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: 72,
   height: 12,
+  backgroundColor: colors.separator,
+})
+const $skeletonCover: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.separator,
 })
 const $skeletonName: ThemedStyle<ViewStyle> = ({ colors }) => ({

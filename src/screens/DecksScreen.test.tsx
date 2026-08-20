@@ -1,5 +1,7 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
+import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 
 import { DecksScreen } from "./DecksScreen"
@@ -100,6 +102,13 @@ describe("DecksScreen", () => {
 
     expect(view.getByLabelText("Loading decks")).toBeTruthy()
     expect(view.getAllByTestId("deck-skeleton-row")).toHaveLength(4)
+    expect(
+      StyleSheet.flatten(view.getAllByTestId("deck-skeleton-cover")[0].props.style),
+    ).toMatchObject({
+      width: 46,
+      height: 64,
+      backgroundColor: colors.separator,
+    })
     expect(view.queryByText("No Magic decks yet")).toBeNull()
   })
 
