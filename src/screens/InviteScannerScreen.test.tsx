@@ -144,9 +144,7 @@ describe("InviteScannerScreen", () => {
       type: "qr",
     })
     await waitFor(() =>
-      expect(screen.getByRole("alert").props.children).toContain(
-        "not a trusted Scryve invitation",
-      ),
+      expect(screen.getByRole("alert").props.children).toContain("not a trusted Scryve invitation"),
     )
     expect(mockDismissScanner).toHaveBeenCalledTimes(1)
     expect(onInvite).not.toHaveBeenCalled()

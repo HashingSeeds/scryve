@@ -24,7 +24,8 @@ const es: Translations = {
     status:
       "La base del producto está lista. La configuración y el juego conectado llegarán después.",
     comingSoonTitle: "Próximamente",
-    comingSoonMessage: "Esta entrada está lista para la siguiente fase de implementación de Scryve.",
+    comingSoonMessage:
+      "Esta entrada está lista para la siguiente fase de implementación de Scryve.",
     dismissComingSoon: "Entendido",
   },
   errorScreen: {
