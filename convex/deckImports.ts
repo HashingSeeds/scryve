@@ -4,6 +4,7 @@ import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
 import type { ActionCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery } from "./_generated/server"
+import { preconstructedFormat } from "./lib/deckGames"
 import {
   type CardReference,
   normalizeScryfallCard,
@@ -274,17 +275,22 @@ async function preconCatalog(ctx: ActionCtx) {
 }
 
 export const searchPreconstructed = action({
-  args: { query: v.string() },
+  args: { query: v.string(), format: v.optional(v.string()) },
   handler: async (ctx, args): Promise<PreconstructedDeck[]> => {
     await requireActionIdentity(ctx)
     const query = args.query.trim().toLocaleLowerCase()
-    if (query.length < 2 || query.length > 120) return []
+    const format = args.format?.trim().toLocaleLowerCase()
+    if (query.length > 120) return []
+    if (query.length < 2 && !format) return []
     const decks = await preconCatalog(ctx)
     return decks
-      .filter((deck) =>
-        [deck.name, deck.code, deck.type].some((value) =>
-          value?.toLocaleLowerCase().includes(query),
-        ),
+      .filter((deck) => !format || preconstructedFormat(deck.type) === format)
+      .filter(
+        (deck) =>
+          query.length < 2 ||
+          [deck.name, deck.code, deck.type].some((value) =>
+            value?.toLocaleLowerCase().includes(query),
+          ),
       )
       .sort((left, right) => (right.releaseDate ?? "").localeCompare(left.releaseDate ?? ""))
       .slice(0, MAX_PRECON_RESULTS)

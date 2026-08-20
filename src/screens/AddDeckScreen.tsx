@@ -1,21 +1,47 @@
-import { useState } from "react"
-import { View } from "react-native"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import type { TextStyle, ViewStyle } from "react-native"
+import { ScrollView, TouchableOpacity, View } from "react-native"
+import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 
-import { $alert, $alertText } from "@/components/BottomActionBar"
+import { $alert, $alertText, BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { Card } from "@/components/Card"
+import type { FocusedCardDetails } from "@/components/CardFocusDialog"
+import { CardFocusDialog } from "@/components/CardFocusDialog"
+import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { cardCountLabel } from "@/features/decks/deckCopy"
+import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { useAppTheme } from "@/theme/context"
+import type { ThemedStyle } from "@/theme/types"
+import { accessibleForeground } from "@/utils/colorContrast"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
-import { preconstructedFormat } from "../../convex/lib/deckGames"
+import {
+  DECK_GAME_LIST,
+  deckFormatLabel,
+  deckFormats,
+  deckSections,
+  preconSearchFormat,
+  preconstructedFormat,
+} from "../../convex/lib/deckGames"
 
 type CreationMode = "precon" | "paste" | "blank"
+
+const MODES: Array<{ id: CreationMode; label: string }> = [
+  { id: "precon", label: "Official precon" },
+  { id: "paste", label: "Paste list" },
+  { id: "blank", label: "From scratch" },
+]
+
+const SEARCH_DEBOUNCE_MS = 350
+
+type SetupField = "game" | "format" | "mode"
 
 type PreconstructedDeck = {
   fileName: string
@@ -35,6 +61,12 @@ type ImportedCard = {
   board: "main" | "sideboard" | "commander"
 }
 
+type ResolvedPreconstructedDeck = {
+  name: string
+  unresolved: string[]
+  cards: ImportedCard[]
+}
+
 function importCards(cards: ImportedCard[]) {
   return cards.map(({ oracleId, scryfallId, name, imageUrl, smallImageUrl, quantity, board }) => ({
     oracleId,
@@ -45,6 +77,39 @@ function importCards(cards: ImportedCard[]) {
     quantity,
     board,
   }))
+}
+
+function preconDetail(deck: PreconstructedDeck) {
+  return [deck.type, deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
+    .filter(Boolean)
+    .join(" · ")
+}
+
+function totalQuantity(cards: ImportedCard[]) {
+  return cards.reduce((total, card) => total + card.quantity, 0)
+}
+
+function previewSections(
+  cards: ImportedCard[],
+  configured: readonly { id: string; label: string }[],
+) {
+  const knownIds = new Set(configured.map((section) => section.id))
+  const extras = [
+    ...new Set(cards.map((card) => card.board).filter((board) => !knownIds.has(board))),
+  ]
+  return [
+    ...configured,
+    ...extras.map((id) => ({ id, label: id.charAt(0).toUpperCase() + id.slice(1) })),
+  ]
+    .map((section) => {
+      const entries = cards.filter((card) => card.board === section.id)
+      return {
+        ...section,
+        entries,
+        quantity: totalQuantity(entries),
+      }
+    })
+    .filter((section) => section.entries.length > 0)
 }
 
 export function AddDeckScreen({
@@ -63,14 +128,31 @@ export function AddDeckScreen({
   const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
+  const fetchCardById = useAction(api.cards.byId)
+  const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
+  const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const [mode, setMode] = useState<CreationMode>("precon")
+  const [setupComplete, setSetupComplete] = useState(false)
+  const [openField, setOpenField] = useState<SetupField>()
   const [name, setName] = useState("")
-  const [format, setFormat] = useState("commander")
+  const [note, setNote] = useState("")
   const [deckList, setDeckList] = useState("")
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
+  const [selectedPrecon, setSelectedPrecon] = useState<PreconstructedDeck>()
+  const [resolvedPrecon, setResolvedPrecon] = useState<ResolvedPreconstructedDeck>()
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [focusedPreviewCard, setFocusedPreviewCard] = useState<ImportedCard>()
+  const [previewDetailsByScryfallId, setPreviewDetailsByScryfallId] = useState<
+    Record<string, FocusedCardDetails>
+  >({})
+  const [previewDetailsError, setPreviewDetailsError] = useState<string>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const searchToken = useRef(0)
+  const previewToken = useRef(0)
+  const preconFormat = preconSearchFormat(format)
 
   function begin() {
     setBusy(true)
@@ -81,11 +163,55 @@ export function AddDeckScreen({
     setError(convexErrorMessage(cause, fallback))
   }
 
+  function chooseGame(next: string) {
+    setGame(next)
+    setDeckFormat(creationFormat(next, ""))
+    setPrecons([])
+    setOpenField(undefined)
+  }
+
+  function chooseFormat(next: string) {
+    setDeckFormat(next)
+    setFormat(next)
+    setOpenField(undefined)
+  }
+
+  const runSearch = useCallback(
+    async (query: string) => {
+      const token = searchToken.current + 1
+      searchToken.current = token
+      if (query.trim().length < 2 && !preconFormat) {
+        setPrecons([])
+        return
+      }
+      try {
+        setSearching(true)
+        const found = await searchPreconstructed({
+          query,
+          ...(preconFormat ? { format: preconFormat } : {}),
+        })
+        if (searchToken.current === token) setPrecons(found)
+      } catch (cause) {
+        if (searchToken.current === token) fail(cause, "Could not search official decks")
+      } finally {
+        if (searchToken.current === token) setSearching(false)
+      }
+    },
+    [preconFormat, searchPreconstructed],
+  )
+
+  useEffect(() => {
+    if (!setupComplete || mode !== "precon") return undefined
+    const timer = setTimeout(() => void runSearch(preconQuery), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [mode, preconQuery, runSearch, setupComplete])
+
   async function createBlank() {
     try {
       begin()
-      const deckId = await createDeck({ name, format })
+      const deckId = await createDeck({ name, format, game, ...(note.trim() ? { note } : {}) })
       setName("")
+      setNote("")
       onCreated(deckId)
     } catch (cause) {
       fail(cause, "Could not create deck")
@@ -94,31 +220,61 @@ export function AddDeckScreen({
     }
   }
 
-  async function searchPrecons() {
+  async function previewPrecon(deck: PreconstructedDeck) {
+    const token = previewToken.current + 1
+    previewToken.current = token
     try {
-      begin()
-      setPrecons(await searchPreconstructed({ query: preconQuery }))
+      setSelectedPrecon(deck)
+      setResolvedPrecon(undefined)
+      setError(undefined)
+      setPreviewLoading(true)
+      const resolved = await resolvePreconstructed({ fileName: deck.fileName })
+      if (previewToken.current === token) setResolvedPrecon(resolved)
     } catch (cause) {
-      fail(cause, "Could not search official decks")
+      if (previewToken.current === token) fail(cause, "Could not load this deck")
     } finally {
-      setBusy(false)
+      if (previewToken.current === token) setPreviewLoading(false)
     }
   }
 
-  async function importPrecon(deck: PreconstructedDeck) {
+  function closePreview() {
+    previewToken.current += 1
+    setSelectedPrecon(undefined)
+    setResolvedPrecon(undefined)
+    setFocusedPreviewCard(undefined)
+    setPreviewDetailsError(undefined)
+    setError(undefined)
+  }
+
+  async function loadPreviewCardDetails(scryfallId: string) {
+    if (previewDetailsByScryfallId[scryfallId]) return
+    try {
+      const { manaCost, typeLine, oracleText, setName, collectorNumber, rarity } =
+        await fetchCardById({ scryfallId })
+      setPreviewDetailsByScryfallId((current) => ({
+        ...current,
+        [scryfallId]: { manaCost, typeLine, oracleText, setName, collectorNumber, rarity },
+      }))
+    } catch (cause) {
+      setPreviewDetailsError(convexErrorMessage(cause, "Could not load card details"))
+    }
+  }
+
+  function focusPreviewCard(card: ImportedCard) {
+    setFocusedPreviewCard(card)
+    setPreviewDetailsError(undefined)
+    void loadPreviewCardDetails(card.scryfallId)
+  }
+
+  async function importPrecon() {
+    if (!selectedPrecon || !resolvedPrecon || resolvedPrecon.unresolved.length) return
     try {
       begin()
-      const resolved = await resolvePreconstructed({ fileName: deck.fileName })
-      if (resolved.unresolved.length) {
-        setError(
-          `Could not match ${resolved.unresolved.length} card(s): ${resolved.unresolved.join(", ")}`,
-        )
-        return
-      }
       const deckId = await createImportedDeck({
-        name: resolved.name || deck.name,
-        format: preconstructedFormat(deck.type),
-        cards: importCards(resolved.cards),
+        name: resolvedPrecon.name || selectedPrecon.name,
+        format: preconSearchFormat(format) ? format : preconstructedFormat(selectedPrecon.type),
+        game,
+        cards: importCards(resolvedPrecon.cards),
       })
       onCreated(deckId)
     } catch (cause) {
@@ -147,9 +303,12 @@ export function AddDeckScreen({
       const deckId = await createImportedDeck({
         name,
         format,
+        game,
+        ...(note.trim() ? { note } : {}),
         cards: importCards(resolved.cards),
       })
       setName("")
+      setNote("")
       setDeckList("")
       onCreated(deckId)
     } catch (cause) {
@@ -159,69 +318,308 @@ export function AddDeckScreen({
     }
   }
 
+  const noteField = (
+    <TextField
+      testID="deck-note-input"
+      label="Notes"
+      placeholder="Optional"
+      value={note}
+      multiline
+      numberOfLines={3}
+      textAlignVertical="top"
+      maxLength={1000}
+      onChangeText={setNote}
+    />
+  )
+
+  if (selectedPrecon) {
+    const previewFormat = preconSearchFormat(format)
+      ? format
+      : preconstructedFormat(selectedPrecon.type)
+    const cards = resolvedPrecon?.cards ?? []
+    const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game
+    const sections = previewSections(cards, deckSections(game, previewFormat))
+    const cover =
+      cards.find((card) => card.board === "commander" && (card.imageUrl || card.smallImageUrl)) ??
+      cards.find((card) => card.imageUrl || card.smallImageUrl)
+    const unresolved = resolvedPrecon?.unresolved.length ?? 0
+    const cannotImport = busy || atCapacity || previewLoading || !resolvedPrecon || unresolved > 0
+
+    return (
+      <Screen
+        preset="fixed"
+        safeAreaEdges={["bottom"]}
+        contentContainerStyle={themed($previewScreen)}
+      >
+        <Header title="Deck preview" leftTx="common:back" onLeftPress={closePreview} />
+        <ScrollView
+          testID="precon-preview"
+          contentContainerStyle={themed($previewContent)}
+          showsVerticalScrollIndicator={false}
+        >
+          {previewLoading ? (
+            <Text style={themed($previewLoading)} text="Loading deck list…" />
+          ) : (
+            <>
+              <View style={themed($previewHero)}>
+                <View style={themed($previewCoverSlot)}>
+                  {cover ? (
+                    <Image
+                      source={cover.imageUrl ?? cover.smallImageUrl}
+                      style={themed($previewCover)}
+                      cachePolicy="memory-disk"
+                    />
+                  ) : null}
+                </View>
+                <View style={themed($previewTitle)}>
+                  <Text preset="heading" text={resolvedPrecon?.name || selectedPrecon.name} />
+                  <Text
+                    size="sm"
+                    style={themed($label)}
+                    text={`${gameLabel} · ${deckFormatLabel(game, previewFormat)} · ${cardCountLabel(totalQuantity(cards))}`}
+                  />
+                  {preconDetail(selectedPrecon) ? (
+                    <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
+                  ) : null}
+                </View>
+              </View>
+
+              {error ? (
+                <View style={themed($alert)}>
+                  <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
+                </View>
+              ) : null}
+              {unresolved > 0 ? (
+                <View style={themed($alert)}>
+                  <Text
+                    accessibilityRole="alert"
+                    style={themed($alertText)}
+                    text={`This deck has ${unresolved} card${unresolved === 1 ? "" : "s"} we could not match, so it cannot be imported yet.`}
+                  />
+                </View>
+              ) : null}
+
+              {sections.map((section) => (
+                <View key={section.id}>
+                  <View style={themed($previewSectionHeader)}>
+                    <Text weight="bold" text={section.label} />
+                    <Text size="xs" style={themed($label)} text={`${section.quantity}`} />
+                  </View>
+                  {section.entries.map((card) => (
+                    <TouchableOpacity
+                      key={`${card.board}:${card.scryfallId}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Preview ${card.name}`}
+                      activeOpacity={0.75}
+                      style={themed($previewCardRow)}
+                      onPress={() => focusPreviewCard(card)}
+                    >
+                      <View style={themed($previewThumbnailSlot)}>
+                        {card.smallImageUrl || card.imageUrl ? (
+                          <Image
+                            source={card.smallImageUrl ?? card.imageUrl}
+                            style={themed($previewThumbnail)}
+                            cachePolicy="memory-disk"
+                          />
+                        ) : null}
+                      </View>
+                      <Text
+                        style={themed($previewCardName)}
+                        text={`${card.quantity}× ${card.name}`}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
+            </>
+          )}
+        </ScrollView>
+        <BottomActionBar>
+          {atCapacity ? (
+            <View style={themed($alert)}>
+              <Text
+                accessibilityRole="alert"
+                style={themed($alertText)}
+                text="You've reached your deck limit. Archive a deck to import this one."
+              />
+            </View>
+          ) : null}
+          <TouchableOpacity
+            testID="import-preview-button"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: cannotImport }}
+            style={[
+              themed($previewImportButton),
+              cannotImport && themed($previewImportButtonDisabled),
+            ]}
+            disabled={cannotImport}
+            onPress={() => void importPrecon()}
+          >
+            <Text
+              weight="bold"
+              style={themed($previewImportButtonText)}
+              text={busy ? "Importing…" : "Import deck"}
+            />
+          </TouchableOpacity>
+        </BottomActionBar>
+        {focusedPreviewCard ? (
+          <CardFocusDialog
+            card={{
+              name: focusedPreviewCard.name,
+              imageUrl: focusedPreviewCard.imageUrl,
+              smallImageUrl: focusedPreviewCard.smallImageUrl,
+              quantity: focusedPreviewCard.quantity,
+              boardLabel:
+                sections.find((section) => section.id === focusedPreviewCard.board)?.label ??
+                focusedPreviewCard.board,
+            }}
+            details={previewDetailsByScryfallId[focusedPreviewCard.scryfallId]}
+            detailsError={previewDetailsError}
+            onClose={() => setFocusedPreviewCard(undefined)}
+          />
+        ) : null}
+      </Screen>
+    )
+  }
+
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
-      <Header title="Add a deck" leftTx="common:back" onLeftPress={onBack} />
-      <View style={$stack}>
-        <Text
-          size="sm"
-          text="Start with an official preconstructed deck, paste an exported list, or build from scratch."
-        />
-        <View style={$modeRow}>
-          <Button
-            text="Official precon"
-            preset={mode === "precon" ? "reversed" : "default"}
-            style={$modeButton}
-            onPress={() => setMode("precon")}
-          />
-          <Button
-            text="Paste list"
-            preset={mode === "paste" ? "reversed" : "default"}
-            style={$modeButton}
-            onPress={() => setMode("paste")}
-          />
-          <Button
-            text="Blank"
-            preset={mode === "blank" ? "reversed" : "default"}
-            style={$modeButton}
-            onPress={() => setMode("blank")}
-          />
-        </View>
+      <Header
+        title={setupComplete && mode === "precon" ? "Find a deck" : "Add a deck"}
+        leftTx="common:back"
+        onLeftPress={onBack}
+      />
+      <View style={themed($stack)}>
+        {!setupComplete ? (
+          <View style={themed($setup)}>
+            <Text size="xxs" style={themed($label)} text="Step 1 of 2" />
+            <SelectorField
+              testID="game-picker"
+              label="Game"
+              value={DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game}
+              open={openField === "game"}
+              onPress={() => setOpenField((current) => (current === "game" ? undefined : "game"))}
+            >
+              <FilterChips
+                testID="game-picker-options"
+                accessibilityLabel="Game"
+                chips={DECK_GAME_LIST.map((candidate) => ({
+                  id: candidate.id,
+                  label: candidate.available
+                    ? candidate.shortLabel
+                    : `${candidate.shortLabel} · soon`,
+                  disabled: !candidate.available,
+                }))}
+                selectedId={game}
+                onSelect={chooseGame}
+              />
+            </SelectorField>
+            <SelectorField
+              testID="format-picker"
+              label="Format"
+              value={deckFormatLabel(game, format)}
+              open={openField === "format"}
+              onPress={() =>
+                setOpenField((current) => (current === "format" ? undefined : "format"))
+              }
+            >
+              <FilterChips
+                testID="format-picker-options"
+                accessibilityLabel="Format"
+                chips={deckFormats(game).map((candidate) => ({
+                  id: candidate.id,
+                  label: candidate.label,
+                }))}
+                selectedId={format}
+                onSelect={chooseFormat}
+              />
+            </SelectorField>
+            <SelectorField
+              testID="mode-picker"
+              label="Start from"
+              value={MODES.find((candidate) => candidate.id === mode)?.label ?? mode}
+              open={openField === "mode"}
+              onPress={() => setOpenField((current) => (current === "mode" ? undefined : "mode"))}
+            >
+              <FilterChips
+                testID="mode-picker-options"
+                accessibilityLabel="Starting point"
+                chips={MODES.map((candidate) => ({ id: candidate.id, label: candidate.label }))}
+                selectedId={mode}
+                onSelect={(next) => {
+                  setMode(next as CreationMode)
+                  setOpenField(undefined)
+                }}
+              />
+            </SelectorField>
+            <Button
+              testID="continue-add-deck"
+              text="Continue"
+              preset="reversed"
+              onPress={() => setSetupComplete(true)}
+            />
+          </View>
+        ) : (
+          <View style={themed($summary)}>
+            <View style={themed($summaryCopy)}>
+              <Text
+                weight="medium"
+                text={`${DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game} · ${deckFormatLabel(game, format)}`}
+              />
+              <Text
+                size="xxs"
+                style={themed($label)}
+                text={MODES.find((candidate) => candidate.id === mode)?.label}
+              />
+            </View>
+            <TouchableOpacity
+              testID="change-deck-setup"
+              accessibilityRole="button"
+              onPress={() => setSetupComplete(false)}
+            >
+              <Text size="sm" weight="medium" style={themed($link)} text="Change" />
+            </TouchableOpacity>
+          </View>
+        )}
 
-        {mode === "precon" ? (
-          <View style={$stack}>
+        {setupComplete && mode === "precon" ? (
+          <View style={themed($stack)}>
             <TextField
-              label="Search official decks"
               testID="precon-search-input"
-              helper="Try a deck name, set code, or product type."
+              placeholder="Search official decks"
               value={preconQuery}
               maxLength={120}
+              autoCorrect={false}
+              clearButtonMode="while-editing"
               onChangeText={setPreconQuery}
-              onSubmitEditing={searchPrecons}
             />
-            <Button
-              text={busy ? "Searching…" : "Search preconstructed decks"}
-              preset="reversed"
-              disabled={busy || atCapacity || preconQuery.trim().length < 2}
-              onPress={searchPrecons}
-            />
+            {searching ? (
+              <Text size="xs" style={themed($label)} text="Searching…" />
+            ) : precons.length === 0 && preconQuery.trim() ? (
+              <Text size="xs" style={themed($label)} text="No official decks found." />
+            ) : null}
             {precons.map((deck) => (
               <Card
                 key={deck.fileName}
                 heading={deck.name}
-                content={[deck.type, deck.code, deck.releaseDate].filter(Boolean).join(" · ")}
-                footer="Import as an editable deck"
-                disabled={busy || atCapacity}
-                onPress={() => importPrecon(deck)}
+                content={preconDetail(deck)}
+                footer="Preview deck"
+                disabled={previewLoading}
+                onPress={() => previewPrecon(deck)}
               />
             ))}
           </View>
         ) : null}
 
-        {mode === "paste" ? (
-          <View style={$stack}>
-            <TextField label="Deck name" value={name} maxLength={80} onChangeText={setName} />
-            <TextField label="Format" value={format} maxLength={32} onChangeText={setFormat} />
+        {setupComplete && mode === "paste" ? (
+          <View style={themed($stack)}>
+            <TextField
+              testID="deck-name-input"
+              label="Deck name"
+              value={name}
+              maxLength={80}
+              onChangeText={setName}
+            />
             <TextField
               label="Deck list"
               helper={
@@ -234,23 +632,30 @@ export function AddDeckScreen({
               maxLength={50_000}
               onChangeText={setDeckList}
             />
+            {noteField}
             <Button
               text={busy ? "Resolving cards…" : "Import deck list"}
               preset="reversed"
-              disabled={busy || atCapacity || !name.trim() || !format.trim() || !deckList.trim()}
+              disabled={busy || atCapacity || !name.trim() || !deckList.trim()}
               onPress={importPasted}
             />
           </View>
         ) : null}
 
-        {mode === "blank" ? (
-          <View style={$stack}>
-            <TextField label="Deck name" value={name} maxLength={80} onChangeText={setName} />
-            <TextField label="Format" value={format} maxLength={32} onChangeText={setFormat} />
+        {setupComplete && mode === "blank" ? (
+          <View style={themed($stack)}>
+            <TextField
+              testID="deck-name-input"
+              label="Deck name"
+              value={name}
+              maxLength={80}
+              onChangeText={setName}
+            />
+            {noteField}
             <Button
-              text={busy ? "Creating…" : "Create blank deck"}
+              text={busy ? "Creating…" : "Create deck"}
               preset="reversed"
-              disabled={busy || atCapacity || !name.trim() || !format.trim()}
+              disabled={busy || atCapacity || !name.trim()}
               onPress={createBlank}
             />
           </View>
@@ -269,18 +674,137 @@ export function AddDeckScreen({
               text={
                 capacity?.premium
                   ? "You've reached the deck limit. Archive a deck to add another."
-                  : "Free accounts include one deck. Premium unlocks more — archive your deck or upgrade to add another."
+                  : "You've reached your deck limit. Archive a deck to add another."
               }
             />
           </View>
-        ) : capacity && !capacity.premium ? (
-          <Text size="xs" text="Free accounts include one deck. Premium unlocks unlimited decks." />
         ) : null}
       </View>
     </Screen>
   )
 }
 
-const $stack = { gap: 12, marginTop: 12 } as const
-const $modeRow = { flexDirection: "row", gap: 8 } as const
-const $modeButton = { flex: 1, minHeight: 48, paddingHorizontal: 6 } as const
+function SelectorField({
+  testID,
+  label,
+  value,
+  open,
+  onPress,
+  children,
+}: {
+  testID: string
+  label: string
+  value: string
+  open: boolean
+  onPress: () => void
+  children: ReactNode
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <View style={themed($field)}>
+      <TouchableOpacity
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={themed($selector)}
+        onPress={onPress}
+      >
+        <View style={themed($summaryCopy)}>
+          <Text size="xxs" style={themed($label)} text={label} />
+          <Text weight="medium" text={value} />
+        </View>
+        <Text style={themed($label)} text={open ? "⌃" : "⌄"} />
+      </TouchableOpacity>
+      {open ? children : null}
+    </View>
+  )
+}
+
+const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.sm,
+  marginTop: spacing.sm,
+})
+const $field: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
+const $setup: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
+const $selector: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 64,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: spacing.sm,
+  borderWidth: 1,
+  borderColor: colors.separator,
+})
+const $summary: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 56,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingBottom: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $summaryCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxxs })
+const $previewScreen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
+const $previewContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: "100%",
+  maxWidth: 720,
+  alignSelf: "center",
+  paddingHorizontal: spacing.lg,
+  paddingBottom: spacing.lg,
+})
+const $previewLoading: ThemedStyle<TextStyle> = ({ spacing }) => ({ paddingVertical: spacing.xl })
+const $previewHero: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "flex-start",
+  gap: spacing.md,
+  paddingVertical: spacing.sm,
+})
+const $previewCoverSlot: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  width: 108,
+  height: 151,
+  borderRadius: spacing.xxs,
+  overflow: "hidden",
+  backgroundColor: colors.separator,
+})
+const $previewCover: ThemedStyle<ImageStyle> = () => ({ width: 108, height: 151 })
+const $previewTitle: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxs })
+const $previewSectionHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingTop: spacing.md,
+  paddingBottom: spacing.xxs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $previewCardRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 68,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $previewThumbnailSlot: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  width: 36,
+  height: 50,
+  borderRadius: spacing.xxxs,
+  overflow: "hidden",
+  backgroundColor: colors.separator,
+})
+const $previewThumbnail: ThemedStyle<ImageStyle> = () => ({ width: 36, height: 50 })
+const $previewCardName: ThemedStyle<TextStyle> = () => ({ flex: 1 })
+const $previewImportButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 56,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: spacing.xxxs,
+  backgroundColor: colors.tint,
+})
+const $previewImportButtonDisabled: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
+const $previewImportButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: accessibleForeground(colors.tint),
+})

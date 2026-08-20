@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -28,6 +28,14 @@ const mockResolvePrecon = jest.fn(async () => ({
   ],
 }))
 const mockResolvePasted = jest.fn()
+const mockCardById = jest.fn(async () => ({
+  manaCost: "{1}{G}{U}",
+  typeLine: "Legendary Creature — Merfolk Scout",
+  oracleText: "Explore twice.",
+  setName: "The Lost Caverns of Ixalan Commander",
+  collectorNumber: "3",
+  rarity: "mythic",
+}))
 const mockListMine = {
   value: {
     decks: [
@@ -36,11 +44,13 @@ const mockListMine = {
         name: "Existing Deck",
         format: "commander",
         game: "mtg",
-        versionNumber: 1,
+        versionCount: 1,
+        cardQuantity: 100,
         coverImageUrl: undefined,
       },
     ],
     capacity: { used: 1, limit: 100, premium: true, canCreate: true },
+    analyticsLocked: false,
   },
 }
 
@@ -49,6 +59,7 @@ jest.mock("convex/react", () => ({
   useMutation: (reference: string) =>
     reference === "decks.importResolved" ? mockImport : mockCreate,
   useAction: (reference: string) => {
+    if (reference === "cards.byId") return mockCardById
     if (reference === "deckImports.searchPreconstructed") return mockSearch
     if (reference === "deckImports.resolvePreconstructed") return mockResolvePrecon
     return mockResolvePasted
@@ -66,6 +77,9 @@ jest.mock("../../convex/_generated/api", () => ({
       searchPreconstructed: "deckImports.searchPreconstructed",
       resolvePreconstructed: "deckImports.resolvePreconstructed",
       resolvePasted: "deckImports.resolvePasted",
+    },
+    cards: {
+      byId: "cards.byId",
     },
   },
 }))
@@ -85,50 +99,169 @@ function renderAddDeck(onCreated = jest.fn()) {
   )
 }
 
+function chooseFormat(view: ReturnType<typeof renderAddDeck>, format: string) {
+  fireEvent.press(view.getByTestId("format-picker"))
+  fireEvent.press(view.getByTestId(`format-picker-options-${format}`))
+}
+
+function chooseMode(view: ReturnType<typeof renderAddDeck>, mode: string) {
+  fireEvent.press(view.getByTestId("mode-picker"))
+  fireEvent.press(view.getByTestId(`mode-picker-options-${mode}`))
+}
+
+function continueSetup(view: ReturnType<typeof renderAddDeck>) {
+  fireEvent.press(view.getByTestId("continue-add-deck"))
+}
+
 describe("AddDeckScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.useFakeTimers()
     mockListMine.value = {
       ...mockListMine.value,
       capacity: { used: 1, limit: 100, premium: true, canCreate: true },
     }
   })
 
-  it("offers official, pasted, and blank deck creation paths", () => {
-    const view = renderAddDeck()
-    expect(view.getByText("Official precon")).toBeTruthy()
-    fireEvent.press(view.getByText("Paste list"))
-    expect(view.getByText("Deck list")).toBeTruthy()
-    fireEvent.press(view.getByText("Blank"))
-    expect(view.getByText("Create blank deck")).toBeTruthy()
+  afterEach(() => {
+    jest.useRealTimers()
   })
 
-  it("resolves an official list before creating version one", async () => {
+  it("offers official, pasted, and scratch-built creation paths", () => {
+    const view = renderAddDeck()
+    expect(view.getByText("Official precon")).toBeTruthy()
+    chooseMode(view, "paste")
+    continueSetup(view)
+    expect(view.getByText("Deck list")).toBeTruthy()
+    fireEvent.press(view.getByTestId("change-deck-setup"))
+    chooseMode(view, "blank")
+    continueSetup(view)
+    expect(view.getByText("Create deck")).toBeTruthy()
+  })
+
+  it("previews an official deck before importing it", async () => {
     const onCreated = jest.fn()
     const view = renderAddDeck(onCreated)
+    continueSetup(view)
     fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
-    fireEvent.press(view.getByText("Search preconstructed decks"))
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
     await waitFor(() => expect(view.getByText("Explorers of the Deep")).toBeTruthy())
+    expect(mockSearch).toHaveBeenLastCalledWith({ query: "Explorers", format: "commander" })
     fireEvent.press(view.getByText("Explorers of the Deep"))
-    await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(view.getByTestId("precon-preview")).toBeTruthy())
     expect(mockResolvePrecon).toHaveBeenCalledWith({ fileName: "ExplorersOfTheDeep_LCC" })
+    expect(mockImport).not.toHaveBeenCalled()
+    expect(view.getByText("Magic · Commander · 1 card")).toBeTruthy()
+    expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy()
+    expect(view.queryByTestId("deck-note-input")).toBeNull()
+    fireEvent.press(view.getByTestId("import-preview-button"))
+    await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))
     expect(mockImport).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Explorers of the Deep", format: "commander" }),
+      expect.objectContaining({
+        name: "Explorers of the Deep",
+        format: "commander",
+        game: "mtg",
+      }),
     )
     expect(onCreated).toHaveBeenCalledWith("deck-imported")
+  })
+
+  it("opens a read-only card preview from the deck preview", async () => {
+    const view = renderAddDeck()
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+    await waitFor(() => expect(view.getByText("Explorers of the Deep")).toBeTruthy())
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+    await waitFor(() => expect(view.getByTestId("precon-preview")).toBeTruthy())
+
+    fireEvent.press(view.getByLabelText("Preview Hakbal of the Surging Soul"))
+
+    await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
+    expect(mockCardById).toHaveBeenCalledWith({
+      scryfallId: "22222222-2222-2222-2222-222222222222",
+    })
+    expect(view.getByText("Legendary Creature — Merfolk Scout")).toBeTruthy()
+    expect(view.queryByTestId("card-focus-increment")).toBeNull()
+    expect(view.queryByTestId("card-focus-decrement")).toBeNull()
+  })
+
+  it("starts importing only from the preview page", async () => {
+    let finishImport: ((deckId: string) => void) | undefined
+    mockSearch.mockResolvedValueOnce([
+      {
+        fileName: "ExplorersOfTheDeep_LCC",
+        name: "Explorers of the Deep",
+        code: "LCC",
+        type: "Commander Deck",
+      },
+      {
+        fileName: "CavalryCharge_MOC",
+        name: "Cavalry Charge",
+        code: "MOC",
+        type: "Commander Deck",
+      },
+    ])
+    mockImport.mockImplementationOnce(
+      () => new Promise<string>((resolve) => (finishImport = resolve)),
+    )
+    const view = renderAddDeck()
+    continueSetup(view)
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+    await waitFor(() => expect(view.getByText("Cavalry Charge")).toBeTruthy())
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+    await waitFor(() => expect(view.getByTestId("precon-preview")).toBeTruthy())
+    expect(mockImport).not.toHaveBeenCalled()
+    fireEvent.press(view.getByTestId("import-preview-button"))
+    await waitFor(() => expect(view.getByText("Importing…")).toBeTruthy())
+    await act(async () => finishImport?.("deck-imported"))
+  })
+
+  it("browses a format with no search term at all", async () => {
+    const view = renderAddDeck()
+    chooseFormat(view, "brawl")
+    continueSetup(view)
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+    expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "brawl" })
+  })
+
+  it("carries the chosen game, format, and note into a new deck", async () => {
+    const view = renderAddDeck()
+    chooseFormat(view, "modern")
+    chooseMode(view, "blank")
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Scratch Deck")
+    fireEvent.changeText(view.getByTestId("deck-note-input"), "Testing a new sideboard plan")
+    fireEvent.press(view.getByText("Create deck"))
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith({
+        name: "Scratch Deck",
+        format: "modern",
+        game: "mtg",
+        note: "Testing a new sideboard plan",
+      }),
+    )
   })
 
   it("blocks new decks and explains the limit once capacity is used up", () => {
     atCapacity()
     const view = renderAddDeck()
     expect(
-      view.getByText(
-        "Free accounts include one deck. Premium unlocks more — archive your deck or upgrade to add another.",
-      ),
+      view.getByText("You've reached your deck limit. Archive a deck to add another."),
     ).toBeTruthy()
-    fireEvent.press(view.getByText("Blank"))
-    fireEvent.changeText(view.getByDisplayValue(""), "Blocked Deck")
-    fireEvent.press(view.getByText("Create blank deck"))
+    expect(view.queryByText(/Premium/)).toBeNull()
+    chooseMode(view, "blank")
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Blocked Deck")
+    fireEvent.press(view.getByText("Create deck"))
     expect(mockCreate).not.toHaveBeenCalled()
   })
 })

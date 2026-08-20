@@ -290,7 +290,14 @@ export const processDecks = internalMutation({
           .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version._id))
           .take(USER_DATA_BATCH_SIZE)
         if (cards.length) for (const card of cards) await ctx.db.delete(card._id)
-        else await ctx.db.delete(version._id)
+        else {
+          const versionStats = await ctx.db
+            .query("deckVersionStats")
+            .withIndex("by_version", (q) => q.eq("deckVersionId", version._id))
+            .unique()
+          if (versionStats) await ctx.db.delete(versionStats._id)
+          await ctx.db.delete(version._id)
+        }
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
         return null
       }

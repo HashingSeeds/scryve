@@ -21,6 +21,7 @@ import type * as legal from "../legal.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
 import type * as lib_deckGames from "../lib/deckGames.js";
+import type * as lib_deckVersions from "../lib/deckVersions.js";
 import type * as lib_entitlements from "../lib/entitlements.js";
 import type * as lib_moderation from "../lib/moderation.js";
 import type * as lib_nameFilter from "../lib/nameFilter.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/authConfig": typeof lib_authConfig;
   "lib/deckGames": typeof lib_deckGames;
+  "lib/deckVersions": typeof lib_deckVersions;
   "lib/entitlements": typeof lib_entitlements;
   "lib/moderation": typeof lib_moderation;
   "lib/nameFilter": typeof lib_nameFilter;

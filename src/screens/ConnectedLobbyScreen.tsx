@@ -5,6 +5,7 @@ import QRCode from "react-native-qrcode-svg"
 
 import { Button } from "@/components/Button"
 import { Card } from "@/components/Card"
+import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -18,6 +19,8 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
+import type { Id } from "../../convex/_generated/dataModel"
+import { versionLabel } from "../../convex/lib/deckVersions"
 
 export function ConnectedLobbyScreen({
   publicId,
@@ -59,6 +62,15 @@ export function ConnectedLobbyScreen({
     ? buildInviteQrPayload(lobby.invitation.token, lobby.invitation.manualCode)
     : null
   const manualCode = lobby?.invitation?.manualCode
+
+  async function chooseVersion(seat: number, deckVersionId: Id<"deckVersions">) {
+    try {
+      setActionError(undefined)
+      await selectDeck({ publicId, seat, deckVersionId })
+    } catch (cause) {
+      setActionError(convexErrorMessage(cause, "Could not select deck"))
+    }
+  }
 
   async function shareInvite() {
     try {
@@ -125,58 +137,80 @@ export function ConnectedLobbyScreen({
         text={`${lobby.players.length} of ${lobby.playerCount} seats claimed · ${lobby.startingLife} life · ${lobby.ruleset}`}
       />
       <View style={$players}>
-        {lobby.players.map((player) => (
-          <Card
-            key={player.playerId ?? `seat-${player.seat}`}
-            heading={player.displayName}
-            content={
-              player.deckVersionId
-                ? `${player.controlledByMe ? "Your seat" : `Seat ${player.seat}`} · deck selected`
-                : `${player.controlledByMe ? "Your seat" : `Seat ${player.seat}`} · no deck selected`
-            }
-            RightComponent={
-              player.controlledByMe && decks?.length ? (
+        {lobby.players.map((player) => {
+          const chosenDeck = decks?.find((deck) =>
+            deck.versions.some((version) => version._id === player.deckVersionId),
+          )
+          const chosenVersion = chosenDeck?.versions.find(
+            (version) => version._id === player.deckVersionId,
+          )
+          return (
+            <View key={player.playerId ?? `seat-${player.seat}`} style={$players}>
+              <Card
+                heading={player.displayName}
+                content={
+                  player.controlledByMe
+                    ? chosenDeck
+                      ? `Your seat · ${chosenDeck.name} · ${versionLabel(chosenVersion ?? { versionNumber: 1 })}`
+                      : "Your seat · no deck selected"
+                    : `Seat ${player.seat} · ${player.deckVersionId ? "deck selected" : "no deck selected"}`
+                }
+                RightComponent={
+                  !player.controlledByMe && player.playerId ? (
+                    <Button
+                      testID={`lobby-report-player-seat-${player.seat}`}
+                      text="Report"
+                      style={$reportAction}
+                      onPress={() =>
+                        setPlayerToReport({
+                          playerId: player.playerId,
+                          seat: player.seat,
+                          displayName: player.displayName,
+                          color: player.color,
+                          controlledByMe: false,
+                        })
+                      }
+                    />
+                  ) : undefined
+                }
+              />
+              {player.controlledByMe && decks?.length ? (
                 <View style={$deckChoices}>
-                  {decks
-                    .filter((deck) => deck.latestVersionId)
-                    .map((deck) => (
-                      <Button
-                        key={deck._id}
-                        text={deck.name}
-                        onPress={async () => {
-                          try {
-                            setActionError(undefined)
-                            await selectDeck({
-                              publicId,
-                              seat: player.seat,
-                              deckVersionId: deck.latestVersionId!,
-                            })
-                          } catch (cause) {
-                            setActionError(convexErrorMessage(cause, "Could not select deck"))
-                          }
-                        }}
-                      />
-                    ))}
+                  <FilterChips
+                    testID={`seat-${player.seat}-deck`}
+                    accessibilityLabel="Deck"
+                    chips={decks
+                      .filter((deck) => deck.versions.length > 0)
+                      .map((deck) => ({ id: deck._id, label: deck.name }))}
+                    selectedId={chosenDeck?._id ?? ""}
+                    onSelect={(deckId) => {
+                      const deck = decks.find((candidate) => candidate._id === deckId)
+                      const version = deck?.versions[deck.versions.length - 1]
+                      if (version) void chooseVersion(player.seat, version._id)
+                    }}
+                  />
+                  {chosenDeck && chosenDeck.versions.length > 1 ? (
+                    <FilterChips
+                      testID={`seat-${player.seat}-version`}
+                      accessibilityLabel="Deck version"
+                      chips={chosenDeck.versions.map((version) => ({
+                        id: version._id,
+                        label: versionLabel(version),
+                      }))}
+                      selectedId={player.deckVersionId ?? ""}
+                      onSelect={(versionId) =>
+                        void chooseVersion(
+                          player.seat,
+                          versionId as (typeof chosenDeck.versions)[number]["_id"],
+                        )
+                      }
+                    />
+                  ) : null}
                 </View>
-              ) : !player.controlledByMe && player.playerId ? (
-                <Button
-                  testID={`lobby-report-player-seat-${player.seat}`}
-                  text="Report"
-                  style={$reportAction}
-                  onPress={() =>
-                    setPlayerToReport({
-                      playerId: player.playerId,
-                      seat: player.seat,
-                      displayName: player.displayName,
-                      color: player.color,
-                      controlledByMe: false,
-                    })
-                  }
-                />
-              ) : undefined
-            }
-          />
-        ))}
+              ) : null}
+            </View>
+          )
+        })}
       </View>
       {inviteUrl || manualCode ? (
         <Button

@@ -220,6 +220,23 @@ async function inviteIsCurrent(
   return current?._id === invite._id
 }
 
+type DeckRecord = { games: number; wins: number; losses: number; draws: number; unknown: number }
+
+function incrementedRecord(
+  current: DeckRecord | null,
+  outcome: "win" | "loss" | "draw" | "unknown",
+  now: number,
+) {
+  return {
+    games: (current?.games ?? 0) + 1,
+    wins: (current?.wins ?? 0) + (outcome === "win" ? 1 : 0),
+    losses: (current?.losses ?? 0) + (outcome === "loss" ? 1 : 0),
+    draws: (current?.draws ?? 0) + (outcome === "draw" ? 1 : 0),
+    unknown: (current?.unknown ?? 0) + (outcome === "unknown" ? 1 : 0),
+    updatedAt: now,
+  }
+}
+
 async function terminalizeGame(
   ctx: MutationCtx,
   game: Doc<"games">,
@@ -337,16 +354,21 @@ async function terminalizeGame(
       .query("deckStats")
       .withIndex("by_deck", (q) => q.eq("deckId", player.deckId!))
       .unique()
-    const increment = {
-      games: (stats?.games ?? 0) + 1,
-      wins: (stats?.wins ?? 0) + (player.outcome === "win" ? 1 : 0),
-      losses: (stats?.losses ?? 0) + (player.outcome === "loss" ? 1 : 0),
-      draws: (stats?.draws ?? 0) + (player.outcome === "draw" ? 1 : 0),
-      unknown: (stats?.unknown ?? 0) + (player.outcome === "unknown" ? 1 : 0),
-      updatedAt: now,
-    }
+    const increment = incrementedRecord(stats, player.outcome, now)
     if (stats) await ctx.db.patch(stats._id, increment)
     else await ctx.db.insert("deckStats", { deckId: player.deckId, ...increment })
+    const versionStats = await ctx.db
+      .query("deckVersionStats")
+      .withIndex("by_version", (q) => q.eq("deckVersionId", player.deckVersionId!))
+      .unique()
+    const versionIncrement = incrementedRecord(versionStats, player.outcome, now)
+    if (versionStats) await ctx.db.patch(versionStats._id, versionIncrement)
+    else
+      await ctx.db.insert("deckVersionStats", {
+        deckId: player.deckId,
+        deckVersionId: player.deckVersionId,
+        ...versionIncrement,
+      })
   }
   await ctx.db.patch(game._id, { status, updatedAt: now })
   for (const player of players) await ctx.db.patch(player._id, { resumable: false })

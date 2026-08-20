@@ -184,6 +184,11 @@ describe("premium deck tracking", () => {
       games: 1,
       wins: 1,
       losses: 0,
+      byVersion: [{ deckVersionId, versionNumber: 1, games: 1, wins: 1, losses: 0 }],
+    })
+    await expect(host.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      record: { games: 1, wins: 1 },
+      versions: [{ record: { games: 1, wins: 1 } }],
     })
   })
 
@@ -264,5 +269,169 @@ describe("premium deck tracking", () => {
     })
     expect(premiumHistory.page).toHaveLength(11)
     expect(premiumHistory).toMatchObject({ premium: true, hasLockedHistory: false, isDone: true })
+  })
+})
+
+function uuid(seed: string) {
+  return `${seed.padEnd(8, "0").slice(0, 8)}-0000-0000-0000-000000000000`
+}
+
+function testCard(name: string, seed: string, board: "main" | "sideboard" | "commander" = "main") {
+  return {
+    oracleId: uuid(seed),
+    scryfallId: uuid(`${seed}f`),
+    name,
+    quantity: 1,
+    board,
+  }
+}
+
+async function premiumVersions(t: ReturnType<typeof convexTest>, clerkUserId: string) {
+  await t.mutation(internal.entitlements.setUserFeature, {
+    clerkUserId,
+    feature: "deck_versions",
+    enabled: true,
+    source: "test",
+  })
+}
+
+describe("deck versions", () => {
+  it("gives every new deck one named version slot", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "slot-owner", "Slot Owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Slots", format: "commander" })
+    await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      versions: [{ versionNumber: 1, name: "Current", cardCount: 0 }],
+      capacity: { used: 1, limit: 1, premium: false, canCreate: false },
+    })
+  })
+
+  it("edits a version in place instead of appending history", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "edit-owner", "Edit Owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Edits", format: "commander" })
+    const first = await actor.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [testCard("First Card", "aaaaaaa1")],
+    })
+    const second = await actor.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [testCard("First Card", "aaaaaaa1"), testCard("Second Card", "aaaaaaa2")],
+    })
+    expect(second).toBe(first)
+    const detail = await actor.query(api.decks.detail, { deckId })
+    expect(detail.versions).toHaveLength(1)
+    expect(detail.versions[0]).toMatchObject({ versionNumber: 1, cardCount: 2, cardQuantity: 2 })
+    expect(detail.cards).toHaveLength(2)
+  })
+
+  it("keeps extra version slots premium and caps them at five", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "version-owner", "Version Owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Tuning", format: "commander" })
+    await expect(
+      actor.mutation(api.decks.createVersion, { deckId, name: "vs Control" }),
+    ).rejects.toMatchObject({
+      data: {
+        code: "version_limit_reached",
+        message: "Premium is required for extra deck versions",
+      },
+    })
+    await premiumVersions(t, "version-owner")
+    for (const name of ["vs Control", "vs Aggro", "Budget", "Spicy"])
+      await expect(actor.mutation(api.decks.createVersion, { deckId, name })).resolves.toBeDefined()
+    await expect(
+      actor.mutation(api.decks.createVersion, { deckId, name: "One too many" }),
+    ).rejects.toMatchObject({ data: { code: "version_limit_reached" } })
+    await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      capacity: { used: 5, limit: 5, premium: true, canCreate: false },
+    })
+  })
+
+  it("seeds a new version from the version it was branched off", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "branch-owner", "Branch Owner")
+    await premiumVersions(t, "branch-owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Branch", format: "commander" })
+    const mainVersionId = await actor.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [testCard("Shared Card", "bbbbbbb1")],
+    })
+    const branchId = await actor.mutation(api.decks.createVersion, {
+      deckId,
+      fromVersionId: mainVersionId,
+      name: "vs Control",
+      note: "Swapping in the sweepers",
+    })
+    const branch = await actor.query(api.decks.detail, { deckId, versionId: branchId })
+    expect(branch.version?._id).toBe(branchId)
+    expect(branch.cards).toMatchObject([{ name: "Shared Card" }])
+    expect(branch.versions.find((version) => version._id === branchId)).toMatchObject({
+      name: "vs Control",
+      note: "Swapping in the sweepers",
+      versionNumber: 2,
+    })
+    await actor.mutation(api.decks.saveVersion, {
+      deckId,
+      versionId: branchId,
+      cards: [testCard("Shared Card", "bbbbbbb1"), testCard("Sweeper", "bbbbbbb2", "sideboard")],
+    })
+    await expect(
+      actor.query(api.decks.detail, { deckId, versionId: mainVersionId }),
+    ).resolves.toMatchObject({
+      cards: [{ name: "Shared Card" }],
+    })
+  })
+
+  it("archives a version without disturbing the last one standing", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "prune-owner", "Prune Owner")
+    await premiumVersions(t, "prune-owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Prune", format: "commander" })
+    const extraId = await actor.mutation(api.decks.createVersion, { deckId, name: "Experiment" })
+    await expect(
+      actor.mutation(api.decks.deleteVersion, { versionId: extraId }),
+    ).resolves.toBeNull()
+    const detail = await actor.query(api.decks.detail, { deckId })
+    expect(detail.versions).toHaveLength(1)
+    await expect(
+      actor.mutation(api.decks.deleteVersion, { versionId: detail.versions[0]._id }),
+    ).rejects.toMatchObject({ data: { code: "last_version" } })
+    await expect(
+      actor.mutation(api.decks.updateVersion, { versionId: extraId, name: "Revived" }),
+    ).rejects.toMatchObject({ data: { code: "deck_version_not_found" } })
+  })
+
+  it("round-trips deck and version notes", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "note-owner", "Note Owner")
+    const deckId = await actor.mutation(api.decks.create, {
+      name: "Notes",
+      format: "commander",
+      note: "Ramp into big spells",
+    })
+    const detail = await actor.query(api.decks.detail, { deckId })
+    expect(detail.deck.note).toBe("Ramp into big spells")
+    await actor.mutation(api.decks.update, { deckId, format: "modern", note: "New plan" })
+    await actor.mutation(api.decks.updateVersion, {
+      versionId: detail.versions[0]._id,
+      name: "Sleeved list",
+      note: "Cut the fast mana",
+    })
+    await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      deck: { format: "modern", note: "New plan" },
+      versions: [{ name: "Sleeved list", note: "Cut the fast mana" }],
+    })
+  })
+
+  it("refuses games that are not playable yet", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "game-owner", "Game Owner")
+    await expect(
+      actor.mutation(api.decks.create, { name: "Duel", format: "advanced", game: "ygo" }),
+    ).rejects.toMatchObject({ data: { code: "game_unavailable" } })
+    await expect(
+      actor.mutation(api.decks.create, { name: "Duel", format: "advanced", game: "pokemon" }),
+    ).rejects.toMatchObject({ data: { code: "unknown_game" } })
   })
 })

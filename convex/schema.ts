@@ -166,6 +166,7 @@ export default defineSchema({
     name: v.string(),
     format: v.string(),
     game: v.optional(v.string()),
+    note: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -177,10 +178,17 @@ export default defineSchema({
     deckId: v.id("decks"),
     versionNumber: v.number(),
     fingerprint: v.string(),
+    name: v.optional(v.string()),
+    note: v.optional(v.string()),
+    cardCount: v.optional(v.number()),
+    cardQuantity: v.optional(v.number()),
+    archivedAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_deck_and_version_number", ["deckId", "versionNumber"])
-    .index("by_deck_and_created_at", ["deckId", "createdAt"]),
+    .index("by_deck_and_created_at", ["deckId", "createdAt"])
+    .index("by_deck_and_archived_at", ["deckId", "archivedAt"]),
 
   deckCards: defineTable({
     deckVersionId: v.id("deckVersions"),
@@ -206,6 +214,19 @@ export default defineSchema({
     .index("by_version_and_finished_at", ["deckVersionId", "finishedAt"])
     .index("by_user", ["userId"])
     .index("by_game_and_player", ["gameId", "playerId"]),
+
+  deckVersionStats: defineTable({
+    deckId: v.id("decks"),
+    deckVersionId: v.id("deckVersions"),
+    games: v.number(),
+    wins: v.number(),
+    losses: v.number(),
+    draws: v.number(),
+    unknown: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_version", ["deckVersionId"])
+    .index("by_deck", ["deckId"]),
 
   deckStats: defineTable({
     deckId: v.id("decks"),

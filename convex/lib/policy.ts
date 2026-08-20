@@ -10,6 +10,10 @@ export const FREE_CONNECTED_HISTORY_GAMES = 10
 export const FREE_DECK_LIMIT = 1
 export const MAX_PREMIUM_DECKS = 100
 export const MAX_DECK_CARDS = 300
+export const FREE_DECK_VERSIONS = 1
+export const MAX_DECK_VERSIONS = 5
+export const MAX_DECK_NOTE_LENGTH = 1000
+export const MAX_VERSION_NAME_LENGTH = 40
 export const STALE_GAME_INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000
 export const STALE_GAME_CLEANUP_BATCH_SIZE = 25
 
@@ -84,6 +88,20 @@ export function assertDeckName(name: string) {
 export function assertDeckFormat(format: string) {
   const value = format.trim().toLowerCase()
   if (value.length < 1 || value.length > 32) throw new Error("Deck format must be 1–32 characters")
+  return value
+}
+
+export function assertDeckNote(note: string) {
+  const value = note.trim()
+  if (value.length > MAX_DECK_NOTE_LENGTH)
+    throw new Error(`Notes must be at most ${MAX_DECK_NOTE_LENGTH} characters`)
+  return value
+}
+
+export function assertVersionName(name: string) {
+  const value = name.trim()
+  if (value.length < 1 || value.length > MAX_VERSION_NAME_LENGTH)
+    throw new Error(`Version name must be 1–${MAX_VERSION_NAME_LENGTH} characters`)
   return value
 }
 

@@ -8,12 +8,13 @@ export const current = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx)
-    const [fullHistory, unlimitedDecks, deckAnalytics] = await Promise.all([
+    const [fullHistory, unlimitedDecks, deckAnalytics, deckVersions] = await Promise.all([
       hasFeature(ctx, user, PREMIUM_FEATURES.fullHistory),
       hasFeature(ctx, user, PREMIUM_FEATURES.unlimitedDecks),
       hasFeature(ctx, user, PREMIUM_FEATURES.deckAnalytics),
+      hasFeature(ctx, user, PREMIUM_FEATURES.deckVersions),
     ])
-    return { fullHistory, unlimitedDecks, deckAnalytics }
+    return { fullHistory, unlimitedDecks, deckAnalytics, deckVersions }
   },
 })
 
