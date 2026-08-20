@@ -25,14 +25,34 @@
       "c6a5bf7b49ff487548fe804ebbb4f8966bb974bf4a5956b34e09882eba528096": 1
     },
     "convex/games.ts": {
-      "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1
+      "62bc290f96db5c030ba3491979a611f8fd46bf61254bacebdb83ea5a062efdaf": 1,
+      "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1,
+      "c089dd511a11e48c3c5021732cb660552ea2e735638a46cb34bd2381c2509ff6": 1,
+      "ff6634c33e4874454138ced4f36fd4f99ed6ef3436f02d5c05918dd4c3507f17": 1
+    },
+    "convex/lib/nameFilter.ts": {
+      "4a62fbcc9fcf196bb96e3fde58d35373e9bd62b00fb994abeb1d9ddae9a44bc1": 1
+    },
+    "convex/moderation.ts": {
+      "37ed3080330a1dd9d289616ab714218e94ba9f89405648854996a3bf7459e14b": 1,
+      "60af2dd0b5e836e1fc5b02840b9b056ccf3aad5893802e5198c58564b05e5b6e": 1,
+      "884608d5d2ea8b8f6e0826770f25367bccd197c12661ed12fa71c0cdc7cd5512": 1,
+      "a01d2f2936c103b88941581d6bda29714aa68bdfcc6f821a66f6a750e69b53c3": 1,
+      "bc0df8f0be3dc3839aa05120abd48ca7e321fed04a7c5233f96bb64d779182cd": 1,
+      "c2766cd44d6ace9211901b74fd38c3f9f69aca563899d335f1cb4728a2f2c4e2": 1
     },
     "convex/schema.ts": {
       "2dfdaa01c8a3339d91d525f33c860c1c812f89dda466bd183c4d0f2402e689b5": 1,
       "60e7c32fcb68ac7f6c595d524d03dbe2fc48e9ffccdaa3c2b336a3c42d17b61d": 1,
+      "90ddcf1b80bf6e3213d0922d24e2ca8d6d433d3ce698157709f87babf2a22098": 1,
       "aeccc44d13a6f8fcbc0ba6db7ee64acdd62d164577991bc53708177570aacee5": 1,
       "b3d78a4cd1d17d3268b48482d0f6635b2b13aeee88dd5c72ac22b29d2c449b60": 1,
-      "cdf00d1ccff33a2492ccd20452c443422abec83754004e0949cef61f6fc80e5d": 1
+      "cdf00d1ccff33a2492ccd20452c443422abec83754004e0949cef61f6fc80e5d": 1,
+      "f0581d083d846f465da0fdca4fb9563bf0e84553041ed7ea2f951c2124a7ec57": 1
+    },
+    "convex/users.ts": {
+      "2e853d3a8e17040c29a001b8b821bb38ef885981cd4a6340230a278ad21f5102": 1,
+      "500fe70ccfa74d25aeb0b84ba96f870f1fb02df96b074b3e2b32f7d3e7343474": 1
     },
     "jest.config.js": {
       "530730d6c7f712f77b68e001b4b038a3f09b8ab1ae620d02bc853e8446ec864a": 1
@@ -322,6 +342,9 @@
     },
     "src/features/connected/OutboxSyncController.ts": {
       "1487abcf2f5a09ce6fd570ee7d715e8b8bc031e4414bc5f15c804b576374b967": 1
+    },
+    "src/features/connected/PlayerActionsDialog.tsx": {
+      "c8a779c7bb5c6212c85be13e1af902bb1bf79eb7a25647f6143cabab8f118f63": 1
     },
     "src/features/legal/LegalConsentGate.tsx": {
       "e63352e063deaf97db321b02bf35054ca662227ce4623027857263097d88b1b1": 1,

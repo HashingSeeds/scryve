@@ -25,6 +25,8 @@ const mockCreateLobby = jest.fn(async () => ({
   manualCode: "AB12CD",
 }))
 const mockMigrate = jest.fn(async () => ({ isDone: true, continueCursor: "done" }))
+const mockReportPlayer = jest.fn(async () => ({ blocked: true, held: false }))
+const mockBlockPlayer = jest.fn(async () => ({ blocked: true }))
 let mockActiveGames: any[] = []
 let mockPaginatedArgs: unknown[] = []
 let mockProjection: any
@@ -40,6 +42,11 @@ const mockMigrationOwners = new Set<string>()
 
 function openConnectedMenu() {
   fireEvent.press(screen.getByTestId("game-menu-button"))
+}
+
+function openConnectedPlayers() {
+  openConnectedMenu()
+  fireEvent.press(screen.getByTestId("connected-players-button"))
 }
 
 function openConnectedStatus() {
@@ -69,6 +76,8 @@ jest.mock("convex/react", () => ({
     if (name.includes("createLobby")) return mockCreateLobby
     if (name.includes("migrateMyGameMemberships") || name.includes("migrateMyHistoryEntries"))
       return mockMigrate
+    if (name.includes("reportPlayer")) return mockReportPlayer
+    if (name.includes("blockPlayer")) return mockBlockPlayer
     return mockSyncUser
   },
   useQuery: (reference: unknown) => {
@@ -122,6 +131,10 @@ jest.mock("../../convex/_generated/api", () => ({
       migrateMyHistoryEntries: "games.migrateMyHistoryEntries",
     },
     decks: { listMine: "decks.listMine", selectForSeat: "decks.selectForSeat" },
+    moderation: {
+      reportPlayer: "moderation.reportPlayer",
+      blockPlayer: "moderation.blockPlayer",
+    },
     entitlements: { current: "entitlements.current" },
   },
 }))
@@ -442,7 +455,57 @@ describe("connected lobby screens", () => {
     expect(
       screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
     ).toBe(true)
-    expect(screen.getByTestId("connected-undo-button").props.accessibilityState.disabled).toBe(true)
+    expect(
+      screen.getByTestId("connected-players-button").props.accessibilityState.disabled,
+    ).toBeFalsy()
+  })
+
+  it("reports an opponent from the board and confirms the block took effect", async () => {
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} />))
+    openConnectedPlayers()
+
+    expect(screen.queryByTestId("report-player-seat-1")).toBeNull()
+    fireEvent.press(screen.getByTestId("report-player-seat-2"))
+    fireEvent.press(screen.getByText("Harassment or abuse"))
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("submit-player-report-button"))
+    })
+
+    expect(mockReportPlayer).toHaveBeenCalledWith({
+      publicId: "game-public",
+      playerId: "player-2",
+      reason: "harassment",
+    })
+    expect(screen.getByTestId("player-actions-confirmation")).toHaveTextContent(/blocked them/)
+  })
+
+  it("blocks an opponent without filing a report", async () => {
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} />))
+    openConnectedPlayers()
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("block-player-seat-2"))
+    })
+
+    expect(mockBlockPlayer).toHaveBeenCalledWith({
+      publicId: "game-public",
+      playerId: "player-2",
+    })
+    expect(mockReportPlayer).not.toHaveBeenCalled()
+  })
+
+  it("keeps the board usable when a report fails", async () => {
+    mockReportPlayer.mockRejectedValueOnce(new Error("Network unavailable") as never)
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} />))
+    openConnectedPlayers()
+    fireEvent.press(screen.getByTestId("report-player-seat-2"))
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("submit-player-report-button"))
+    })
+
+    expect(screen.getByTestId("player-actions-error")).toHaveTextContent(
+      /Could not complete that request/,
+    )
+    expect(screen.getByTestId("submit-player-report-button")).toBeTruthy()
   })
 
   it("uses a connected end-game pop-up with cancel and confirm outcomes", async () => {
@@ -648,8 +711,8 @@ describe("connected lobby screens", () => {
     )
     expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
     expect(screen.getByText("Code: AB12CD")).toBeTruthy()
-    expect(screen.queryByText("Ada")).toBeNull()
-    expect(screen.queryByText("Grace")).toBeNull()
+    expect(screen.getByText("Ada")).toBeTruthy()
+    expect(screen.getByText("Grace")).toBeTruthy()
     expect(screen.queryByTestId("share-manual-code-button")).toBeNull()
     fireEvent.press(screen.getByTestId("share-invite-button"))
     await waitFor(() =>
@@ -672,6 +735,45 @@ describe("connected lobby screens", () => {
       expect(share).toHaveBeenLastCalledWith({ message: "Join my Scryve game with code ZX90QW" }),
     )
     expect(screen.getByText(/Enter code ZX90QW/i)).toBeTruthy()
+  })
+
+  it("opens a confirmation dialog from an opponent in the lobby", async () => {
+    mockProjection = {
+      ...mockProjection,
+      status: "lobby",
+      invitation: null,
+      players: [
+        {
+          playerId: "player-1",
+          seat: 1,
+          displayName: "Ada",
+          color: "#7C3AED",
+          controlledByMe: true,
+        },
+        {
+          playerId: "player-2",
+          seat: 2,
+          displayName: "Grace",
+          color: "#2563EB",
+          controlledByMe: false,
+        },
+      ],
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    fireEvent.press(screen.getByTestId("lobby-report-player-seat-2"))
+    expect(screen.getByText("Report Grace")).toBeTruthy()
+    expect(screen.getByText(/Reporting also blocks this player for you immediately/i)).toBeTruthy()
+    expect(mockReportPlayer).not.toHaveBeenCalled()
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("submit-player-report-button"))
+    })
+    expect(mockReportPlayer).toHaveBeenCalledWith({
+      publicId: "game-public",
+      playerId: "player-2",
+      reason: "offensive_username",
+    })
   })
 
   it("does not queue start or seat claim from cached UI while the socket is offline", () => {

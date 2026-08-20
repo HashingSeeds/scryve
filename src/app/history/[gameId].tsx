@@ -14,8 +14,14 @@ export default function GameSummaryRoute() {
     return (
       <ConnectedGate onBack={onBack}>
         <ConnectedSummarySource publicId={gameId}>
-          {({ model, changes, loading }) => (
-            <GameSummaryScreen model={model} changes={changes} loading={loading} onBack={onBack} />
+          {({ model, changes, loading, viewerPlayerIds }) => (
+            <GameSummaryScreen
+              model={model}
+              changes={changes}
+              loading={loading}
+              onBack={onBack}
+              moderation={{ publicId: gameId, viewerPlayerIds }}
+            />
           )}
         </ConnectedSummarySource>
       </ConnectedGate>

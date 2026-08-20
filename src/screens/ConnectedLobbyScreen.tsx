@@ -10,6 +10,10 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
+import {
+  PlayerActionsDialog,
+  type ReportablePlayer,
+} from "@/features/connected/PlayerActionsDialog"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { convexErrorMessage } from "@/utils/convexError"
 
@@ -37,6 +41,7 @@ export function ConnectedLobbyScreen({
   const [actionError, setActionError] = useState<string>()
   const [leaveAction, setLeaveAction] = useState<"leave" | "abandon">()
   const [leaving, setLeaving] = useState(false)
+  const [playerToReport, setPlayerToReport] = useState<ReportablePlayer>()
   const didNavigateToGame = useRef(false)
 
   useEffect(() => {
@@ -120,45 +125,58 @@ export function ConnectedLobbyScreen({
         text={`${lobby.players.length} of ${lobby.playerCount} seats claimed · ${lobby.startingLife} life · ${lobby.ruleset}`}
       />
       <View style={$players}>
-        {lobby.players
-          .filter((player) => player.controlledByMe)
-          .map((player) => (
-            <Card
-              key={player.playerId ?? `seat-${player.seat}`}
-              heading={`Your seat ${player.seat}`}
-              content={
-                player.deckVersionId
-                  ? `Seat ${player.seat} · deck selected`
-                  : `Seat ${player.seat} · no deck selected`
-              }
-              RightComponent={
-                player.controlledByMe && decks?.length ? (
-                  <View style={$deckChoices}>
-                    {decks
-                      .filter((deck) => deck.latestVersionId)
-                      .map((deck) => (
-                        <Button
-                          key={deck._id}
-                          text={deck.name}
-                          onPress={async () => {
-                            try {
-                              setActionError(undefined)
-                              await selectDeck({
-                                publicId,
-                                seat: player.seat,
-                                deckVersionId: deck.latestVersionId!,
-                              })
-                            } catch (cause) {
-                              setActionError(convexErrorMessage(cause, "Could not select deck"))
-                            }
-                          }}
-                        />
-                      ))}
-                  </View>
-                ) : undefined
-              }
-            />
-          ))}
+        {lobby.players.map((player) => (
+          <Card
+            key={player.playerId ?? `seat-${player.seat}`}
+            heading={player.displayName}
+            content={
+              player.deckVersionId
+                ? `${player.controlledByMe ? "Your seat" : `Seat ${player.seat}`} · deck selected`
+                : `${player.controlledByMe ? "Your seat" : `Seat ${player.seat}`} · no deck selected`
+            }
+            RightComponent={
+              player.controlledByMe && decks?.length ? (
+                <View style={$deckChoices}>
+                  {decks
+                    .filter((deck) => deck.latestVersionId)
+                    .map((deck) => (
+                      <Button
+                        key={deck._id}
+                        text={deck.name}
+                        onPress={async () => {
+                          try {
+                            setActionError(undefined)
+                            await selectDeck({
+                              publicId,
+                              seat: player.seat,
+                              deckVersionId: deck.latestVersionId!,
+                            })
+                          } catch (cause) {
+                            setActionError(convexErrorMessage(cause, "Could not select deck"))
+                          }
+                        }}
+                      />
+                    ))}
+                </View>
+              ) : !player.controlledByMe && player.playerId ? (
+                <Button
+                  testID={`lobby-report-player-seat-${player.seat}`}
+                  text="Report"
+                  style={$reportAction}
+                  onPress={() =>
+                    setPlayerToReport({
+                      playerId: player.playerId,
+                      seat: player.seat,
+                      displayName: player.displayName,
+                      color: player.color,
+                      controlledByMe: false,
+                    })
+                  }
+                />
+              ) : undefined
+            }
+          />
+        ))}
       </View>
       {inviteUrl || manualCode ? (
         <Button
@@ -282,6 +300,14 @@ export function ConnectedLobbyScreen({
           text="Reconnect before starting. Start is online-only and will not be queued."
         />
       ) : null}
+      {playerToReport ? (
+        <PlayerActionsDialog
+          publicId={publicId}
+          players={[playerToReport]}
+          initialPlayer={playerToReport}
+          onClose={() => setPlayerToReport(undefined)}
+        />
+      ) : null}
     </Screen>
   )
 }
@@ -308,3 +334,4 @@ const $confirmation = {
 const $leaveActions = { gap: 8 } as const
 const $players = { gap: 8 } as const
 const $deckChoices = { gap: 4, minWidth: 120 } as const
+const $reportAction: ViewStyle = { minHeight: 44, minWidth: 96 }

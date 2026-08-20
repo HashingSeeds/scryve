@@ -17,6 +17,7 @@ let mockUserLoaded = true
 let mockUserId: string | undefined = "user-a"
 const mockOpenAuth = jest.fn()
 const mockSyncCurrent = jest.fn(async () => "user")
+const mockUsernameCheck = jest.fn(async () => ({ acceptable: true }))
 const mockCachedGames = new Set<string>()
 let mockCachedProjectionPublicId: string | undefined
 
@@ -41,6 +42,7 @@ jest.mock("convex/react", () => ({
   }),
   useConvexConnectionState: () => ({ isWebSocketConnected: mockSocketConnected }),
   useMutation: () => mockSyncCurrent,
+  useConvex: () => ({ query: mockUsernameCheck }),
 }))
 jest.mock("./persistence", () => ({
   ConnectedGameRepository: jest.fn((_storage, ownerId: string) => ({
@@ -51,7 +53,10 @@ jest.mock("./persistence", () => ({
   })),
 }))
 jest.mock("../../../convex/_generated/api", () => ({
-  api: { users: { syncCurrent: "syncCurrent" } },
+  api: {
+    users: { syncCurrent: "syncCurrent" },
+    moderation: { usernameIsAcceptable: "usernameIsAcceptable" },
+  },
 }))
 
 function themed(children: ReactNode) {

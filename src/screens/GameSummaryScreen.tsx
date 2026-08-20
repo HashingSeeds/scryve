@@ -8,6 +8,10 @@ import { EmptyState } from "@/components/EmptyState"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import {
+  PlayerActionsDialog,
+  type ReportablePlayer,
+} from "@/features/connected/PlayerActionsDialog"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -26,6 +30,7 @@ export interface GameSummaryScreenProps {
   changes?: SummaryChangeFeed
   loading?: boolean
   onBack: () => void
+  moderation?: { publicId: string; viewerPlayerIds: string[] }
 }
 
 const OUTCOME_BADGES: Record<SummaryOutcome, { label: string; accessibilityLabel: string }> = {
@@ -105,10 +110,17 @@ function StandingRow({
   )
 }
 
-export function GameSummaryScreen({ model, changes, loading, onBack }: GameSummaryScreenProps) {
+export function GameSummaryScreen({
+  model,
+  changes,
+  loading,
+  onBack,
+  moderation,
+}: GameSummaryScreenProps) {
   const { theme, themed } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const [timelineOpen, setTimelineOpen] = useState(false)
+  const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
 
   if (!model) {
     return (
@@ -130,6 +142,15 @@ export function GameSummaryScreen({ model, changes, loading, onBack }: GameSumma
   const rows = standings(model)
   const playersById = new Map(model.players.map((player) => [player.id, player]))
   const timeline = changes?.changes ?? []
+  const reportablePlayers: ReportablePlayer[] = moderation
+    ? model.players.map((player) => ({
+        playerId: player.id,
+        seat: player.seat,
+        displayName: player.name,
+        color: player.color,
+        controlledByMe: moderation.viewerPlayerIds.includes(player.id),
+      }))
+    : []
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($fixedScreen)}>
@@ -185,6 +206,14 @@ export function GameSummaryScreen({ model, changes, loading, onBack }: GameSumma
         </View>
         {!showOutcome && model.source === "connected" ? (
           <Text size="xxs" style={themed($footnote)} text="No winner was recorded for this game." />
+        ) : null}
+        {reportablePlayers.some((player) => !player.controlledByMe) ? (
+          <Button
+            testID="summary-report-player-button"
+            text="Report or block a player"
+            style={themed($reportAction)}
+            onPress={() => setPlayerActionsOpen(true)}
+          />
         ) : null}
 
         <TouchableOpacity
@@ -259,6 +288,13 @@ export function GameSummaryScreen({ model, changes, loading, onBack }: GameSumma
           </View>
         ) : null}
       </ScrollView>
+      {playerActionsOpen && moderation ? (
+        <PlayerActionsDialog
+          publicId={moderation.publicId}
+          players={reportablePlayers}
+          onClose={() => setPlayerActionsOpen(false)}
+        />
+      ) : null}
     </Screen>
   )
 }
@@ -280,6 +316,10 @@ const $block: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.sm,
 })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $reportAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  marginTop: spacing.sm,
+  minHeight: 44,
+})
 const $footnote: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.textDim,
   marginTop: spacing.xs,

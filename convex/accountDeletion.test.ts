@@ -61,7 +61,7 @@ describe("account deletion", () => {
       publicId: "deletion-game-123456",
       deviceId: "device-alice-001",
     })
-    const alice = projection.players.find((player) => player.displayName === "Alice")!
+    const alice = projection.players.find((player) => player.controlledByMe)!
     await host.mutation(api.games.changeLife, {
       publicId: "deletion-game-123456",
       playerId: alice.playerId,
@@ -121,7 +121,11 @@ describe("account deletion", () => {
         deletedAt: expect.any(Number),
         finalLife: 35,
       }),
-      expect.objectContaining({ playerId: remainingPlayer._id, displayName: "Bob", finalLife: 40 }),
+      expect.objectContaining({
+        playerId: remainingPlayer._id,
+        displayName: "Player 2",
+        finalLife: 40,
+      }),
     ])
 
     const history = await otherPlayer.query(api.games.connectedHistory, {

@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from "react"
 import type { ViewStyle } from "react-native"
 import { ActivityIndicator, Animated } from "react-native"
 import { useUser } from "@clerk/expo"
-import { useConvexAuth, useConvexConnectionState, useMutation } from "convex/react"
+import { useConvex, useConvexAuth, useConvexConnectionState, useMutation } from "convex/react"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
@@ -92,6 +92,7 @@ export function BackendGate({
   const { isWebSocketConnected } = useConvexConnectionState()
   const { isLoaded: isUserLoaded, user } = useUser()
   const syncCurrent = useMutation(api.users.syncCurrent)
+  const convex = useConvex()
   const [readyUserId, setReadyUserId] = useState<string | undefined>(syncedProfile.userId)
   const [syncError, setSyncError] = useState<string>()
   const [syncAttempt, setSyncAttempt] = useState(0)
@@ -188,6 +189,15 @@ export function BackendGate({
             try {
               setSavingUsername(true)
               setUsernameError(undefined)
+              const { acceptable } = await convex.query(api.moderation.usernameIsAcceptable, {
+                username: username.trim(),
+              })
+              if (!acceptable) {
+                setUsernameError(
+                  "That username is not allowed. Other players will see this name, so please choose another.",
+                )
+                return
+              }
               await user.update({ username: username.trim() })
             } catch (cause) {
               setUsernameError(describeUsernameFailure(cause))

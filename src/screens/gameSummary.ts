@@ -116,7 +116,8 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
       id: player.playerId,
       seat: player.seat,
       name: player.displayName,
-      username: player.usernameAtFinish,
+      username:
+        player.usernameAtFinish === player.displayName ? undefined : player.usernameAtFinish,
       deckLabel: player.deckNameAtFinish
         ? player.deckVersionNumber
           ? `${player.deckNameAtFinish} v${player.deckVersionNumber}`

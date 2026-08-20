@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-08-18",
-  effectiveDate: "August 18, 2026",
+  version: "2026-08-20",
+  effectiveDate: "August 20, 2026",
   sections: [
     {
       blocks: [
@@ -167,6 +167,8 @@ export const privacyContent = {
             "profile image, if provided",
             "account identifier",
             "games, players, decks, counters, game history, and other content and settings associated with your account",
+            "reports you submit about another player, including the reason you select and any note you write",
+            "the list of players you have blocked",
             "messages and information you provide when contacting support",
           ],
         },
@@ -272,6 +274,7 @@ export const privacyContent = {
             "To respond to support requests and user feedback.",
             "To verify purchases and manage subscription access.",
             "To protect the Services, prevent abuse, and maintain account security.",
+            "To review reports about other players, filter objectionable usernames, and act on abuse.",
             "To diagnose crashes, troubleshoot problems, and improve performance and reliability.",
             "To save or protect an individual's vital interest. We may process your information when necessary to save or protect an individual’s vital interest, such as to prevent harm.",
           ],
@@ -356,6 +359,7 @@ export const privacyContent = {
             "RevenueCat, for verifying purchases and managing subscription entitlements.",
             "Apple and Google, when you purchase a subscription or use their platform services.",
             "Sentry, for crash reporting, diagnostic logging, user feedback, and privacy-protected session replay.",
+            "Resend, to email us when a player is reported so we can review it within 24 hours. That email contains the reported username and any note the reporter wrote; it does not identify the person who filed the report.",
             "Legal and Safety Disclosures. We may disclose information when required by law or when reasonably necessary to protect users, the Services, or our legal rights.",
             "Business Transfers. We may share or transfer information in connection with a merger, financing, acquisition, reorganization, or sale of all or part of our business or assets.",
           ],
@@ -417,7 +421,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. We may retain limited records longer when reasonably necessary for security, fraud prevention, legal compliance, dispute resolution, backups, or enforcement of our agreements.",
+          text: "We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. We may retain limited records longer when reasonably necessary for security, fraud prevention, legal compliance, dispute resolution, backups, or enforcement of our agreements. We keep player reports and the record of our decision for as long as needed to enforce our Terms and to recognize repeat behavior.",
         },
         {
           type: "paragraph",

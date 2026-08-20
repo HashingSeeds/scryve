@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
@@ -22,6 +22,7 @@ export interface SettingsScreenProps {
   onOpenTerms?: () => void
   onOpenLicenseAgreement?: () => void
   onOpenCookiePolicy?: () => void
+  BlockedPlayers?: ReactNode
 }
 
 export function SettingsScreen({
@@ -33,6 +34,7 @@ export function SettingsScreen({
   onOpenTerms,
   onOpenLicenseAgreement,
   onOpenCookiePolicy,
+  BlockedPlayers,
 }: SettingsScreenProps) {
   const { themed } = useAppTheme()
   const [settings, setSettings] = useState(initialSettings)
@@ -114,6 +116,7 @@ export function SettingsScreen({
           />
         </View>
       ) : null}
+      {BlockedPlayers}
       {onOpenPrivacy && onOpenTerms ? (
         <View style={themed($legalSection)}>
           <Text text="Legal" preset="subheading" accessibilityRole="header" />

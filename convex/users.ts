@@ -1,7 +1,12 @@
 import { v } from "convex/values"
 
+import { internal } from "./_generated/api"
+import type { Id } from "./_generated/dataModel"
 import { internalMutation, mutation } from "./_generated/server"
+import type { MutationCtx } from "./_generated/server"
 import { requireIdentity } from "./lib/auth"
+import { placeUsernameOnHold, releaseUsernameHold } from "./lib/moderation"
+import { usernameFailsGate } from "./lib/nameFilter"
 import {
   assertAvatarUrl,
   assertDisplayName,
@@ -10,6 +15,27 @@ import {
   MEMBERSHIP_MIGRATION_VERSION,
   normalizeUsername,
 } from "./lib/policy"
+
+/**
+ * The username that reaches Convex comes from Clerk, so the filter has to run here rather than in
+ * the signup form. A failing name is held rather than rejected: throwing would break the webhook
+ * and leave the account unusable instead of merely renamed.
+ */
+async function enforceUsernameFilter(ctx: MutationCtx, userId: Id<"users">, username: string) {
+  const user = await ctx.db.get(userId)
+  if (!user) return
+  if (usernameFailsGate(username)) {
+    const wasHeld = Boolean(user.moderationHold)
+    await placeUsernameOnHold(ctx, user, "filter")
+    if (!wasHeld) await ctx.scheduler.runAfter(0, internal.moderation.sendHoldAlert, { userId })
+    return
+  }
+  if (user.moderationHold?.reason === "filter") {
+    await releaseUsernameHold(ctx, user)
+    return
+  }
+  if (user.moderationHold) await placeUsernameOnHold(ctx, user, user.moderationHold.reason)
+}
 
 export const syncFromClerk = internalMutation({
   args: {
@@ -41,15 +67,19 @@ export const syncFromClerk = internalMutation({
     }
     if (existing) {
       await ctx.db.patch(existing._id, value)
+      // Re-checked on every sync, not just at signup: a rename in Clerk's own UI arrives here.
+      await enforceUsernameFilter(ctx, existing._id, username)
       return existing._id
     }
-    return await ctx.db.insert("users", {
+    const userId = await ctx.db.insert("users", {
       clerkUserId: args.clerkUserId,
       ...value,
       membershipMigrationVersion: MEMBERSHIP_MIGRATION_VERSION,
       historyMigrationVersion: HISTORY_MIGRATION_VERSION,
       createdAt: now,
     })
+    await enforceUsernameFilter(ctx, userId, username)
+    return userId
   },
 })
 
