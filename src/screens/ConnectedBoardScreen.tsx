@@ -20,6 +20,10 @@ import {
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import {
+  PlayerActionsDialog,
+  type ReportablePlayer,
+} from "@/features/connected/PlayerActionsDialog"
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
 import { asPlayerId } from "@/features/game/domain"
 import type { GamePlayer } from "@/features/game/types"
@@ -68,6 +72,7 @@ function ConnectedBoardRuntime({
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
+  const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
@@ -145,11 +150,14 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "connected-undo",
-      label: "Undo",
+      id: "connected-players",
+      label: "Players",
       color: "#55C894",
-      disabled: true,
-      onPress: () => undefined,
+      onPress: (event) => {
+        captureMenuDialogOrigin(event)
+        setMenuOpen(false)
+        setPlayerActionsOpen(true)
+      },
     },
     {
       id: "connected-status",
@@ -189,7 +197,15 @@ function ConnectedBoardRuntime({
     },
   ]
 
-  const overlayOpen = menuOpen || statusOpen || layoutPickerOpen || confirmingFinish
+  const overlayOpen =
+    menuOpen || statusOpen || layoutPickerOpen || confirmingFinish || playerActionsOpen
+  const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
+    playerId: player.playerId,
+    seat: player.seat,
+    displayName: player.displayName,
+    color: player.color,
+    controlledByMe: player.controlledByMe,
+  }))
 
   return (
     <Screen
@@ -327,6 +343,15 @@ function ConnectedBoardRuntime({
           </ScrollView>
           <Button text="Close" onPress={() => setStatusOpen(false)} />
         </DialogCard>
+      ) : null}
+
+      {playerActionsOpen ? (
+        <PlayerActionsDialog
+          publicId={publicId}
+          players={reportablePlayers}
+          origin={menuDialogOrigin}
+          onClose={() => setPlayerActionsOpen(false)}
+        />
       ) : null}
 
       {confirmingFinish ? (

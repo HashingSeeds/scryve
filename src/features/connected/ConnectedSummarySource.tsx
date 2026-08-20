@@ -17,6 +17,7 @@ export function ConnectedSummarySource({
     model: GameSummaryModel | null
     changes: SummaryChangeFeed
     loading: boolean
+    viewerPlayerIds: string[]
   }) => ReactNode
 }) {
   const { isAuthenticated } = useConvexAuth()
@@ -31,6 +32,7 @@ export function ConnectedSummarySource({
   return children({
     model: summary ? connectedSummaryModel(summary as any) : null,
     loading: summary === undefined,
+    viewerPlayerIds: summary?.viewerPlayerIds ?? [],
     changes: {
       changes: connectedChanges(events.results as any[]),
       onExpand: () => setTimelineRequested(true),

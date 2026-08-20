@@ -8,6 +8,16 @@ export default defineSchema({
     username: v.optional(v.string()),
     usernameNormalized: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
+    // Set when moderation pulls a username. While present, every surface other players can see
+    // shows `placeholderUsername` instead of the name Clerk holds.
+    moderationHold: v.optional(
+      v.object({
+        placeholderUsername: v.string(),
+        heldUsername: v.string(),
+        reason: v.union(v.literal("filter"), v.literal("reports"), v.literal("operator")),
+        createdAt: v.number(),
+      }),
+    ),
     membershipMigrationVersion: v.optional(v.number()),
     membershipMigrationCursor: v.optional(v.string()),
     historyMigrationVersion: v.optional(v.number()),
@@ -257,6 +267,38 @@ export default defineSchema({
   })
     .index("by_clerk_user", ["clerkUserId"])
     .index("by_clerk_user_and_document", ["clerkUserId", "document"]),
+
+  moderationReports: defineTable({
+    reporterUserId: v.id("users"),
+    reportedUserId: v.id("users"),
+    gameId: v.optional(v.id("games")),
+    reportedUsername: v.string(),
+    reason: v.union(
+      v.literal("offensive_username"),
+      v.literal("harassment"),
+      v.literal("impersonation"),
+      v.literal("other"),
+    ),
+    note: v.optional(v.string()),
+    status: v.union(v.literal("open"), v.literal("upheld"), v.literal("dismissed")),
+    autoAction: v.optional(v.union(v.literal("held_on_filter"), v.literal("held_on_reports"))),
+    matchedTerms: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+    resolutionNote: v.optional(v.string()),
+  })
+    .index("by_status_and_created_at", ["status", "createdAt"])
+    .index("by_reported_user", ["reportedUserId"])
+    .index("by_reporter_and_reported", ["reporterUserId", "reportedUserId"]),
+
+  userBlocks: defineTable({
+    blockerUserId: v.id("users"),
+    blockedUserId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_blocker", ["blockerUserId"])
+    .index("by_blocker_and_blocked", ["blockerUserId", "blockedUserId"])
+    .index("by_blocked", ["blockedUserId"]),
 
   accountDeletionRequests: defineTable({
     clerkUserId: v.string(),

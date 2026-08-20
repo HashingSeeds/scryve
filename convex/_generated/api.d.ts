@@ -22,9 +22,13 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
 import type * as lib_deckGames from "../lib/deckGames.js";
 import type * as lib_entitlements from "../lib/entitlements.js";
+import type * as lib_moderation from "../lib/moderation.js";
+import type * as lib_nameFilter from "../lib/nameFilter.js";
 import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_policy from "../lib/policy.js";
 import type * as lib_scryfall from "../lib/scryfall.js";
+import type * as lib_usernameSuggestions from "../lib/usernameSuggestions.js";
+import type * as moderation from "../moderation.js";
 import type * as users from "../users.js";
 
 import type {
@@ -48,9 +52,13 @@ declare const fullApi: ApiFromModules<{
   "lib/authConfig": typeof lib_authConfig;
   "lib/deckGames": typeof lib_deckGames;
   "lib/entitlements": typeof lib_entitlements;
+  "lib/moderation": typeof lib_moderation;
+  "lib/nameFilter": typeof lib_nameFilter;
   "lib/pagination": typeof lib_pagination;
   "lib/policy": typeof lib_policy;
   "lib/scryfall": typeof lib_scryfall;
+  "lib/usernameSuggestions": typeof lib_usernameSuggestions;
+  moderation: typeof moderation;
   users: typeof users;
 }>;
 

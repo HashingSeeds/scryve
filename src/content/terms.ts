@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const termsContent = {
   id: "terms",
   title: "TERMS OF USE",
-  version: "2026-08-18",
-  effectiveDate: "August 18, 2026",
+  version: "2026-08-20",
+  effectiveDate: "August 20, 2026",
   sections: [
     {
       heading: "AGREEMENT TO OUR LEGAL TERMS",
@@ -92,7 +92,7 @@ export const termsContent = {
         },
         {
           type: "paragraph",
-          text: "13. SERVICES MANAGEMENT",
+          text: "13. OBJECTIONABLE CONTENT, REPORTING, AND BLOCKING",
         },
         {
           type: "paragraph",
@@ -469,11 +469,31 @@ export const termsContent = {
       ],
     },
     {
-      heading: "13. SERVICES MANAGEMENT",
+      heading: "13. OBJECTIONABLE CONTENT, REPORTING, AND BLOCKING",
       blocks: [
         {
           type: "paragraph",
-          text: "We may monitor the Services for violations of these Legal Terms, restrict or remove unlawful or harmful User Content, suspend access, cooperate with lawful requests, and otherwise manage the Services as reasonably necessary to protect users, our rights and property, and the proper operation of the Services.",
+          text: "We do not tolerate objectionable content or abusive behavior on the Services. The only content other players can see about you is your username, and you must not choose a username that is obscene, hateful, harassing, threatening, sexually explicit, or that impersonates another person. Choosing such a username, or using the Services to harass another player, is a violation of these Legal Terms.",
+        },
+        {
+          type: "paragraph",
+          text: "We filter usernames automatically when they are created and whenever they change. A username that our filter identifies as objectionable is replaced with a neutral placeholder for everyone else until we have reviewed it. Filtering is not perfect, and it does not replace the reporting mechanism described below.",
+        },
+        {
+          type: "paragraph",
+          text: 'You can report a player from the "Players" action on the connected game board and from any connected game summary. Reporting a player blocks them for you at once: their username is hidden from you, and you will not be seated in a connected game with them again. You do not need to wait for us, and we do not ask the reported player for permission.',
+        },
+        {
+          type: "paragraph",
+          text: "We review every report and act on it within 24 hours. A username that draws reports from two or more separate accounts, or that our filter identifies, is replaced with a neutral placeholder for all players immediately, before we review it. Where a report is upheld we may replace the username permanently, suspend access, or terminate the account under Section 15. Where it is not, we restore the username.",
+        },
+        {
+          type: "paragraph",
+          text: "You can see and undo your blocks under Blocked players in Settings. If your username was replaced and you believe that was wrong, write to support@sowinghope.how and we will review it again. You can also report objectionable content or behavior directly to support@sowinghope.how at any time.",
+        },
+        {
+          type: "paragraph",
+          text: "We may also monitor the Services for violations of these Legal Terms, restrict or remove unlawful or harmful User Content, suspend access, cooperate with lawful requests, and otherwise manage the Services as reasonably necessary to protect users, our rights and property, and the proper operation of the Services.",
         },
       ],
     },

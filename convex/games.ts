@@ -6,6 +6,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { internalMutation, mutation, query } from "./_generated/server"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
+import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
 import {
   boundedPaginationOptions,
   CONNECTED_EVENT_PAGE_MAX_ITEMS,
@@ -73,6 +74,69 @@ async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string) {
   }
   if (record.attempts >= 10) throw new Error("Too many join attempts; wait a minute and try again")
   await ctx.db.patch(record._id, { attempts: record.attempts + 1 })
+}
+
+function seatLabelFor(player: { seat: number }) {
+  return `Player ${player.seat}`
+}
+
+function displayNameForViewer(
+  player: Doc<"gamePlayers">,
+  user: Doc<"users"> | null,
+  blocked: boolean,
+) {
+  if (blocked) return seatLabelFor(player)
+  return (
+    (user ? publicUsernameFor(user) : undefined) ??
+    player.usernameAtJoin ??
+    (player.deletedAt ? player.displayName : seatLabelFor(player))
+  )
+}
+
+async function displayNamesForViewer(
+  ctx: QueryCtx,
+  viewerUserId: Id<"users">,
+  players: Doc<"gamePlayers">[],
+) {
+  const blocked = await blockedUserIdsFor(ctx, viewerUserId)
+  const names = new Map<Id<"gamePlayers">, string>()
+  for (const player of players) {
+    const user = player.userId ? await ctx.db.get(player.userId) : null
+    names.set(
+      player._id,
+      displayNameForViewer(player, user, Boolean(player.userId && blocked.has(player.userId))),
+    )
+  }
+  return names
+}
+
+function summaryIdentitySnapshotFor(
+  player: Doc<"gamePlayers">,
+  user: Doc<"users"> | null,
+): { displayName: string; usernameAtFinish?: string } {
+  const resolved = user ? publicUsernameFor(user) : undefined
+  if (resolved) return { displayName: resolved, usernameAtFinish: resolved }
+  if (player.deletedAt) return { displayName: player.displayName }
+  if (player.usernameAtJoin)
+    return { displayName: player.usernameAtJoin, usernameAtFinish: player.usernameAtJoin }
+  return { displayName: seatLabelFor(player) }
+}
+
+function maskSummaryPlayersForViewer(
+  players: Doc<"gameSummaries">["players"],
+  blocked: Set<Id<"users">>,
+) {
+  return players.map((player) => {
+    if (player.userId && blocked.has(player.userId)) {
+      const { usernameAtFinish: _, ...masked } = player
+      return { ...masked, displayName: seatLabelFor(player) }
+    }
+    return {
+      ...player,
+      displayName:
+        player.usernameAtFinish ?? (player.deletedAt ? player.displayName : seatLabelFor(player)),
+    }
+  })
 }
 
 async function playersForGame(ctx: QueryCtx, gameId: Id<"games">) {
@@ -208,9 +272,8 @@ async function terminalizeGame(
         return {
           playerId: player._id,
           seat: player.seat,
-          displayName: player.displayName,
+          ...summaryIdentitySnapshotFor(player, user),
           ...(player.userId ? { userId: player.userId } : {}),
-          ...(user?.username ? { usernameAtFinish: user.username } : {}),
           ...(deck ? { deckId: deck._id, deckNameAtFinish: deck.name } : {}),
           ...(version
             ? { deckVersionId: version._id, deckVersionNumber: version.versionNumber }
@@ -413,6 +476,11 @@ export const claimSeat = mutation({
     if (!game || game.status !== "lobby" || !(await inviteIsCurrent(ctx, game, invite, Date.now())))
       throw new Error("Invite is invalid, expired, or revoked")
     const existingPlayers = await playersForGame(ctx, game._id)
+    for (const seated of existingPlayers) {
+      if (!seated.userId || seated.userId === user._id) continue
+      if (await isBlockedBetween(ctx, user._id, seated.userId))
+        throw new Error("You cannot join a game with a player you blocked or who blocked you")
+    }
     const duplicate = existingPlayers.find(
       (candidate) =>
         candidate.userId === user._id &&
@@ -465,6 +533,7 @@ export const lobbyProjection = query({
             .take(100)
         : []
     const invite = isHost ? await currentUsableInvite(ctx, game, Date.now()) : null
+    const displayNames = await displayNamesForViewer(ctx, user._id, players)
     const eventCount = totalEventCount(game, players)
     const serverUpdatedAt = players.reduce(
       (latest, player) => Math.max(latest, player.lastEventAt ?? 0),
@@ -494,8 +563,7 @@ export const lobbyProjection = query({
         .map((p) => ({
           playerId: p._id,
           seat: p.seat,
-          displayName: p.displayName,
-          username: p.usernameAtJoin,
+          displayName: displayNames.get(p._id) ?? seatLabelFor(p),
           deckVersionId: p.deckVersionId,
           color: p.color,
           currentLife: p.currentLife,
@@ -775,6 +843,7 @@ export const connectedHistory = query({
             : Math.min(FREE_CONNECTED_HISTORY_GAMES, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS),
         ),
       )
+    const blocked = await blockedUserIdsFor(ctx, user._id)
     const page = []
     for (const entry of history.page) {
       const summary = await ctx.db.get(entry.summaryId)
@@ -788,7 +857,7 @@ export const connectedHistory = query({
           outcome: entry.outcome,
           terminalStatus: summary.terminalStatus ?? "finished",
           terminalReason: summary.terminalReason,
-          players: summary.players,
+          players: maskSummaryPlayersForViewer(summary.players, blocked),
         })
       }
     }
@@ -951,10 +1020,20 @@ export const connectedSummary = query({
     const game = await gameByPublicId(ctx, args.publicId)
     await requireMembership(ctx, game._id)
     if (game.status !== "finished" && game.status !== "abandoned") return null
-    return await ctx.db
+    const summary = await ctx.db
       .query("gameSummaries")
       .withIndex("by_game", (q) => q.eq("gameId", game._id))
       .unique()
+    if (!summary) return null
+    const viewer = await requireUser(ctx)
+    const blocked = await blockedUserIdsFor(ctx, viewer._id)
+    return {
+      ...summary,
+      players: maskSummaryPlayersForViewer(summary.players, blocked),
+      viewerPlayerIds: summary.players
+        .filter((player) => player.userId === viewer._id)
+        .map((player) => player.playerId),
+    }
   },
 })
 
