@@ -45,8 +45,8 @@ function localGame(overrides: Partial<LocalGame> = {}): LocalGame {
     updatedAt: FINISHED_AT,
     finishedAt: FINISHED_AT,
     players: [
-      { id: "p1", name: "Ada", color: "#7C3AED", life: 3, seat: 1 },
-      { id: "p2", name: "Grace", color: "#2563EB", life: 20, seat: 2 },
+      { id: "p1", name: "Ada", color: "#7C3AED", life: 3, seat: 0 },
+      { id: "p2", name: "Grace", color: "#2563EB", life: 20, seat: 1 },
     ],
     events: [],
     ...overrides,
@@ -107,6 +107,14 @@ describe("game summary", () => {
     expect(screen.getByText("Finished")).toBeTruthy()
     expect(screen.getByText("2 players · 20 life · 34 min · 0 life changes")).toBeTruthy()
     expect(screen.getByText("Final life totals")).toBeTruthy()
+  })
+
+  it("numbers local seats for humans, starting at one like the board does", () => {
+    renderLocal()
+
+    expect(screen.getByText("Seat 1")).toBeTruthy()
+    expect(screen.getByText("Seat 2")).toBeTruthy()
+    expect(screen.queryByText("Seat 0")).toBeNull()
   })
 
   it("shows each player's final life and swing from the starting total", () => {
