@@ -17,9 +17,12 @@ jest.mock("expo-router", () => ({
 }))
 jest.mock("@/features/auth/AuthContext", () => ({ useAuthAccess: () => mockAuth }))
 let mockAccountAcceptances: unknown = []
+let mockConvexAuth = { isAuthenticated: true, isLoading: false }
+const mockRecordAcceptance = jest.fn(async () => ({ acceptedAt: 0 }))
 jest.mock("convex/react", () => ({
   useQuery: () => mockAccountAcceptances,
-  useMutation: () => jest.fn(),
+  useMutation: () => mockRecordAcceptance,
+  useConvexAuth: () => mockConvexAuth,
 }))
 
 function renderGate(onResolved?: () => void) {
@@ -37,6 +40,8 @@ describe("LegalConsentGate", () => {
     mockPathname = "/"
     mockAuth = { configured: false, isLoaded: true, isSignedIn: false }
     mockAccountAcceptances = []
+    mockConvexAuth = { isAuthenticated: true, isLoading: false }
+    mockRecordAcceptance.mockClear()
     accountAcceptanceCache.write("user-a", {})
     accountAcceptanceCache.write("user-b", {})
     mockPush.mockClear()
@@ -154,6 +159,60 @@ describe("LegalConsentGate", () => {
     const view = renderGate()
     expect(view.queryByText("APP CONTENT")).toBeNull()
     expect(view.getByText("We have updated our terms")).toBeTruthy()
+  })
+
+  it("does not trust the backend answer until Convex itself is authenticated", () => {
+    jest.useFakeTimers()
+    try {
+      accountAcceptanceCache.write("user-a", REQUIRED_CONSENT_VERSIONS)
+      mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+      mockConvexAuth = { isAuthenticated: false, isLoading: true }
+      mockAccountAcceptances = null
+      const view = renderGate()
+      act(() => void jest.advanceTimersByTime(ACCOUNT_CONSENT_TIMEOUT_MS))
+      expect(view.getByText("APP CONTENT")).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("keeps the answer locally when the backend cannot be written to", async () => {
+    jest.useFakeTimers()
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockConvexAuth = { isAuthenticated: false, isLoading: false }
+    mockAccountAcceptances = null
+    const view = renderGate()
+    act(() => void jest.advanceTimersByTime(ACCOUNT_CONSENT_TIMEOUT_MS))
+    await act(async () => void fireEvent.press(view.getByTestId("accept-legal-button")))
+    expect(mockRecordAcceptance).not.toHaveBeenCalled()
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(accountAcceptanceCache.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
+    jest.useRealTimers()
+  })
+
+  it("replays an unsynced acceptance once the backend authenticates", async () => {
+    jest.useFakeTimers()
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockConvexAuth = { isAuthenticated: false, isLoading: false }
+    mockAccountAcceptances = null
+    const view = renderGate()
+    act(() => void jest.advanceTimersByTime(ACCOUNT_CONSENT_TIMEOUT_MS))
+    await act(async () => void fireEvent.press(view.getByTestId("accept-legal-button")))
+    expect(mockRecordAcceptance).not.toHaveBeenCalled()
+
+    mockConvexAuth = { isAuthenticated: true, isLoading: false }
+    mockAccountAcceptances = []
+    await act(async () =>
+      view.rerender(
+        <ThemeProvider initialContext="light">
+          <LegalConsentGate>
+            <Text text="APP CONTENT" />
+          </LegalConsentGate>
+        </ThemeProvider>,
+      ),
+    )
+    expect(mockRecordAcceptance).toHaveBeenCalledTimes(2)
+    jest.useRealTimers()
   })
 
   it("caches what the backend reports so the next launch is immediate", () => {

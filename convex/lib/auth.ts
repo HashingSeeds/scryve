@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values"
+
 import type { Doc, Id } from "../_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
 
@@ -5,7 +7,8 @@ type Ctx = QueryCtx | MutationCtx
 
 export async function requireIdentity(ctx: Ctx) {
   const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Authentication required")
+  if (!identity)
+    throw new ConvexError({ code: "unauthenticated", message: "Authentication required" })
   return identity
 }
 
