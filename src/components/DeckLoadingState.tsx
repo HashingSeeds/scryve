@@ -34,7 +34,7 @@ export function DeckLoadingProgress({
   const reducedMotion = useReducedMotion()
   const trackWidth = useSharedValue(0)
   const travel = useSharedValue(0)
-  const completion = useSharedValue(state === "complete" ? 1 : 0)
+  const completion = useSharedValue(0)
   const loading = state === "loading"
 
   useEffect(() => {

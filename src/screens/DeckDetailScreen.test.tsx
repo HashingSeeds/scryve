@@ -122,6 +122,9 @@ describe("DeckDetailScreen", () => {
   it("opens read-only with the deck, its notes, and the selected version's record", () => {
     const view = renderDetail()
     expect(view.getByText("Magic · Commander · 1 card")).toBeTruthy()
+    expect(view.getByTestId("deck-loading-progress").props.accessibilityValue).toEqual({
+      text: "Deck loaded",
+    })
     expect(view.getByText("50% win rate · 3W 3L 0D over 6 games")).toBeTruthy()
     expect(view.getByText("Current  ›")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-tab-notes"))

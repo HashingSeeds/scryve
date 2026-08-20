@@ -455,6 +455,7 @@ export function DeckDetailScreen({
                 text={`${gameLabel} · ${deckFormatLabel(detail.deck.game, detail.deck.format)} · ${cardCountLabel(totalQuantity(cards))}`}
               />
               {deckRecord ? <Text size="sm" text={deckRecord} /> : null}
+              <DeckLoadingProgress state="complete" accessibilityText="Deck loaded" />
             </View>
 
             <View style={themed($tabs)} accessibilityRole="tablist">
