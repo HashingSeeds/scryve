@@ -20,13 +20,13 @@ const ar: Translations = {
     signInAccessibilityHint: "سجّل الدخول للعب المتصل. قريبًا.",
     status: "أساس المنتج جاهز. إعداد المباراة واللعب المتصل قادمان.",
     comingSoonTitle: "قريبًا",
-    comingSoonMessage: "نقطة الدخول هذه جاهزة لمرحلة تنفيذ Count التالية.",
+    comingSoonMessage: "نقطة الدخول هذه جاهزة لمرحلة تنفيذ Scryve التالية.",
     dismissComingSoon: "حسنًا",
   },
   errorScreen: {
     title: "حدث خطأ ما",
     friendlySubtitle:
-      "واجه Count خطأ غير متوقع. أعد تعيين التطبيق للعودة إلى حالة سليمة. إذا استمرت المشكلة، فأعد تشغيل عميل التطوير.",
+      "واجه Scryve خطأ غير متوقع. أعد تعيين التطبيق للعودة إلى حالة سليمة. إذا استمرت المشكلة، فأعد تشغيل عميل التطوير.",
     reset: "إعادة تعيين التطبيق",
   },
   emptyStateComponent: {

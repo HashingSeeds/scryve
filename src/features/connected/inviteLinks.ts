@@ -9,8 +9,18 @@ export type InvitePayload = { kind: "token"; token: string } | { kind: "code"; c
 
 function getAppScheme(): string {
   const configuredScheme = Constants.expoConfig?.scheme
-  if (Array.isArray(configuredScheme)) return configuredScheme[0] ?? "count"
-  return configuredScheme ?? "count"
+  if (Array.isArray(configuredScheme)) return configuredScheme[0] ?? "scryve"
+  return configuredScheme ?? "scryve"
+}
+
+function getTrustedAppSchemes(): string[] {
+  const configuredScheme = Constants.expoConfig?.scheme
+  const schemes = Array.isArray(configuredScheme)
+    ? configuredScheme
+    : configuredScheme
+      ? [configuredScheme]
+      : ["scryve"]
+  return [...new Set([...schemes, "count"])]
 }
 
 export function normalizeManualCode(value: string): string | null {
@@ -31,7 +41,9 @@ export function normalizeInvitePayload(
 
   try {
     const url = new URL(payload)
-    const isCustomScheme = url.protocol === `${getAppScheme()}:` && url.hostname === "join"
+    const isCustomScheme =
+      getTrustedAppSchemes().some((scheme) => url.protocol === `${scheme}:`) &&
+      url.hostname === "join"
     const normalizedOrigin = normalizeHttpsOrigin(trustedOrigin)
     const isTrustedHttps =
       url.protocol === "https:" && !!normalizedOrigin && url.origin === normalizedOrigin

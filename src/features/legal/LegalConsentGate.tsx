@@ -1,7 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import { Platform } from "react-native"
 import { router, usePathname } from "expo-router"
-import { useMutation, useQuery } from "convex/react"
+import { useConvexAuth, useMutation, useQuery } from "convex/react"
 
 import { CONSENT_DOCUMENT_IDS, type ConsentDocumentId } from "@/content/legal"
 import { termsContent } from "@/content/terms"
@@ -75,6 +75,7 @@ function DeviceConsentGate({ children, onResolved }: GateProps) {
 function SignedInConsentGate({ children, userId, onResolved }: GateProps & { userId?: string }) {
   const recordAcceptance = useMutation(api.legal.recordAcceptance)
   const accountAcceptances = useQuery(api.legal.currentAcceptances, {})
+  const { isAuthenticated: backendReady } = useConvexAuth()
   const [cached, setCached] = useState<AcceptedVersions>(() =>
     userId ? accountAcceptanceCache.read(userId) : {},
   )
@@ -83,28 +84,28 @@ function SignedInConsentGate({ children, userId, onResolved }: GateProps & { use
   )
   const [accountUnreachable, setAccountUnreachable] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string>()
+  const [unsyncedAcceptance, setUnsyncedAcceptance] = useState(false)
 
   const cacheSaysAccepted = missingConsent(REQUIRED_CONSENT_VERSIONS, cached).length === 0
-  const isLoadingAccount =
-    accountAcceptances === undefined && !accountUnreachable && !cacheSaysAccepted
+  const backendAnswered = backendReady && accountAcceptances !== undefined
+  const isLoadingAccount = !backendAnswered && !accountUnreachable && !cacheSaysAccepted
 
   useEffect(() => {
-    if (accountAcceptances !== undefined || cacheSaysAccepted) return
+    if (backendAnswered || cacheSaysAccepted) return
     const timer = setTimeout(() => setAccountUnreachable(true), ACCOUNT_CONSENT_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [accountAcceptances, cacheSaysAccepted])
+  }, [backendAnswered, cacheSaysAccepted])
 
   useEffect(() => {
     if (!isLoadingAccount) onResolved?.()
   }, [isLoadingAccount, onResolved])
 
   const fromServer = useMemo<AcceptedVersions | undefined>(() => {
-    if (accountAcceptances === undefined) return undefined
+    if (!backendAnswered) return undefined
     const map: AcceptedVersions = {}
     for (const entry of accountAcceptances ?? []) map[entry.document] = entry.version
     return map
-  }, [accountAcceptances])
+  }, [accountAcceptances, backendAnswered])
 
   useEffect(() => {
     if (!userId || !fromServer) return
@@ -112,31 +113,53 @@ function SignedInConsentGate({ children, userId, onResolved }: GateProps & { use
     setCached(fromServer)
   }, [fromServer, userId])
 
+  const sendAcceptance = useCallback(async () => {
+    for (const document of CONSENT_DOCUMENT_IDS)
+      await recordAcceptance({
+        document,
+        version: REQUIRED_CONSENT_VERSIONS[document],
+        platform: Platform.OS,
+      })
+  }, [recordAcceptance])
+
   const accepted =
     fromServer ??
     acceptedWithoutBackendAnswer({ cacheSaysAccepted, cached, accountUnreachable, deviceAccepted })
   const outstanding = useMemo(() => missingConsent(REQUIRED_CONSENT_VERSIONS, accepted), [accepted])
 
+  const keepAcceptanceOnThisDevice = useCallback(() => {
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    if (userId) accountAcceptanceCache.write(userId, REQUIRED_CONSENT_VERSIONS)
+    setCached(REQUIRED_CONSENT_VERSIONS)
+    setDeviceAccepted(REQUIRED_CONSENT_VERSIONS)
+  }, [userId])
+
   const accept = useCallback(async () => {
     setIsSubmitting(true)
-    setError(undefined)
+    keepAcceptanceOnThisDevice()
     try {
-      for (const document of CONSENT_DOCUMENT_IDS)
-        await recordAcceptance({
-          document,
-          version: REQUIRED_CONSENT_VERSIONS[document],
-          platform: Platform.OS,
-        })
-      deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
-      if (userId) accountAcceptanceCache.write(userId, REQUIRED_CONSENT_VERSIONS)
-      setCached(REQUIRED_CONSENT_VERSIONS)
-      setDeviceAccepted(REQUIRED_CONSENT_VERSIONS)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save your response")
+      if (!backendReady) throw new Error("The account backend is not authenticated yet")
+      await sendAcceptance()
+      setUnsyncedAcceptance(false)
+    } catch {
+      setUnsyncedAcceptance(true)
     } finally {
       setIsSubmitting(false)
     }
-  }, [recordAcceptance, userId])
+  }, [backendReady, keepAcceptanceOnThisDevice, sendAcceptance])
+
+  useEffect(() => {
+    if (!unsyncedAcceptance || !backendReady) return
+    let cancelled = false
+    void sendAcceptance()
+      .then(() => {
+        if (!cancelled) setUnsyncedAcceptance(false)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [backendReady, sendAcceptance, unsyncedAcceptance])
 
   if (isLoadingAccount) return null
   if (outstanding.length === 0) return <>{children}</>
@@ -144,7 +167,6 @@ function SignedInConsentGate({ children, userId, onResolved }: GateProps & { use
     <ConsentPrompt
       hasPriorAcceptance={hasPriorAcceptance(accepted)}
       isSubmitting={isSubmitting}
-      error={error}
       onAccept={() => void accept()}
     />
   )
@@ -153,12 +175,10 @@ function SignedInConsentGate({ children, userId, onResolved }: GateProps & { use
 function ConsentPrompt({
   hasPriorAcceptance,
   isSubmitting,
-  error,
   onAccept,
 }: {
   hasPriorAcceptance: boolean
   isSubmitting?: boolean
-  error?: string
   onAccept: () => void
 }) {
   return (
@@ -166,7 +186,6 @@ function ConsentPrompt({
       effectiveDate={termsContent.effectiveDate}
       isReturningUser={hasPriorAcceptance}
       isSubmitting={isSubmitting}
-      error={error}
       onAccept={onAccept}
       onOpenTerms={() => router.push("/terms")}
       onOpenPrivacy={() => router.push("/privacy")}

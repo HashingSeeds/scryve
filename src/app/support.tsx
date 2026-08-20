@@ -8,7 +8,9 @@ export default function SupportRoute() {
   return (
     <SupportScreen
       onBack={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-      onEmailSupport={() => void Linking.openURL("mailto:support@sow.care?subject=Count%20Support")}
+      onEmailSupport={() =>
+        void Linking.openURL("mailto:support@sow.care?subject=Scryve%20Support")
+      }
       onOpenPrivacy={() => router.push("/privacy")}
       onOpenTerms={() => router.push("/terms")}
       onOpenLicenseAgreement={

@@ -84,12 +84,12 @@ export function revenueCatErrorMessage(cause: unknown) {
     case PURCHASES_ERROR_CODE.PURCHASE_NOT_ALLOWED_ERROR:
       return "Purchases are not allowed on this device or store account."
     case PURCHASES_ERROR_CODE.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR:
-      return "This Count Pro option is not available from the current store."
+      return "This Scryve Pro option is not available from the current store."
     case PURCHASES_ERROR_CODE.PAYMENT_PENDING_ERROR:
       return "The store is still processing this purchase. Access will update when it completes."
     case PURCHASES_ERROR_CODE.CONFIGURATION_ERROR:
     case PURCHASES_ERROR_CODE.INVALID_CREDENTIALS_ERROR:
-      return "Count Pro is not configured correctly for this build."
+      return "Scryve Pro is not configured correctly for this build."
     default:
       return error.message || "The purchase could not be completed."
   }
@@ -234,7 +234,7 @@ export function RevenueCatProvider({
     try {
       setError(undefined)
       const result = await presentCountProPaywall(currentOffering)
-      if (result === "error") setError("The Count Pro paywall could not complete the request.")
+      if (result === "error") setError("The Scryve Pro paywall could not complete the request.")
       if (result === "purchased" || result === "restored") await refreshCustomerInfo()
       return result
     } catch (cause) {

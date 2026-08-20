@@ -24,7 +24,7 @@ export default function DeleteAccountRoute() {
           text={
             requestStarted
               ? "Your account deletion request was received."
-              : auth.configurationMessage || "Sign in to request deletion of your Count account."
+              : auth.configurationMessage || "Sign in to request deletion of your Scryve account."
           }
         />
         {auth.configured && !requestStarted ? (
@@ -55,7 +55,7 @@ function AuthenticatedDeleteAccountRoute({ onRequestStarted }: { onRequestStarte
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
         <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
-        <Text accessibilityRole="alert" text="Reconnect to Count before deleting your account." />
+        <Text accessibilityRole="alert" text="Reconnect to Scryve before deleting your account." />
         <Button text="Return home" onPress={() => router.replace("/")} />
       </Screen>
     )

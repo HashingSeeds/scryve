@@ -40,8 +40,8 @@ export function LegalConsentScreen({
         <Text
           text={
             isReturningUser
-              ? `Our Terms of Use and Privacy Policy changed on ${effectiveDate}. Please review them to keep using Count.`
-              : "Please review our Terms of Use and Privacy Policy. You need to accept them to use Count."
+              ? `Our Terms of Use and Privacy Policy changed on ${effectiveDate}. Please review them to keep using Scryve.`
+              : "Please review our Terms of Use and Privacy Policy. You need to accept them to use Scryve."
           }
           style={themed($muted)}
         />

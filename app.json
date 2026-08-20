@@ -1,7 +1,7 @@
 {
-  "name": "Count",
+  "name": "Scryve",
   "slug": "count",
-  "scheme": "count",
+  "scheme": ["scryve", "count"],
   "version": "0.1.0",
   "runtimeVersion": {
     "policy": "appVersion"
@@ -29,7 +29,7 @@
     "icon": "./assets/images/app-icon-ios.png",
     "supportsTablet": true,
     "infoPlist": {
-      "NSCameraUsageDescription": "Scan Count game invitation QR codes. Count does not capture, store, or upload images.",
+      "NSCameraUsageDescription": "Scan Scryve game invitation QR codes. Scryve does not capture, store, or upload images.",
       "ITSAppUsesNonExemptEncryption": false
     },
     "bundleIdentifier": "com.sowinghope.count",
@@ -59,7 +59,7 @@
     [
       "expo-camera",
       {
-        "cameraPermission": "Scan Count game invitation QR codes. Count does not capture, store, or upload images.",
+        "cameraPermission": "Scan Scryve game invitation QR codes. Scryve does not capture, store, or upload images.",
         "recordAudioAndroid": false,
         "barcodeScannerEnabled": true
       }

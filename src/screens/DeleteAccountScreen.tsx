@@ -53,7 +53,7 @@ export function DeleteAccountScreen({
           text={
             hasRequest
               ? statusDescription(deletionStatus)
-              : "This permanently deletes your Count account and anonymizes your connected-play history. Review what happens first."
+              : "This permanently deletes your Scryve account and anonymizes your connected-play history. Review what happens first."
           }
           style={themed($lede)}
         />
@@ -124,10 +124,10 @@ export function DeleteAccountScreen({
 
 function statusDescription(status: AccountDeletionStatus | null | undefined) {
   if (status === "failed")
-    return "Count could not finish automatically. Return to this page and submit the request again to retry."
+    return "Scryve could not finish automatically. Return to this page and submit the request again to retry."
   if (status === "identity_pending")
-    return "Your connected data is anonymized. Count is now removing your sign-in identity."
-  return "Count is anonymizing connected history and removing account-linked data. You can close this page safely."
+    return "Your connected data is anonymized. Scryve is now removing your sign-in identity."
+  return "Scryve is anonymizing connected history and removing account-linked data. You can close this page safely."
 }
 
 function DeletionStatusPanel({ status }: { status: AccountDeletionStatus | null | undefined }) {

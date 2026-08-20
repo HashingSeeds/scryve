@@ -14,6 +14,8 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { ConnectedGameRepository } from "./persistence"
+import { describeUsernameFailure, isUsernameValid, suggestUsername } from "./username"
+import { UsernameChecklist } from "./UsernameChecklist"
 import { api } from "../../../convex/_generated/api"
 
 const LOADING_REVEAL_DELAY_MS = 200
@@ -164,21 +166,31 @@ export function BackendGate({
           autoCapitalize="none"
           autoCorrect={false}
           value={username}
-          maxLength={64}
-          onChangeText={setUsername}
+          onChangeText={(next) => {
+            setUsername(next)
+            setUsernameError(undefined)
+          }}
+        />
+        <UsernameChecklist username={username} />
+        <Button
+          text="Suggest a username"
+          onPress={() => {
+            setUsername(suggestUsername())
+            setUsernameError(undefined)
+          }}
         />
         {usernameError ? <Text accessibilityRole="alert" text={usernameError} /> : null}
         <Button
           text={savingUsername ? "Saving…" : "Save username"}
           preset="reversed"
-          disabled={savingUsername || username.trim().length < 4}
+          disabled={savingUsername || !isUsernameValid(username)}
           onPress={async () => {
             try {
               setSavingUsername(true)
               setUsernameError(undefined)
               await user.update({ username: username.trim() })
             } catch (cause) {
-              setUsernameError(cause instanceof Error ? cause.message : "Could not save username")
+              setUsernameError(describeUsernameFailure(cause))
             } finally {
               setSavingUsername(false)
             }

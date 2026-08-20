@@ -36,8 +36,8 @@ The current app has a large-logical-width layout defect: at lower tablet densiti
 ## Apple in-app purchase review screenshot
 
 Apple's review screenshot is an internal review artifact, not a public product-page screenshot.
-`CaptureAppleReview.yaml` preserves the installed app's state, opens the live Count Pro paywall, and
-captures all three purchase choices to:
+`CaptureAppleReview.yaml` preserves the installed app's state, opens the live Scryve Pro
+paywall, and captures all three purchase choices to:
 
 ```text
 .maestro/screenshots/apple-review/count-pro-paywall.png

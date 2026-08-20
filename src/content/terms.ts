@@ -15,7 +15,7 @@ export const termsContent = {
         },
         {
           type: "paragraph",
-          text: 'We operate the website https://count.sow.care (the "Site") and the Count mobile application (the "App"), together with related products and services that link to these terms (collectively, the "Services"). Our contact information appears in Section 27.',
+          text: 'We operate the website https://scryve.sow.care (the "Site") and the Scryve mobile application (the "App"), together with related products and services that link to these terms (collectively, the "Services"). Our contact information appears in Section 27.',
         },
         {
           type: "paragraph",
@@ -328,7 +328,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "You may cancel a subscription through the platform where you purchased it. On iOS, subscriptions can be managed through your Apple Account subscription settings. On Android, subscriptions can be managed through Google Play. Deleting your Count account or uninstalling the application does not automatically cancel an active subscription. Cancellation ordinarily takes effect at the end of the current paid subscription period. Except where required by law or the applicable platform's rules, previously paid subscription fees are non-refundable. If you have questions, contact us at contact@sowinghope.how.",
+          text: "You may cancel a subscription through the platform where you purchased it. On iOS, subscriptions can be managed through your Apple Account subscription settings. On Android, subscriptions can be managed through Google Play. Deleting your Scryve account or uninstalling the application does not automatically cancel an active subscription. Cancellation ordinarily takes effect at the end of the current paid subscription period. Except where required by law or the applicable platform's rules, previously paid subscription fees are non-refundable. If you have questions, contact us at contact@sowinghope.how.",
         },
       ],
     },
@@ -482,7 +482,7 @@ export const termsContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "We care about data privacy and security. Please review our Privacy Policy: https://count.sow.care/privacy. By using the Services, you agree to be bound by our Privacy Policy, which is incorporated into these Legal Terms. The Services and our service providers may process information in the United States and other countries as described in the Privacy Policy. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has provided personal information, we will take reasonable steps to delete it.",
+          text: "We care about data privacy and security. Please review our Privacy Policy: https://scryve.sow.care/privacy. By using the Services, you agree to be bound by our Privacy Policy, which is incorporated into these Legal Terms. The Services and our service providers may process information in the United States and other countries as described in the Privacy Policy. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has provided personal information, we will take reasonable steps to delete it.",
         },
       ],
     },

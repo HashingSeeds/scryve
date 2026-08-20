@@ -24,13 +24,14 @@ const es: Translations = {
     status:
       "La base del producto está lista. La configuración y el juego conectado llegarán después.",
     comingSoonTitle: "Próximamente",
-    comingSoonMessage: "Esta entrada está lista para la siguiente fase de implementación de Count.",
+    comingSoonMessage:
+      "Esta entrada está lista para la siguiente fase de implementación de Scryve.",
     dismissComingSoon: "Entendido",
   },
   errorScreen: {
     title: "Algo salió mal",
     friendlySubtitle:
-      "Count encontró un error inesperado. Reinicia la app para volver a un estado limpio. Si el problema continúa, reinicia el cliente de desarrollo.",
+      "Scryve encontró un error inesperado. Reinicia la app para volver a un estado limpio. Si el problema continúa, reinicia el cliente de desarrollo.",
     reset: "Reiniciar app",
   },
   emptyStateComponent: {

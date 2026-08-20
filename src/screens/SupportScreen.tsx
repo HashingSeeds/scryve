@@ -29,12 +29,12 @@ export function SupportScreen({
 
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header title="Count Help" leftTx="common:back" onLeftPress={onBack} />
+      <Header title="Scryve Help" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($section)}>
         <Text text="COUNT" preset="formLabel" style={themed($eyebrow)} />
         <Text text="Help when you need it" preset="heading" accessibilityRole="header" />
         <Text
-          text="Find answers about games, accounts, and Count Pro, or contact us directly."
+          text="Find answers about games, accounts, and Scryve Pro, or contact us directly."
           style={themed($muted)}
         />
         <Button text="Email support" preset="reversed" onPress={onEmailSupport} />
@@ -48,7 +48,7 @@ export function SupportScreen({
       <Section title="Getting started">
         <Answer
           title="1. Start a game"
-          body="Open Count and choose New game from the home screen."
+          body="Open Scryve and choose New game from the home screen."
         />
         <Answer
           title="2. Choose how to play"
@@ -62,8 +62,8 @@ export function SupportScreen({
 
       <Section title="Frequently asked questions">
         <Answer
-          title="Restore Count Pro"
-          body="Open Count, go to your account, choose Count Pro, and tap Restore Purchases. Use the same Apple or Google account that made the original purchase."
+          title="Restore Scryve Pro"
+          body="Open Scryve, go to your account, choose Scryve Pro, and tap Restore Purchases. Use the same Apple or Google account that made the original purchase."
         />
         <Answer
           title="Manage or cancel a subscription"
@@ -71,11 +71,11 @@ export function SupportScreen({
         />
         <Answer
           title="Having trouble with a game?"
-          body="Restart Count and try again. If the problem continues, email us with your device model, operating-system version, and a short description of what happened."
+          body="Restart Scryve and try again. If the problem continues, email us with your device model, operating-system version, and a short description of what happened."
         />
         <Answer
           title="Account or privacy questions"
-          body="You can manage your account from Count’s account screen. Contact us if you need help accessing or deleting your account."
+          body="You can manage your account from Scryve’s account screen. Contact us if you need help accessing or deleting your account."
         />
       </Section>
 

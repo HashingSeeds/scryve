@@ -8,11 +8,12 @@ import {
 describe("invite links", () => {
   const token = "A".repeat(43)
 
-  it("accepts only the configured HTTPS origin or Count scheme", () => {
+  it("accepts only the configured HTTPS origin or trusted Scryve schemes", () => {
     expect(
       normalizeInvitePayload(`https://play.example/join/${token}`, "https://play.example"),
     ).toEqual({ kind: "token", token })
     expect(normalizeInvitePayload(`count://join/${token}`)).toEqual({ kind: "token", token })
+    expect(normalizeInvitePayload(`scryve://join/${token}`)).toEqual({ kind: "token", token })
     expect(normalizeInvitePayload("count://join/AB12CD")).toEqual({
       kind: "code",
       code: "AB12CD",
@@ -41,9 +42,9 @@ describe("invite links", () => {
 
   it("prefers a compact manual-code QR payload that round-trips through invite parsing", () => {
     const payload = buildInviteQrPayload(token, "ab-12cd")
-    expect(payload).toBe("count://join/AB12CD")
+    expect(payload).toBe("scryve://join/AB12CD")
     expect(normalizeInvitePayload(payload!)).toEqual({ kind: "code", code: "AB12CD" })
-    expect(buildInviteQrPayload(token)).toBe(`count://join/${token}`)
+    expect(buildInviteQrPayload(token)).toBe(`scryve://join/${token}`)
     expect(buildInviteQrPayload("invalid")).toBeNull()
   })
 })

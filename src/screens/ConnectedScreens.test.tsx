@@ -642,7 +642,7 @@ describe("connected lobby screens", () => {
     )
     const inviteUrl = `https://play.count.example/join/${inviteToken}`
     expect(view.UNSAFE_getByType(Screen).props.preset).toBe("auto")
-    expect(screen.getByTestId("invite-qr").props.children).toBe("count://join/AB12CD")
+    expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
     expect(screen.getByTestId("invite-qr").props.accessibilityHint).toBe(
       "size-184-quiet-zone-16-ecl-H",
     )
@@ -654,7 +654,7 @@ describe("connected lobby screens", () => {
     fireEvent.press(screen.getByTestId("share-invite-button"))
     await waitFor(() =>
       expect(share).toHaveBeenCalledWith({
-        message: `Join my Count game: ${inviteUrl}`,
+        message: `Join my Scryve game: ${inviteUrl}`,
         url: inviteUrl,
       }),
     )
@@ -666,10 +666,10 @@ describe("connected lobby screens", () => {
       invitation: { token: "invalid", manualCode: "ZX90QW" },
     }
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
-    expect(screen.getByTestId("invite-qr").props.children).toBe("count://join/ZX90QW")
+    expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/ZX90QW")
     fireEvent.press(screen.getByTestId("share-invite-button"))
     await waitFor(() =>
-      expect(share).toHaveBeenLastCalledWith({ message: "Join my Count game with code ZX90QW" }),
+      expect(share).toHaveBeenLastCalledWith({ message: "Join my Scryve game with code ZX90QW" }),
     )
     expect(screen.getByText(/Enter code ZX90QW/i)).toBeTruthy()
   })

@@ -18,7 +18,7 @@ const en = {
     signInAccessibilityHint: "Sign in for connected play. Coming soon.",
     status: "Product foundation ready. Game setup and connected play are coming next.",
     comingSoonTitle: "Coming soon",
-    comingSoonMessage: "This entry point is ready for the next Count implementation phase.",
+    comingSoonMessage: "This entry point is ready for the next Scryve implementation phase.",
     dismissComingSoon: "Got it",
   },
   localGame: {
@@ -65,7 +65,7 @@ const en = {
   errorScreen: {
     title: "Something went wrong",
     friendlySubtitle:
-      "Count hit an unexpected error. Reset the app to return to a clean state. If the problem continues, restart the development client.",
+      "Scryve hit an unexpected error. Reset the app to return to a clean state. If the problem continues, restart the development client.",
     reset: "Reset app",
   },
   emptyStateComponent: {

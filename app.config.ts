@@ -25,12 +25,12 @@ function normalizeHttpsOrigin(value: string | undefined): string | null {
 
 const getAppName = () => {
   if (IS_DEV) {
-    return "Count (Dev)"
+    return "Scryve (Dev)"
   }
   if (IS_PREVIEW) {
-    return "Count (Preview)"
+    return "Scryve (Preview)"
   }
-  return "Count"
+  return "Scryve"
 }
 
 const getUniqueIdentifier = () => {
@@ -44,6 +44,16 @@ const getUniqueIdentifier = () => {
 }
 
 const getAppScheme = () => {
+  if (IS_DEV) {
+    return "scryve-dev"
+  }
+  if (IS_PREVIEW) {
+    return "scryve-preview"
+  }
+  return "scryve"
+}
+
+const getLegacyAppScheme = () => {
   if (IS_DEV) {
     return "count-dev"
   }
@@ -76,7 +86,7 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
   const expoConfig = {
     ...config,
     name: getAppName(),
-    scheme: getAppScheme(),
+    scheme: [getAppScheme(), getLegacyAppScheme()],
     ios: {
       ...config.ios,
       bundleIdentifier: getUniqueIdentifier(),

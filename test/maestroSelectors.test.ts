@@ -39,7 +39,7 @@ describe("shipping Maestro selectors", () => {
     expect(packageJson.scripts["capture:apple-review"]).toContain("CaptureAppleReview.yaml")
   })
 
-  it("captures the live Count Pro paywall for Apple review", () => {
+  it("captures the live Scryve Pro paywall for Apple review", () => {
     const capture = readFileSync(
       join(process.cwd(), ".maestro/store-assets/CaptureAppleReview.yaml"),
       "utf8",

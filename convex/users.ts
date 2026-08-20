@@ -30,7 +30,7 @@ export const syncFromClerk = internalMutation({
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
       .unique()
     if (conflicting && conflicting._id !== existing?._id)
-      throw new Error("Clerk username conflicts with an existing Count account")
+      throw new Error("Clerk username conflicts with an existing Scryve account")
     const now = Date.now()
     const value = {
       displayName: assertDisplayName(args.displayName),
