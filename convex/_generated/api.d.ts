@@ -15,6 +15,7 @@ import type * as crons from "../crons.js";
 import type * as deckImports from "../deckImports.js";
 import type * as decks from "../decks.js";
 import type * as entitlements from "../entitlements.js";
+import type * as externalApiRateLimits from "../externalApiRateLimits.js";
 import type * as games from "../games.js";
 import type * as http from "../http.js";
 import type * as legal from "../legal.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   deckImports: typeof deckImports;
   decks: typeof decks;
   entitlements: typeof entitlements;
+  externalApiRateLimits: typeof externalApiRateLimits;
   games: typeof games;
   http: typeof http;
   legal: typeof legal;

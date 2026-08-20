@@ -269,6 +269,38 @@ export default defineSchema({
     ),
   }),
 
+  resolvedPreconstructedDecks: defineTable({
+    fileName: v.string(),
+    name: v.string(),
+    cards: v.array(
+      v.object({
+        oracleId: v.string(),
+        scryfallId: v.string(),
+        name: v.string(),
+        imageUrl: v.optional(v.string()),
+        smallImageUrl: v.optional(v.string()),
+        quantity: v.number(),
+        board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
+      }),
+    ),
+    unresolved: v.array(v.string()),
+    fetchedAt: v.number(),
+    refreshingUntil: v.optional(v.number()),
+  })
+    .index("by_file_name", ["fileName"])
+    .index("by_fetched_at", ["fetchedAt"]),
+
+  preconstructedDeckFetches: defineTable({
+    fileName: v.string(),
+    claimId: v.string(),
+    leaseUntil: v.number(),
+  }).index("by_file_name", ["fileName"]),
+
+  externalApiRateLimits: defineTable({
+    bucket: v.string(),
+    nextRequestAt: v.number(),
+  }).index("by_bucket", ["bucket"]),
+
   userEntitlements: defineTable({
     userId: v.id("users"),
     feature: v.string(),

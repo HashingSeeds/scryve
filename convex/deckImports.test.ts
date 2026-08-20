@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test"
 
-import { api } from "./_generated/api"
+import { api, internal } from "./_generated/api"
 import { parsePastedDeckList } from "./deckImports"
 import schema from "./schema"
 
@@ -10,6 +10,7 @@ const modules = {
   "./cards.ts": async () => jest.requireActual("./cards"),
   "./deckImports.ts": async () => jest.requireActual("./deckImports"),
   "./decks.ts": async () => jest.requireActual("./decks"),
+  "./externalApiRateLimits.ts": async () => jest.requireActual("./externalApiRateLimits"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
 
@@ -30,6 +31,49 @@ function deckListResponse() {
     ok: true,
     status: 200,
     json: async () => deckListPayload,
+  } as unknown as Response)
+}
+
+const preconCardId = "22222222-2222-2222-2222-222222222222"
+
+function resolvedPreconResponse(url: string, deckName = "Avengers Assemble") {
+  if (url.includes("mtgjson.com"))
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          name: deckName,
+          commander: [
+            {
+              name: "Captain America, Team Leader",
+              count: 1,
+              identifiers: { scryfallId: preconCardId },
+            },
+          ],
+          mainBoard: [],
+          sideBoard: [],
+        },
+      }),
+    } as unknown as Response)
+  return Promise.resolve({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      data: [
+        {
+          id: preconCardId,
+          oracle_id: "11111111-1111-1111-1111-111111111111",
+          name: "Captain America, Team Leader",
+          set_name: "Marvel's Spider-Man",
+          image_uris: {
+            normal: "https://cards.scryfall.io/normal/captain-america.jpg",
+            small: "https://cards.scryfall.io/small/captain-america.jpg",
+          },
+        },
+      ],
+      not_found: [],
+    }),
   } as unknown as Response)
 }
 
@@ -86,6 +130,347 @@ describe("preconstructed catalog caching", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1)
       expect(first).toMatchObject([{ fileName: "AtraxaInfect", name: "Atraxa Infect" }])
       expect(second).toEqual(first)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("shares a resolved deck across users without repeating external requests", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) => resolvedPreconResponse(String(input)))
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      const firstUser = t.withIdentity({ subject: "first-precon-user" })
+      const secondUser = t.withIdentity({ subject: "second-precon-user" })
+
+      const first = await firstUser.action(api.deckImports.resolvePreconstructed, {
+        fileName: "AvengersAssemble",
+      })
+      nowSpy.mockReturnValue(1_000_000 + 60 * 60 * 1000)
+      const second = await secondUser.action(api.deckImports.resolvePreconstructed, {
+        fileName: "AvengersAssemble.json",
+      })
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+      expect(first).toEqual(second)
+      expect(second).toMatchObject({
+        name: "Avengers Assemble",
+        cards: [{ name: "Captain America, Team Leader", board: "commander", quantity: 1 }],
+      })
+    } finally {
+      nowSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("coalesces concurrent cold requests for the same deck", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) => resolvedPreconResponse(String(input)))
+    try {
+      const t = convexTest(schema, modules)
+      const users = Array.from({ length: 5 }, (_, index) =>
+        t.withIdentity({ subject: `concurrent-precon-user-${index}` }),
+      )
+
+      const results = await Promise.all(
+        users.map((user) =>
+          user.action(api.deckImports.resolvePreconstructed, {
+            fileName: "AvengersAssemble",
+          }),
+        ),
+      )
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+      expect(results.every((result) => result.name === "Avengers Assemble")).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("releases a cold-fetch lease when the owner fails", async () => {
+    let shouldFail = true
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation((input) => {
+      if (shouldFail) {
+        shouldFail = false
+        return Promise.resolve({ ok: false, status: 503 } as Response)
+      }
+      return resolvedPreconResponse(String(input))
+    })
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "recovering-precon-user" })
+
+      await expect(
+        actor.action(api.deckImports.resolvePreconstructed, {
+          fileName: "AvengersAssemble",
+        }),
+      ).rejects.toBeDefined()
+      await expect(
+        actor.action(api.deckImports.resolvePreconstructed, {
+          fileName: "AvengersAssemble",
+        }),
+      ).resolves.toMatchObject({ name: "Avengers Assemble" })
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("does not let an expired owner release a newer cold-fetch lease", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      const fileName = "LeaseOwnership.json"
+      await expect(
+        t.mutation(internal.deckImports.claimColdPreconstructedFetch, {
+          fileName,
+          claimId: "first-owner",
+        }),
+      ).resolves.toBe(true)
+
+      nowSpy.mockReturnValue(1_000_000 + 15_001)
+      await expect(
+        t.mutation(internal.deckImports.claimColdPreconstructedFetch, {
+          fileName,
+          claimId: "second-owner",
+        }),
+      ).resolves.toBe(true)
+      await t.mutation(internal.deckImports.releaseColdPreconstructedFetch, {
+        fileName,
+        claimId: "first-owner",
+      })
+
+      await expect(
+        t.mutation(internal.deckImports.claimColdPreconstructedFetch, {
+          fileName,
+          claimId: "third-owner",
+        }),
+      ).resolves.toBe(false)
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it("serves stale data immediately while one background refresh updates the cache", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    let deckName = "Avengers Assemble"
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) => resolvedPreconResponse(String(input), deckName))
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "stale-precon-user" })
+      const first = await actor.action(api.deckImports.resolvePreconstructed, {
+        fileName: "AvengersAssemble",
+      })
+      expect(first.name).toBe("Avengers Assemble")
+
+      deckName = "Avengers Assemble Updated"
+      nowSpy.mockReturnValue(1_000_000 + 24 * 60 * 60 * 1000 + 1)
+      const stale = await actor.action(api.deckImports.resolvePreconstructed, {
+        fileName: "AvengersAssemble",
+      })
+      const sameStale = await t
+        .withIdentity({ subject: "second-stale-precon-user" })
+        .action(api.deckImports.resolvePreconstructed, { fileName: "AvengersAssemble" })
+      expect(stale.name).toBe("Avengers Assemble")
+      expect(sameStale).toEqual(stale)
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+
+      await t.run(async (ctx) => {
+        const scheduled = await ctx.db.system.query("_scheduled_functions").collect()
+        expect(scheduled).toHaveLength(1)
+        await ctx.scheduler.cancel(scheduled[0]._id)
+      })
+      await t.action(internal.deckImports.refreshResolvedPreconstructed, {
+        fileName: "AvengersAssemble.json",
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(4)
+      const refreshed = await actor.action(api.deckImports.resolvePreconstructed, {
+        fileName: "AvengersAssemble",
+      })
+      expect(refreshed.name).toBe("Avengers Assemble Updated")
+      expect(fetchSpy).toHaveBeenCalledTimes(4)
+    } finally {
+      nowSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("releases a stale-refresh lease after a failed refresh", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue({ ok: false, status: 503 } as Response)
+    try {
+      const t = convexTest(schema, modules)
+      await t.mutation(internal.deckImports.storeResolvedPreconstructed, {
+        fileName: "RetryRefresh.json",
+        name: "Retry Refresh",
+        cards: [],
+        unresolved: [],
+      })
+      nowSpy.mockReturnValue(1_000_000 + 24 * 60 * 60 * 1000 + 1)
+
+      await expect(
+        t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
+          fileName: "RetryRefresh.json",
+        }),
+      ).resolves.toBe(true)
+      await expect(
+        t.action(internal.deckImports.refreshResolvedPreconstructed, {
+          fileName: "RetryRefresh.json",
+        }),
+      ).rejects.toBeDefined()
+      await expect(
+        t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
+          fileName: "RetryRefresh.json",
+        }),
+      ).resolves.toBe(true)
+    } finally {
+      nowSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("prunes resolved decks that have gone unused for three months", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      await t.mutation(internal.deckImports.storeResolvedPreconstructed, {
+        fileName: "OldDeck.json",
+        name: "Old Deck",
+        cards: [],
+        unresolved: [],
+      })
+      nowSpy.mockReturnValue(1_000_000 + 91 * 24 * 60 * 60 * 1000)
+      await t.mutation(internal.deckImports.storeResolvedPreconstructed, {
+        fileName: "RecentDeck.json",
+        name: "Recent Deck",
+        cards: [],
+        unresolved: [],
+      })
+
+      await expect(
+        t.mutation(internal.deckImports.pruneResolvedPreconstructedCache, {}),
+      ).resolves.toBe(1)
+      await expect(
+        t.query(internal.deckImports.resolvedPreconstructedCache, {
+          fileName: "OldDeck.json",
+        }),
+      ).resolves.toBeNull()
+      await expect(
+        t.query(internal.deckImports.resolvedPreconstructedCache, {
+          fileName: "RecentDeck.json",
+        }),
+      ).resolves.toMatchObject({ name: "Recent Deck" })
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it("stores the maximum supported number of compact card entries", async () => {
+    const t = convexTest(schema, modules)
+    const cards = Array.from({ length: 300 }, (_, index) => ({
+      oracleId: `oracle-${index}`,
+      scryfallId: `scryfall-${index}`,
+      name: `Representative card ${index}`,
+      imageUrl: `https://cards.scryfall.io/normal/front/${index}/card-${index}.jpg`,
+      smallImageUrl: `https://cards.scryfall.io/small/front/${index}/card-${index}.jpg`,
+      quantity: 1,
+      board: "main" as const,
+    }))
+
+    await expect(
+      t.mutation(internal.deckImports.storeResolvedPreconstructed, {
+        fileName: "MaximumDeck.json",
+        name: "Maximum Deck",
+        cards,
+        unresolved: [],
+      }),
+    ).resolves.toBeDefined()
+    await expect(
+      t.query(internal.deckImports.resolvedPreconstructedCache, {
+        fileName: "MaximumDeck.json",
+      }),
+    ).resolves.toMatchObject({ cards })
+  })
+})
+
+describe("Scryfall request pacing", () => {
+  it("allocates a unique persistent slot to every concurrent reservation", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      const reservations = await Promise.all(
+        Array.from({ length: 20 }, () =>
+          t.mutation(internal.externalApiRateLimits.reserve, {
+            bucket: "stress-test",
+            intervalMs: 500,
+          }),
+        ),
+      )
+
+      expect(reservations.sort((left, right) => left - right)).toEqual(
+        Array.from({ length: 20 }, (_, index) => index * 500),
+      )
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it("preserves the full cooldown after an external 429", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      await t.mutation(internal.externalApiRateLimits.block, {
+        bucket: "scryfall:cards-search",
+        durationMs: 30_000,
+      })
+
+      await expect(
+        t.mutation(internal.externalApiRateLimits.reserve, {
+          bucket: "scryfall:cards-search",
+          intervalMs: 500,
+        }),
+      ).resolves.toBe(30_000)
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it("spaces collection requests across users by at least 500 ms", async () => {
+    const requestTimes: number[] = []
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_input, options) => {
+      requestTimes.push(performance.now())
+      const body = JSON.parse(String(options?.body)) as { identifiers: Array<{ name: string }> }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: body.identifiers.map(({ name }, index) => ({
+            id: `${String(requestTimes.length).padStart(8, "0")}-0000-0000-0000-${String(index).padStart(12, "0")}`,
+            name,
+          })),
+          not_found: [],
+        }),
+      } as Response
+    })
+    try {
+      const t = convexTest(schema, modules)
+      const firstUser = t.withIdentity({ subject: "first-paced-importer" })
+      const secondUser = t.withIdentity({ subject: "second-paced-importer" })
+
+      await Promise.all([
+        firstUser.action(api.deckImports.resolvePasted, { list: "1 First Card" }),
+        secondUser.action(api.deckImports.resolvePasted, { list: "1 Second Card" }),
+      ])
+
+      expect(requestTimes).toHaveLength(2)
+      expect(requestTimes[1] - requestTimes[0]).toBeGreaterThanOrEqual(490)
     } finally {
       fetchSpy.mockRestore()
     }
