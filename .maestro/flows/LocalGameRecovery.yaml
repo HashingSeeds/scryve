@@ -1,6 +1,11 @@
+# flow: Recover an interrupted local game
+# intent: Restore the active local game after the app restarts.
+
 appId: ${MAESTRO_APP_ID}
+tags: [local]
+onFlowStart:
+  - runFlow: ../shared/_OnFlowStart.yaml
 ---
-- runFlow: ../shared/_OnFlowStart.yaml
 - tapOn:
     id: "new-game-button"
 - assertVisible: "New local game"

@@ -14,14 +14,18 @@ Scryve's Maestro flows exercise an installed development build by bundle/package
 ## Commands
 
 ```bash
-pnpm run test:maestro:check
-pnpm run test:maestro:smoke
-pnpm run test:maestro
+pnpm e2e
+pnpm e2e full
 ```
 
-`test:maestro:check` does not need a simulator or Maestro installation. It catches renamed or stale
-React Native `testID` selectors in Jest. `test:maestro:smoke` runs the local-game happy path.
-`test:maestro` runs every flow under `.maestro/flows`.
+`pnpm e2e` checks the local environment and runs flows tagged `smoke`. `pnpm e2e full` runs every
+flow under `.maestro/flows`. Both commands write a JUnit report and Maestro debug output to
+`artifacts/e2e/`. Set `SKIP_METRO_CHECK=1` when testing an installed release build.
+
+The flows are `Landing.yaml`, `LocalGameRecovery.yaml`, and `MissingCloudConfig.yaml`. Tag every
+deterministic local flow with `local`, and reserve `smoke` for the smallest suite that verifies the
+main path. `pnpm run test:maestro:check` does not need a simulator or Maestro installation. It
+catches renamed or stale React Native `testID` selectors in Jest.
 
 Every flow must use `${MAESTRO_APP_ID}` and include `shared/_OnFlowStart.yaml` so state is cleared
 and the Expo development-client chooser is handled consistently. Prefer stable React Native

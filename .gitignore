@@ -95,6 +95,7 @@ web-build/
 .convex/
 
 /coverage
+artifacts/
 
 # Dependency Graph Visualizations
 app-dependency-graph.svg

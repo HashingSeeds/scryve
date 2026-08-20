@@ -2,6 +2,7 @@
 # intent: Start, play, undo, finish, and inspect a local game without an account.
 
 appId: ${MAESTRO_APP_ID}
+tags: [smoke, local]
 onFlowStart:
   - runFlow: ../shared/_OnFlowStart.yaml
 ---
