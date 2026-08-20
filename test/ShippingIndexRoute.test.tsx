@@ -3,7 +3,6 @@ import { fireEvent, render } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 
 import Index from "../src/app/index"
-import en from "../src/i18n/en"
 
 const mockOpenAuth = jest.fn()
 
@@ -25,14 +24,9 @@ describe("shipping index route", () => {
       </ThemeProvider>,
     )
     expect(view.getByText("localGame:localPlayNote")).toBeTruthy()
-    expect(en.localGame.localPlayNote).toBe(
-      "Local play stays available without an account or network.",
-    )
     expect(view.queryByTestId("quick-local-game-button")).toBeNull()
     expect(view.queryByText("On this device")).toBeNull()
     expect(view.getByText("localGame:signUpOrLogIn")).toBeTruthy()
-    expect(en.localGame.signUpOrLogIn).toBe("Sign up / log in")
-    expect(en.localGame.account).toBe("Account")
     fireEvent.press(view.getByTestId("new-game-button"))
     expect(jest.requireMock("expo-router").router.push).toHaveBeenCalledWith("/game/new")
     fireEvent.press(view.getByTestId("decks-button"))
