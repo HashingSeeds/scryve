@@ -8,11 +8,17 @@ import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import type { DialogOrigin } from "@/components/DialogCard"
+import {
+  $dialogActions,
+  $dialogButton,
+  DialogCard,
+  type DialogOrigin,
+} from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
+import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import {
   lobbyDetail,
   lobbyExitCopy,
@@ -35,6 +41,7 @@ import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
+import { isPlayerMarkShape, shapeForSeat, type PlayerAppearance } from "../../convex/lib/appearance"
 import { versionLabel } from "../../convex/lib/deckVersions"
 
 const LOBBY_TITLE = "Lobby"
@@ -76,11 +83,16 @@ export function ConnectedLobbyScreen({
   const leave = useMutation(api.games.leaveMyGame)
   const abandon = useMutation(api.games.abandonGame)
   const selectDeck = useMutation(api.decks.selectForSeat)
+  const setAppearance = useMutation(api.games.setMyAppearance)
   const [actionError, setActionError] = useState<string>()
   const [leaveAction, setLeaveAction] = useState<LobbyExitAction>()
   const [leaving, setLeaving] = useState(false)
   const [exitOrigin, setExitOrigin] = useState<DialogOrigin>()
   const [playerToReport, setPlayerToReport] = useState<ReportablePlayer>()
+  const [appearanceSeat, setAppearanceSeat] = useState<number>()
+  const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
+  const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
+  const [savingAppearance, setSavingAppearance] = useState(false)
   const didNavigateToGame = useRef(false)
 
   useEffect(() => {
@@ -118,6 +130,20 @@ export function ConnectedLobbyScreen({
       }
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Could not open sharing")
+    }
+  }
+
+  async function saveAppearance() {
+    if (appearanceSeat === undefined || !appearanceDraft) return
+    try {
+      setSavingAppearance(true)
+      setActionError(undefined)
+      await setAppearance({ publicId, seat: appearanceSeat, ...appearanceDraft })
+      setAppearanceSeat(undefined)
+    } catch (cause) {
+      setActionError(convexErrorMessage(cause, "Could not update your color and shape"))
+    } finally {
+      setSavingAppearance(false)
     }
   }
 
@@ -176,6 +202,12 @@ export function ConnectedLobbyScreen({
   const exitCopy = lobbyExitCopy(exitAction)
   const startBlocked = !everySeatClaimed || !isWebSocketConnected
   const openExitCopy = leaveAction ? lobbyExitCopy(leaveAction) : undefined
+  const takenAppearances = lobby.players
+    .filter((player) => player.seat !== appearanceSeat)
+    .map((player) => ({
+      color: player.color,
+      shape: isPlayerMarkShape(player.shape) ? player.shape : shapeForSeat(player.seat),
+    }))
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
@@ -216,6 +248,18 @@ export function ConnectedLobbyScreen({
             decks={decks}
             versionLabel={versionLabel}
             onSelectVersion={(seat, deckVersionId) => void chooseVersion(seat, deckVersionId)}
+            onEditAppearance={(seat, event) => {
+              setAppearanceOrigin(
+                event?.nativeEvent
+                  ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }
+                  : undefined,
+              )
+              setAppearanceDraft({
+                color: seat.color,
+                shape: isPlayerMarkShape(seat.shape) ? seat.shape : shapeForSeat(seat.seat),
+              })
+              setAppearanceSeat(seat.seat)
+            }}
             onReport={(seat) =>
               seat.playerId
                 ? setPlayerToReport({
@@ -223,6 +267,7 @@ export function ConnectedLobbyScreen({
                     seat: seat.seat,
                     displayName: seat.displayName,
                     color: seat.color,
+                    ...(isPlayerMarkShape(seat.shape) ? { shape: seat.shape } : {}),
                     controlledByMe: false,
                   })
                 : undefined
@@ -304,6 +349,42 @@ export function ConnectedLobbyScreen({
           onConfirm={() => void confirmExit()}
           onClose={() => setLeaveAction(undefined)}
         />
+      ) : null}
+      {appearanceSeat !== undefined && appearanceDraft ? (
+        <DialogCard
+          visible
+          onClose={() => setAppearanceSeat(undefined)}
+          closeDisabled={savingAppearance}
+          origin={appearanceOrigin}
+          backdropTestID="lobby-appearance-backdrop"
+          backdropAccessibilityLabel="Close color and shape picker"
+          dialogTestID="lobby-appearance-dialog"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text="Your color and shape" />
+          <AppearancePicker
+            value={appearanceDraft}
+            taken={takenAppearances}
+            onChange={setAppearanceDraft}
+          />
+          <View style={themed($dialogActions)}>
+            <Button
+              testID="cancel-appearance-button"
+              text="Cancel"
+              style={themed($dialogButton)}
+              disabled={savingAppearance}
+              onPress={() => setAppearanceSeat(undefined)}
+            />
+            <Button
+              testID="save-appearance-button"
+              text={savingAppearance ? "Saving…" : "Save"}
+              preset="reversed"
+              style={themed($dialogButton)}
+              disabled={savingAppearance}
+              onPress={() => void saveAppearance()}
+            />
+          </View>
+        </DialogCard>
       ) : null}
       {playerToReport ? (
         <PlayerActionsDialog

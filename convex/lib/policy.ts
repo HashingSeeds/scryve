@@ -1,3 +1,5 @@
+import { isPlayerMarkShape } from "./appearance"
+
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
 export const INVITE_LIFETIME_MS = 24 * 60 * 60 * 1000
@@ -60,6 +62,10 @@ export function normalizeManualCode(code: string) {
 
 export function assertAllowedColor(color: string) {
   if (!/^#[0-9A-Fa-f]{6}$/.test(color)) throw new Error("Choose a valid six-digit color")
+}
+
+export function assertAllowedShape(shape: string) {
+  if (!isPlayerMarkShape(shape)) throw new Error("Choose a valid player shape")
 }
 
 export function assertDisplayName(name: string) {

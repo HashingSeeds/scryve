@@ -1,3 +1,5 @@
+import type { PlayerMarkShape } from "../../../convex/lib/appearance"
+
 export type Brand<T, Name extends string> = T & { readonly __brand: Name }
 
 export type GameId = Brand<string, "GameId">
@@ -14,6 +16,7 @@ export interface GamePlayer {
   id: PlayerId
   name: string
   color: string
+  shape?: PlayerMarkShape
   life: number
   seat: number
 }

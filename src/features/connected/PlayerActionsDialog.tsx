@@ -15,12 +15,14 @@ import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
+import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 
 export interface ReportablePlayer {
   playerId: string
   seat: number
   displayName: string
   color: string
+  shape?: PlayerMarkShape
   controlledByMe: boolean
 }
 
@@ -171,7 +173,12 @@ export function PlayerActionsDialog({
             {opponents.map((player) => (
               <View key={player.playerId} style={themed($row)}>
                 <View style={themed($identity)}>
-                  <PlayerMark seatNumber={player.seat} color={player.color} size={28} />
+                  <PlayerMark
+                    seatNumber={player.seat}
+                    shape={player.shape}
+                    color={player.color}
+                    size={28}
+                  />
                   <Text numberOfLines={1} text={player.displayName} style={themed($identityName)} />
                   <Text size="xxs" style={themed($muted)} text={`Seat ${player.seat}`} />
                 </View>

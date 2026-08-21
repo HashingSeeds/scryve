@@ -14,22 +14,14 @@ import Svg, { Circle, Line, Path, Polygon, Rect } from "react-native-svg"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import type { LifeCardContentRotation } from "./playerCardTypes"
+import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
-export type PlayerMarkShape = "circle" | "triangle" | "square" | "diamond" | "star" | "hexagon"
-
-const SHAPES: readonly PlayerMarkShape[] = [
-  "circle",
-  "triangle",
-  "square",
-  "diamond",
-  "star",
-  "hexagon",
-]
 const SPIN_DURATION_MS = 7000
 
 export interface PlayerMarkProps {
   seatNumber: number
   color: string
+  shape?: PlayerMarkShape
   rotation?: LifeCardContentRotation
   spinning?: boolean
   size?: number
@@ -39,13 +31,13 @@ export interface PlayerMarkProps {
 export function PlayerMark({
   seatNumber,
   color,
+  shape: chosenShape,
   rotation = 0,
   spinning = false,
   size = 44,
   style,
 }: PlayerMarkProps) {
-  const markIndex = Math.abs(seatNumber - 1) % SHAPES.length
-  const shape = SHAPES[markIndex]
+  const shape = chosenShape ?? shapeForSeat(seatNumber)
   const insetColor = color.toUpperCase() === "#FFFFFF" ? "#000000" : "#FFFFFF"
   const reducedMotion = useReducedMotion()
   const spin = useSharedValue(0)

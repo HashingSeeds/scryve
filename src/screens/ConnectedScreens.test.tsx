@@ -19,6 +19,7 @@ const mockSyncUser = jest.fn(async () => "user")
 const mockStart = jest.fn(async () => ({ publicId: "game-public" }))
 const mockLeave = jest.fn(async () => ({ publicId: "game-public", left: true }))
 const mockAbandon = jest.fn(async () => ({ publicId: "game-public" }))
+const mockSetAppearance = jest.fn(async () => ({ color: "#41476E", shape: "square" }))
 const mockCreateLobby = jest.fn(async () => ({
   publicId: "new-game",
   inviteToken: "A".repeat(43),
@@ -76,6 +77,7 @@ jest.mock("convex/react", () => ({
     if (name.includes("createLobby")) return mockCreateLobby
     if (name.includes("migrateMyGameMemberships") || name.includes("migrateMyHistoryEntries"))
       return mockMigrate
+    if (name.includes("setMyAppearance")) return mockSetAppearance
     if (name.includes("reportPlayer")) return mockReportPlayer
     if (name.includes("blockPlayer")) return mockBlockPlayer
     return mockSyncUser
@@ -123,6 +125,7 @@ jest.mock("../../convex/_generated/api", () => ({
       startGame: "games.startGame",
       leaveMyGame: "games.leaveMyGame",
       abandonGame: "games.abandonGame",
+      setMyAppearance: "games.setMyAppearance",
       migrateMyGameMemberships: "games.migrateMyGameMemberships",
       activeConnectedGames: "games.activeConnectedGames",
       createLobby: "games.createLobby",
@@ -253,6 +256,21 @@ describe("connected lobby screens", () => {
     await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
     expect(mockClaimSeat).toHaveBeenCalledWith(
       expect.objectContaining({ manualCode: "AB12CD", displayName: "Grace" }),
+    )
+  })
+
+  it("submits the color and shape a joiner picked independently", async () => {
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    fireEvent.press(screen.getByTestId("appearance-color-39755c"))
+    fireEvent.press(screen.getByTestId("appearance-shape-hexagon"))
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    expect(mockClaimSeat).toHaveBeenLastCalledWith(
+      expect.objectContaining({ color: "#39755C", shape: "hexagon" }),
     )
   })
 
@@ -851,6 +869,93 @@ describe("connected lobby screens", () => {
     fireEvent.press(screen.getByTestId("connected-lobby-leave-backdrop"))
     expect(screen.queryByTestId("connected-lobby-leave-confirmation")).toBeNull()
     expect(mockAbandon).not.toHaveBeenCalled()
+  })
+
+  it("greys out a color and shape another seat already claimed", async () => {
+    mockProjection = {
+      ...mockProjection,
+      status: "lobby",
+      isHost: true,
+      invitation: null,
+      players: [
+        {
+          playerId: "player-1",
+          seat: 1,
+          displayName: "Ada",
+          color: "#B85636",
+          shape: "circle",
+          controlledByMe: true,
+        },
+        {
+          playerId: "player-2",
+          seat: 2,
+          displayName: "Grace",
+          color: "#B85636",
+          shape: "square",
+          controlledByMe: false,
+        },
+      ],
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    fireEvent.press(screen.getByTestId("edit-appearance-seat-1"))
+    expect(screen.getByTestId("lobby-appearance-dialog")).toBeTruthy()
+
+    expect(screen.getByTestId("appearance-shape-square").props.accessibilityState.disabled).toBe(
+      true,
+    )
+    expect(screen.getByTestId("appearance-shape-star").props.accessibilityState.disabled).toBe(
+      false,
+    )
+
+    fireEvent.press(screen.getByTestId("appearance-shape-star"))
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("save-appearance-button"))
+    })
+    expect(mockSetAppearance).toHaveBeenCalledWith({
+      publicId: "game-public",
+      seat: 1,
+      color: "#B85636",
+      shape: "star",
+    })
+  })
+
+  it("frees the taken shape again after switching to an unclaimed color", () => {
+    mockProjection = {
+      ...mockProjection,
+      status: "lobby",
+      isHost: true,
+      invitation: null,
+      players: [
+        {
+          playerId: "player-1",
+          seat: 1,
+          displayName: "Ada",
+          color: "#B85636",
+          shape: "circle",
+          controlledByMe: true,
+        },
+        {
+          playerId: "player-2",
+          seat: 2,
+          displayName: "Grace",
+          color: "#B85636",
+          shape: "square",
+          controlledByMe: false,
+        },
+      ],
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    fireEvent.press(screen.getByTestId("edit-appearance-seat-1"))
+    expect(screen.getByTestId("appearance-shape-square").props.accessibilityState.disabled).toBe(
+      true,
+    )
+
+    fireEvent.press(screen.getByTestId("appearance-color-41476e"))
+
+    expect(screen.getByTestId("appearance-shape-square").props.accessibilityState.disabled).toBe(
+      false,
+    )
   })
 
   it("requires a host to abandon instead of hiding an unfinished lobby", () => {

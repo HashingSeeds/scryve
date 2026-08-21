@@ -1,5 +1,5 @@
-import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
+import { TouchableOpacity, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { FilterChips } from "@/components/FilterChips"
@@ -9,12 +9,14 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { seatDetail } from "./connectedCopy"
+import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 
 export type LobbySeat = {
   playerId?: string
   seat: number
   displayName: string
   color: string
+  shape?: string
   deckVersionId?: string
   controlledByMe: boolean
 }
@@ -32,6 +34,7 @@ export function LobbySeatList({
   versionLabel,
   onSelectVersion,
   onReport,
+  onEditAppearance,
 }: {
   seats: LobbySeat[]
   openSeats: number
@@ -39,6 +42,7 @@ export function LobbySeatList({
   versionLabel: (version: { versionNumber: number; name?: string }) => string
   onSelectVersion: (seat: number, deckVersionId: string) => void
   onReport: (seat: LobbySeat) => void
+  onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
   const { themed } = useAppTheme()
   return (
@@ -54,7 +58,30 @@ export function LobbySeatList({
         return (
           <View key={seat.playerId ?? `seat-${seat.seat}`} style={themed($seat)}>
             <View style={themed($seatRow)}>
-              <PlayerMark seatNumber={seat.seat} color={seat.color} size={32} />
+              {seat.controlledByMe && onEditAppearance ? (
+                <TouchableOpacity
+                  testID={`edit-appearance-seat-${seat.seat}`}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change your color and shape"
+                  activeOpacity={0.75}
+                  style={themed($markButton)}
+                  onPress={(event) => onEditAppearance(seat, event)}
+                >
+                  <PlayerMark
+                    seatNumber={seat.seat}
+                    shape={isPlayerMarkShape(seat.shape) ? seat.shape : undefined}
+                    color={seat.color}
+                    size={32}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <PlayerMark
+                  seatNumber={seat.seat}
+                  shape={isPlayerMarkShape(seat.shape) ? seat.shape : undefined}
+                  color={seat.color}
+                  size={32}
+                />
+              )}
               <View style={themed($seatCopy)}>
                 <Text weight="medium" numberOfLines={1} text={seat.displayName} />
                 <Text
@@ -136,6 +163,12 @@ const $seatRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
 })
 const $seatCopy: ThemedStyle<ViewStyle> = () => ({ flex: 1, gap: 2 })
+const $markButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  padding: spacing.xxs,
+  borderRadius: spacing.xs,
+  borderWidth: 1,
+  borderColor: colors.separator,
+})
 const $seatDetail: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $seatPending: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $report: ThemedStyle<ViewStyle> = ({ spacing }) => ({

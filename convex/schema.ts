@@ -64,6 +64,7 @@ export default defineSchema({
     deckVersionId: v.optional(v.id("deckVersions")),
     deletedAt: v.optional(v.number()),
     color: v.string(),
+    shape: v.optional(v.string()),
     currentLife: v.number(),
     // Optional during the staged Phase 4.5A rollout. Counts only post-hot-path events.
     eventCount: v.optional(v.number()),
@@ -141,6 +142,7 @@ export default defineSchema({
           v.union(v.literal("win"), v.literal("loss"), v.literal("draw"), v.literal("unknown")),
         ),
         color: v.string(),
+        shape: v.optional(v.string()),
         finalLife: v.number(),
         deletedAt: v.optional(v.number()),
       }),

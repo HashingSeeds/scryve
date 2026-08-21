@@ -30,6 +30,8 @@ import type { GamePlayer } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import { isPlayerMarkShape } from "../../convex/lib/appearance"
+
 export function ConnectedBoardScreen(props: {
   publicId: string
   onBack?: () => void
@@ -112,6 +114,7 @@ function ConnectedBoardRuntime({
     id: asPlayerId(player.playerId),
     name: player.displayName,
     color: player.color,
+    ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
     life: player.currentLife,
     seat: player.seat,
   }))
@@ -204,6 +207,7 @@ function ConnectedBoardRuntime({
     seat: player.seat,
     displayName: player.displayName,
     color: player.color,
+    ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
     controlledByMe: player.controlledByMe,
   }))
 
@@ -384,7 +388,12 @@ function ConnectedBoardRuntime({
                   detail={`${player.currentLife} life`}
                   accentColor={player.color}
                   Leading={({ color }) => (
-                    <PlayerMark seatNumber={player.seat} color={color} size={28} />
+                    <PlayerMark
+                      seatNumber={player.seat}
+                      shape={isPlayerMarkShape(player.shape) ? player.shape : undefined}
+                      color={color}
+                      size={28}
+                    />
                   )}
                   accessibilityLabel={`${player.displayName}, ${player.currentLife} life${selected ? ", winner" : ""}`}
                   selected={selected}

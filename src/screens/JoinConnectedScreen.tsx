@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import { ScrollView, View } from "react-native"
 import { useUser } from "@clerk/expo"
 import { useConvexConnectionState, useMutation } from "convex/react"
 
@@ -9,13 +9,13 @@ import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { Header } from "@/components/Header"
-import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
-import { MAX_PLAYER_NAME_LENGTH, PLAYER_COLORS, validatePlayerNames } from "@/features/game/domain"
+import { MAX_PLAYER_NAME_LENGTH, validatePlayerNames } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -23,6 +23,11 @@ import type { ThemedStyle } from "@/theme/types"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import { api } from "../../convex/_generated/api"
+import {
+  PLAYER_COLOR_CHOICES,
+  shapeForSeat,
+  type PlayerAppearance,
+} from "../../convex/lib/appearance"
 
 export function JoinConnectedScreen({
   inviteToken,
@@ -46,7 +51,10 @@ export function JoinConnectedScreen({
   const deviceId = useState(() => new LocalGameRepository().getDeviceId())[0]
   const [code, setCode] = useState(initialCode)
   const [name, setName] = useState(user?.fullName || user?.firstName || "Player")
-  const [color, setColor] = useState(PLAYER_COLORS[0])
+  const [appearance, setAppearance] = useState<PlayerAppearance>({
+    color: PLAYER_COLOR_CHOICES[0],
+    shape: shapeForSeat(1),
+  })
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const nameValidation = validatePlayerNames([name])
@@ -78,7 +86,8 @@ export function JoinConnectedScreen({
         token: inviteToken,
         manualCode: manualCode ?? undefined,
         displayName: normalizedName,
-        color: color.toUpperCase(),
+        color: appearance.color.toUpperCase(),
+        shape: appearance.shape,
         deviceId,
       })
       emitTelemetry("join.completed", { durationMs: Date.now() - startedAt, outcome: "success" })
@@ -152,26 +161,12 @@ export function JoinConnectedScreen({
           />
         </View>
         <View style={themed($section)}>
-          <Text size="xs" style={themed($dimmed)} text="Your color" />
-          <View style={themed($swatches)}>
-            {PLAYER_COLORS.map((option, index) => {
-              const selected = option.toUpperCase() === color.toUpperCase()
-              return (
-                <TouchableOpacity
-                  key={option}
-                  testID={`join-color-${option.replace("#", "").toLowerCase()}`}
-                  accessibilityRole="radio"
-                  accessibilityLabel={`Color ${index + 1}`}
-                  accessibilityState={{ selected }}
-                  activeOpacity={0.75}
-                  style={[themed($swatch), selected && themed($selectedSwatch)]}
-                  onPress={() => setColor(option)}
-                >
-                  <PlayerMark seatNumber={index + 1} color={option} size={32} />
-                </TouchableOpacity>
-              )
-            })}
-          </View>
+          <AppearancePicker value={appearance} onChange={setAppearance} />
+          <Text
+            size="xxs"
+            style={themed($dimmed)}
+            text="If someone already took this combination, you get the nearest free one and can change it in the lobby."
+          />
         </View>
       </ScrollView>
       <BottomActionBar>
@@ -200,17 +195,5 @@ const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $codeInput: ThemedStyle<TextStyle> = () => ({ letterSpacing: 4 })
-const $swatches: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: spacing.xs,
-})
-const $swatch: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  padding: spacing.xs,
-  borderRadius: spacing.sm,
-  borderWidth: 2,
-  borderColor: colors.transparent,
-})
-const $selectedSwatch: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.tint })
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 52 })
 const $secondaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
