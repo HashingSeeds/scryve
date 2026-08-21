@@ -1,16 +1,24 @@
+# flow: Recover an interrupted local game
+# intent: Restore the active local game after the app restarts.
+
 appId: ${MAESTRO_APP_ID}
+tags: [local]
+onFlowStart:
+  - runFlow: ../shared/_OnFlowStart.yaml
 ---
-- runFlow: ../shared/_OnFlowStart.yaml
 - tapOn:
     id: "new-game-button"
 - assertVisible: "New local game"
-- tapOn: "6"
+- tapOn: "6 players"
 - tapOn:
     id: "start-game-button"
 - assertVisible:
     id: "player-grid"
 - tapOn:
     id: "life-seat-1-1"
+# the undo control lives inside the radial game menu
+- tapOn:
+    id: "game-menu-button"
 - tapOn:
     id: "undo-button"
 - stopApp

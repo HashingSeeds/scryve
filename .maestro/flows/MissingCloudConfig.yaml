@@ -1,0 +1,14 @@
+# flow: Keep local play available without cloud configuration
+# intent: Explain the missing configuration while preserving the local-game path.
+
+appId: ${MAESTRO_APP_ID}
+# precondition: a build compiled WITHOUT cloud env (no Clerk/Convex EXPO_PUBLIC vars);
+# a configured build shows the auth gate instead, so default runs exclude this tag.
+tags: [unconfigured]
+onFlowStart:
+  - runFlow: ../shared/_OnFlowStart.yaml
+---
+- assertVisible: "Local play stays available without an account or network."
+- tapOn:
+    id: "connected-play-button"
+- assertVisible: "Local play remains available."
