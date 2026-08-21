@@ -46,8 +46,11 @@ describe("EAS release profile isolation", () => {
         eas.build.production.channel,
       ]).size,
     ).toBe(3)
+  })
+
+  it("derives the update runtime from the native fingerprint so incompatible binaries never receive an OTA update", () => {
     const app = JSON.parse(fs.readFileSync(path.join(process.cwd(), "app.json"), "utf8"))
-    expect(app.runtimeVersion).toEqual({ policy: "appVersion" })
+    expect(app.runtimeVersion).toEqual({ policy: "fingerprint" })
   })
 
   it("keeps Expo configuration compatible with Node and Bun config loaders", () => {
