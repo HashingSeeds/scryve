@@ -233,7 +233,6 @@ export function ConnectedLobbyScreen({
         <InviteCard
           qrPayload={inviteQrPayload}
           manualCode={manualCode}
-          seatSummary={seatSummary(claimedSeats, lobby.playerCount)}
           onShare={inviteUrl || manualCode ? shareInvite : undefined}
         />
         <View style={themed($section)}>
@@ -400,6 +399,7 @@ export function ConnectedLobbyScreen({
 
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexGrow: 1,
   gap: spacing.md,
   padding: spacing.lg,
   paddingBottom: spacing.xl,

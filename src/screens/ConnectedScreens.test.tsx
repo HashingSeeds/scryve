@@ -350,6 +350,14 @@ describe("connected lobby screens", () => {
     expect(screen.getByText(/Resume or finish\/abandon your hosted game/i)).toBeTruthy()
   })
 
+  it("fills the home screen with an empty state instead of a blank band", async () => {
+    mockActiveGames = []
+    render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
+
+    await waitFor(() => expect(screen.getByTestId("no-active-connected-games")).toBeTruthy())
+    expect(screen.getByText(/Host a lobby and share the code/i)).toBeTruthy()
+  })
+
   it("does not restart a completed membership migration on the next home mount", async () => {
     const first = render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
     await waitFor(() => expect(mockMigrate).toHaveBeenCalledTimes(1))
@@ -726,7 +734,7 @@ describe("connected lobby screens", () => {
     expect(view.UNSAFE_getByType(Screen).props.preset).toBe("fixed")
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
     expect(screen.getByTestId("invite-qr").props.accessibilityHint).toBe(
-      "size-184-quiet-zone-16-ecl-H",
+      "size-184-quiet-zone-8-ecl-H",
     )
     expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
     expect(screen.getByTestId("manual-code")).toHaveTextContent("AB12CD")

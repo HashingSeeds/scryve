@@ -139,7 +139,7 @@ export function ConnectedHomeScreen({
         </View>
         {bootstrapError ? <AlertNote text={bootstrapError} /> : null}
         {uniqueActiveGames.length ? (
-          <View style={themed($section)}>
+          <View style={[themed($section), $styles.flex1]}>
             <Text
               preset="subheading"
               accessibilityRole="header"
@@ -161,7 +161,18 @@ export function ConnectedHomeScreen({
               />
             ) : null}
           </View>
-        ) : null}
+        ) : projectionReady ? (
+          <View testID="no-active-connected-games" style={themed($empty)}>
+            <Text preset="subheading" style={themed($emptyHeading)} text="No games in progress" />
+            <Text
+              size="sm"
+              style={themed($emptyCopy)}
+              text="Host a lobby and share the code, or join a friend's game to see it here."
+            />
+          </View>
+        ) : (
+          <View style={$styles.flex1} />
+        )}
         <View style={themed($section)}>
           <Text preset="subheading" accessibilityRole="header" text="More" />
           <Button
@@ -210,6 +221,7 @@ export function ConnectedHomeScreen({
 
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexGrow: 1,
   gap: spacing.lg,
   padding: spacing.lg,
   paddingBottom: spacing.xl,
@@ -217,6 +229,18 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  gap: spacing.xxs,
+  paddingVertical: spacing.xl,
+})
+const $emptyHeading: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
+const $emptyCopy: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.textDim,
+  textAlign: "center",
+})
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 52 })
 const $secondaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
 const $listAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })

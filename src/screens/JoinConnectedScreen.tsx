@@ -187,6 +187,7 @@ export function JoinConnectedScreen({
 
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexGrow: 1,
   gap: spacing.lg,
   padding: spacing.lg,
   paddingBottom: spacing.xl,
