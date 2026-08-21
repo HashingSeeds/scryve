@@ -106,6 +106,7 @@ builds/
 app-store-assets/
 play-store-assets/
 dist/
+dist-export-check/
 .env.local
 build-*.tar.gz
 

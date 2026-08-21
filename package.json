@@ -21,6 +21,7 @@
     "compile:test": "tsc --noEmit -p test/test-tsconfig.json --pretty",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",
+    "export:check": "expo export --platform ios --platform android --platform web --output-dir dist-export-check",
     "lint:comments:baseline": "node scripts/generate-comment-baseline.cjs",
     "depcruise": "depcruise src convex --config .dependency-cruiser.js",
     "depcruise:graph": "depcruise src convex --include-only \"^(src|convex)\" --config .dependency-cruiser.js --output-type dot > app-dependency-graph.dot && dot -T svg app-dependency-graph.dot -o app-dependency-graph.svg && dot -T png app-dependency-graph.dot -o app-dependency-graph.png && rm app-dependency-graph.dot",
