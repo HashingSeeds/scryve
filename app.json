@@ -87,7 +87,7 @@
       "@sentry/react-native/expo",
       {
         "url": "https://sentry.io/",
-        "project": "count",
+        "project": "scryve",
         "organization": "matthew-chisolm"
       }
     ]
