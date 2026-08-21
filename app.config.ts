@@ -38,7 +38,7 @@ const getUniqueIdentifier = () => {
     return "com.sowinghope.count.dev"
   }
   if (IS_PREVIEW) {
-    return "com.sowinghpe.count.preview"
+    return "com.sowinghope.count.preview"
   }
   return "com.sowinghope.count"
 }
