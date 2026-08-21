@@ -11,6 +11,7 @@ import {
   mockClaimSeat,
   mockLeave,
   mockReportPlayer,
+  mockSetAppearance,
   mockStart,
   mockSyncUser,
   resetConnectedHarness,
@@ -84,13 +85,13 @@ describe("ConnectedLobbyScreen", () => {
       themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />),
     )
     const inviteUrl = `https://play.count.example/join/${inviteToken}`
-    expect(view.UNSAFE_getByType(Screen).props.preset).toBe("auto")
+    expect(view.UNSAFE_getByType(Screen).props.preset).toBe("fixed")
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
     expect(screen.getByTestId("invite-qr").props.accessibilityHint).toBe(
-      "size-184-quiet-zone-16-ecl-H",
+      "size-184-quiet-zone-8-ecl-H",
     )
     expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
-    expect(screen.getByText("Code: AB12CD")).toBeTruthy()
+    expect(screen.getByTestId("manual-code")).toHaveTextContent("AB12CD")
     expect(screen.getByText("Ada")).toBeTruthy()
     expect(screen.getByText("Grace")).toBeTruthy()
     expect(screen.queryByTestId("share-manual-code-button")).toBeNull()
@@ -173,7 +174,7 @@ describe("ConnectedLobbyScreen", () => {
     lobby.unmount()
 
     render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
-    expect(screen.getByText("Seat claims are online-only.")).toBeTruthy()
+    expect(screen.getByText(/Reconnect to claim a seat/i)).toBeTruthy()
     fireEvent.press(screen.getByTestId("claim-seat-button"))
     expect(mockSyncUser).not.toHaveBeenCalled()
     expect(mockClaimSeat).not.toHaveBeenCalled()
@@ -243,6 +244,70 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByTestId("abandon-connected-lobby-button")).toBeTruthy()
   })
 
+  it("confirms an abandon in a modal instead of pushing the lobby content down", () => {
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      invitation: null,
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    fireEvent.press(screen.getByTestId("abandon-connected-lobby-button"))
+    const confirmation = screen.getByTestId("connected-lobby-leave-confirmation")
+    expect(confirmation.props.accessibilityViewIsModal).toBe(true)
+    expect(screen.getByTestId("connected-lobby-leave-backdrop")).toBeTruthy()
+
+    fireEvent.press(screen.getByTestId("connected-lobby-leave-backdrop"))
+    expect(screen.queryByTestId("connected-lobby-leave-confirmation")).toBeNull()
+    expect(mockAbandon).not.toHaveBeenCalled()
+  })
+
+  it("disables appearance combinations claimed by another seat", async () => {
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      invitation: null,
+      players: [
+        {
+          playerId: "player-1",
+          seat: 1,
+          displayName: "Ada",
+          color: "#B85636",
+          shape: "circle",
+          controlledByMe: true,
+        },
+        {
+          playerId: "player-2",
+          seat: 2,
+          displayName: "Grace",
+          color: "#B85636",
+          shape: "square",
+          controlledByMe: false,
+        },
+      ],
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    fireEvent.press(screen.getByTestId("edit-appearance-seat-1"))
+    expect(screen.getByTestId("appearance-shape-square")).toBeDisabled()
+    expect(screen.getByTestId("appearance-shape-star")).toBeEnabled()
+
+    fireEvent.press(screen.getByTestId("appearance-shape-star"))
+    await act(async () => fireEvent.press(screen.getByTestId("save-appearance-button")))
+    expect(mockSetAppearance).toHaveBeenCalledWith({
+      publicId: "game-public",
+      seat: 1,
+      color: "#B85636",
+      shape: "star",
+    })
+
+    fireEvent.press(screen.getByTestId("edit-appearance-seat-1"))
+    fireEvent.press(screen.getByTestId("appearance-color-41476e"))
+    expect(screen.getByTestId("appearance-shape-square")).toBeEnabled()
+  })
+
   it("explains online-only lobby exits when offline, including a dropped confirmation", () => {
     connectedHarness.projection = {
       ...connectedHarness.projection,
@@ -263,7 +328,7 @@ describe("ConnectedLobbyScreen", () => {
       ),
     )
     expect(screen.getByTestId("connected-lobby-exit-offline").props.accessibilityRole).toBe("alert")
-    expect(screen.getByText(/Reconnect before leaving or abandoning/i)).toBeTruthy()
+    expect(screen.getByText(/Reconnect to leave or abandon this lobby/i)).toBeTruthy()
     expect(
       screen.getByTestId("confirm-connected-lobby-leave-button").props.accessibilityState.disabled,
     ).toBe(true)

@@ -19,6 +19,7 @@ import type * as externalApiRateLimits from "../externalApiRateLimits.js";
 import type * as games from "../games.js";
 import type * as http from "../http.js";
 import type * as legal from "../legal.js";
+import type * as lib_appearance from "../lib/appearance.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
 import type * as lib_deckGames from "../lib/deckGames.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   games: typeof games;
   http: typeof http;
   legal: typeof legal;
+  "lib/appearance": typeof lib_appearance;
   "lib/auth": typeof lib_auth;
   "lib/authConfig": typeof lib_authConfig;
   "lib/deckGames": typeof lib_deckGames;

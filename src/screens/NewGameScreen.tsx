@@ -1,14 +1,21 @@
 import { useMemo, useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
+import { TouchableOpacity, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
+import {
+  $dialogActions,
+  $dialogButton,
+  DialogCard,
+  type DialogOrigin,
+} from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import {
   MAX_PLAYER_NAME_LENGTH,
   PLAYER_COLORS,
@@ -22,6 +29,12 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
+
+import {
+  PLAYER_COLOR_CHOICES,
+  shapeForSeat,
+  type PlayerAppearance,
+} from "../../convex/lib/appearance"
 
 export type NewGameMode = "local" | "connected"
 
@@ -57,6 +70,15 @@ export function NewGameScreen({
   const $footerSafeArea = useSafeAreaInsetsStyle(["bottom"])
   const [playerCount, setPlayerCount] = useState(defaults.defaultPlayerCount)
   const [names, setNames] = useState<string[]>(() => Array.from({ length: MAX_SEATS }, () => ""))
+  const [appearances, setAppearances] = useState<PlayerAppearance[]>(() =>
+    Array.from({ length: MAX_SEATS }, (_, index) => ({
+      color: PLAYER_COLOR_CHOICES[index],
+      shape: shapeForSeat(index + 1),
+    })),
+  )
+  const [appearanceSeat, setAppearanceSeat] = useState<number>()
+  const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
+  const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
   const [lifeText, setLifeText] = useState(String(defaults.defaultStartingLife))
   const [ruleset, setRuleset] = useState("standard")
   const [showCustomStartingLife, setShowCustomStartingLife] = useState(() =>
@@ -73,8 +95,13 @@ export function NewGameScreen({
   const normalizedRuleset = ruleset.trim()
   const validRuleset = normalizedRuleset.length > 0 && normalizedRuleset.length <= 32
   const players = useMemo(
-    () => nameValidation.names.map((name, index) => ({ name, color: PLAYER_COLORS[index] })),
-    [nameValidation.names],
+    () =>
+      nameValidation.names.map((name, index) => ({
+        name,
+        color: appearances[index]?.color ?? PLAYER_COLORS[index],
+        shape: appearances[index]?.shape ?? shapeForSeat(index + 1),
+      })),
+    [appearances, nameValidation.names],
   )
   const valid = connectedMode
     ? validLife && validRuleset && Boolean(connected?.ready) && !connected?.blockedReason
@@ -85,6 +112,27 @@ export function NewGameScreen({
     if (!valid || busy) return
     if (connectedMode) connected?.host({ playerCount, startingLife, ruleset: normalizedRuleset })
     else onStartLocal(players, startingLife)
+  }
+
+  function openAppearancePicker(index: number, event?: GestureResponderEvent) {
+    setAppearanceOrigin(
+      event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
+    )
+    setAppearanceDraft(appearances[index])
+    setAppearanceSeat(index)
+  }
+
+  function closeAppearancePicker() {
+    setAppearanceSeat(undefined)
+    setAppearanceDraft(undefined)
+  }
+
+  function saveAppearance() {
+    if (appearanceSeat === undefined || !appearanceDraft) return
+    setAppearances((current) =>
+      current.map((appearance, index) => (index === appearanceSeat ? appearanceDraft : appearance)),
+    )
+    closeAppearancePicker()
   }
 
   return (
@@ -201,7 +249,21 @@ export function NewGameScreen({
             <View style={themed($nameList)}>
               {players.map((player, index) => (
                 <View key={index} style={themed($nameRow)}>
-                  <PlayerMark seatNumber={index + 1} color={player.color} size={32} />
+                  <TouchableOpacity
+                    testID={`player-appearance-${index + 1}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Change appearance for ${player.name}`}
+                    activeOpacity={0.75}
+                    style={themed($appearanceButton)}
+                    onPress={(event) => openAppearancePicker(index, event)}
+                  >
+                    <PlayerMark
+                      seatNumber={index + 1}
+                      shape={player.shape}
+                      color={player.color}
+                      size={32}
+                    />
+                  </TouchableOpacity>
                   <TextField
                     testID={`player-name-${index + 1}`}
                     value={names[index]}
@@ -254,6 +316,34 @@ export function NewGameScreen({
           />
         </View>
       </View>
+      {appearanceSeat !== undefined && appearanceDraft ? (
+        <DialogCard
+          visible
+          origin={appearanceOrigin}
+          onClose={closeAppearancePicker}
+          backdropTestID="local-appearance-backdrop"
+          backdropAccessibilityLabel="Close color and mark picker"
+          dialogTestID="local-appearance-dialog"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text={`${players[appearanceSeat].name}'s color and mark`} />
+          <AppearancePicker
+            value={appearanceDraft}
+            taken={appearances.slice(0, playerCount).filter((_, index) => index !== appearanceSeat)}
+            onChange={setAppearanceDraft}
+          />
+          <View style={themed($dialogActions)}>
+            <Button text="Cancel" style={themed($dialogButton)} onPress={closeAppearancePicker} />
+            <Button
+              testID="save-local-appearance-button"
+              text="Save"
+              preset="reversed"
+              style={themed($dialogButton)}
+              onPress={saveAppearance}
+            />
+          </View>
+        </DialogCard>
+      ) : null}
     </View>
   )
 }
@@ -289,6 +379,12 @@ const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexBasis: MIN_NAME_ROW_WIDTH,
 })
 const $nameField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
+  width: 44,
+  height: 44,
+  alignItems: "center",
+  justifyContent: "center",
+})
 const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderTopWidth: 1,
   borderTopColor: colors.separator,

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
 import { mockClaimSeat, resetConnectedHarness, themed } from "../../test/support/connectedHarness"
@@ -37,6 +37,21 @@ describe("JoinConnectedScreen", () => {
     await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
     expect(mockClaimSeat).toHaveBeenCalledWith(
       expect.objectContaining({ manualCode: "AB12CD", displayName: "Grace" }),
+    )
+  })
+
+  it("submits the color and shape a joiner picked independently", async () => {
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+    fireEvent.press(screen.getByTestId("appearance-color-39755c"))
+    fireEvent.press(screen.getByTestId("appearance-shape-hexagon"))
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    expect(mockClaimSeat).toHaveBeenLastCalledWith(
+      expect.objectContaining({ color: "#39755C", shape: "hexagon" }),
     )
   })
 

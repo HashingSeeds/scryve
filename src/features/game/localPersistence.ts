@@ -10,6 +10,7 @@ import {
   isLifeDelta,
 } from "./domain"
 import type { GameEvent, GamePlayer, LocalGame, LocalGameResult, LocalGameSummary } from "./types"
+import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -94,6 +95,7 @@ function parsePlayers(value: unknown): GamePlayer[] | null {
       id: asPlayerId(candidate.id),
       name: candidate.name,
       color: candidate.color,
+      ...(isPlayerMarkShape(candidate.shape) ? { shape: candidate.shape } : {}),
       life: candidate.life,
       seat: candidate.seat,
     })

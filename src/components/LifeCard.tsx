@@ -25,6 +25,7 @@ import {
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
+import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
 const DELTA_VISIBLE_MS = 1800
 type LifeEditMode = "add" | "subtract" | "set"
@@ -34,6 +35,7 @@ export type { LifeCardContentRotation } from "./playerCardTypes"
 export interface LifeCardProps {
   playerName: string
   seatNumber: number
+  shape?: PlayerMarkShape
   life: number
   color: string
   compact?: boolean
@@ -49,6 +51,7 @@ export interface LifeCardProps {
 export function LifeCard({
   playerName,
   seatNumber,
+  shape,
   life,
   color,
   compact,
@@ -173,6 +176,7 @@ export function LifeCard({
     >
       <PlayerMark
         seatNumber={seatNumber}
+        shape={shape}
         color={foreground}
         rotation={contentRotation}
         spinning={ownership === "owned"}

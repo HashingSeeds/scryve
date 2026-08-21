@@ -123,6 +123,7 @@ export function PlayerGrid({
                 <LifeCard
                   playerName={player.name}
                   seatNumber={seatNumber}
+                  shape={player.shape}
                   life={player.life}
                   color={player.color}
                   compact={layout.compact}

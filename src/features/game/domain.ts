@@ -103,6 +103,7 @@ export function createLocalGame(input: {
     id: asPlayerId(createClientId("player", now + seat)),
     name: validatedNames.names[seat],
     color: player.color || PLAYER_COLORS[seat],
+    ...(player.shape ? { shape: player.shape } : {}),
     life: input.startingLife,
     seat,
   }))

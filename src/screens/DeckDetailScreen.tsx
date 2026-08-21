@@ -4,7 +4,8 @@ import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 
-import { $alert, $alertText, BottomActionBar } from "@/components/BottomActionBar"
+import { AlertNote } from "@/components/AlertNote"
+import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
@@ -483,11 +484,7 @@ export function DeckDetailScreen({
               ))}
             </View>
 
-            {activeTab !== "cards" && error ? (
-              <View style={themed($alert)}>
-                <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
-              </View>
-            ) : null}
+            {activeTab !== "cards" && error ? <AlertNote text={error} /> : null}
 
             {activeTab === "cards" ? (
               <TouchableOpacity
@@ -639,11 +636,7 @@ export function DeckDetailScreen({
       />
       {activeTab === "cards" ? (
         <BottomActionBar>
-          {error ? (
-            <View style={themed($alert)}>
-              <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
-            </View>
-          ) : null}
+          {error ? <AlertNote text={error} /> : null}
           <View style={themed($actionRow)}>
             {editing ? (
               <>
@@ -760,11 +753,7 @@ export function DeckDetailScreen({
             text="Games already played with it keep their record, but the list will no longer be editable or selectable."
             style={themed($dialogText)}
           />
-          {error ? (
-            <View style={themed($alert)}>
-              <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
-            </View>
-          ) : null}
+          {error ? <AlertNote text={error} /> : null}
           <View style={themed($dialogActions)}>
             <Button
               text="Cancel"

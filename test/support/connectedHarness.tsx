@@ -16,6 +16,7 @@ type LobbyPlayer = {
   seat: number
   displayName: string
   color: string
+  shape?: string
   currentLife?: number
   controlledByMe?: boolean
   deckVersionId?: string
@@ -70,6 +71,7 @@ export const mockSyncUser = jest.fn(async () => "user")
 export const mockStart = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockLeave = jest.fn(async () => ({ publicId: "game-public", left: true }))
 export const mockAbandon = jest.fn(async () => ({ publicId: "game-public" }))
+export const mockSetAppearance = jest.fn(async () => ({ color: "#41476E", shape: "square" }))
 export const mockCreateLobby = jest.fn(async () => ({
   publicId: "new-game",
   inviteToken: "A".repeat(43),
@@ -168,6 +170,7 @@ export function resetConnectedHarness() {
   mockStart.mockReset().mockResolvedValue({ publicId: "game-public" })
   mockLeave.mockReset().mockResolvedValue({ publicId: "game-public", left: true })
   mockAbandon.mockReset().mockResolvedValue({ publicId: "game-public" })
+  mockSetAppearance.mockReset().mockResolvedValue({ color: "#41476E", shape: "square" })
   mockCreateLobby.mockReset().mockResolvedValue({
     publicId: "new-game",
     inviteToken: "A".repeat(43),
@@ -214,6 +217,7 @@ export function createConvexReactMock() {
       if (name.includes("startGame")) return mockStart
       if (name.includes("leaveMyGame")) return mockLeave
       if (name.includes("abandonGame")) return mockAbandon
+      if (name.includes("setMyAppearance")) return mockSetAppearance
       if (name.includes("createLobby")) return mockCreateLobby
       if (name.includes("migrateMyGameMemberships") || name.includes("migrateMyHistoryEntries"))
         return mockMigrate
@@ -275,6 +279,7 @@ export const connectedApi = {
     startGame: "games.startGame",
     leaveMyGame: "games.leaveMyGame",
     abandonGame: "games.abandonGame",
+    setMyAppearance: "games.setMyAppearance",
     migrateMyGameMemberships: "games.migrateMyGameMemberships",
     activeConnectedGames: "games.activeConnectedGames",
     createLobby: "games.createLobby",

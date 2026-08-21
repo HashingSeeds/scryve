@@ -80,9 +80,17 @@ describe("ConnectedHomeScreen", () => {
     render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
 
     await waitFor(() => expect(screen.getByTestId("resume-connected-hosted-lobby")).toBeTruthy())
-    expect(screen.getByText(/Hosted lobby · standard · 2 seats/)).toBeTruthy()
+    expect(screen.getByText("Hosting · waiting to start")).toBeTruthy()
+    expect(screen.getByText(/2 seats · standard/)).toBeTruthy()
     expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
     expect(screen.getByText(/Resume or finish\/abandon your hosted game/i)).toBeTruthy()
+  })
+
+  it("fills the home screen with an empty state instead of a blank band", async () => {
+    render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
+
+    await waitFor(() => expect(screen.getByTestId("no-active-connected-games")).toBeTruthy())
+    expect(screen.getByText(/Host a lobby and share the code/i)).toBeTruthy()
   })
 
   it("does not restart a completed membership migration on the next home mount", async () => {

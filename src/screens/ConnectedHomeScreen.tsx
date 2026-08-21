@@ -1,13 +1,21 @@
-import { useEffect, useMemo, useState } from "react"
-import { View } from "react-native"
+import { useEffect, useMemo, useRef, useState } from "react"
+import type { TextStyle, ViewStyle } from "react-native"
+import { ScrollView, View } from "react-native"
 import { useUser } from "@clerk/expo"
 import { useConvexConnectionState, useMutation, usePaginatedQuery } from "convex/react"
 
+import { AlertNote } from "@/components/AlertNote"
+import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
+import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import { ConnectedGameRepository } from "@/features/connected/persistence"
+import { useAppTheme } from "@/theme/context"
+import { $styles } from "@/theme/styles"
+import type { ThemedStyle } from "@/theme/types"
 
 import { api } from "../../convex/_generated/api"
 
@@ -28,6 +36,9 @@ export function ConnectedHomeScreen({
   onResume,
   onBack,
 }: ConnectedHomeScreenProps) {
+  const { themed } = useAppTheme()
+  const { titleVisible, onScroll } = useCollapsingTitle()
+  const now = useRef(Date.now()).current
   const { user } = useUser()
   const clerkUserId = user?.id
   const clerkDisplayName = user?.fullName || user?.firstName || "Player"
@@ -106,38 +117,85 @@ export function ConnectedHomeScreen({
   }, [isWebSocketConnected, migrateMemberships, migrationRepository, projectionReady])
 
   return (
-    <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
+    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
       <Header
-        title="Connected play"
+        title={titleVisible ? "Connected play" : ""}
         leftTx={onBack ? "common:back" : undefined}
         onLeftPress={onBack}
       />
-      <Text preset="heading" accessibilityRole="header" text="Connected play" />
-      <Text text="Host a resilient live game, or join an existing lobby." />
-      {bootstrapError ? <Text accessibilityRole="alert" text={bootstrapError} /> : null}
-      {uniqueActiveGames.length ? (
-        <View style={$form}>
-          <Text preset="subheading" accessibilityRole="header" text="Resume connected game" />
-          {uniqueActiveGames.map((game: any) => (
-            <Button
-              key={game.publicId}
-              testID={`resume-connected-${game.publicId}`}
-              text={`${game.isHost ? "Hosted" : "Joined"} ${game.status} · ${game.ruleset} · ${game.playerCount} seats · ${new Date(game.updatedAt).toLocaleString()}`}
-              onPress={() => onResume?.(game)}
-            />
-          ))}
-          {activeGames.status === "CanLoadMore" ? (
-            <Button text="Load more active games" onPress={() => activeGames.loadMore(10)} />
-          ) : null}
-        </View>
-      ) : null}
-      <View style={$form}>
-        {!isWebSocketConnected ? (
-          <Text accessibilityRole="alert" text="Connected actions are online-only." />
-        ) : null}
-        {hasHostedGame ? (
+      <ScrollView
+        style={$styles.flex1}
+        contentContainerStyle={themed($content)}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <View style={themed($hero)}>
+          <Text preset="heading" accessibilityRole="header" text="Connected play" />
           <Text
-            accessibilityRole="alert"
+            size="sm"
+            style={themed($dimmed)}
+            text="Host a resilient live game, or join an existing lobby."
+          />
+        </View>
+        {bootstrapError ? <AlertNote text={bootstrapError} /> : null}
+        {uniqueActiveGames.length ? (
+          <View style={[themed($section), $styles.flex1]}>
+            <Text
+              preset="subheading"
+              accessibilityRole="header"
+              text="Pick up where you left off"
+            />
+            {uniqueActiveGames.map((game: any) => (
+              <ConnectedGameRow
+                key={game.publicId}
+                game={game}
+                now={now}
+                onPress={() => onResume?.(game)}
+              />
+            ))}
+            {activeGames.status === "CanLoadMore" ? (
+              <Button
+                text="Load more"
+                style={themed($loadMore)}
+                onPress={() => activeGames.loadMore(10)}
+              />
+            ) : null}
+          </View>
+        ) : projectionReady ? (
+          <View testID="no-active-connected-games" style={themed($empty)}>
+            <Text preset="subheading" style={themed($emptyHeading)} text="No games in progress" />
+            <Text
+              size="sm"
+              style={themed($emptyCopy)}
+              text="Host a lobby and share the code, or join a friend's game to see it here."
+            />
+          </View>
+        ) : (
+          <View style={$styles.flex1} />
+        )}
+        <View style={themed($section)}>
+          <Text preset="subheading" accessibilityRole="header" text="More" />
+          <Button
+            text="Connected history"
+            style={themed($listAction)}
+            disabled={!projectionReady}
+            onPress={onHistory}
+          />
+          <Button
+            text="Decks"
+            style={themed($listAction)}
+            disabled={!projectionReady}
+            onPress={onDecks}
+          />
+        </View>
+      </ScrollView>
+      <BottomActionBar>
+        {!isWebSocketConnected ? (
+          <AlertNote text="Connected play is offline. Hosting and joining need a connection." />
+        ) : null}
+        {hasHostedGame && isWebSocketConnected ? (
+          <AlertNote
+            tone="info"
             text="Resume or finish/abandon your hosted game before creating another."
           />
         ) : null}
@@ -146,19 +204,44 @@ export function ConnectedHomeScreen({
           text="Host a new game"
           disabled={!isWebSocketConnected || !projectionReady || hasHostedGame}
           preset="reversed"
+          style={themed($primaryAction)}
           onPress={onHostNew}
         />
         <Button
           testID="join-connected-button"
           text="Join with code"
           disabled={!isWebSocketConnected || !projectionReady}
+          style={themed($secondaryAction)}
           onPress={onJoin}
         />
-        <Button text="Connected history" disabled={!projectionReady} onPress={onHistory} />
-        <Button text="Decks" disabled={!projectionReady} onPress={onDecks} />
-      </View>
+      </BottomActionBar>
     </Screen>
   )
 }
 
-const $form = { gap: 12, marginTop: 20 }
+const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexGrow: 1,
+  gap: spacing.lg,
+  padding: spacing.lg,
+  paddingBottom: spacing.xl,
+})
+const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  gap: spacing.xxs,
+  paddingVertical: spacing.xl,
+})
+const $emptyHeading: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
+const $emptyCopy: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.textDim,
+  textAlign: "center",
+})
+const $primaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 52 })
+const $secondaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
+const $listAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
+const $loadMore: ThemedStyle<ViewStyle> = () => ({ minHeight: 44 })

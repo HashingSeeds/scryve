@@ -10,6 +10,7 @@ export interface ConnectedPlayerProjection {
   username?: string
   deckVersionId?: string
   color: string
+  shape?: string
   currentLife: number
   controlledByMe: boolean
 }
@@ -84,6 +85,7 @@ export function toConnectedProjection(value: any): ConnectedProjection | null {
       ...(typeof player.username === "string" ? { username: player.username } : {}),
       ...(typeof player.deckVersionId === "string" ? { deckVersionId: player.deckVersionId } : {}),
       color: player.color,
+      ...(typeof player.shape === "string" ? { shape: player.shape } : {}),
       currentLife: player.currentLife,
       controlledByMe: player.controlledByMe,
     })
