@@ -30,8 +30,9 @@ http.route({
       return new Response("Invalid webhook signature", { status: 400 })
     }
     const event = asRecord(payload)
-    const data = asRecord(event?.data)
-    if ((event?.type === "user.created" || event?.type === "user.updated") && data) {
+    if (event?.type === "user.created" || event?.type === "user.updated") {
+      const data = asRecord(event.data)
+      if (!data) return new Response("Clerk user event is missing its data", { status: 400 })
       const clerkUserId = typeof data.id === "string" ? data.id : undefined
       const username = typeof data.username === "string" ? data.username : undefined
       if (!clerkUserId || !username)
