@@ -13,7 +13,7 @@ const modules = {
 }
 
 const PUBLIC_ID = "moderation-game-1234"
-type Harness = ReturnType<typeof convexTest>
+type Harness = ReturnType<typeof convexTest<(typeof schema)["tables"]>>
 type Actor = ReturnType<Harness["withIdentity"]>
 
 async function seatedGame(t: Harness, usernames: [string, string]) {
@@ -57,6 +57,37 @@ async function settle(t: Harness) {
 
 async function projectionFor(actor: Actor, deviceId: string) {
   return await actor.query(api.games.lobbyProjection, { publicId: PUBLIC_ID, deviceId })
+}
+
+async function addThirdSeat(t: Harness) {
+  const thirdParty = t.withIdentity({ subject: "third-subject" })
+  await t.mutation(internal.users.syncFromClerk, {
+    clerkUserId: "third-subject",
+    displayName: "Third Realname",
+    username: "third-handle",
+  })
+  await t.run(async (ctx) => {
+    const game = await ctx.db
+      .query("games")
+      .withIndex("by_public_id", (q) => q.eq("publicId", PUBLIC_ID))
+      .unique()
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "third-subject"))
+      .unique()
+    await ctx.db.patch(game!._id, { playerCount: 3 })
+    await ctx.db.insert("gamePlayers", {
+      gameId: game!._id,
+      seat: 3,
+      userId: user!._id,
+      displayName: "Third Realname",
+      usernameAtJoin: "third-handle",
+      color: "#059669",
+      currentLife: 40,
+      joinedAt: Date.now(),
+    })
+  })
+  return thirdParty
 }
 
 async function seatOf(actor: Actor, deviceId: string, seat: number) {
@@ -164,33 +195,7 @@ describe("moderation", () => {
     const t = convexTest(schema, modules)
     const { host, guest } = await seatedGame(t, ["host-handle", "guest-handle"])
     const guestSeat = await seatOf(host, "device-host-0001", 2)
-    const thirdParty = t.withIdentity({ subject: "third-subject" })
-    await t.mutation(internal.users.syncFromClerk, {
-      clerkUserId: "third-subject",
-      displayName: "Third Realname",
-      username: "third-handle",
-    })
-    await t.run(async (ctx) => {
-      const game = await ctx.db
-        .query("games")
-        .withIndex("by_public_id", (q) => q.eq("publicId", PUBLIC_ID))
-        .unique()
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "third-subject"))
-        .unique()
-      await ctx.db.patch(game!._id, { playerCount: 3 })
-      await ctx.db.insert("gamePlayers", {
-        gameId: game!._id,
-        seat: 3,
-        userId: user!._id,
-        displayName: "Third Realname",
-        usernameAtJoin: "third-handle",
-        color: "#059669",
-        currentLife: 40,
-        joinedAt: Date.now(),
-      })
-    })
+    const thirdParty = await addThirdSeat(t)
 
     await host.mutation(api.moderation.reportPlayer, {
       publicId: PUBLIC_ID,
@@ -281,24 +286,40 @@ describe("moderation", () => {
     )
   })
 
-  it("releases an automatic hold when the operator dismisses the last open report", async () => {
+  it("releases a reports-based hold once the operator dismisses every open report", async () => {
     const t = convexTest(schema, modules)
-    const { host, guest } = await seatedGame(t, ["host-handle", "sh1t-lord"])
-    await settle(t)
+    const { host, guest } = await seatedGame(t, ["host-handle", "guest-handle"])
+    const thirdParty = await addThirdSeat(t)
     const guestSeat = await seatOf(host, "device-host-0001", 2)
-    await host.mutation(api.moderation.reportPlayer, {
-      publicId: PUBLIC_ID,
-      playerId: guestSeat.playerId as Id<"gamePlayers">,
-      reason: "offensive_username",
-    })
-    const [report] = await t.run(async (ctx) => await ctx.db.query("moderationReports").collect())
-    await t.mutation(internal.moderation.dismissReport, {
-      reportId: report._id,
-      note: "false positive",
-    })
+    for (const reporter of [host, thirdParty])
+      await reporter.mutation(api.moderation.reportPlayer, {
+        publicId: PUBLIC_ID,
+        playerId: guestSeat.playerId as Id<"gamePlayers">,
+        reason: "harassment",
+      })
+    await settle(t)
+    expect((await projectionFor(guest, "device-guest-001")).players[1].displayName).not.toBe(
+      "guest-handle",
+    )
+
+    const reports = await t.run(async (ctx) => await ctx.db.query("moderationReports").collect())
+    expect(reports).toHaveLength(2)
+    const [first, second] = reports
+    expect(
+      await t.mutation(internal.moderation.dismissReport, {
+        reportId: first._id,
+        note: "one report still open",
+      }),
+    ).toEqual({ released: false })
+    expect(
+      await t.mutation(internal.moderation.dismissReport, {
+        reportId: second._id,
+        note: "false positive",
+      }),
+    ).toEqual({ released: true })
     await settle(t)
     expect((await projectionFor(guest, "device-guest-001")).players[1].displayName).toBe(
-      "sh1t-lord",
+      "guest-handle",
     )
   })
 

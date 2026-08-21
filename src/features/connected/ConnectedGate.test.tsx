@@ -15,6 +15,8 @@ let mockClerkLoaded = true
 let mockClerkSignedIn = true
 let mockUserLoaded = true
 let mockUserId: string | undefined = "user-a"
+let mockUsername: string | null = "existing-handle"
+const mockUserUpdate = jest.fn(async () => undefined)
 const mockOpenAuth = jest.fn()
 const mockSyncCurrent = jest.fn(async () => "user")
 const mockUsernameCheck = jest.fn(async () => ({ acceptable: true }))
@@ -32,7 +34,15 @@ jest.mock("@/features/auth/AuthContext", () => ({
 jest.mock("@clerk/expo", () => ({
   useUser: () => ({
     isLoaded: mockUserLoaded,
-    user: mockUserId ? { id: mockUserId, fullName: "Ada", imageUrl: undefined } : null,
+    user: mockUserId
+      ? {
+          id: mockUserId,
+          fullName: "Ada",
+          imageUrl: undefined,
+          username: mockUsername,
+          update: mockUserUpdate,
+        }
+      : null,
   }),
 }))
 jest.mock("convex/react", () => ({
@@ -84,6 +94,8 @@ describe("connected cold-offline and authentication gate", () => {
     mockClerkSignedIn = true
     mockUserLoaded = true
     mockUserId = "user-a"
+    mockUsername = "existing-handle"
+    mockUsernameCheck.mockResolvedValue({ acceptable: true })
   })
 
   it("keeps an established board and taps mounted through a socket drop", async () => {
@@ -192,6 +204,43 @@ describe("connected cold-offline and authentication gate", () => {
     } finally {
       jest.useRealTimers()
     }
+  })
+
+  describe("choosing a username", () => {
+    async function chooseUsername(value: string) {
+      mockUsername = null
+      render(gate(<Button testID="board" text="board" onPress={jest.fn()} />))
+      fireEvent.changeText(screen.getByLabelText("Username"), value)
+      await act(async () => {
+        fireEvent.press(screen.getByText("Save username"))
+      })
+    }
+
+    it("refuses a username the moderation filter rejects, without writing it to Clerk", async () => {
+      mockUsernameCheck.mockResolvedValue({ acceptable: false })
+      await chooseUsername("sh1t-lord")
+
+      expect(mockUsernameCheck).toHaveBeenCalledWith("usernameIsAcceptable", {
+        username: "sh1t-lord",
+      })
+      expect(mockUserUpdate).not.toHaveBeenCalled()
+      expect(screen.getByText(/not allowed/)).toBeTruthy()
+    })
+
+    it("saves a username the filter accepts", async () => {
+      await chooseUsername("clever-otter-01")
+
+      expect(mockUserUpdate).toHaveBeenCalledWith({ username: "clever-otter-01" })
+      expect(screen.queryByText(/not allowed/)).toBeNull()
+    })
+
+    it("asks the filter before Clerk, so a rejected name is never briefly live", async () => {
+      mockUsernameCheck.mockResolvedValue({ acceptable: false })
+      await chooseUsername("f4ggot")
+
+      expect(mockUsernameCheck).toHaveBeenCalledTimes(1)
+      expect(mockUserUpdate).not.toHaveBeenCalled()
+    })
   })
 
   it("offers retry, re-authentication, and a safe exit after profile setup fails", async () => {

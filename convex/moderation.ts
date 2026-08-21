@@ -290,10 +290,19 @@ export const dismissReport = internalMutation({
       (candidate) => candidate.status === "open" && candidate._id !== report._id,
     )
     const reported = await ctx.db.get(report.reportedUserId)
-    // Only an automatic hold is lifted here; one an operator placed deliberately stays.
-    if (reported && !stillOpen && reported.moderationHold?.reason !== "operator")
-      await releaseUsernameHoldFor(ctx, reported)
-    return { released: !stillOpen }
+    const hold = reported?.moderationHold
+    // Only an automatic hold is lifted here; one an operator placed deliberately stays. A name the
+    // filter still objects to also stays held: dismissing "they harassed me" as unfounded says
+    // nothing about the username, and releasing it here would put an offensive name back in play.
+    const release = Boolean(
+      reported &&
+      hold &&
+      !stillOpen &&
+      hold.reason !== "operator" &&
+      !usernameFailsReportThreshold(hold.heldUsername),
+    )
+    if (reported && release) await releaseUsernameHoldFor(ctx, reported)
+    return { released: release }
   },
 })
 
