@@ -2,8 +2,13 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { Text } from "@/components/Text"
 import { ThemeProvider } from "@/theme/context"
+import { storage } from "@/utils/storage"
 
-import { accountAcceptanceCache, deviceAcceptanceStore } from "./acceptanceStore"
+import {
+  accountAcceptanceCache,
+  deviceAcceptanceStore,
+  LEGAL_ACCOUNT_ACCEPTANCE_KEY,
+} from "./acceptanceStore"
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
 import {
   ACCOUNT_CONSENT_TIMEOUT_MS,
@@ -29,14 +34,22 @@ jest.mock("convex/react", () => ({
   useConvexAuth: () => mockConvexAuth,
 }))
 
-function renderGate(onResolved?: () => void) {
-  return render(
+function gateTree(onResolved?: () => void) {
+  return (
     <ThemeProvider initialContext="light">
       <LegalConsentGate onResolved={onResolved}>
         <Text text="APP CONTENT" />
       </LegalConsentGate>
-    </ThemeProvider>,
+    </ThemeProvider>
   )
+}
+
+function renderGate(onResolved?: () => void) {
+  return render(gateTree(onResolved))
+}
+
+function clearAccountAcceptanceCache() {
+  storage.delete(LEGAL_ACCOUNT_ACCEPTANCE_KEY)
 }
 
 describe("LegalConsentGate", () => {
@@ -95,7 +108,7 @@ describe("LegalConsentGate", () => {
     expect(mockPush).toHaveBeenCalledWith("/privacy")
   })
 
-  it("asks a newly signed-in account even when this device already agreed", () => {
+  it("asks an account signing in on a device another account already used", () => {
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
     const view = renderGate()
@@ -103,7 +116,47 @@ describe("LegalConsentGate", () => {
     expect(view.getByText("Before you start")).toBeTruthy()
   })
 
-  it("renders nothing while authentication is still loading", () => {
+  it("lets the only account on a device inherit the answer given here", async () => {
+    clearAccountAcceptanceCache()
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = undefined
+    const onResolved = jest.fn()
+    const view = renderGate(onResolved)
+
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(view.queryByText("Before you start")).toBeNull()
+    expect(onResolved).toHaveBeenCalled()
+
+    await act(async () => await Promise.resolve())
+  })
+
+  it("records the inherited acceptance against the account", async () => {
+    clearAccountAcceptanceCache()
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = undefined
+    renderGate()
+
+    await act(async () => await Promise.resolve())
+    expect(mockRecordAcceptance).toHaveBeenCalledWith({
+      document: "terms",
+      version: REQUIRED_CONSENT_VERSIONS.terms,
+      platform: expect.any(String),
+    })
+    expect(accountAcceptanceCache.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
+  })
+
+  it("still asks when the device answer is for older versions", () => {
+    clearAccountAcceptanceCache()
+    deviceAcceptanceStore.write({ terms: "0.0.1", privacy: "0.0.1" })
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    const view = renderGate()
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+    expect(view.getByText("Before you start")).toBeTruthy()
+  })
+
+  it("holds behind the splash screen while authentication is still loading", () => {
     mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
     const onResolved = jest.fn()
     const view = renderGate(onResolved)
@@ -112,7 +165,27 @@ describe("LegalConsentGate", () => {
     expect(onResolved).not.toHaveBeenCalled()
   })
 
-  it("renders nothing while the account acceptances are still loading", () => {
+  it("launches immediately from current device consent while authentication loads", () => {
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
+    const onResolved = jest.fn()
+    const view = renderGate(onResolved)
+
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(onResolved).toHaveBeenCalled()
+  })
+
+  it("keeps stale device consent behind the splash while authentication loads", () => {
+    deviceAcceptanceStore.write({ ...REQUIRED_CONSENT_VERSIONS, terms: "0.0.1" })
+    mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
+    const onResolved = jest.fn()
+    const view = renderGate(onResolved)
+
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+    expect(onResolved).not.toHaveBeenCalled()
+  })
+
+  it("holds behind the splash screen while the account acceptances are still loading", () => {
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
     mockAccountAcceptances = undefined
@@ -120,6 +193,32 @@ describe("LegalConsentGate", () => {
     const view = renderGate(onResolved)
     expect(view.queryByText("APP CONTENT")).toBeNull()
     expect(onResolved).not.toHaveBeenCalled()
+  })
+
+  it("uses the cached account answer once Clerk hydrates the user id", () => {
+    accountAcceptanceCache.write("user-a", REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: undefined }
+    mockAccountAcceptances = undefined
+    const view = renderGate()
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    view.rerender(gateTree())
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+  })
+
+  it("keeps the app on screen when a mid-session sign-in has to check the account", () => {
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: false }
+    const view = renderGate()
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = undefined
+    view.rerender(gateTree())
+
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(view.queryByText("Before you start")).toBeNull()
   })
 
   it("falls back to the device answer when the account cannot be reached", () => {
@@ -137,16 +236,15 @@ describe("LegalConsentGate", () => {
     }
   })
 
-  it("stops waiting for authentication that never loads", () => {
+  it("falls back to the device consent prompt when authentication never loads", () => {
     jest.useFakeTimers()
     try {
-      deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
       mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
       const onResolved = jest.fn()
       const view = renderGate(onResolved)
       expect(view.queryByText("APP CONTENT")).toBeNull()
       act(() => void jest.advanceTimersByTime(AUTH_LOAD_TIMEOUT_MS))
-      expect(view.getByText("APP CONTENT")).toBeTruthy()
+      expect(view.getByText("Before you start")).toBeTruthy()
       expect(onResolved).toHaveBeenCalled()
     } finally {
       jest.useRealTimers()
