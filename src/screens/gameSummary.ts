@@ -62,7 +62,7 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
     changeCount: localChanges(game).length,
     players: game.players.map((player) => ({
       id: player.id,
-      seat: player.seat,
+      seat: player.seat + 1,
       name: player.name,
       color: player.color,
       life: player.life,

@@ -31,7 +31,7 @@ export function LegalConsentScreen({
   return (
     <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentContainerStyle={themed($screen)}>
       <View style={themed($body)}>
-        <Text text="COUNT" preset="formLabel" style={themed($eyebrow)} />
+        <Text text="SCRYVE" preset="formLabel" style={themed($eyebrow)} />
         <Text
           text={isReturningUser ? "We have updated our terms" : "Before you start"}
           preset="heading"
