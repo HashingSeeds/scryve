@@ -73,6 +73,11 @@ describe("LegalConsentGate", () => {
     expect(view.getByText("We have updated our terms")).toBeTruthy()
   })
 
+  it("lets the support page be read while gated", () => {
+    mockPathname = "/support"
+    expect(renderGate().getByText("APP CONTENT")).toBeTruthy()
+  })
+
   it("lets the legal documents themselves be read while gated", () => {
     mockPathname = "/terms"
     expect(renderGate().getByText("APP CONTENT")).toBeTruthy()

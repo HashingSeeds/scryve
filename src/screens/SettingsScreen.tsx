@@ -18,6 +18,7 @@ export interface SettingsScreenProps {
   onBack: () => void
   onSave: (settings: LocalSettings) => void
   onRequestAccountDeletion?: () => void
+  onOpenSupport?: () => void
   onOpenPrivacy?: () => void
   onOpenTerms?: () => void
   onOpenLicenseAgreement?: () => void
@@ -30,6 +31,7 @@ export function SettingsScreen({
   onBack,
   onSave,
   onRequestAccountDeletion,
+  onOpenSupport,
   onOpenPrivacy,
   onOpenTerms,
   onOpenLicenseAgreement,
@@ -117,6 +119,12 @@ export function SettingsScreen({
         </View>
       ) : null}
       {BlockedPlayers}
+      {onOpenSupport ? (
+        <View style={themed($legalSection)}>
+          <Text text="Help" preset="subheading" accessibilityRole="header" />
+          <ListItem text="Help & support" rightIcon="caretRight" onPress={onOpenSupport} />
+        </View>
+      ) : null}
       {onOpenPrivacy && onOpenTerms ? (
         <View style={themed($legalSection)}>
           <Text text="Legal" preset="subheading" accessibilityRole="header" />
