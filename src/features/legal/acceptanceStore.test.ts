@@ -84,6 +84,15 @@ describe("AccountAcceptanceCache", () => {
     expect(new AccountAcceptanceCache(storage).read("user-a")).toEqual(current)
   })
 
+  it("reports whether a different account has used the cache", () => {
+    const cache = new AccountAcceptanceCache(memoryStorage())
+    cache.write("user-a", current)
+
+    expect(cache.hasAccountsOtherThan("user-a")).toBe(false)
+    expect(cache.hasAccountsOtherThan("user-b")).toBe(true)
+    expect(cache.hasAccountsOtherThan(undefined)).toBe(true)
+  })
+
   it("ignores malformed stored data", () => {
     expect(
       new AccountAcceptanceCache(

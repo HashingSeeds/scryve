@@ -37,6 +37,10 @@ export class AccountAcceptanceCache {
     return this.all()[userId] ?? {}
   }
 
+  hasAccountsOtherThan(userId: string | undefined): boolean {
+    return Object.keys(this.all()).some((id) => id !== userId)
+  }
+
   write(userId: string, accepted: AcceptedVersions): void {
     this.storage.set(
       LEGAL_ACCOUNT_ACCEPTANCE_KEY,
