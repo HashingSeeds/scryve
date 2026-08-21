@@ -44,7 +44,10 @@
     },
     "production": {
       "node": "24.18.1",
-      "env": { "APP_VARIANT": "production" },
+      "env": {
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_INVITE_ORIGIN": "https://scryve.sow.care"
+      },
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
