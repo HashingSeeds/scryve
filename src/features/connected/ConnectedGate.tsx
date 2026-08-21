@@ -164,6 +164,7 @@ export function BackendGate({
         <Text text="Your unique @username identifies you in connected game history." />
         <TextField
           label="Username"
+          accessibilityLabel="Username"
           autoCapitalize="none"
           autoCorrect={false}
           value={username}
