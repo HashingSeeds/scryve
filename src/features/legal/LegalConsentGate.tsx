@@ -17,7 +17,7 @@ import {
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
 import { api } from "../../../convex/_generated/api"
 
-const READABLE_WHILE_GATED = new Set(["/terms", "/privacy", "/cookie-policy"])
+const READABLE_WHILE_GATED = new Set(["/terms", "/privacy", "/cookie-policy", "/support"])
 
 export const ACCOUNT_CONSENT_TIMEOUT_MS = 4000
 export const AUTH_LOAD_TIMEOUT_MS = 4000

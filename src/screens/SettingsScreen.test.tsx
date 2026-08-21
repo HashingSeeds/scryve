@@ -59,6 +59,23 @@ describe("SettingsScreen", () => {
     expect(view.queryByText("License Agreement")).toBeNull()
   })
 
+  it("opens the help page when a handler is provided", () => {
+    const onOpenSupport = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          onBack={jest.fn()}
+          onSave={jest.fn()}
+          onOpenSupport={onOpenSupport}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByText("Help & support"))
+    expect(onOpenSupport).toHaveBeenCalledTimes(1)
+  })
+
   it("exposes the license agreement when a handler is provided", () => {
     const onOpenLicenseAgreement = jest.fn()
     const view = render(

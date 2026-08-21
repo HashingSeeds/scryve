@@ -481,7 +481,7 @@ export const privacyContent = {
         {
           type: "list",
           items: [
-            "Online: sow.care/support",
+            "Online: scryve.sow.care/support",
             "Email: privacy@sowinghope.how",
             'Post: See " HOW CAN YOU CONTACT US ABOUT THIS NOTICE? "',
           ],

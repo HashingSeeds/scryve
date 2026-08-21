@@ -14,6 +14,7 @@ export default function SettingsRoute() {
       initialSettings={localGameRepository.loadSettings()}
       onBack={() => router.back()}
       onRequestAccountDeletion={() => router.push("/delete-account")}
+      onOpenSupport={() => router.push("/support")}
       onOpenPrivacy={() => router.push("/privacy")}
       onOpenTerms={() => router.push("/terms")}
       onOpenLicenseAgreement={
