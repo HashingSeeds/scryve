@@ -141,7 +141,7 @@ export function ConnectedLobbyScreen({
       await setAppearance({ publicId, seat: appearanceSeat, ...appearanceDraft })
       setAppearanceSeat(undefined)
     } catch (cause) {
-      setActionError(convexErrorMessage(cause, "Could not update your color and shape"))
+      setActionError(convexErrorMessage(cause, "Could not update your color and mark"))
     } finally {
       setSavingAppearance(false)
     }
@@ -356,11 +356,11 @@ export function ConnectedLobbyScreen({
           closeDisabled={savingAppearance}
           origin={appearanceOrigin}
           backdropTestID="lobby-appearance-backdrop"
-          backdropAccessibilityLabel="Close color and shape picker"
+          backdropAccessibilityLabel="Close color and mark picker"
           dialogTestID="lobby-appearance-dialog"
           accessibilityViewIsModal
         >
-          <Text preset="subheading" text="Your color and shape" />
+          <Text preset="subheading" text="Your color and mark" />
           <AppearancePicker
             value={appearanceDraft}
             taken={takenAppearances}

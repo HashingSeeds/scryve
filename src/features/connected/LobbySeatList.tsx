@@ -62,7 +62,7 @@ export function LobbySeatList({
                 <TouchableOpacity
                   testID={`edit-appearance-seat-${seat.seat}`}
                   accessibilityRole="button"
-                  accessibilityLabel="Change your color and shape"
+                  accessibilityLabel="Change your color and mark"
                   activeOpacity={0.75}
                   style={themed($markButton)}
                   onPress={(event) => onEditAppearance(seat, event)}

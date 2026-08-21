@@ -25,8 +25,8 @@ function makeGame(now = 1) {
     now,
     startingLife: 20,
     players: [
-      { name: "Ada", color: "#000" },
-      { name: "Grace", color: "#111" },
+      { name: "Ada", color: "#000", shape: "hexagon" },
+      { name: "Grace", color: "#111", shape: "circle" },
     ],
   })
 }

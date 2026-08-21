@@ -1,5 +1,5 @@
 import type { TextStyle, ViewStyle } from "react-native"
-import { TouchableOpacity, View } from "react-native"
+import { ScrollView, TouchableOpacity, View } from "react-native"
 
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
@@ -46,7 +46,12 @@ export function AppearancePicker({
     <View style={themed($picker)}>
       <View style={themed($group)}>
         <Text size="xs" style={themed($label)} text="Color" />
-        <View style={themed($row)} accessibilityRole="radiogroup">
+        <ScrollView
+          horizontal
+          accessibilityRole="radiogroup"
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={themed($row)}
+        >
           {PLAYER_COLOR_CHOICES.map((color) => {
             const selected = color.toUpperCase() === value.color.toUpperCase()
             const exhausted = colorIsExhausted(color)
@@ -70,11 +75,16 @@ export function AppearancePicker({
               </TouchableOpacity>
             )
           })}
-        </View>
+        </ScrollView>
       </View>
       <View style={themed($group)}>
-        <Text size="xs" style={themed($label)} text="Shape" />
-        <View style={themed($row)} accessibilityRole="radiogroup">
+        <Text size="xs" style={themed($label)} text="Mark" />
+        <ScrollView
+          horizontal
+          accessibilityRole="radiogroup"
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={themed($row)}
+        >
           {PLAYER_MARK_SHAPES.map((shape, index) => {
             const selected = shape === value.shape
             const unavailable = shapeIsTaken(value.color, shape)
@@ -104,7 +114,7 @@ export function AppearancePicker({
               </TouchableOpacity>
             )
           })}
-        </View>
+        </ScrollView>
       </View>
     </View>
   )
@@ -113,17 +123,15 @@ export function AppearancePicker({
 const $picker: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $group: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: spacing.xs,
+  gap: spacing.xxs,
 })
 const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $swatch: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   alignItems: "center",
   justifyContent: "center",
-  minWidth: 48,
-  minHeight: 48,
-  padding: spacing.xs,
+  width: 44,
+  height: 44,
+  padding: spacing.xxs,
   borderRadius: spacing.sm,
   borderWidth: 2,
   borderColor: colors.transparent,

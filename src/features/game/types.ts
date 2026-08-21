@@ -65,6 +65,7 @@ export interface LocalGame {
 export interface NewPlayerInput {
   name: string
   color: string
+  shape?: PlayerMarkShape
 }
 
 export type GameCommand =

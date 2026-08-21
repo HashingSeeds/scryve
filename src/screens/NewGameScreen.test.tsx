@@ -102,6 +102,35 @@ describe("NewGameScreen", () => {
     ])
   })
 
+  it("edits a local player's color and mark from the mark beside their name", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
+
+    fireEvent.press(view.getByTestId("player-appearance-1"), {
+      nativeEvent: { pageX: 22, pageY: 240 },
+    })
+    expect(view.getByTestId("local-appearance-dialog")).toBeTruthy()
+    fireEvent.press(view.getByTestId("appearance-color-39755c"))
+    fireEvent.press(view.getByTestId("appearance-shape-hexagon"))
+    fireEvent.press(view.getByTestId("save-local-appearance-button"))
+    fireEvent.press(view.getByTestId("start-game-button"))
+
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Player 1", color: "#39755C", shape: "hexagon" }),
+      ]),
+      20,
+    )
+  })
+
+  it("does not offer another local player's color and mark combination", () => {
+    const view = setup()
+
+    fireEvent.press(view.getByTestId("player-appearance-2"))
+    fireEvent.press(view.getByTestId("appearance-color-b85636"))
+    expect(view.getByTestId("appearance-shape-circle")).toBeDisabled()
+  })
+
   it("disables start for invalid custom life", () => {
     const view = setup()
 

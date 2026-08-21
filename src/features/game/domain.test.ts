@@ -47,6 +47,23 @@ describe("local game domain", () => {
     expect(game.players.every(({ life }) => life === 40)).toBe(true)
   })
 
+  it("keeps a chosen player mark", () => {
+    const game = createLocalGame({
+      gameId: asGameId("game"),
+      now: 1,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#39755C", shape: "hexagon" },
+        { name: "Grace", color: "#B85636", shape: "circle" },
+      ],
+    })
+
+    expect(game.players.map(({ color, shape }) => ({ color, shape }))).toEqual([
+      { color: "#39755C", shape: "hexagon" },
+      { color: "#B85636", shape: "circle" },
+    ])
+  })
+
   it("rejects invalid player counts and starting life", () => {
     expect(() => makeGame(1)).toThrow("2–6")
     expect(() => makeGame(7)).toThrow("2–6")
