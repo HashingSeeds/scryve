@@ -4,7 +4,7 @@ import { Image, type ImageStyle } from "expo-image"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
+import { DialogCard } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -68,45 +68,70 @@ export function CardFocusDialog({
     <DialogCard
       visible
       wide
+      style={themed($dialog)}
       onClose={onClose}
       backdropTestID="card-focus-backdrop"
       backdropAccessibilityLabel="Close card details"
       dialogTestID="card-focus-dialog"
       accessibilityViewIsModal
     >
+      <View style={themed($header)}>
+        <Text weight="medium" text="Card details" />
+        <Button
+          text="×"
+          accessibilityLabel="Close"
+          testID="card-focus-close"
+          style={themed($closeButton)}
+          textStyle={$closeButtonText}
+          onPress={onClose}
+        />
+      </View>
       <ScrollView
         style={$scrollBody}
         contentContainerStyle={themed($scrollContent)}
         showsVerticalScrollIndicator={false}
       >
-        {displayImageUrl ? (
-          <Image
-            testID="card-focus-image"
-            accessibilityLabel={card.name}
-            source={displayImageUrl}
-            placeholder={cachedThumbnailUrl}
-            style={themed($cardImage)}
-            contentFit="contain"
-            transition={150}
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={themed($imagePlaceholder)}>
-            <Text style={themed($dimText)} text={card.name} />
-          </View>
-        )}
-        <View style={themed($details)}>
-          <View style={themed($nameRow)}>
-            <Text preset="subheading" style={themed($name)} text={card.name} />
+        <View style={themed($identity)}>
+          {displayImageUrl ? (
+            <Image
+              testID="card-focus-image"
+              accessibilityLabel={card.name}
+              source={displayImageUrl}
+              placeholder={cachedThumbnailUrl}
+              style={themed($cardImage)}
+              contentFit="contain"
+              transition={150}
+              cachePolicy="memory-disk"
+            />
+          ) : (
+            <View style={themed($imagePlaceholder)}>
+              <Text size="xs" style={themed($dimText)} text={card.name} />
+            </View>
+          )}
+          <View style={themed($identityDetails)}>
+            <Text size="xxs" style={themed($sectionLabel)} text={card.boardLabel} />
+            <Text preset="subheading" text={card.name} />
             {details?.manaCost ? (
-              <Text size="sm" style={themed($dimText)} text={details.manaCost} />
+              <Text size="xs" style={themed($manaCost)} text={details.manaCost} />
+            ) : null}
+            {details?.typeLine ? (
+              <Text size="xs" style={themed($dimText)} text={details.typeLine} />
             ) : null}
           </View>
-          {details?.typeLine ? (
-            <Text size="sm" style={themed($dimText)} text={details.typeLine} />
-          ) : null}
-          {details?.oracleText ? <Text selectable text={details.oracleText} /> : null}
-          {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
+        </View>
+        {details?.oracleText ? (
+          <View style={themed($section)}>
+            <Text size="xxs" style={themed($sectionLabel)} text="Oracle text" />
+            <Text selectable text={details.oracleText} />
+          </View>
+        ) : null}
+        {printing ? (
+          <View style={themed($section)}>
+            <Text size="xxs" style={themed($sectionLabel)} text="Printing" />
+            <Text size="sm" text={printing} />
+          </View>
+        ) : null}
+        <View style={themed($statusSection)}>
           {!details && !detailsError ? (
             <Text size="sm" style={themed($dimText)} text="Loading details…" />
           ) : null}
@@ -114,11 +139,7 @@ export function CardFocusDialog({
         </View>
       </ScrollView>
       <View style={themed($quantityRow)}>
-        <Text
-          size="sm"
-          style={themed($quantityLabel)}
-          text={`${card.quantity}× in ${card.boardLabel}`}
-        />
+        <Text size="sm" style={themed($quantityLabel)} text={`Copies in ${card.boardLabel}`} />
         {onDecrement ? (
           <Button
             text="−"
@@ -127,6 +148,12 @@ export function CardFocusDialog({
             onPress={onDecrement}
           />
         ) : null}
+        <Text
+          testID="card-focus-quantity"
+          weight="bold"
+          style={$quantityValue}
+          text={String(card.quantity)}
+        />
         {onIncrement ? (
           <Button
             text="+"
@@ -136,22 +163,51 @@ export function CardFocusDialog({
           />
         ) : null}
       </View>
-      <View style={themed($dialogActions)}>
-        <Button text="Close" style={themed($dialogButton)} onPress={onClose} />
-      </View>
     </DialogCard>
   )
 }
 
 const $scrollBody = { flexGrow: 0, flexShrink: 1 } as const
-const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.lg })
+const $dialog: ThemedStyle<ViewStyle> = () => ({ gap: 0, padding: 0, overflow: "hidden" })
+const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 56,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingLeft: spacing.lg,
+  paddingRight: spacing.xs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $closeButton: ThemedStyle<ViewStyle> = () => ({
+  minWidth: 48,
+  minHeight: 48,
+  paddingHorizontal: 0,
+  paddingVertical: 0,
+  borderWidth: 0,
+  backgroundColor: "transparent",
+})
+const $closeButtonText: TextStyle = { fontSize: 28, lineHeight: 30 }
+const $scrollContent: ThemedStyle<ViewStyle> = () => ({})
+const $identity: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.md,
+  padding: spacing.lg,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $identityDetails: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  alignSelf: "center",
+  gap: spacing.xxs,
+})
 const $cardImage: ThemedStyle<ImageStyle> = ({ spacing }) => ({
-  alignSelf: "stretch",
+  width: 120,
   aspectRatio: CARD_ASPECT_RATIO,
   borderRadius: spacing.sm,
 })
 const $imagePlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  alignSelf: "stretch",
+  width: 120,
   aspectRatio: CARD_ASPECT_RATIO,
   alignItems: "center",
   justifyContent: "center",
@@ -161,24 +217,42 @@ const $imagePlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.border,
   backgroundColor: colors.separator,
 })
-const $details: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.xs,
-})
-const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
 const $dimText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $quantityRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $manaCost: ThemedStyle<TextStyle> = ({ colors, typography }) => ({
+  color: colors.textDim,
+  fontFamily: typography.primary.medium,
+})
+const $section: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.xs,
+  padding: spacing.lg,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $sectionLabel: ThemedStyle<TextStyle> = ({ colors, typography }) => ({
+  color: colors.textDim,
+  fontFamily: typography.primary.medium,
+  textTransform: "uppercase",
+  letterSpacing: 1.4,
+})
+const $statusSection: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
+  paddingHorizontal: spacing.lg,
+})
+const $quantityRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
+  minHeight: 72,
+  paddingHorizontal: spacing.lg,
+  borderTopWidth: 1,
+  borderTopColor: colors.separator,
 })
 const $quantityLabel: ThemedStyle<TextStyle> = ({ colors }) => ({
   flexGrow: 1,
   flexShrink: 1,
   color: colors.textDim,
 })
+const $quantityValue: TextStyle = { width: 32, textAlign: "center" }
 const $quantityButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,
   minWidth: 44,

@@ -40,14 +40,15 @@ describe("CardFocusDialog", () => {
     expect(view.getByText("Creature — Elf Druid")).toBeTruthy()
     expect(view.getByText("{T}: Add {G}.")).toBeTruthy()
     expect(view.getByText("Dominaria · #168 · Common")).toBeTruthy()
-    expect(view.getByText("2× in Main")).toBeTruthy()
+    expect(view.getByText("Copies in Main")).toBeTruthy()
+    expect(view.getByTestId("card-focus-quantity")).toHaveTextContent("2")
   })
 
   it("reports quantity changes to the screen", () => {
     const view = renderDialog()
     fireEvent.press(view.getByTestId("card-focus-increment"))
     fireEvent.press(view.getByTestId("card-focus-decrement"))
-    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("card-focus-close"))
     expect(view.onIncrement).toHaveBeenCalledTimes(1)
     expect(view.onDecrement).toHaveBeenCalledTimes(1)
     expect(view.onClose).toHaveBeenCalledTimes(1)
