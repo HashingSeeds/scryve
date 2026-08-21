@@ -37,3 +37,13 @@ appId: ${MAESTRO_APP_ID}
       - tapOn: "http://.*:.*" 
       - waitForAnimationToEnd
       - tapOn: "Close" # dismiss the bottom sheet
+
+# a cleared install always lands on the legal consent gate before Home,
+# so accept it here to keep individual flows starting from a usable app.
+- runFlow:
+    when:
+      visible: "Before you start"
+    commands:
+      - tapOn:
+          id: "accept-legal-button"
+      - waitForAnimationToEnd

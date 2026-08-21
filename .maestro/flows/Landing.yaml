@@ -2,6 +2,7 @@
 # intent: Start, play, undo, finish, and inspect a local game without an account.
 
 appId: ${MAESTRO_APP_ID}
+tags: [smoke, local]
 onFlowStart:
   - runFlow: ../shared/_OnFlowStart.yaml
 ---
@@ -9,17 +10,36 @@ onFlowStart:
 - tapOn: "New local game"
 - assertVisible: "New local game"
 - tapOn: "Start game"
-- assertVisible: "Local game"
+- assertVisible:
+    id: "player-grid"
 - longPressOn:
     id: "life-seat-1--1"
+- assertVisible: "Subtract life"
+- inputText: "5"
+# the number pad's Done accessory overlaps the apply button and submits the
+# editor itself, so use it when present and fall back to the apply button.
+- runFlow:
+    when:
+      visible: "Done"
+    commands:
+      - tapOn: "Done"
+- runFlow:
+    when:
+      visible:
+        id: "life-editor-apply-seat-1"
+    commands:
+      - tapOn:
+          id: "life-editor-apply-seat-1"
 - assertVisible: "Seat 1, Player 1, 15 life"
 - tapOn: "Game options"
 - tapOn: "Undo"
 - assertVisible: "Seat 1, Player 1, 20 life"
 - tapOn: "Game options"
 - tapOn: "End game"
-- assertVisible: "End this game and save its final totals?"
+- assertVisible: "Who won?"
+- tapOn:
+    id: "end-game-winner-0"
 - tapOn:
     id: "confirm-end-game-button"
-- assertVisible: "Game summary"
 - assertVisible: "Finished"
+- assertVisible: "Result"

@@ -1,10 +1,39 @@
-import { fireEvent, render, within } from "@testing-library/react-native"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
 import { Screen } from "@/components/Screen"
+import { ConnectedHostSource } from "@/features/connected/ConnectedHostSource"
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
 import { NewGameScreen, type ConnectedHostFeed, type NewGameScreenProps } from "./NewGameScreen"
+import {
+  connectedHarness,
+  mockCreateLobby,
+  resetConnectedHarness,
+  themed,
+} from "../../test/support/connectedHarness"
+
+jest.mock("@clerk/expo", () =>
+  jest
+    .requireActual<typeof import("../../test/support/connectedHarness")>(
+      "../../test/support/connectedHarness",
+    )
+    .createClerkMock(),
+)
+jest.mock("convex/react", () =>
+  jest
+    .requireActual<typeof import("../../test/support/connectedHarness")>(
+      "../../test/support/connectedHarness",
+    )
+    .createConvexReactMock(),
+)
+jest.mock("../../convex/_generated/api", () =>
+  jest
+    .requireActual<typeof import("../../test/support/connectedHarness")>(
+      "../../test/support/connectedHarness",
+    )
+    .createGeneratedApiMock(),
+)
 
 function setup(overrides: Partial<NewGameScreenProps> = {}) {
   return render(
@@ -23,7 +52,26 @@ function setup(overrides: Partial<NewGameScreenProps> = {}) {
 
 const readyHost: ConnectedHostFeed = { ready: true, busy: false, host: jest.fn() }
 
+function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
+  return themed(
+    <ConnectedHostSource onLobbyCreated={onLobbyCreated}>
+      {(connected) => (
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="connected"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={jest.fn()}
+          connected={connected}
+        />
+      )}
+    </ConnectedHostSource>,
+  )
+}
+
 describe("NewGameScreen", () => {
+  beforeEach(resetConnectedHarness)
+
   it("starts defaults and supports six players plus custom life", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
@@ -131,5 +179,32 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("mode-local").props.accessibilityState.selected).toBe(true)
     fireEvent.press(view.getByTestId("mode-connected"))
     expect(onModeChange).toHaveBeenCalledWith("connected")
+  })
+
+  it("hosts from the shared setup screen with validated seats and life presets", async () => {
+    const onLobbyCreated = jest.fn()
+    render(hostSetup(onLobbyCreated))
+    await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
+    fireEvent.press(screen.getByLabelText("4 seats"))
+    fireEvent.press(screen.getByLabelText("Start at 40 life"))
+    fireEvent.press(screen.getByTestId("host-connected-button"))
+    await waitFor(() => expect(onLobbyCreated).toHaveBeenCalled())
+    expect(mockCreateLobby).toHaveBeenCalledWith(
+      expect.objectContaining({ playerCount: 4, startingLife: 40, ruleset: "standard" }),
+    )
+
+    fireEvent.press(screen.getByLabelText("Use custom starting life"))
+    fireEvent.changeText(screen.getByTestId("connected-starting-life"), "0")
+    expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
+  })
+
+  it("blocks hosting a second lobby from the setup screen", async () => {
+    connectedHarness.activeGames = [
+      { publicId: "hosted-lobby", status: "lobby", ruleset: "standard", isHost: true },
+    ]
+    render(hostSetup(jest.fn()))
+
+    await waitFor(() => expect(screen.getByText(/Resume or finish your hosted game/i)).toBeTruthy())
+    expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
   })
 })

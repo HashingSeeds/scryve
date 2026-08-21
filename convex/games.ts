@@ -170,6 +170,13 @@ async function playersForGame(ctx: QueryCtx, gameId: Id<"games">) {
   return players
 }
 
+async function deckSelectionIsPlayable(ctx: QueryCtx, deckVersionId: Id<"deckVersions">) {
+  const version = await ctx.db.get(deckVersionId)
+  if (!version || version.archivedAt !== undefined) return false
+  const deck = await ctx.db.get(version.deckId)
+  return deck !== null && deck.archivedAt === undefined
+}
+
 function totalEventCount(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
   return (
     (game.eventSequence ?? 0) +
@@ -676,7 +683,15 @@ export const startGame = mutation({
       throw new Error("All configured seats (2–6) must be claimed before starting")
     const now = Date.now()
     await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
-    for (const player of players) await ctx.db.patch(player._id, { resumable: true })
+    for (const player of players) {
+      const deletedSinceSelection =
+        player.deckVersionId !== undefined &&
+        !(await deckSelectionIsPlayable(ctx, player.deckVersionId))
+      await ctx.db.patch(player._id, {
+        resumable: true,
+        ...(deletedSinceSelection ? { deckVersionId: undefined } : {}),
+      })
+    }
     return { publicId: game.publicId }
   },
 })

@@ -334,12 +334,19 @@ export const storeResolvedPreconstructed = internalMutation({
       .unique()
     const value = { ...args, fetchedAt: Date.now() }
     if (existing) {
-      await ctx.db.replace(existing._id, value)
+      await ctx.db.replace(existing._id, { ...value, ...refreshLeaseOf(existing) })
       return existing._id
     }
     return await ctx.db.insert("resolvedPreconstructedDecks", value)
   },
 })
+
+function refreshLeaseOf(cached: Doc<"resolvedPreconstructedDecks">) {
+  return {
+    ...(cached.refreshingUntil === undefined ? {} : { refreshingUntil: cached.refreshingUntil }),
+    ...(cached.refreshClaimId === undefined ? {} : { refreshClaimId: cached.refreshClaimId }),
+  }
+}
 
 export const preconstructedOutlineCache = internalQuery({
   args: { fileName: v.string() },
@@ -376,26 +383,30 @@ export const storePreconstructedOutline = internalMutation({
 })
 
 export const claimResolvedPreconstructedRefresh = internalMutation({
-  args: { fileName: v.string() },
+  args: { fileName: v.string(), claimId: v.string() },
   handler: async (ctx, args) => {
     const cached = await ctx.db
       .query("resolvedPreconstructedDecks")
       .withIndex("by_file_name", (query) => query.eq("fileName", args.fileName))
       .unique()
     if (!cached || (cached.refreshingUntil ?? 0) > Date.now()) return false
-    await ctx.db.patch(cached._id, { refreshingUntil: Date.now() + PRECON_REFRESH_LEASE_MS })
+    await ctx.db.patch(cached._id, {
+      refreshingUntil: Date.now() + PRECON_REFRESH_LEASE_MS,
+      refreshClaimId: args.claimId,
+    })
     return true
   },
 })
 
 export const releaseResolvedPreconstructedRefresh = internalMutation({
-  args: { fileName: v.string() },
+  args: { fileName: v.string(), claimId: v.string() },
   handler: async (ctx, args) => {
     const cached = await ctx.db
       .query("resolvedPreconstructedDecks")
       .withIndex("by_file_name", (query) => query.eq("fileName", args.fileName))
       .unique()
-    if (cached) await ctx.db.patch(cached._id, { refreshingUntil: undefined })
+    if (cached?.refreshClaimId === args.claimId)
+      await ctx.db.patch(cached._id, { refreshingUntil: undefined, refreshClaimId: undefined })
     return null
   },
 })
@@ -666,7 +677,7 @@ async function resolveColdPreconstructed(
 }
 
 export const refreshResolvedPreconstructed = internalAction({
-  args: { fileName: v.string() },
+  args: { fileName: v.string(), claimId: v.string() },
   handler: async (ctx, args): Promise<null> => {
     try {
       await fetchAndCachePreconstructed(ctx, args.fileName, true)
@@ -722,13 +733,15 @@ export const resolvePreconstructed = action({
     if (cached && Date.now() - cached.fetchedAt < RESOLVED_PRECON_TTL_MS)
       return cachedPreconstructedDeck(cached)
     if (cached) {
+      const claimId = crypto.randomUUID()
       const claimed: boolean = await ctx.runMutation(
         internal.deckImports.claimResolvedPreconstructedRefresh,
-        { fileName },
+        { fileName, claimId },
       )
       if (claimed)
         await ctx.scheduler.runAfter(0, internal.deckImports.refreshResolvedPreconstructed, {
           fileName,
+          claimId,
         })
       return cachedPreconstructedDeck(cached)
     }

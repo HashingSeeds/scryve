@@ -1,20 +1,11 @@
-import { exec } from "child_process"
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import en from "../src/i18n/en"
 
-// Use this array for keys that for whatever reason aren't greppable so they
-// don't hold your test suite hostage by always failing.
-const EXCEPTIONS: string[] = [
-  // "welcomeScreen:readyForLaunch",
+const KEYS_ONLY_USED_IN_CODE_COMMENTS = ["hello"]
 
-  /**
-   * This translation key actually shows up in a comment describing the usage of the translate
-   * function in the src/i18n/translate.ts file. Because the grep command in the i18n test below
-   * doesn't account for commented out code, we must manually exclude it so tests don't fail
-   * because of a comment.
-   */
-  "hello",
-]
+const EXCEPTIONS: string[] = [...KEYS_ONLY_USED_IN_CODE_COMMENTS]
 
 function iterate(obj: Record<string, unknown>, stack: string, array: string[]): string[] {
   for (const property in obj) {
@@ -32,46 +23,41 @@ function iterate(obj: Record<string, unknown>, stack: string, array: string[]): 
   return array
 }
 
-/**
- * This tests your codebase for missing i18n strings so you can avoid error strings at render time
- *
- * It was taken from https://gist.github.com/Michaelvilleneuve/8808ba2775536665d95b7577c9d8d5a1
- * and modified slightly to account for our Ignite higher order components,
- * which take 'tx' and 'fooTx' props.
- * The grep command is nasty looking, but it's essentially searching the codebase for a few different things:
- *
- * tx="*"
- * Tx=""
- * tx={""}
- * Tx={""}
- * translate(""
- *
- * and then grabs the i18n key between the double quotes
- *
- * This approach isn't 100% perfect. If you are storing your key string in a variable because you
- * are setting it conditionally, then it won't be picked up.
- *
- */
+function listSourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = join(directory, entry.name)
+    if (entry.isDirectory()) return listSourceFiles(entryPath)
+    return /\.tsx?$/.test(entry.name) ? [entryPath] : []
+  })
+}
+
+function findTranslationKeys(source: string): string[] {
+  const propPattern = /\b\w*[Tt]x\s*=\s*(?:"([^"\s]+)"|{([^}]*)})/g
+  const translatePattern = /\btranslate\(\s*"([^"\s]+)"/g
+  const propKeys = [...source.matchAll(propPattern)].flatMap((match) => {
+    if (match[1]) return [match[1]]
+    return [...match[2].matchAll(/"([^"\s]+)"/g)].map((expressionMatch) => expressionMatch[1])
+  })
+
+  const translateKeys = [...source.matchAll(translatePattern)].map((match) => match[1])
+  return [...propKeys, ...translateKeys]
+}
 
 describe("i18n", () => {
-  test("There are no missing keys", (done) => {
-    // Actual command output:
-    // grep "[T\|t]x=[{]\?\"\S*\"[}]\?\|translate(\"\S*\"" -ohr './src' | grep -o "\".*\""
-    const command = `grep "[T\\|t]x=[{]\\?\\"\\S*\\"[}]\\?\\|translate(\\"\\S*\\"" -ohr './src' | grep -o "\\".*\\""`
-    exec(command, (_, stdout) => {
-      const allTranslationsDefinedOld = iterate(en, "", [])
-      // Replace first instance of "." because of i18next namespace separator
-      const allTranslationsDefined = allTranslationsDefinedOld.map((key) => key.replace(".", ":"))
-      const allTranslationsUsed = stdout.replace(/"/g, "").split("\n")
-      allTranslationsUsed.splice(-1, 1)
+  test("finds no missing keys", () => {
+    const allTranslationsDefinedOld = iterate(en, "", [])
+    // Replace first instance of "." because of i18next namespace separator
+    const allTranslationsDefined = allTranslationsDefinedOld.map((key) => key.replace(".", ":"))
+    const allTranslationsUsed = listSourceFiles(join(process.cwd(), "src")).flatMap((file) =>
+      findTranslationKeys(readFileSync(file, "utf8")),
+    )
 
-      for (let i = 0; i < allTranslationsUsed.length; i += 1) {
-        if (!EXCEPTIONS.includes(allTranslationsUsed[i])) {
-          // You can add keys to EXCEPTIONS (above) if you don't want them included in the test
-          expect(allTranslationsDefined).toContainEqual(allTranslationsUsed[i])
-        }
+    expect(allTranslationsUsed.length).toBeGreaterThan(50)
+    for (const translation of allTranslationsUsed) {
+      if (!EXCEPTIONS.includes(translation)) {
+        // You can add keys to EXCEPTIONS (above) if you don't want them included in the test
+        expect(allTranslationsDefined).toContainEqual(translation)
       }
-      done()
-    })
-  }, 240000)
+    }
+  })
 })

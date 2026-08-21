@@ -192,6 +192,134 @@ describe("premium deck tracking", () => {
     })
   })
 
+  it("drops a seat selection whose version was deleted before the game started", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "stale-host", "Host")
+    const joiner = await synced(t, "stale-joiner", "Joiner")
+    const deckId = await host.mutation(api.decks.create, { name: "Goblins", format: "commander" })
+    const firstVersionId = await host.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [
+        {
+          oracleId: "11111111-1111-1111-1111-111111111111",
+          scryfallId: "22222222-2222-2222-2222-222222222222",
+          name: "Goblin Test Card",
+          quantity: 1,
+          board: "commander",
+        },
+      ],
+    })
+    await t.mutation(internal.entitlements.setUserFeature, {
+      clerkUserId: "stale-host",
+      feature: "deck_versions",
+      enabled: true,
+      source: "test",
+    })
+    await host.mutation(api.decks.createVersion, { deckId, name: "Version 2" })
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "stale-deck-public-1234",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      inviteToken,
+      manualCodeCandidates: ["ABC235"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+      deviceId: hostDeviceId,
+    })
+    await joiner.mutation(api.games.claimSeat, {
+      token: inviteToken,
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+    await host.mutation(api.decks.selectForSeat, {
+      publicId: created.publicId,
+      seat: 1,
+      deckVersionId: firstVersionId,
+    })
+    await host.mutation(api.decks.deleteVersion, { versionId: firstVersionId })
+
+    const lobby = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: hostDeviceId,
+    })
+    const hostPlayer = lobby.players.find((player) => player.seat === 1)!
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    await host.mutation(api.games.finishGame, {
+      publicId: created.publicId,
+      result: { kind: "win", winnerPlayerIds: [hostPlayer.playerId] },
+    })
+
+    const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
+    expect(summary?.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
+    await t.mutation(internal.entitlements.setUserFeature, {
+      clerkUserId: "stale-host",
+      feature: "deck_analytics",
+      enabled: true,
+      source: "test",
+    })
+    await expect(host.query(api.decks.stats, { deckId })).resolves.toMatchObject({
+      locked: false,
+      games: 0,
+    })
+  })
+
+  it("drops a seat selection whose deck was deleted before the game started", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "archived-host", "Host")
+    const joiner = await synced(t, "archived-joiner", "Joiner")
+    const deckId = await host.mutation(api.decks.create, { name: "Elves", format: "commander" })
+    const deckVersionId = await host.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [
+        {
+          oracleId: "11111111-1111-1111-1111-111111111111",
+          scryfallId: "22222222-2222-2222-2222-222222222222",
+          name: "Elf Test Card",
+          quantity: 1,
+          board: "commander",
+        },
+      ],
+    })
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "archived-deck-public-12",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      inviteToken,
+      manualCodeCandidates: ["ABC236"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+      deviceId: hostDeviceId,
+    })
+    await joiner.mutation(api.games.claimSeat, {
+      token: inviteToken,
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+    await host.mutation(api.decks.selectForSeat, {
+      publicId: created.publicId,
+      seat: 1,
+      deckVersionId,
+    })
+    await host.mutation(api.decks.archive, { deckId })
+
+    const lobby = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: hostDeviceId,
+    })
+    const hostPlayer = lobby.players.find((player) => player.seat === 1)!
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    await host.mutation(api.games.finishGame, {
+      publicId: created.publicId,
+      result: { kind: "win", winnerPlayerIds: [hostPlayer.playerId] },
+    })
+
+    const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
+    expect(summary).not.toBeNull()
+    expect(summary?.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
+  })
+
   it("accepts authoritative Clerk username projections", async () => {
     const t = convexTest(schema, modules)
     await t.mutation(internal.users.syncFromClerk, {

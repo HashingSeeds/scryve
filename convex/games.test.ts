@@ -550,7 +550,7 @@ describe("Convex realtime life writes", () => {
   })
 })
 
-describe("Phase 4.5A lifecycle and API hardening", () => {
+describe("connected game lifecycle and API hardening", () => {
   it("validates profile avatar URLs at the user projection boundary", async () => {
     const t = convexTest(schema, modules)
     const actor = t.withIdentity({ subject: "avatar-user" })

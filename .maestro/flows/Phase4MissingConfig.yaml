@@ -1,7 +1,0 @@
-appId: ${MAESTRO_APP_ID}
----
-- runFlow: ../shared/_OnFlowStart.yaml
-- assertVisible: "Local play stays available without an account or network."
-- tapOn:
-    id: "connected-play-button"
-- assertVisible: "Local play remains available."

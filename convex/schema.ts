@@ -288,6 +288,7 @@ export default defineSchema({
     unresolved: v.array(v.string()),
     fetchedAt: v.number(),
     refreshingUntil: v.optional(v.number()),
+    refreshClaimId: v.optional(v.string()),
   })
     .index("by_file_name", ["fileName"])
     .index("by_fetched_at", ["fetchedAt"]),

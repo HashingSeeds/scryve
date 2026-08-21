@@ -4,6 +4,8 @@ import { api, internal } from "./_generated/api"
 import { parsePastedDeckList } from "./deckImports"
 import schema from "./schema"
 
+const REFRESH_LEASE_MS = 5 * 60 * 1000
+
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
@@ -355,13 +357,15 @@ describe("preconstructed catalog caching", () => {
       expect(sameStale).toEqual(stale)
       expect(fetchSpy).toHaveBeenCalledTimes(2)
 
-      await t.run(async (ctx) => {
+      const claimId = await t.run(async (ctx) => {
         const scheduled = await ctx.db.system.query("_scheduled_functions").collect()
         expect(scheduled).toHaveLength(1)
         await ctx.scheduler.cancel(scheduled[0]._id)
+        return (scheduled[0].args[0] as { claimId: string }).claimId
       })
       await t.action(internal.deckImports.refreshResolvedPreconstructed, {
         fileName: "AvengersAssemble.json",
+        claimId,
       })
       expect(fetchSpy).toHaveBeenCalledTimes(4)
       const refreshed = await actor.action(api.deckImports.resolvePreconstructed, {
@@ -393,21 +397,76 @@ describe("preconstructed catalog caching", () => {
       await expect(
         t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
           fileName: "RetryRefresh.json",
+          claimId: "claim-a",
         }),
       ).resolves.toBe(true)
       await expect(
         t.action(internal.deckImports.refreshResolvedPreconstructed, {
           fileName: "RetryRefresh.json",
+          claimId: "claim-a",
         }),
       ).rejects.toBeDefined()
       await expect(
         t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
           fileName: "RetryRefresh.json",
+          claimId: "claim-b",
         }),
       ).resolves.toBe(true)
     } finally {
       nowSpy.mockRestore()
       fetchSpy.mockRestore()
+    }
+  })
+
+  it("does not let an expired refresh release a newer refresh lease", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      await t.mutation(internal.deckImports.storeResolvedPreconstructed, {
+        fileName: "LeaseOwner.json",
+        name: "Lease Owner",
+        cards: [],
+        unresolved: [],
+      })
+
+      await expect(
+        t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
+          fileName: "LeaseOwner.json",
+          claimId: "refresh-a",
+        }),
+      ).resolves.toBe(true)
+      nowSpy.mockReturnValue(1_000_000 + REFRESH_LEASE_MS + 1)
+
+      await expect(
+        t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
+          fileName: "LeaseOwner.json",
+          claimId: "refresh-b",
+        }),
+      ).resolves.toBe(true)
+
+      await t.mutation(internal.deckImports.releaseResolvedPreconstructedRefresh, {
+        fileName: "LeaseOwner.json",
+        claimId: "refresh-a",
+      })
+      await expect(
+        t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
+          fileName: "LeaseOwner.json",
+          claimId: "refresh-c",
+        }),
+      ).resolves.toBe(false)
+
+      await t.mutation(internal.deckImports.releaseResolvedPreconstructedRefresh, {
+        fileName: "LeaseOwner.json",
+        claimId: "refresh-b",
+      })
+      await expect(
+        t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
+          fileName: "LeaseOwner.json",
+          claimId: "refresh-d",
+        }),
+      ).resolves.toBe(true)
+    } finally {
+      nowSpy.mockRestore()
     }
   })
 
