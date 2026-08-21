@@ -224,6 +224,28 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByText(/Premium/)).toBeNull()
   })
 
+  it("deletes the selected version from the version editor behind a confirmation", async () => {
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("deck-tab-versions"))
+    fireEvent.press(view.getByTestId("rename-version-button"))
+    fireEvent.press(view.getByTestId("delete-version-button"))
+    fireEvent.press(view.getByTestId("delete-version-confirm"))
+    await waitFor(() =>
+      expect(mockDeleteVersion).toHaveBeenCalledWith({ versionId: "version-main" }),
+    )
+  })
+
+  it("hides version deletion when the deck has only one version", () => {
+    mockDetail.value = {
+      ...(mockDetail.value as Record<string, unknown>),
+      versions: [mainVersion],
+    }
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("deck-tab-versions"))
+    fireEvent.press(view.getByTestId("rename-version-button"))
+    expect(view.queryByTestId("delete-version-button")).toBeNull()
+  })
+
   it("archives the deck from deck settings behind a confirmation", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("deck-settings-button"))

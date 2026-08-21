@@ -151,6 +151,7 @@ export function DeckDetailScreen({
   const version = detail?.version
   const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)
   const canAddVersion = detail?.capacity.canCreate === true
+  const canDeleteVersion = (detail?.versions.length ?? 0) > 1
   const premium = detail?.capacity.premium === true
 
   function fail(cause: unknown, fallback: string) {
@@ -286,6 +287,11 @@ export function DeckDetailScreen({
       await updateVersion({ versionId: version._id, name, note })
       setDialog("none")
     }, "Could not update version")
+  }
+
+  function startDeleteVersion() {
+    setError(undefined)
+    setDialog("deleteVersion")
   }
 
   async function confirmDeleteVersion() {
@@ -716,6 +722,7 @@ export function DeckDetailScreen({
           busy={busy}
           error={error}
           onSubmit={submitRenameVersion}
+          {...(canDeleteVersion ? { onDelete: startDeleteVersion } : {})}
           onClose={() => setDialog("none")}
         />
       ) : null}
@@ -753,6 +760,11 @@ export function DeckDetailScreen({
             text="Games already played with it keep their record, but the list will no longer be editable or selectable."
             style={themed($dialogText)}
           />
+          {error ? (
+            <View style={themed($alert)}>
+              <Text accessibilityRole="alert" style={themed($alertText)} text={error} />
+            </View>
+          ) : null}
           <View style={themed($dialogActions)}>
             <Button
               text="Cancel"

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { ViewStyle } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
@@ -24,6 +24,7 @@ export interface DeckVersionDialogProps {
   busy?: boolean
   error?: string
   onSubmit: (draft: DeckVersionDraft) => void
+  onDelete?: () => void
   onClose: () => void
 }
 
@@ -37,6 +38,7 @@ export function DeckVersionDialog({
   busy,
   error,
   onSubmit,
+  onDelete,
   onClose,
 }: DeckVersionDialogProps) {
   const { themed } = useAppTheme()
@@ -110,8 +112,24 @@ export function DeckVersionDialog({
           onPress={() => onSubmit({ name, note, copyCards })}
         />
       </View>
+      {onDelete ? (
+        <Button
+          testID="delete-version-button"
+          text="Delete version"
+          style={themed($destructiveButton)}
+          textStyle={themed($destructiveText)}
+          disabled={busy}
+          onPress={onDelete}
+        />
+      ) : null}
     </DialogCard>
   )
 }
 
 const $choices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.errorBackground,
+  borderColor: colors.error,
+  borderWidth: 1,
+})
+const $destructiveText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
