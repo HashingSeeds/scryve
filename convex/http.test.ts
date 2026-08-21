@@ -73,6 +73,23 @@ describe("Clerk webhook user sync", () => {
     expect(await users(t)).toEqual([])
   })
 
+  it("returns 400 for a signed user event whose data is missing or not an object", async () => {
+    process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
+    const t = convexTest(schema, modules)
+
+    const malformedEvents = [
+      { type: "user.created" },
+      { type: "user.created", data: null },
+      { type: "user.updated", data: "not-an-object" },
+      { type: "user.updated", data: ["not", "a", "record"] },
+    ]
+    for (const event of malformedEvents) {
+      const response = await fetchSigned(t, event)
+      expect(response.status).toBe(400)
+    }
+    expect(await users(t)).toEqual([])
+  })
+
   it("returns 400 for a signed user.created event without a username", async () => {
     process.env.CLERK_WEBHOOK_SIGNING_SECRET = secret
     const t = convexTest(schema, modules)
