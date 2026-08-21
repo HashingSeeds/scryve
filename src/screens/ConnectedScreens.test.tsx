@@ -326,7 +326,8 @@ describe("connected lobby screens", () => {
     render(themed(<ConnectedHomeScreen onHostNew={jest.fn()} onJoin={jest.fn()} />))
 
     await waitFor(() => expect(screen.getByTestId("resume-connected-hosted-lobby")).toBeTruthy())
-    expect(screen.getByText(/Hosted lobby · standard · 2 seats/)).toBeTruthy()
+    expect(screen.getByText("Hosting · waiting to start")).toBeTruthy()
+    expect(screen.getByText(/2 seats · standard/)).toBeTruthy()
     expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
     expect(screen.getByText(/Resume or finish\/abandon your hosted game/i)).toBeTruthy()
   })
@@ -704,13 +705,13 @@ describe("connected lobby screens", () => {
       themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />),
     )
     const inviteUrl = `https://play.count.example/join/${inviteToken}`
-    expect(view.UNSAFE_getByType(Screen).props.preset).toBe("auto")
+    expect(view.UNSAFE_getByType(Screen).props.preset).toBe("fixed")
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
     expect(screen.getByTestId("invite-qr").props.accessibilityHint).toBe(
       "size-184-quiet-zone-16-ecl-H",
     )
     expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
-    expect(screen.getByText("Code: AB12CD")).toBeTruthy()
+    expect(screen.getByTestId("manual-code")).toHaveTextContent("AB12CD")
     expect(screen.getByText("Ada")).toBeTruthy()
     expect(screen.getByText("Grace")).toBeTruthy()
     expect(screen.queryByTestId("share-manual-code-button")).toBeNull()
@@ -788,7 +789,7 @@ describe("connected lobby screens", () => {
     lobby.unmount()
 
     render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
-    expect(screen.getByText("Seat claims are online-only.")).toBeTruthy()
+    expect(screen.getByText(/Reconnect to claim a seat/i)).toBeTruthy()
     fireEvent.press(screen.getByTestId("claim-seat-button"))
     expect(mockSyncUser).not.toHaveBeenCalled()
     expect(mockClaimSeat).not.toHaveBeenCalled()
@@ -835,6 +836,23 @@ describe("connected lobby screens", () => {
     expect(onLeft).toHaveBeenCalledTimes(1)
   })
 
+  it("confirms an abandon in a modal instead of pushing the lobby content down", () => {
+    mockProjection = { ...mockProjection, status: "lobby", isHost: true, invitation: null }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    expect(screen.queryByTestId("connected-lobby-leave-confirmation")).toBeNull()
+    fireEvent.press(screen.getByTestId("abandon-connected-lobby-button"))
+
+    const confirmation = screen.getByTestId("connected-lobby-leave-confirmation")
+    expect(confirmation.props.accessibilityViewIsModal).toBe(true)
+    expect(screen.getByTestId("connected-lobby-leave-backdrop")).toBeTruthy()
+    expect(screen.getByText(/cannot be undone/i)).toBeTruthy()
+
+    fireEvent.press(screen.getByTestId("connected-lobby-leave-backdrop"))
+    expect(screen.queryByTestId("connected-lobby-leave-confirmation")).toBeNull()
+    expect(mockAbandon).not.toHaveBeenCalled()
+  })
+
   it("requires a host to abandon instead of hiding an unfinished lobby", () => {
     mockProjection = { ...mockProjection, status: "lobby", isHost: true, invitation: null }
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
@@ -858,7 +876,7 @@ describe("connected lobby screens", () => {
       ),
     )
     expect(screen.getByTestId("connected-lobby-exit-offline").props.accessibilityRole).toBe("alert")
-    expect(screen.getByText(/Reconnect before leaving or abandoning/i)).toBeTruthy()
+    expect(screen.getByText(/Reconnect to leave or abandon this lobby/i)).toBeTruthy()
     expect(
       screen.getByTestId("confirm-connected-lobby-leave-button").props.accessibilityState.disabled,
     ).toBe(true)

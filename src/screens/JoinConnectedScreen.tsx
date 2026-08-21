@@ -1,15 +1,25 @@
 import { useState } from "react"
+import type { TextStyle, ViewStyle } from "react-native"
+import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useUser } from "@clerk/expo"
 import { useConvexConnectionState, useMutation } from "convex/react"
 
+import { AlertNote } from "@/components/AlertNote"
+import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
+import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { Header } from "@/components/Header"
+import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
-import { MAX_PLAYER_NAME_LENGTH, validatePlayerNames } from "@/features/game/domain"
+import { MAX_PLAYER_NAME_LENGTH, PLAYER_COLORS, validatePlayerNames } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { useAppTheme } from "@/theme/context"
+import { $styles } from "@/theme/styles"
+import type { ThemedStyle } from "@/theme/types"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import { api } from "../../convex/_generated/api"
@@ -27,6 +37,8 @@ export function JoinConnectedScreen({
   initialCode?: string
   onBack?: () => void
 }) {
+  const { themed } = useAppTheme()
+  const { titleVisible, onScroll } = useCollapsingTitle()
   const { user } = useUser()
   const { isWebSocketConnected } = useConvexConnectionState()
   const syncUser = useMutation(api.users.syncCurrent)
@@ -34,26 +46,26 @@ export function JoinConnectedScreen({
   const deviceId = useState(() => new LocalGameRepository().getDeviceId())[0]
   const [code, setCode] = useState(initialCode)
   const [name, setName] = useState(user?.fullName || user?.firstName || "Player")
-  const [color, setColor] = useState("#2563EB")
+  const [color, setColor] = useState(PLAYER_COLORS[0])
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const nameValidation = validatePlayerNames([name])
   const normalizedName = nameValidation.names[0]
-  const validColor = /^#[0-9A-Fa-f]{6}$/.test(color.trim())
   const validCode = Boolean(inviteToken || normalizeManualCode(code))
-  const validInput = nameValidation.valid && validColor && validCode
+  const validInput = nameValidation.valid && validCode
+  const title = inviteToken ? "Join invited lobby" : "Join with code"
 
   async function join() {
     const startedAt = Date.now()
     if (!isWebSocketConnected) {
-      setError("Reconnect before claiming a seat; this action is not queued.")
+      setError(onlineOnlyNotice("join"))
       return
     }
     try {
       setBusy(true)
       setError(undefined)
       if (!validInput) {
-        setError("Enter a valid name, color, and invitation code.")
+        setError("Enter a valid name and invitation code.")
         return
       }
       await syncUser({ displayName: normalizedName, avatarUrl: user?.imageUrl })
@@ -66,7 +78,7 @@ export function JoinConnectedScreen({
         token: inviteToken,
         manualCode: manualCode ?? undefined,
         displayName: normalizedName,
-        color: color.trim().toUpperCase(),
+        color: color.toUpperCase(),
         deviceId,
       })
       emitTelemetry("join.completed", { durationMs: Date.now() - startedAt, outcome: "success" })
@@ -78,65 +90,127 @@ export function JoinConnectedScreen({
       setBusy(false)
     }
   }
+
   return (
-    <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
+    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
       <Header
-        title={inviteToken ? "Join invited lobby" : "Join with code"}
+        title={titleVisible ? title : ""}
         leftTx={onBack ? "common:back" : undefined}
         onLeftPress={onBack}
       />
-      <Text
-        preset="heading"
-        accessibilityRole="header"
-        text={inviteToken ? "Join invited lobby" : "Join with code"}
-      />
-      {!inviteToken ? (
-        <>
-          <TextField
-            testID="manual-code-input"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={7}
-            label="6-character code"
-            value={code}
-            onChangeText={setCode}
+      <ScrollView
+        style={$styles.flex1}
+        contentContainerStyle={themed($content)}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={themed($hero)}>
+          <Text preset="heading" accessibilityRole="header" text={title} />
+          <Text
+            size="sm"
+            style={themed($dimmed)}
+            text={
+              inviteToken
+                ? "Your invite is checked when you join. Lobby details stay hidden until your seat is claimed."
+                : "Enter the 6-character code from the host, or scan their QR."
+            }
           />
-          {onScan ? (
-            <Button testID="scan-invite-button" text="Scan invite QR" onPress={onScan} />
-          ) : null}
-        </>
-      ) : (
-        <Text text="The private invite will be validated when you join; lobby details remain hidden until membership is claimed." />
-      )}
-      <TextField
-        testID="join-display-name"
-        label="Display name"
-        value={name}
-        maxLength={MAX_PLAYER_NAME_LENGTH}
-        status={nameValidation.errors[0] ? "error" : undefined}
-        helper={nameValidation.errors[0]}
-        onChangeText={setName}
-      />
-      <TextField
-        testID="join-color"
-        label="Color (hex)"
-        autoCapitalize="characters"
-        value={color}
-        status={validColor ? undefined : "error"}
-        helper={validColor ? undefined : "Enter a 6-digit hex color such as #2563EB."}
-        onChangeText={setColor}
-      />
-      {error ? <Text accessibilityRole="alert" text={error} /> : null}
-      {!isWebSocketConnected ? (
-        <Text accessibilityRole="alert" text="Seat claims are online-only." />
-      ) : null}
-      <Button
-        testID="claim-seat-button"
-        text={busy ? "Joining…" : "Claim open seat"}
-        disabled={busy || !isWebSocketConnected || !validInput}
-        preset="reversed"
-        onPress={join}
-      />
+        </View>
+        {!inviteToken ? (
+          <View style={themed($section)}>
+            <TextField
+              testID="manual-code-input"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={7}
+              label="Invite code"
+              placeholder="ABC123"
+              value={code}
+              onChangeText={setCode}
+              style={themed($codeInput)}
+            />
+            {onScan ? (
+              <Button
+                testID="scan-invite-button"
+                text="Scan invite QR instead"
+                style={themed($secondaryAction)}
+                onPress={onScan}
+              />
+            ) : null}
+          </View>
+        ) : null}
+        <View style={themed($section)}>
+          <TextField
+            testID="join-display-name"
+            label="Display name"
+            value={name}
+            maxLength={MAX_PLAYER_NAME_LENGTH}
+            status={nameValidation.errors[0] ? "error" : undefined}
+            helper={nameValidation.errors[0]}
+            onChangeText={setName}
+          />
+        </View>
+        <View style={themed($section)}>
+          <Text size="xs" style={themed($dimmed)} text="Your color" />
+          <View style={themed($swatches)}>
+            {PLAYER_COLORS.map((option, index) => {
+              const selected = option.toUpperCase() === color.toUpperCase()
+              return (
+                <TouchableOpacity
+                  key={option}
+                  testID={`join-color-${option.replace("#", "").toLowerCase()}`}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`Color ${index + 1}`}
+                  accessibilityState={{ selected }}
+                  activeOpacity={0.75}
+                  style={[themed($swatch), selected && themed($selectedSwatch)]}
+                  onPress={() => setColor(option)}
+                >
+                  <PlayerMark seatNumber={index + 1} color={option} size={32} />
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        </View>
+      </ScrollView>
+      <BottomActionBar>
+        {error ? <AlertNote testID="join-error" text={error} /> : null}
+        {!isWebSocketConnected ? <AlertNote text={onlineOnlyNotice("join")} /> : null}
+        <Button
+          testID="claim-seat-button"
+          text={busy ? "Joining…" : "Claim open seat"}
+          disabled={busy || !isWebSocketConnected || !validInput}
+          preset="reversed"
+          style={themed($primaryAction)}
+          onPress={join}
+        />
+      </BottomActionBar>
     </Screen>
   )
 }
+
+const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.lg,
+  padding: spacing.lg,
+  paddingBottom: spacing.xl,
+})
+const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $codeInput: ThemedStyle<TextStyle> = () => ({ letterSpacing: 4 })
+const $swatches: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: spacing.xs,
+})
+const $swatch: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  padding: spacing.xs,
+  borderRadius: spacing.sm,
+  borderWidth: 2,
+  borderColor: colors.transparent,
+})
+const $selectedSwatch: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.tint })
+const $primaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 52 })
+const $secondaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })

@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react"
-import { AppState, Linking, Platform } from "react-native"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import type { TextStyle, ViewStyle } from "react-native"
+import { AppState, Linking, Platform, ScrollView, View } from "react-native"
 import { CameraView, ScanningResult, useCameraPermissions } from "expo-camera"
 import * as Haptics from "expo-haptics"
 
+import { AlertNote } from "@/components/AlertNote"
+import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { InvitePayload, normalizeInvitePayload } from "@/features/connected/inviteLinks"
+import { useAppTheme } from "@/theme/context"
+import { $styles } from "@/theme/styles"
+import type { ThemedStyle } from "@/theme/types"
 import { delay } from "@/utils/delay"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -106,64 +112,116 @@ export function InviteScannerScreen({
 
   if (Platform.OS === "web") {
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
-        <Text preset="heading" accessibilityRole="header" text="Scan invite" />
-        <Text text="Camera QR scanning is available in the iOS and Android app. Enter the 6-character code instead." />
-        <Button text="Enter code manually" onPress={onCancel} />
-      </Screen>
+      <ScannerLayout
+        title="Scan invite"
+        body="Camera QR scanning is available in the iOS and Android app. Enter the 6-character code instead."
+        actions={<Button text="Enter code manually" preset="reversed" onPress={onCancel} />}
+      />
     )
   }
 
   if (Platform.OS === "ios" && !permission?.granted) {
+    const canAsk = permission?.canAskAgain !== false
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
-        <Text preset="heading" accessibilityRole="header" text="Camera permission" />
-        <Text text="Scryve uses the camera only while this screen is open to read an invitation QR. Images are not captured, stored, or uploaded." />
-        {permission?.canAskAgain !== false ? (
-          <Button text="Allow camera" onPress={() => void requestPermission()} />
-        ) : (
-          <>
-            <Text
-              accessibilityRole="alert"
+      <ScannerLayout
+        title="Camera permission"
+        body="Scryve uses the camera only while this screen is open to read an invitation QR. Images are not captured, stored, or uploaded."
+        notice={
+          canAsk ? undefined : (
+            <AlertNote
+              tone="info"
               text="Camera access is denied. You can enable it in system settings or enter the code manually."
             />
-            <Button
-              text="Open settings"
-              onPress={() => void Linking.openSettings().then(() => AppState.currentState)}
-            />
+          )
+        }
+        actions={
+          <>
+            {canAsk ? (
+              <Button
+                text="Allow camera"
+                preset="reversed"
+                onPress={() => void requestPermission()}
+              />
+            ) : (
+              <Button
+                text="Open settings"
+                preset="reversed"
+                onPress={() => void Linking.openSettings().then(() => AppState.currentState)}
+              />
+            )}
+            <Button text="Enter code manually" onPress={onCancel} />
           </>
-        )}
-        <Button text="Enter code manually" onPress={onCancel} />
-      </Screen>
+        }
+      />
     )
   }
 
   if (!modernScannerAvailable) {
     return (
-      <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
-        <Text preset="heading" accessibilityRole="header" text="Scan invite" />
-        <Text
-          accessibilityRole="alert"
-          text="The native QR scanner is unavailable on this device. Enter the invitation code manually."
-        />
-        <Button text="Enter code manually" onPress={onCancel} />
-      </Screen>
+      <ScannerLayout
+        title="Scan invite"
+        notice={
+          <AlertNote text="The native QR scanner is unavailable on this device. Enter the invitation code manually." />
+        }
+        actions={<Button text="Enter code manually" preset="reversed" onPress={onCancel} />}
+      />
     )
   }
 
   return (
-    <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>
-      <Text preset="heading" accessibilityRole="header" text="Scan invite" />
-      <Text text="Use the device scanner to find a trusted Scryve invite QR. Recognition stays on-device and no image is saved." />
-      {error ? (
-        <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" text={error} />
-      ) : null}
-      <Button
-        text={openingScanner ? "Opening scanner…" : "Open QR scanner"}
-        disabled={openingScanner}
-        onPress={() => void openScanner()}
-      />
-      <Button text="Cancel and enter code" onPress={onCancel} />
+    <ScannerLayout
+      title="Scan invite"
+      body="Use the device scanner to find a trusted Scryve invite QR. Recognition stays on-device and no image is saved."
+      notice={error ? <AlertNote text={error} /> : undefined}
+      actions={
+        <>
+          <Button
+            text={openingScanner ? "Opening scanner…" : "Open QR scanner"}
+            preset="reversed"
+            disabled={openingScanner}
+            onPress={() => void openScanner()}
+          />
+          <Button text="Cancel and enter code" onPress={onCancel} />
+        </>
+      }
+    />
+  )
+}
+
+function ScannerLayout({
+  title,
+  body,
+  notice,
+  actions,
+}: {
+  title: string
+  body?: string
+  notice?: ReactNode
+  actions: ReactNode
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <Screen
+      preset="fixed"
+      safeAreaEdges={["top", "bottom"]}
+      contentContainerStyle={themed($screen)}
+    >
+      <ScrollView style={$styles.flex1} contentContainerStyle={themed($content)}>
+        <View style={themed($hero)}>
+          <Text preset="heading" accessibilityRole="header" text={title} />
+          {body ? <Text size="sm" style={themed($dimmed)} text={body} /> : null}
+        </View>
+        {notice}
+      </ScrollView>
+      <BottomActionBar>{actions}</BottomActionBar>
     </Screen>
   )
 }
+
+const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.md,
+  padding: spacing.lg,
+})
+const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
