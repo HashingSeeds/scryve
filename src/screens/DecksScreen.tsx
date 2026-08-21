@@ -1,80 +1,123 @@
+import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { FlatList, TouchableOpacity, View } from "react-native"
+import { SectionList, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useQuery } from "convex/react"
 
+import { Button } from "@/components/Button"
+import type { FilterChip } from "@/components/FilterChips"
+import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { TextField } from "@/components/TextField"
+import type { DeckRecord } from "@/features/decks/deckCopy"
+import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
+import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { api } from "../../convex/_generated/api"
+import {
+  DECK_GAME_LIST,
+  deckFormatLabel,
+  deckFormats,
+  DEFAULT_DECK_GAME,
+} from "../../convex/lib/deckGames"
 
 type ShelfDeck = {
   _id: string
   name: string
+  format: string
+  game?: string
   coverImageUrl?: string
-  versionNumber?: number
+  versionCount?: number
+  cardQuantity?: number
+  lastPlayedAt?: number
+  record?: DeckRecord
 }
+
+export type DeckSelection = {
+  deckId: string
+  name: string
+  game: string
+  format: string
+  cardQuantity?: number
+}
+
+type DeckSection = { title: "Recent" | "All decks"; data: ShelfDeck[] }
 
 function coverInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?"
 }
 
-function versionLabel(versionNumber?: number) {
-  return versionNumber ? `v${versionNumber}` : "no list"
+function deckSubtitle(deck: ShelfDeck, game: string) {
+  const cards = deck.cardQuantity ? cardCountLabel(deck.cardQuantity) : "Empty list"
+  const versions =
+    deck.versionCount && deck.versionCount > 1 ? `${deck.versionCount} versions` : null
+  const record = recordSummary(deck.record)
+  return [deckFormatLabel(game, deck.format), cards, versions, record].filter(Boolean).join(" · ")
 }
 
-function filledFraction(used: number, limit: number): `${number}%` {
-  if (limit <= 0) return "0%"
-  return `${Math.min(100, Math.round((used / limit) * 100))}%`
+function matchesSearch(deck: ShelfDeck, game: string, search: string) {
+  const term = search.trim().toLocaleLowerCase()
+  if (!term) return true
+  return [deck.name, deckFormatLabel(game, deck.format)].some((value) =>
+    value.toLocaleLowerCase().includes(term),
+  )
 }
 
-function DeckTile({ deck, onPress }: { deck: ShelfDeck; onPress: () => void }) {
+function DeckRow({ deck, game, onPress }: { deck: ShelfDeck; game: string; onPress: () => void }) {
   const { themed } = useAppTheme()
   return (
     <TouchableOpacity
-      style={themed($tileColumn)}
+      style={themed($row)}
       accessibilityRole="button"
       accessibilityLabel={deck.name}
-      activeOpacity={0.8}
+      activeOpacity={0.75}
       onPress={onPress}
     >
       {deck.coverImageUrl ? (
         <Image source={deck.coverImageUrl} style={themed($cover)} cachePolicy="memory-disk" />
       ) : (
         <View style={themed($coverPlaceholder)}>
-          <Text
-            weight="bold"
-            size="lg"
-            text={coverInitial(deck.name)}
-            style={themed($dimmedText)}
-          />
+          <Text weight="bold" size="md" text={coverInitial(deck.name)} />
         </View>
       )}
-      <Text size="xs" numberOfLines={1} text={deck.name} />
-      <Text size="xxs" style={themed($dimmedText)} text={versionLabel(deck.versionNumber)} />
+      <View style={themed($rowCopy)}>
+        <Text weight="medium" numberOfLines={1} text={deck.name} />
+        <Text
+          size="xxs"
+          numberOfLines={2}
+          style={themed($dimmedText)}
+          text={deckSubtitle(deck, game)}
+        />
+      </View>
+      <Text size="lg" style={themed($dimmedText)} text="›" />
     </TouchableOpacity>
   )
 }
 
-function AddDeckTile({ onPress }: { onPress: () => void }) {
+function DeckShelfSkeleton() {
   const { themed } = useAppTheme()
   return (
-    <TouchableOpacity
-      testID="add-deck-tile"
-      style={themed($tileColumn)}
-      accessibilityRole="button"
-      accessibilityLabel="Add deck"
-      activeOpacity={0.8}
-      onPress={onPress}
-    >
-      <View style={themed($addTile)}>
-        <Text size="xl" text="+" style={themed($dimmedText)} />
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading decks">
+      <View style={themed($sectionHeader)}>
+        <View style={themed($skeletonHeading)} />
       </View>
-      <Text size="xs" numberOfLines={1} text="Add deck" />
-    </TouchableOpacity>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <View key={index} testID="deck-skeleton-row" style={themed($row)}>
+          <View
+            testID="deck-skeleton-cover"
+            style={[themed($coverPlaceholder), themed($skeletonCover)]}
+          />
+          <View style={themed($rowCopy)}>
+            <View style={themed($skeletonName)} />
+            <View style={themed($skeletonSubtitle)} />
+          </View>
+        </View>
+      ))}
+    </View>
   )
 }
 
@@ -84,122 +127,260 @@ export function DecksScreen({
   onAddDeck,
 }: {
   onBack: () => void
-  onSelect: (deckId: string) => void
+  onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
 }) {
   const { themed } = useAppTheme()
   const mine = useQuery(api.decks.listMine)
-  const capacity = mine?.capacity
-  const atCapacity = capacity !== undefined && !capacity.canCreate
-  const decks = mine?.decks ?? []
+  const { game, format, setGame, setFormat } = useDeckFilters()
+  const [search, setSearch] = useState("")
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  const gameDecks = useMemo(
+    () => (mine?.decks ?? []).filter((deck) => (deck.game ?? DEFAULT_DECK_GAME) === game),
+    [mine?.decks, game],
+  )
+  const formatChips = useMemo<FilterChip[]>(() => {
+    const owned = new Set(gameDecks.map((deck) => deck.format))
+    const known = deckFormats(game)
+      .filter((candidate) => owned.has(candidate.id))
+      .map((candidate) => ({ id: candidate.id, label: candidate.label }))
+    const extra = [...owned]
+      .filter((value) => !known.some((candidate) => candidate.id === value))
+      .map((value) => ({ id: value, label: deckFormatLabel(game, value) }))
+    return [{ id: ALL_FORMATS, label: "All formats" }, ...known, ...extra]
+  }, [gameDecks, game])
+  const visibleDecks = useMemo(
+    () =>
+      gameDecks
+        .filter((deck) => format === ALL_FORMATS || deck.format === format)
+        .filter((deck) => matchesSearch(deck, game, search)),
+    [gameDecks, format, game, search],
+  )
+  const sections = useMemo<DeckSection[]>(() => {
+    if (visibleDecks.length === 0) return []
+    const recent = visibleDecks
+      .filter((deck) => deck.lastPlayedAt !== undefined)
+      .sort((left, right) => (right.lastPlayedAt ?? 0) - (left.lastPlayedAt ?? 0))
+      .slice(0, 2)
+    const recentIds = new Set(recent.map((deck) => deck._id))
+    const rest = visibleDecks.filter((deck) => !recentIds.has(deck._id))
+    return [
+      ...(recent.length ? [{ title: "Recent" as const, data: recent }] : []),
+      { title: "All decks", data: rest },
+    ]
+  }, [visibleDecks])
+  const filtered = gameDecks.length > 0 && visibleDecks.length === 0
+  const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? "deck"
+  const filterSummary = `${gameLabel} · ${
+    format === ALL_FORMATS ? "All formats" : deckFormatLabel(game, format)
+  }`
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header title="Decks" leftTx="common:back" onLeftPress={onBack} />
+      <Header
+        title="Decks"
+        leftTx="common:back"
+        onLeftPress={onBack}
+        RightActionComponent={
+          <TouchableOpacity
+            testID="add-deck-tile"
+            accessibilityRole="button"
+            accessibilityLabel="Add deck"
+            style={themed($headerAction)}
+            onPress={onAddDeck}
+          >
+            <Text size="md" weight="medium" style={themed($link)} text="+ Add" />
+          </TouchableOpacity>
+        }
+      />
       <View style={themed($content)}>
-        <Text preset="heading" text="Your decks" />
-        <FlatList
-          testID="decks-list"
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={themed($shelfContent)}
-          data={decks}
-          keyExtractor={(deck) => deck._id}
-          renderItem={({ item: deck }) => (
-            <DeckTile deck={deck} onPress={() => onSelect(deck._id)} />
-          )}
-          ListFooterComponent={<AddDeckTile onPress={onAddDeck} />}
-        />
-        {mine && decks.length === 0 ? (
-          <Text size="xs" style={themed($dimmedText)} text="No decks yet — add your first deck." />
-        ) : null}
-        {capacity ? (
-          <View style={themed($capacity)}>
-            <Text
-              size="xs"
-              style={themed($dimmedText)}
-              text={`${capacity.used} of ${capacity.limit} deck${capacity.limit === 1 ? "" : "s"} used`}
+        <View style={themed($searchRow)}>
+          <TextField
+            testID="deck-search-input"
+            containerStyle={themed($searchField)}
+            placeholder="Search decks or formats"
+            value={search}
+            maxLength={80}
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            onChangeText={setSearch}
+          />
+          <Button
+            testID="deck-filter-button"
+            text="Filters"
+            style={themed($filterButton)}
+            onPress={() => setFiltersOpen((open) => !open)}
+          />
+        </View>
+        <Text size="xxs" style={themed($dimmedText)} text={filterSummary} />
+        {filtersOpen ? (
+          <View style={themed($filters)}>
+            <FilterChips
+              testID="game-filter"
+              accessibilityLabel="Game"
+              chips={DECK_GAME_LIST.map((candidate) => ({
+                id: candidate.id,
+                label: candidate.available
+                  ? candidate.shortLabel
+                  : `${candidate.shortLabel} · soon`,
+                disabled: !candidate.available,
+              }))}
+              selectedId={game}
+              onSelect={setGame}
             />
-            <View style={themed($meterTrack)}>
-              <View
-                style={[
-                  themed($meterFill),
-                  { width: filledFraction(capacity.used, capacity.limit) },
-                ]}
-              />
-            </View>
-            {atCapacity && !capacity.premium ? (
-              <Text
-                size="xs"
-                text="Free accounts include one deck. Premium unlocks unlimited decks."
+            {formatChips.length > 1 ? (
+              <FilterChips
+                testID="format-filter"
+                accessibilityLabel="Format"
+                chips={formatChips}
+                selectedId={format}
+                onSelect={setFormat}
               />
             ) : null}
           </View>
         ) : null}
+        <SectionList
+          testID="decks-list"
+          sections={sections}
+          keyExtractor={(deck) => deck._id}
+          contentContainerStyle={themed($listContent)}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section }) =>
+            section.data.length ? (
+              <View style={themed($sectionHeader)}>
+                <Text size="xs" weight="bold" text={section.title} />
+                <Text size="xxs" style={themed($dimmedText)} text={`${section.data.length}`} />
+              </View>
+            ) : null
+          }
+          renderItem={({ item: deck }) => (
+            <DeckRow
+              deck={deck}
+              game={game}
+              onPress={() =>
+                onSelect({
+                  deckId: deck._id,
+                  name: deck.name,
+                  game: deck.game ?? DEFAULT_DECK_GAME,
+                  format: deck.format,
+                  cardQuantity: deck.cardQuantity,
+                })
+              }
+            />
+          )}
+          ListEmptyComponent={
+            mine ? (
+              <View style={themed($empty)}>
+                <Text
+                  preset="subheading"
+                  text={filtered ? "Nothing matches those filters" : `No ${gameLabel} decks yet`}
+                />
+                <Text
+                  size="sm"
+                  style={themed($dimmedText)}
+                  text={
+                    filtered
+                      ? "Try another format or clear the search."
+                      : "Add a deck to get started."
+                  }
+                />
+                {filtered ? (
+                  <Button
+                    text="Clear filters"
+                    onPress={() => {
+                      setFormat(ALL_FORMATS)
+                      setSearch("")
+                    }}
+                  />
+                ) : null}
+              </View>
+            ) : (
+              <DeckShelfSkeleton />
+            )
+          }
+        />
       </View>
     </Screen>
   )
 }
 
-const TILE_SIZE = 96
-
-const $cover: ThemedStyle<ImageStyle> = ({ spacing }) => ({
-  width: TILE_SIZE,
-  height: TILE_SIZE,
-  borderRadius: spacing.xs,
-})
-const $coverPlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: TILE_SIZE,
-  height: TILE_SIZE,
-  borderRadius: spacing.xs,
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 1,
-  borderColor: colors.separator,
-  backgroundColor: colors.palette.neutral200,
-})
-const $addTile: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: TILE_SIZE,
-  height: TILE_SIZE,
-  borderRadius: spacing.xs,
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 1,
-  borderStyle: "dashed",
-  borderColor: colors.separator,
-})
-const $tileColumn: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: TILE_SIZE,
-  gap: spacing.xxs,
-})
-const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $capacity: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xxs,
-  marginTop: spacing.sm,
-})
-const $meterTrack: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: "100%",
-  height: spacing.xxs,
-  borderRadius: spacing.xxs,
-  overflow: "hidden",
-  backgroundColor: colors.separator,
-})
-const $meterFill: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  height: "100%",
-  borderRadius: spacing.xxs,
-  backgroundColor: colors.tint,
-})
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   width: "100%",
   maxWidth: 720,
   alignSelf: "center",
-  gap: spacing.sm,
   paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.xl,
 })
-const $shelfContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+const $searchField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $filterButton: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
+const $filters: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.lg })
+const $sectionHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  paddingTop: spacing.md,
+  paddingBottom: spacing.xxs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 88,
+  flexDirection: "row",
+  alignItems: "center",
   gap: spacing.sm,
-  paddingVertical: spacing.xxs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $cover: ThemedStyle<ImageStyle> = ({ spacing }) => ({
+  width: 46,
+  height: 64,
+  borderRadius: spacing.xxxs,
+})
+const $coverPlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  width: 46,
+  height: 64,
+  borderRadius: spacing.xxxs,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: colors.palette.neutral200,
+})
+const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
+const $skeletonHeading: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 72,
+  height: 12,
+  backgroundColor: colors.separator,
+})
+const $skeletonCover: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.separator,
+})
+const $skeletonName: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "58%",
+  height: 16,
+  backgroundColor: colors.separator,
+})
+const $skeletonSubtitle: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "76%",
+  height: 10,
+  backgroundColor: colors.separator,
+})
+const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
+const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  height: 56,
+  justifyContent: "center",
+  paddingHorizontal: spacing.md,
+})
+const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
+  paddingVertical: spacing.xl,
 })

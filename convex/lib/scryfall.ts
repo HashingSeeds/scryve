@@ -1,8 +1,56 @@
-export const SCRYFALL_BASE_URL = "https://api.scryfall.com"
+import { internal } from "../_generated/api"
+import type { ActionCtx } from "../_generated/server"
 
-export const SCRYFALL_HEADERS = {
+const SCRYFALL_BASE_URL = "https://api.scryfall.com"
+
+const SCRYFALL_HEADERS = {
   "Accept": "application/json;q=0.9,*/*;q=0.8",
   "User-Agent": "ScryveDeckBuilder/1.0 (https://scryve.sow.care)",
+}
+
+const SCRYFALL_SLOW_INTERVAL_MS = 500
+const SCRYFALL_DEFAULT_INTERVAL_MS = 100
+const SCRYFALL_RATE_LIMIT_BLOCK_MS = 30_000
+
+type ScryfallRequestOptions = {
+  method?: "GET" | "POST"
+  body?: string
+}
+
+function requestPolicy(path: string) {
+  if (path.startsWith("/cards/search"))
+    return { bucket: "scryfall:cards-search", intervalMs: SCRYFALL_SLOW_INTERVAL_MS }
+  if (path === "/cards/collection")
+    return { bucket: "scryfall:cards-collection", intervalMs: SCRYFALL_SLOW_INTERVAL_MS }
+  return { bucket: "scryfall:default", intervalMs: SCRYFALL_DEFAULT_INTERVAL_MS }
+}
+
+function wait(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
+}
+
+export async function fetchScryfall(
+  ctx: ActionCtx,
+  path: string,
+  options: ScryfallRequestOptions = {},
+) {
+  const policy = requestPolicy(path)
+  const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, policy)
+  if (waitMs > 0) await wait(waitMs)
+  const response = await fetch(`${SCRYFALL_BASE_URL}${path}`, {
+    method: options.method,
+    headers: {
+      ...SCRYFALL_HEADERS,
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: options.body,
+  })
+  if (response.status === 429)
+    await ctx.runMutation(internal.externalApiRateLimits.block, {
+      bucket: policy.bucket,
+      durationMs: SCRYFALL_RATE_LIMIT_BLOCK_MS,
+    })
+  return response
 }
 
 const FACE_ORACLE_SEPARATOR = "\n—\n"

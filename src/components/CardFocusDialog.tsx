@@ -30,8 +30,8 @@ export interface CardFocusDialogProps {
   card: FocusedCard
   details?: FocusedCardDetails
   detailsError?: string
-  onIncrement: () => void
-  onDecrement: () => void
+  onIncrement?: () => void
+  onDecrement?: () => void
   onClose: () => void
 }
 
@@ -123,18 +123,22 @@ export function CardFocusDialog({
           style={themed($quantityLabel)}
           text={`${card.quantity}× in ${card.boardLabel}`}
         />
-        <Button
-          text="−"
-          testID="card-focus-decrement"
-          style={themed($quantityButton)}
-          onPress={onDecrement}
-        />
-        <Button
-          text="+"
-          testID="card-focus-increment"
-          style={themed($quantityButton)}
-          onPress={onIncrement}
-        />
+        {onDecrement ? (
+          <Button
+            text="−"
+            testID="card-focus-decrement"
+            style={themed($quantityButton)}
+            onPress={onDecrement}
+          />
+        ) : null}
+        {onIncrement ? (
+          <Button
+            text="+"
+            testID="card-focus-increment"
+            style={themed($quantityButton)}
+            onPress={onIncrement}
+          />
+        ) : null}
       </View>
       <View style={themed($dialogActions)}>
         <Button text="Close" style={themed($dialogButton)} onPress={onClose} />

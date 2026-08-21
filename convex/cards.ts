@@ -6,10 +6,9 @@ import type { MutationCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery } from "./_generated/server"
 import {
   type CardReference,
+  fetchScryfall,
   normalizeScryfallCard,
   objectRecord,
-  SCRYFALL_BASE_URL,
-  SCRYFALL_HEADERS,
 } from "./lib/scryfall"
 
 const MAX_SEARCH_RESULTS = 20
@@ -25,8 +24,8 @@ export const search = action({
     await requireActionIdentity(ctx)
     const query = args.query.trim()
     if (query.length < 2 || query.length > 120) return []
-    const url = `${SCRYFALL_BASE_URL}/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
-    const response = await fetch(url, { headers: SCRYFALL_HEADERS })
+    const path = `/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
+    const response = await fetchScryfall(ctx, path)
     if (response.status === 404) return []
     if (!response.ok)
       throw new ConvexError({
@@ -61,12 +60,7 @@ export const byId = action({
       throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
     const cached: Doc<"cardReferences"> | null = await ctx.runQuery(internal.cards.cachedById, args)
     if (cached && isCompleteReference(cached)) return toCardReference(cached)
-    const response = await fetch(
-      `${SCRYFALL_BASE_URL}/cards/${encodeURIComponent(args.scryfallId)}`,
-      {
-        headers: SCRYFALL_HEADERS,
-      },
-    )
+    const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(args.scryfallId)}`)
     if (!response.ok)
       throw new ConvexError({
         code: "scryfall_unavailable",

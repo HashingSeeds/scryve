@@ -166,6 +166,7 @@ export default defineSchema({
     name: v.string(),
     format: v.string(),
     game: v.optional(v.string()),
+    note: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -177,10 +178,17 @@ export default defineSchema({
     deckId: v.id("decks"),
     versionNumber: v.number(),
     fingerprint: v.string(),
+    name: v.optional(v.string()),
+    note: v.optional(v.string()),
+    cardCount: v.optional(v.number()),
+    cardQuantity: v.optional(v.number()),
+    archivedAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_deck_and_version_number", ["deckId", "versionNumber"])
-    .index("by_deck_and_created_at", ["deckId", "createdAt"]),
+    .index("by_deck_and_created_at", ["deckId", "createdAt"])
+    .index("by_deck_and_archived_at", ["deckId", "archivedAt"]),
 
   deckCards: defineTable({
     deckVersionId: v.id("deckVersions"),
@@ -206,6 +214,19 @@ export default defineSchema({
     .index("by_version_and_finished_at", ["deckVersionId", "finishedAt"])
     .index("by_user", ["userId"])
     .index("by_game_and_player", ["gameId", "playerId"]),
+
+  deckVersionStats: defineTable({
+    deckId: v.id("decks"),
+    deckVersionId: v.id("deckVersions"),
+    games: v.number(),
+    wins: v.number(),
+    losses: v.number(),
+    draws: v.number(),
+    unknown: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_version", ["deckVersionId"])
+    .index("by_deck", ["deckId"]),
 
   deckStats: defineTable({
     deckId: v.id("decks"),
@@ -247,6 +268,55 @@ export default defineSchema({
       }),
     ),
   }),
+
+  resolvedPreconstructedDecks: defineTable({
+    fileName: v.string(),
+    name: v.string(),
+    cards: v.array(
+      v.object({
+        oracleId: v.string(),
+        scryfallId: v.string(),
+        name: v.string(),
+        imageUrl: v.optional(v.string()),
+        smallImageUrl: v.optional(v.string()),
+        quantity: v.number(),
+        board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
+      }),
+    ),
+    unresolved: v.array(v.string()),
+    fetchedAt: v.number(),
+    refreshingUntil: v.optional(v.number()),
+    refreshClaimId: v.optional(v.string()),
+  })
+    .index("by_file_name", ["fileName"])
+    .index("by_fetched_at", ["fetchedAt"]),
+
+  preconstructedDeckOutlines: defineTable({
+    fileName: v.string(),
+    name: v.string(),
+    cards: v.array(
+      v.object({
+        name: v.string(),
+        quantity: v.number(),
+        board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
+        scryfallId: v.optional(v.string()),
+      }),
+    ),
+    fetchedAt: v.number(),
+  })
+    .index("by_file_name", ["fileName"])
+    .index("by_fetched_at", ["fetchedAt"]),
+
+  preconstructedDeckFetches: defineTable({
+    fileName: v.string(),
+    claimId: v.string(),
+    leaseUntil: v.number(),
+  }).index("by_file_name", ["fileName"]),
+
+  externalApiRateLimits: defineTable({
+    bucket: v.string(),
+    nextRequestAt: v.number(),
+  }).index("by_bucket", ["bucket"]),
 
   userEntitlements: defineTable({
     userId: v.id("users"),

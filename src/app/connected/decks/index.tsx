@@ -9,8 +9,19 @@ export default function DecksRoute() {
       <DecksScreen
         onBack={() => router.back()}
         onAddDeck={() => router.push("/connected/decks/add")}
-        onSelect={(deckId) =>
-          router.push({ pathname: "/connected/decks/[deckId]", params: { deckId } })
+        onSelect={(deck) =>
+          router.push({
+            pathname: "/connected/decks/[deckId]",
+            params: {
+              deckId: deck.deckId,
+              deckName: deck.name,
+              deckGame: deck.game,
+              deckFormat: deck.format,
+              ...(deck.cardQuantity !== undefined
+                ? { deckCardQuantity: String(deck.cardQuantity) }
+                : {}),
+            },
+          })
         }
       />
     </ConnectedGate>
