@@ -111,7 +111,7 @@ describe("username filter", () => {
     })
   })
 
-  describe("the hate-term list the profanity dataset does not cover", () => {
+  describe("the username policy terms added to the English dataset", () => {
     it("rejects slurs and extremist references at signup", () => {
       for (const username of [
         "hitler88",
@@ -166,6 +166,7 @@ describe("username filter", () => {
       expect(describeUsernameMatches("hitler88")).toEqual(["hitler"])
       expect(describeUsernameMatches("kys-loser")).toEqual(["kys"])
       expect(describeUsernameMatches("sh1t-nazi")).toEqual(["shit", "nazi"])
+      expect(describeUsernameMatches("nazi-kys-spic")).toEqual(["nazi", "kys", "spic"])
     })
   })
 

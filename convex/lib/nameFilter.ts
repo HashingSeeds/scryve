@@ -1,59 +1,56 @@
-import { englishDataset, englishRecommendedTransformers, RegExpMatcher } from "obscenity"
+import {
+  DataSet,
+  englishDataset,
+  englishRecommendedTransformers,
+  pattern,
+  RegExpMatcher,
+} from "obscenity"
 
-const datasetOptions = englishDataset.build()
+type PhraseMetadata = { originalWord: string }
 
-const gateMatcher = new RegExpMatcher({ ...datasetOptions, ...englishRecommendedTransformers })
+const policyDataset = new DataSet<PhraseMetadata>()
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "hitler" }).addPattern(pattern`hitler`))
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "kkk" }).addPattern(pattern`kkk`))
+  .addPhrase((phrase) =>
+    phrase.setMetadata({ originalWord: "pedophile" }).addPattern(pattern`pedophile`),
+  )
+  .addPhrase((phrase) =>
+    phrase.setMetadata({ originalWord: "beaner" }).addPattern(pattern`|beaner|`),
+  )
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "coon" }).addPattern(pattern`|coon|`))
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "gook" }).addPattern(pattern`|gook|`))
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "kys" }).addPattern(pattern`|kys|`))
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "nazi" }).addPattern(pattern`|nazi|`))
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "pedo" }).addPattern(pattern`|pedo|`))
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "spic" }).addPattern(pattern`|spic|`))
+  .addPhrase((phrase) =>
+    phrase.setMetadata({ originalWord: "wetback" }).addPattern(pattern`|wetback|`),
+  )
+  .addPhrase((phrase) => phrase.setMetadata({ originalWord: "1488" }).addPattern(pattern`1488`))
 
-/**
- * The obscenity dataset covers profanity, not hate speech, so slurs and extremist references reach
- * both thresholds untouched. These lists close that gap. They are matched separately from the
- * dataset rather than added to it because the leetspeak transformers rewrite digits before
- * matching, which would defeat a numeric reference like 1488.
- */
-const HATE_TERMS_ANYWHERE = ["hitler", "kkk", "1488", "pedophile"]
-
-/**
- * Short enough to appear inside ordinary words ("raccoon", "torpedo", "auspicious", "skyscraper"),
- * so these only match when no letter sits either side of them. A separator or a digit still counts
- * as a boundary, which is where an evasion like "kys-loser" or "pedo42" lands.
- */
-const HATE_TERMS_STANDALONE = [
-  "beaner",
-  "chink",
-  "coon",
-  "gook",
-  "kys",
-  "nazi",
-  "pedo",
-  "spic",
-  "tranny",
-  "wetback",
-]
-
-const hateAnywhere = new RegExp(HATE_TERMS_ANYWHERE.join("|"))
-const hateStandalone = new RegExp(`(?<![a-z])(${HATE_TERMS_STANDALONE.join("|")})(?![a-z])`)
-
-function matchedHateTerms(username: string) {
-  const lower = username.toLowerCase()
-  const stripped = lower.replace(/[_-]/g, "")
-  const terms = new Set<string>()
-  for (const term of HATE_TERMS_ANYWHERE) if (stripped.includes(term)) terms.add(term)
-  for (const variant of [lower, stripped]) {
-    const match = hateStandalone.exec(variant)
-    if (match) terms.add(match[1])
-  }
-  return [...terms]
-}
-
-function failsHateList(username: string) {
-  const lower = username.toLowerCase()
-  const stripped = lower.replace(/[_-]/g, "")
-  return hateAnywhere.test(stripped) || [lower, stripped].some((v) => hateStandalone.test(v))
-}
+const englishMatcher = new RegExpMatcher({
+  ...englishDataset.build(),
+  ...englishRecommendedTransformers,
+})
+// Policy patterns are intentionally untransformed. English's leetspeak and duplicate transformers
+// would rewrite numeric references and repeated-letter terms before these literal patterns run.
+const policyMatcher = new RegExpMatcher(policyDataset.build())
 
 function gateVariantsOf(username: string) {
   const stripped = username.replace(/[_-]/g, "")
   return stripped === username ? [username] : [username, stripped]
+}
+
+function policyVariantsOf(variants: string[]) {
+  const policyVariants = new Set<string>()
+  // Obscenity treats digits as word characters. Splitting letter/number transitions lets bounded
+  // policy terms catch names such as "pedo42" without making "pedometer" a match.
+  for (const variant of variants) {
+    const lower = variant.toLowerCase()
+    policyVariants.add(lower)
+    policyVariants.add(lower.replace(/([a-z])([0-9])|([0-9])([a-z])/g, "$1$3-$2$4"))
+  }
+  return [...policyVariants]
 }
 
 /**
@@ -71,27 +68,33 @@ function reportVariantsOf(username: string) {
   return [...variants]
 }
 
-function matchedWords(username: string) {
+function matchesFor(variants: string[]) {
   const words = new Set<string>()
-  for (const variant of reportVariantsOf(username)) {
-    for (const match of gateMatcher.getAllMatches(variant, true)) {
+  for (const variant of variants) {
+    for (const match of englishMatcher.getAllMatches(variant, true)) {
       const phrase = englishDataset.getPayloadWithPhraseMetadata(match)
       const word = phrase.phraseMetadata?.originalWord
       if (word) words.add(word)
     }
   }
-  for (const term of matchedHateTerms(username)) words.add(term)
+  for (const variant of policyVariantsOf(variants)) {
+    for (const match of policyMatcher.getAllMatches(variant, true)) {
+      const phrase = policyDataset.getPayloadWithPhraseMetadata(match)
+      const word = phrase.phraseMetadata?.originalWord
+      if (word) words.add(word)
+    }
+  }
   return [...words]
 }
 
 export function usernameFailsGate(username: string) {
-  return failsHateList(username) || gateVariantsOf(username).some((v) => gateMatcher.hasMatch(v))
+  return matchesFor(gateVariantsOf(username)).length > 0
 }
 
 export function usernameFailsReportThreshold(username: string) {
-  return failsHateList(username) || reportVariantsOf(username).some((v) => gateMatcher.hasMatch(v))
+  return matchesFor(reportVariantsOf(username)).length > 0
 }
 
 export function describeUsernameMatches(username: string) {
-  return matchedWords(username)
+  return matchesFor(reportVariantsOf(username))
 }
