@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, Share, View } from "react-native"
 import { useConvexConnectionState, useMutation, useQuery } from "convex/react"
@@ -17,6 +17,8 @@ import {
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { remoteValue } from "@/features/async/remoteState"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import {
@@ -28,7 +30,7 @@ import {
 } from "@/features/connected/connectedCopy"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
-import { LobbySeatList } from "@/features/connected/LobbySeatList"
+import { LobbySeatList, type LobbyDeckState } from "@/features/connected/LobbySeatList"
 import {
   PlayerActionsDialog,
   type ReportablePlayer,
@@ -73,11 +75,43 @@ export function ConnectedLobbyScreen({
   onBack?: () => void
   onLeft?: () => void
 }) {
+  return (
+    <ConvexQueryBoundary
+      resetKey={publicId}
+      fallback={({ retry }) => (
+        <LobbyStatusScreen
+          message="This lobby is unavailable."
+          error
+          retry={retry}
+          onBack={onBack}
+        />
+      )}
+    >
+      <ConnectedLobbyContent
+        publicId={publicId}
+        onStarted={onStarted}
+        onBack={onBack}
+        onLeft={onLeft}
+      />
+    </ConvexQueryBoundary>
+  )
+}
+
+function ConnectedLobbyContent({
+  publicId,
+  onStarted,
+  onBack,
+  onLeft,
+}: {
+  publicId: string
+  onStarted: () => void
+  onBack?: () => void
+  onLeft?: () => void
+}) {
   const { themed } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const deviceId = useRef(new LocalGameRepository().getDeviceId()).current
   const lobby = useQuery(api.games.lobbyProjection, { publicId, deviceId })
-  const decks = useQuery(api.decks.listMine)?.decks
   const { isWebSocketConnected } = useConvexConnectionState()
   const start = useMutation(api.games.startGame)
   const leave = useMutation(api.games.leaveMyGame)
@@ -208,26 +242,7 @@ export function ConnectedLobbyScreen({
     }
   }
 
-  if (lobby === undefined)
-    return (
-      <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-        <Header title="" leftTx={onBack ? "common:back" : undefined} onLeftPress={onBack} />
-        <ScrollView
-          style={$styles.flex1}
-          contentContainerStyle={themed($content)}
-          scrollEnabled={false}
-        >
-          <View style={themed($hero)}>
-            <Text preset="heading" text={LOBBY_TITLE} />
-            <Text size="sm" style={themed($dimmed)} text="Loading lobby…" />
-          </View>
-          <LobbySkeleton />
-        </ScrollView>
-        <BottomActionBar>
-          <Button text="Start game" preset="reversed" style={themed($primaryAction)} disabled />
-        </BottomActionBar>
-      </Screen>
-    )
+  if (lobby === undefined) return <LobbyStatusScreen message="Loading lobby…" onBack={onBack} />
 
   const claimedSeats = lobby.players.length
   const openSeats = Math.max(0, lobby.playerCount - claimedSeats)
@@ -275,38 +290,42 @@ export function ConnectedLobbyScreen({
             accessibilityRole="header"
             text={`Seats · ${claimedSeats} of ${lobby.playerCount}`}
           />
-          <LobbySeatList
-            seats={lobby.players}
-            openSeats={openSeats}
-            decks={decks}
-            versionLabel={versionLabel}
-            selectingDeckSeats={selectingDeckSeats}
-            onSelectVersion={(seat, deckVersionId) => void chooseVersion(seat, deckVersionId)}
-            onEditAppearance={(seat, event) => {
-              setAppearanceOrigin(
-                event?.nativeEvent
-                  ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }
-                  : undefined,
-              )
-              setAppearanceDraft({
-                color: seat.color,
-                shape: isPlayerMarkShape(seat.shape) ? seat.shape : shapeForSeat(seat.seat),
-              })
-              setAppearanceSeat(seat.seat)
-            }}
-            onReport={(seat) =>
-              seat.playerId
-                ? setPlayerToReport({
-                    playerId: seat.playerId,
-                    seat: seat.seat,
-                    displayName: seat.displayName,
+          <LobbyDeckSource>
+            {(deckState) => (
+              <LobbySeatList
+                seats={lobby.players}
+                openSeats={openSeats}
+                deckState={deckState}
+                versionLabel={versionLabel}
+                selectingDeckSeats={selectingDeckSeats}
+                onSelectVersion={(seat, deckVersionId) => void chooseVersion(seat, deckVersionId)}
+                onEditAppearance={(seat, event) => {
+                  setAppearanceOrigin(
+                    event?.nativeEvent
+                      ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }
+                      : undefined,
+                  )
+                  setAppearanceDraft({
                     color: seat.color,
-                    ...(isPlayerMarkShape(seat.shape) ? { shape: seat.shape } : {}),
-                    controlledByMe: false,
+                    shape: isPlayerMarkShape(seat.shape) ? seat.shape : shapeForSeat(seat.seat),
                   })
-                : undefined
-            }
-          />
+                  setAppearanceSeat(seat.seat)
+                }}
+                onReport={(seat) =>
+                  seat.playerId
+                    ? setPlayerToReport({
+                        playerId: seat.playerId,
+                        seat: seat.seat,
+                        displayName: seat.displayName,
+                        color: seat.color,
+                        ...(isPlayerMarkShape(seat.shape) ? { shape: seat.shape } : {}),
+                        controlledByMe: false,
+                      })
+                    : undefined
+                }
+              />
+            )}
+          </LobbyDeckSource>
         </View>
       </ScrollView>
       <BottomActionBar>
@@ -415,6 +434,65 @@ export function ConnectedLobbyScreen({
           onClose={() => setPlayerToReport(undefined)}
         />
       ) : null}
+    </Screen>
+  )
+}
+
+function LobbyDeckSource({ children }: { children: (state: LobbyDeckState) => ReactNode }) {
+  return (
+    <ConvexQueryBoundary fallback={({ retry }) => children({ status: "error", retry })}>
+      <LobbyDeckQuery>{children}</LobbyDeckQuery>
+    </ConvexQueryBoundary>
+  )
+}
+
+function LobbyDeckQuery({ children }: { children: (state: LobbyDeckState) => ReactNode }) {
+  const result = useQuery(api.decks.listMine)
+  return children(remoteValue(result?.decks))
+}
+
+function LobbyStatusScreen({
+  message,
+  error = false,
+  retry,
+  onBack,
+}: {
+  message: string
+  error?: boolean
+  retry?: () => void
+  onBack?: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
+      <Header title="" leftTx={onBack ? "common:back" : undefined} onLeftPress={onBack} />
+      <ScrollView
+        style={$styles.flex1}
+        contentContainerStyle={themed($content)}
+        scrollEnabled={false}
+      >
+        <View style={themed($hero)}>
+          <Text preset="heading" text={LOBBY_TITLE} />
+          {error ? (
+            <AlertNote text={message} />
+          ) : (
+            <Text
+              accessibilityRole="progressbar"
+              accessibilityLiveRegion="polite"
+              size="sm"
+              style={themed($dimmed)}
+              text={message}
+            />
+          )}
+        </View>
+        <LobbySkeleton />
+        {error && retry ? (
+          <Button testID="retry-lobby-button" text="Try again" onPress={retry} />
+        ) : null}
+      </ScrollView>
+      <BottomActionBar>
+        <Button text="Start game" preset="reversed" style={themed($primaryAction)} disabled />
+      </BottomActionBar>
     </Screen>
   )
 }

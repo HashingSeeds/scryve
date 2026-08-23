@@ -135,6 +135,65 @@ describe("ConnectedLobbyScreen", () => {
     await act(async () => resolveSelection(undefined))
   })
 
+  it("reserves deck selector space while decks load independently", () => {
+    connectedHarness.decks = undefined
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      invitation: null,
+      players: connectedHarness.projection.players.map((player, index) => ({
+        ...player,
+        controlledByMe: index === 0,
+      })),
+    }
+
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    expect(screen.getByTestId("seat-1-deck-loading").props.accessibilityRole).toBe("progressbar")
+    expect(screen.getByText("Loading decks…")).toBeTruthy()
+    expect(screen.getByText("Ada")).toBeTruthy()
+  })
+
+  it("says that an empty deck list does not block play", () => {
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      invitation: null,
+      players: connectedHarness.projection.players.map((player, index) => ({
+        ...player,
+        controlledByMe: index === 0,
+      })),
+    }
+
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    expect(screen.getByTestId("seat-1-no-decks")).toHaveTextContent(
+      "No decks available. You can play without one.",
+    )
+  })
+
+  it("keeps the lobby usable and retries a failed deck query in place", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    connectedHarness.queryErrors.add("decks.listMine")
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      invitation: null,
+      players: connectedHarness.projection.players.map((player, index) => ({
+        ...player,
+        controlledByMe: index === 0,
+      })),
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    expect(screen.getByText("Decks unavailable. You can play without one.")).toBeTruthy()
+    expect(screen.getByText("Ada")).toBeTruthy()
+    connectedHarness.queryErrors.delete("decks.listMine")
+    fireEvent.press(screen.getByTestId("retry-seat-1-decks"))
+    expect(screen.getByTestId("seat-1-no-decks")).toBeTruthy()
+    consoleError.mockRestore()
+  })
+
   it("renders and shares the production HTTPS invite with an actionable manual fallback", async () => {
     const inviteToken = "A".repeat(43)
     connectedHarness.projection = {

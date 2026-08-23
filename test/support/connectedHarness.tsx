@@ -148,7 +148,10 @@ function defaultRuntime(): MockConnectedRuntime {
 
 export const connectedHarness: {
   activeGames: ActiveConnectedGame[]
+  activeGamesStatus: "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted"
+  paginatedError?: Error
   paginatedArgs: unknown[]
+  queryErrors: Set<string>
   projection: LobbyProjection
   runtime: MockConnectedRuntime
   socketConnected: boolean
@@ -157,10 +160,12 @@ export const connectedHarness: {
   userId?: string
   userLoaded: boolean
   migrationOwners: Set<string>
-  decks: SeatDeck[]
+  decks: SeatDeck[] | undefined
 } = {
   activeGames: [],
+  activeGamesStatus: "Exhausted",
   paginatedArgs: [],
+  queryErrors: new Set<string>(),
   projection: defaultProjection(),
   runtime: defaultRuntime(),
   socketConnected: true,
@@ -198,7 +203,10 @@ export function resetConnectedHarness() {
   mockFinish.mockReset().mockResolvedValue(true)
   mockUseConnectedGame.mockReset().mockImplementation(() => connectedHarness.runtime)
   connectedHarness.activeGames = []
+  connectedHarness.activeGamesStatus = "Exhausted"
+  connectedHarness.paginatedError = undefined
   connectedHarness.paginatedArgs = []
+  connectedHarness.queryErrors.clear()
   connectedHarness.projection = defaultProjection()
   connectedHarness.runtime = defaultRuntime()
   connectedHarness.socketConnected = true
@@ -251,16 +259,19 @@ export function createConvexReactMock() {
     },
     useQuery: (reference: unknown) => {
       const name = String(reference)
-      if (name.includes("listMine")) return { decks: connectedHarness.decks }
+      if (connectedHarness.queryErrors.has(name)) throw new Error(`${name} failed`)
+      if (name.includes("listMine"))
+        return connectedHarness.decks === undefined ? undefined : { decks: connectedHarness.decks }
       if (name.includes("entitlements.current"))
         return { fullHistory: false, unlimitedDecks: false, deckAnalytics: false }
       return connectedHarness.projection
     },
     usePaginatedQuery: (_reference: unknown, args: unknown) => {
       connectedHarness.paginatedArgs.push(args)
+      if (args !== "skip" && connectedHarness.paginatedError) throw connectedHarness.paginatedError
       return {
         results: args === "skip" ? [] : connectedHarness.activeGames,
-        status: "Exhausted",
+        status: args === "skip" ? "LoadingFirstPage" : connectedHarness.activeGamesStatus,
         loadMore: jest.fn(),
       }
     },
