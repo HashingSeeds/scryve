@@ -53,7 +53,8 @@ describe("SubscriptionControls", () => {
   it("sends a subscriber without Scryve Pro to the paywall", () => {
     const view = renderControls()
 
-    fireEvent.press(view.getByTestId("count-pro-paywall-button"))
+    expect(view.getByText("Free plan")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("View Scryve Pro options"))
 
     expect(presentPaywall).toHaveBeenCalledTimes(1)
     expect(presentCustomerCenter).not.toHaveBeenCalled()
@@ -71,7 +72,7 @@ describe("SubscriptionControls", () => {
     expect(
       view.getByText(`Renews ${new Date("2026-09-01T00:00:00Z").toLocaleDateString()}`),
     ).toBeTruthy()
-    fireEvent.press(view.getByTestId("count-pro-customer-center-button"))
+    fireEvent.press(view.getByLabelText("Manage Scryve Pro subscription"))
 
     expect(presentCustomerCenter).toHaveBeenCalledTimes(1)
     expect(presentPaywall).not.toHaveBeenCalled()
@@ -104,6 +105,7 @@ describe("SubscriptionControls", () => {
     fireEvent.press(view.getByTestId("count-pro-paywall-button"))
 
     expect(presentPaywall).not.toHaveBeenCalled()
+    expect(view.getByText("Checking access…")).toBeTruthy()
     expect(view.getByLabelText("Loading Scryve Pro")).toBeTruthy()
   })
 
@@ -119,6 +121,8 @@ describe("SubscriptionControls", () => {
   it("surfaces billing errors to the subscriber", () => {
     mockBilling.error = "The purchase could not be completed."
 
-    expect(renderControls().getByText("The purchase could not be completed.")).toBeTruthy()
+    const view = renderControls()
+    expect(view.getByText("Status unavailable")).toBeTruthy()
+    expect(view.getByText("The purchase could not be completed.")).toBeTruthy()
   })
 })

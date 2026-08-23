@@ -17,6 +17,15 @@ export function SubscriptionControls() {
   const expiration = entitlement?.expirationDate
     ? new Date(entitlement.expirationDate).toLocaleDateString()
     : null
+  const accessStatus = billing.isLoading
+    ? "Checking access…"
+    : billing.isCountPro
+      ? expiration
+        ? `${entitlement?.willRenew ? "Renews" : "Available until"} ${expiration}`
+        : "Lifetime access"
+      : billing.error && !billing.customerInfo
+        ? "Status unavailable"
+        : "Free plan"
 
   return (
     <View
@@ -24,15 +33,12 @@ export function SubscriptionControls() {
     >
       <View style={$headingText}>
         <Text preset="subheading" text="Scryve Pro" accessibilityRole="header" />
-        {billing.isCountPro && entitlement ? (
+        {billing.configured ? (
           <Text
             size="xs"
             style={themed($muted)}
-            text={
-              expiration
-                ? `${entitlement.willRenew ? "Renews" : "Available until"} ${expiration}`
-                : "Lifetime access"
-            }
+            text={accessStatus}
+            accessibilityLiveRegion={billing.isLoading ? "polite" : undefined}
           />
         ) : null}
       </View>
@@ -43,6 +49,9 @@ export function SubscriptionControls() {
             billing.isCountPro ? "count-pro-customer-center-button" : "count-pro-paywall-button"
           }
           text={billing.isCountPro ? "Manage" : "View options"}
+          accessibilityLabel={
+            billing.isCountPro ? "Manage Scryve Pro subscription" : "View Scryve Pro options"
+          }
           preset="reversed"
           disabled={billing.isLoading}
           style={themed($button)}
