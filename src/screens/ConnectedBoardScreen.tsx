@@ -50,7 +50,13 @@ const BOARD_SHELL_ROWS = [
   [2, 3],
 ]
 
-function ConnectedBoardShell({ state }: { state: ConnectedBoardShellState }) {
+function ConnectedBoardShell({
+  state,
+  onBack,
+}: {
+  state: ConnectedBoardShellState
+  onBack?: () => void
+}) {
   const { themed } = useAppTheme()
   const unavailable = state.status === "unavailable"
 
@@ -114,6 +120,16 @@ function ConnectedBoardShell({ state }: { state: ConnectedBoardShellState }) {
                 onPress={state.retry}
               />
             ) : null}
+            {unavailable && onBack ? (
+              <Button
+                testID="back-from-connected-board-button"
+                accessibilityLabel="Back to local play"
+                text="Back"
+                style={themed($statusAction)}
+                textStyle={themed($statusActionText)}
+                onPress={onBack}
+              />
+            ) : null}
           </View>
         </View>
       </View>
@@ -131,6 +147,7 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
     return (
       <ConnectedBoardShell
         state={{ status: "unavailable", message: "Connected session unavailable" }}
+        onBack={props.onBack}
       />
     )
   const ownerId = user.id
@@ -141,6 +158,7 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
       fallback={({ retry }) => (
         <ConnectedBoardShell
           state={{ status: "unavailable", message: "Connected board unavailable", retry }}
+          onBack={props.onBack}
         />
       )}
     >

@@ -495,12 +495,13 @@ describe("ConnectedBoardScreen", () => {
 
   it("retries a thrown board query without replacing the player-grid shell", () => {
     const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    const onBack = jest.fn()
     let unavailable = true
     mockUseConnectedGame.mockImplementation(() => {
       if (unavailable) throw new Error("Game unavailable")
       return connectedHarness.runtime
     })
-    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
 
     expect(view.getByText("Connected board unavailable")).toBeTruthy()
     expect(
@@ -509,6 +510,8 @@ describe("ConnectedBoardScreen", () => {
     expect(
       StyleSheet.flatten(view.getByTestId("connected-board-status-layer").props.style),
     ).toMatchObject({ position: "absolute" })
+    fireEvent.press(view.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalledTimes(1)
 
     unavailable = false
     fireEvent.press(view.getByTestId("retry-connected-board-button"))
@@ -517,9 +520,23 @@ describe("ConnectedBoardScreen", () => {
     consoleError.mockRestore()
   })
 
+  it("offers a way back to local play when the Clerk session is signed out", () => {
+    const onBack = jest.fn()
+    connectedHarness.userId = undefined
+
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+
+    expect(screen.getByText("Connected session unavailable")).toBeTruthy()
+    expect(screen.getByLabelText("Back to local play")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(mockUseConnectedGame).not.toHaveBeenCalled()
+  })
+
   it("does not mount a runtime before Clerk hydration and keeps the board shell stable", () => {
+    const onBack = jest.fn()
     connectedHarness.userLoaded = false
-    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
     expect(screen.getByText("Checking connected session…")).toBeTruthy()
     expect(
       screen.getAllByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
@@ -529,6 +546,7 @@ describe("ConnectedBoardScreen", () => {
     ).toMatchObject({ position: "absolute" })
     expect(mockUseConnectedGame).not.toHaveBeenCalled()
     expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
+    expect(screen.queryByTestId("back-from-connected-board-button")).toBeNull()
     connectedHarness.userLoaded = true
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(mockUseConnectedGame).toHaveBeenCalledWith("game-public", "user-a")
