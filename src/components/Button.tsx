@@ -18,7 +18,7 @@ type Presets = "default" | "filled" | "reversed"
 type ButtonTextProps = Omit<AppTextProps, "tx" | "text" | "txOptions" | "children">
 
 export interface ButtonAccessoryProps {
-  style: StyleProp<any>
+  style: StyleProp<ViewStyle>
   pressableState: PressableStateCallbackType
   disabled?: boolean
 }
@@ -163,7 +163,11 @@ export function Button(props: ButtonProps) {
       {(state) => (
         <>
           {!!LeftAccessory && (
-            <LeftAccessory style={$leftAccessoryStyle} pressableState={state} disabled={disabled} />
+            <LeftAccessory
+              style={themed($leftAccessoryStyle)}
+              pressableState={state}
+              disabled={disabled}
+            />
           )}
 
           <Text
@@ -178,7 +182,7 @@ export function Button(props: ButtonProps) {
 
           {!!RightAccessory && (
             <RightAccessory
-              style={$rightAccessoryStyle}
+              style={themed($rightAccessoryStyle)}
               pressableState={state}
               disabled={disabled}
             />

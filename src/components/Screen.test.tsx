@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet } from "react-native"
-import { render } from "@testing-library/react-native"
+import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -21,5 +21,26 @@ describe("Screen", () => {
       paddingHorizontal: 24,
       paddingBottom: 32,
     })
+  })
+
+  it("recalculates auto scrolling after its threshold changes", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <Screen preset="auto" scrollEnabledToggleThreshold={{ percent: 0.92 }} />
+      </ThemeProvider>,
+    )
+
+    const scrollView = view.UNSAFE_getByType(ScrollView)
+    fireEvent(scrollView, "layout", { nativeEvent: { layout: { height: 100 } } })
+    fireEvent(scrollView, "contentSizeChange", 100, 95)
+    expect(scrollView.props.scrollEnabled).toBe(true)
+
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <Screen preset="auto" scrollEnabledToggleThreshold={{ percent: 1 }} />
+      </ThemeProvider>,
+    )
+
+    expect(view.UNSAFE_getByType(ScrollView).props.scrollEnabled).toBe(false)
   })
 })

@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native"
+import { StyleSheet, View } from "react-native"
 import { render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -64,6 +64,20 @@ describe("Button", () => {
     expect(view.getByTestId("selected-disabled-button").props.accessibilityState).toEqual({
       selected: true,
       disabled: true,
+    })
+  })
+
+  it("passes resolved view styles to accessories", () => {
+    const accessory = jest.fn(({ style }) => <View testID="button-accessory" style={style} />)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <Button text="Continue" RightAccessory={accessory} />
+      </ThemeProvider>,
+    )
+
+    expect(StyleSheet.flatten(view.getByTestId("button-accessory").props.style)).toMatchObject({
+      marginStart: 8,
+      zIndex: 1,
     })
   })
 
