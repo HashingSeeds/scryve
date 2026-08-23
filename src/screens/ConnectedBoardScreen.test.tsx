@@ -102,7 +102,8 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.getByTestId("connected-game-board")).toBeTruthy()
-    openConnectedStatus()
+    expect(screen.getByText("1 change needs attention")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("review-connected-sync-button"))
     expect(screen.getByLabelText("Needs attention, 1 failed change, 1 change pending")).toBeTruthy()
     expect(screen.getByTestId("connected-failed-action").props.accessibilityRole).toBe("alert")
     fireEvent.press(screen.getByText("Dismiss after reviewing"))
@@ -116,9 +117,39 @@ describe("ConnectedBoardScreen", () => {
         "The offline queue for pending changes is full. Reconnect and sync before making more changes.",
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    openConnectedStatus()
+    expect(screen.getByTestId("connected-sync-toast").props.accessibilityRole).toBe("alert")
+    fireEvent.press(screen.getByTestId("review-connected-sync-button"))
     expect(screen.getByTestId("connected-change-error").props.accessibilityRole).toBe("alert")
     expect(screen.getByText(/Reconnect and sync/i)).toBeTruthy()
+  })
+
+  it("layers queued and syncing status over the board, then dismisses sync success", () => {
+    jest.useFakeTimers()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      connectionStatus: "offline",
+      pending: [{ event: { operationId: "operation-1", playerId: "player-1" } }],
+    }
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(
+      StyleSheet.flatten(screen.getByTestId("connected-sync-toast-layer").props.style),
+    ).toMatchObject({ position: "absolute" })
+    expect(screen.getByText("1 change queued")).toBeTruthy()
+
+    connectedHarness.runtime = { ...connectedHarness.runtime, connectionStatus: "syncing" }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.getByText("Syncing 1 change\u2026")).toBeTruthy()
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      connectionStatus: "connected",
+      pending: [],
+    }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.getByText("Changes synced")).toBeTruthy()
+    act(() => jest.advanceTimersByTime(2_500))
+    expect(screen.queryByTestId("connected-sync-toast")).toBeNull()
+    jest.useRealTimers()
   })
 
   it("renders a resumed finished summary read-only with the shared menu actions disabled", () => {
@@ -225,6 +256,27 @@ describe("ConnectedBoardScreen", () => {
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
   })
 
+  it("submits connected finish only once while the mutation is pending", async () => {
+    let resolveFinish: (finished: boolean) => void = () => undefined
+    mockFinish.mockReturnValueOnce(
+      new Promise<boolean>((resolve) => {
+        resolveFinish = resolve
+      }),
+    )
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, isHost: true },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedFinish()
+    fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+    fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+    expect(mockFinish).toHaveBeenCalledTimes(1)
+
+    await act(async () => resolveFinish(true))
+    await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+  })
+
   it("keeps connected finish unavailable while offline or life changes are pending", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -271,7 +323,7 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByText("Ending…")).toBeTruthy()
   })
 
-  it("surfaces a connected finish mutation error and keeps recovery/navigation available", async () => {
+  it("keeps finish confirmation open and shows a mutation error there", async () => {
     const onHistory = jest.fn()
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -282,9 +334,11 @@ describe("ConnectedBoardScreen", () => {
         <ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} onHistory={onHistory} />,
       ),
     )
+    mockFinish.mockResolvedValueOnce(false)
     openConnectedFinish()
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
-    await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+    await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId("connected-finish-confirmation")).toBeTruthy()
 
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -295,12 +349,9 @@ describe("ConnectedBoardScreen", () => {
         <ConnectedBoardScreen publicId="game-public" onBack={jest.fn()} onHistory={onHistory} />,
       ),
     )
-    openConnectedStatus()
     expect(screen.getByTestId("connected-finish-error").props.accessibilityRole).toBe("alert")
     expect(screen.getByText("Could not finish the game")).toBeTruthy()
-    fireEvent.press(screen.getByText("Close"))
-    openConnectedMenu()
-    expect(screen.getByTestId("finish-connected-game-button")).toBeTruthy()
+    expect(screen.getByTestId("confirm-connected-finish-button")).toBeTruthy()
     expect(onHistory).not.toHaveBeenCalled()
   })
 

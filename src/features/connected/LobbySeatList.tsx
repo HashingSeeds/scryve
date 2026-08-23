@@ -32,6 +32,7 @@ export function LobbySeatList({
   openSeats,
   decks,
   versionLabel,
+  selectingDeckSeats,
   onSelectVersion,
   onReport,
   onEditAppearance,
@@ -40,6 +41,7 @@ export function LobbySeatList({
   openSeats: number
   decks?: SeatDeck[]
   versionLabel: (version: { versionNumber: number; name?: string }) => string
+  selectingDeckSeats?: ReadonlySet<number>
   onSelectVersion: (seat: number, deckVersionId: string) => void
   onReport: (seat: LobbySeat) => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
@@ -55,6 +57,7 @@ export function LobbySeatList({
           (version) => version._id === seat.deckVersionId,
         )
         const deckReady = Boolean(seat.deckVersionId)
+        const selectingDeck = selectingDeckSeats?.has(seat.seat) ?? false
         return (
           <View key={seat.playerId ?? `seat-${seat.seat}`} style={themed($seat)}>
             <View style={themed($seatRow)}>
@@ -113,7 +116,7 @@ export function LobbySeatList({
                   accessibilityLabel="Deck"
                   chips={decks
                     .filter((deck) => deck.versions.length > 0)
-                    .map((deck) => ({ id: deck._id, label: deck.name }))}
+                    .map((deck) => ({ id: deck._id, label: deck.name, disabled: selectingDeck }))}
                   selectedId={chosenDeck?._id ?? ""}
                   onSelect={(deckId) => {
                     const deck = decks.find((candidate) => candidate._id === deckId)
@@ -128,9 +131,20 @@ export function LobbySeatList({
                     chips={chosenDeck.versions.map((version) => ({
                       id: version._id,
                       label: versionLabel(version),
+                      disabled: selectingDeck,
                     }))}
                     selectedId={seat.deckVersionId ?? ""}
                     onSelect={(versionId) => onSelectVersion(seat.seat, versionId)}
+                  />
+                ) : null}
+                {selectingDeck ? (
+                  <Text
+                    testID={`seat-${seat.seat}-deck-selection-status`}
+                    accessibilityRole="text"
+                    accessibilityLiveRegion="polite"
+                    size="xxs"
+                    style={themed($seatPending)}
+                    text="Selecting deck…"
                   />
                 ) : null}
               </View>

@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
+import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { ConnectionBadge } from "@/components/ConnectionBadge"
@@ -20,6 +21,7 @@ import {
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { ConnectedBoardSyncToast } from "@/features/connected/ConnectedBoardSyncToast"
 import {
   PlayerActionsDialog,
   type ReportablePlayer,
@@ -79,6 +81,7 @@ function ConnectedBoardRuntime({
   const [drawSelected, setDrawSelected] = useState(false)
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
+  const finishSubmitInFlight = useRef(false)
   const game = runtime.projection
 
   function toggleWinner(playerId: string) {
@@ -237,6 +240,16 @@ function ConnectedBoardRuntime({
           actions={radialActions}
           onToggle={() => setMenuOpen((current) => !current)}
           onClose={() => setMenuOpen(false)}
+        />
+        <ConnectedBoardSyncToast
+          connectionStatus={runtime.connectionStatus}
+          pendingCount={runtime.pending.length}
+          failedCount={runtime.failed.length}
+          changeError={runtime.changeError}
+          onReview={() => {
+            setMenuOpen(false)
+            setStatusOpen(true)
+          }}
         />
       </View>
 
@@ -409,6 +422,9 @@ function ConnectedBoardRuntime({
               onPress={selectDraw}
             />
           </View>
+          {runtime.finishError ? (
+            <AlertNote testID="connected-finish-error" text={runtime.finishError} />
+          ) : null}
           <View style={themed($dialogActions)}>
             <Button
               testID="cancel-connected-finish-button"
@@ -423,12 +439,18 @@ function ConnectedBoardRuntime({
               preset="reversed"
               disabled={runtime.finishing || Boolean(finishBlockedReason)}
               style={themed($dialogAction)}
-              onPress={() => {
+              onPress={async () => {
+                if (finishSubmitInFlight.current) return
+                finishSubmitInFlight.current = true
                 const result =
                   winnerPlayerIds.length > 0
                     ? { kind: "win" as const, winnerPlayerIds }
                     : { kind: drawSelected ? ("draw" as const) : ("unknown" as const) }
-                void runtime.finish(result).finally(() => setConfirmingFinish(false))
+                try {
+                  if (await runtime.finish(result)) setConfirmingFinish(false)
+                } finally {
+                  finishSubmitInFlight.current = false
+                }
               }}
             />
           </View>

@@ -93,6 +93,10 @@ export function ConnectedLobbyScreen({
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
   const [savingAppearance, setSavingAppearance] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [selectingDeckSeats, setSelectingDeckSeats] = useState<ReadonlySet<number>>(new Set())
+  const startInFlight = useRef(false)
+  const selectingDeckSeatsInFlight = useRef(new Set<number>())
   const didNavigateToGame = useRef(false)
 
   useEffect(() => {
@@ -112,11 +116,37 @@ export function ConnectedLobbyScreen({
   const manualCode = lobby?.invitation?.manualCode
 
   async function chooseVersion(seat: number, deckVersionId: string) {
+    if (selectingDeckSeatsInFlight.current.has(seat)) return
+    selectingDeckSeatsInFlight.current.add(seat)
+    setSelectingDeckSeats(new Set(selectingDeckSeatsInFlight.current))
     try {
       setActionError(undefined)
       await selectDeck({ publicId, seat, deckVersionId: deckVersionId as Id<"deckVersions"> })
     } catch (cause) {
       setActionError(convexErrorMessage(cause, "Could not select deck"))
+    } finally {
+      selectingDeckSeatsInFlight.current.delete(seat)
+      setSelectingDeckSeats(new Set(selectingDeckSeatsInFlight.current))
+    }
+  }
+
+  async function startGame() {
+    if (startInFlight.current) return
+    if (!isWebSocketConnected) {
+      setActionError(onlineOnlyNotice("start"))
+      return
+    }
+
+    startInFlight.current = true
+    setStarting(true)
+    try {
+      setActionError(undefined)
+      await start({ publicId })
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Could not start the game")
+    } finally {
+      startInFlight.current = false
+      setStarting(false)
     }
   }
 
@@ -200,7 +230,7 @@ export function ConnectedLobbyScreen({
   const everySeatClaimed = claimedSeats === lobby.playerCount
   const exitAction: LobbyExitAction = lobby.isHost ? "abandon" : "leave"
   const exitCopy = lobbyExitCopy(exitAction)
-  const startBlocked = !everySeatClaimed || !isWebSocketConnected
+  const startBlocked = !everySeatClaimed || !isWebSocketConnected || starting
   const openExitCopy = leaveAction ? lobbyExitCopy(leaveAction) : undefined
   const takenAppearances = lobby.players
     .filter((player) => player.seat !== appearanceSeat)
@@ -246,6 +276,7 @@ export function ConnectedLobbyScreen({
             openSeats={openSeats}
             decks={decks}
             versionLabel={versionLabel}
+            selectingDeckSeats={selectingDeckSeats}
             onSelectVersion={(seat, deckVersionId) => void chooseVersion(seat, deckVersionId)}
             onEditAppearance={(seat, event) => {
               setAppearanceOrigin(
@@ -285,24 +316,11 @@ export function ConnectedLobbyScreen({
           <>
             <Button
               testID="start-connected-game-button"
-              text="Start game"
+              text={starting ? "Starting\u2026" : "Start game"}
               preset="reversed"
               style={themed($primaryAction)}
               disabled={startBlocked}
-              onPress={async () => {
-                if (!isWebSocketConnected) {
-                  setActionError(onlineOnlyNotice("start"))
-                  return
-                }
-                try {
-                  setActionError(undefined)
-                  await start({ publicId })
-                } catch (cause) {
-                  setActionError(
-                    cause instanceof Error ? cause.message : "Could not start the game",
-                  )
-                }
-              }}
+              onPress={() => void startGame()}
             />
             {!everySeatClaimed && isWebSocketConnected ? (
               <Text

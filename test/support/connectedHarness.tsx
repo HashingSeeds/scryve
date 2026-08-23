@@ -33,6 +33,12 @@ type LobbyProjection = {
   players: LobbyPlayer[]
 }
 
+type SeatDeck = {
+  _id: string
+  name: string
+  versions: { _id: string; versionNumber: number; name?: string }[]
+}
+
 type RuntimePlayer = Required<Pick<LobbyPlayer, "playerId" | "controlledByMe" | "currentLife">> &
   Omit<LobbyPlayer, "playerId" | "controlledByMe" | "currentLife"> & {
     pendingDelta: number
@@ -72,6 +78,7 @@ export const mockStart = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockLeave = jest.fn(async () => ({ publicId: "game-public", left: true }))
 export const mockAbandon = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockSetAppearance = jest.fn(async () => ({ color: "#41476E", shape: "square" }))
+export const mockSelectDeck = jest.fn(async () => undefined)
 export const mockCreateLobby = jest.fn(async () => ({
   publicId: "new-game",
   inviteToken: "A".repeat(43),
@@ -82,7 +89,7 @@ export const mockReportPlayer = jest.fn(async () => ({ blocked: true, held: fals
 export const mockBlockPlayer = jest.fn(async () => ({ blocked: true }))
 export const mockChangeLife = jest.fn()
 export const mockDismissFailed = jest.fn()
-export const mockFinish = jest.fn(async () => undefined)
+export const mockFinish = jest.fn(async () => true)
 
 function defaultProjection(): LobbyProjection {
   return {
@@ -148,6 +155,7 @@ export const connectedHarness: {
   userId: string
   userLoaded: boolean
   migrationOwners: Set<string>
+  decks: SeatDeck[]
 } = {
   activeGames: [],
   paginatedArgs: [],
@@ -157,6 +165,7 @@ export const connectedHarness: {
   userId: "user-a",
   userLoaded: true,
   migrationOwners: new Set<string>(),
+  decks: [],
 }
 
 export const mockUseConnectedGame = jest.fn(
@@ -171,6 +180,7 @@ export function resetConnectedHarness() {
   mockLeave.mockReset().mockResolvedValue({ publicId: "game-public", left: true })
   mockAbandon.mockReset().mockResolvedValue({ publicId: "game-public" })
   mockSetAppearance.mockReset().mockResolvedValue({ color: "#41476E", shape: "square" })
+  mockSelectDeck.mockReset().mockResolvedValue(undefined)
   mockCreateLobby.mockReset().mockResolvedValue({
     publicId: "new-game",
     inviteToken: "A".repeat(43),
@@ -181,7 +191,7 @@ export function resetConnectedHarness() {
   mockBlockPlayer.mockReset().mockResolvedValue({ blocked: true })
   mockChangeLife.mockReset()
   mockDismissFailed.mockReset()
-  mockFinish.mockReset().mockResolvedValue(undefined)
+  mockFinish.mockReset().mockResolvedValue(true)
   mockUseConnectedGame.mockReset().mockImplementation(() => connectedHarness.runtime)
   connectedHarness.activeGames = []
   connectedHarness.paginatedArgs = []
@@ -191,6 +201,7 @@ export function resetConnectedHarness() {
   connectedHarness.userId = "user-a"
   connectedHarness.userLoaded = true
   connectedHarness.migrationOwners.clear()
+  connectedHarness.decks = []
 }
 
 export function createClerkMock() {
@@ -218,6 +229,7 @@ export function createConvexReactMock() {
       if (name.includes("leaveMyGame")) return mockLeave
       if (name.includes("abandonGame")) return mockAbandon
       if (name.includes("setMyAppearance")) return mockSetAppearance
+      if (name.includes("selectForSeat")) return mockSelectDeck
       if (name.includes("createLobby")) return mockCreateLobby
       if (name.includes("migrateMyGameMemberships") || name.includes("migrateMyHistoryEntries"))
         return mockMigrate
@@ -227,7 +239,7 @@ export function createConvexReactMock() {
     },
     useQuery: (reference: unknown) => {
       const name = String(reference)
-      if (name.includes("listMine")) return []
+      if (name.includes("listMine")) return { decks: connectedHarness.decks }
       if (name.includes("entitlements.current"))
         return { fullHistory: false, unlimitedDecks: false, deckAnalytics: false }
       return connectedHarness.projection
