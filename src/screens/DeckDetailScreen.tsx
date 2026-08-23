@@ -21,11 +21,12 @@ import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { cardCountLabel, recordLine } from "@/features/decks/deckCopy"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
-import { convexErrorMessage } from "@/utils/convexError"
+import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
@@ -99,15 +100,148 @@ export type DeckDetailSummary = {
   cardQuantity?: number
 }
 
-export function DeckDetailScreen({
-  deckId,
-  summary,
-  onBack,
-}: {
+type DeckDetailScreenProps = {
   deckId: string
   summary?: DeckDetailSummary
   onBack: () => void
+}
+
+function DeckDetailPlaceholder({
+  summary,
+  onBack,
+  failure,
+}: {
+  summary?: DeckDetailSummary
+  onBack: () => void
+  failure?: { kind: "missing" | "unavailable"; retry: () => void }
 }) {
+  const { themed } = useAppTheme()
+  const loadingGameLabel = summary ? (deckGame(summary.game)?.shortLabel ?? summary.game) : null
+  const loadingMetadata = summary
+    ? [
+        loadingGameLabel,
+        deckFormatLabel(summary.game, summary.format),
+        summary.cardQuantity !== undefined ? cardCountLabel(summary.cardQuantity) : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null
+  const loadingSections = summary ? deckSections(summary.game, summary.format) : []
+  const statusText = failure?.kind === "missing" ? "Deck not found" : "Deck unavailable"
+
+  return (
+    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
+      <Header
+        title=""
+        leftTx="common:back"
+        onLeftPress={onBack}
+        RightActionComponent={
+          <View style={themed($headerAction)}>
+            <Text size="lg" text="•••" />
+          </View>
+        }
+      />
+      <ScrollView
+        style={$styles.flex1}
+        contentContainerStyle={themed($loadingContent)}
+        scrollEnabled={false}
+      >
+        <View style={themed($headerBlock)}>
+          <View style={themed($titleBlock)}>
+            <Text preset="heading" text={summary?.name ?? "Deck"} />
+            {loadingMetadata ? (
+              <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
+            ) : null}
+            <DeckLoadingProgress
+              state={failure ? "unavailable" : "loading"}
+              accessibilityText={failure ? statusText : "Loading deck"}
+            />
+          </View>
+          <View style={themed($tabs)} accessibilityRole="tablist">
+            {(["cards", "versions", "notes"] as const).map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                testID={`deck-tab-${tab}`}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: tab === "cards", disabled: true }}
+                style={[themed($tab), tab === "cards" && themed($selectedTab)]}
+                disabled
+              >
+                <Text
+                  size="sm"
+                  weight={tab === "cards" ? "bold" : "normal"}
+                  text={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity
+            testID="current-version-button"
+            style={themed($currentVersion)}
+            disabled
+          >
+            <Text size="xs" style={themed($dimmedText)} text="Version" />
+            <Text weight="medium" text="Current  ›" />
+          </TouchableOpacity>
+          {failure ? (
+            <View style={themed($queryFailure)}>
+              <Text preset="subheading" text={statusText} />
+              <Text
+                size="sm"
+                style={themed($dimmedText)}
+                text={
+                  failure.kind === "missing"
+                    ? "This deck may have been deleted."
+                    : "Could not load this deck."
+                }
+              />
+              {failure.kind === "unavailable" ? (
+                <Button testID="retry-deck-detail" text="Retry" onPress={failure.retry} />
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+        <DeckListSkeleton sections={loadingSections} density="comfortable" />
+      </ScrollView>
+      <BottomActionBar>
+        <View style={themed($actionRow)}>
+          <Button
+            testID="edit-deck-button"
+            text="Edit list"
+            preset="reversed"
+            style={$actionButton}
+            disabled
+          />
+        </View>
+      </BottomActionBar>
+    </Screen>
+  )
+}
+
+export function DeckDetailScreen(props: DeckDetailScreenProps) {
+  return (
+    <ConvexQueryBoundary
+      resetKey={props.deckId}
+      fallback={({ error, retry }) => (
+        <DeckDetailPlaceholder
+          summary={props.summary}
+          onBack={props.onBack}
+          failure={{
+            kind:
+              convexErrorCode(error) === "deck_not_found" || /deck not found/i.test(error.message)
+                ? "missing"
+                : "unavailable",
+            retry,
+          }}
+        />
+      )}
+    >
+      <DeckDetailContent {...props} />
+    </ConvexQueryBoundary>
+  )
+}
+
+function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   const { themed } = useAppTheme()
   const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
   const detail = useQuery(api.decks.detail, {
@@ -339,90 +473,7 @@ export function DeckDetailScreen({
     )
   }
 
-  const loadingGameLabel = summary ? (deckGame(summary.game)?.shortLabel ?? summary.game) : null
-  const loadingMetadata = summary
-    ? [
-        loadingGameLabel,
-        deckFormatLabel(summary.game, summary.format),
-        summary.cardQuantity !== undefined ? cardCountLabel(summary.cardQuantity) : undefined,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : null
-  const loadingSections = summary ? deckSections(summary.game, summary.format) : []
-
-  if (!detail)
-    return (
-      <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-        <Header
-          title=""
-          leftTx="common:back"
-          onLeftPress={onBack}
-          RightActionComponent={
-            <View style={themed($headerAction)}>
-              <Text size="lg" text="•••" />
-            </View>
-          }
-        />
-        <ScrollView
-          style={$styles.flex1}
-          contentContainerStyle={themed($loadingContent)}
-          scrollEnabled={false}
-        >
-          <View style={themed($headerBlock)}>
-            <View style={themed($titleBlock)}>
-              <Text preset="heading" text={summary?.name ?? "Deck"} />
-              {loadingMetadata ? (
-                <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
-              ) : null}
-              <LoadingProgress
-                testID="deck-loading-progress"
-                state="loading"
-                accessibilityText="Loading deck"
-              />
-            </View>
-            <View style={themed($tabs)} accessibilityRole="tablist">
-              {(["cards", "versions", "notes"] as const).map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  testID={`deck-tab-${tab}`}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: tab === "cards", disabled: true }}
-                  style={[themed($tab), tab === "cards" && themed($selectedTab)]}
-                  disabled
-                >
-                  <Text
-                    size="sm"
-                    weight={tab === "cards" ? "bold" : "normal"}
-                    text={tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity
-              testID="current-version-button"
-              style={themed($currentVersion)}
-              disabled
-            >
-              <Text size="xs" style={themed($dimmedText)} text="Version" />
-              <Text weight="medium" text="Current  ›" />
-            </TouchableOpacity>
-          </View>
-          <DeckListSkeleton sections={loadingSections} density="comfortable" />
-        </ScrollView>
-        <BottomActionBar>
-          <View style={themed($actionRow)}>
-            <Button
-              testID="edit-deck-button"
-              text="Edit list"
-              preset="reversed"
-              style={$actionButton}
-              disabled
-            />
-          </View>
-        </BottomActionBar>
-      </Screen>
-    )
+  if (!detail) return <DeckDetailPlaceholder summary={summary} onBack={onBack} />
 
   const deckRecord = recordLine(detail.record)
   const gameLabel = deckGame(detail.deck.game)?.shortLabel ?? detail.deck.game
@@ -842,6 +893,10 @@ const $loadingContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.lg,
 })
 const $block: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $queryFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
+  alignItems: "flex-start",
+})
 const $headerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $titleBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $tabs: ThemedStyle<ViewStyle> = ({ colors }) => ({

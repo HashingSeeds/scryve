@@ -43,7 +43,7 @@ const standardDeck = {
   coverImageUrl: undefined,
 }
 
-const mockListMine: { value: ShelfState | undefined } = {
+const mockListMine: { value: ShelfState | undefined; error?: Error } = {
   value: {
     decks: [commanderDeck, standardDeck],
     capacity: { used: 2, limit: 100, premium: true, canCreate: true },
@@ -52,7 +52,10 @@ const mockListMine: { value: ShelfState | undefined } = {
 }
 
 jest.mock("convex/react", () => ({
-  useQuery: () => mockListMine.value,
+  useQuery: () => {
+    if (mockListMine.error) throw mockListMine.error
+    return mockListMine.value
+  },
 }))
 
 jest.mock("../../convex/_generated/api", () => ({
@@ -79,6 +82,7 @@ describe("DecksScreen", () => {
       capacity: { used: 2, limit: 100, premium: true, canCreate: true },
       analyticsLocked: false,
     }
+    mockListMine.error = undefined
   })
 
   it("shows dense rows with format, size, versions, and record", () => {
@@ -164,5 +168,22 @@ describe("DecksScreen", () => {
     const view = renderShelf()
     expect(view.queryByText(/Premium/)).toBeNull()
     expect(view.getByTestId("add-deck-tile")).toBeEnabled()
+  })
+
+  it("keeps shelf controls mounted and retries a failed deck query", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    mockListMine.error = new Error("Network unavailable")
+    const view = renderShelf()
+
+    expect(view.getByText("Decks")).toBeTruthy()
+    expect(view.getByTestId("deck-search-input")).toBeTruthy()
+    expect(view.getByTestId("deck-filter-button")).toBeTruthy()
+    expect(view.getByText("Decks unavailable")).toBeTruthy()
+
+    mockListMine.error = undefined
+    fireEvent.press(view.getByTestId("retry-decks"))
+    expect(view.getByText("Existing Deck")).toBeTruthy()
+    expect(view.queryByTestId("decks-unavailable")).toBeNull()
+    consoleError.mockRestore()
   })
 })

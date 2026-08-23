@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
+import type { FunctionReturnType } from "convex/server"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -17,6 +18,7 @@ import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { useAppTheme } from "@/theme/context"
@@ -35,6 +37,10 @@ import {
 } from "../../convex/lib/deckGames"
 
 type CreationMode = "precon" | "paste" | "blank"
+
+type DeckCapacity = FunctionReturnType<typeof api.decks.listMine>["capacity"]
+
+type CapacityState = { status: "checking" } | { status: "ready"; capacity: DeckCapacity }
 
 const MODES: Array<{ id: CreationMode; label: string }> = [
   { id: "precon", label: "Official precon" },
@@ -80,6 +86,35 @@ type ResolvedPreconstructedDeck = {
   name: string
   unresolved: string[]
   cards: ImportedCard[]
+}
+
+function CapacityQuery({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {
+  const { themed } = useAppTheme()
+  const mine = useQuery(api.decks.listMine)
+
+  useEffect(() => {
+    if (mine) onReady(mine.capacity)
+  }, [mine, onReady])
+
+  return mine ? null : <Text size="xs" style={themed($label)} text="Checking deck limit…" />
+}
+
+function DeckCapacityStatus({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {
+  const { themed } = useAppTheme()
+  return (
+    <View testID="deck-capacity-status" style={themed($capacityStatus)}>
+      <ConvexQueryBoundary
+        fallback={({ retry }) => (
+          <View style={themed($inlineStatus)}>
+            <Text size="xs" style={themed($label)} text="Deck limit unavailable." />
+            <Button testID="retry-deck-capacity" text="Retry" onPress={retry} />
+          </View>
+        )}
+      >
+        <CapacityQuery onReady={onReady} />
+      </ConvexQueryBoundary>
+    </View>
+  )
 }
 
 function importCards(cards: ImportedCard[]) {
@@ -135,9 +170,10 @@ export function AddDeckScreen({
   onCreated: (deckId: string) => void
 }) {
   const { themed } = useAppTheme()
-  const mine = useQuery(api.decks.listMine)
-  const capacity = mine?.capacity
-  const atCapacity = capacity !== undefined && !capacity.canCreate
+  const [capacityState, setCapacityState] = useState<CapacityState>({ status: "checking" })
+  const capacity = capacityState.status === "ready" ? capacityState.capacity : undefined
+  const capacityReady = capacityState.status === "ready"
+  const atCapacity = capacity?.canCreate === false
   const createDeck = useMutation(api.decks.create)
   const createImportedDeck = useMutation(api.decks.importResolved)
   const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
@@ -167,9 +203,15 @@ export function AddDeckScreen({
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string>()
+  const [previewError, setPreviewError] = useState<string>()
   const searchToken = useRef(0)
   const previewToken = useRef(0)
   const preconFormat = preconSearchFormat(format)
+  const handleCapacity = useCallback(
+    (next: DeckCapacity) => setCapacityState({ status: "ready", capacity: next }),
+    [],
+  )
 
   function begin() {
     setBusy(true)
@@ -203,13 +245,15 @@ export function AddDeckScreen({
       }
       try {
         setSearching(true)
+        setSearchError(undefined)
         const found = await searchPreconstructed({
           query,
           ...(preconFormat ? { format: preconFormat } : {}),
         })
         if (searchToken.current === token) setPrecons(found)
       } catch (cause) {
-        if (searchToken.current === token) fail(cause, "Could not search official decks")
+        if (searchToken.current === token)
+          setSearchError(convexErrorMessage(cause, "Could not search official decks"))
       } finally {
         if (searchToken.current === token) setSearching(false)
       }
@@ -224,6 +268,7 @@ export function AddDeckScreen({
   }, [mode, preconQuery, runSearch, setupComplete])
 
   async function createBlank() {
+    if (!capacityReady || atCapacity) return
     try {
       begin()
       const deckId = await createDeck({ name, format, game, ...(note.trim() ? { note } : {}) })
@@ -237,14 +282,15 @@ export function AddDeckScreen({
     }
   }
 
-  async function previewPrecon(deck: PreconstructedDeck) {
+  async function previewPrecon(deck: PreconstructedDeck, keepOutline = false) {
     const token = previewToken.current + 1
     previewToken.current = token
     try {
       setSelectedPrecon(deck)
-      setPreconOutline(undefined)
+      if (!keepOutline) setPreconOutline(undefined)
       setResolvedPrecon(undefined)
       setError(undefined)
+      setPreviewError(undefined)
       setPreviewLoading(true)
       const outline = await previewPreconstructed({ fileName: deck.fileName })
       if (previewToken.current !== token) return
@@ -252,7 +298,8 @@ export function AddDeckScreen({
       const resolved = await resolvePreconstructed({ fileName: deck.fileName })
       if (previewToken.current === token) setResolvedPrecon(resolved)
     } catch (cause) {
-      if (previewToken.current === token) fail(cause, "Could not load this deck")
+      if (previewToken.current === token)
+        setPreviewError(convexErrorMessage(cause, "Could not load this deck"))
     } finally {
       if (previewToken.current === token) setPreviewLoading(false)
     }
@@ -265,6 +312,7 @@ export function AddDeckScreen({
     setResolvedPrecon(undefined)
     setFocusedPreviewCard(undefined)
     setPreviewDetailsError(undefined)
+    setPreviewError(undefined)
     setError(undefined)
   }
 
@@ -290,7 +338,14 @@ export function AddDeckScreen({
   }
 
   async function importPrecon() {
-    if (!selectedPrecon || !resolvedPrecon || resolvedPrecon.unresolved.length) return
+    if (
+      !capacityReady ||
+      atCapacity ||
+      !selectedPrecon ||
+      !resolvedPrecon ||
+      resolvedPrecon.unresolved.length
+    )
+      return
     try {
       begin()
       const deckId = await createImportedDeck({
@@ -308,6 +363,7 @@ export function AddDeckScreen({
   }
 
   async function importPasted() {
+    if (!capacityReady || atCapacity) return
     try {
       begin()
       const resolved = await resolvePasted({ list: deckList })
@@ -364,7 +420,8 @@ export function AddDeckScreen({
     const configuredSections = deckSections(game, previewFormat)
     const sections = previewSections(cards, configuredSections)
     const unresolved = resolvedPrecon?.unresolved.length ?? 0
-    const cannotImport = busy || atCapacity || previewLoading || !resolvedPrecon || unresolved > 0
+    const cannotImport =
+      busy || !capacityReady || atCapacity || previewLoading || !resolvedPrecon || unresolved > 0
 
     return (
       <Screen
@@ -412,6 +469,16 @@ export function AddDeckScreen({
             />
           </View>
 
+          {previewError ? (
+            <View style={themed($inlineStatus)}>
+              <AlertNote text={previewError} />
+              <Button
+                testID="retry-precon-preview"
+                text="Retry"
+                onPress={() => void previewPrecon(selectedPrecon, true)}
+              />
+            </View>
+          ) : null}
           {error ? <AlertNote text={error} /> : null}
           {unresolved > 0 ? (
             <AlertNote
@@ -458,6 +525,7 @@ export function AddDeckScreen({
           )}
         </ScrollView>
         <BottomActionBar>
+          <DeckCapacityStatus onReady={handleCapacity} />
           {atCapacity ? (
             <AlertNote text="You've reached your deck limit. Archive a deck to import this one." />
           ) : null}
@@ -612,6 +680,15 @@ export function AddDeckScreen({
             />
             {searching ? (
               <Text size="xs" style={themed($label)} text="Searching…" />
+            ) : searchError ? (
+              <View style={themed($inlineStatus)}>
+                <AlertNote text={searchError} />
+                <Button
+                  testID="retry-precon-search"
+                  text="Retry"
+                  onPress={() => void runSearch(preconQuery)}
+                />
+              </View>
             ) : precons.length === 0 && preconQuery.trim() ? (
               <Text size="xs" style={themed($label)} text="No official decks found." />
             ) : null}
@@ -653,7 +730,7 @@ export function AddDeckScreen({
             <Button
               text={busy ? "Resolving cards…" : "Import deck list"}
               preset="reversed"
-              disabled={busy || atCapacity || !name.trim() || !deckList.trim()}
+              disabled={busy || !capacityReady || atCapacity || !name.trim() || !deckList.trim()}
               onPress={importPasted}
             />
           </View>
@@ -672,13 +749,14 @@ export function AddDeckScreen({
             <Button
               text={busy ? "Creating…" : "Create deck"}
               preset="reversed"
-              disabled={busy || atCapacity || !name.trim()}
+              disabled={busy || !capacityReady || atCapacity || !name.trim()}
               onPress={createBlank}
             />
           </View>
         ) : null}
 
         {error ? <AlertNote text={error} /> : null}
+        <DeckCapacityStatus onReady={handleCapacity} />
         {atCapacity ? (
           <AlertNote
             text={
@@ -732,6 +810,15 @@ function SelectorField({
 const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   marginTop: spacing.sm,
+})
+const $capacityStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 40,
+  justifyContent: "center",
+  paddingVertical: spacing.xxxs,
+})
+const $inlineStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
+  alignItems: "flex-start",
 })
 const $field: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
