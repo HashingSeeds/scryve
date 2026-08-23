@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from "react"
 import type { ViewStyle } from "react-native"
 import { ActivityIndicator, Animated } from "react-native"
 import { useUser } from "@clerk/expo"
-import { useConvex, useConvexAuth, useConvexConnectionState, useMutation } from "convex/react"
+import { useConvex, useConvexAuth } from "convex/react"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
@@ -14,6 +14,11 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { ConnectedGameRepository } from "./persistence"
+import {
+  ConnectedProfileProvider,
+  resetConnectedProfileBootstrapForTests,
+  useConnectedProfile,
+} from "./useConnectedProfile"
 import { describeUsernameFailure, isUsernameValid, suggestUsername } from "./username"
 import { UsernameChecklist } from "./UsernameChecklist"
 import { api } from "../../../convex/_generated/api"
@@ -21,10 +26,8 @@ import { api } from "../../../convex/_generated/api"
 const LOADING_REVEAL_DELAY_MS = 200
 const LOADING_FADE_DURATION_MS = 150
 
-const syncedProfile: { userId?: string } = { userId: undefined }
-
 export function resetSyncedProfileCacheForTests() {
-  syncedProfile.userId = undefined
+  resetConnectedProfileBootstrapForTests()
 }
 
 function useRevealAfterDelay(delayMs: number) {
@@ -89,56 +92,21 @@ export function BackendGate({
   onReauthenticate: () => void
 }) {
   const { isAuthenticated, isLoading } = useConvexAuth()
-  const { isWebSocketConnected } = useConvexConnectionState()
   const { isLoaded: isUserLoaded, user } = useUser()
-  const syncCurrent = useMutation(api.users.syncCurrent)
   const convex = useConvex()
-  const [readyUserId, setReadyUserId] = useState<string | undefined>(syncedProfile.userId)
-  const [syncError, setSyncError] = useState<string>()
-  const [syncAttempt, setSyncAttempt] = useState(0)
+  const connectedProfile = useConnectedProfile()
   const [username, setUsername] = useState("")
   const [usernameError, setUsernameError] = useState<string>()
   const [savingUsername, setSavingUsername] = useState(false)
+  const offlineProfile =
+    connectedProfile.status === "offline" ? connectedProfile.profile : undefined
   const cachedProjection =
-    allowOfflineBootstrap && !isWebSocketConnected && offlineGameId && isUserLoaded && user?.id
-      ? new ConnectedGameRepository(undefined, user.id).loadProjection(offlineGameId)
+    allowOfflineBootstrap && offlineGameId && isUserLoaded && offlineProfile
+      ? new ConnectedGameRepository(undefined, offlineProfile.userId).loadProjection(offlineGameId)
       : null
   const hasOwnerScopedCache = Boolean(offlineGameId && cachedProjection?.publicId === offlineGameId)
 
-  useEffect(() => {
-    if (!clerkSignedIn || !isAuthenticated || !isWebSocketConnected || !user?.id) return
-    let cancelled = false
-    const displayName = user.fullName || user.firstName || "Player"
-    void syncCurrent({ displayName, avatarUrl: user.imageUrl })
-      .then(() => {
-        if (!cancelled) {
-          syncedProfile.userId = user.id
-          setReadyUserId(user.id)
-          setSyncError(undefined)
-        }
-      })
-      .catch((cause) => {
-        if (!cancelled) {
-          syncedProfile.userId = undefined
-          setReadyUserId(undefined)
-          setSyncError(cause instanceof Error ? cause.message : "Could not prepare connected play")
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [
-    isAuthenticated,
-    isWebSocketConnected,
-    clerkSignedIn,
-    syncCurrent,
-    syncAttempt,
-    user?.firstName,
-    user?.fullName,
-    user?.id,
-    user?.imageUrl,
-  ])
-  if (clerkSignedIn && !isWebSocketConnected && hasOwnerScopedCache) return children
+  if (clerkSignedIn && connectedProfile.status === "offline" && hasOwnerScopedCache) return children
   if (!clerkLoaded)
     return (
       <GateScreen busy>
@@ -210,8 +178,15 @@ export function BackendGate({
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
-  if (isAuthenticated && isUserLoaded && user?.id && readyUserId === user.id) return children
-  if (!isWebSocketConnected)
+  if (
+    isAuthenticated &&
+    isUserLoaded &&
+    user?.id &&
+    connectedProfile.status === "ready" &&
+    connectedProfile.profile.userId === user.id
+  )
+    return children
+  if (connectedProfile.status === "offline")
     return (
       <GateScreen>
         <Text
@@ -221,14 +196,20 @@ export function BackendGate({
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
-  if (isLoading)
+  if (
+    isLoading ||
+    (connectedProfile.status === "loading" && connectedProfile.reason === "authentication")
+  )
     return (
       <GateScreen busy>
         <Text text="Connecting to Convex… Local play remains available." />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
-  if (!isAuthenticated)
+  if (
+    !isAuthenticated ||
+    (connectedProfile.status === "error" && connectedProfile.reason === "authentication")
+  )
     return (
       <GateScreen>
         <Text
@@ -239,18 +220,11 @@ export function BackendGate({
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
-  if (syncError)
+  if (connectedProfile.status === "error" && connectedProfile.reason === "sync")
     return (
       <GateScreen>
-        <Text accessibilityRole="alert" text={syncError} />
-        <Button
-          text="Retry connected setup"
-          preset="reversed"
-          onPress={() => {
-            setSyncError(undefined)
-            setSyncAttempt((attempt) => attempt + 1)
-          }}
-        />
+        <Text accessibilityRole="alert" text={connectedProfile.message} />
+        <Button text="Retry connected setup" preset="reversed" onPress={connectedProfile.retry} />
         <Button text="Re-authenticate" onPress={onReauthenticate} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
@@ -284,16 +258,18 @@ export function ConnectedGate({
     )
   return (
     <ConnectedErrorBoundary onBack={onBack}>
-      <BackendGate
-        allowOfflineBootstrap={allowOfflineBootstrap}
-        offlineGameId={offlineGameId}
-        clerkLoaded={auth.isLoaded}
-        clerkSignedIn={auth.isSignedIn}
-        onBack={onBack}
-        onReauthenticate={auth.openAuth}
-      >
-        {children}
-      </BackendGate>
+      <ConnectedProfileProvider>
+        <BackendGate
+          allowOfflineBootstrap={allowOfflineBootstrap}
+          offlineGameId={offlineGameId}
+          clerkLoaded={auth.isLoaded}
+          clerkSignedIn={auth.isSignedIn}
+          onBack={onBack}
+          onReauthenticate={auth.openAuth}
+        >
+          {children}
+        </BackendGate>
+      </ConnectedProfileProvider>
     </ConnectedErrorBoundary>
   )
 }

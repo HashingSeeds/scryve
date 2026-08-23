@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
-import { useUser } from "@clerk/expo"
-import { useConvexConnectionState, useMutation, usePaginatedQuery } from "convex/react"
+import { useMutation, usePaginatedQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -13,6 +12,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import { ConnectedGameRepository } from "@/features/connected/persistence"
+import { useConnectedProfile } from "@/features/connected/useConnectedProfile"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -39,60 +39,29 @@ export function ConnectedHomeScreen({
   const { themed } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const now = useRef(Date.now()).current
-  const { user } = useUser()
-  const clerkUserId = user?.id
-  const clerkDisplayName = user?.fullName || user?.firstName || "Player"
-  const clerkAvatarUrl = user?.imageUrl
+  const connectedProfile = useConnectedProfile()
+  const clerkUserId = connectedProfile.profile?.userId
   const migrationRepository = useMemo(
     () => (clerkUserId ? new ConnectedGameRepository(undefined, clerkUserId) : null),
     [clerkUserId],
   )
-  const { isWebSocketConnected } = useConvexConnectionState()
-  const syncUser = useMutation(api.users.syncCurrent)
   const migrateMemberships = useMutation(api.games.migrateMyGameMemberships)
-  const [readyClerkUserId, setReadyClerkUserId] = useState<string>()
-  const [bootstrapError, setBootstrapError] = useState<string>()
-  const projectionReady = Boolean(
-    isWebSocketConnected && clerkUserId && readyClerkUserId === clerkUserId,
-  )
+  const projectionReady = connectedProfile.status === "ready"
   const activeGames = usePaginatedQuery(
     api.games.activeConnectedGames,
     projectionReady ? {} : "skip",
     { initialNumItems: 10 },
   )
   const uniqueActiveGames = Array.from(
-    new Map(activeGames.results.map((game: any) => [game.publicId, game])).values(),
+    new Map(activeGames.results.map((game) => [game.publicId, game])).values(),
+  ).filter(
+    (game): game is typeof game & { status: "lobby" | "active" } =>
+      game.status === "lobby" || game.status === "active",
   )
-  const hasHostedGame = uniqueActiveGames.some((game: any) => game.isHost)
-
-  useEffect(() => {
-    if (!isWebSocketConnected || !clerkUserId) {
-      return
-    }
-    let cancelled = false
-    void syncUser({ displayName: clerkDisplayName, avatarUrl: clerkAvatarUrl })
-      .then(() => {
-        if (!cancelled) {
-          setReadyClerkUserId(clerkUserId)
-          setBootstrapError(undefined)
-        }
-      })
-      .catch((cause) => {
-        if (!cancelled) {
-          setReadyClerkUserId((ready) => (ready === clerkUserId ? undefined : ready))
-          setBootstrapError(
-            cause instanceof Error ? cause.message : "Could not prepare connected play",
-          )
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [clerkAvatarUrl, clerkDisplayName, clerkUserId, isWebSocketConnected, syncUser])
+  const hasHostedGame = uniqueActiveGames.some((game) => game.isHost)
 
   useEffect(() => {
     if (
-      !isWebSocketConnected ||
       !projectionReady ||
       !migrationRepository ||
       migrationRepository.isMembershipMigrationComplete()
@@ -114,7 +83,7 @@ export function ConnectedHomeScreen({
     return () => {
       cancelled = true
     }
-  }, [isWebSocketConnected, migrateMemberships, migrationRepository, projectionReady])
+  }, [migrateMemberships, migrationRepository, projectionReady])
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
@@ -137,7 +106,9 @@ export function ConnectedHomeScreen({
             text="Host a resilient live game, or join an existing lobby."
           />
         </View>
-        {bootstrapError ? <AlertNote text={bootstrapError} /> : null}
+        {connectedProfile.status === "error" && connectedProfile.reason === "sync" ? (
+          <AlertNote text={connectedProfile.message} />
+        ) : null}
         {uniqueActiveGames.length ? (
           <View style={[themed($section), $styles.flex1]}>
             <Text
@@ -145,7 +116,7 @@ export function ConnectedHomeScreen({
               accessibilityRole="header"
               text="Pick up where you left off"
             />
-            {uniqueActiveGames.map((game: any) => (
+            {uniqueActiveGames.map((game) => (
               <ConnectedGameRow
                 key={game.publicId}
                 game={game}
@@ -190,10 +161,10 @@ export function ConnectedHomeScreen({
         </View>
       </ScrollView>
       <BottomActionBar>
-        {!isWebSocketConnected ? (
+        {connectedProfile.status === "offline" ? (
           <AlertNote text="Connected play is offline. Hosting and joining need a connection." />
         ) : null}
-        {hasHostedGame && isWebSocketConnected ? (
+        {hasHostedGame && projectionReady ? (
           <AlertNote
             tone="info"
             text="Resume or finish/abandon your hosted game before creating another."
@@ -202,7 +173,7 @@ export function ConnectedHomeScreen({
         <Button
           testID="host-connected-button"
           text="Host a new game"
-          disabled={!isWebSocketConnected || !projectionReady || hasHostedGame}
+          disabled={!projectionReady || hasHostedGame}
           preset="reversed"
           style={themed($primaryAction)}
           onPress={onHostNew}
@@ -210,7 +181,7 @@ export function ConnectedHomeScreen({
         <Button
           testID="join-connected-button"
           text="Join with code"
-          disabled={!isWebSocketConnected || !projectionReady}
+          disabled={!projectionReady}
           style={themed($secondaryAction)}
           onPress={onJoin}
         />

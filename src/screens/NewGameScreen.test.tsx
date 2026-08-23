@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 
 import { Screen } from "@/components/Screen"
 import { ConnectedHostSource } from "@/features/connected/ConnectedHostSource"
+import {
+  ConnectedProfileProvider,
+  resetConnectedProfileBootstrapForTests,
+} from "@/features/connected/useConnectedProfile"
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -9,6 +13,7 @@ import { NewGameScreen, type ConnectedHostFeed, type NewGameScreenProps } from "
 import {
   connectedHarness,
   mockCreateLobby,
+  mockSyncUser,
   resetConnectedHarness,
   themed,
 } from "../../test/support/connectedHarness"
@@ -54,23 +59,28 @@ const readyHost: ConnectedHostFeed = { ready: true, busy: false, host: jest.fn()
 
 function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
   return themed(
-    <ConnectedHostSource onLobbyCreated={onLobbyCreated}>
-      {(connected) => (
-        <NewGameScreen
-          defaults={DEFAULT_LOCAL_SETTINGS}
-          mode="connected"
-          onModeChange={jest.fn()}
-          onBack={jest.fn()}
-          onStartLocal={jest.fn()}
-          connected={connected}
-        />
-      )}
-    </ConnectedHostSource>,
+    <ConnectedProfileProvider>
+      <ConnectedHostSource onLobbyCreated={onLobbyCreated}>
+        {(connected) => (
+          <NewGameScreen
+            defaults={DEFAULT_LOCAL_SETTINGS}
+            mode="connected"
+            onModeChange={jest.fn()}
+            onBack={jest.fn()}
+            onStartLocal={jest.fn()}
+            connected={connected}
+          />
+        )}
+      </ConnectedHostSource>
+    </ConnectedProfileProvider>,
   )
 }
 
 describe("NewGameScreen", () => {
-  beforeEach(resetConnectedHarness)
+  beforeEach(() => {
+    resetConnectedHarness()
+    resetConnectedProfileBootstrapForTests()
+  })
 
   it("starts defaults and supports six players plus custom life", () => {
     const onStartLocal = jest.fn()
@@ -214,6 +224,7 @@ describe("NewGameScreen", () => {
     const onLobbyCreated = jest.fn()
     render(hostSetup(onLobbyCreated))
     await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
+    expect(mockSyncUser).toHaveBeenCalledTimes(1)
     fireEvent.press(screen.getByLabelText("4 seats"))
     fireEvent.press(screen.getByLabelText("Start at 40 life"))
     fireEvent.press(screen.getByTestId("host-connected-button"))
@@ -221,6 +232,7 @@ describe("NewGameScreen", () => {
     expect(mockCreateLobby).toHaveBeenCalledWith(
       expect.objectContaining({ playerCount: 4, startingLife: 40, ruleset: "standard" }),
     )
+    expect(mockSyncUser).toHaveBeenCalledTimes(1)
 
     fireEvent.press(screen.getByLabelText("Use custom starting life"))
     fireEvent.changeText(screen.getByTestId("connected-starting-life"), "0")

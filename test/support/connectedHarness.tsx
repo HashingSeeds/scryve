@@ -152,7 +152,9 @@ export const connectedHarness: {
   projection: LobbyProjection
   runtime: MockConnectedRuntime
   socketConnected: boolean
-  userId: string
+  convexAuthenticated: boolean
+  convexLoading: boolean
+  userId?: string
   userLoaded: boolean
   migrationOwners: Set<string>
   decks: SeatDeck[]
@@ -162,6 +164,8 @@ export const connectedHarness: {
   projection: defaultProjection(),
   runtime: defaultRuntime(),
   socketConnected: true,
+  convexAuthenticated: true,
+  convexLoading: false,
   userId: "user-a",
   userLoaded: true,
   migrationOwners: new Set<string>(),
@@ -198,6 +202,8 @@ export function resetConnectedHarness() {
   connectedHarness.projection = defaultProjection()
   connectedHarness.runtime = defaultRuntime()
   connectedHarness.socketConnected = true
+  connectedHarness.convexAuthenticated = true
+  connectedHarness.convexLoading = false
   connectedHarness.userId = "user-a"
   connectedHarness.userLoaded = true
   connectedHarness.migrationOwners.clear()
@@ -208,17 +214,23 @@ export function createClerkMock() {
   return {
     useUser: () => ({
       isLoaded: connectedHarness.userLoaded,
-      user: {
-        id: connectedHarness.userId,
-        fullName: "Ada",
-        imageUrl: "https://example.test/a.png",
-      },
+      user: connectedHarness.userId
+        ? {
+            id: connectedHarness.userId,
+            fullName: "Ada",
+            imageUrl: "https://example.test/a.png",
+          }
+        : null,
     }),
   }
 }
 
 export function createConvexReactMock() {
   return {
+    useConvexAuth: () => ({
+      isAuthenticated: connectedHarness.convexAuthenticated,
+      isLoading: connectedHarness.convexLoading,
+    }),
     useConvexConnectionState: () => ({
       isWebSocketConnected: connectedHarness.socketConnected,
     }),

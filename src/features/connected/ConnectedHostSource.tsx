@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
-import { useUser } from "@clerk/expo"
-import { useConvexConnectionState, useMutation, usePaginatedQuery } from "convex/react"
+import { useMemo, useState, type ReactNode } from "react"
+import { useMutation, usePaginatedQuery } from "convex/react"
 
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
+import { useConnectedProfile } from "@/features/connected/useConnectedProfile"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 
@@ -21,60 +21,44 @@ export function ConnectedHostSource({
   onLobbyCreated: (lobby: CreatedLobby) => void
   children: (feed: ConnectedHostFeed) => ReactNode
 }) {
-  const { user } = useUser()
-  const clerkUserId = user?.id
-  const displayName = user?.fullName || user?.firstName || "Player"
-  const avatarUrl = user?.imageUrl
-  const { isWebSocketConnected } = useConvexConnectionState()
-  const syncUser = useMutation(api.users.syncCurrent)
+  const connectedProfile = useConnectedProfile()
   const createLobby = useMutation(api.games.createLobby)
   const deviceId = useMemo(() => new LocalGameRepository().getDeviceId(), [])
-  const [readyClerkUserId, setReadyClerkUserId] = useState<string>()
-  const [error, setError] = useState<string>()
+  const [hostError, setHostError] = useState<string>()
   const [busy, setBusy] = useState(false)
-  const ready = Boolean(isWebSocketConnected && clerkUserId && readyClerkUserId === clerkUserId)
+  const ready = connectedProfile.status === "ready"
   const activeGames = usePaginatedQuery(api.games.activeConnectedGames, ready ? {} : "skip", {
     initialNumItems: 10,
   })
-  const hasHostedGame = activeGames.results.some((game: any) => game.isHost)
-
-  useEffect(() => {
-    if (!isWebSocketConnected || !clerkUserId) return
-    let cancelled = false
-    void syncUser({ displayName, avatarUrl })
-      .then(() => {
-        if (!cancelled) setReadyClerkUserId(clerkUserId)
-      })
-      .catch((cause) => {
-        if (cancelled) return
-        setReadyClerkUserId((current) => (current === clerkUserId ? undefined : current))
-        setError(cause instanceof Error ? cause.message : "Could not prepare connected play")
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [avatarUrl, clerkUserId, displayName, isWebSocketConnected, syncUser])
+  const hasHostedGame = activeGames.results.some((game) => game.isHost)
 
   async function host(setup: { playerCount: number; startingLife: number; ruleset: string }) {
-    if (!isWebSocketConnected) {
-      setError("Reconnect before hosting; lobby creation is not queued.")
+    if (connectedProfile.status === "offline") {
+      setHostError("Reconnect before hosting; lobby creation is not queued.")
+      return
+    }
+    if (connectedProfile.status !== "ready") {
+      setHostError(
+        connectedProfile.status === "error"
+          ? connectedProfile.message
+          : "Connected profile is not ready yet.",
+      )
       return
     }
     try {
       setBusy(true)
-      setError(undefined)
-      await syncUser({ displayName, avatarUrl })
+      setHostError(undefined)
       const ids = await createLobbyIdentifiers()
       const lobby = await createLobby({
         ...ids,
         ...setup,
-        hostDisplayName: displayName,
+        hostDisplayName: connectedProfile.profile.displayName,
         hostColor: "#7C3AED",
         deviceId,
       })
       onLobbyCreated(lobby)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not create lobby")
+      setHostError(cause instanceof Error ? cause.message : "Could not create lobby")
     } finally {
       setBusy(false)
     }
@@ -83,12 +67,17 @@ export function ConnectedHostSource({
   return children({
     ready,
     busy,
-    blockedReason: !isWebSocketConnected
-      ? "Connected games need a live connection."
-      : hasHostedGame
-        ? "Resume or finish your hosted game before creating another."
-        : undefined,
-    error,
+    blockedReason:
+      connectedProfile.status === "offline"
+        ? "Connected games need a live connection."
+        : hasHostedGame
+          ? "Resume or finish your hosted game before creating another."
+          : undefined,
+    error:
+      hostError ??
+      (connectedProfile.status === "error" && connectedProfile.reason === "sync"
+        ? connectedProfile.message
+        : undefined),
     host: (setup) => void host(setup),
   })
 }
