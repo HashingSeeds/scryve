@@ -12,6 +12,54 @@ const MEMBERSHIP_BATCH_SIZE = 5
 const EVENT_BATCH_SIZE = 50
 const USER_DATA_BATCH_SIZE = 50
 
+type AccountDeletionStatus = Doc<"accountDeletionRequests">["status"]
+
+function createReceiptToken() {
+  return Array.from({ length: 16 }, () =>
+    Math.floor(Math.random() * 0x1_0000)
+      .toString(16)
+      .padStart(4, "0"),
+  ).join("")
+}
+
+async function createReceipt(ctx: MutationCtx, status: AccountDeletionStatus, requestedAt: number) {
+  const token = createReceiptToken()
+  const receiptId = await ctx.db.insert("accountDeletionReceipts", {
+    token,
+    status,
+    requestedAt,
+    updatedAt: requestedAt,
+  })
+  return { receiptId, receiptToken: token }
+}
+
+async function updateReceipt(
+  ctx: MutationCtx,
+  request: Doc<"accountDeletionRequests">,
+  status: AccountDeletionStatus | "completed",
+  updatedAt: number,
+) {
+  if (!request.receiptId) return
+  const receipt = await ctx.db.get(request.receiptId)
+  if (receipt) await ctx.db.patch(receipt._id, { status, updatedAt })
+}
+
+async function recordFailure(
+  ctx: MutationCtx,
+  request: Doc<"accountDeletionRequests">,
+  message: string,
+) {
+  const updatedAt = Date.now()
+  await ctx.db.patch(request._id, { status: "failed", lastError: message, updatedAt })
+  await updateReceipt(ctx, request, "failed", updatedAt)
+}
+
+async function touchRequest(ctx: MutationCtx, request: Doc<"accountDeletionRequests">) {
+  const updatedAt = Date.now()
+  await ctx.db.patch(request._id, { updatedAt })
+  await updateReceipt(ctx, request, request.status, updatedAt)
+}
+
 async function requestByClerkUser(ctx: MutationCtx, clerkUserId: string) {
   return await ctx.db
     .query("accountDeletionRequests")
@@ -21,12 +69,14 @@ async function requestByClerkUser(ctx: MutationCtx, clerkUserId: string) {
 
 async function restartRequest(ctx: MutationCtx, request: Doc<"accountDeletionRequests">) {
   const status = request.userId ? "processing" : "identity_pending"
+  const updatedAt = Date.now()
   await ctx.db.patch(request._id, {
     status,
     attempts: 0,
     lastError: undefined,
-    updatedAt: Date.now(),
+    updatedAt,
   })
+  await updateReceipt(ctx, request, status, updatedAt)
   if (request.userId)
     await ctx.scheduler.runAfter(0, internal.accountDeletion.processMemberships, {
       requestId: request._id,
@@ -47,17 +97,25 @@ export const requestCurrentAccountDeletion = mutation({
     if (existing) {
       const status =
         existing.status === "failed" ? await restartRequest(ctx, existing) : existing.status
-      return { requestId: existing._id, status }
+      const receipt = existing.receiptId ? await ctx.db.get(existing.receiptId) : null
+      if (receipt) return { requestId: existing._id, receiptToken: receipt.token, status }
+
+      const created = await createReceipt(ctx, status, existing.requestedAt)
+      await ctx.db.patch(existing._id, { receiptId: created.receiptId })
+      return { requestId: existing._id, receiptToken: created.receiptToken, status }
     }
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
       .unique()
     const now = Date.now()
+    const status = user ? ("processing" as const) : ("identity_pending" as const)
+    const receipt = await createReceipt(ctx, status, now)
     const requestId = await ctx.db.insert("accountDeletionRequests", {
       clerkUserId: identity.subject,
       ...(user ? { userId: user._id } : {}),
-      status: user ? "processing" : "identity_pending",
+      receiptId: receipt.receiptId,
+      status,
       attempts: 0,
       requestedAt: now,
       updatedAt: now,
@@ -68,7 +126,7 @@ export const requestCurrentAccountDeletion = mutation({
       await ctx.scheduler.runAfter(0, internal.accountDeletionActions.deleteClerkIdentity, {
         requestId,
       })
-    return { requestId, status: user ? ("processing" as const) : ("identity_pending" as const) }
+    return { requestId, receiptToken: receipt.receiptToken, status }
   },
 })
 
@@ -82,11 +140,31 @@ export const currentAccountDeletion = query({
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
       .unique()
     if (!request) return null
+    const receipt = request.receiptId ? await ctx.db.get(request.receiptId) : null
     return {
       status: request.status,
       requestedAt: request.requestedAt,
       updatedAt: request.updatedAt,
       canRetry: request.status === "failed",
+      receiptToken: receipt?.token,
+    }
+  },
+})
+
+export const deletionReceipt = query({
+  args: { receiptToken: v.string() },
+  handler: async (ctx, args) => {
+    if (!/^[0-9a-f]{64}$/.test(args.receiptToken)) return null
+    const receipt = await ctx.db
+      .query("accountDeletionReceipts")
+      .withIndex("by_token", (q) => q.eq("token", args.receiptToken))
+      .unique()
+    if (!receipt) return null
+    return {
+      status: receipt.status,
+      requestedAt: receipt.requestedAt,
+      updatedAt: receipt.updatedAt,
+      canRetry: receipt.status === "failed",
     }
   },
 })
@@ -164,15 +242,16 @@ export const processMemberships = internalMutation({
       const now = Date.now()
       for (const membership of memberships) await anonymizeMembership(ctx, request, membership, now)
       await ctx.db.patch(request._id, { updatedAt: now })
+      await updateReceipt(ctx, request, request.status, now)
       await ctx.scheduler.runAfter(0, internal.accountDeletion.processMemberships, {
         requestId: request._id,
       })
     } catch (cause) {
-      await ctx.db.patch(request._id, {
-        status: "failed",
-        lastError: cause instanceof Error ? cause.message : "Could not anonymize memberships",
-        updatedAt: Date.now(),
-      })
+      await recordFailure(
+        ctx,
+        request,
+        cause instanceof Error ? cause.message : "Could not anonymize memberships",
+      )
     }
     return null
   },
@@ -198,15 +277,16 @@ export const processEvents = internalMutation({
       for (const event of events)
         await ctx.db.patch(event._id, { actorUserId: undefined, deviceId: undefined })
       await ctx.db.patch(request._id, { updatedAt: now })
+      await updateReceipt(ctx, request, request.status, now)
       await ctx.scheduler.runAfter(0, internal.accountDeletion.processEvents, {
         requestId: request._id,
       })
     } catch (cause) {
-      await ctx.db.patch(request._id, {
-        status: "failed",
-        lastError: cause instanceof Error ? cause.message : "Could not anonymize game events",
-        updatedAt: Date.now(),
-      })
+      await recordFailure(
+        ctx,
+        request,
+        cause instanceof Error ? cause.message : "Could not anonymize game events",
+      )
     }
     return null
   },
@@ -218,6 +298,7 @@ export const processUserLinkedData = internalMutation({
     const request = await ctx.db.get(args.requestId)
     if (!request || request.status !== "processing" || !request.userId) return null
     try {
+      await touchRequest(ctx, request)
       const history = await ctx.db
         .query("gameHistoryEntries")
         .withIndex("by_user_and_finished_at", (q) => q.eq("userId", request.userId!))
@@ -256,11 +337,11 @@ export const processUserLinkedData = internalMutation({
       }
       await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
     } catch (cause) {
-      await ctx.db.patch(request._id, {
-        status: "failed",
-        lastError: cause instanceof Error ? cause.message : "Could not delete user-linked data",
-        updatedAt: Date.now(),
-      })
+      await recordFailure(
+        ctx,
+        request,
+        cause instanceof Error ? cause.message : "Could not delete user-linked data",
+      )
     }
     return null
   },
@@ -272,6 +353,7 @@ export const processDecks = internalMutation({
     const request = await ctx.db.get(args.requestId)
     if (!request || request.status !== "processing" || !request.userId) return null
     try {
+      await touchRequest(ctx, request)
       const deck = await ctx.db
         .query("decks")
         .withIndex("by_owner_and_updated_at", (q) => q.eq("ownerUserId", request.userId!))
@@ -309,11 +391,11 @@ export const processDecks = internalMutation({
       await ctx.db.delete(deck._id)
       await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
     } catch (cause) {
-      await ctx.db.patch(request._id, {
-        status: "failed",
-        lastError: cause instanceof Error ? cause.message : "Could not delete decks",
-        updatedAt: Date.now(),
-      })
+      await recordFailure(
+        ctx,
+        request,
+        cause instanceof Error ? cause.message : "Could not delete decks",
+      )
     }
     return null
   },
@@ -331,13 +413,15 @@ export const finalizeAppData = internalMutation({
     if (attemptRecord) await ctx.db.delete(attemptRecord._id)
     const user = await ctx.db.get(request.userId)
     if (user) await ctx.db.delete(user._id)
+    const updatedAt = Date.now()
     await ctx.db.patch(request._id, {
       userId: undefined,
       status: "identity_pending",
       attempts: 0,
       lastError: undefined,
-      updatedAt: Date.now(),
+      updatedAt,
     })
+    await updateReceipt(ctx, request, "identity_pending", updatedAt)
     await ctx.scheduler.runAfter(0, internal.accountDeletionActions.deleteClerkIdentity, {
       requestId: request._id,
     })
@@ -362,12 +446,15 @@ export const recordIdentityFailure = internalMutation({
     if (!request) return null
     const attempts = request.attempts + 1
     const shouldRetry = attempts < 8
+    const updatedAt = Date.now()
+    const status = shouldRetry ? "identity_pending" : "failed"
     await ctx.db.patch(request._id, {
       attempts,
-      status: shouldRetry ? "identity_pending" : "failed",
+      status,
       lastError: args.message.slice(0, 500),
-      updatedAt: Date.now(),
+      updatedAt,
     })
+    await updateReceipt(ctx, request, status, updatedAt)
     return { attempts, shouldRetry }
   },
 })
@@ -376,7 +463,10 @@ export const complete = internalMutation({
   args: { requestId: v.id("accountDeletionRequests") },
   handler: async (ctx, args) => {
     const request = await ctx.db.get(args.requestId)
-    if (request) await ctx.db.delete(request._id)
+    if (request) {
+      await updateReceipt(ctx, request, "completed", Date.now())
+      await ctx.db.delete(request._id)
+    }
     return null
   },
 })

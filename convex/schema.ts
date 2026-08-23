@@ -375,10 +375,23 @@ export default defineSchema({
   accountDeletionRequests: defineTable({
     clerkUserId: v.string(),
     userId: v.optional(v.id("users")),
+    receiptId: v.optional(v.id("accountDeletionReceipts")),
     status: v.union(v.literal("processing"), v.literal("identity_pending"), v.literal("failed")),
     attempts: v.number(),
     requestedAt: v.number(),
     updatedAt: v.number(),
     lastError: v.optional(v.string()),
   }).index("by_clerk_user", ["clerkUserId"]),
+
+  accountDeletionReceipts: defineTable({
+    token: v.string(),
+    status: v.union(
+      v.literal("processing"),
+      v.literal("identity_pending"),
+      v.literal("failed"),
+      v.literal("completed"),
+    ),
+    requestedAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_token", ["token"]),
 })
