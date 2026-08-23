@@ -1,0 +1,17 @@
+diff --git a/dist/index.js b/dist/index.js
+index 4aaed44325732f08b6fa1857011e68e10134f9c9..7852dfe23e4a034a2aa4638fd2d538f02da0c1bd 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1851,7 +1851,11 @@ function withAuth(auth = authStorage.getStore() ?? new AuthFake()) {
+                     // it is not faked by vitest and not removed by edge-runtime.
+                     await new Promise((r) => {
+                         const { port1, port2 } = new MessageChannel();
+-                        port2.onmessage = () => r();
++                        port2.onmessage = () => {
++                            port1.close();
++                            port2.close();
++                            r();
++                        };
+                         port1.postMessage(null);
+                     });
+                     if (pump === maxPumps - 1 && !done) {

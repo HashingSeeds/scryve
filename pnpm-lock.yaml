@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  convex-test@0.0.54:
+    hash: ad66aa7d478d3750462375942993487a7cd9d38819c0ccb5c9074c721c6d5bd3
+    path: patches/convex-test@0.0.54.patch
+
 importers:
 
   .:
@@ -188,7 +193,7 @@ importers:
         version: 9.2.4
       convex-test:
         specifier: 0.0.54
-        version: 0.0.54(convex@1.42.3(@clerk/react@6.12.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))
+        version: 0.0.54(patch_hash=ad66aa7d478d3750462375942993487a7cd9d38819c0ccb5c9074c721c6d5bd3)(convex@1.42.3(@clerk/react@6.12.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))
       dependency-cruiser:
         specifier: ^17.0.2
         version: 17.4.3
@@ -11373,7 +11378,7 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  convex-test@0.0.54(convex@1.42.3(@clerk/react@6.12.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)):
+  convex-test@0.0.54(patch_hash=ad66aa7d478d3750462375942993487a7cd9d38819c0ccb5c9074c721c6d5bd3)(convex@1.42.3(@clerk/react@6.12.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)):
     dependencies:
       convex: 1.42.3(@clerk/react@6.12.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
 
