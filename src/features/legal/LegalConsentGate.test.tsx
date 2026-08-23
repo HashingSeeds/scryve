@@ -6,8 +6,10 @@ import { storage } from "@/utils/storage"
 
 import {
   accountAcceptanceCache,
+  accountConsentSyncStore,
   deviceAcceptanceStore,
   LEGAL_ACCOUNT_ACCEPTANCE_KEY,
+  LEGAL_ACCOUNT_PENDING_CONSENT_KEY,
 } from "./acceptanceStore"
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
 import {
@@ -58,9 +60,11 @@ describe("LegalConsentGate", () => {
     mockAuth = { configured: false, isLoaded: true, isSignedIn: false }
     mockAccountAcceptances = []
     mockConvexAuth = { isAuthenticated: true, isLoading: false }
-    mockRecordAcceptance.mockClear()
+    mockRecordAcceptance.mockReset()
+    mockRecordAcceptance.mockResolvedValue({ acceptedAt: 0 })
     accountAcceptanceCache.write("user-a", {})
     accountAcceptanceCache.write("user-b", {})
+    storage.delete(LEGAL_ACCOUNT_PENDING_CONSENT_KEY)
     mockPush.mockClear()
     deviceAcceptanceStore.write({})
   })
@@ -162,6 +166,7 @@ describe("LegalConsentGate", () => {
     const view = renderGate(onResolved)
     expect(view.queryByText("APP CONTENT")).toBeNull()
     expect(view.queryByText("Before you start")).toBeNull()
+    expect(view.getByTestId("launch-fallback")).toBeTruthy()
     expect(onResolved).not.toHaveBeenCalled()
   })
 
@@ -192,6 +197,7 @@ describe("LegalConsentGate", () => {
     const onResolved = jest.fn()
     const view = renderGate(onResolved)
     expect(view.queryByText("APP CONTENT")).toBeNull()
+    expect(view.getByTestId("launch-fallback")).toBeTruthy()
     expect(onResolved).not.toHaveBeenCalled()
   })
 
@@ -309,7 +315,9 @@ describe("LegalConsentGate", () => {
     await act(async () => void fireEvent.press(view.getByTestId("accept-legal-button")))
     expect(mockRecordAcceptance).not.toHaveBeenCalled()
     expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(view.getByText("Agreement saved on this device. Account sync pending.")).toBeTruthy()
     expect(accountAcceptanceCache.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
+    expect(accountConsentSyncStore.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
     jest.useRealTimers()
   })
 
@@ -335,7 +343,40 @@ describe("LegalConsentGate", () => {
       ),
     )
     expect(mockRecordAcceptance).toHaveBeenCalledTimes(2)
+    expect(view.queryByTestId("account-consent-sync-status")).toBeNull()
+    expect(accountConsentSyncStore.read("user-a")).toEqual({})
     jest.useRealTimers()
+  })
+
+  it("lets the user retry pending account consent without blocking local play", async () => {
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = []
+    mockRecordAcceptance.mockRejectedValueOnce(new Error("offline"))
+    const view = renderGate()
+
+    await act(async () => void fireEvent.press(view.getByTestId("accept-legal-button")))
+
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(view.getByTestId("account-consent-sync-status")).toBeTruthy()
+    mockRecordAcceptance.mockResolvedValue({ acceptedAt: 1 })
+
+    await act(async () => void fireEvent.press(view.getByTestId("retry-account-consent-sync")))
+
+    expect(mockRecordAcceptance).toHaveBeenCalledTimes(3)
+    expect(view.queryByTestId("account-consent-sync-status")).toBeNull()
+    expect(accountConsentSyncStore.read("user-a")).toEqual({})
+  })
+
+  it("does not expose one account's pending consent to another account", () => {
+    accountConsentSyncStore.write("user-a", REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-b" }
+    mockAccountAcceptances = []
+
+    const view = renderGate()
+
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+    expect(view.queryByTestId("account-consent-sync-status")).toBeNull()
+    expect(view.getByText("Before you start")).toBeTruthy()
   })
 
   it("caches what the backend reports so the next launch is immediate", () => {

@@ -2,9 +2,11 @@ import type { StringStorage } from "@/features/game/localPersistence"
 
 import {
   AccountAcceptanceCache,
+  AccountConsentSyncStore,
   DeviceAcceptanceStore,
   LEGAL_ACCEPTANCE_KEY,
   LEGAL_ACCOUNT_ACCEPTANCE_KEY,
+  LEGAL_ACCOUNT_PENDING_CONSENT_KEY,
   missingConsent,
 } from "./acceptanceStore"
 
@@ -99,5 +101,31 @@ describe("AccountAcceptanceCache", () => {
         memoryStorage({ [LEGAL_ACCOUNT_ACCEPTANCE_KEY]: "not json" }),
       ).read("user-a"),
     ).toEqual({})
+  })
+})
+
+describe("AccountConsentSyncStore", () => {
+  it("keeps pending consent scoped to the account that accepted it", () => {
+    const store = new AccountConsentSyncStore(memoryStorage())
+    store.write("user-a", current)
+
+    expect(store.read("user-a")).toEqual(current)
+    expect(store.read("user-b")).toEqual({})
+  })
+
+  it("clears one account without losing another account's pending consent", () => {
+    const storage = memoryStorage()
+    const store = new AccountConsentSyncStore(storage)
+    store.write("user-a", current)
+    store.write("user-b", { terms: "2026-01-01" })
+    store.clear("user-a")
+
+    expect(store.read("user-a")).toEqual({})
+    expect(store.read("user-b")).toEqual({ terms: "2026-01-01" })
+  })
+
+  it("ignores malformed pending consent", () => {
+    const storage = memoryStorage({ [LEGAL_ACCOUNT_PENDING_CONSENT_KEY]: "not json" })
+    expect(new AccountConsentSyncStore(storage).read("user-a")).toEqual({})
   })
 })
