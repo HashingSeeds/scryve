@@ -9,6 +9,7 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { LifeDelta } from "@/features/game/types"
 
 import type { ConnectedDisplayProjection, FailedLifeAction, PendingLifeAction } from "./model"
+import { toConnectedProjection } from "./model"
 import { OutboxSyncController } from "./OutboxSyncController"
 import type { ConnectedGameResult } from "./OutboxSyncController"
 import { ConnectedGameRepository } from "./persistence"
@@ -18,8 +19,7 @@ import type { Id } from "../../../convex/_generated/dataModel"
 
 export { mergeDrainSnapshot } from "./OutboxSyncController"
 
-export interface ConnectedGameRuntime {
-  projection: ConnectedDisplayProjection | null
+interface ConnectedGameRuntimeBase {
   pending: PendingLifeAction[]
   failed: FailedLifeAction[]
   connectionStatus: ConnectionStatus
@@ -30,6 +30,16 @@ export interface ConnectedGameRuntime {
   finishError?: string
   finishing: boolean
 }
+
+export type ConnectedGameRuntime = ConnectedGameRuntimeBase &
+  (
+    | { status: "loading"; projection: null }
+    | {
+        status: "ready"
+        source: "cache" | "remote"
+        projection: ConnectedDisplayProjection
+      }
+  )
 
 type LobbyProjection = FunctionReturnType<typeof api.games.lobbyProjection>
 type OptimisticLobbyProjection = LobbyProjection & { __optimisticOperationIds?: string[] }
@@ -66,7 +76,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
   const repository = useMemo(() => new ConnectedGameRepository(undefined, ownerId), [ownerId])
   const deviceId = useRef(asDeviceId(new LocalGameRepository().getDeviceId())).current
   const remote: unknown = useQuery(api.games.lobbyProjection, { publicId, deviceId })
-  const remoteReady = Boolean(remote)
+  const remoteReady = toConnectedProjection(remote) !== null
   const changeLifeBase = useMutation(api.games.changeLife)
   const changeLifeMutation = useMemo(
     () => changeLifeBase.withOptimisticUpdate(connectedLifeOptimisticUpdater),
@@ -122,10 +132,23 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
 
   useEffect(() => () => controller.dispose(), [controller])
 
-  return {
-    ...snapshot,
+  const runtime = {
+    pending: snapshot.pending,
+    failed: snapshot.failed,
+    connectionStatus: snapshot.connectionStatus,
+    changeError: snapshot.changeError,
+    finishError: snapshot.finishError,
+    finishing: snapshot.finishing,
     changeLife: controller.changeLife,
     finish: controller.finish,
     dismissFailed: controller.dismissFailed,
   }
+  return snapshot.projection
+    ? {
+        ...runtime,
+        status: "ready",
+        source: remoteReady ? "remote" : "cache",
+        projection: snapshot.projection,
+      }
+    : { ...runtime, status: "loading", projection: null }
 }

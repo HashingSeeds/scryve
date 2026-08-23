@@ -45,6 +45,8 @@ type RuntimePlayer = Required<Pick<LobbyPlayer, "playerId" | "controlledByMe" | 
   }
 
 export type MockConnectedRuntime = {
+  status: "loading" | "ready"
+  source: "cache" | "remote"
   projection: {
     schemaVersion: 1
     publicId: string
@@ -109,6 +111,8 @@ function defaultProjection(): LobbyProjection {
 function defaultRuntime(): MockConnectedRuntime {
   const projection = defaultProjection()
   return {
+    status: "ready",
+    source: "remote",
     projection: {
       schemaVersion: 1,
       ...projection,
