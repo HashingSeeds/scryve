@@ -14,7 +14,6 @@ import {
   getPlayerGridLayout,
   getPlayerGridLayoutOptions,
   getPlayerGridMenuAnchor,
-  getScreenCornerSquaringStyle,
   PlayerGrid,
   type PlayerGridLayoutVariant,
 } from "@/components/PlayerGrid"
@@ -45,11 +44,6 @@ type ConnectedBoardShellState =
   | { status: "loading"; message: string }
   | { status: "unavailable"; message: string; retry?: () => void }
 
-const BOARD_SHELL_ROWS = [
-  [0, 1],
-  [2, 3],
-]
-
 function ConnectedBoardShell({
   state,
   onBack,
@@ -75,24 +69,7 @@ function ConnectedBoardShell({
           pointerEvents="none"
           style={themed($shellGrid)}
         >
-          {BOARD_SHELL_ROWS.map((row, rowIndex) => (
-            <View key={rowIndex} style={themed($shellRow)}>
-              {row.map((cell, columnIndex) => (
-                <View
-                  key={cell}
-                  testID="connected-board-shell-cell"
-                  style={[
-                    themed($shellCell),
-                    getScreenCornerSquaringStyle({
-                      rows: BOARD_SHELL_ROWS,
-                      rowIndex,
-                      columnIndex,
-                    }),
-                  ]}
-                />
-              ))}
-            </View>
-          ))}
+          <View testID="connected-board-shell-surface" style={themed($shellSurface)} />
         </View>
         <View
           testID="connected-board-status-layer"
@@ -572,20 +549,14 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   backgroundColor: "#000000",
 })
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
-const $shellGrid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $shellGrid: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   width: "100%",
-  gap: spacing.xxs,
 })
-const $shellRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $shellSurface: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
-  flexDirection: "row",
-  gap: spacing.xxs,
-})
-const $shellCell: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
-  borderRadius: spacing.md,
-  backgroundColor: "#151515",
+  width: "100%",
+  backgroundColor: "#0C0C0C",
 })
 const $toastLayer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",

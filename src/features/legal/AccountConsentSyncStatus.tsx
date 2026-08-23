@@ -1,5 +1,6 @@
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
@@ -15,7 +16,11 @@ export function AccountConsentSyncStatus({
   retryFailed: boolean
   onRetry: () => void
 }) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { spacing },
+  } = useAppTheme()
+  const insets = useSafeAreaInsets()
   const message = isSyncing
     ? "Syncing your agreement…"
     : retryFailed
@@ -24,25 +29,41 @@ export function AccountConsentSyncStatus({
 
   return (
     <View
-      testID="account-consent-sync-status"
-      accessibilityLiveRegion="polite"
-      style={themed($status)}
+      testID="account-consent-sync-layer"
+      pointerEvents="box-none"
+      style={[themed($layer), { top: insets.top + spacing.xs }]}
     >
-      <Text size="xs" weight="medium" text={message} style={$message} />
-      <Button
-        testID="retry-account-consent-sync"
-        text={isSyncing ? "Retrying…" : "Retry"}
-        accessibilityLabel="Retry account consent sync"
-        disabled={isSyncing}
-        style={themed($retry)}
-        textStyle={$retryText}
-        onPress={onRetry}
-      />
+      <View
+        testID="account-consent-sync-status"
+        accessibilityLiveRegion="polite"
+        style={themed($status)}
+      >
+        <Text size="xs" weight="medium" text={message} style={$message} />
+        <Button
+          testID="retry-account-consent-sync"
+          text={isSyncing ? "Retrying…" : "Retry"}
+          accessibilityLabel="Retry account consent sync"
+          disabled={isSyncing}
+          style={themed($retry)}
+          textStyle={$retryText}
+          onPress={onRetry}
+        />
+      </View>
     </View>
   )
 }
 
+const $layer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  left: spacing.xs,
+  right: spacing.xs,
+  zIndex: 100,
+  elevation: 100,
+  alignItems: "center",
+})
 const $status: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: "100%",
+  maxWidth: 560,
   minHeight: 48,
   flexDirection: "row",
   alignItems: "center",

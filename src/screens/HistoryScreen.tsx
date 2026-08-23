@@ -458,11 +458,33 @@ export function HistoryScreen({
                 ) : null}
               </>
             ) : null}
-            {connected?.premiumLocked && connectedPage?.status === "ready" ? (
-              <Card
-                heading="Unlock full history"
-                content="Premium keeps every connected game and its complete event timeline available."
-              />
+            {connectedPage?.status === "ready" && connected?.access.status !== "not-applicable" ? (
+              <View testID="history-access-slot" style={themed($accessSlot)}>
+                {connected?.access.status === "loading" ? (
+                  <Text
+                    accessibilityRole="progressbar"
+                    accessibilityLabel="Checking full-history access"
+                    size="xs"
+                    style={themed($dimmedText)}
+                    text="Checking full-history access…"
+                  />
+                ) : connected?.access.status === "unavailable" ? (
+                  <View accessibilityRole="alert" style={themed($accessStatus)}>
+                    <Text size="xs" text="Full-history access is unavailable." />
+                    <Button
+                      testID="history-retry-access"
+                      style={themed($statusButton)}
+                      text="Try again"
+                      onPress={connected.access.retry}
+                    />
+                  </View>
+                ) : connected?.access.premiumLocked ? (
+                  <Card
+                    heading="Unlock full history"
+                    content="Premium keeps every connected game and its complete event timeline available."
+                  />
+                ) : null}
+              </View>
             ) : null}
           </View>
         }
@@ -588,6 +610,13 @@ const $headerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $footerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingTop: spacing.md,
+})
+const $accessSlot: ThemedStyle<ViewStyle> = () => ({
+  minHeight: 112,
+  justifyContent: "center",
+})
+const $accessStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
 })
 const $status: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,

@@ -45,7 +45,7 @@ function connectedFeed(
       items: games.map(connectedHistoryEntry),
       nextPage: { status: "exhausted" },
     },
-    premiumLocked: false,
+    access: { status: "ready", premiumLocked: false },
     migration: { status: "complete" },
     ...overrides,
   }
@@ -69,7 +69,7 @@ function connectedGame(overrides: Partial<ConnectedHistoryGame> = {}): Connected
 function renderHistory(props: Partial<Parameters<typeof HistoryScreen>[0]> = {}) {
   const onSelectLocal = jest.fn()
   const onSelectConnected = jest.fn()
-  render(
+  const view = render(
     themed(
       <HistoryScreen
         games={[localGame()]}
@@ -80,7 +80,7 @@ function renderHistory(props: Partial<Parameters<typeof HistoryScreen>[0]> = {})
       />,
     ),
   )
-  return { onSelectLocal, onSelectConnected }
+  return { ...view, onSelectLocal, onSelectConnected }
 }
 
 function openFilters() {
@@ -316,6 +316,47 @@ describe("unified history screen", () => {
 
     expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
     fireEvent.press(screen.getByTestId("history-retry-connected"))
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  it("reserves one stable footer slot while full-history access loads", () => {
+    const view = renderHistory({
+      connected: connectedFeed([connectedGame()], { access: { status: "loading" } }),
+    })
+
+    const loadingSlot = screen.getByTestId("history-access-slot")
+    expect(screen.getByText("Checking full-history access…")).toBeTruthy()
+
+    view.rerender(
+      themed(
+        <HistoryScreen
+          games={[localGame()]}
+          onBack={jest.fn()}
+          onSelectLocal={jest.fn()}
+          onSelectConnected={jest.fn()}
+          connected={connectedFeed([connectedGame()], {
+            access: { status: "ready", premiumLocked: true },
+          })}
+        />,
+      ),
+    )
+
+    expect(screen.getByTestId("history-access-slot").props.style).toEqual(loadingSlot.props.style)
+    expect(screen.getByText("Unlock full history")).toBeTruthy()
+  })
+
+  it("keeps healthy history visible when only full-history access is unavailable", () => {
+    const retry = jest.fn()
+    renderHistory({
+      connected: connectedFeed([connectedGame()], {
+        access: { status: "unavailable", retry },
+      }),
+    })
+
+    expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
+    expect(screen.getByTestId("history-row-connected-connected-1")).toBeTruthy()
+    expect(screen.getByText("Full-history access is unavailable.")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("history-retry-access"))
     expect(retry).toHaveBeenCalledTimes(1)
   })
 
