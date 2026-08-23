@@ -179,6 +179,64 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
   )
 }
 
+function HistoryRowSkeleton({ testID = "history-skeleton-row" }: { testID?: string }) {
+  const { themed } = useAppTheme()
+  return (
+    <View testID={testID} style={themed($row)}>
+      <View style={themed($skeletonBadge)} />
+      <View style={themed($skeletonCopy)}>
+        <View style={themed($skeletonTitle)} />
+        <View style={themed($skeletonSubtitle)} />
+      </View>
+      <View style={themed($skeletonDots)} />
+    </View>
+  )
+}
+
+function HistoryRowsSkeleton() {
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading connected history">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <HistoryRowSkeleton key={index} />
+      ))}
+    </View>
+  )
+}
+
+function ConnectedHistoryStatus({
+  status,
+  onRetry,
+}: {
+  status: "loading" | "unavailable"
+  onRetry?: () => void
+}) {
+  const { themed } = useAppTheme()
+  if (status === "loading")
+    return (
+      <View
+        testID="history-connected-progress"
+        accessibilityRole="progressbar"
+        accessibilityLabel="Loading connected history"
+        style={themed($row)}
+      >
+        <View style={themed($skeletonBadge)} />
+        <Text size="xs" style={themed($dimmedText)} text="Loading connected history…" />
+      </View>
+    )
+
+  return (
+    <View testID="history-connected-unavailable" accessibilityRole="alert" style={themed($status)}>
+      <Text size="xs" text="Connected history is unavailable." />
+      <Button
+        testID="history-retry-connected"
+        style={themed($statusButton)}
+        text="Try again"
+        onPress={onRetry}
+      />
+    </View>
+  )
+}
+
 export function HistoryScreen({
   games,
   onBack,
@@ -194,20 +252,41 @@ export function HistoryScreen({
     source: initialSource ?? "all",
   })
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const connectedPage = connected?.page
 
   const entries = useMemo(() => {
     const unique = new Map<string, HistoryEntry>()
-    for (const entry of [...games.map(localHistoryEntry), ...(connected?.entries ?? [])])
+    const connectedEntries = connectedPage?.status === "ready" ? connectedPage.items : []
+    for (const entry of [...games.map(localHistoryEntry), ...connectedEntries])
       unique.set(entry.key, entry)
     return sortedByRecency([...unique.values()])
-  }, [games, connected?.entries])
+  }, [games, connectedPage])
   const now = Date.now()
   const visible = filterHistory(entries, filters, now)
   const options = useMemo(() => filterOptions(entries), [entries])
   const record = tallyOutcomes(visible)
   const filterCount = activeFilterCount(filters)
   const anyFilters = filtersActive(filters)
-  const loading = entries.length === 0 && Boolean(connected?.loading)
+  const connectedRelevant = filters.source !== "local"
+  const loadingFirstPage = connectedRelevant && connectedPage?.status === "loading"
+  const connectedUnavailable = connectedRelevant && connectedPage?.status === "unavailable"
+  const loadingMore =
+    connectedRelevant &&
+    connectedPage?.status === "ready" &&
+    connectedPage.nextPage.status === "loading"
+  const localVisibleCount = visible.filter((entry) => entry.source === "local").length
+  const recordLabel = `${visible.length} game${visible.length === 1 ? "" : "s"} · ${record.wins}W · ${record.losses}L · ${record.draws}D`
+  const countLabel = loadingFirstPage
+    ? localVisibleCount > 0
+      ? `${localVisibleCount} local game${localVisibleCount === 1 ? "" : "s"} · Connected history loading`
+      : "Loading connected history…"
+    : connectedUnavailable
+      ? localVisibleCount > 0
+        ? `${localVisibleCount} local game${localVisibleCount === 1 ? "" : "s"} · Connected history unavailable`
+        : "Connected history unavailable"
+      : loadingMore
+        ? `${visible.length} loaded game${visible.length === 1 ? "" : "s"} · Loading more connected history`
+        : recordLabel
 
   function patch(change: Partial<HistoryFilters>) {
     setFilters((current) => ({ ...current, ...change }))
@@ -265,14 +344,7 @@ export function HistoryScreen({
         ListHeaderComponent={
           <View style={themed($headerBlock)}>
             <Text preset="heading" text="History" />
-            {connected?.error ? (
-              <Text accessibilityRole="alert" size="xs" text={connected.error} />
-            ) : null}
-            <Text
-              size="xs"
-              style={themed($dimmedText)}
-              text={`${visible.length} game${visible.length === 1 ? "" : "s"} · ${record.wins}W · ${record.losses}L · ${record.draws}D`}
-            />
+            <Text size="xs" style={themed($dimmedText)} text={countLabel} />
             <View style={themed($chipRow)}>
               <ScrollView
                 horizontal
@@ -325,7 +397,9 @@ export function HistoryScreen({
           />
         )}
         ListEmptyComponent={
-          loading ? null : anyFilters ? (
+          loadingFirstPage ? (
+            <HistoryRowsSkeleton />
+          ) : connectedUnavailable ? null : anyFilters ? (
             <EmptyState
               heading="No games match these filters"
               content="Clear a filter to widen the search."
@@ -338,19 +412,53 @@ export function HistoryScreen({
         }
         ListFooterComponent={
           <View style={themed($footerBlock)}>
-            {connected?.canLoadMore ? (
+            {loadingFirstPage && visible.length > 0 ? (
+              <ConnectedHistoryStatus status="loading" />
+            ) : null}
+            {connectedUnavailable ? (
+              <ConnectedHistoryStatus status="unavailable" onRetry={connectedPage.retry} />
+            ) : null}
+            {connected?.migration.status === "failed" ? (
+              <View
+                testID="history-migration-error"
+                accessibilityRole="alert"
+                style={themed($status)}
+              >
+                <Text size="xs" text="Some older connected games could not be added." />
+                <Button
+                  testID="history-retry-migration"
+                  style={themed($statusButton)}
+                  text="Retry import"
+                  onPress={connected.migration.retry}
+                />
+              </View>
+            ) : null}
+            {connectedPage?.status === "ready" && connectedPage.nextPage.status !== "exhausted" ? (
               <>
-                <Button text="Load more connected games" onPress={connected.loadMore} />
+                <Button
+                  testID="history-load-more"
+                  text={
+                    connectedPage.nextPage.status === "loading"
+                      ? "Loading more connected games…"
+                      : "Load more connected games"
+                  }
+                  disabled={connectedPage.nextPage.status === "loading"}
+                  onPress={
+                    connectedPage.nextPage.status === "available"
+                      ? connectedPage.nextPage.load
+                      : undefined
+                  }
+                />
                 {anyFilters ? (
                   <Text
                     size="xxs"
                     style={themed($dimmedText)}
-                    text="Filters apply to loaded games — load more to search further back."
+                    text="Filters apply to loaded games. Load more to search further back."
                   />
                 ) : null}
               </>
             ) : null}
-            {connected?.premiumLocked ? (
+            {connected?.premiumLocked && connectedPage?.status === "ready" ? (
               <Card
                 heading="Unlock full history"
                 content="Premium keeps every connected game and its complete event timeline available."
@@ -453,7 +561,7 @@ export function HistoryScreen({
           <Button
             style={themed($dialogButton)}
             preset="reversed"
-            text={`Show ${visible.length}`}
+            text={loadingFirstPage || loadingMore ? "Show loaded games" : `Show ${visible.length}`}
             onPress={() => setFiltersOpen(false)}
           />
         </View>
@@ -480,6 +588,19 @@ const $headerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $footerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingTop: spacing.md,
+})
+const $status: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.xs,
+  paddingVertical: spacing.sm,
+  borderTopWidth: 1,
+  borderBottomWidth: 1,
+  borderColor: colors.separator,
+})
+const $statusButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 40,
+  alignSelf: "flex-start",
+  paddingVertical: spacing.xxs,
+  paddingHorizontal: spacing.md,
 })
 const $chipRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
@@ -532,6 +653,34 @@ const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingVertical: spacing.sm,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
+})
+const $skeletonBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: BADGE_SIZE,
+  height: BADGE_SIZE,
+  borderRadius: BADGE_SIZE / 2,
+  backgroundColor: colors.separator,
+})
+const $skeletonCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  gap: spacing.xs,
+})
+const $skeletonTitle: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "56%",
+  height: 14,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
+})
+const $skeletonSubtitle: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "82%",
+  height: 10,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
+})
+const $skeletonDots: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 38,
+  height: DOT_SIZE,
+  borderRadius: DOT_SIZE / 2,
+  backgroundColor: colors.separator,
 })
 const $badge: ThemedStyle<ViewStyle> = () => ({
   width: BADGE_SIZE,

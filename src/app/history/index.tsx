@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router"
 
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ConnectedHistorySource } from "@/features/connected/ConnectedHistorySource"
 import { localGameRepository } from "@/features/game/localPersistence"
@@ -22,8 +23,21 @@ export default function HistoryRoute() {
   }
   if (!auth.configured || !auth.isSignedIn) return <HistoryScreen {...shared} />
   return (
-    <ConnectedHistorySource>
-      {(connected) => <HistoryScreen {...shared} connected={connected} />}
-    </ConnectedHistorySource>
+    <ConvexQueryBoundary
+      fallback={({ retry }) => (
+        <HistoryScreen
+          {...shared}
+          connected={{
+            page: { status: "unavailable", retry },
+            premiumLocked: false,
+            migration: { status: "complete" },
+          }}
+        />
+      )}
+    >
+      <ConnectedHistorySource>
+        {(connected) => <HistoryScreen {...shared} connected={connected} />}
+      </ConnectedHistorySource>
+    </ConvexQueryBoundary>
   )
 }
