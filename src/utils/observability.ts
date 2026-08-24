@@ -1,3 +1,4 @@
+import { Platform } from "react-native"
 import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
@@ -16,11 +17,21 @@ export function initObservability(): void {
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 1,
     integrations: [
-      Sentry.mobileReplayIntegration({
-        maskAllText: true,
-        maskAllImages: true,
-        maskAllVectors: true,
-      }),
+      ...(Platform.OS === "web"
+        ? [
+            Sentry.browserReplayIntegration({
+              maskAllText: true,
+              maskAllInputs: true,
+              blockAllMedia: true,
+            }),
+          ]
+        : [
+            Sentry.mobileReplayIntegration({
+              maskAllText: true,
+              maskAllImages: true,
+              maskAllVectors: true,
+            }),
+          ]),
       Sentry.feedbackIntegration(),
     ],
   })
