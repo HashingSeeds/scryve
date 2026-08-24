@@ -9,6 +9,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import {
   clearAccountDeletionReceiptToken,
+  isValidReceiptToken,
   loadAccountDeletionReceiptToken,
   saveAccountDeletionReceiptToken,
 } from "@/features/auth/accountDeletionReceiptStore"
@@ -35,8 +36,9 @@ export default function DeleteAccountRoute() {
   const auth = useAuthAccess()
   const [receiptToken, setReceiptToken] = useState(loadAccountDeletionReceiptToken)
   const rememberReceipt = useCallback((token: string) => {
-    if (!saveAccountDeletionReceiptToken(token)) return
+    if (!isValidReceiptToken(token)) return
     setReceiptToken(token)
+    saveAccountDeletionReceiptToken(token)
   }, [])
   if (!auth.configured || !auth.isSignedIn)
     if (auth.configured && receiptToken)

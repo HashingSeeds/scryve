@@ -15,11 +15,9 @@ const USER_DATA_BATCH_SIZE = 50
 type AccountDeletionStatus = Doc<"accountDeletionRequests">["status"]
 
 function createReceiptToken() {
-  return Array.from({ length: 16 }, () =>
-    Math.floor(Math.random() * 0x1_0000)
-      .toString(16)
-      .padStart(4, "0"),
-  ).join("")
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")
 }
 
 async function createReceipt(ctx: MutationCtx, status: AccountDeletionStatus, requestedAt: number) {
