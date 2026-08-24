@@ -501,45 +501,48 @@ describe("ConnectedBoardScreen", () => {
     (playerCount) => {
       const originalWindow = Dimensions.get("window")
       const originalScreen = Dimensions.get("screen")
-      Dimensions.set({
-        window: { width: 844, height: 390, scale: 1, fontScale: 1 },
-        screen: { width: 844, height: 390, scale: 1, fontScale: 1 },
-      })
-      const players = Array.from({ length: playerCount }, (_, index) => ({
-        playerId: `player-${index + 1}`,
-        seat: index + 1,
-        displayName: `Player ${index + 1}`,
-        color: index % 2 === 0 ? "#7C3AED" : "#2563EB",
-        currentLife: 40,
-        pendingDelta: 0,
-        controlledByMe: index === 0,
-      }))
-      connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
-      const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-      const loadingBoardStyle = StyleSheet.flatten(
-        screen.getByTestId("connected-game-board").props.style,
-      )
+      try {
+        Dimensions.set({
+          window: { width: 844, height: 390, scale: 1, fontScale: 1 },
+          screen: { width: 844, height: 390, scale: 1, fontScale: 1 },
+        })
+        const players = Array.from({ length: playerCount }, (_, index) => ({
+          playerId: `player-${index + 1}`,
+          seat: index + 1,
+          displayName: `Player ${index + 1}`,
+          color: index % 2 === 0 ? "#7C3AED" : "#2563EB",
+          currentLife: 40,
+          pendingDelta: 0,
+          controlledByMe: index === 0,
+        }))
+        connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
+        const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+        const loadingBoardStyle = StyleSheet.flatten(
+          screen.getByTestId("connected-game-board").props.style,
+        )
 
-      connectedHarness.runtime = {
-        ...connectedHarness.runtime,
-        status: "ready",
-        projection: {
-          ...connectedHarness.runtime.projection,
-          playerCount,
-          players,
-        },
+        connectedHarness.runtime = {
+          ...connectedHarness.runtime,
+          status: "ready",
+          projection: {
+            ...connectedHarness.runtime.projection,
+            playerCount,
+            players,
+          },
+        }
+        view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+        expect(screen.getByTestId("player-grid").props.accessibilityLabel).toBe(
+          `${playerCount} player life grid`,
+        )
+        expect(screen.getAllByTestId(/^player-grid-row-/)).toHaveLength(2)
+        expect(StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style)).toEqual(
+          loadingBoardStyle,
+        )
+        view.unmount()
+      } finally {
+        act(() => Dimensions.set({ window: originalWindow, screen: originalScreen }))
       }
-      view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-
-      expect(screen.getByTestId("player-grid").props.accessibilityLabel).toBe(
-        `${playerCount} player life grid`,
-      )
-      expect(screen.getAllByTestId(/^player-grid-row-/)).toHaveLength(2)
-      expect(StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style)).toEqual(
-        loadingBoardStyle,
-      )
-      view.unmount()
-      act(() => Dimensions.set({ window: originalWindow, screen: originalScreen }))
     },
   )
 
