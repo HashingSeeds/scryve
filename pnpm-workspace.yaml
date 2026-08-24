@@ -8,3 +8,7 @@ onlyBuiltDependencies:
 
 ignoredBuiltDependencies:
   - dtrace-provider
+
+# convex-test 0.0.54 leaves its event-loop MessagePorts open after scheduled functions finish.
+patchedDependencies:
+  convex-test@0.0.54: patches/convex-test@0.0.54.patch
