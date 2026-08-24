@@ -1,0 +1,164 @@
+name: native fingerprints
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: native-fingerprints-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: >-
+      ${{ github.event.pull_request.head.repo.fork == false &&
+      (github.actor == 'mchisolm0' ||
+      contains(fromJSON('["OWNER", "MEMBER"]'), github.event.pull_request.author_association)) }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 22.2.0
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check native fingerprints
+        id: fingerprints
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          marker='<!-- native-fingerprint-check -->'
+          comment_file="$RUNNER_TEMP/native-fingerprints.md"
+          needs_build=false
+
+          {
+            echo "$marker"
+            echo 'Native builds are needed for these targets:'
+            echo
+            echo '| Environment | Platform | Fingerprint difference |'
+            echo '| --- | --- | --- |'
+          } > "$comment_file"
+
+          for profile in development:device preview:device production; do
+            case "$profile" in
+              development:device) environment=Development ;;
+              preview:device) environment=Preview ;;
+              production) environment=Production ;;
+            esac
+
+            for platform in ios android; do
+              fingerprint_file="$RUNNER_TEMP/fingerprint-${profile//:/-}-$platform.json"
+              matching_file="$RUNNER_TEMP/matching-${profile//:/-}-$platform.json"
+              latest_file="$RUNNER_TEMP/latest-${profile//:/-}-$platform.json"
+
+              eas fingerprint:generate \
+                --build-profile "$profile" \
+                --platform "$platform" \
+                --json \
+                --non-interactive > "$fingerprint_file"
+              current_hash=$(jq -er '.hash' "$fingerprint_file")
+
+              eas build:list \
+                --build-profile "$profile" \
+                --platform "$platform" \
+                --status finished \
+                --fingerprint-hash "$current_hash" \
+                --limit 1 \
+                --json \
+                --non-interactive > "$matching_file"
+
+              if [ "$(jq 'length' "$matching_file")" -gt 0 ]; then
+                continue
+              fi
+
+              needs_build=true
+              eas build:list \
+                --build-profile "$profile" \
+                --platform "$platform" \
+                --status finished \
+                --limit 1 \
+                --json \
+                --non-interactive > "$latest_file"
+
+              current_short=${current_hash:0:8}
+              if [ "$(jq 'length' "$latest_file")" -eq 0 ]; then
+                difference="No finished build → \`$current_short\`"
+              else
+                previous_hash=$(jq -er '.[0].fingerprint.hash' "$latest_file")
+                previous_short=${previous_hash:0:8}
+                build_id=$(jq -er '.[0].id' "$latest_file")
+                account=$(jq -er '.[0].app.ownerAccount.name' "$latest_file")
+                project=$(jq -er '.[0].app.slug' "$latest_file")
+                build_url="https://expo.dev/accounts/$account/projects/$project/builds/$build_id"
+                difference="[\`$previous_short\`]($build_url) → \`$current_short\`"
+              fi
+
+              case "$platform" in
+                ios) platform_name=iOS ;;
+                android) platform_name=Android ;;
+              esac
+              echo "| $environment | $platform_name | $difference |" >> "$comment_file"
+            done
+          done
+
+          echo "needs_build=$needs_build" >> "$GITHUB_OUTPUT"
+          echo "comment_file=$comment_file" >> "$GITHUB_OUTPUT"
+
+      - name: Update pull request comment
+        uses: actions/github-script@v7
+        env:
+          COMMENT_FILE: ${{ steps.fingerprints.outputs.comment_file }}
+          NEEDS_BUILD: ${{ steps.fingerprints.outputs.needs_build }}
+        with:
+          script: |
+            const fs = require("node:fs")
+            const marker = "<!-- native-fingerprint-check -->"
+            const { owner, repo } = context.repo
+            const issue_number = context.issue.number
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+            })
+            const existing = comments.find((comment) => comment.body?.includes(marker))
+
+            if (process.env.NEEDS_BUILD === "true") {
+              const body = fs.readFileSync(process.env.COMMENT_FILE, "utf8")
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: existing.id,
+                  body,
+                })
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number, body })
+              }
+            } else if (existing) {
+              await github.rest.issues.deleteComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+              })
+            }
