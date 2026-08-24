@@ -597,7 +597,7 @@ const $status: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $statusButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 40,
+  minHeight: 44,
   alignSelf: "flex-start",
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.md,
