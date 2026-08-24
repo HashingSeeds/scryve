@@ -16,6 +16,7 @@ jobs:
   check:
     if: >-
       ${{ github.event.pull_request.head.repo.fork == false &&
+      github.actor == github.event.pull_request.user.login &&
       (github.actor == 'mchisolm0' ||
       contains(fromJSON('["OWNER", "MEMBER"]'), github.event.pull_request.author_association)) }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
