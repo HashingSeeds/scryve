@@ -2,7 +2,6 @@ import "react-native-url-polyfill/auto"
 
 import { useCallback, useEffect, useState } from "react"
 import { Slot, SplashScreen, type ErrorBoundaryProps } from "expo-router"
-import * as Sentry from "@sentry/react-native"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
@@ -12,20 +11,9 @@ import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
 import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
 import { ThemeProvider } from "@/theme/context"
 import { reportCrash } from "@/utils/crashReporting"
+import { initObservability } from "@/utils/observability"
 
-Sentry.init({
-  dsn: "https://fb85fd67adf134394a15190b8a488404@o4507118738669568.ingest.us.sentry.io/4511870328635392",
-
-  sendDefaultPii: false,
-
-  // Enable Logs
-  enableLogs: true,
-
-  // Configure Session Replay
-  replaysSessionSampleRate: 0,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-})
+initObservability()
 
 SplashScreen.preventAutoHideAsync()
 
