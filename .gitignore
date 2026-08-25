@@ -102,6 +102,7 @@ artifacts/
 app-dependency-graph.svg
 app-dependency-graph.png
 
+.plans/
 docs/
 builds/
 app-store-assets/
