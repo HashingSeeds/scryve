@@ -2,9 +2,6 @@ name: checks
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
 
 concurrency:
   group: checks-${{ github.ref }}
@@ -43,6 +40,12 @@ jobs:
 
       - name: Validate dependency boundaries
         run: pnpm depcruise
+
+      - name: Restore Jest cache
+        uses: actions/cache@v4
+        with:
+          path: .jest-cache
+          key: jest-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Run Jest tests
         id: jest
