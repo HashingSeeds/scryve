@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router"
 
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { ConnectedGate } from "@/features/connected/ConnectedGate"
 import { ConnectedSummarySource } from "@/features/connected/ConnectedSummarySource"
 import { localGameRepository } from "@/features/game/localPersistence"
@@ -13,17 +14,27 @@ export default function GameSummaryRoute() {
   if (source === "connected" && typeof gameId === "string") {
     return (
       <ConnectedGate onBack={onBack}>
-        <ConnectedSummarySource publicId={gameId}>
-          {({ model, changes, loading, viewerPlayerIds }) => (
+        <ConvexQueryBoundary
+          resetKey={gameId}
+          fallback={({ retry }) => (
             <GameSummaryScreen
-              model={model}
-              changes={changes}
-              loading={loading}
+              summary={{ status: "unavailable", retry }}
+              timeline={{ status: "unavailable" }}
               onBack={onBack}
-              moderation={{ publicId: gameId, viewerPlayerIds }}
             />
           )}
-        </ConnectedSummarySource>
+        >
+          <ConnectedSummarySource publicId={gameId}>
+            {({ summary, timeline, viewerPlayerIds }) => (
+              <GameSummaryScreen
+                summary={summary}
+                timeline={timeline}
+                onBack={onBack}
+                moderation={{ publicId: gameId, viewerPlayerIds }}
+              />
+            )}
+          </ConnectedSummarySource>
+        </ConvexQueryBoundary>
       </ConnectedGate>
     )
   }
@@ -31,14 +42,16 @@ export default function GameSummaryRoute() {
   const detail = typeof gameId === "string" ? localGameRepository.loadHistoryDetail(gameId) : null
   return (
     <GameSummaryScreen
-      model={detail ? localSummaryModel(detail.game) : null}
-      changes={
+      summary={{ status: "ready", value: detail ? localSummaryModel(detail.game) : null }}
+      timeline={
         detail
           ? {
-              changes: localChanges(detail.game),
+              status: "ready",
+              items: localChanges(detail.game),
+              nextPage: { status: "exhausted" },
               olderEventsDropped: detail.eventsTruncated,
             }
-          : undefined
+          : { status: "unavailable" }
       }
       onBack={onBack}
     />

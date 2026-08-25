@@ -33,18 +33,25 @@ function localGame(overrides: Partial<LocalGameSummary> = {}): LocalGameSummary 
   } as LocalGameSummary
 }
 
-function connectedFeed(games: any[], overrides: Partial<ConnectedHistoryFeed> = {}) {
+type ConnectedHistoryGame = Parameters<typeof connectedHistoryEntry>[0]
+
+function connectedFeed(
+  games: ConnectedHistoryGame[],
+  overrides: Partial<ConnectedHistoryFeed> = {},
+): ConnectedHistoryFeed {
   return {
-    entries: games.map(connectedHistoryEntry),
-    loading: false,
-    canLoadMore: false,
-    loadMore: jest.fn(),
+    page: {
+      status: "ready",
+      items: games.map(connectedHistoryEntry),
+      nextPage: { status: "exhausted" },
+    },
     premiumLocked: false,
+    migration: { status: "complete" },
     ...overrides,
   }
 }
 
-function connectedGame(overrides: Record<string, unknown> = {}) {
+function connectedGame(overrides: Partial<ConnectedHistoryGame> = {}): ConnectedHistoryGame {
   return {
     publicId: "connected-1",
     outcome: "win",
@@ -237,7 +244,15 @@ describe("unified history screen", () => {
   })
 
   it("warns that filters only cover loaded connected pages", () => {
-    renderHistory({ connected: connectedFeed([connectedGame()], { canLoadMore: true }) })
+    renderHistory({
+      connected: connectedFeed([connectedGame()], {
+        page: {
+          status: "ready",
+          items: [connectedHistoryEntry(connectedGame())],
+          nextPage: { status: "available", load: jest.fn() },
+        },
+      }),
+    })
 
     expect(screen.queryByText(/load more to search further back/i)).toBeNull()
 
@@ -266,5 +281,67 @@ describe("unified history screen", () => {
     renderHistory({ games: [localGame({ status: "abandoned" })] })
 
     expect(screen.getByLabelText("Abandoned · Ada · Grace")).toBeTruthy()
+  })
+
+  it("uses stable rows instead of settled zero counts while connected history loads", () => {
+    renderHistory({
+      games: [],
+      connected: connectedFeed([], { page: { status: "loading" } }),
+    })
+
+    expect(screen.getAllByTestId("history-skeleton-row")).toHaveLength(3)
+    expect(screen.getByText("Loading connected history…")).toBeTruthy()
+    expect(screen.queryByText("0 games · 0W · 0L · 0D")).toBeNull()
+  })
+
+  it("keeps local rows visible beside connected first-page progress", () => {
+    renderHistory({ connected: connectedFeed([], { page: { status: "loading" } }) })
+
+    expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
+    expect(screen.getByTestId("history-connected-progress")).toBeTruthy()
+  })
+
+  it("shows a settled empty state only after connected history finishes", () => {
+    renderHistory({ games: [], connected: connectedFeed([]) })
+
+    expect(screen.getByText("localGame:noGames")).toBeTruthy()
+    expect(screen.queryByTestId("history-skeleton-row")).toBeNull()
+  })
+
+  it("keeps local history usable when connected history is unavailable", () => {
+    const retry = jest.fn()
+    renderHistory({
+      connected: connectedFeed([], { page: { status: "unavailable", retry } }),
+    })
+
+    expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("history-retry-connected"))
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  it("retries a failed history import", () => {
+    const retry = jest.fn()
+    renderHistory({
+      connected: connectedFeed([], { migration: { status: "failed", retry } }),
+    })
+
+    fireEvent.press(screen.getByTestId("history-retry-migration"))
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  it("labels and locks connected pagination while the next page loads", () => {
+    renderHistory({
+      connected: connectedFeed([connectedGame()], {
+        page: {
+          status: "ready",
+          items: [connectedHistoryEntry(connectedGame())],
+          nextPage: { status: "loading" },
+        },
+      }),
+    })
+
+    const button = screen.getByTestId("history-load-more")
+    expect(screen.getByText("Loading more connected games…")).toBeTruthy()
+    expect(button).toBeDisabled()
   })
 })

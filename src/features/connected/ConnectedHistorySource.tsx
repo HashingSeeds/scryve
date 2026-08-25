@@ -1,18 +1,16 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { useConvexAuth, useMutation, usePaginatedQuery, useQuery } from "convex/react"
 
+import { remotePage, type RemotePage } from "@/features/async/remoteState"
 import type { HistoryEntry } from "@/screens/historyEntries"
 import { connectedHistoryEntry } from "@/screens/historyEntries"
 
 import { api } from "../../../convex/_generated/api"
 
 export interface ConnectedHistoryFeed {
-  entries: HistoryEntry[]
-  loading: boolean
-  canLoadMore: boolean
-  loadMore: () => void
+  page: RemotePage<HistoryEntry> | { status: "unavailable"; retry: () => void }
   premiumLocked: boolean
-  error?: string
+  migration: { status: "running" | "complete" } | { status: "failed"; retry: () => void }
 }
 
 const PAGE_SIZE = 10
@@ -25,16 +23,19 @@ export function ConnectedHistorySource({
   const { isAuthenticated } = useConvexAuth()
   const entitlements = useQuery(api.entitlements.current, isAuthenticated ? {} : "skip")
   const migrateHistory = useMutation(api.games.migrateMyHistoryEntries)
-  const [migrationError, setMigrationError] = useState<string>()
-  const { results, status, loadMore } = usePaginatedQuery(
-    api.games.connectedHistory,
-    isAuthenticated ? {} : "skip",
-    { initialNumItems: PAGE_SIZE },
+  const [migrationAttempt, setMigrationAttempt] = useState(0)
+  const [migrationStatus, setMigrationStatus] = useState<"running" | "complete" | "failed">(
+    "running",
   )
+  const history = usePaginatedQuery(api.games.connectedHistory, isAuthenticated ? {} : "skip", {
+    initialNumItems: PAGE_SIZE,
+  })
+  const retryMigration = useCallback(() => setMigrationAttempt((attempt) => attempt + 1), [])
 
   useEffect(() => {
     if (!isAuthenticated) return
     let cancelled = false
+    setMigrationStatus("running")
     void (async () => {
       let cursor: string | null = null
       let isDone = false
@@ -43,21 +44,27 @@ export function ConnectedHistorySource({
         cursor = result.continueCursor
         isDone = result.isDone
       }
-    })().catch((cause) => {
-      if (!cancelled)
-        setMigrationError(cause instanceof Error ? cause.message : "Could not migrate game history")
+      if (!cancelled) setMigrationStatus("complete")
+    })().catch(() => {
+      if (!cancelled) setMigrationStatus("failed")
     })
     return () => {
       cancelled = true
     }
-  }, [isAuthenticated, migrateHistory])
+  }, [isAuthenticated, migrateHistory, migrationAttempt])
 
   return children({
-    entries: results.map((game: any) => connectedHistoryEntry(game)),
-    loading: status === "LoadingFirstPage",
-    canLoadMore: status === "CanLoadMore",
-    loadMore: () => loadMore(PAGE_SIZE),
-    premiumLocked: Boolean(entitlements && !entitlements.fullHistory && results.length >= 10),
-    error: migrationError,
+    page: (() => {
+      const page = remotePage(history, PAGE_SIZE)
+      if (page.status === "loading") return page
+      return { ...page, items: page.items.map(connectedHistoryEntry) }
+    })(),
+    premiumLocked: Boolean(
+      entitlements && !entitlements.fullHistory && history.results.length >= PAGE_SIZE,
+    ),
+    migration:
+      migrationStatus === "failed"
+        ? { status: "failed", retry: retryMigration }
+        : { status: migrationStatus },
   })
 }

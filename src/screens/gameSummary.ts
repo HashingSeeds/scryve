@@ -1,3 +1,4 @@
+import type { NextPageState, RemoteValue } from "@/features/async/remoteState"
 import type { LifeChangedEvent, LocalGame } from "@/features/game/types"
 
 import type { HistorySource } from "./historyEntries"
@@ -36,12 +37,21 @@ export interface GameSummaryModel {
 }
 
 export interface SummaryChangeFeed {
-  changes: SummaryChange[]
-  onExpand?: () => void
-  canLoadMore?: boolean
-  loadMore?: () => void
+  status: "ready"
+  items: readonly SummaryChange[]
+  nextPage: NextPageState
   olderEventsDropped?: boolean
 }
+
+export type SummaryTimelineState =
+  | { status: "idle"; request: () => void }
+  | { status: "loading" }
+  | SummaryChangeFeed
+  | { status: "error"; retry: () => void }
+  | { status: "unavailable" }
+
+export type GameSummaryState =
+  RemoteValue<GameSummaryModel | null> | { status: "unavailable"; retry: () => void }
 
 const OUTCOME_ORDER: Record<SummaryOutcome, number> = { win: 0, draw: 1, loss: 2, unrecorded: 3 }
 
@@ -135,15 +145,19 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
 }
 
 export function connectedChanges(
-  events: { operationId: string; playerId?: string; kind: string; delta?: number }[],
+  events: readonly { operationId: string; playerId?: string; kind: string; delta?: number }[],
 ): SummaryChange[] {
-  return events
-    .filter((event) => event.kind === "life.changed" && typeof event.delta === "number")
-    .map((event) => ({
-      id: event.operationId,
-      playerId: event.playerId,
-      delta: event.delta as number,
-    }))
+  return events.flatMap((event) =>
+    event.kind === "life.changed" && typeof event.delta === "number"
+      ? [
+          {
+            id: event.operationId,
+            playerId: event.playerId,
+            delta: event.delta,
+          },
+        ]
+      : [],
+  )
 }
 
 export function standings(model: GameSummaryModel) {

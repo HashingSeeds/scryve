@@ -18,17 +18,16 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 
 import type {
-  GameSummaryModel,
-  SummaryChangeFeed,
+  GameSummaryState,
   SummaryOutcome,
   SummaryPlayer,
+  SummaryTimelineState,
 } from "./gameSummary"
 import { anyResultRecorded, finishedOnLabel, metaLine, netSwing, standings } from "./gameSummary"
 
 export interface GameSummaryScreenProps {
-  model: GameSummaryModel | null
-  changes?: SummaryChangeFeed
-  loading?: boolean
+  summary: GameSummaryState
+  timeline: SummaryTimelineState
   onBack: () => void
   moderation?: { publicId: string; viewerPlayerIds: string[] }
 }
@@ -110,10 +109,67 @@ function StandingRow({
   )
 }
 
+function SummaryLoadingShell({ onBack }: { onBack: () => void }) {
+  const { themed } = useAppTheme()
+  return (
+    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($fixedScreen)}>
+      <Header titleTx="localGame:gameSummary" leftTx="common:back" onLeftPress={onBack} />
+      <ScrollView style={$styles.flex1} contentContainerStyle={themed($screen)}>
+        <View
+          testID="summary-loading-shell"
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading game summary"
+        >
+          <View style={themed($loadingHeader)}>
+            <View style={themed($skeletonHeading)} />
+            <View style={themed($skeletonMeta)} />
+            <View style={themed($skeletonMetaShort)} />
+          </View>
+          <View style={themed($skeletonSectionHeading)} />
+          {Array.from({ length: 2 }).map((_, index) => (
+            <View key={index} testID="summary-skeleton-standing" style={themed($standingRow)}>
+              <View style={themed($skeletonColorBar)} />
+              <View style={themed($skeletonBadge)} />
+              <View style={themed($skeletonPlayerCopy)}>
+                <View style={themed($skeletonPlayerName)} />
+                <View style={themed($skeletonPlayerDetail)} />
+              </View>
+              <View style={themed($skeletonLife)} />
+            </View>
+          ))}
+          <View style={themed($timelineToggle)}>
+            <View style={themed($skeletonTimelineHeading)} />
+            <View style={themed($skeletonToggleLabel)} />
+          </View>
+        </View>
+      </ScrollView>
+    </Screen>
+  )
+}
+
+function TimelineLoading() {
+  const { themed } = useAppTheme()
+  return (
+    <View
+      testID="summary-timeline-loading"
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading life changes"
+      style={themed($timeline)}
+    >
+      {Array.from({ length: 3 }).map((_, index) => (
+        <View key={index} style={themed($eventRow)}>
+          <View style={themed($eventDot)} />
+          <View style={themed($skeletonEventName)} />
+          <View style={themed($skeletonEventDelta)} />
+        </View>
+      ))}
+    </View>
+  )
+}
+
 export function GameSummaryScreen({
-  model,
-  changes,
-  loading,
+  summary,
+  timeline,
   onBack,
   moderation,
 }: GameSummaryScreenProps) {
@@ -122,18 +178,29 @@ export function GameSummaryScreen({
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
 
+  if (summary.status === "loading") return <SummaryLoadingShell onBack={onBack} />
+
+  if (summary.status === "unavailable") {
+    return (
+      <Screen preset="auto" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
+        <Header titleTx="localGame:gameSummary" leftTx="common:back" onLeftPress={onBack} />
+        <EmptyState
+          heading="Summary unavailable"
+          content="Check your connection and try again."
+          button="Try again"
+          buttonOnPress={summary.retry}
+          ButtonProps={{ testID: "summary-retry" }}
+        />
+      </Screen>
+    )
+  }
+
+  const model = summary.value
   if (!model) {
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
         <Header titleTx="localGame:gameSummary" leftTx="common:back" onLeftPress={onBack} />
-        {loading ? (
-          <Text text="Loading final summary…" />
-        ) : (
-          <EmptyState
-            heading="Game not found"
-            content="This game summary is no longer available."
-          />
-        )}
+        <EmptyState heading="Game not found" content="This game summary is no longer available." />
       </Screen>
     )
   }
@@ -141,7 +208,7 @@ export function GameSummaryScreen({
   const showOutcome = anyResultRecorded(model)
   const rows = standings(model)
   const playersById = new Map(model.players.map((player) => [player.id, player]))
-  const timeline = changes?.changes ?? []
+  const timelineItems = timeline.status === "ready" ? timeline.items : []
   const reportablePlayers: ReportablePlayer[] = moderation
     ? model.players.map((player) => ({
         playerId: player.id,
@@ -219,12 +286,12 @@ export function GameSummaryScreen({
         <TouchableOpacity
           testID="summary-timeline-toggle"
           accessibilityRole="button"
-          accessibilityState={{ expanded: timelineOpen }}
+          accessibilityState={{ expanded: timelineOpen, disabled: model.changeCount === 0 }}
           accessibilityLabel={`Life changes, ${model.changeCount}`}
           activeOpacity={0.8}
           style={themed($timelineToggle)}
           onPress={() => {
-            if (!timelineOpen) changes?.onExpand?.()
+            if (!timelineOpen && timeline.status === "idle") timeline.request()
             setTimelineOpen((open) => !open)
           }}
           disabled={model.changeCount === 0}
@@ -243,49 +310,89 @@ export function GameSummaryScreen({
         {model.changeCount === 0 ? (
           <Text size="xs" style={themed($muted)} text="No life changes were recorded." />
         ) : timelineOpen ? (
-          <View style={themed($timeline)}>
-            {timeline.map((change) => {
-              const player = change.playerId ? playersById.get(change.playerId) : undefined
-              return (
-                <View key={change.id} style={themed($eventRow)}>
-                  <View
-                    style={[
-                      themed($eventDot),
-                      player ? { backgroundColor: player.color } : undefined,
-                    ]}
-                  />
-                  <Text
-                    size="xs"
-                    numberOfLines={1}
-                    style={$styles.flex1}
-                    text={player?.name ?? "Player"}
-                  />
-                  {change.undo ? <Text size="xxs" style={themed($muted)} text="undo" /> : null}
-                  <Text
-                    size="xs"
-                    weight="medium"
-                    style={{ color: change.delta < 0 ? theme.colors.error : theme.colors.text }}
-                    text={signed(change.delta)}
-                  />
-                </View>
-              )
-            })}
-            {changes?.canLoadMore ? (
-              <Button text="Load older changes" onPress={() => changes.loadMore?.()} />
-            ) : null}
-            {changes?.olderEventsDropped ? (
+          timeline.status === "loading" || timeline.status === "idle" ? (
+            <TimelineLoading />
+          ) : timeline.status === "error" ? (
+            <View
+              testID="summary-timeline-error"
+              accessibilityRole="alert"
+              style={themed($timelineStatus)}
+            >
+              <Text size="xs" text="Could not load life changes." />
+              <Button
+                testID="summary-timeline-retry"
+                style={themed($timelineStatusButton)}
+                text="Try again"
+                onPress={timeline.retry}
+              />
+            </View>
+          ) : timeline.status === "unavailable" ? (
+            <Text
+              testID="summary-timeline-unavailable"
+              accessibilityRole="alert"
+              size="xs"
+              style={themed($muted)}
+              text="Life change details are unavailable."
+            />
+          ) : (
+            <View style={themed($timeline)}>
+              {timelineItems.map((change) => {
+                const player = change.playerId ? playersById.get(change.playerId) : undefined
+                return (
+                  <View key={change.id} style={themed($eventRow)}>
+                    <View
+                      style={[
+                        themed($eventDot),
+                        player ? { backgroundColor: player.color } : undefined,
+                      ]}
+                    />
+                    <Text
+                      size="xs"
+                      numberOfLines={1}
+                      style={$styles.flex1}
+                      text={player?.name ?? "Player"}
+                    />
+                    {change.undo ? <Text size="xxs" style={themed($muted)} text="undo" /> : null}
+                    <Text
+                      size="xs"
+                      weight="medium"
+                      style={{ color: change.delta < 0 ? theme.colors.error : theme.colors.text }}
+                      text={signed(change.delta)}
+                    />
+                  </View>
+                )
+              })}
+              {timelineItems.length === 0 ? (
+                <Text size="xs" style={themed($muted)} text="No life change details were found." />
+              ) : null}
+              {timeline.nextPage.status !== "exhausted" ? (
+                <Button
+                  testID="summary-load-more"
+                  text={
+                    timeline.nextPage.status === "loading"
+                      ? "Loading older changes…"
+                      : "Load older changes"
+                  }
+                  disabled={timeline.nextPage.status === "loading"}
+                  onPress={
+                    timeline.nextPage.status === "available" ? timeline.nextPage.load : undefined
+                  }
+                />
+              ) : null}
+              {timeline.olderEventsDropped ? (
+                <Text
+                  size="xxs"
+                  style={themed($footnote)}
+                  text="Older events were dropped to save space."
+                />
+              ) : null}
               <Text
                 size="xxs"
                 style={themed($footnote)}
-                text="Older events were dropped to save space."
+                text="Undo stays in the record as a compensating change."
               />
-            ) : null}
-            <Text
-              size="xxs"
-              style={themed($footnote)}
-              text="Undo stays in the record as a compensating change."
-            />
-          </View>
+            </View>
+          )
         ) : null}
       </ScrollView>
       {playerActionsOpen && moderation ? (
@@ -314,6 +421,82 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $block: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
   paddingVertical: spacing.sm,
+})
+const $loadingHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
+  paddingVertical: spacing.sm,
+})
+const $skeletonHeading: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "34%",
+  height: 28,
+  borderRadius: 4,
+  backgroundColor: colors.separator,
+})
+const $skeletonMeta: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "62%",
+  height: 12,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
+})
+const $skeletonMetaShort: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "48%",
+  height: 12,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
+})
+const $skeletonSectionHeading: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  width: 96,
+  height: 12,
+  borderRadius: 3,
+  marginTop: spacing.md,
+  marginBottom: spacing.xs,
+  backgroundColor: colors.separator,
+})
+const $skeletonColorBar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  width: BAR_WIDTH,
+  height: 40,
+  borderRadius: spacing.xxs,
+  backgroundColor: colors.separator,
+})
+const $skeletonBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: BADGE_SIZE,
+  height: BADGE_SIZE,
+  borderRadius: BADGE_SIZE / 2,
+  backgroundColor: colors.separator,
+})
+const $skeletonPlayerCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  gap: spacing.xs,
+})
+const $skeletonPlayerName: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "52%",
+  height: 14,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
+})
+const $skeletonPlayerDetail: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: "70%",
+  height: 10,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
+})
+const $skeletonLife: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 54,
+  height: 28,
+  borderRadius: 4,
+  backgroundColor: colors.separator,
+})
+const $skeletonTimelineHeading: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 128,
+  height: 12,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
+})
+const $skeletonToggleLabel: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 34,
+  height: 10,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
 })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $reportAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -374,6 +557,19 @@ const $timeline: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderLeftColor: colors.separator,
   paddingLeft: spacing.md,
 })
+const $timelineStatus: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.xs,
+  paddingVertical: spacing.sm,
+  borderTopWidth: 1,
+  borderBottomWidth: 1,
+  borderColor: colors.separator,
+})
+const $timelineStatusButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  alignSelf: "flex-start",
+  paddingVertical: spacing.xxs,
+  paddingHorizontal: spacing.md,
+})
 const $eventRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
@@ -383,5 +579,18 @@ const $eventDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: EVENT_DOT,
   height: EVENT_DOT,
   borderRadius: EVENT_DOT / 2,
+  backgroundColor: colors.separator,
+})
+const $skeletonEventName: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  flex: 1,
+  maxWidth: 180,
+  height: 12,
+  borderRadius: 3,
+  backgroundColor: colors.separator,
+})
+const $skeletonEventDelta: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 28,
+  height: 12,
+  borderRadius: 3,
   backgroundColor: colors.separator,
 })

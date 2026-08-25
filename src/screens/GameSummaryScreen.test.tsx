@@ -89,11 +89,17 @@ function connectedSummary(
 }
 
 function renderLocal(game = localGame(), eventsTruncated = false) {
+  const model = localSummaryModel(game)
   render(
     themed(
       <GameSummaryScreen
-        model={localSummaryModel(game)}
-        changes={{ changes: localChanges(game), olderEventsDropped: eventsTruncated }}
+        summary={{ status: "ready", value: model }}
+        timeline={{
+          status: "ready",
+          items: localChanges(game),
+          nextPage: { status: "exhausted" },
+          olderEventsDropped: eventsTruncated,
+        }}
         onBack={jest.fn()}
       />,
     ),
@@ -180,8 +186,8 @@ describe("game summary", () => {
     render(
       themed(
         <GameSummaryScreen
-          model={connectedSummaryModel(connectedSummary())}
-          changes={{ changes: [] }}
+          summary={{ status: "ready", value: connectedSummaryModel(connectedSummary()) }}
+          timeline={{ status: "ready", items: [], nextPage: { status: "exhausted" } }}
           onBack={jest.fn()}
         />,
       ),
@@ -198,14 +204,18 @@ describe("game summary", () => {
     render(
       themed(
         <GameSummaryScreen
-          model={connectedSummaryModel(
-            connectedSummary({
-              players: connectedSummary().players.map((player) => ({
-                ...player,
-                outcome: "unknown" as const,
-              })),
-            }),
-          )}
+          summary={{
+            status: "ready",
+            value: connectedSummaryModel(
+              connectedSummary({
+                players: connectedSummary().players.map((player) => ({
+                  ...player,
+                  outcome: "unknown" as const,
+                })),
+              }),
+            ),
+          }}
+          timeline={{ status: "unavailable" }}
           onBack={jest.fn()}
         />,
       ),
@@ -220,8 +230,8 @@ describe("game summary", () => {
     render(
       themed(
         <GameSummaryScreen
-          model={connectedSummaryModel(connectedSummary())}
-          changes={{ changes: [], onExpand, canLoadMore: true, loadMore: jest.fn() }}
+          summary={{ status: "ready", value: connectedSummaryModel(connectedSummary()) }}
+          timeline={{ status: "idle", request: onExpand }}
           onBack={jest.fn()}
         />,
       ),
@@ -232,7 +242,7 @@ describe("game summary", () => {
     fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
 
     expect(onExpand).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole("button", { name: "Load older changes" })).toBeTruthy()
+    expect(screen.getByTestId("summary-timeline-loading")).toBeTruthy()
   })
 
   it("maps connected life events onto their players", () => {
@@ -243,8 +253,12 @@ describe("game summary", () => {
     render(
       themed(
         <GameSummaryScreen
-          model={connectedSummaryModel(connectedSummary())}
-          changes={{ changes }}
+          summary={{ status: "ready", value: connectedSummaryModel(connectedSummary()) }}
+          timeline={{
+            status: "ready",
+            items: changes,
+            nextPage: { status: "exhausted" },
+          }}
           onBack={jest.fn()}
         />,
       ),
@@ -257,15 +271,100 @@ describe("game summary", () => {
   })
 
   it("waits for a connected summary before claiming the game is missing", () => {
-    render(themed(<GameSummaryScreen model={null} loading onBack={jest.fn()} />))
+    render(
+      themed(
+        <GameSummaryScreen
+          summary={{ status: "loading" }}
+          timeline={{ status: "loading" }}
+          onBack={jest.fn()}
+        />,
+      ),
+    )
 
-    expect(screen.getByText("Loading final summary…")).toBeTruthy()
+    expect(screen.getByTestId("summary-loading-shell")).toBeTruthy()
+    expect(screen.getAllByTestId("summary-skeleton-standing")).toHaveLength(2)
     expect(screen.queryByText("Game not found")).toBeNull()
   })
 
   it("keeps a deleted game recoverable with an explanation", () => {
-    render(themed(<GameSummaryScreen model={null} onBack={jest.fn()} />))
+    render(
+      themed(
+        <GameSummaryScreen
+          summary={{ status: "ready", value: null }}
+          timeline={{ status: "unavailable" }}
+          onBack={jest.fn()}
+        />,
+      ),
+    )
 
     expect(screen.getByText("Game not found")).toBeTruthy()
+  })
+
+  it("retries an unavailable summary", () => {
+    const retry = jest.fn()
+    render(
+      themed(
+        <GameSummaryScreen
+          summary={{ status: "unavailable", retry }}
+          timeline={{ status: "unavailable" }}
+          onBack={jest.fn()}
+        />,
+      ),
+    )
+
+    fireEvent.press(screen.getByTestId("summary-retry"))
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps the summary visible when its timeline fails and retries in place", () => {
+    const retry = jest.fn()
+    render(
+      themed(
+        <GameSummaryScreen
+          summary={{ status: "ready", value: connectedSummaryModel(connectedSummary()) }}
+          timeline={{ status: "error", retry }}
+          onBack={jest.fn()}
+        />,
+      ),
+    )
+
+    fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
+
+    expect(screen.getByText("Finished")).toBeTruthy()
+    expect(screen.getByTestId("summary-timeline-error")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("summary-timeline-retry"))
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  it("labels a timeline that is unavailable", () => {
+    render(
+      themed(
+        <GameSummaryScreen
+          summary={{ status: "ready", value: connectedSummaryModel(connectedSummary()) }}
+          timeline={{ status: "unavailable" }}
+          onBack={jest.fn()}
+        />,
+      ),
+    )
+
+    fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
+    expect(screen.getByText("Life change details are unavailable.")).toBeTruthy()
+  })
+
+  it("labels and locks timeline pagination while older changes load", () => {
+    render(
+      themed(
+        <GameSummaryScreen
+          summary={{ status: "ready", value: connectedSummaryModel(connectedSummary()) }}
+          timeline={{ status: "ready", items: [], nextPage: { status: "loading" } }}
+          onBack={jest.fn()}
+        />,
+      ),
+    )
+
+    fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
+    const button = screen.getByTestId("summary-load-more")
+    expect(screen.getByText("Loading older changes…")).toBeTruthy()
+    expect(button).toBeDisabled()
   })
 })
