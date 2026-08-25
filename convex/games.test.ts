@@ -1,6 +1,7 @@
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
+import type { Id } from "./_generated/dataModel"
 import schema from "./schema"
 
 const modules = {
@@ -129,7 +130,7 @@ describe("Convex connected-game authorization", () => {
       deviceId: "device-host-0001",
     })
     expect(projection.players).toHaveLength(2)
-    expect(projection.players.map((player: any) => player.controlledByMe)).toEqual([true, false])
+    expect(projection.players.map((player) => player.controlledByMe)).toEqual([true, false])
     await expect(
       host.mutation(api.games.startGame, { publicId: created.publicId }),
     ).resolves.toEqual({ publicId: created.publicId })
@@ -137,7 +138,7 @@ describe("Convex connected-game authorization", () => {
     const history = await host.query(api.games.connectedHistory, {
       paginationOpts: { cursor: null, numItems: 10 },
     })
-    expect(history.page.map((game: any) => game.publicId)).toEqual([created.publicId])
+    expect(history.page.map((game) => game.publicId)).toEqual([created.publicId])
   })
 
   it("enforces host-only start and requires all configured seats", async () => {
@@ -176,19 +177,13 @@ describe("Convex connected-game authorization", () => {
     const joinerProjection = await joiner.query(api.games.lobbyProjection, {
       publicId: created.publicId,
     })
-    expect(hostProjection.players.map(({ controlledByMe: _, ...player }: any) => player)).toEqual(
-      joinerProjection.players.map(({ controlledByMe: _, ...player }: any) => player),
+    expect(hostProjection.players.map(({ controlledByMe: _, ...player }) => player)).toEqual(
+      joinerProjection.players.map(({ controlledByMe: _, ...player }) => player),
     )
-    expect(hostProjection.players.map((player: any) => player.controlledByMe)).toEqual([
-      true,
-      false,
-    ])
-    expect(joinerProjection.players.map((player: any) => player.controlledByMe)).toEqual([
-      false,
-      true,
-    ])
+    expect(hostProjection.players.map((player) => player.controlledByMe)).toEqual([true, false])
+    expect(joinerProjection.players.map((player) => player.controlledByMe)).toEqual([false, true])
     expect(hostProjection.status).toBe(joinerProjection.status)
-    expect(hostProjection.players.map((player: any) => player.currentLife)).toEqual([40, 40])
+    expect(hostProjection.players.map((player) => player.currentLife)).toEqual([40, 40])
   })
 
   it("enforces invite revocation and manual-code collisions", async () => {
@@ -305,7 +300,7 @@ async function activeGame(t: ReturnType<typeof convexTest>) {
 
 function lifeArgs(
   publicId: string,
-  playerId: any,
+  playerId: Id<"gamePlayers">,
   operationId: string,
   delta: number,
   deviceId = "device-host-0001",
@@ -369,7 +364,7 @@ describe("Convex realtime life writes", () => {
     const active = await actor.query(api.games.activeConnectedGames, {
       paginationOpts: { cursor: null, numItems: 10 },
     })
-    expect(active.page.map((game: any) => game.publicId)).toEqual(["legacy_game_0000000000000000"])
+    expect(active.page.map((game) => game.publicId)).toEqual(["legacy_game_0000000000000000"])
     const resumable = await t.run((ctx) =>
       ctx.db
         .query("gamePlayers")
@@ -469,7 +464,7 @@ describe("Convex realtime life writes", () => {
       ),
     ])
     const projection = await game.host.query(api.games.lobbyProjection, { publicId: game.publicId })
-    expect(projection.players.map((player: any) => player.currentLife)).toEqual([57, 35])
+    expect(projection.players.map((player) => player.currentLife)).toEqual([57, 35])
     expect(projection.eventSequence).toBe(4)
     const allEvents = await t.run((ctx) => ctx.db.query("gameEvents").collect())
     expect(allEvents).toHaveLength(4)
@@ -532,7 +527,7 @@ describe("Convex realtime life writes", () => {
     ).rejects.toThrow("Only an active game")
     const summary = await game.joiner.query(api.games.connectedSummary, { publicId: game.publicId })
     expect(summary).toMatchObject({ eventCount: 1 })
-    expect(summary!.players.map((player: any) => player.finalLife)).toEqual([35, 40])
+    expect(summary!.players.map((player) => player.finalLife)).toEqual([35, 40])
     const history = await game.host.query(api.games.connectedHistory, {
       paginationOpts: { numItems: 1, cursor: null },
     })
@@ -706,7 +701,7 @@ describe("connected game lifecycle and API hardening", () => {
       terminalStatus: "abandoned",
       terminalReason: "host_abandoned",
     })
-    expect(summary!.players.map((player: any) => player.finalLife)).toEqual([39, 45])
+    expect(summary!.players.map((player) => player.finalLife)).toEqual([39, 45])
     const resumable = await t.run((ctx) =>
       ctx.db
         .query("gamePlayers")
@@ -727,7 +722,7 @@ describe("connected game lifecycle and API hardening", () => {
     )
     for (let index = 1; index <= 3; index += 1) {
       await t.run(async (ctx) => {
-        const player: any = await ctx.db.get(game.hostPlayerId)
+        const player = await ctx.db.get(game.hostPlayerId)
         await ctx.db.insert("gameEvents", {
           gameId: gameRow!._id,
           playerId: game.hostPlayerId,
@@ -761,15 +756,13 @@ describe("connected game lifecycle and API hardening", () => {
       publicId: game.publicId,
       paginationOpts: { numItems: 2, cursor: first.continueCursor },
     })
-    expect(first.page.map((event: any) => event.operationId)).toEqual([
+    expect(first.page.map((event) => event.operationId)).toEqual([
       "operation-history-0003",
       "operation-history-0002",
     ])
-    expect(second.page.map((event: any) => event.operationId)).toEqual(["operation-history-0001"])
-    expect([...first.page, ...second.page].every((event: any) => event.sequence === null)).toBe(
-      true,
-    )
-    expect(new Set([...first.page, ...second.page].map((event: any) => event.eventId)).size).toBe(3)
+    expect(second.page.map((event) => event.operationId)).toEqual(["operation-history-0001"])
+    expect([...first.page, ...second.page].every((event) => event.sequence === null)).toBe(true)
+    expect(new Set([...first.page, ...second.page].map((event) => event.eventId)).size).toBe(3)
   })
 
   it("abandons stale games in bounded batches and refreshes recently active candidates", async () => {
