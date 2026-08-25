@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useCallback, useState, type ReactNode } from "react"
 import { useConvexAuth, usePaginatedQuery, useQuery } from "convex/react"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
@@ -18,16 +18,19 @@ interface ConnectedSummaryState {
 
 function ConnectedTimelineSource({
   publicId,
+  enabled,
+  request,
   children,
 }: {
   publicId: string
+  enabled: boolean
+  request: () => void
   children: (timeline: SummaryTimelineState) => ReactNode
 }) {
-  const events = usePaginatedQuery(
-    api.games.connectedEvents,
-    { publicId },
-    { initialNumItems: EVENT_PAGE_SIZE },
-  )
+  const events = usePaginatedQuery(api.games.connectedEvents, enabled ? { publicId } : "skip", {
+    initialNumItems: EVENT_PAGE_SIZE,
+  })
+  if (!enabled) return children({ status: "idle", request })
   const page = remotePage(events, EVENT_PAGE_SIZE)
   return children(
     page.status === "loading" ? page : { ...page, items: connectedChanges(page.items) },
@@ -43,6 +46,7 @@ export function ConnectedSummarySource({
 }) {
   const { isAuthenticated } = useConvexAuth()
   const [timelineRequested, setTimelineRequested] = useState(false)
+  const requestTimeline = useCallback(() => setTimelineRequested(true), [])
   const summary = useQuery(api.games.connectedSummary, isAuthenticated ? { publicId } : "skip")
   const remoteSummary = remoteValue(summary)
   const state: Omit<ConnectedSummaryState, "timeline"> = {
@@ -56,18 +60,16 @@ export function ConnectedSummarySource({
     viewerPlayerIds: summary?.viewerPlayerIds ?? [],
   }
 
-  if (!timelineRequested)
-    return children({
-      ...state,
-      timeline: { status: "idle", request: () => setTimelineRequested(true) },
-    })
-
   return (
     <ConvexQueryBoundary
       resetKey={publicId}
       fallback={({ retry }) => children({ ...state, timeline: { status: "error", retry } })}
     >
-      <ConnectedTimelineSource publicId={publicId}>
+      <ConnectedTimelineSource
+        publicId={publicId}
+        enabled={timelineRequested}
+        request={requestTimeline}
+      >
         {(timeline) => children({ ...state, timeline })}
       </ConnectedTimelineSource>
     </ConvexQueryBoundary>
