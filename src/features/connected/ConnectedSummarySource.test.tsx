@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native"
 
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { ThemeProvider } from "@/theme/context"
 
 import { ConnectedSummarySource } from "./ConnectedSummarySource"
@@ -36,10 +37,14 @@ const summaryDocument: ConnectedSummaryDocument & { viewerPlayerIds: string[] } 
 }
 
 const mockPaginated = jest.fn()
+let mockSummaryError: Error | undefined
 
 jest.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
-  useQuery: () => summaryDocument,
+  useQuery: () => {
+    if (mockSummaryError) throw mockSummaryError
+    return summaryDocument
+  },
   usePaginatedQuery: (...args: unknown[]) => mockPaginated(...args),
 }))
 
@@ -49,20 +54,32 @@ jest.mock("../../../convex/_generated/api", () => ({
   },
 }))
 
-function renderSource() {
+function renderRouteComposition() {
   render(
     <ThemeProvider initialContext="light">
-      <ConnectedSummarySource publicId="game-1">
-        {({ summary, timeline }) => (
-          <GameSummaryScreen summary={summary} timeline={timeline} onBack={jest.fn()} />
+      <ConvexQueryBoundary
+        resetKey="game-1"
+        fallback={({ retry }) => (
+          <GameSummaryScreen
+            summary={{ status: "unavailable", retry }}
+            timeline={{ status: "unavailable" }}
+            onBack={jest.fn()}
+          />
         )}
-      </ConnectedSummarySource>
+      >
+        <ConnectedSummarySource publicId="game-1">
+          {({ summary, timeline }) => (
+            <GameSummaryScreen summary={summary} timeline={timeline} onBack={jest.fn()} />
+          )}
+        </ConnectedSummarySource>
+      </ConvexQueryBoundary>
     </ThemeProvider>,
   )
 }
 
 describe("ConnectedSummarySource", () => {
   beforeEach(() => {
+    mockSummaryError = undefined
     mockPaginated.mockReset()
     mockPaginated.mockReturnValue({
       results: [],
@@ -73,7 +90,7 @@ describe("ConnectedSummarySource", () => {
   })
 
   it("skips the timeline query until the viewer asks for it", () => {
-    renderSource()
+    renderRouteComposition()
 
     expect(mockPaginated).toHaveBeenCalledWith("games:connectedEvents", "skip", {
       initialNumItems: 20,
@@ -82,7 +99,7 @@ describe("ConnectedSummarySource", () => {
   })
 
   it("expands the timeline on a single press", () => {
-    renderSource()
+    renderRouteComposition()
 
     fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
 
@@ -92,5 +109,15 @@ describe("ConnectedSummarySource", () => {
       { initialNumItems: 20 },
     )
     expect(screen.getByText("Hide")).toBeTruthy()
+  })
+
+  it("offers a retry when the summary query fails", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    mockSummaryError = new Error("Network unavailable")
+
+    renderRouteComposition()
+
+    expect(screen.getByTestId("summary-retry")).toBeTruthy()
+    consoleError.mockRestore()
   })
 })
