@@ -54,6 +54,14 @@ function clearAccountAcceptanceCache() {
   storage.delete(LEGAL_ACCOUNT_ACCEPTANCE_KEY)
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve
+  })
+  return { promise, resolve }
+}
+
 describe("LegalConsentGate", () => {
   beforeEach(() => {
     mockPathname = "/"
@@ -377,6 +385,39 @@ describe("LegalConsentGate", () => {
     expect(view.queryByText("APP CONTENT")).toBeNull()
     expect(view.queryByTestId("account-consent-sync-status")).toBeNull()
     expect(view.getByText("Before you start")).toBeTruthy()
+  })
+
+  it("replays pending consent when the signed-in account changes", async () => {
+    accountConsentSyncStore.write("user-b", REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    const view = renderGate()
+
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-b" }
+    await act(async () => view.rerender(gateTree()))
+
+    expect(mockRecordAcceptance).toHaveBeenCalledTimes(2)
+    expect(accountConsentSyncStore.read("user-b")).toEqual({})
+  })
+
+  it("does not clear the new account's status when an earlier sync finishes", async () => {
+    const firstWrite = deferred<{ acceptedAt: number }>()
+    const secondWrite = deferred<{ acceptedAt: number }>()
+    mockRecordAcceptance.mockReturnValueOnce(firstWrite.promise)
+    mockRecordAcceptance.mockReturnValueOnce(secondWrite.promise)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    const view = renderGate()
+
+    fireEvent.press(view.getByTestId("accept-legal-button"))
+    accountConsentSyncStore.write("user-b", REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-b" }
+    view.rerender(gateTree())
+
+    await act(async () => firstWrite.resolve({ acceptedAt: 1 }))
+
+    expect(accountConsentSyncStore.read("user-b")).toEqual(REQUIRED_CONSENT_VERSIONS)
+    expect(view.getByTestId("account-consent-sync-status")).toBeTruthy()
+
+    await act(async () => secondWrite.resolve({ acceptedAt: 1 }))
   })
 
   it("caches what the backend reports so the next launch is immediate", () => {
