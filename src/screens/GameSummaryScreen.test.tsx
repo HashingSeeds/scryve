@@ -365,6 +365,6 @@ describe("game summary", () => {
     fireEvent.press(screen.getByTestId("summary-timeline-toggle"))
     const button = screen.getByTestId("summary-load-more")
     expect(screen.getByText("Loading older changes…")).toBeTruthy()
-    expect(button.props.accessibilityState.disabled).toBe(true)
+    expect(button).toBeDisabled()
   })
 })

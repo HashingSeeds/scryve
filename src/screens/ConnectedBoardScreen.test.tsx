@@ -599,9 +599,24 @@ describe("ConnectedBoardScreen", () => {
     ).toMatchObject({ position: "absolute" })
     expect(mockUseConnectedGame).not.toHaveBeenCalled()
     expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
-    expect(screen.queryByTestId("back-from-connected-board-button")).toBeNull()
+    expect(screen.getByTestId("back-from-connected-board-button")).toBeTruthy()
     connectedHarness.userLoaded = true
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(mockUseConnectedGame).toHaveBeenCalledWith("game-public", "user-a")
+  })
+
+  it("offers a way back to local play while the connected board is stuck loading", () => {
+    const onBack = jest.fn()
+    connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+
+    expect(view.getByText("Loading connected board…")).toBeTruthy()
+    fireEvent.press(view.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalledTimes(1)
+
+    connectedHarness.runtime = { ...connectedHarness.runtime, status: "ready" }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    expect(view.queryByTestId("back-from-connected-board-button")).toBeNull()
+    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
   })
 })
