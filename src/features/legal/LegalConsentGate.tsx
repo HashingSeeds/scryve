@@ -162,8 +162,7 @@ function SignedInConsentGate({
   const [retryFailed, setRetryFailed] = useState(false)
   const [recentlySyncedUserId, setRecentlySyncedUserId] = useState<string>()
   const currentUserId = useRef(userId)
-  const previousBackendReady = useRef(false)
-  currentUserId.current = userId
+  const syncAttemptedUserIds = useRef(new Set<string>())
 
   const cacheSaysAccepted = missingConsent(REQUIRED_CONSENT_VERSIONS, cached).length === 0
   const pendingSyncIsCurrent =
@@ -180,6 +179,10 @@ function SignedInConsentGate({
     !cacheSaysAccepted &&
     !pendingSyncIsCurrent &&
     !inheritsDeviceAcceptance
+
+  useEffect(() => {
+    currentUserId.current = userId
+  }, [userId])
 
   useEffect(() => {
     if (backendAnswered || cacheSaysAccepted || pendingSyncIsCurrent || inheritsDeviceAcceptance)
@@ -260,6 +263,7 @@ function SignedInConsentGate({
   const syncAcceptance = useCallback(async () => {
     if (!backendReady) throw new Error("The account backend is not authenticated yet")
     const syncingUserId = userId
+    if (syncingUserId) syncAttemptedUserIds.current.add(syncingUserId)
     await sendAcceptance()
     if (!syncingUserId) return
     accountConsentSyncStore.clear(syncingUserId)
@@ -299,9 +303,17 @@ function SignedInConsentGate({
   ])
 
   useEffect(() => {
-    const backendBecameReady = backendReady && !previousBackendReady.current
-    previousBackendReady.current = backendReady
-    if (!backendBecameReady || !pendingSyncIsCurrent || serverAcceptanceIsCurrent) return
+    if (!backendReady) {
+      syncAttemptedUserIds.current.clear()
+      return
+    }
+    if (
+      !userId ||
+      !pendingSyncIsCurrent ||
+      serverAcceptanceIsCurrent ||
+      syncAttemptedUserIds.current.has(userId)
+    )
+      return
     let cancelled = false
     setIsSyncingAcceptance(true)
     void syncAcceptance()
@@ -312,7 +324,7 @@ function SignedInConsentGate({
     return () => {
       cancelled = true
     }
-  }, [backendReady, pendingSyncIsCurrent, serverAcceptanceIsCurrent, syncAcceptance])
+  }, [backendReady, pendingSyncIsCurrent, serverAcceptanceIsCurrent, syncAcceptance, userId])
 
   const retryAcceptance = useCallback(async () => {
     setIsSyncingAcceptance(true)
