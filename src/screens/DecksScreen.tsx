@@ -11,6 +11,7 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { DeckRecord } from "@/features/decks/deckCopy"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
@@ -121,35 +122,38 @@ function DeckShelfSkeleton() {
   )
 }
 
-export function DecksScreen({
-  onBack,
+function DeckShelfUnavailable({ retry }: { retry: () => void }) {
+  const { themed } = useAppTheme()
+  return (
+    <View testID="decks-unavailable" style={themed($empty)}>
+      <Text preset="subheading" text="Decks unavailable" />
+      <Text size="sm" style={themed($dimmedText)} text="Could not load your decks." />
+      <Button testID="retry-decks" text="Retry" onPress={retry} />
+    </View>
+  )
+}
+
+function DeckShelf({
+  game,
+  format,
+  search,
+  setFormat,
+  setSearch,
   onSelect,
-  onAddDeck,
 }: {
-  onBack: () => void
+  game: string
+  format: string
+  search: string
+  setFormat: (format: string) => void
+  setSearch: (search: string) => void
   onSelect: (deck: DeckSelection) => void
-  onAddDeck: () => void
 }) {
   const { themed } = useAppTheme()
   const mine = useQuery(api.decks.listMine)
-  const { game, format, setGame, setFormat } = useDeckFilters()
-  const [search, setSearch] = useState("")
-  const [filtersOpen, setFiltersOpen] = useState(false)
-
   const gameDecks = useMemo(
     () => (mine?.decks ?? []).filter((deck) => (deck.game ?? DEFAULT_DECK_GAME) === game),
     [mine?.decks, game],
   )
-  const formatChips = useMemo<FilterChip[]>(() => {
-    const owned = new Set(gameDecks.map((deck) => deck.format))
-    const known = deckFormats(game)
-      .filter((candidate) => owned.has(candidate.id))
-      .map((candidate) => ({ id: candidate.id, label: candidate.label }))
-    const extra = [...owned]
-      .filter((value) => !known.some((candidate) => candidate.id === value))
-      .map((value) => ({ id: value, label: deckFormatLabel(game, value) }))
-    return [{ id: ALL_FORMATS, label: "All formats" }, ...known, ...extra]
-  }, [gameDecks, game])
   const visibleDecks = useMemo(
     () =>
       gameDecks
@@ -171,6 +175,93 @@ export function DecksScreen({
     ]
   }, [visibleDecks])
   const filtered = gameDecks.length > 0 && visibleDecks.length === 0
+  const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? "deck"
+
+  return (
+    <SectionList
+      testID="decks-list"
+      sections={sections}
+      keyExtractor={(deck) => deck._id}
+      contentContainerStyle={themed($listContent)}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      stickySectionHeadersEnabled={false}
+      renderSectionHeader={({ section }) =>
+        section.data.length ? (
+          <View style={themed($sectionHeader)}>
+            <Text size="xs" weight="bold" text={section.title} />
+            <Text size="xxs" style={themed($dimmedText)} text={`${section.data.length}`} />
+          </View>
+        ) : null
+      }
+      renderItem={({ item: deck }) => (
+        <DeckRow
+          deck={deck}
+          game={game}
+          onPress={() =>
+            onSelect({
+              deckId: deck._id,
+              name: deck.name,
+              game: deck.game ?? DEFAULT_DECK_GAME,
+              format: deck.format,
+              cardQuantity: deck.cardQuantity,
+            })
+          }
+        />
+      )}
+      ListEmptyComponent={
+        mine ? (
+          <View style={themed($empty)}>
+            <Text
+              preset="subheading"
+              text={filtered ? "Nothing matches those filters" : `No ${gameLabel} decks yet`}
+            />
+            <Text
+              size="sm"
+              style={themed($dimmedText)}
+              text={
+                filtered ? "Try another format or clear the search." : "Add a deck to get started."
+              }
+            />
+            {filtered ? (
+              <Button
+                text="Clear filters"
+                onPress={() => {
+                  setFormat(ALL_FORMATS)
+                  setSearch("")
+                }}
+              />
+            ) : null}
+          </View>
+        ) : (
+          <DeckShelfSkeleton />
+        )
+      }
+    />
+  )
+}
+
+export function DecksScreen({
+  onBack,
+  onSelect,
+  onAddDeck,
+}: {
+  onBack: () => void
+  onSelect: (deck: DeckSelection) => void
+  onAddDeck: () => void
+}) {
+  const { themed } = useAppTheme()
+  const { game, format, setGame, setFormat } = useDeckFilters()
+  const [search, setSearch] = useState("")
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  const formatChips = useMemo<FilterChip[]>(() => {
+    const known = deckFormats(game).map((candidate) => ({
+      id: candidate.id,
+      label: candidate.label,
+    }))
+    return [{ id: ALL_FORMATS, label: "All formats" }, ...known]
+  }, [game])
   const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? "deck"
   const filterSummary = `${gameLabel} · ${
     format === ALL_FORMATS ? "All formats" : deckFormatLabel(game, format)
@@ -240,68 +331,19 @@ export function DecksScreen({
             ) : null}
           </View>
         ) : null}
-        <SectionList
-          testID="decks-list"
-          sections={sections}
-          keyExtractor={(deck) => deck._id}
-          contentContainerStyle={themed($listContent)}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          stickySectionHeadersEnabled={false}
-          renderSectionHeader={({ section }) =>
-            section.data.length ? (
-              <View style={themed($sectionHeader)}>
-                <Text size="xs" weight="bold" text={section.title} />
-                <Text size="xxs" style={themed($dimmedText)} text={`${section.data.length}`} />
-              </View>
-            ) : null
-          }
-          renderItem={({ item: deck }) => (
-            <DeckRow
-              deck={deck}
-              game={game}
-              onPress={() =>
-                onSelect({
-                  deckId: deck._id,
-                  name: deck.name,
-                  game: deck.game ?? DEFAULT_DECK_GAME,
-                  format: deck.format,
-                  cardQuantity: deck.cardQuantity,
-                })
-              }
-            />
-          )}
-          ListEmptyComponent={
-            mine ? (
-              <View style={themed($empty)}>
-                <Text
-                  preset="subheading"
-                  text={filtered ? "Nothing matches those filters" : `No ${gameLabel} decks yet`}
-                />
-                <Text
-                  size="sm"
-                  style={themed($dimmedText)}
-                  text={
-                    filtered
-                      ? "Try another format or clear the search."
-                      : "Add a deck to get started."
-                  }
-                />
-                {filtered ? (
-                  <Button
-                    text="Clear filters"
-                    onPress={() => {
-                      setFormat(ALL_FORMATS)
-                      setSearch("")
-                    }}
-                  />
-                ) : null}
-              </View>
-            ) : (
-              <DeckShelfSkeleton />
-            )
-          }
-        />
+        <ConvexQueryBoundary
+          resetKey={`${game}:${format}`}
+          fallback={({ retry }) => <DeckShelfUnavailable retry={retry} />}
+        >
+          <DeckShelf
+            game={game}
+            format={format}
+            search={search}
+            setFormat={setFormat}
+            setSearch={setSearch}
+            onSelect={onSelect}
+          />
+        </ConvexQueryBoundary>
       </View>
     </Screen>
   )

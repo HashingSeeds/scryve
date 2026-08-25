@@ -67,11 +67,13 @@ const loadedDetail = {
 
 const mockDetail = {
   value: loadedDetail as Record<string, unknown> | undefined,
+  error: undefined as Error | undefined,
 }
 
 jest.mock("convex/react", () => ({
   useQuery: (_reference: string, args: Record<string, unknown>) => {
     queryArgs.push(args)
+    if (mockDetail.error) throw mockDetail.error
     return mockDetail.value
   },
   useMutation: (reference: string) => {
@@ -117,6 +119,7 @@ describe("DeckDetailScreen", () => {
       version: mainVersion,
       capacity: { used: 2, limit: 5, premium: true, canCreate: true },
     }
+    mockDetail.error = undefined
   })
 
   it("opens read-only with the deck, its notes, and the selected version's record", () => {
@@ -252,5 +255,41 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("delete-deck-button"))
     fireEvent.press(view.getByTestId("delete-deck-confirm"))
     await waitFor(() => expect(mockArchiveDeck).toHaveBeenCalledWith({ deckId: "deck-1" }))
+  })
+
+  it("keeps detail geometry visible and retries an unavailable query", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    mockDetail.error = new Error("Network unavailable")
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          summary={{ name: "Existing Deck", game: "mtg", format: "commander", cardQuantity: 100 }}
+          onBack={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Deck unavailable")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
+    expect(view.getByTestId("deck-tab-cards")).toBeTruthy()
+    expect(view.getByTestId("current-version-button")).toBeTruthy()
+    expect(view.getByTestId("edit-deck-button")).toBeDisabled()
+
+    mockDetail.error = undefined
+    fireEvent.press(view.getByTestId("retry-deck-detail"))
+    expect(view.getByText("1× Sol Ring")).toBeTruthy()
+    consoleError.mockRestore()
+  })
+
+  it("distinguishes a missing deck from a temporary failure", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    mockDetail.error = new Error("Deck not found")
+    const view = renderDetail()
+
+    expect(view.getByText("Deck not found")).toBeTruthy()
+    expect(view.getByText("This deck may have been deleted.")).toBeTruthy()
+    expect(view.queryByTestId("retry-deck-detail")).toBeNull()
+    consoleError.mockRestore()
   })
 })

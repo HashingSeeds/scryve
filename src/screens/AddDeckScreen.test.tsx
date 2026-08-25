@@ -47,26 +47,49 @@ const mockCardById = jest.fn(async () => ({
   collectorNumber: "3",
   rarity: "mythic",
 }))
-const mockListMine = {
-  value: {
-    decks: [
-      {
-        _id: "existing-deck",
-        name: "Existing Deck",
-        format: "commander",
-        game: "mtg",
-        versionCount: 1,
-        cardQuantity: 100,
-        coverImageUrl: undefined,
-      },
-    ],
-    capacity: { used: 1, limit: 100, premium: true, canCreate: true },
-    analyticsLocked: false,
-  },
+type DeckShelfState = {
+  decks: Array<{
+    _id: string
+    name: string
+    format: string
+    game: string
+    versionCount: number
+    cardQuantity: number
+    coverImageUrl?: string
+  }>
+  capacity: { used: number; limit: number; premium: boolean; canCreate: boolean }
+  analyticsLocked: boolean
+}
+
+const readyShelf: DeckShelfState = {
+  decks: [
+    {
+      _id: "existing-deck",
+      name: "Existing Deck",
+      format: "commander",
+      game: "mtg",
+      versionCount: 1,
+      cardQuantity: 100,
+      coverImageUrl: undefined,
+    },
+  ],
+  capacity: { used: 1, limit: 100, premium: true, canCreate: true },
+  analyticsLocked: false,
+}
+
+const mockListMine: {
+  value: DeckShelfState | undefined
+  error: Error | undefined
+} = {
+  value: readyShelf,
+  error: undefined,
 }
 
 jest.mock("convex/react", () => ({
-  useQuery: () => mockListMine.value,
+  useQuery: () => {
+    if (mockListMine.error) throw mockListMine.error
+    return mockListMine.value
+  },
   useMutation: (reference: string) =>
     reference === "decks.importResolved" ? mockImport : mockCreate,
   useAction: (reference: string) => {
@@ -99,7 +122,7 @@ jest.mock("../../convex/_generated/api", () => ({
 
 function atCapacity() {
   mockListMine.value = {
-    ...mockListMine.value,
+    ...readyShelf,
     capacity: { used: 1, limit: 1, premium: false, canCreate: false },
   }
 }
@@ -131,9 +154,10 @@ describe("AddDeckScreen", () => {
     jest.clearAllMocks()
     jest.useFakeTimers()
     mockListMine.value = {
-      ...mockListMine.value,
+      ...readyShelf,
       capacity: { used: 1, limit: 100, premium: true, canCreate: true },
     }
+    mockListMine.error = undefined
   })
 
   afterEach(() => {
@@ -311,5 +335,47 @@ describe("AddDeckScreen", () => {
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Blocked Deck")
     fireEvent.press(view.getByText("Create deck"))
     expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it("keeps entered data while the deck limit is still loading", () => {
+    mockListMine.value = undefined
+    const view = renderAddDeck()
+    chooseMode(view, "blank")
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Patient Deck")
+
+    expect(view.getByText("Checking deck limit…")).toBeTruthy()
+    expect(view.getByText("Create deck")).toBeDisabled()
+
+    mockListMine.value = {
+      decks: [],
+      capacity: { used: 0, limit: 100, premium: true, canCreate: true },
+      analyticsLocked: false,
+    }
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("deck-name-input").props.value).toBe("Patient Deck")
+    expect(view.getByText("Create deck")).toBeEnabled()
+  })
+
+  it("retries a failed preview without losing the selected deck", async () => {
+    mockPreviewPrecon.mockRejectedValueOnce(new Error("Preview service unavailable"))
+    const view = renderAddDeck()
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Explorers of the Deep")).toBeTruthy())
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+
+    await waitFor(() => expect(view.getByText("Could not load this deck")).toBeTruthy())
+    expect(view.getByText("Explorers of the Deep")).toBeTruthy()
+    fireEvent.press(view.getByTestId("retry-precon-preview"))
+
+    await waitFor(() => expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy())
+    expect(view.getByText("Explorers of the Deep")).toBeTruthy()
   })
 })
