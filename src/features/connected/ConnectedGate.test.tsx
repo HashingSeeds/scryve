@@ -6,7 +6,8 @@ import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { ThemeProvider } from "@/theme/context"
 
-import { ConnectedGate, resetSyncedProfileCacheForTests } from "./ConnectedGate"
+import { ConnectedGate } from "./ConnectedGate"
+import { resetConnectedProfileBootstrapForTests } from "./useConnectedProfile"
 
 let mockSocketConnected = true
 let mockConvexAuthenticated = true
@@ -84,7 +85,7 @@ function gate(children: ReactNode, onBack = jest.fn()) {
 describe("connected cold-offline and authentication gate", () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    resetSyncedProfileCacheForTests()
+    resetConnectedProfileBootstrapForTests()
     mockCachedGames.clear()
     mockCachedProjectionPublicId = undefined
     mockSocketConnected = true
