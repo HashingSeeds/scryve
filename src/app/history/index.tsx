@@ -29,7 +29,7 @@ export default function HistoryRoute() {
           {...shared}
           connected={{
             page: { status: "unavailable", retry },
-            premiumLocked: false,
+            access: { status: "unavailable", retry },
             migration: { status: "complete" },
           }}
         />

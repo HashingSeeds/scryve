@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native"
+import { Dimensions, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
@@ -471,13 +471,16 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("user-b")
   })
 
-  it("keeps final board geometry while the first projection has no cache", () => {
+  it("uses a neutral full-board surface while the first projection has no seat metadata", () => {
     connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
     expect(
-      screen.getAllByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
-    ).toHaveLength(4)
+      screen.getByTestId("connected-board-shell-surface", { includeHiddenElements: true }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
+    ).toBeNull()
     expect(
       StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style),
     ).toMatchObject({ flex: 1, width: "100%" })
@@ -493,6 +496,56 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("life-seat-1-1")).toBeTruthy()
   })
 
+  it.each([5, 6])(
+    "keeps the outer board geometry stable when a %i-player projection arrives",
+    (playerCount) => {
+      const originalWindow = Dimensions.get("window")
+      const originalScreen = Dimensions.get("screen")
+      try {
+        Dimensions.set({
+          window: { width: 844, height: 390, scale: 1, fontScale: 1 },
+          screen: { width: 844, height: 390, scale: 1, fontScale: 1 },
+        })
+        const players = Array.from({ length: playerCount }, (_, index) => ({
+          playerId: `player-${index + 1}`,
+          seat: index + 1,
+          displayName: `Player ${index + 1}`,
+          color: index % 2 === 0 ? "#7C3AED" : "#2563EB",
+          currentLife: 40,
+          pendingDelta: 0,
+          controlledByMe: index === 0,
+        }))
+        connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
+        const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+        const loadingBoardStyle = StyleSheet.flatten(
+          screen.getByTestId("connected-game-board").props.style,
+        )
+
+        connectedHarness.runtime = {
+          ...connectedHarness.runtime,
+          status: "ready",
+          projection: {
+            ...connectedHarness.runtime.projection,
+            playerCount,
+            players,
+          },
+        }
+        view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+        expect(screen.getByTestId("player-grid").props.accessibilityLabel).toBe(
+          `${playerCount} player life grid`,
+        )
+        expect(screen.getAllByTestId(/^player-grid-row-/)).toHaveLength(2)
+        expect(StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style)).toEqual(
+          loadingBoardStyle,
+        )
+        view.unmount()
+      } finally {
+        act(() => Dimensions.set({ window: originalWindow, screen: originalScreen }))
+      }
+    },
+  )
+
   it("retries a thrown board query without replacing the player-grid shell", () => {
     const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
     const onBack = jest.fn()
@@ -505,8 +558,8 @@ describe("ConnectedBoardScreen", () => {
 
     expect(view.getByText("Connected board unavailable")).toBeTruthy()
     expect(
-      view.getAllByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
-    ).toHaveLength(4)
+      view.getByTestId("connected-board-shell-surface", { includeHiddenElements: true }),
+    ).toBeTruthy()
     expect(
       StyleSheet.flatten(view.getByTestId("connected-board-status-layer").props.style),
     ).toMatchObject({ position: "absolute" })
@@ -539,8 +592,8 @@ describe("ConnectedBoardScreen", () => {
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
     expect(screen.getByText("Checking connected session…")).toBeTruthy()
     expect(
-      screen.getAllByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
-    ).toHaveLength(4)
+      screen.getByTestId("connected-board-shell-surface", { includeHiddenElements: true }),
+    ).toBeTruthy()
     expect(
       StyleSheet.flatten(screen.getByTestId("connected-board-status-layer").props.style),
     ).toMatchObject({ position: "absolute" })
