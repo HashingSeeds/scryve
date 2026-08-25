@@ -1,0 +1,2 @@
+# Gradle output generated inside Sentry's nested Android module
+**/node_modules/@sentry/react-native/android/expo-handler/build/**/*
