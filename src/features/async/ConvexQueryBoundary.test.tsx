@@ -1,5 +1,5 @@
 import { Pressable, View } from "react-native"
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ConvexQueryBoundary } from "./ConvexQueryBoundary"
 
@@ -91,5 +91,146 @@ describe("ConvexQueryBoundary", () => {
       props: { testID: "only-fallback" },
       children: null,
     })
+  })
+})
+
+describe("ConvexQueryBoundary against still-cached convex query errors", () => {
+  let consoleError: jest.SpyInstance
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+    consoleError.mockRestore()
+  })
+
+  function createCachedErrorQuery() {
+    let healthy = true
+    let renderCount = 0
+    return {
+      get renderCount() {
+        return renderCount
+      },
+      fail() {
+        healthy = false
+      },
+      purge() {
+        healthy = true
+      },
+      useQuery(): { decks: string[] } {
+        renderCount += 1
+        if (!healthy) throw new Error("decks.listMine failed")
+        return { decks: ["deck-a"] }
+      },
+    }
+  }
+
+  function setup(query: ReturnType<typeof createCachedErrorQuery>) {
+    function LobbyDeckQuery() {
+      const result = query.useQuery()
+      void result
+      return <View testID="query-result" />
+    }
+
+    const view = render(
+      <ConvexQueryBoundary
+        fallback={({ retry }) => (
+          <Pressable testID="retry-query" onPress={retry}>
+            <View />
+          </Pressable>
+        )}
+      >
+        <LobbyDeckQuery />
+      </ConvexQueryBoundary>,
+    )
+
+    return {
+      rerender: () =>
+        view.rerender(
+          <ConvexQueryBoundary
+            fallback={({ retry }) => (
+              <Pressable testID="retry-query" onPress={retry}>
+                <View />
+              </Pressable>
+            )}
+          >
+            <LobbyDeckQuery />
+          </ConvexQueryBoundary>,
+        ),
+      pressRetry: () => {
+        fireEvent.press(view.getByTestId("retry-query"))
+        view.rerender(
+          <ConvexQueryBoundary
+            fallback={({ retry }) => (
+              <Pressable testID="retry-query" onPress={retry}>
+                <View />
+              </Pressable>
+            )}
+          >
+            <LobbyDeckQuery />
+          </ConvexQueryBoundary>,
+        )
+      },
+      advance: (ms: number) => act(() => void jest.advanceTimersByTime(ms)),
+      view,
+    }
+  }
+
+  it("recovers from a retry pressed while the error is still cached once the client purges it", () => {
+    const query = createCachedErrorQuery()
+    const harness = setup(query)
+    expect(harness.view.getByTestId("query-result")).toBeTruthy()
+
+    act(() => query.fail())
+    harness.rerender()
+    expect(harness.view.queryByTestId("query-result")).toBeNull()
+
+    harness.pressRetry()
+    expect(harness.view.queryByTestId("query-result")).toBeNull()
+
+    query.purge()
+    harness.advance(500)
+
+    expect(harness.view.getByTestId("query-result")).toBeTruthy()
+  })
+
+  it("caps automatic retries and recovers on a later manual retry", () => {
+    const query = createCachedErrorQuery()
+    const harness = setup(query)
+    expect(harness.view.getByTestId("query-result")).toBeTruthy()
+
+    act(() => query.fail())
+    harness.rerender()
+    const rendersAfterFirstFailure = query.renderCount
+
+    harness.advance(500)
+    harness.advance(2000)
+    const rendersAfterExhaustedBackoff = query.renderCount
+    expect(rendersAfterExhaustedBackoff).toBeGreaterThan(rendersAfterFirstFailure)
+
+    harness.advance(60000)
+    expect(query.renderCount).toBe(rendersAfterExhaustedBackoff)
+    expect(harness.view.queryByTestId("query-result")).toBeNull()
+
+    query.purge()
+    harness.pressRetry()
+
+    expect(harness.view.getByTestId("query-result")).toBeTruthy()
+  })
+
+  it("remounts children on every attempt so convex re-subscribes", () => {
+    const query = createCachedErrorQuery()
+    const harness = setup(query)
+    expect(harness.view.getByTestId("query-result")).toBeTruthy()
+
+    act(() => query.fail())
+    harness.rerender()
+
+    harness.pressRetry()
+    harness.pressRetry()
+    expect(query.renderCount).toBeGreaterThanOrEqual(4)
   })
 })
