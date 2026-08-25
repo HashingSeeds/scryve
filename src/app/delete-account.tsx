@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { router } from "expo-router"
+import { useCallback, useEffect, useState } from "react"
+import { router, type ErrorBoundaryProps } from "expo-router"
 import { useUser } from "@clerk/expo"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 
@@ -8,13 +8,28 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { type AccountDeletionStatus, DeleteAccountScreen } from "@/screens/DeleteAccountScreen"
+import { DeleteAccountScreen } from "@/screens/DeleteAccountScreen"
 
 import { api } from "../../convex/_generated/api"
+
+export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+  return (
+    <Screen preset="auto" safeAreaEdges={["bottom"]}>
+      <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
+      <Text
+        accessibilityRole="alert"
+        text="Scryve couldn't check your deletion status. Account deletion stays unavailable until the check succeeds."
+      />
+      <Button text="Try again" preset="reversed" onPress={() => void retry()} />
+      <Button text="Return home" onPress={() => router.replace("/")} />
+    </Screen>
+  )
+}
 
 export default function DeleteAccountRoute() {
   const auth = useAuthAccess()
   const [requestStarted, setRequestStarted] = useState(false)
+  const handleRequestStarted = useCallback(() => setRequestStarted(true), [])
   if (!auth.configured || !auth.isSignedIn)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
@@ -33,7 +48,7 @@ export default function DeleteAccountRoute() {
         <Button text="Return home" onPress={() => router.replace("/")} />
       </Screen>
     )
-  return <AuthenticatedDeleteAccountRoute onRequestStarted={() => setRequestStarted(true)} />
+  return <AuthenticatedDeleteAccountRoute onRequestStarted={handleRequestStarted} />
 }
 
 function AuthenticatedDeleteAccountRoute({ onRequestStarted }: { onRequestStarted: () => void }) {
@@ -43,6 +58,10 @@ function AuthenticatedDeleteAccountRoute({ onRequestStarted }: { onRequestStarte
   const deletion = useQuery(api.accountDeletion.currentAccountDeletion)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string>()
+
+  useEffect(() => {
+    if (deletion) onRequestStarted()
+  }, [deletion, onRequestStarted])
 
   if (isLoading || !isUserLoaded)
     return (
@@ -76,7 +95,7 @@ function AuthenticatedDeleteAccountRoute({ onRequestStarted }: { onRequestStarte
   return (
     <DeleteAccountScreen
       email={user?.primaryEmailAddress?.emailAddress}
-      deletionStatus={deletion?.status as AccountDeletionStatus | undefined}
+      deletionStatus={deletion === undefined ? undefined : (deletion?.status ?? null)}
       isSubmitting={isSubmitting}
       error={error}
       onBack={() => router.back()}

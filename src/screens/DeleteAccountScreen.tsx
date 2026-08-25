@@ -14,7 +14,7 @@ export type AccountDeletionStatus = "processing" | "identity_pending" | "failed"
 
 export interface DeleteAccountScreenProps {
   email?: string
-  deletionStatus?: AccountDeletionStatus | null
+  deletionStatus: AccountDeletionStatus | null | undefined
   isSubmitting: boolean
   error?: string
   onBack: () => void
@@ -31,8 +31,10 @@ export function DeleteAccountScreen({
 }: DeleteAccountScreenProps) {
   const { themed } = useAppTheme()
   const [confirmation, setConfirmation] = useState("")
-  const hasRequest = deletionStatus !== null && deletionStatus !== undefined
+  const isChecking = deletionStatus === undefined
+  const hasRequest = deletionStatus !== null && !isChecking
   const needsRetry = deletionStatus === "failed"
+  const canRequestDeletion = deletionStatus === null || needsRetry
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
       <Header title="Delete account" leftTx="common:back" onLeftPress={onBack} />
@@ -40,25 +42,30 @@ export function DeleteAccountScreen({
         <Text text="ACCOUNT & DATA" preset="formLabel" style={themed($eyebrow)} />
         <Text
           text={
-            needsRetry
-              ? "Your deletion needs attention"
-              : hasRequest
-                ? "Your deletion is in progress"
-                : "Before you delete your account"
+            isChecking
+              ? "Delete account"
+              : needsRetry
+                ? "Your deletion needs attention"
+                : hasRequest
+                  ? "Your deletion is in progress"
+                  : "Before you delete your account"
           }
           preset="heading"
           accessibilityRole="header"
         />
         <Text
           text={
-            hasRequest
-              ? statusDescription(deletionStatus)
-              : "This permanently deletes your Scryve account and anonymizes your connected-play history. Review what happens first."
+            isChecking
+              ? "Checking deletion status…"
+              : hasRequest
+                ? statusDescription(deletionStatus)
+                : "This permanently deletes your Scryve account and anonymizes your connected-play history. Review what happens first."
           }
+          accessibilityLiveRegion={isChecking ? "polite" : undefined}
           style={themed($lede)}
         />
         {hasRequest ? <DeletionStatusPanel status={deletionStatus} /> : null}
-        {!hasRequest ? (
+        {deletionStatus === null ? (
           <View style={themed($stepList)}>
             <Step
               number="1"
@@ -77,7 +84,7 @@ export function DeleteAccountScreen({
             />
           </View>
         ) : null}
-        {!hasRequest || needsRetry ? (
+        {canRequestDeletion ? (
           <>
             {email ? (
               <Text text={`Signed in as ${email}`} size="xs" style={themed($muted)} />
