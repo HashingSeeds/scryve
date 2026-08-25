@@ -6,6 +6,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
 import { CloudProviders } from "@/features/auth/AuthContext"
+import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
 import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
 import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
@@ -41,7 +42,7 @@ export default function Root() {
   const ready = useLaunchReadiness(isConsentResolved)
 
   if (!ready) {
-    return null
+    return <LaunchFallback />
   }
 
   return (

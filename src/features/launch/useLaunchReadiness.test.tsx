@@ -6,7 +6,11 @@ import { initI18n } from "@/i18n"
 import { reportCrash } from "@/utils/crashReporting"
 import { loadDateFnsLocale } from "@/utils/formatDate"
 
-import { LAUNCH_DEADLINE_MS, useLaunchReadiness } from "./useLaunchReadiness"
+import {
+  LAUNCH_DEADLINE_MS,
+  LAUNCH_FALLBACK_REVEAL_MS,
+  useLaunchReadiness,
+} from "./useLaunchReadiness"
 
 jest.mock("expo-router", () => ({
   SplashScreen: { hideAsync: jest.fn(() => Promise.resolve()) },
@@ -43,7 +47,7 @@ describe("useLaunchReadiness", () => {
     jest.useRealTimers()
   })
 
-  it("waits for fonts and i18n, then hides the splash after consent resolves", async () => {
+  it("hands a normal fast launch straight from the native splash to the app", async () => {
     const i18n = deferred<never>()
     initI18nMock.mockReturnValue(i18n.promise)
     let fontsLoaded = false
@@ -80,16 +84,34 @@ describe("useLaunchReadiness", () => {
     expect(reportCrashMock).toHaveBeenCalledWith(fontError)
   })
 
-  it("becomes ready at the 8000ms deadline when i18n never settles", () => {
+  it("reveals the React launch fallback when startup takes longer than 700ms", () => {
+    jest.useFakeTimers()
+    useFontsMock.mockReturnValue([false, null])
+    initI18nMock.mockReturnValue(new Promise<never>(() => undefined))
+
+    const hook = renderHook(() => useLaunchReadiness(false))
+
+    act(() => void jest.advanceTimersByTime(LAUNCH_FALLBACK_REVEAL_MS - 1))
+    expect(hook.result.current).toBe(false)
+    expect(hideSplashMock).not.toHaveBeenCalled()
+
+    act(() => void jest.advanceTimersByTime(1))
+    expect(hook.result.current).toBe(false)
+    expect(hideSplashMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("enters the degraded path at the existing 8000ms deadline", () => {
     jest.useFakeTimers()
     useFontsMock.mockReturnValue([true, null])
     initI18nMock.mockReturnValue(new Promise<never>(() => undefined))
 
     const hook = renderHook(() => useLaunchReadiness(true))
 
-    act(() => void jest.advanceTimersByTime(LAUNCH_DEADLINE_MS - 1))
+    act(() => void jest.advanceTimersByTime(LAUNCH_FALLBACK_REVEAL_MS))
+    expect(hideSplashMock).toHaveBeenCalledTimes(1)
+
+    act(() => void jest.advanceTimersByTime(LAUNCH_DEADLINE_MS - LAUNCH_FALLBACK_REVEAL_MS - 1))
     expect(hook.result.current).toBe(false)
-    expect(hideSplashMock).not.toHaveBeenCalled()
 
     act(() => void jest.advanceTimersByTime(1))
     expect(hook.result.current).toBe(true)

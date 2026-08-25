@@ -4,6 +4,7 @@ import { storage as mmkvStorage } from "@/utils/storage"
 
 export const LEGAL_ACCEPTANCE_KEY = "count.local.legal.v1"
 export const LEGAL_ACCOUNT_ACCEPTANCE_KEY = "count.local.legal.accounts.v1"
+export const LEGAL_ACCOUNT_PENDING_CONSENT_KEY = "count.local.legal.accounts.pending.v1"
 
 export type AcceptedVersions = Partial<Record<ConsentDocumentId, string>>
 
@@ -50,6 +51,42 @@ export class AccountAcceptanceCache {
 }
 
 export const accountAcceptanceCache = new AccountAcceptanceCache()
+
+export class AccountConsentSyncStore {
+  constructor(private readonly storage: StringStorage = mmkvStorage) {}
+
+  private all(): Record<string, AcceptedVersions> {
+    const parsed = parseRecord(this.storage.getString(LEGAL_ACCOUNT_PENDING_CONSENT_KEY))
+    if (!parsed) return {}
+    const accounts: Record<string, AcceptedVersions> = {}
+    for (const [userId, value] of Object.entries(parsed))
+      accounts[userId] = pickVersions(value as Record<string, unknown>)
+    return accounts
+  }
+
+  read(userId: string): AcceptedVersions {
+    return this.all()[userId] ?? {}
+  }
+
+  write(userId: string, accepted: AcceptedVersions): void {
+    this.storage.set(
+      LEGAL_ACCOUNT_PENDING_CONSENT_KEY,
+      JSON.stringify({ ...this.all(), [userId]: accepted }),
+    )
+  }
+
+  clear(userId: string): void {
+    const accounts = this.all()
+    delete accounts[userId]
+    if (Object.keys(accounts).length === 0) {
+      this.storage.delete(LEGAL_ACCOUNT_PENDING_CONSENT_KEY)
+      return
+    }
+    this.storage.set(LEGAL_ACCOUNT_PENDING_CONSENT_KEY, JSON.stringify(accounts))
+  }
+}
+
+export const accountConsentSyncStore = new AccountConsentSyncStore()
 
 function parseRecord(raw: string | undefined): Record<string, unknown> | undefined {
   if (!raw) return undefined

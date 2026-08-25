@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import { Platform } from "react-native"
@@ -14,14 +15,17 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react"
 import { CONSENT_DOCUMENT_IDS, type ConsentDocumentId } from "@/content/legal"
 import { termsContent } from "@/content/terms"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { LegalConsentScreen } from "@/screens/LegalConsentScreen"
 
 import {
   accountAcceptanceCache,
+  accountConsentSyncStore,
   type AcceptedVersions,
   deviceAcceptanceStore,
   missingConsent,
 } from "./acceptanceStore"
+import { AccountConsentSyncStatus } from "./AccountConsentSyncStatus"
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
 import { api } from "../../../convex/_generated/api"
 
@@ -69,7 +73,7 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
 
   if (readingDocument) return <>{children}</>
   if (isLoadingAuth && !authUnreachable)
-    return deviceConsentIsCurrent || !behindSplashScreen ? <>{children}</> : null
+    return deviceConsentIsCurrent || !behindSplashScreen ? <>{children}</> : <LaunchFallback />
   if (auth.configured && auth.isSignedIn)
     return (
       <SignedInConsentGate
@@ -114,6 +118,22 @@ function useCachedAcceptancesForUser(
   return [cached, setCached]
 }
 
+function usePendingConsentForUser(
+  userId: string | undefined,
+): [AcceptedVersions, Dispatch<SetStateAction<AcceptedVersions>>] {
+  const [pending, setPending] = useState<AcceptedVersions>(() =>
+    userId ? accountConsentSyncStore.read(userId) : {},
+  )
+  const [readForUserId, setReadForUserId] = useState(userId)
+
+  if (userId !== readForUserId) {
+    setReadForUserId(userId)
+    setPending(userId ? accountConsentSyncStore.read(userId) : {})
+  }
+
+  return [pending, setPending]
+}
+
 function accountCanInheritDeviceAcceptance(
   userId: string | undefined,
   deviceAccepted: AcceptedVersions,
@@ -132,27 +152,44 @@ function SignedInConsentGate({
   const accountAcceptances = useQuery(api.legal.currentAcceptances, {})
   const { isAuthenticated: backendReady } = useConvexAuth()
   const [cached, setCached] = useCachedAcceptancesForUser(userId)
+  const [pendingSync, setPendingSync] = usePendingConsentForUser(userId)
   const [deviceAccepted, setDeviceAccepted] = useState<AcceptedVersions>(() =>
     deviceAcceptanceStore.read(),
   )
   const [accountUnreachable, setAccountUnreachable] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [unsyncedAcceptance, setUnsyncedAcceptance] = useState(false)
+  const [isSyncingAcceptance, setIsSyncingAcceptance] = useState(false)
+  const [retryFailed, setRetryFailed] = useState(false)
+  const [recentlySyncedUserId, setRecentlySyncedUserId] = useState<string>()
+  const currentUserId = useRef(userId)
+  const syncAttemptedUserIds = useRef(new Set<string>())
 
   const cacheSaysAccepted = missingConsent(REQUIRED_CONSENT_VERSIONS, cached).length === 0
+  const pendingSyncIsCurrent =
+    Boolean(userId) && missingConsent(REQUIRED_CONSENT_VERSIONS, pendingSync).length === 0
+  const recentlySyncedCurrentUser = Boolean(userId && recentlySyncedUserId === userId)
   const inheritsDeviceAcceptance = useMemo(
     () => accountCanInheritDeviceAcceptance(userId, deviceAccepted),
     [deviceAccepted, userId],
   )
   const backendAnswered = backendReady && accountAcceptances !== undefined
   const isLoadingAccount =
-    !backendAnswered && !accountUnreachable && !cacheSaysAccepted && !inheritsDeviceAcceptance
+    !backendAnswered &&
+    !accountUnreachable &&
+    !cacheSaysAccepted &&
+    !pendingSyncIsCurrent &&
+    !inheritsDeviceAcceptance
 
   useEffect(() => {
-    if (backendAnswered || cacheSaysAccepted) return
+    currentUserId.current = userId
+  }, [userId])
+
+  useEffect(() => {
+    if (backendAnswered || cacheSaysAccepted || pendingSyncIsCurrent || inheritsDeviceAcceptance)
+      return
     const timer = setTimeout(() => setAccountUnreachable(true), ACCOUNT_CONSENT_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [backendAnswered, cacheSaysAccepted])
+  }, [backendAnswered, cacheSaysAccepted, inheritsDeviceAcceptance, pendingSyncIsCurrent])
 
   useEffect(() => {
     if (!isLoadingAccount) onResolved?.()
@@ -165,11 +202,28 @@ function SignedInConsentGate({
     return map
   }, [accountAcceptances, backendAnswered])
 
+  const serverAcceptanceIsCurrent =
+    Boolean(fromServer) && missingConsent(REQUIRED_CONSENT_VERSIONS, fromServer ?? {}).length === 0
+
   useEffect(() => {
     if (!userId || !fromServer) return
+    if ((pendingSyncIsCurrent || recentlySyncedCurrentUser) && !serverAcceptanceIsCurrent) return
     accountAcceptanceCache.write(userId, fromServer)
     setCached(fromServer)
-  }, [fromServer, setCached, userId])
+    if (serverAcceptanceIsCurrent && pendingSyncIsCurrent) {
+      accountConsentSyncStore.clear(userId)
+      setPendingSync({})
+    }
+    if (serverAcceptanceIsCurrent && recentlySyncedCurrentUser) setRecentlySyncedUserId(undefined)
+  }, [
+    fromServer,
+    pendingSyncIsCurrent,
+    recentlySyncedCurrentUser,
+    serverAcceptanceIsCurrent,
+    setCached,
+    setPendingSync,
+    userId,
+  ])
 
   const sendAcceptance = useCallback(async () => {
     for (const document of CONSENT_DOCUMENT_IDS)
@@ -180,7 +234,9 @@ function SignedInConsentGate({
       })
   }, [recordAcceptance])
 
-  const accepted = inheritsDeviceAcceptance
+  const trustsLocalAcceptance =
+    inheritsDeviceAcceptance || pendingSyncIsCurrent || recentlySyncedCurrentUser
+  const accepted = trustsLocalAcceptance
     ? REQUIRED_CONSENT_VERSIONS
     : (fromServer ??
       acceptedWithoutBackendAnswer({
@@ -198,54 +254,104 @@ function SignedInConsentGate({
     setDeviceAccepted(REQUIRED_CONSENT_VERSIONS)
   }, [setCached, userId])
 
+  const markAcceptancePending = useCallback(() => {
+    if (!userId) return
+    accountConsentSyncStore.write(userId, REQUIRED_CONSENT_VERSIONS)
+    setPendingSync(REQUIRED_CONSENT_VERSIONS)
+  }, [setPendingSync, userId])
+
+  const syncAcceptance = useCallback(async () => {
+    if (!backendReady) throw new Error("The account backend is not authenticated yet")
+    const syncingUserId = userId
+    if (syncingUserId) syncAttemptedUserIds.current.add(syncingUserId)
+    await sendAcceptance()
+    if (!syncingUserId) return
+    accountConsentSyncStore.clear(syncingUserId)
+    if (currentUserId.current !== syncingUserId) return
+    setPendingSync({})
+    setRecentlySyncedUserId(syncingUserId)
+  }, [backendReady, sendAcceptance, setPendingSync, userId])
+
   const accept = useCallback(async () => {
     setIsSubmitting(true)
+    setRetryFailed(false)
     keepAcceptanceOnThisDevice()
+    markAcceptancePending()
     try {
-      if (!backendReady) throw new Error("The account backend is not authenticated yet")
-      await sendAcceptance()
-      setUnsyncedAcceptance(false)
+      await syncAcceptance()
     } catch {
-      setUnsyncedAcceptance(true)
+      return
     } finally {
       setIsSubmitting(false)
     }
-  }, [backendReady, keepAcceptanceOnThisDevice, sendAcceptance])
+  }, [keepAcceptanceOnThisDevice, markAcceptancePending, syncAcceptance])
 
   useEffect(() => {
-    if (!inheritsDeviceAcceptance || cacheSaysAccepted || !backendReady) return
-    let cancelled = false
-    void sendAcceptance()
-      .then(() => {
-        if (!cancelled) keepAcceptanceOnThisDevice()
-      })
-      .catch(() => undefined)
-    return () => {
-      cancelled = true
-    }
+    if (!inheritsDeviceAcceptance || cacheSaysAccepted || pendingSyncIsCurrent || !backendReady)
+      return
+    keepAcceptanceOnThisDevice()
+    markAcceptancePending()
+    void syncAcceptance().catch(() => undefined)
   }, [
     backendReady,
     cacheSaysAccepted,
     inheritsDeviceAcceptance,
     keepAcceptanceOnThisDevice,
-    sendAcceptance,
+    markAcceptancePending,
+    pendingSyncIsCurrent,
+    syncAcceptance,
   ])
 
   useEffect(() => {
-    if (!unsyncedAcceptance || !backendReady) return
+    if (!backendReady) {
+      syncAttemptedUserIds.current.clear()
+      return
+    }
+    if (
+      !userId ||
+      !pendingSyncIsCurrent ||
+      serverAcceptanceIsCurrent ||
+      syncAttemptedUserIds.current.has(userId)
+    )
+      return
     let cancelled = false
-    void sendAcceptance()
-      .then(() => {
-        if (!cancelled) setUnsyncedAcceptance(false)
-      })
+    setIsSyncingAcceptance(true)
+    void syncAcceptance()
       .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setIsSyncingAcceptance(false)
+      })
     return () => {
       cancelled = true
     }
-  }, [backendReady, sendAcceptance, unsyncedAcceptance])
+  }, [backendReady, pendingSyncIsCurrent, serverAcceptanceIsCurrent, syncAcceptance, userId])
 
-  if (isLoadingAccount) return behindSplashScreen ? null : <>{children}</>
-  if (outstanding.length === 0) return <>{children}</>
+  const retryAcceptance = useCallback(async () => {
+    setIsSyncingAcceptance(true)
+    setRetryFailed(false)
+    try {
+      await syncAcceptance()
+    } catch {
+      setRetryFailed(true)
+    } finally {
+      setIsSyncingAcceptance(false)
+    }
+  }, [syncAcceptance])
+
+  if (isLoadingAccount) return behindSplashScreen ? <LaunchFallback /> : <>{children}</>
+  if (outstanding.length === 0)
+    return (
+      <>
+        {pendingSyncIsCurrent ? (
+          <AccountConsentSyncStatus
+            isSyncing={isSyncingAcceptance}
+            retryFailed={retryFailed}
+            onRetry={() => void retryAcceptance()}
+          />
+        ) : null}
+        {children}
+      </>
+    )
   return (
     <ConsentPrompt
       hasPriorAcceptance={hasPriorAcceptance(accepted)}
