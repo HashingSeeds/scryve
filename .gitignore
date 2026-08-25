@@ -95,6 +95,7 @@ web-build/
 .convex/
 
 /coverage
+.jest-cache/
 artifacts/
 
 # Dependency Graph Visualizations
