@@ -107,6 +107,45 @@ describe("ConnectedHomeScreen", () => {
     expect(screen.getByText(/Host a lobby and share the code/i)).toBeTruthy()
   })
 
+  it("reserves game rows while the connected profile is prepared", async () => {
+    let resolveSync: (value: string) => void = () => undefined
+    mockSyncUser.mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        resolveSync = resolve
+      }),
+    )
+    render(home({ onHostNew: jest.fn(), onJoin: jest.fn() }))
+
+    expect(screen.getByText("Preparing your connected profile…")).toBeTruthy()
+    expect(screen.getAllByTestId("connected-game-row-placeholder")).toHaveLength(2)
+    expect(screen.getByTestId("host-connected-button")).toBeDisabled()
+
+    await act(async () => resolveSync("user-a"))
+  })
+
+  it("keeps the same rows while the first games page loads", async () => {
+    connectedHarness.activeGamesStatus = "LoadingFirstPage"
+    render(home({ onHostNew: jest.fn(), onJoin: jest.fn() }))
+
+    await waitFor(() => expect(screen.getByText("Loading your games…")).toBeTruthy())
+    expect(screen.getAllByTestId("connected-game-row-placeholder")).toHaveLength(2)
+    expect(screen.queryByTestId("no-active-connected-games")).toBeNull()
+  })
+
+  it("offers a local retry when the active-games query fails", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    connectedHarness.paginatedError = new Error("Active games failed")
+    render(home({ onHostNew: jest.fn(), onJoin: jest.fn() }))
+
+    await waitFor(() =>
+      expect(screen.getByText("Could not load your connected games.")).toBeTruthy(),
+    )
+    connectedHarness.paginatedError = undefined
+    fireEvent.press(screen.getByTestId("retry-connected-games-button"))
+    await waitFor(() => expect(screen.getByTestId("no-active-connected-games")).toBeTruthy())
+    consoleError.mockRestore()
+  })
+
   it("does not restart a completed membership migration on the next home mount", async () => {
     const first = render(home({ onHostNew: jest.fn(), onJoin: jest.fn() }))
     await waitFor(() => expect(mockMigrate).toHaveBeenCalledTimes(1))

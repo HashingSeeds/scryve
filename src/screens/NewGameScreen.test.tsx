@@ -194,9 +194,19 @@ describe("NewGameScreen", () => {
   })
 
   it("keeps hosting unavailable until the connected session is ready", () => {
-    const view = setup({ mode: "connected", connected: { ...readyHost, ready: false } })
+    const view = setup({
+      mode: "connected",
+      connected: {
+        ...readyHost,
+        ready: false,
+        status: "Preparing your connected profile…",
+      },
+    })
 
     expect(view.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
+    expect(view.getByTestId("connected-host-preparation")).toHaveTextContent(
+      "Preparing your connected profile…",
+    )
   })
 
   it("surfaces a host blocker and refuses to submit while it stands", () => {
@@ -247,5 +257,15 @@ describe("NewGameScreen", () => {
 
     await waitFor(() => expect(screen.getByText(/Resume or finish your hosted game/i)).toBeTruthy())
     expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
+  })
+
+  it("explains the hosted-game check before enabling Host", async () => {
+    connectedHarness.activeGamesStatus = "LoadingFirstPage"
+    render(hostSetup(jest.fn()))
+
+    await waitFor(() =>
+      expect(screen.getByText("Checking for an existing hosted game…")).toBeTruthy(),
+    )
+    expect(screen.getByTestId("host-connected-button")).toBeDisabled()
   })
 })

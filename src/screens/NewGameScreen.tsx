@@ -41,8 +41,10 @@ export type NewGameMode = "local" | "connected"
 export interface ConnectedHostFeed {
   ready: boolean
   busy: boolean
+  status?: string
   blockedReason?: string
   error?: string
+  retry?: () => void
   host: (setup: { playerCount: number; startingLife: number; ruleset: string }) => void
 }
 
@@ -285,6 +287,16 @@ export function NewGameScreen({
       </Screen>
       <View style={[themed($footer), $footerSafeArea]}>
         <View style={themed($footerContent)}>
+          {connectedMode && connected?.status ? (
+            <Text
+              testID="connected-host-preparation"
+              accessibilityRole="progressbar"
+              accessibilityLiveRegion="polite"
+              size="xs"
+              text={connected.status}
+              style={themed($footerStatus)}
+            />
+          ) : null}
           {connectedMode && connected?.blockedReason ? (
             <Text
               accessibilityRole="alert"
@@ -294,12 +306,22 @@ export function NewGameScreen({
             />
           ) : null}
           {connectedMode && connected?.error ? (
-            <Text
-              accessibilityRole="alert"
-              size="xs"
-              text={connected.error}
-              style={themed($footerNote)}
-            />
+            <View style={themed($connectedError)}>
+              <Text
+                accessibilityRole="alert"
+                size="xs"
+                text={connected.error}
+                style={themed($footerNote)}
+              />
+              {connected.retry ? (
+                <Button
+                  testID="retry-connected-host-preparation"
+                  text="Try again"
+                  style={themed($retryConnected)}
+                  onPress={connected.retry}
+                />
+              ) : null}
+            </View>
           ) : null}
           <Button
             testID={connectedMode ? "host-connected-button" : "start-game-button"}
@@ -378,6 +400,8 @@ const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexShrink: 1,
   flexBasis: MIN_NAME_ROW_WIDTH,
 })
+const $connectedError: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $retryConnected: ThemedStyle<ViewStyle> = () => ({ minHeight: 40 })
 const $nameField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
   width: 44,
@@ -400,3 +424,4 @@ const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.sm,
 })
 const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
+const $footerStatus: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

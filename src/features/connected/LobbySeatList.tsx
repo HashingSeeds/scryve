@@ -5,6 +5,7 @@ import { Button } from "@/components/Button"
 import { FilterChips } from "@/components/FilterChips"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
+import type { RemoteValue } from "@/features/async/remoteState"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -27,10 +28,12 @@ export type SeatDeck = {
   versions: { _id: string; versionNumber: number; name?: string }[]
 }
 
+export type LobbyDeckState = RemoteValue<SeatDeck[]> | { status: "error"; retry: () => void }
+
 export function LobbySeatList({
   seats,
   openSeats,
-  decks,
+  deckState,
   versionLabel,
   selectingDeckSeats,
   onSelectVersion,
@@ -39,7 +42,7 @@ export function LobbySeatList({
 }: {
   seats: LobbySeat[]
   openSeats: number
-  decks?: SeatDeck[]
+  deckState: LobbyDeckState
   versionLabel: (version: { versionNumber: number; name?: string }) => string
   selectingDeckSeats?: ReadonlySet<number>
   onSelectVersion: (seat: number, deckVersionId: string) => void
@@ -50,6 +53,8 @@ export function LobbySeatList({
   return (
     <View style={themed($list)}>
       {seats.map((seat) => {
+        const decks = deckState.status === "ready" ? deckState.value : undefined
+        const usableDecks = decks?.filter((deck) => deck.versions.length > 0) ?? []
         const chosenDeck = decks?.find((deck) =>
           deck.versions.some((version) => version._id === seat.deckVersionId),
         )
@@ -109,34 +114,77 @@ export function LobbySeatList({
                 />
               ) : null}
             </View>
-            {seat.controlledByMe && decks?.length ? (
+            {seat.controlledByMe ? (
               <View style={themed($deckChoices)}>
-                <FilterChips
-                  testID={`seat-${seat.seat}-deck`}
-                  accessibilityLabel="Deck"
-                  chips={decks
-                    .filter((deck) => deck.versions.length > 0)
-                    .map((deck) => ({ id: deck._id, label: deck.name, disabled: selectingDeck }))}
-                  selectedId={chosenDeck?._id ?? ""}
-                  onSelect={(deckId) => {
-                    const deck = decks.find((candidate) => candidate._id === deckId)
-                    const version = deck?.versions[deck.versions.length - 1]
-                    if (version) onSelectVersion(seat.seat, version._id)
-                  }}
-                />
-                {chosenDeck && chosenDeck.versions.length > 1 ? (
-                  <FilterChips
-                    testID={`seat-${seat.seat}-version`}
-                    accessibilityLabel="Deck version"
-                    chips={chosenDeck.versions.map((version) => ({
-                      id: version._id,
-                      label: versionLabel(version),
-                      disabled: selectingDeck,
-                    }))}
-                    selectedId={seat.deckVersionId ?? ""}
-                    onSelect={(versionId) => onSelectVersion(seat.seat, versionId)}
-                  />
-                ) : null}
+                {deckState.status === "loading" ? (
+                  <View
+                    testID={`seat-${seat.seat}-deck-loading`}
+                    accessibilityRole="progressbar"
+                    accessibilityLabel="Loading decks"
+                    style={themed($deckLoading)}
+                  >
+                    <Text size="xxs" style={themed($seatPending)} text="Loading decks…" />
+                    <View style={themed($deckPlaceholderRow)}>
+                      <View style={themed($deckPlaceholderWide)} />
+                      <View style={themed($deckPlaceholderNarrow)} />
+                    </View>
+                  </View>
+                ) : deckState.status === "error" ? (
+                  <View testID={`seat-${seat.seat}-deck-error`} style={themed($deckMessage)}>
+                    <Text
+                      accessibilityRole="alert"
+                      size="xxs"
+                      style={themed($seatPending)}
+                      text="Decks unavailable. You can play without one."
+                    />
+                    <Button
+                      testID={`retry-seat-${seat.seat}-decks`}
+                      text="Try again"
+                      style={themed($deckRetry)}
+                      textStyle={themed($deckRetryText)}
+                      onPress={deckState.retry}
+                    />
+                  </View>
+                ) : usableDecks.length === 0 ? (
+                  <View testID={`seat-${seat.seat}-no-decks`} style={themed($deckMessage)}>
+                    <Text
+                      size="xxs"
+                      style={themed($seatPending)}
+                      text="No decks available. You can play without one."
+                    />
+                  </View>
+                ) : (
+                  <>
+                    <FilterChips
+                      testID={`seat-${seat.seat}-deck`}
+                      accessibilityLabel="Deck"
+                      chips={usableDecks.map((deck) => ({
+                        id: deck._id,
+                        label: deck.name,
+                        disabled: selectingDeck,
+                      }))}
+                      selectedId={chosenDeck?._id ?? ""}
+                      onSelect={(deckId) => {
+                        const deck = usableDecks.find((candidate) => candidate._id === deckId)
+                        const version = deck?.versions[deck.versions.length - 1]
+                        if (version) onSelectVersion(seat.seat, version._id)
+                      }}
+                    />
+                    {chosenDeck && chosenDeck.versions.length > 1 ? (
+                      <FilterChips
+                        testID={`seat-${seat.seat}-version`}
+                        accessibilityLabel="Deck version"
+                        chips={chosenDeck.versions.map((version) => ({
+                          id: version._id,
+                          label: versionLabel(version),
+                          disabled: selectingDeck,
+                        }))}
+                        selectedId={seat.deckVersionId ?? ""}
+                        onSelect={(versionId) => onSelectVersion(seat.seat, versionId)}
+                      />
+                    ) : null}
+                  </>
+                )}
                 {selectingDeck ? (
                   <Text
                     testID={`seat-${seat.seat}-deck-selection-status`}
@@ -163,7 +211,11 @@ export function LobbySeatList({
 }
 
 const $list: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $deckChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $deckChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 72,
+  gap: spacing.xxs,
+  justifyContent: "center",
+})
 const $seat: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,
   padding: spacing.sm,
@@ -191,6 +243,38 @@ const $report: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.sm,
 })
 const $reportText: ThemedStyle<TextStyle> = () => ({ fontSize: 14 })
+const $deckLoading: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $deckPlaceholderRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+const $deckPlaceholderWide: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 104,
+  height: 40,
+  borderRadius: 12,
+  backgroundColor: colors.palette.neutral300,
+})
+const $deckPlaceholderNarrow: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 76,
+  height: 40,
+  borderRadius: 12,
+  backgroundColor: colors.palette.neutral200,
+})
+const $deckMessage: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 56,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: spacing.sm,
+})
+const $deckRetry: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 36,
+  paddingVertical: spacing.xxs,
+  paddingHorizontal: spacing.xs,
+})
+const $deckRetryText: ThemedStyle<TextStyle> = () => ({ fontSize: 13, lineHeight: 16 })
 const $openSeat: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
