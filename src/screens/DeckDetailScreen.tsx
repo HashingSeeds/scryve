@@ -152,7 +152,8 @@ function DeckDetailPlaceholder({
             {loadingMetadata ? (
               <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
             ) : null}
-            <DeckLoadingProgress
+            <LoadingProgress
+              testID="deck-loading-progress"
               state={failure ? "unavailable" : "loading"}
               accessibilityText={failure ? statusText : "Loading deck"}
             />
