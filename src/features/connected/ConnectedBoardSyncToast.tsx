@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
 import type { ConnectionStatus } from "@/components/ConnectionBadge"
+import { LoadingProgress } from "@/components/LoadingProgress"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+const SYNCING_DELAY_MS = 1_500
 const SUCCESS_DURATION_MS = 2_500
 
 type SyncToast = {
@@ -32,9 +35,23 @@ export function ConnectedBoardSyncToast({
   changeError?: string
   onReview: () => void
 }) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
+  const insets = useSafeAreaInsets()
   const previousPendingCount = useRef(pendingCount)
+  const [showSlowSync, setShowSlowSync] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+
+  const hasIssues = failedCount > 0 || Boolean(changeError)
+  const isSyncing = pendingCount > 0 && connectionStatus !== "offline" && !hasIssues
+
+  useEffect(() => {
+    if (!isSyncing) {
+      setShowSlowSync(false)
+      return
+    }
+    const timeout = setTimeout(() => setShowSlowSync(true), SYNCING_DELAY_MS)
+    return () => clearTimeout(timeout)
+  }, [isSyncing])
 
   useEffect(() => {
     const completedSync =
@@ -51,10 +68,17 @@ export function ConnectedBoardSyncToast({
     }
     if (!completedSync) return
 
-    setShowSuccess(true)
+    if (showSlowSync) {
+      setShowSlowSync(false)
+      setShowSuccess(true)
+    }
+  }, [changeError, connectionStatus, failedCount, pendingCount, showSlowSync])
+
+  useEffect(() => {
+    if (!showSuccess) return
     const timeout = setTimeout(() => setShowSuccess(false), SUCCESS_DURATION_MS)
     return () => clearTimeout(timeout)
-  }, [changeError, connectionStatus, failedCount, pendingCount])
+  }, [showSuccess])
 
   const toast: SyncToast | undefined =
     failedCount > 0 || changeError
@@ -67,7 +91,7 @@ export function ConnectedBoardSyncToast({
         }
       : pendingCount > 0 && connectionStatus === "offline"
         ? { kind: "queued", message: `${changeCount(pendingCount)} queued` }
-        : pendingCount > 0
+        : isSyncing && showSlowSync
           ? { kind: "syncing", message: `Syncing ${changeCount(pendingCount)}\u2026` }
           : showSuccess
             ? { kind: "success", message: "Changes synced" }
@@ -83,25 +107,44 @@ export function ConnectedBoardSyncToast({
 
   if (!toast) return null
 
+  const showProgress = toast.kind === "syncing" || toast.kind === "success"
+
   return (
-    <View testID="connected-sync-toast-layer" pointerEvents="box-none" style={themed($layer)}>
+    <View
+      testID="connected-sync-toast-layer"
+      pointerEvents="box-none"
+      style={[themed($layer), { top: insets.top + theme.spacing.md }]}
+    >
       <View
         testID="connected-sync-toast"
         accessibilityRole={toast.kind === "failure" ? "alert" : "text"}
         accessibilityLabel={toast.message}
         accessibilityLiveRegion={toast.kind === "failure" ? "assertive" : "polite"}
-        style={themed([$toast, toast.kind === "failure" && $failure])}
+        style={[
+          themed([$toast, toast.kind === "failure" && $failure]),
+          showProgress && themed($withProgress),
+        ]}
       >
-        <Text size="xs" weight="medium" text={toast.message} style={themed($message)} />
-        {toast.kind === "failure" ? (
-          <Button
-            testID="review-connected-sync-button"
-            accessibilityLabel="Review sync issues"
-            text="Review"
-            preset="reversed"
-            style={themed($review)}
-            textStyle={themed($reviewText)}
-            onPress={onReview}
+        <View style={themed($row)}>
+          <Text size="xs" weight="medium" text={toast.message} style={themed($message)} />
+          {toast.kind === "failure" ? (
+            <Button
+              testID="review-connected-sync-button"
+              accessibilityLabel="Review sync issues"
+              text="Review"
+              preset="reversed"
+              style={themed($review)}
+              textStyle={themed($reviewText)}
+              onPress={onReview}
+            />
+          ) : null}
+        </View>
+        {showProgress ? (
+          <LoadingProgress
+            testID="connected-sync-progress"
+            edge="bottom"
+            state={toast.kind === "syncing" ? "loading" : "complete"}
+            accessibilityText={toast.kind === "syncing" ? "Syncing changes" : "Changes synced"}
           />
         ) : null}
       </View>
@@ -111,7 +154,6 @@ export function ConnectedBoardSyncToast({
 
 const $layer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
-  top: spacing.md,
   left: spacing.md,
   right: spacing.md,
   zIndex: 20,
@@ -121,15 +163,21 @@ const $layer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $toast: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   maxWidth: 420,
   minHeight: 40,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
   paddingVertical: spacing.xs,
   paddingHorizontal: spacing.sm,
   borderWidth: 1,
   borderColor: colors.palette.neutral700,
   borderRadius: 4,
   backgroundColor: colors.palette.neutral900,
+  overflow: "hidden",
+})
+const $withProgress: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingBottom: spacing.sm,
+})
+const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
 })
 const $failure: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.error })
 const $message: ThemedStyle<TextStyle> = ({ colors }) => ({

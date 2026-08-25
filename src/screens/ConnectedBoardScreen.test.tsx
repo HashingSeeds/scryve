@@ -138,6 +138,8 @@ describe("ConnectedBoardScreen", () => {
 
     connectedHarness.runtime = { ...connectedHarness.runtime, connectionStatus: "syncing" }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.queryByText("Syncing 1 change\u2026")).toBeNull()
+    act(() => jest.advanceTimersByTime(1_500))
     expect(screen.getByText("Syncing 1 change\u2026")).toBeTruthy()
 
     connectedHarness.runtime = {
@@ -148,6 +150,28 @@ describe("ConnectedBoardScreen", () => {
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.getByText("Changes synced")).toBeTruthy()
     act(() => jest.advanceTimersByTime(2_500))
+    expect(screen.queryByTestId("connected-sync-toast")).toBeNull()
+    jest.useRealTimers()
+  })
+
+  it("stays silent when a sync completes quickly", () => {
+    jest.useFakeTimers()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      connectionStatus: "syncing",
+      pending: [{ event: { operationId: "operation-1", playerId: "player-1" } }],
+    }
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.queryByText("Syncing 1 change\u2026")).toBeNull()
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      connectionStatus: "connected",
+      pending: [],
+    }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.queryByText("Changes synced")).toBeNull()
+    act(() => jest.advanceTimersByTime(5_000))
     expect(screen.queryByTestId("connected-sync-toast")).toBeNull()
     jest.useRealTimers()
   })
