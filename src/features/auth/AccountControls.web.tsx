@@ -6,7 +6,7 @@ import { AccountScreen } from "@/screens/AccountScreen"
 import type { AccountProfileProps } from "./accountProfileProps"
 import { clerkAppearance } from "./clerkAppearance"
 
-export function AccountProfile({ onBack, onSignedOut }: AccountProfileProps) {
+export function AccountProfile({ onBack, onSignedOut, accountControls }: AccountProfileProps) {
   const clerk = useClerk()
   const { user } = useUser()
   const [isSigningOut, setIsSigningOut] = useState(false)
@@ -38,6 +38,7 @@ export function AccountProfile({ onBack, onSignedOut }: AccountProfileProps) {
       avatarUrl={user?.hasImage ? user.imageUrl : undefined}
       isSigningOut={isSigningOut}
       error={error}
+      accountControls={accountControls}
       onBack={onBack}
       onManageProfile={manageProfile}
       onSignOut={() => void signOut()}

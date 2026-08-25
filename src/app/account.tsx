@@ -31,9 +31,16 @@ export default function AccountRoute() {
     )
   return (
     <Screen preset="fixed" contentContainerStyle={$profileScreen}>
-      <AccountProfile onBack={leaveAccount} onSignedOut={() => router.replace("/")} />
-      <AccountDataControls onOpen={openAccountData} />
-      <SubscriptionControls />
+      <AccountProfile
+        accountControls={
+          <>
+            <SubscriptionControls />
+            <AccountDataControls onOpen={openAccountData} />
+          </>
+        }
+        onBack={leaveAccount}
+        onSignedOut={() => router.replace("/")}
+      />
     </Screen>
   )
 }

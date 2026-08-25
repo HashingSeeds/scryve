@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { Image } from "expo-image"
@@ -15,6 +16,7 @@ export interface AccountScreenProps {
   avatarUrl?: string
   isSigningOut?: boolean
   error?: string
+  accountControls?: ReactNode
   onBack?: () => void
   onManageProfile: () => void
   onSignOut: () => void
@@ -26,6 +28,7 @@ export function AccountScreen({
   avatarUrl,
   isSigningOut,
   error,
+  accountControls,
   onBack,
   onManageProfile,
   onSignOut,
@@ -55,14 +58,10 @@ export function AccountScreen({
             accessibilityHint="Opens the profile manager to change your name, email addresses, and password"
             rightIcon="caretRight"
             topSeparator
-            bottomSeparator
+            bottomSeparator={!accountControls}
             onPress={onManageProfile}
           />
-          <Text
-            text="Update your name, email addresses, password, and connected sign-in methods."
-            size="xxs"
-            style={themed($muted)}
-          />
+          {accountControls}
         </View>
 
         <View style={themed($signOut)}>
@@ -77,11 +76,7 @@ export function AccountScreen({
             textStyle={themed($signOutText)}
             onPress={onSignOut}
           />
-          <Text
-            text="Local games stay on this device after you sign out."
-            size="xxs"
-            style={themed($muted)}
-          />
+          <Text text="Local games stay on this device." size="xxs" style={themed($muted)} />
         </View>
       </ScrollView>
     </View>
@@ -114,22 +109,26 @@ function initial(label?: string) {
   return label?.trim().charAt(0).toUpperCase() || "?"
 }
 
-const AVATAR_SIZE = 56
+const AVATAR_SIZE = 64
 
 const $fill: ViewStyle = { flex: 1 }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
-  maxWidth: 560,
+  maxWidth: 580,
   alignSelf: "center",
   gap: spacing.xl,
   paddingHorizontal: spacing.lg,
   paddingTop: spacing.lg,
   paddingBottom: spacing.xl,
 })
-const $identity: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $identity: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.md,
+  paddingTop: spacing.sm,
+  paddingBottom: spacing.xl,
+  borderBottomWidth: 1,
+  borderColor: colors.separator,
 })
 const $identityText: ViewStyle = { flex: 1 }
 const $avatar: ThemedStyle<ImageStyle> = ({ colors }) => ({
@@ -144,15 +143,14 @@ const $avatarFallback: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.tintInactive,
 })
 const $avatarInitial: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.text })
-const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $signOut: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
+const $signOut: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   paddingTop: spacing.lg,
-  borderTopWidth: 1,
-  borderColor: colors.separator,
 })
-const $signOutButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $signOutButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 50,
+  borderRadius: spacing.sm,
   borderColor: colors.error,
   backgroundColor: colors.transparent,
 })
