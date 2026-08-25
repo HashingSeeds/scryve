@@ -342,6 +342,6 @@ describe("unified history screen", () => {
 
     const button = screen.getByTestId("history-load-more")
     expect(screen.getByText("Loading more connected games…")).toBeTruthy()
-    expect(button.props.accessibilityState.disabled).toBe(true)
+    expect(button).toBeDisabled()
   })
 })
