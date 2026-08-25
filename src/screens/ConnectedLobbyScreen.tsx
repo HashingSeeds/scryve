@@ -117,6 +117,10 @@ export function ConnectedLobbyScreen({
 
   async function chooseVersion(seat: number, deckVersionId: string) {
     if (selectingDeckSeatsInFlight.current.has(seat)) return
+    if (!isWebSocketConnected) {
+      setActionError(onlineOnlyNotice("deck"))
+      return
+    }
     selectingDeckSeatsInFlight.current.add(seat)
     setSelectingDeckSeats(new Set(selectingDeckSeatsInFlight.current))
     try {

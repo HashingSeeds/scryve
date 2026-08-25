@@ -62,7 +62,7 @@ export function ConnectedBoardSyncToast({
       connectionStatus === "connected"
     previousPendingCount.current = pendingCount
 
-    if (pendingCount > 0 || failedCount > 0 || changeError) {
+    if (pendingCount > 0 || failedCount > 0 || changeError || connectionStatus !== "connected") {
       setShowSuccess(false)
       return
     }

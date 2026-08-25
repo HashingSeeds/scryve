@@ -221,6 +221,11 @@ export class OutboxSyncController {
       this.publish()
       return false
     }
+    if (this.failed.length > 0) {
+      this.finishError = "Review failed life changes before finishing."
+      this.publish()
+      return false
+    }
     try {
       this.finishing = true
       this.publish()
