@@ -233,4 +233,61 @@ describe("ConvexQueryBoundary against still-cached convex query errors", () => {
     harness.pressRetry()
     expect(query.renderCount).toBeGreaterThanOrEqual(4)
   })
+
+  it("discards pending automatic retry state when the reset key changes", () => {
+    const query = createCachedErrorQuery()
+    const fallback = ({ retry }: { retry: () => void }) => (
+      <Pressable testID="retry-query" onPress={retry}>
+        <View />
+      </Pressable>
+    )
+    const tree = (resetKey: string) => (
+      <ConvexQueryBoundary resetKey={resetKey} fallback={fallback}>
+        <LobbyDeckQueryOf query={query} />
+      </ConvexQueryBoundary>
+    )
+
+    const view = render(tree("game-a"))
+    expect(view.getByTestId("query-result")).toBeTruthy()
+
+    act(() => query.fail())
+    view.rerender(tree("game-a"))
+    expect(view.queryByTestId("query-result")).toBeNull()
+
+    query.purge()
+    view.rerender(tree("game-b"))
+    const rendersAtReset = query.renderCount
+    expect(view.getByTestId("query-result")).toBeTruthy()
+
+    harnessAdvance(500)
+    harnessAdvance(2000)
+    expect(query.renderCount).toBe(rendersAtReset)
+
+    act(() => query.fail())
+    view.rerender(tree("game-b"))
+    expect(view.queryByTestId("query-result")).toBeNull()
+
+    harnessAdvance(500)
+    harnessAdvance(2000)
+    harnessAdvance(60000)
+    query.purge()
+    const rendersAfterExhaustedBudget = query.renderCount
+    harnessAdvance(60000)
+
+    expect(query.renderCount).toBe(rendersAfterExhaustedBudget)
+    expect(view.queryByTestId("query-result")).toBeNull()
+    fireEvent.press(view.getByTestId("retry-query"))
+
+    expect(view.getByTestId("query-result")).toBeTruthy()
+  })
+
+  function LobbyDeckQueryOf({ query }: { query: ReturnType<typeof createCachedErrorQuery> }) {
+    const result = query.useQuery()
+    void result
+    return <View testID="query-result" />
+  }
 })
+
+function harnessAdvance(ms: number) {
+  act(() => void jest.advanceTimersByTime(ms))
+}
