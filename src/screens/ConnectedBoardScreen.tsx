@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ScrollView, useWindowDimensions, View } from "react-native"
+import { ActivityIndicator, ScrollView, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
@@ -10,17 +10,18 @@ import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { ConnectionBadge } from "@/components/ConnectionBadge"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
-import { Header } from "@/components/Header"
 import {
   getPlayerGridLayout,
   getPlayerGridLayoutOptions,
   getPlayerGridMenuAnchor,
+  getScreenCornerSquaringStyle,
   PlayerGrid,
   type PlayerGridLayoutVariant,
 } from "@/components/PlayerGrid"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { ConnectedBoardSyncToast } from "@/features/connected/ConnectedBoardSyncToast"
 import {
   PlayerActionsDialog,
@@ -34,25 +35,139 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
 
-export function ConnectedBoardScreen(props: {
+type ConnectedBoardScreenProps = {
   publicId: string
   onBack?: () => void
   onHistory?: () => void
+}
+
+type ConnectedBoardShellState =
+  | { status: "loading"; message: string }
+  | { status: "unavailable"; message: string; retry?: () => void }
+
+const BOARD_SHELL_ROWS = [
+  [0, 1],
+  [2, 3],
+]
+
+function ConnectedBoardShell({
+  state,
+  onBack,
+}: {
+  state: ConnectedBoardShellState
+  onBack?: () => void
 }) {
+  const { themed } = useAppTheme()
+  const unavailable = state.status === "unavailable"
+
+  return (
+    <Screen
+      preset="fixed"
+      safeAreaEdges={[]}
+      SystemBarsProps={{ hidden: true }}
+      contentContainerStyle={themed($screen)}
+    >
+      <View testID="connected-game-board" style={themed($board)}>
+        <View
+          testID="connected-board-shell"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          pointerEvents="none"
+          style={themed($shellGrid)}
+        >
+          {BOARD_SHELL_ROWS.map((row, rowIndex) => (
+            <View key={rowIndex} style={themed($shellRow)}>
+              {row.map((cell, columnIndex) => (
+                <View
+                  key={cell}
+                  testID="connected-board-shell-cell"
+                  style={[
+                    themed($shellCell),
+                    getScreenCornerSquaringStyle({
+                      rows: BOARD_SHELL_ROWS,
+                      rowIndex,
+                      columnIndex,
+                    }),
+                  ]}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+        <View
+          testID="connected-board-status-layer"
+          pointerEvents="box-none"
+          style={themed($toastLayer)}
+        >
+          <View
+            testID={
+              unavailable ? "connected-board-unavailable-status" : "connected-board-loading-status"
+            }
+            accessibilityRole={unavailable ? "alert" : "progressbar"}
+            accessibilityLabel={state.message}
+            accessibilityLiveRegion={unavailable ? "assertive" : "polite"}
+            style={themed([$statusToast, unavailable && $unavailableToast])}
+          >
+            {!unavailable ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+            <Text size="xs" weight="medium" text={state.message} style={themed($statusMessage)} />
+            {unavailable && state.retry ? (
+              <Button
+                testID="retry-connected-board-button"
+                text="Try again"
+                preset="reversed"
+                style={themed($statusAction)}
+                textStyle={themed($statusActionText)}
+                onPress={state.retry}
+              />
+            ) : null}
+            {onBack ? (
+              <Button
+                testID="back-from-connected-board-button"
+                accessibilityLabel="Back to local play"
+                text="Back"
+                style={themed($statusAction)}
+                textStyle={themed($statusActionText)}
+                onPress={onBack}
+              />
+            ) : null}
+          </View>
+        </View>
+      </View>
+    </Screen>
+  )
+}
+
+export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   const { isLoaded, user } = useUser()
-  if (!isLoaded || !user?.id)
+  if (!isLoaded)
     return (
-      <Screen preset="auto">
-        <Header
-          title="Connected game"
-          leftTx={props.onBack ? "common:back" : undefined}
-          onLeftPress={props.onBack}
-        />
-        <Text text="Loading your connected-game session…" />
-      </Screen>
+      <ConnectedBoardShell
+        state={{ status: "loading", message: "Checking connected session…" }}
+        onBack={props.onBack}
+      />
+    )
+  if (!user?.id)
+    return (
+      <ConnectedBoardShell
+        state={{ status: "unavailable", message: "Connected session unavailable" }}
+        onBack={props.onBack}
+      />
     )
   const ownerId = user.id
-  return <ConnectedBoardRuntime key={`${ownerId}:${props.publicId}`} {...props} ownerId={ownerId} />
+  const runtimeKey = `${ownerId}:${props.publicId}`
+  return (
+    <ConvexQueryBoundary
+      resetKey={runtimeKey}
+      fallback={({ retry }) => (
+        <ConnectedBoardShell
+          state={{ status: "unavailable", message: "Connected board unavailable", retry }}
+          onBack={props.onBack}
+        />
+      )}
+    >
+      <ConnectedBoardRuntime key={runtimeKey} {...props} ownerId={ownerId} />
+    </ConvexQueryBoundary>
+  )
 }
 
 function ConnectedBoardRuntime({
@@ -82,7 +197,6 @@ function ConnectedBoardRuntime({
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const finishSubmitInFlight = useRef(false)
-  const game = runtime.projection
 
   function toggleWinner(playerId: string) {
     setDrawSelected(false)
@@ -101,17 +215,15 @@ function ConnectedBoardRuntime({
       event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
     )
   }
-  if (!game)
+  if (runtime.status === "loading")
     return (
-      <Screen preset="auto">
-        <Header
-          title="Connected game"
-          leftTx={onBack ? "common:back" : undefined}
-          onLeftPress={onBack}
-        />
-        <Text text="Loading connected board…" />
-      </Screen>
+      <ConnectedBoardShell
+        state={{ status: "loading", message: "Loading connected board…" }}
+        onBack={onBack}
+      />
     )
+
+  const game = runtime.projection
 
   const players: GamePlayer[] = game.players.map((player) => ({
     id: asPlayerId(player.playerId),
@@ -460,8 +572,66 @@ function ConnectedBoardRuntime({
   )
 }
 
-const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
+const $screen: ThemedStyle<ViewStyle> = () => ({
+  flex: 1,
+  width: "100%",
+  backgroundColor: "#000000",
+})
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
+const $shellGrid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  width: "100%",
+  gap: spacing.xxs,
+})
+const $shellRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  flexDirection: "row",
+  gap: spacing.xxs,
+})
+const $shellCell: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  borderRadius: spacing.md,
+  backgroundColor: "#151515",
+})
+const $toastLayer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  top: spacing.md,
+  left: spacing.md,
+  right: spacing.md,
+  zIndex: 20,
+  elevation: 20,
+  alignItems: "center",
+})
+const $statusToast: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  maxWidth: 420,
+  minHeight: 40,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  paddingVertical: spacing.xs,
+  paddingHorizontal: spacing.sm,
+  borderWidth: 1,
+  borderColor: "#444444",
+  borderRadius: 4,
+  backgroundColor: "#111111",
+})
+const $unavailableToast: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.error })
+const $statusMessage: ThemedStyle<TextStyle> = () => ({
+  flexShrink: 1,
+  color: "#FFFFFF",
+})
+const $statusAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 32,
+  paddingVertical: spacing.xxs,
+  paddingHorizontal: spacing.xs,
+  borderColor: "#FFFFFF",
+  backgroundColor: "transparent",
+})
+const $statusActionText: ThemedStyle<TextStyle> = () => ({
+  color: "#FFFFFF",
+  fontSize: 13,
+  lineHeight: 16,
+})
 const $boardDialog: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxHeight: "82%",
   gap: spacing.md,

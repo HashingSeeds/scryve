@@ -37,6 +37,7 @@ const mockRemoteProjection = {
     },
   ],
 } as const
+let mockRemote: unknown = mockRemoteProjection
 const mockChangeMutation = Object.assign(
   jest.fn(async (args: any) => args),
   {
@@ -80,7 +81,7 @@ jest.mock("../../../convex/_generated/api", () => ({
 jest.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
   useConvexConnectionState: () => ({ isWebSocketConnected: mockSocketConnected }),
-  useQuery: () => mockRemoteProjection,
+  useQuery: () => mockRemote,
   useMutation: (reference: string) => {
     if (reference === "finishGame") return mockFinishMutation
     mockChangeMutation.withOptimisticUpdate.mockReturnValue(mockChangeMutation)
@@ -92,7 +93,9 @@ describe("useConnectedGame connection readiness", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockSocketConnected = false
+    mockRemote = mockRemoteProjection
     mockPending = []
+    mockRepository.loadProjection.mockReturnValue(null)
     mockRepository.enqueue.mockImplementation((_action, current) => ({
       accepted: true,
       pending: [...(current ?? []), _action],
@@ -100,8 +103,11 @@ describe("useConnectedGame connection readiness", () => {
     mockDrain.mockResolvedValue({ acknowledged: [], failed: [], stoppedForRetry: false })
   })
 
-  it("treats a cached projection as offline and never queues finish on a disconnected socket", async () => {
+  it("keeps a remote projection read-only for online-only finish while disconnected", async () => {
     const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
+    expect(result.current.status).toBe("ready")
+    if (result.current.status !== "ready") throw new Error("Expected a ready projection")
+    expect(result.current.source).toBe("remote")
     expect(result.current.projection?.players[0].currentLife).toBe(20)
     expect(result.current.connectionStatus).toBe("offline")
     await act(async () => result.current.finish())
@@ -110,6 +116,7 @@ describe("useConnectedGame connection readiness", () => {
   })
 
   it("recovers owner-scoped cached projection and pending overlay on an offline cold mount", () => {
+    mockRemote = undefined
     mockRepository.loadProjection.mockReturnValueOnce({
       ...mockRemoteProjection,
       eventSequence: 2,
@@ -133,9 +140,21 @@ describe("useConnectedGame connection readiness", () => {
       },
     ]
     const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
+    expect(result.current.status).toBe("ready")
+    if (result.current.status !== "ready") throw new Error("Expected a ready projection")
+    expect(result.current.source).toBe("cache")
     expect(result.current.projection?.players[0].currentLife).toBe(25)
     expect(result.current.pending).toHaveLength(1)
     expect(result.current.connectionStatus).toBe("offline")
+    expect(mockDrain).not.toHaveBeenCalled()
+  })
+
+  it("keeps a no-cache board loading until the first remote projection arrives", () => {
+    mockRemote = undefined
+
+    const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
+
+    expect(result.current).toMatchObject({ status: "loading", projection: null })
     expect(mockDrain).not.toHaveBeenCalled()
   })
 

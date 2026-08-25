@@ -176,6 +176,25 @@ describe("ConnectedBoardScreen", () => {
     jest.useRealTimers()
   })
 
+  it("keeps an owner-scoped cached board usable offline with sync status over the grid", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      status: "ready",
+      source: "cache",
+      connectionStatus: "offline",
+      pending: [{ event: { operationId: "operation-cached", playerId: "player-1" } }],
+    }
+
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("Ada")
+    expect(screen.getByTestId("life-seat-1-1").props.accessibilityState.disabled).toBe(false)
+    expect(screen.getByText("1 change queued")).toBeTruthy()
+    expect(
+      StyleSheet.flatten(screen.getByTestId("connected-sync-toast-layer").props.style),
+    ).toMatchObject({ position: "absolute" })
+  })
+
   it("renders a resumed finished summary read-only with the shared menu actions disabled", () => {
     const onHistory = jest.fn()
     connectedHarness.runtime = {
@@ -421,17 +440,19 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("game-b")
   })
 
-  it("remounts and withholds account-A runtime state after an A-to-B account switch", () => {
+  it("withholds account-A cache until account B has its own ready projection", () => {
+    let userBReady = false
     mockUseConnectedGame.mockImplementation((_publicId: string, ownerId?: string) => {
-      const React = jest.requireActual<typeof import("react")>("react")
-      const [mountedOwner] = React.useState(ownerId)
+      const loading = ownerId === "user-b" && !userBReady
       return {
         ...connectedHarness.runtime,
+        status: loading ? "loading" : "ready",
+        source: ownerId === "user-a" ? "cache" : "remote",
         projection: {
           ...connectedHarness.runtime.projection,
           players: connectedHarness.runtime.projection.players.map((player, index) => ({
             ...player,
-            displayName: index === 0 ? (mountedOwner ?? "") : player.displayName,
+            displayName: index === 0 ? (ownerId ?? "") : player.displayName,
           })),
         },
       }
@@ -440,19 +461,109 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("user-a")
     connectedHarness.userId = "user-b"
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).not.toContain("user-a")
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("user-b")
+    expect(screen.queryByText("user-a")).toBeNull()
+    expect(screen.queryByTestId("life-card-seat-1")).toBeNull()
+    expect(screen.getByTestId("connected-board-loading-status")).toBeTruthy()
     expect(mockUseConnectedGame).toHaveBeenLastCalledWith("game-public", "user-b")
+
+    userBReady = true
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("user-b")
   })
 
-  it("does not mount a runtime or expose controls before Clerk user hydration", () => {
-    connectedHarness.userLoaded = false
+  it("keeps final board geometry while the first projection has no cache", () => {
+    connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByText("Loading your connected-game session…")).toBeTruthy()
+
+    expect(
+      screen.getAllByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
+    ).toHaveLength(4)
+    expect(
+      StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style),
+    ).toMatchObject({ flex: 1, width: "100%" })
+    expect(
+      StyleSheet.flatten(screen.getByTestId("connected-board-status-layer").props.style),
+    ).toMatchObject({ position: "absolute" })
+    expect(screen.getByText("Loading connected board…")).toBeTruthy()
+    expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
+
+    connectedHarness.runtime = { ...connectedHarness.runtime, status: "ready" }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.queryByTestId("connected-board-shell")).toBeNull()
+    expect(screen.getByTestId("life-seat-1-1")).toBeTruthy()
+  })
+
+  it("retries a thrown board query without replacing the player-grid shell", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    const onBack = jest.fn()
+    let unavailable = true
+    mockUseConnectedGame.mockImplementation(() => {
+      if (unavailable) throw new Error("Game unavailable")
+      return connectedHarness.runtime
+    })
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+
+    expect(view.getByText("Connected board unavailable")).toBeTruthy()
+    expect(
+      view.getAllByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
+    ).toHaveLength(4)
+    expect(
+      StyleSheet.flatten(view.getByTestId("connected-board-status-layer").props.style),
+    ).toMatchObject({ position: "absolute" })
+    fireEvent.press(view.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalledTimes(1)
+
+    unavailable = false
+    fireEvent.press(view.getByTestId("retry-connected-board-button"))
+    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
+    expect(view.queryByTestId("connected-board-unavailable-status")).toBeNull()
+    consoleError.mockRestore()
+  })
+
+  it("offers a way back to local play when the Clerk session is signed out", () => {
+    const onBack = jest.fn()
+    connectedHarness.userId = undefined
+
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+
+    expect(screen.getByText("Connected session unavailable")).toBeTruthy()
+    expect(screen.getByLabelText("Back to local play")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(mockUseConnectedGame).not.toHaveBeenCalled()
+  })
+
+  it("does not mount a runtime before Clerk hydration and keeps the board shell stable", () => {
+    const onBack = jest.fn()
+    connectedHarness.userLoaded = false
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    expect(screen.getByText("Checking connected session…")).toBeTruthy()
+    expect(
+      screen.getAllByTestId("connected-board-shell-cell", { includeHiddenElements: true }),
+    ).toHaveLength(4)
+    expect(
+      StyleSheet.flatten(screen.getByTestId("connected-board-status-layer").props.style),
+    ).toMatchObject({ position: "absolute" })
     expect(mockUseConnectedGame).not.toHaveBeenCalled()
     expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
+    expect(screen.getByTestId("back-from-connected-board-button")).toBeTruthy()
     connectedHarness.userLoaded = true
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(mockUseConnectedGame).toHaveBeenCalledWith("game-public", "user-a")
+  })
+
+  it("offers a way back to local play while the connected board is stuck loading", () => {
+    const onBack = jest.fn()
+    connectedHarness.runtime = { ...connectedHarness.runtime, status: "loading" }
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+
+    expect(view.getByText("Loading connected board…")).toBeTruthy()
+    fireEvent.press(view.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalledTimes(1)
+
+    connectedHarness.runtime = { ...connectedHarness.runtime, status: "ready" }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    expect(view.queryByTestId("back-from-connected-board-button")).toBeNull()
+    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
   })
 })
