@@ -10,9 +10,10 @@ import { Button } from "@/components/Button"
 import { Card } from "@/components/Card"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
-import { DeckListSkeleton, DeckLoadingProgress } from "@/components/DeckLoadingState"
+import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
+import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -396,7 +397,7 @@ export function AddDeckScreen({
             {preconDetail(selectedPrecon) ? (
               <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
             ) : null}
-            <DeckLoadingProgress
+            <LoadingProgress
               testID="precon-loading-progress"
               state={previewLoading ? "loading" : resolvedPrecon ? "complete" : "unavailable"}
               accessibilityText={
