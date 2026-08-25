@@ -109,6 +109,27 @@ describe("SubscriptionControls", () => {
     expect(view.getByLabelText("Loading Scryve Pro")).toBeTruthy()
   })
 
+  it("keeps the status live region active through the loading result transition", () => {
+    mockBilling.isLoading = true
+    const view = renderControls()
+
+    expect(view.getByText("Checking access…").props.accessibilityLiveRegion).toBe("polite")
+
+    mockBilling.isLoading = false
+    mockBilling.isCountPro = true
+    mockBilling.customerInfo = entitledCustomerInfo({
+      expirationDate: "2026-09-01T00:00:00Z",
+      willRenew: true,
+    })
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <SubscriptionControls />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText(/Renews/).props.accessibilityLiveRegion).toBe("polite")
+  })
+
   it("explains why purchases are unavailable when RevenueCat is not configured", () => {
     mockBilling.configured = false
     mockBilling.configurationMessage = "Scryve Pro purchases are unavailable in this build."

@@ -38,7 +38,7 @@ export function SubscriptionControls() {
             size="xs"
             style={themed($muted)}
             text={accessStatus}
-            accessibilityLiveRegion={billing.isLoading ? "polite" : undefined}
+            accessibilityLiveRegion="polite"
           />
         ) : null}
       </View>
