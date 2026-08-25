@@ -125,4 +125,11 @@ describe("SubscriptionControls", () => {
     expect(view.getByText("Status unavailable")).toBeTruthy()
     expect(view.getByText("The purchase could not be completed.")).toBeTruthy()
   })
+
+  it("does not promise a free plan while a refresh failed with stale customer info", () => {
+    mockBilling.error = "Connect to the internet and try again."
+    mockBilling.customerInfo = { entitlements: { all: {} } }
+
+    expect(renderControls().getByText("Status unavailable")).toBeTruthy()
+  })
 })

@@ -23,7 +23,7 @@ export function SubscriptionControls() {
       ? expiration
         ? `${entitlement?.willRenew ? "Renews" : "Available until"} ${expiration}`
         : "Lifetime access"
-      : billing.error && !billing.customerInfo
+      : billing.error
         ? "Status unavailable"
         : "Free plan"
 
