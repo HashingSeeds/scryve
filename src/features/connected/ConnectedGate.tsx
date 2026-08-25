@@ -14,10 +14,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { ConnectedGameRepository } from "./persistence"
-import {
-  ConnectedProfileProvider,
-  useConnectedProfile,
-} from "./useConnectedProfile"
+import { ConnectedProfileProvider, useConnectedProfile } from "./useConnectedProfile"
 import { describeUsernameFailure, isUsernameValid, suggestUsername } from "./username"
 import { UsernameChecklist } from "./UsernameChecklist"
 import { api } from "../../../convex/_generated/api"
