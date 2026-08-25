@@ -97,7 +97,7 @@ function ConnectedBoardShell({
                 onPress={state.retry}
               />
             ) : null}
-            {unavailable && onBack ? (
+            {onBack ? (
               <Button
                 testID="back-from-connected-board-button"
                 accessibilityLabel="Back to local play"
@@ -118,7 +118,10 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   const { isLoaded, user } = useUser()
   if (!isLoaded)
     return (
-      <ConnectedBoardShell state={{ status: "loading", message: "Checking connected session…" }} />
+      <ConnectedBoardShell
+        state={{ status: "loading", message: "Checking connected session…" }}
+        onBack={props.onBack}
+      />
     )
   if (!user?.id)
     return (
@@ -191,7 +194,10 @@ function ConnectedBoardRuntime({
   }
   if (runtime.status === "loading")
     return (
-      <ConnectedBoardShell state={{ status: "loading", message: "Loading connected board…" }} />
+      <ConnectedBoardShell
+        state={{ status: "loading", message: "Loading connected board…" }}
+        onBack={onBack}
+      />
     )
 
   const game = runtime.projection
