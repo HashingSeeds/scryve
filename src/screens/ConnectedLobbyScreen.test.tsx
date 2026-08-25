@@ -11,6 +11,7 @@ import {
   mockClaimSeat,
   mockLeave,
   mockReportPlayer,
+  mockSelectDeck,
   mockSetAppearance,
   mockStart,
   mockSyncUser,
@@ -71,6 +72,67 @@ describe("ConnectedLobbyScreen", () => {
     await waitFor(() => expect(screen.getByTestId("connected-action-error")).toBeTruthy())
     expect(screen.getByTestId("connected-action-error").props.accessibilityRole).toBe("alert")
     expect(onStarted).not.toHaveBeenCalled()
+  })
+
+  it("disables Start and ignores duplicate presses while starting", async () => {
+    let resolveStart: (value: { publicId: string }) => void = () => undefined
+    mockStart.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStart = resolve
+      }),
+    )
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      invitation: null,
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    fireEvent.press(screen.getByTestId("start-connected-game-button"))
+    fireEvent.press(screen.getByTestId("start-connected-game-button"))
+    expect(mockStart).toHaveBeenCalledTimes(1)
+    expect(screen.getByText("Starting\u2026")).toBeTruthy()
+    expect(screen.getByTestId("start-connected-game-button")).toBeDisabled()
+
+    await act(async () => resolveStart({ publicId: "game-public" }))
+  })
+
+  it("disables deck choices and ignores duplicate selection presses", async () => {
+    let resolveSelection: (value: undefined) => void = () => undefined
+    mockSelectDeck.mockReturnValueOnce(
+      new Promise<undefined>((resolve) => {
+        resolveSelection = resolve
+      }),
+    )
+    connectedHarness.decks = [
+      {
+        _id: "deck-1",
+        name: "Krenko",
+        versions: [{ _id: "deck-version-1", versionNumber: 1 }],
+      },
+    ]
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      invitation: null,
+      players: connectedHarness.projection.players.map((player, index) => ({
+        ...player,
+        controlledByMe: index === 0,
+      })),
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    fireEvent.press(screen.getByTestId("seat-1-deck-deck-1"))
+    fireEvent.press(screen.getByTestId("seat-1-deck-deck-1"))
+    expect(mockSelectDeck).toHaveBeenCalledTimes(1)
+    expect(mockSelectDeck).toHaveBeenCalledWith({
+      publicId: "game-public",
+      seat: 1,
+      deckVersionId: "deck-version-1",
+    })
+    expect(screen.getByText("Selecting deck\u2026")).toBeTruthy()
+    expect(screen.getByTestId("seat-1-deck-deck-1")).toBeDisabled()
+
+    await act(async () => resolveSelection(undefined))
   })
 
   it("renders and shares the production HTTPS invite with an actionable manual fallback", async () => {

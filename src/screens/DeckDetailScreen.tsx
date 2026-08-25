@@ -10,13 +10,14 @@ import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
-import { DeckListSkeleton, DeckLoadingProgress } from "@/components/DeckLoadingState"
+import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import type { DeckVersionDraft } from "@/components/DeckVersionDialog"
 import { DeckVersionDialog } from "@/components/DeckVersionDialog"
 import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "@/components/DialogCard"
 import { Header } from "@/components/Header"
 import { ListItem } from "@/components/ListItem"
+import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -374,7 +375,11 @@ export function DeckDetailScreen({
               {loadingMetadata ? (
                 <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
               ) : null}
-              <DeckLoadingProgress state="loading" accessibilityText="Loading deck" />
+              <LoadingProgress
+                testID="deck-loading-progress"
+                state="loading"
+                accessibilityText="Loading deck"
+              />
             </View>
             <View style={themed($tabs)} accessibilityRole="tablist">
               {(["cards", "versions", "notes"] as const).map((tab) => (
@@ -462,7 +467,11 @@ export function DeckDetailScreen({
                 text={`${gameLabel} · ${deckFormatLabel(detail.deck.game, detail.deck.format)} · ${cardCountLabel(totalQuantity(cards))}`}
               />
               {deckRecord ? <Text size="sm" text={deckRecord} /> : null}
-              <DeckLoadingProgress state="complete" accessibilityText="Deck loaded" />
+              <LoadingProgress
+                testID="deck-loading-progress"
+                state="complete"
+                accessibilityText="Deck loaded"
+              />
             </View>
 
             <View style={themed($tabs)} accessibilityRole="tablist">

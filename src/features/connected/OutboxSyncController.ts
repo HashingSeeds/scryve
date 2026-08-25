@@ -208,24 +208,32 @@ export class OutboxSyncController {
     this.publish()
   }
 
-  finish = async (result?: ConnectedGameResult): Promise<void> => {
+  finish = async (result?: ConnectedGameResult): Promise<boolean> => {
+    if (this.finishing) return false
     this.finishError = undefined
     if (!this.canSync()) {
       this.finishError = "Connect and sign in before finishing this game."
       this.publish()
-      return
+      return false
     }
     if (this.options.repository.loadOutbox(this.options.publicId).length > 0) {
       this.finishError = "Wait for pending life changes to sync before finishing."
       this.publish()
-      return
+      return false
+    }
+    if (this.failed.length > 0) {
+      this.finishError = "Review failed life changes before finishing."
+      this.publish()
+      return false
     }
     try {
       this.finishing = true
       this.publish()
       await this.options.finishGame(result)
+      return true
     } catch (cause) {
       this.finishError = cause instanceof Error ? cause.message : "Could not finish the game"
+      return false
     } finally {
       this.finishing = false
       this.publish()

@@ -24,7 +24,7 @@ export interface ConnectedGameRuntime {
   failed: FailedLifeAction[]
   connectionStatus: ConnectionStatus
   changeLife: (playerId: string, delta: LifeDelta) => void
-  finish: (result?: ConnectedGameResult) => Promise<void>
+  finish: (result?: ConnectedGameResult) => Promise<boolean>
   dismissFailed: (operationId: string) => void
   changeError?: string
   finishError?: string
