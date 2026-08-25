@@ -42,7 +42,6 @@ export class ConvexQueryBoundary extends Component<
     if (prevProps.resetKey !== this.props.resetKey) {
       this.clearAutoRetryTimer()
       this.autoRetryCount = 0
-      return
     }
     if (this.state.error && this.autoRetryTimer === undefined) {
       this.scheduleAutoRetry()

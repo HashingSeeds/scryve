@@ -281,6 +281,38 @@ describe("ConvexQueryBoundary against still-cached convex query errors", () => {
     expect(view.getByTestId("query-result")).toBeTruthy()
   })
 
+  it("schedules automatic retries when the replacement child fails after a resetKey change", () => {
+    const query = createCachedErrorQuery()
+    const fallback = ({ retry }: { retry: () => void }) => (
+      <Pressable testID="retry-query" onPress={retry}>
+        <View />
+      </Pressable>
+    )
+    const tree = (resetKey: string) => (
+      <ConvexQueryBoundary resetKey={resetKey} fallback={fallback}>
+        <LobbyDeckQueryOf query={query} />
+      </ConvexQueryBoundary>
+    )
+
+    act(() => query.fail())
+    const view = render(tree("game-a"))
+    expect(view.queryByTestId("query-result")).toBeNull()
+
+    const rendersAfterSwitch = (() => {
+      view.rerender(tree("game-b"))
+      return query.renderCount
+    })()
+    expect(view.queryByTestId("query-result")).toBeNull()
+
+    harnessAdvance(500)
+    expect(query.renderCount).toBeGreaterThan(rendersAfterSwitch)
+
+    harnessAdvance(2000)
+    const rendersAfterBackoff = query.renderCount
+    harnessAdvance(60000)
+    expect(query.renderCount).toBe(rendersAfterBackoff)
+  })
+
   function LobbyDeckQueryOf({ query }: { query: ReturnType<typeof createCachedErrorQuery> }) {
     const result = query.useQuery()
     void result
