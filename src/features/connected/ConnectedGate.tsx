@@ -16,7 +16,6 @@ import type { ThemedStyle } from "@/theme/types"
 import { ConnectedGameRepository } from "./persistence"
 import {
   ConnectedProfileProvider,
-  resetConnectedProfileBootstrapForTests,
   useConnectedProfile,
 } from "./useConnectedProfile"
 import { describeUsernameFailure, isUsernameValid, suggestUsername } from "./username"
@@ -25,10 +24,6 @@ import { api } from "../../../convex/_generated/api"
 
 const LOADING_REVEAL_DELAY_MS = 200
 const LOADING_FADE_DURATION_MS = 150
-
-export function resetSyncedProfileCacheForTests() {
-  resetConnectedProfileBootstrapForTests()
-}
 
 function useRevealAfterDelay(delayMs: number) {
   const [revealed, setRevealed] = useState(false)
