@@ -68,4 +68,13 @@ describe("Router recovery fallbacks", () => {
     expect(view.getByTestId("account-profile")).toBeTruthy()
     expect(view.UNSAFE_getByType(Screen).props.contentContainerStyle).toEqual({ flex: 1 })
   })
+
+  it("opens account deletion from the signed-in account screen", () => {
+    mockIsSignedIn = true
+    const view = render(themed(<AccountRoute />))
+
+    fireEvent.press(view.getByLabelText("Account and data"))
+
+    expect(jest.requireMock("expo-router").router.push).toHaveBeenCalledWith("/delete-account")
+  })
 })

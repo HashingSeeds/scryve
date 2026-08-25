@@ -5,12 +5,16 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { AccountProfile } from "@/features/auth/AccountControls"
+import { AccountDataControls } from "@/features/auth/AccountDataControls"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { SubscriptionControls } from "@/features/billing/SubscriptionControls"
 
 export default function AccountRoute() {
   const auth = useAuthAccess()
   const leaveAccount = () => (router.canGoBack() ? router.back() : router.replace("/"))
+  const openAccountData = () => {
+    if (auth.isSignedIn) router.push("/delete-account")
+  }
   if (!auth.configured || !auth.isSignedIn)
     return (
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
@@ -28,6 +32,7 @@ export default function AccountRoute() {
   return (
     <Screen preset="fixed" contentContainerStyle={$profileScreen}>
       <AccountProfile onBack={leaveAccount} onSignedOut={() => router.replace("/")} />
+      <AccountDataControls onOpen={openAccountData} />
       <SubscriptionControls />
     </Screen>
   )
