@@ -76,6 +76,9 @@ importers:
       expo-localization:
         specifier: ~55.0.8
         version: 55.0.16(expo@55.0.5)(react@19.2.0)
+      expo-observe:
+        specifier: ~0.2.6
+        version: 0.2.6(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       expo-router:
         specifier: ~55.0.4
         version: 55.0.16(15cd1016527b924cd7347c247d34a25f)
@@ -4221,6 +4224,13 @@ packages:
     resolution: {integrity: sha512-2Zks0hf1VLFYI1kbh0I5jP3KHHyCHpkfyHBzsSXRFgl/Bg9mWYfMW8oD+PdMPlEwy5HNsR9JutYy6pMeOh61nw==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
 
+  expo-app-metrics@0.2.6:
+    resolution: {integrity: sha512-WCwV0R44TU8m2IsshIp4Y6Hzr2FrWyMxfDSUR/fxAK9IBaX0SlYoeUVzBaTUuxCwZWg0uHwN3hnbweGuguHztA==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
+
   expo-apple-authentication@55.0.14:
     resolution: {integrity: sha512-Jpf/Zap30b6wQEGQx56OgltRokCy/gD00OhaGEhiYwW+wlwbZBHlJMkq4/y8CyYCkGouECd8AiawbMh7fZHEmw==}
     peerDependencies:
@@ -4375,6 +4385,12 @@ packages:
     resolution: {integrity: sha512-eAerOnnhbZitUAKbY7B61kIudiabAz/m/oMGINms2+GeY1DRhdvrm5aAkhkHHmykPrg58PPryXtmF14YAYWViw==}
     peerDependencies:
       react: '*'
+      react-native: '*'
+
+  expo-observe@0.2.6:
+    resolution: {integrity: sha512-JHyY1Vo4eiq+0mK84hBrjrhjq+ZdRVDDnN+0xcMQDP5fZOFDYMsNUHA3wGXaQduYyem+J/knCJYgCOG4NuWc4g==}
+    peerDependencies:
+      expo: '*'
       react-native: '*'
 
   expo-router@55.0.16:
@@ -12080,6 +12096,13 @@ snapshots:
       jest-message-util: 29.7.0
       jest-util: 29.7.0
 
+  expo-app-metrics@0.2.6(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0):
+    dependencies:
+      expo: 55.0.5(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.11)(bufferutil@4.1.0)(expo-router@55.0.16)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      expo-updates-interface: 55.1.6(expo@55.0.5)
+      react: 19.2.0
+      react-native: 0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
+
   expo-apple-authentication@55.0.14(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)):
     dependencies:
       expo: 55.0.5(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.11)(bufferutil@4.1.0)(expo-router@55.0.16)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
@@ -12255,6 +12278,15 @@ snapshots:
       invariant: 2.2.4
       react: 19.2.0
       react-native: 0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
+
+  expo-observe@0.2.6(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0):
+    dependencies:
+      expo: 55.0.5(@babel/core@7.29.7)(@expo/dom-webview@55.0.6)(@expo/metro-runtime@55.0.11)(bufferutil@4.1.0)(expo-router@55.0.16)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      expo-app-metrics: 0.2.6(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
+      expo-eas-client: 55.0.5
+      react-native: 0.83.2(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
+    transitivePeerDependencies:
+      - react
 
   expo-router@55.0.16(15cd1016527b924cd7347c247d34a25f):
     dependencies:

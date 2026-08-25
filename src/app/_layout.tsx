@@ -1,6 +1,7 @@
 import "react-native-url-polyfill/auto"
 
 import { useCallback, useEffect, useState } from "react"
+import { AppMetrics, AppMetricsRoot } from "expo-observe"
 import { Slot, SplashScreen, type ErrorBoundaryProps } from "expo-router"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
@@ -36,10 +37,14 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return <RootErrorFallback error={error} onRetry={retry} />
 }
 
-export default function Root() {
+function Root() {
   const [isConsentResolved, setIsConsentResolved] = useState(false)
   const resolveConsent = useCallback(() => setIsConsentResolved(true), [])
   const ready = useLaunchReadiness(isConsentResolved)
+
+  useEffect(() => {
+    if (ready && isConsentResolved) AppMetrics.markInteractive()
+  }, [isConsentResolved, ready])
 
   if (!ready) {
     return <LaunchFallback />
@@ -59,3 +64,5 @@ export default function Root() {
     </ThemeProvider>
   )
 }
+
+export default AppMetricsRoot.wrap(Root)
