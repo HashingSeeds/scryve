@@ -29,8 +29,10 @@ requested), driven through [agent-device](https://oss.callstack.com/agent-device
 
 Development identity:
 
-- App: `Scryve Dev`
+- App: `Scryve (Dev)`
 - Bundle identifier: `com.sowinghope.count.dev`
+- Clerk test identity: `jane+clerk_test@sow.care`
+- Clerk development OTP: `424242`
 
 Bundle presence proves the variant, not native compatibility. Reuse an
 installed client only when the current changes did not alter its Expo SDK,
@@ -51,6 +53,46 @@ native source.
 4. Open the app: `agent-device open com.sowinghope.count.dev --platform ios`.
    The development build must already be installed; if it isn't, stop and
    report — never kick off an EAS or local build inside this pass.
+
+Bind the first `open` to one explicit `agent-device` session and use that same
+session for every snapshot, action, close, and reopen in the pass. Do not rely
+on an implicit session when checking persistence.
+
+## Establish the required app state
+
+Use the real consent and Clerk flows. Do not inject MMKV or SecureStore data,
+fake authentication, or add a bypass to the app.
+
+Preserve the installed app's state by default. A prior test session and legal
+acceptance are useful shared development prerequisites. Clear app data or the
+simulator keychain only when the changed behavior requires a clean install,
+signed-out state, first-run consent, or account transition. Restore the normal
+signed-in state after such a check when the remaining flow requires it.
+
+After opening the app, inspect the current screen and establish only the state
+the affected flow needs:
+
+1. If `Before you start` is visible, press `accept-legal-button` and wait for
+   the app to settle. This is the real Scryve consent flow. Never suppress it.
+2. If the flow works signed out, continue signed out. Authentication is not a
+   prerequisite for local play.
+3. If the flow requires an account and the app is signed out, open the account
+   action and use Clerk's real development sign-in flow with
+   `jane+clerk_test@sow.care` and OTP `424242`. Discover and act on the current
+   Clerk fields from a fresh accessibility snapshot rather than assuming their
+   labels or order. If Clerk asks to create a username or password, stop and
+   report that the dedicated test user is missing instead of creating another
+   account.
+4. Wait for the auth modal to close and confirm the account action reflects the
+   signed-in state. If signed-in consent appears, accept it through the same
+   `accept-legal-button` flow and wait for its backend sync.
+5. Force-close and reopen the app once. Confirm the Clerk session and current
+   consent persist before navigating to the changed screen.
+
+The email address and fixed OTP work only with Clerk test mode. Stop if this
+development build points at a production Clerk instance or production Convex
+deployment. Never enable Clerk test mode in production and never request or
+store a Clerk secret key in the app, repository, screenshots, or report.
 
 ## Drive with agent-device
 
@@ -79,7 +121,7 @@ loop.
 If agent-device cannot complete a flow, run the tagged Maestro smoke flows:
 
 ```bash
-maestro test -e MAESTRO_APP_ID=com.sowinghope.count --include-tags smoke .maestro/flows
+maestro test -e MAESTRO_APP_ID=com.sowinghope.count.dev --include-tags smoke .maestro/flows
 ```
 
 and report which passed or failed. If a bug blocks the flow, reproduce it
@@ -121,3 +163,6 @@ backend, stale dev client, etc.). Be specific about what you actually saw.
   navigation; fall back to screenshot estimation, then Maestro smoke.
 - **Connected-play screens fail:** expected without a Convex dev backend;
   record as skipped, not failed.
+- **Clerk rejects the test identity or OTP:** confirm the app uses the Clerk
+  development instance and that email-code sign-in is enabled. Do not switch
+  to a personal account, production instance, or secret-bearing workaround.

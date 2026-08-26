@@ -38,6 +38,45 @@ app (react-native-web via Expo) in a browser.
    (preview tools where available).
 4. Check the console for errors after load; record any that appear.
 
+Development identity:
+
+- Clerk test identity: `jane+clerk_test@sow.care`
+- Clerk development OTP: `424242`
+
+## Establish the required app state
+
+Use the real consent and Clerk flows. Do not write browser storage directly,
+fake authentication, or add a bypass to the app.
+
+Reuse the browser profile's session and legal acceptance by default. Clear site
+data only when the changed behavior requires a clean install, signed-out state,
+first-run consent, or account transition. Restore the normal signed-in state
+after such a check when the remaining flow requires it.
+
+After opening the app, inspect the current page and establish only the state the
+affected flow needs:
+
+1. If `Before you start` is visible, press `accept-legal-button` and wait for
+   the app to settle. This is the real Scryve consent flow. Never suppress it.
+2. If the flow works signed out, continue signed out. Authentication is not a
+   prerequisite for local play.
+3. If the flow requires an account and the app is signed out, open the account
+   action and use Clerk's real development sign-in flow with
+   `jane+clerk_test@sow.care` and OTP `424242`. Inspect the current DOM or
+   accessibility snapshot rather than assuming Clerk's field labels or order.
+   If Clerk asks to create a username or password, stop and report that the
+   dedicated test user is missing instead of creating another account.
+4. Wait for authentication to finish and confirm the account action reflects
+   the signed-in state. If signed-in consent appears, accept it through the
+   same `accept-legal-button` flow and wait for its backend sync.
+5. Refresh the page once. Confirm the Clerk session and current consent persist
+   before navigating to the changed screen.
+
+The email address and fixed OTP work only with Clerk test mode. Stop if this
+server points at a production Clerk instance or production Convex deployment.
+Never enable Clerk test mode in production and never request or store a Clerk
+secret key in the client, repository, screenshots, or report.
+
 ## Drive the flow
 
 - Interact like a user: navigate to the changed screen, perform its primary
@@ -46,9 +85,10 @@ app (react-native-web via Expo) in a browser.
   creation/edit) and navigation reaches and leaves the screen cleanly.
 - For layout changes, check at desktop width and a phone-width viewport
   (~390px); Scryve web is often used at phone sizes.
-- Treat sign-in prompts as part of the flow under test. Clerk native
-  components fall back on web; if a flow requires credentials you do not
-  have, mark it skipped rather than working around auth.
+- Treat sign-in prompts as part of the flow under test. Use the development
+  test identity above when the flow requires authentication. If the configured
+  server is not a development Clerk and Convex environment, mark the flow
+  skipped rather than working around auth.
 
 ## Platform-gap awareness
 
@@ -99,8 +139,10 @@ actually saw.
 
 - **Old UI or stale errors appear:** verify the server's worktree and port;
   hard-reload to bypass the cached bundle.
-- **Auth dead-end:** expected without Clerk env vars configured; skip
-  authenticated flows and record them as such.
+- **Auth dead-end:** confirm Clerk environment variables are configured for the
+  development instance and email-code sign-in is enabled. If they are missing,
+  skip authenticated flows and record them as such. Do not switch to a personal
+  account, production instance, or secret-bearing workaround.
 - **Connected-play screens fail:** expected without a Convex dev backend;
   record as skipped, not failed.
 - **Interaction has no effect:** check the console first — RN-web-only
