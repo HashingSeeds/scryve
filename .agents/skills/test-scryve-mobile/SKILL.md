@@ -68,7 +68,8 @@ binary matches merely because EAS has a compatible build.
 3. Otherwise start `pnpm start:expo` from the repository root and wait for
    the bundler. Do not start `convex dev`; test against whatever backend
    state exists and note connected-play gaps in the report.
-4. Open the app: `agent-device open com.sowinghope.count.dev --platform ios`.
+4. Open the app with one stable session:
+   `agent-device open com.sowinghope.count.dev --platform ios --session scryve-mobile-check`.
    The development build must already be installed; if it isn't, stop and
    report — never kick off an EAS or local build inside this pass.
 
@@ -86,6 +87,12 @@ acceptance are useful shared development prerequisites. Clear app data or the
 simulator keychain only when the changed behavior requires a clean install,
 signed-out state, first-run consent, or account transition. Restore the normal
 signed-in state after such a check when the remaining flow requires it.
+
+Before entering the test identity, confirm the running bundle uses the Clerk
+development instance and development Convex deployment. Check public config
+without printing its values in logs or reports. Stop before authentication if
+the Clerk publishable key is not a test key or the Convex deployment does not
+match the development configuration.
 
 After opening the app, inspect the current screen and establish only the state
 the affected flow needs:
@@ -107,10 +114,9 @@ the affected flow needs:
 5. Force-close and reopen the app once. Confirm the Clerk session and current
    consent persist before navigating to the changed screen.
 
-The email address and fixed OTP work only with Clerk test mode. Stop if this
-development build points at a production Clerk instance or production Convex
-deployment. Never enable Clerk test mode in production and never request or
-store a Clerk secret key in the app, repository, screenshots, or report.
+The email address and fixed OTP work only with Clerk test mode. Never enable
+Clerk test mode in production and never request or store a Clerk secret key in
+the app, repository, screenshots, or report.
 
 ## Drive with agent-device
 
@@ -139,7 +145,7 @@ loop.
 If agent-device cannot complete a flow, run the tagged Maestro smoke flows:
 
 ```bash
-maestro test -e MAESTRO_APP_ID=com.sowinghope.count.dev --include-tags smoke .maestro/flows
+pnpm e2e
 ```
 
 and report which passed or failed. If a bug blocks the flow, reproduce it

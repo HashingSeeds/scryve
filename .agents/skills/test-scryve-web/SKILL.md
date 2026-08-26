@@ -53,6 +53,12 @@ data only when the changed behavior requires a clean install, signed-out state,
 first-run consent, or account transition. Restore the normal signed-in state
 after such a check when the remaining flow requires it.
 
+Before entering the test identity, confirm the running bundle uses the Clerk
+development instance and development Convex deployment. Check public config
+without printing its values in logs or reports. Stop before authentication if
+the Clerk publishable key is not a test key or the Convex deployment does not
+match the development configuration.
+
 After opening the app, inspect the current page and establish only the state the
 affected flow needs:
 
@@ -72,10 +78,9 @@ affected flow needs:
 5. Refresh the page once. Confirm the Clerk session and current consent persist
    before navigating to the changed screen.
 
-The email address and fixed OTP work only with Clerk test mode. Stop if this
-server points at a production Clerk instance or production Convex deployment.
-Never enable Clerk test mode in production and never request or store a Clerk
-secret key in the client, repository, screenshots, or report.
+The email address and fixed OTP work only with Clerk test mode. Never enable
+Clerk test mode in production and never request or store a Clerk secret key in
+the client, repository, screenshots, or report.
 
 ## Drive the flow
 
