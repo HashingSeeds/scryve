@@ -11,6 +11,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 export type AccountDeletionStatus = "processing" | "identity_pending" | "failed"
+export type AccountDeletionReceiptStatus = AccountDeletionStatus | "completed"
 
 export interface DeleteAccountScreenProps {
   email?: string
@@ -19,6 +20,14 @@ export interface DeleteAccountScreenProps {
   error?: string
   onBack: () => void
   onRequestDeletion: () => void
+}
+
+export interface AccountDeletionReceiptScreenProps {
+  status: AccountDeletionReceiptStatus
+  updatedAt: number
+  onBack: () => void
+  onSignIn?: () => void
+  onReturnHome: () => void
 }
 
 export function DeleteAccountScreen({
@@ -129,6 +138,69 @@ export function DeleteAccountScreen({
   )
 }
 
+export function AccountDeletionReceiptScreen({
+  status,
+  updatedAt,
+  onBack,
+  onSignIn,
+  onReturnHome,
+}: AccountDeletionReceiptScreenProps) {
+  const { themed } = useAppTheme()
+  const completed = status === "completed"
+  const failed = status === "failed"
+  return (
+    <Screen preset="scroll" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
+      <Header title="Delete account" leftTx="common:back" onLeftPress={onBack} />
+      <View style={themed($content)}>
+        <Text text="ACCOUNT & DATA" preset="formLabel" style={themed($eyebrow)} />
+        <Text
+          text={
+            completed
+              ? "Your account was deleted"
+              : failed
+                ? "Your deletion needs attention"
+                : "Your deletion is in progress"
+          }
+          preset="heading"
+          accessibilityRole="header"
+        />
+        <Text
+          text={
+            completed
+              ? "Scryve removed your sign-in account and anonymized your connected-play history."
+              : failed
+                ? "Scryve could not finish the remaining deletion work automatically."
+                : statusDescription(status)
+          }
+          style={themed($lede)}
+        />
+        <DeletionStatusPanel status={status} />
+        <Text
+          testID="account-deletion-last-update"
+          text={`Last updated ${formatDeletionUpdate(updatedAt)}`}
+          size="xs"
+          style={themed($muted)}
+        />
+        <Text
+          text={
+            completed
+              ? "No further action is needed."
+              : failed
+                ? "Sign in again, return to this page, and retry the request."
+                : "You can close Scryve. This page will keep checking when you return."
+          }
+          size="xs"
+          style={themed($muted)}
+        />
+        {failed && onSignIn ? (
+          <Button text="Sign in to retry" preset="reversed" onPress={onSignIn} />
+        ) : null}
+        <Button text="Return home" onPress={onReturnHome} />
+      </View>
+    </Screen>
+  )
+}
+
 function statusDescription(status: AccountDeletionStatus | null | undefined) {
   if (status === "failed")
     return "Scryve could not finish automatically. Return to this page and submit the request again to retry."
@@ -137,24 +209,37 @@ function statusDescription(status: AccountDeletionStatus | null | undefined) {
   return "Scryve is anonymizing connected history and removing account-linked data. You can close this page safely."
 }
 
-function DeletionStatusPanel({ status }: { status: AccountDeletionStatus | null | undefined }) {
+function DeletionStatusPanel({
+  status,
+}: {
+  status: AccountDeletionReceiptStatus | null | undefined
+}) {
   const { themed } = useAppTheme()
   const failed = status === "failed"
+  const completed = status === "completed"
   return (
     <View accessibilityRole="alert" style={themed(failed ? $failurePanel : $statusPanel)}>
       <View style={themed(failed ? $failureMark : $statusMark)}>
-        <Text text={failed ? "!" : "…"} style={themed($statusMarkText)} />
+        <Text text={failed ? "!" : completed ? "✓" : "…"} style={themed($statusMarkText)} />
       </View>
       <View style={$flex}>
         <Text
-          text={failed ? "Deletion needs attention" : "Deletion request received"}
+          text={
+            failed
+              ? "Deletion needs attention"
+              : completed
+                ? "Deletion complete"
+                : "Deletion request received"
+          }
           preset="subheading"
         />
         <Text
           text={
             failed
               ? "No account data will be restored. Type DELETE and submit again to retry the remaining work."
-              : "New connected activity is blocked while the request is processed."
+              : completed
+                ? "This receipt contains no account details."
+                : "New connected activity is blocked while the request is processed."
           }
           size="xs"
           style={themed($muted)}
@@ -162,6 +247,17 @@ function DeletionStatusPanel({ status }: { status: AccountDeletionStatus | null 
       </View>
     </View>
   )
+}
+
+function formatDeletionUpdate(timestamp: number) {
+  const date = new Date(timestamp)
+  const day = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  return `${day} at ${time}`
 }
 
 function Step({ number, title, body }: { number: string; title: string; body: string }) {

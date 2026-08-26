@@ -151,9 +151,65 @@ describe("account deletion", () => {
       confirmation: "DELETE",
     })
     expect(result.status).toBe("identity_pending")
+    expect(result.receiptToken).toMatch(/^[0-9a-f]{64}$/)
     await expect(
       actor.query(api.accountDeletion.currentAccountDeletion, {}),
-    ).resolves.toMatchObject({ status: "identity_pending" })
+    ).resolves.toMatchObject({
+      status: "identity_pending",
+      receiptToken: result.receiptToken,
+    })
+  })
+
+  it("keeps an identifier-free completion receipt readable after identity removal", async () => {
+    const t = convexTest(schema, modules)
+    const actor = t.withIdentity({ subject: "receipt-owner" })
+    const request = await actor.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+      confirmation: "DELETE",
+    })
+
+    expect(
+      await t.query(api.accountDeletion.deletionReceipt, {
+        receiptToken: "0".repeat(64),
+      }),
+    ).toBeNull()
+    await t.mutation(internal.accountDeletion.complete, { requestId: request.requestId })
+
+    const receipt = await t.query(api.accountDeletion.deletionReceipt, {
+      receiptToken: request.receiptToken,
+    })
+    expect(receipt).toMatchObject({ status: "completed", canRetry: false })
+    expect(receipt).not.toHaveProperty("clerkUserId")
+    expect(receipt).not.toHaveProperty("lastError")
+    expect(await t.run((ctx) => ctx.db.get(request.requestId))).toBeNull()
+
+    const storedReceipt = await t.run((ctx) =>
+      ctx.db
+        .query("accountDeletionReceipts")
+        .withIndex("by_token", (q) => q.eq("token", request.receiptToken))
+        .unique(),
+    )
+    expect(storedReceipt).not.toHaveProperty("clerkUserId")
+    expect(storedReceipt).not.toHaveProperty("requestId")
+  })
+
+  it("publishes a safe failure receipt without the provider error", async () => {
+    const t = convexTest(schema, modules)
+    const actor = t.withIdentity({ subject: "failed-receipt-owner" })
+    const request = await actor.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+      confirmation: "DELETE",
+    })
+    for (let attempt = 0; attempt < 8; attempt += 1)
+      await t.mutation(internal.accountDeletion.recordIdentityFailure, {
+        requestId: request.requestId,
+        message: "Clerk response included private diagnostics",
+      })
+
+    const receipt = await t.query(api.accountDeletion.deletionReceipt, {
+      receiptToken: request.receiptToken,
+    })
+    expect(receipt).toMatchObject({ status: "failed", canRetry: true })
+    expect(receipt).not.toHaveProperty("lastError")
+    expect(JSON.stringify(receipt)).not.toContain("Clerk")
   })
 
   it("fails before changing data when Clerk deletion is not configured", async () => {
