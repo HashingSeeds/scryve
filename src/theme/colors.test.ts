@@ -42,4 +42,10 @@ describe.each([
       )
     },
   )
+
+  it("gives every game menu action its own color", () => {
+    const actionColors = Object.values(colors.gameMenu.actions)
+
+    expect(new Set(actionColors).size).toBe(actionColors.length)
+  })
 })

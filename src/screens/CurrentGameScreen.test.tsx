@@ -109,12 +109,12 @@ describe("CurrentGameScreen", () => {
     expect(view.queryByText("Grace")).toBeNull()
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
     expect(view.queryByTestId("undo-button")).toBeNull()
-    expect(view.queryByTestId("game-home-button")).toBeNull()
+    expect(view.queryByTestId("home-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
 
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
-    expect(view.getByTestId("game-home-button")).toBeTruthy()
+    expect(view.getByTestId("home-button")).toBeTruthy()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
     expect(view.getByTestId("status-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()

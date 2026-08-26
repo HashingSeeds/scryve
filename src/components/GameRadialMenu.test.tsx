@@ -9,15 +9,13 @@ import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./G
 
 describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
-  const tones = ["default", "success", "info", "navigation", "destructive"] as const
-  const actions: RadialMenuAction[] = ["Layout", "Undo", "Home", "Finish", "Abandon"].map(
-    (label, index) => ({
-      id: label.toLowerCase(),
-      label,
-      tone: tones[index],
-      onPress: callbacks[index],
-    }),
-  )
+  const actions: RadialMenuAction[] = [
+    { kind: "layout", label: "Layout", onPress: callbacks[0] },
+    { kind: "undo", label: "Undo", onPress: callbacks[1] },
+    { kind: "status", label: "Status", onPress: callbacks[2] },
+    { kind: "home", label: "Home", onPress: callbacks[3] },
+    { kind: "end-game", label: "End game", onPress: callbacks[4] },
+  ]
 
   function menu(open: boolean, onClose = jest.fn()) {
     return (
@@ -42,7 +40,7 @@ describe("GameRadialMenu", () => {
     view.rerender(menu(true))
 
     expect(view.getByTestId("game-menu-button").props.accessibilityState.expanded).toBe(true)
-    for (const action of actions) expect(view.getByTestId(`${action.id}-button`)).toBeTruthy()
+    for (const action of actions) expect(view.getByTestId(`${action.kind}-button`)).toBeTruthy()
   })
 
   it("draws the pentagon button with the light menu tokens", () => {
@@ -89,7 +87,7 @@ describe("GameRadialMenu", () => {
   it.each([
     ["light", lightTheme],
     ["dark", darkTheme],
-  ] as const)("resolves action tones through the %s theme", (initialContext, theme) => {
+  ] as const)("resolves action kinds through the %s theme", (initialContext, theme) => {
     const view = render(
       <ThemeProvider initialContext={initialContext}>
         <GameRadialMenu
@@ -103,9 +101,9 @@ describe("GameRadialMenu", () => {
     )
 
     actions.forEach((action) => {
-      const button = view.getByTestId(`${action.id}-button`)
+      const button = view.getByTestId(`${action.kind}-button`)
       const style = StyleSheet.flatten(button.props.style)
-      expect(style.backgroundColor).toBe(theme.colors.gameMenu.actions[action.tone])
+      expect(style.backgroundColor).toBe(theme.colors.gameMenu.actions[action.kind])
     })
   })
 

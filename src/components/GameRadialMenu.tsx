@@ -11,7 +11,8 @@ import Animated, {
 import Svg, { Polygon } from "react-native-svg"
 
 import { useAppTheme } from "@/theme/context"
-import type { Theme, ThemedStyle } from "@/theme/types"
+import type { GameMenuActionKind } from "@/theme/gameMenu"
+import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import {
   motionDuration,
@@ -22,14 +23,11 @@ import {
 import { Text } from "./Text"
 
 export interface RadialMenuAction {
-  id: string
+  kind: GameMenuActionKind
   label: string
-  tone: RadialMenuActionTone
   disabled?: boolean
   onPress: (event?: GestureResponderEvent) => void
 }
-
-export type RadialMenuActionTone = keyof Theme["colors"]["gameMenu"]["actions"]
 
 export interface GameRadialMenuProps {
   open: boolean
@@ -201,7 +199,7 @@ export function GameRadialMenu({
             .slice(0, poses.length)
             .map((action, index) => (
               <RadialAction
-                key={action.id}
+                key={action.kind}
                 action={action}
                 anchorStyle={anchorStyle}
                 pose={poses[index]}
@@ -285,7 +283,7 @@ function RadialAction({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const background = colors.gameMenu.actions[action.tone]
+  const background = colors.gameMenu.actions[action.kind]
   const foreground = accessibleForeground(background)
   const animateFully = reducedMotion === false
   const arrive = useSharedValue(0)
@@ -310,7 +308,7 @@ function RadialAction({
   return (
     <Animated.View style={[themed($actionAnchor), anchorStyle, animatedStyle]}>
       <Pressable
-        testID={`${action.id}-button`}
+        testID={`${action.kind}-button`}
         disabled={action.disabled}
         accessibilityRole="button"
         accessibilityLabel={action.label}

@@ -50,17 +50,17 @@ function openConnectedMenu() {
 
 function openConnectedPlayers() {
   openConnectedMenu()
-  fireEvent.press(screen.getByTestId("connected-players-button"))
+  fireEvent.press(screen.getByTestId("players-button"))
 }
 
 function openConnectedStatus() {
   openConnectedMenu()
-  fireEvent.press(screen.getByTestId("connected-status-button"))
+  fireEvent.press(screen.getByTestId("status-button"))
 }
 
 function openConnectedFinish() {
   openConnectedMenu()
-  fireEvent.press(screen.getByTestId("finish-connected-game-button"))
+  fireEvent.press(screen.getByTestId("end-game-button"))
 }
 
 describe("ConnectedBoardScreen", () => {
@@ -219,16 +219,12 @@ describe("ConnectedBoardScreen", () => {
         (seat) => screen.getByTestId(`life-seat-${seat}-1`).props.accessibilityState.disabled,
       ),
     ).toBe(true)
-    expect(screen.queryByTestId("finish-connected-game-button")).toBeNull()
+    expect(screen.queryByTestId("end-game-button")).toBeNull()
     fireEvent.press(screen.getByText("Close"))
     openConnectedMenu()
     expect(screen.queryByTestId("connected-history-button")).toBeNull()
-    expect(
-      screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
-    ).toBe(true)
-    expect(
-      screen.getByTestId("connected-players-button").props.accessibilityState.disabled,
-    ).toBeFalsy()
+    expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
+    expect(screen.getByTestId("players-button").props.accessibilityState.disabled).toBeFalsy()
   })
 
   it("reports an opponent from the board and confirms the block took effect", async () => {
@@ -328,10 +324,8 @@ describe("ConnectedBoardScreen", () => {
     }
     const offline = render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
-    expect(
-      screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
-    ).toBe(true)
-    fireEvent.press(screen.getByTestId("connected-status-button"))
+    expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
+    fireEvent.press(screen.getByTestId("status-button"))
     expect(screen.getByText(/Reconnect before finishing/i)).toBeTruthy()
     offline.unmount()
 
@@ -343,10 +337,8 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
-    expect(
-      screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
-    ).toBe(true)
-    fireEvent.press(screen.getByTestId("connected-status-button"))
+    expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
+    fireEvent.press(screen.getByTestId("status-button"))
     expect(screen.getByText(/Wait for 1 pending change/i)).toBeTruthy()
     expect(screen.getByText("1 pending")).toBeTruthy()
   })
@@ -412,9 +404,7 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByText("This game is lobby and is read-only on the board.")).toBeTruthy()
     fireEvent.press(screen.getByText("Close"))
     openConnectedMenu()
-    expect(
-      screen.getByTestId("finish-connected-game-button").props.accessibilityState.disabled,
-    ).toBe(true)
+    expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
   })
 
   it("remounts runtime state when the dynamic route switches games", () => {

@@ -237,9 +237,8 @@ function ConnectedBoardRuntime({
   const menuAnchor = getPlayerGridMenuAnchor(players.length, gridLayout)
   const radialActions: RadialMenuAction[] = [
     {
-      id: "connected-layout",
+      kind: "layout",
       label: "Layout",
-      tone: "default",
       disabled: layoutOptions.length < 2,
       onPress: (event) => {
         captureMenuDialogOrigin(event)
@@ -248,9 +247,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "connected-players",
+      kind: "players",
       label: "Players",
-      tone: "success",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         setMenuOpen(false)
@@ -258,14 +256,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "connected-status",
+      kind: "status",
       label: runtime.connectionStatus === "connected" ? "Status" : runtime.connectionStatus,
-      tone:
-        runtime.connectionStatus === "connected"
-          ? "success"
-          : runtime.connectionStatus === "offline"
-            ? "destructive"
-            : "default",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         setMenuOpen(false)
@@ -273,9 +265,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "connected-back",
+      kind: "home",
       label: "Home",
-      tone: "navigation",
       disabled: !onBack,
       onPress: () => {
         setMenuOpen(false)
@@ -283,9 +274,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "finish-connected-game",
+      kind: "end-game",
       label: "End game",
-      tone: "destructive",
       disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
       onPress: (event) => {
         captureMenuDialogOrigin(event)

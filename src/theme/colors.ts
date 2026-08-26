@@ -1,3 +1,5 @@
+import type { GameMenuActionKind } from "./gameMenu"
+
 const palette = {
   neutral100: "#FFFFFF",
   neutral200: "#F4F2F1",
@@ -112,11 +114,12 @@ export const colors = {
     anchorGlyph: palette.neutral100,
     shadow: palette.neutral900,
     actions: {
-      default: palette.primary600,
-      success: palette.success500,
-      info: palette.info500,
-      navigation: palette.secondary500,
-      destructive: palette.angry500,
-    },
+      "layout": palette.primary600,
+      "undo": palette.success500,
+      "players": "#77558A",
+      "status": palette.info500,
+      "home": "#356A86",
+      "end-game": palette.angry500,
+    } satisfies Record<GameMenuActionKind, string>,
   },
 } as const
