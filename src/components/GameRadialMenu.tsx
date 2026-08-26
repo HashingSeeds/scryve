@@ -110,8 +110,8 @@ export function getRadialActionPoses(
   anchor: { x: number; y: number },
   actionCount = 5,
 ): readonly RadialActionPose[] {
-  const anchorNearLeftEdge = anchor.x < 0.4
-  const anchorNearRightEdge = anchor.x > 0.6
+  const anchorNearLeftEdge = anchor.x < 0.25
+  const anchorNearRightEdge = anchor.x > 0.75
   const edgeAngles = actionCount === 4 ? FOUR_LEFT_EDGE_POSE_ANGLES : LEFT_EDGE_POSE_ANGLES
   if (anchorNearLeftEdge) return edgeAngles.map(poseAlongAngle)
   if (anchorNearRightEdge) return edgeAngles.map(poseAlongAngle).map(mirrorPose)

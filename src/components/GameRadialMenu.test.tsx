@@ -119,8 +119,11 @@ describe("GameRadialMenu", () => {
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {
-    expect(getRadialActionPoses({ x: 0.33, y: 0.5 }).every((pose) => pose.x >= 0)).toBe(true)
-    expect(getRadialActionPoses({ x: 0.67, y: 0.5 }).every((pose) => pose.x <= 0)).toBe(true)
+    expect(getRadialActionPoses({ x: 0.2, y: 0.5 }).every((pose) => pose.x >= 0)).toBe(true)
+    expect(getRadialActionPoses({ x: 0.8, y: 0.5 }).every((pose) => pose.x <= 0)).toBe(true)
+    expect(getRadialActionPoses({ x: 2 / 3, y: 0.5 })).toEqual(
+      getRadialActionPoses({ x: 0.5, y: 0.5 }),
+    )
     expect(getRadialActionPoses({ x: 0.5, y: 0.5 }, 4)).toHaveLength(4)
     expect(getRadialActionPoses({ x: 0.5, y: 0.5 })).toHaveLength(5)
   })
