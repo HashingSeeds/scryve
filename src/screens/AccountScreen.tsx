@@ -52,21 +52,23 @@ export function AccountScreen({
 
         <View style={themed($section)}>
           <Text text="Your account" preset="formLabel" accessibilityRole="header" />
-          <View style={themed([$profileRow, !accountControls && $profileRowClosed])}>
-            <ListItem
-              testID="manage-profile-item"
-              text="Profile and security"
-              accessibilityHint="Opens the profile manager to change your name, email addresses, and password"
-              rightIcon="caretRight"
-              topSeparator
-              onPress={onManageProfile}
-            />
+          <ListItem
+            testID="manage-profile-item"
+            accessibilityLabel="Profile and security"
+            accessibilityHint="Opens the profile manager to change your name, email addresses, and password"
+            rightIcon="caretRight"
+            topSeparator
+            bottomSeparator={!accountControls}
+            onPress={onManageProfile}
+          >
+            <Text text="Profile and security" />
+            {"\n"}
             <Text
               text="Name, email, password, and sign-in methods."
               size="xxs"
-              style={themed($profileHint)}
+              style={themed($muted)}
             />
-          </View>
+          </ListItem>
           {accountControls}
         </View>
 
@@ -150,15 +152,6 @@ const $avatarFallback: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $avatarInitial: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.text })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
-const $profileRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.sm })
-const $profileRowClosed: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  borderBottomWidth: 1,
-  borderColor: colors.separator,
-})
-const $profileHint: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
-  marginTop: -spacing.xs,
-  color: colors.textDim,
-})
 const $signOut: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   paddingTop: spacing.lg,
