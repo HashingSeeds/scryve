@@ -22,10 +22,9 @@ export function AccountDataControls({ onOpen }: { onOpen: () => void }) {
   )
 }
 
-const $container: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $container: ThemedStyle<ViewStyle> = ({ colors }) => ({
   minHeight: 48,
-  paddingHorizontal: spacing.lg,
   borderTopWidth: 1,
+  borderBottomWidth: 1,
   borderColor: colors.separator,
-  backgroundColor: colors.palette.neutral100,
 })

@@ -8,13 +8,16 @@ import type { ThemedStyle } from "@/theme/types"
 
 import type { AccountProfileProps } from "./accountProfileProps"
 
-export function AccountProfile({ onBack }: AccountProfileProps) {
+export function AccountProfile({ onBack, accountControls }: AccountProfileProps) {
   const { themed } = useAppTheme()
   const insets = useSafeAreaInsets()
 
   return (
     <View style={$profile}>
       <UserProfileView isDismissible={false} style={$profile} />
+      {accountControls ? (
+        <View style={{ paddingBottom: Math.max(insets.bottom, 8) }}>{accountControls}</View>
+      ) : null}
       {onBack ? (
         <Pressable
           accessibilityRole="button"

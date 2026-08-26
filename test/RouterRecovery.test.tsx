@@ -25,8 +25,16 @@ jest.mock("@/features/auth/AuthContext", () => ({
 jest.mock("@/features/auth/AccountControls", () => {
   const { View } = jest.requireActual("react-native")
   return {
-    AccountProfile: ({ onBack }: { onBack: () => void }) => (
-      <View testID="account-profile" onTouchEnd={onBack} />
+    AccountProfile: ({
+      onBack,
+      accountControls,
+    }: {
+      onBack: () => void
+      accountControls?: React.ReactNode
+    }) => (
+      <View testID="account-profile" onTouchEnd={onBack}>
+        {accountControls}
+      </View>
     ),
   }
 })
