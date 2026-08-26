@@ -94,6 +94,12 @@ without printing its values in logs or reports. Stop before authentication if
 the Clerk publishable key is not a test key or the Convex deployment does not
 match the development configuration.
 
+When the affected flow requires authentication and a Clerk session already
+exists, confirm it belongs to `jane+clerk_test@sow.care`. If the identity cannot
+be confirmed or belongs to another account, stop and report the mismatch. Do
+not sign out, switch accounts, or treat that session as valid test evidence
+without separate approval.
+
 After opening the app, inspect the current screen and establish only the state
 the affected flow needs:
 
