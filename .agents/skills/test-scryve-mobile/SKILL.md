@@ -34,10 +34,28 @@ Development identity:
 - Clerk test identity: `jane+clerk_test@sow.care`
 - Clerk development OTP: `424242`
 
-Bundle presence proves the variant, not native compatibility. Reuse an
-installed client only when the current changes did not alter its Expo SDK,
-native dependencies, config plugins, entitlements, generated project, or
-native source.
+Bundle presence proves the variant, not native compatibility. An Expo
+fingerprint can prove that an EAS build matches this worktree's native runtime,
+but it proves the installed client matches only when the installed client's EAS
+build ID is known.
+
+Reuse the installed client without a fingerprint check when the current changes
+are JavaScript, TypeScript, or assets only and its native-build provenance is
+otherwise credible. If native inputs changed or the installed build's
+compatibility is uncertain:
+
+1. Compute the current platform fingerprint with
+   `APP_VARIANT=development eas fingerprint:generate --platform <ios|android> --environment development`.
+2. Query finished EAS builds for the matching platform and `development`
+   profile. Compare candidate build IDs with
+   `APP_VARIANT=development eas fingerprint:compare --build-id <id> --environment development`.
+3. If a matching simulator or emulator build exists, stop and report its build
+   ID and artifact URL as the compatible build to install.
+4. If none matches, stop and report that a new `development` build is required.
+
+Do not start, download, or install an EAS build during this verification pass
+unless the user separately approved it. Do not claim the currently installed
+binary matches merely because EAS has a compatible build.
 
 ## Setup
 
