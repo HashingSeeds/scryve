@@ -9,11 +9,12 @@ import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./G
 
 describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
+  const tones = ["default", "success", "info", "navigation", "destructive"] as const
   const actions: RadialMenuAction[] = ["Layout", "Undo", "Home", "Finish", "Abandon"].map(
     (label, index) => ({
       id: label.toLowerCase(),
       label,
-      color: "#FBC878",
+      tone: tones[index],
       onPress: callbacks[index],
     }),
   )
@@ -44,12 +45,13 @@ describe("GameRadialMenu", () => {
     for (const action of actions) expect(view.getByTestId(`${action.id}-button`)).toBeTruthy()
   })
 
-  it("draws the pentagon button outlined in the screen background color", () => {
+  it("draws the pentagon button with the light menu tokens", () => {
     const view = render(menu(false))
 
     expect(view.getByTestId("game-menu-pentagon")).toBeTruthy()
     const pentagon = view.UNSAFE_getByType(Polygon)
-    expect(pentagon.props.stroke).toBe(lightTheme.colors.background)
+    expect(pentagon.props.fill).toBe(lightTheme.colors.gameMenu.anchor)
+    expect(pentagon.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
     expect(pentagon.props.points.split(" ")).toHaveLength(5)
   })
 
@@ -67,10 +69,8 @@ describe("GameRadialMenu", () => {
     )
 
     const pentagon = view.UNSAFE_getByType(Polygon)
-    expect(pentagon.props.fill).toBe(darkTheme.colors.palette.neutral300)
-    expect(pentagon.props.stroke).toBe(darkTheme.colors.border)
-    expect(pentagon.props.fill).not.toBe(darkTheme.colors.background)
-    expect(pentagon.props.stroke).not.toBe(darkTheme.colors.background)
+    expect(pentagon.props.fill).toBe(darkTheme.colors.gameMenu.anchor)
+    expect(pentagon.props.stroke).toBe(darkTheme.colors.gameMenu.anchorBorder)
   })
 
   it("keeps the menu glyph in centered square bounds", () => {
@@ -83,6 +83,29 @@ describe("GameRadialMenu", () => {
       height: 24,
       alignItems: "center",
       justifyContent: "center",
+    })
+  })
+
+  it.each([
+    ["light", lightTheme],
+    ["dark", darkTheme],
+  ] as const)("resolves action tones through the %s theme", (initialContext, theme) => {
+    const view = render(
+      <ThemeProvider initialContext={initialContext}>
+        <GameRadialMenu
+          open
+          anchor={{ x: 0.5, y: 0.5 }}
+          actions={actions}
+          onToggle={jest.fn()}
+          onClose={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    actions.forEach((action) => {
+      const button = view.getByTestId(`${action.id}-button`)
+      const style = StyleSheet.flatten(button.props.style)
+      expect(style.backgroundColor).toBe(theme.colors.gameMenu.actions[action.tone])
     })
   })
 

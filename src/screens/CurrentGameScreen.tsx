@@ -111,7 +111,7 @@ export function CurrentGameScreen({
     {
       id: "layout",
       label: "Layout",
-      color: "#FBC878",
+      tone: "default",
       disabled: layoutOptions.length < 2,
       onPress: (event) => {
         captureMenuDialogOrigin(event)
@@ -122,7 +122,7 @@ export function CurrentGameScreen({
     {
       id: "undo",
       label: "Undo",
-      color: "#55C894",
+      tone: "success",
       disabled: !runtime.canUndo,
       onPress: () => {
         runtime.undo()
@@ -132,7 +132,7 @@ export function CurrentGameScreen({
     {
       id: "status",
       label: "Status",
-      color: "#B48CE0",
+      tone: "info",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         setMenuOpen(false)
@@ -142,7 +142,7 @@ export function CurrentGameScreen({
     {
       id: "game-home",
       label: "Home",
-      color: "#7DB7E8",
+      tone: "navigation",
       onPress: () => {
         closeMenu()
         onHome()
@@ -151,7 +151,7 @@ export function CurrentGameScreen({
     {
       id: "end-game",
       label: "End game",
-      color: "#D96767",
+      tone: "destructive",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         showEndConfirmation()

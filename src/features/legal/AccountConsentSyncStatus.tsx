@@ -38,14 +38,14 @@ export function AccountConsentSyncStatus({
         accessibilityLiveRegion="polite"
         style={themed($status)}
       >
-        <Text size="xs" weight="medium" text={message} style={$message} />
+        <Text size="xs" weight="medium" text={message} style={themed($message)} />
         <Button
           testID="retry-account-consent-sync"
           text={isSyncing ? "Retrying…" : "Retry"}
           accessibilityLabel="Retry account consent sync"
           disabled={isSyncing}
           style={themed($retry)}
-          textStyle={$retryText}
+          textStyle={themed($retryText)}
           onPress={onRetry}
         />
       </View>
@@ -61,7 +61,7 @@ const $layer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   elevation: 100,
   alignItems: "center",
 })
-const $status: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $status: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   width: "100%",
   maxWidth: 560,
   minHeight: 48,
@@ -72,15 +72,22 @@ const $status: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xs,
   paddingHorizontal: spacing.md,
   borderBottomWidth: 1,
-  borderBottomColor: "#FFFFFF",
-  backgroundColor: "#000000",
+  borderBottomColor: colors.border,
+  backgroundColor: colors.surfaceRaised,
 })
-const $message: TextStyle = { flexShrink: 1, color: "#FFFFFF" }
-const $retry: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $message: ThemedStyle<TextStyle> = ({ colors }) => ({
+  flexShrink: 1,
+  color: colors.text,
+})
+const $retry: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 32,
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.sm,
-  borderColor: "#FFFFFF",
-  backgroundColor: "#000000",
+  borderColor: colors.border,
+  backgroundColor: colors.surfaceRaised,
 })
-const $retryText: TextStyle = { color: "#FFFFFF", fontSize: 13, lineHeight: 16 }
+const $retryText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.text,
+  fontSize: 13,
+  lineHeight: 16,
+})

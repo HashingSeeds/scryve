@@ -2,19 +2,21 @@ import { useCallback, useState } from "react"
 import { useClerk, useUser } from "@clerk/expo"
 
 import { AccountScreen } from "@/screens/AccountScreen"
+import { useAppTheme } from "@/theme/context"
 
 import type { AccountProfileProps } from "./accountProfileProps"
-import { clerkAppearance } from "./clerkAppearance"
+import { getClerkAppearance } from "./clerkAppearance"
 
 export function AccountProfile({ onBack, onSignedOut, accountControls }: AccountProfileProps) {
   const clerk = useClerk()
   const { user } = useUser()
+  const { theme } = useAppTheme()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [error, setError] = useState<string>()
 
   const manageProfile = useCallback(
-    () => clerk.openUserProfile({ appearance: clerkAppearance }),
-    [clerk],
+    () => clerk.openUserProfile({ appearance: getClerkAppearance(theme) }),
+    [clerk, theme],
   )
 
   const signOut = useCallback(async () => {

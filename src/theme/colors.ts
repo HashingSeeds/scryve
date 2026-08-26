@@ -31,6 +31,10 @@ const palette = {
   angry100: "#F2D6CD",
   angry500: "#C03403",
 
+  success500: "#39755C",
+  info500: "#41476E",
+  destructive500: "#A33A52",
+
   overlay20: "rgba(25, 16, 21, 0.2)",
   overlay50: "rgba(25, 16, 21, 0.5)",
 } as const
@@ -86,4 +90,33 @@ export const colors = {
    * Error Background.
    */
   errorBackground: palette.angry100,
+  surface: palette.neutral100,
+  surfaceMuted: palette.neutral200,
+  surfaceRaised: palette.neutral100,
+  surfaceInverse: palette.neutral900,
+  textInverse: palette.neutral100,
+  overlay: palette.overlay50,
+  shadow: palette.neutral900,
+  success: palette.success500,
+  board: {
+    background: palette.neutral900,
+    surface: palette.neutral800,
+    surfaceRaised: palette.neutral700,
+    border: palette.neutral600,
+    text: palette.neutral100,
+  },
+  gameMenu: {
+    backdrop: "rgba(0, 0, 0, 0.56)",
+    anchor: palette.neutral800,
+    anchorBorder: palette.neutral100,
+    anchorGlyph: palette.neutral100,
+    shadow: palette.neutral900,
+    actions: {
+      default: palette.primary600,
+      success: palette.success500,
+      info: palette.info500,
+      navigation: palette.secondary500,
+      destructive: palette.angry500,
+    },
+  },
 } as const

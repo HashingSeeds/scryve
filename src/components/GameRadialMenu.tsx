@@ -11,7 +11,7 @@ import Animated, {
 import Svg, { Polygon } from "react-native-svg"
 
 import { useAppTheme } from "@/theme/context"
-import type { ThemedStyle } from "@/theme/types"
+import type { Theme, ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import {
   motionDuration,
@@ -24,10 +24,12 @@ import { Text } from "./Text"
 export interface RadialMenuAction {
   id: string
   label: string
-  color: string
+  tone: RadialMenuActionTone
   disabled?: boolean
   onPress: (event?: GestureResponderEvent) => void
 }
+
+export type RadialMenuActionTone = keyof Theme["colors"]["gameMenu"]["actions"]
 
 export interface GameRadialMenuProps {
   open: boolean
@@ -52,7 +54,6 @@ const MENU_FALLBACK_ANIMATION_MS = 220
 const PENTAGON_SIDES = 5
 const PENTAGON_VIEWBOX = 100
 const PENTAGON_RADIUS = 46
-const PENTAGON_FILL = "#050505"
 const PENTAGON_STROKE_WIDTH = 7
 export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
 
@@ -158,7 +159,7 @@ export function GameRadialMenu({
 }: GameRadialMenuProps) {
   const {
     themed,
-    theme: { colors, isDark },
+    theme: { colors },
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
@@ -236,33 +237,33 @@ export function GameRadialMenu({
             >
               <Polygon
                 points={PENTAGON_POINTS}
-                fill={isDark ? colors.palette.neutral300 : PENTAGON_FILL}
-                stroke={isDark ? colors.border : colors.background}
+                fill={colors.gameMenu.anchor}
+                stroke={colors.gameMenu.anchorBorder}
                 strokeWidth={PENTAGON_STROKE_WIDTH}
                 strokeLinejoin="round"
               />
             </Svg>
           </Animated.View>
-          <MenuGlyph open={open} />
+          <MenuGlyph color={colors.gameMenu.anchorGlyph} open={open} />
         </Pressable>
       </Animated.View>
     </View>
   )
 }
 
-function MenuGlyph({ open }: { open: boolean }) {
+function MenuGlyph({ color, open }: { color: string; open: boolean }) {
   return (
     <View testID="game-menu-glyph" style={$menuGlyph}>
       {open ? (
         <>
-          <View style={[$menuGlyphBar, $closeGlyphForward]} />
-          <View style={[$menuGlyphBar, $closeGlyphBackward]} />
+          <View style={[$menuGlyphBar, { backgroundColor: color }, $closeGlyphForward]} />
+          <View style={[$menuGlyphBar, { backgroundColor: color }, $closeGlyphBackward]} />
         </>
       ) : (
         <>
-          <View style={$menuGlyphBar} />
-          <View style={$menuGlyphBar} />
-          <View style={$menuGlyphBar} />
+          <View style={[$menuGlyphBar, { backgroundColor: color }]} />
+          <View style={[$menuGlyphBar, { backgroundColor: color }]} />
+          <View style={[$menuGlyphBar, { backgroundColor: color }]} />
         </>
       )}
     </View>
@@ -280,8 +281,12 @@ function RadialAction({
   pose: RadialActionPose
   reducedMotion: ReducedMotionPreference
 }) {
-  const { themed } = useAppTheme()
-  const foreground = accessibleForeground(action.color)
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  const background = colors.gameMenu.actions[action.tone]
+  const foreground = accessibleForeground(background)
   const animateFully = reducedMotion === false
   const arrive = useSharedValue(0)
   const start = getRadialActionStart(pose)
@@ -312,7 +317,7 @@ function RadialAction({
         accessibilityState={{ disabled: !!action.disabled }}
         style={({ pressed }) => [
           themed($action),
-          { backgroundColor: action.color },
+          { backgroundColor: background },
           action.disabled && themed($disabledAction),
           pressed && !action.disabled && themed($pressedAction),
         ]}
@@ -330,10 +335,10 @@ function RadialAction({
   )
 }
 
-const $backdrop: ThemedStyle<ViewStyle> = () => ({
+const $backdrop: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFillObject,
   zIndex: 10,
-  backgroundColor: "rgba(0,0,0,0.56)",
+  backgroundColor: colors.gameMenu.backdrop,
 })
 const $anchor: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
@@ -370,7 +375,6 @@ const $menuGlyphBar: ViewStyle = {
   width: 16,
   height: 2,
   borderRadius: 1,
-  backgroundColor: "#FFFFFF",
 }
 const $closeGlyphForward: ViewStyle = {
   position: "absolute",
@@ -388,13 +392,13 @@ const $actionAnchor: ThemedStyle<ViewStyle> = () => ({
   marginLeft: -ACTION_WIDTH / 2,
   marginTop: -ACTION_HEIGHT / 2,
 })
-const $action: ThemedStyle<ViewStyle> = () => ({
+const $action: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
   paddingHorizontal: 12,
   borderRadius: ACTION_HEIGHT / 2,
-  shadowColor: "#000000",
+  shadowColor: colors.gameMenu.shadow,
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.35,
   shadowRadius: 7,

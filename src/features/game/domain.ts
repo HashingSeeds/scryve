@@ -16,8 +16,9 @@ import type {
   OperationId,
   PlayerId,
 } from "./types"
+import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
 
-export const PLAYER_COLORS = ["#B85636", "#41476E", "#39755C", "#94632D", "#77558A", "#A33A52"]
+export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
 export const LIFE_DELTAS: readonly LifeDelta[] = [-5, -1, 1, 5]
 export const MAX_LIFE_DELTA = 999_999
 export const STARTING_LIFE_PRESETS = [20, 30, 40] as const

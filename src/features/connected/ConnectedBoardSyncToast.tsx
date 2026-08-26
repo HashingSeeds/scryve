@@ -166,9 +166,9 @@ const $toast: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingVertical: spacing.xs,
   paddingHorizontal: spacing.sm,
   borderWidth: 1,
-  borderColor: colors.palette.neutral700,
+  borderColor: colors.board.border,
   borderRadius: 4,
-  backgroundColor: colors.palette.neutral900,
+  backgroundColor: colors.board.surfaceRaised,
   overflow: "hidden",
 })
 const $withProgress: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -182,17 +182,17 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $failure: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.error })
 const $message: ThemedStyle<TextStyle> = ({ colors }) => ({
   flexShrink: 1,
-  color: colors.palette.neutral100,
+  color: colors.board.text,
 })
 const $review: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 32,
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.xs,
-  borderColor: colors.palette.neutral100,
+  borderColor: colors.board.text,
   backgroundColor: colors.transparent,
 })
 const $reviewText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.palette.neutral100,
+  color: colors.board.text,
   fontSize: 13,
   lineHeight: 16,
 })
