@@ -14,6 +14,6 @@ describe("Convex Clerk issuer configuration", () => {
     "https://example.clerk.accounts.dev?tenant=bad",
     "https://user:pass@example.clerk.accounts.dev",
   ])("rejects unsafe or imprecise issuer value %s", (value) => {
-    expect(() => validateClerkIssuerDomain(value)).toThrow("CLERK_JWT_ISSUER_DOMAIN")
+    expect(() => validateClerkIssuerDomain(value)).toThrow("CLERK_FRONTEND_API_URL")
   })
 })

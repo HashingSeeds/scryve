@@ -43,7 +43,7 @@ chmod +x "$(git rev-parse --git-common-dir)/hooks/post-checkout"
 ```
 
 - Backend secrets are set on each Convex deployment, not in any local file.
-  `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `CLERK_JWT_ISSUER_DOMAIN`,
+  `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `CLERK_FRONTEND_API_URL`,
   `RESEND_API_KEY`, and `MODERATION_ALERT_*` are read by `convex/` code running on
   the deployment. Set them with `npx convex env set`.
 
