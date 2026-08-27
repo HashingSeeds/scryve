@@ -21,6 +21,19 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm run start
 ```
 
+Maintainers load the development environment from 1Password. The tracked
+`.env.op.development` file contains secret references, so it works in every
+checkout and worktree without copying dotenv files. Run the machine setup once:
+
+```bash
+./scripts/setup-onepassword.sh
+```
+
+The regular `pnpm start`, platform, Convex, and development build commands then
+resolve those references automatically. Contributors without access to the
+Scryve vault can copy `.env.example` to the ignored `.env.local`; the same
+commands fall back to Expo and Convex's normal dotenv loading.
+
 Static checks run with:
 
 ```bash
