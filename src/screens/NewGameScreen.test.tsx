@@ -230,6 +230,22 @@ describe("NewGameScreen", () => {
     expect(onModeChange).toHaveBeenCalledWith("connected")
   })
 
+  it("offers the signed-in username as a one-tap fill for the first local seat", () => {
+    const onStartLocal = jest.fn()
+    setup({ username: "ada_lovelace", onStartLocal })
+    fireEvent.press(screen.getByTestId("use-my-username"))
+    expect(screen.getByTestId("player-name-1").props.value).toBe("ada_lovelace")
+    expect(screen.queryByTestId("use-my-username")).toBeNull()
+  })
+
+  it("hides the username fill when signed out or when it would fail name validation", () => {
+    setup()
+    expect(screen.queryByTestId("use-my-username")).toBeNull()
+    screen.unmount()
+    setup({ username: "a".repeat(25) })
+    expect(screen.queryByTestId("use-my-username")).toBeNull()
+  })
+
   it("hosts from the shared setup screen with validated seats and life presets", async () => {
     const onLobbyCreated = jest.fn()
     render(hostSetup(onLobbyCreated))

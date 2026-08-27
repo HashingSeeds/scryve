@@ -54,6 +54,7 @@ export interface NewGameScreenProps {
   onModeChange: (mode: NewGameMode) => void
   onBack: () => void
   onStartLocal: (players: NewPlayerInput[], startingLife: number) => void
+  username?: string
   connected?: ConnectedHostFeed
 }
 
@@ -66,6 +67,7 @@ export function NewGameScreen({
   onModeChange,
   onBack,
   onStartLocal,
+  username,
   connected,
 }: NewGameScreenProps) {
   const { themed } = useAppTheme()
@@ -87,6 +89,10 @@ export function NewGameScreen({
     STARTING_LIFE_PRESETS.every((life) => life !== defaults.defaultStartingLife),
   )
   const connectedMode = mode === "connected"
+  const fillableUsername =
+    username && username.length <= MAX_PLAYER_NAME_LENGTH && names[0].trim() !== username
+      ? username
+      : undefined
   const startingLife = Number(lifeText)
   const validLife = validateStartingLife(startingLife)
   const seatNames = useMemo(
@@ -247,7 +253,22 @@ export function NewGameScreen({
           </View>
         ) : (
           <View style={themed($section)}>
-            <Text tx="localGame:playerNames" preset="subheading" accessibilityRole="header" />
+            <View style={themed($nameHeaderRow)}>
+              <Text tx="localGame:playerNames" preset="subheading" accessibilityRole="header" />
+              {fillableUsername ? (
+                <Button
+                  testID="use-my-username"
+                  text={`Use @${fillableUsername}`}
+                  accessibilityHint="Names the first player with your account username"
+                  style={themed($useUsername)}
+                  onPress={() =>
+                    setNames((current) =>
+                      current.map((name, index) => (index === 0 ? fillableUsername : name)),
+                    )
+                  }
+                />
+              ) : null}
+            </View>
             <View style={themed($nameList)}>
               {players.map((player, index) => (
                 <View key={index} style={themed($nameRow)}>
@@ -373,6 +394,18 @@ export function NewGameScreen({
 function defaultName(index: number) {
   return `Player ${index + 1}`
 }
+
+const $nameHeaderRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: spacing.xs,
+})
+const $useUsername: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 40,
+  paddingHorizontal: spacing.sm,
+})
 
 const CONTENT_MAX_WIDTH = 720
 const MIN_NAME_ROW_WIDTH = 280
