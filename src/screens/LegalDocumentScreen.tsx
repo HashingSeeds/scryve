@@ -1,14 +1,11 @@
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
+import { View } from "react-native"
 
-import { useCollapsingTitle } from "@/components/CollapsingTitle"
-import { Header } from "@/components/Header"
 import { LinkedText } from "@/components/LinkedText"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { LegalDocumentBlock, LegalDocumentContent } from "@/content/legal"
 import { useAppTheme } from "@/theme/context"
-import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 
 export interface LegalDocumentScreenProps {
@@ -19,56 +16,48 @@ export interface LegalDocumentScreenProps {
 export function LegalDocumentScreen({ document, onBack }: LegalDocumentScreenProps) {
   const { theme, themed } = useAppTheme()
   const backgroundColor = theme.isDark ? theme.colors.palette.neutral100 : theme.colors.background
-  const { titleVisible, onScroll } = useCollapsingTitle()
 
   return (
     <Screen
-      preset="fixed"
+      preset="scroll"
       safeAreaEdges={["bottom"]}
       backgroundColor={backgroundColor}
       systemBarStyle={theme.isDark ? "light" : "dark"}
-      contentContainerStyle={themed($screen)}
+      header={{
+        title: document.title,
+        backgroundColor,
+        leftTx: "common:back",
+        onLeftPress: onBack,
+      }}
+      contentContainerStyle={themed($scrollContent)}
+      ScrollViewProps={{ testID: "legal-document-scroll" }}
     >
-      <Header
-        title={titleVisible ? document.title : ""}
-        backgroundColor={backgroundColor}
-        leftTx="common:back"
-        onLeftPress={onBack}
-      />
-      <ScrollView
-        testID="legal-document-scroll"
-        style={$styles.flex1}
-        contentContainerStyle={themed($scrollContent)}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-      >
-        <View style={themed($content)}>
-          <View style={themed($documentHeader)}>
-            <Text text={document.title} preset="heading" accessibilityRole="header" />
-            <Text
-              text={`Last updated ${document.effectiveDate}`}
-              size="xs"
-              style={themed($metadata)}
-            />
-          </View>
-          {document.sections.map((section, index) => (
-            <View key={`${section.heading ?? "section"}-${index}`} style={themed($section)}>
-              {section.heading ? (
-                <Text
-                  text={section.heading}
-                  weight="bold"
-                  size="md"
-                  accessibilityRole="header"
-                  style={themed($sectionHeading)}
-                />
-              ) : null}
-              {section.blocks.map((block, blockIndex) => (
-                <LegalBlockView key={`${block.type}-${blockIndex}`} block={block} />
-              ))}
-            </View>
-          ))}
+      <View style={themed($content)}>
+        <View style={themed($documentHeader)}>
+          <Text text={document.title} preset="heading" accessibilityRole="header" />
+          <Text
+            text={`Last updated ${document.effectiveDate}`}
+            size="xs"
+            style={themed($metadata)}
+          />
         </View>
-      </ScrollView>
+        {document.sections.map((section, index) => (
+          <View key={`${section.heading ?? "section"}-${index}`} style={themed($section)}>
+            {section.heading ? (
+              <Text
+                text={section.heading}
+                weight="bold"
+                size="md"
+                accessibilityRole="header"
+                style={themed($sectionHeading)}
+              />
+            ) : null}
+            {section.blocks.map((block, blockIndex) => (
+              <LegalBlockView key={`${block.type}-${blockIndex}`} block={block} />
+            ))}
+          </View>
+        ))}
+      </View>
     </Screen>
   )
 }
@@ -98,8 +87,6 @@ function LegalBlockView({ block }: { block: LegalDocumentBlock }) {
     </View>
   )
 }
-
-const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
