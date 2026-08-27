@@ -11,6 +11,11 @@ import { useUser } from "@clerk/expo"
 import { useConvexAuth, useConvexConnectionState, useMutation } from "convex/react"
 
 import { api } from "../../../convex/_generated/api"
+import { MAX_DISPLAY_NAME_LENGTH } from "../../../convex/lib/policy"
+
+export function connectedProfileName(username: string | null | undefined) {
+  return username?.trim().slice(0, MAX_DISPLAY_NAME_LENGTH) || "Player"
+}
 
 interface ConnectedProfileDetails {
   userId: string
@@ -98,11 +103,11 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
       user?.id
         ? {
             userId: user.id,
-            displayName: user.fullName || user.firstName || "Player",
+            displayName: connectedProfileName(user.username),
             avatarUrl: user.imageUrl,
           }
         : undefined,
-    [user?.firstName, user?.fullName, user?.id, user?.imageUrl],
+    [user?.id, user?.imageUrl, user?.username],
   )
 
   useEffect(() => {

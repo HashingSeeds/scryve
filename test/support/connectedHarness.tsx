@@ -230,6 +230,7 @@ export function createClerkMock() {
         ? {
             id: connectedHarness.userId,
             fullName: "Ada",
+            username: "ada_lovelace",
             imageUrl: "https://example.test/a.png",
           }
         : null,

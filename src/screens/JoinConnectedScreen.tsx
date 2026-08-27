@@ -15,7 +15,7 @@ import { TextField } from "@/components/TextField"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
-import { MAX_PLAYER_NAME_LENGTH, validatePlayerNames } from "@/features/game/domain"
+import { connectedProfileName } from "@/features/connected/useConnectedProfile"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -50,17 +50,14 @@ export function JoinConnectedScreen({
   const claimSeat = useMutation(api.games.claimSeat)
   const deviceId = useState(() => new LocalGameRepository().getDeviceId())[0]
   const [code, setCode] = useState(initialCode)
-  const [name, setName] = useState(user?.fullName || user?.firstName || "Player")
   const [appearance, setAppearance] = useState<PlayerAppearance>({
     color: PLAYER_COLOR_CHOICES[0],
     shape: shapeForSeat(1),
   })
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
-  const nameValidation = validatePlayerNames([name])
-  const normalizedName = nameValidation.names[0]
-  const validCode = Boolean(inviteToken || normalizeManualCode(code))
-  const validInput = nameValidation.valid && validCode
+  const profileName = connectedProfileName(user?.username)
+  const validInput = Boolean(inviteToken || normalizeManualCode(code))
   const title = inviteToken ? "Join invited lobby" : "Join with code"
 
   async function join() {
@@ -73,10 +70,10 @@ export function JoinConnectedScreen({
       setBusy(true)
       setError(undefined)
       if (!validInput) {
-        setError("Enter a valid name and invitation code.")
+        setError("Enter a valid invitation code.")
         return
       }
-      await syncUser({ displayName: normalizedName, avatarUrl: user?.imageUrl })
+      await syncUser({ displayName: profileName, avatarUrl: user?.imageUrl })
       const manualCode = inviteToken ? undefined : normalizeManualCode(code)
       if (!inviteToken && !manualCode) {
         setError("Enter a valid 6-character invitation code.")
@@ -85,7 +82,7 @@ export function JoinConnectedScreen({
       const result = await claimSeat({
         token: inviteToken,
         manualCode: manualCode ?? undefined,
-        displayName: normalizedName,
+        displayName: profileName,
         color: appearance.color.toUpperCase(),
         shape: appearance.shape,
         deviceId,
@@ -149,17 +146,17 @@ export function JoinConnectedScreen({
             ) : null}
           </View>
         ) : null}
-        <View style={themed($section)}>
-          <TextField
-            testID="join-display-name"
-            label="Display name"
-            value={name}
-            maxLength={MAX_PLAYER_NAME_LENGTH}
-            status={nameValidation.errors[0] ? "error" : undefined}
-            helper={nameValidation.errors[0]}
-            onChangeText={setName}
-          />
-        </View>
+        {user?.username ? (
+          <View style={themed($section)}>
+            <Text size="xs" style={themed($dimmed)} text="You join as" />
+            <Text testID="join-username" weight="medium" text={`@${user.username}`} />
+            <Text
+              size="xxs"
+              style={themed($dimmed)}
+              text="Other players see your username. Change it from your account settings."
+            />
+          </View>
+        ) : null}
         <View style={themed($section)}>
           <AppearancePicker value={appearance} onChange={setAppearance} />
           <Text
