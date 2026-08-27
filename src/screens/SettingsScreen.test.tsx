@@ -7,13 +7,13 @@ import { SettingsScreen } from "./SettingsScreen"
 
 describe("SettingsScreen", () => {
   it("changes local defaults, haptics, and theme", () => {
-    const onSave = jest.fn()
+    const onSettingsChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
         <SettingsScreen
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
-          onSave={onSave}
+          onSettingsChange={onSettingsChange}
         />
       </ThemeProvider>,
     )
@@ -21,8 +21,8 @@ describe("SettingsScreen", () => {
     fireEvent.press(view.getByLabelText("Default 40 life"))
     fireEvent.press(view.getByTestId("haptics-switch"))
     fireEvent.press(view.getByText("Dark"))
-    fireEvent.press(view.getByTestId("save-settings-button"))
-    expect(onSave).toHaveBeenCalledWith(
+    expect(onSettingsChange).toHaveBeenCalledTimes(4)
+    expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         defaultPlayerCount: 6,
         defaultStartingLife: 40,
@@ -30,6 +30,29 @@ describe("SettingsScreen", () => {
         themePreference: "dark",
       }),
     )
+  })
+
+  it("keeps Back reachable and reveals the title after scrolling", () => {
+    const onBack = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          onBack={onBack}
+          onSettingsChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getAllByText("Settings")).toHaveLength(1)
+
+    fireEvent.scroll(view.getByTestId("settings-scroll"), {
+      nativeEvent: { contentOffset: { y: 400 } },
+    })
+    expect(view.getAllByText("Settings")).toHaveLength(2)
+
+    fireEvent.press(view.getByText(/^(Back|common:back)$/))
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 
   it("exposes every web legal document", () => {
@@ -43,7 +66,7 @@ describe("SettingsScreen", () => {
         <SettingsScreen
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
-          onSave={jest.fn()}
+          onSettingsChange={jest.fn()}
           {...handlers}
         />
       </ThemeProvider>,
@@ -66,7 +89,7 @@ describe("SettingsScreen", () => {
         <SettingsScreen
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
-          onSave={jest.fn()}
+          onSettingsChange={jest.fn()}
           onOpenSupport={onOpenSupport}
         />
       </ThemeProvider>,
@@ -83,7 +106,7 @@ describe("SettingsScreen", () => {
         <SettingsScreen
           initialSettings={DEFAULT_LOCAL_SETTINGS}
           onBack={jest.fn()}
-          onSave={jest.fn()}
+          onSettingsChange={jest.fn()}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenLicenseAgreement={onOpenLicenseAgreement}
