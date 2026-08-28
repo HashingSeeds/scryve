@@ -11,7 +11,7 @@
     "android": "env APP_VARIANT=development npx expo run:android",
     "ios": "env APP_VARIANT=development npx expo run:ios",
     "web": "env APP_VARIANT=development npx expo start --web",
-    "bundle:web": "env APP_VARIANT=development npx expo export --platform web",
+    "bundle:web": "set -a && . ./.env.development && set +a && env APP_VARIANT=development npx expo export --platform web --clear",
     "bundle:web:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx expo export --platform web --clear",
     "deploy:web:prod": "node scripts/prepare-web-deploy.cjs && wrangler pages deploy \"$PWD/dist\" --project-name=scryve --branch=main",
     "convex:dev": "pnpm convex:dev:raw",
