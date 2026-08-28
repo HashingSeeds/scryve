@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-08-20",
-  effectiveDate: "August 20, 2026",
+  version: "2026-08-27",
+  effectiveDate: "August 27, 2026",
   sections: [
     {
       blocks: [
@@ -163,6 +163,7 @@ export const privacyContent = {
           type: "list",
           items: [
             "email address",
+            "the platforms you select when joining our wait list",
             "username and display name",
             "profile image, if provided",
             "account identifier",
@@ -270,6 +271,7 @@ export const privacyContent = {
           type: "list",
           items: [
             "To create, authenticate, and manage user accounts.",
+            "To manage the wait list, review access requests, and send invitations.",
             "To provide connected games, game history, decks, subscription features, and the other functionality you request.",
             "To respond to support requests and user feedback.",
             "To verify purchases and manage subscription access.",
@@ -356,6 +358,7 @@ export const privacyContent = {
           items: [
             "Clerk, for account registration, authentication, and account management.",
             "Convex, for application hosting, database storage, synchronization, and backend services.",
+            "Cloudflare, for website hosting, security, abuse prevention, and wait-list form verification.",
             "RevenueCat, for verifying purchases and managing subscription entitlements.",
             "Apple and Google, when you purchase a subscription or use their platform services.",
             "Sentry, for crash reporting, diagnostic logging, user feedback, and privacy-protected session replay.",
@@ -421,7 +424,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. We may retain limited records longer when reasonably necessary for security, fraud prevention, legal compliance, dispute resolution, backups, or enforcement of our agreements. We keep player reports and the record of our decision for as long as needed to enforce our Terms and to recognize repeat behavior.",
+          text: "We retain wait-list submissions while we review and fulfill access requests. You may ask us to remove your submission at any time. We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. We may retain limited records longer when reasonably necessary for security, fraud prevention, legal compliance, dispute resolution, backups, or enforcement of our agreements. We keep player reports and the record of our decision for as long as needed to enforce our Terms and to recognize repeat behavior.",
         },
         {
           type: "paragraph",

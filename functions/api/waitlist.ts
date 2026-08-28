@@ -49,7 +49,10 @@ export const onRequest: PagesFunction<PagesEnv> = async (context) => {
     )
     if (!verified) return json({ error: "Verification failed. Please try again." }, 400)
 
-    const convexUrl = new URL("/waitlist/submissions", requireEnv(context.env, "CONVEX_SITE_URL"))
+    const convexUrl = new URL(
+      "/waitlist/submissions",
+      requireEnv(context.env, "EXPO_PUBLIC_CONVEX_SITE_URL"),
+    )
     const response = await fetch(convexUrl, {
       method: "POST",
       headers: {

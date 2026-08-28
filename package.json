@@ -12,6 +12,7 @@
     "web": "env APP_VARIANT=development npx expo start --web",
     "bundle:web": "set -a && . ./.env.development && set +a && env APP_VARIANT=development npx expo export --platform web --clear",
     "bundle:web:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx expo export --platform web --clear",
+    "build:web:pages": "APP_VARIANT=production npx expo export --platform web --clear && node scripts/prepare-web-deploy.cjs",
     "deploy:web:prod": "node scripts/prepare-web-deploy.cjs && wrangler pages deploy \"$PWD/dist\" --project-name=scryve --branch=main",
     "convex:dev": "pnpm convex:dev:raw",
     "convex:dev:raw": "convex dev",

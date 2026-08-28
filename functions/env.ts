@@ -1,8 +1,8 @@
 export interface PagesEnv {
   APP_ORIGIN?: string
-  CLERK_PUBLISHABLE_KEY?: string
   CLERK_SECRET_KEY?: string
-  CONVEX_SITE_URL?: string
+  EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY?: string
+  EXPO_PUBLIC_CONVEX_SITE_URL?: string
   TURNSTILE_SECRET_KEY?: string
   WAITLIST_GATE_ENABLED?: string
   WAITLIST_INGEST_SECRET?: string

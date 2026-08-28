@@ -13,7 +13,7 @@ export const onRequest: PagesFunction<PagesEnv> = async (context) => {
   try {
     const origin = requireEnv(context.env, "APP_ORIGIN")
     const clerk = createClerkClient({
-      publishableKey: requireEnv(context.env, "CLERK_PUBLISHABLE_KEY"),
+      publishableKey: requireEnv(context.env, "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"),
       secretKey: requireEnv(context.env, "CLERK_SECRET_KEY"),
     })
     const auth = await clerk.authenticateRequest(context.request, {
