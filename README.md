@@ -130,3 +130,15 @@ Read our [Upgrade Guide](https://ignitecookbook.com/docs/recipes/UpdatingIgnite)
 
 📰 Make our Editor-in-chief happy by [reading the React Native Newsletter](https://reactnativenewsletter.com/).
 Connected lobby development is configuration-gated; see [docs/CONNECTED_SETUP.md](docs/CONNECTED_SETUP.md). Missing Clerk/Convex configuration never blocks offline local games.
+
+## Web wait-list gate
+
+The production Pages deployment uses `functions/_middleware.ts` to admit signed-in Clerk users and
+redirect everyone else to `/waitlist/`. The gate is disabled unless the production Pages environment
+sets `WAITLIST_GATE_ENABLED=true`, so local and preview deployments remain open.
+
+The production Pages environment also needs `APP_ORIGIN`, `CLERK_PUBLISHABLE_KEY`,
+`CLERK_SECRET_KEY`, `CONVEX_SITE_URL`, `TURNSTILE_SECRET_KEY`, and `WAITLIST_INGEST_SECRET`.
+Set the same `WAITLIST_INGEST_SECRET` in the production Convex deployment. The static page gets its
+Turnstile site key and Clerk Account Portal sign-in URL from `EXPO_PUBLIC_TURNSTILE_SITE_KEY` and
+`EXPO_PUBLIC_CLERK_SIGN_IN_URL` during `scripts/prepare-web-deploy.cjs`.
