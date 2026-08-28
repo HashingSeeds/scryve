@@ -15,6 +15,8 @@ import {
   type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller"
 
+import { useCollapsingTitle } from "@/components/CollapsingTitle"
+import { Header, type HeaderProps } from "@/components/Header"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -64,6 +66,7 @@ interface BaseScreenProps {
    * Pass any additional props directly to the KeyboardAvoidingView component.
    */
   KeyboardAvoidingViewProps?: KeyboardAvoidingViewProps
+  header?: HeaderProps & { collapseTitle?: boolean }
 }
 
 interface FixedScreenProps extends BaseScreenProps {
@@ -258,6 +261,13 @@ export function Screen(props: ScreenProps) {
     SystemBarsProps,
     systemBarStyle,
   } = props
+  const { titleVisible, onScroll: onTitleScroll } = useCollapsingTitle()
+  const { collapseTitle = true, ...headerProps } = props.header ?? {}
+  const collapsesTitle = Boolean(props.header) && !isNonScrolling(props.preset) && collapseTitle
+  const showHeaderTitle = !collapsesTitle || titleVisible
+  const screenProps = collapsesTitle
+    ? withTitleScrollHandler(props as ScrollScreenProps, onTitleScroll)
+    : props
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
 
@@ -274,20 +284,46 @@ export function Screen(props: ScreenProps) {
         {...SystemBarsProps}
       />
 
+      {props.header ? (
+        <Header
+          {...headerProps}
+          title={showHeaderTitle ? headerProps.title : undefined}
+          titleTx={showHeaderTitle ? headerProps.titleTx : undefined}
+        />
+      ) : null}
+
       <KeyboardAvoidingView
         behavior={isIos ? "padding" : "height"}
         keyboardVerticalOffset={keyboardOffset}
         {...KeyboardAvoidingViewProps}
         style={[$styles.flex1, KeyboardAvoidingViewProps?.style]}
       >
-        {isNonScrolling(props.preset) ? (
-          <ScreenWithoutScrolling {...props} />
+        {isNonScrolling(screenProps.preset) ? (
+          <ScreenWithoutScrolling {...screenProps} />
         ) : (
-          <ScreenWithScrolling {...props} />
+          <ScreenWithScrolling {...screenProps} />
         )}
       </KeyboardAvoidingView>
     </View>
   )
+}
+
+function withTitleScrollHandler(
+  props: ScrollScreenProps,
+  onTitleScroll: NonNullable<ScrollViewProps["onScroll"]>,
+): ScrollScreenProps {
+  const consumerOnScroll = props.ScrollViewProps?.onScroll
+  return {
+    ...props,
+    ScrollViewProps: {
+      ...props.ScrollViewProps,
+      scrollEventThrottle: props.ScrollViewProps?.scrollEventThrottle ?? 16,
+      onScroll: (event) => {
+        onTitleScroll(event)
+        consumerOnScroll?.(event)
+      },
+    },
+  }
 }
 
 const $containerStyle: ViewStyle = {
