@@ -1,10 +1,5 @@
 import { type PagesEnv, requireEnv } from "../env"
-import { parseWaitlistSubmission } from "../waitlistValidation"
-
-interface TurnstileResult {
-  action?: string
-  success?: boolean
-}
+import { isValidTurnstileResult, parseWaitlistSubmission } from "../waitlistValidation"
 
 function json(body: unknown, status = 200) {
   return Response.json(body, {
@@ -14,6 +9,12 @@ function json(body: unknown, status = 200) {
 }
 
 async function verifyTurnstile(env: PagesEnv, token: string, ip: string | null) {
+  const expectedHostnames = new Set(
+    requireEnv(env, "TURNSTILE_HOSTNAMES")
+      .split(",")
+      .map((hostname) => hostname.trim())
+      .filter(Boolean),
+  )
   const formData = new FormData()
   formData.set("secret", requireEnv(env, "TURNSTILE_SECRET_KEY"))
   formData.set("response", token)
@@ -24,8 +25,9 @@ async function verifyTurnstile(env: PagesEnv, token: string, ip: string | null) 
     body: formData,
   })
   if (!response.ok) return false
-  const result: TurnstileResult = await response.json()
-  return result.success === true && (!result.action || result.action === "join_waitlist")
+  const result: unknown = await response.json()
+  if (typeof result !== "object" || result === null) return false
+  return isValidTurnstileResult(result, expectedHostnames)
 }
 
 export const onRequest: PagesFunction<PagesEnv> = async (context) => {

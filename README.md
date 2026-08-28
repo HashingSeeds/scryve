@@ -138,10 +138,10 @@ redirect everyone else to `/waitlist/`. The gate is disabled unless the producti
 sets `WAITLIST_GATE_ENABLED=true`, so local and preview deployments remain open.
 
 The production Pages environment also needs `APP_ORIGIN`, `CLERK_SECRET_KEY`,
-`TURNSTILE_SECRET_KEY`, and `WAITLIST_INGEST_SECRET`, along with the existing
+`TURNSTILE_SECRET_KEY`, `TURNSTILE_HOSTNAMES=scryve.sow.care`, and `WAITLIST_INGEST_SECRET`, along with the existing
 `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` and `EXPO_PUBLIC_CONVEX_SITE_URL`. Set the same
-`WAITLIST_INGEST_SECRET` in the production Convex deployment. The static page gets its Turnstile
-site key and Clerk Account Portal sign-in URL from `EXPO_PUBLIC_TURNSTILE_SITE_KEY` and
+`WAITLIST_INGEST_SECRET` in the production Convex deployment. The public Turnstile site key is
+embedded in the wait-list page. The static page gets its Clerk Account Portal sign-in URL from
 `EXPO_PUBLIC_CLERK_SIGN_IN_URL` during `scripts/prepare-web-deploy.cjs`.
 
 For a Git-connected Cloudflare Pages project, use `pnpm build:web:pages` as the build command and

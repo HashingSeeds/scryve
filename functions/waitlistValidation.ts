@@ -8,6 +8,12 @@ interface WaitlistSubmission {
   turnstileToken: string
 }
 
+interface TurnstileResult {
+  action?: unknown
+  hostname?: unknown
+  success?: unknown
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
@@ -23,6 +29,18 @@ export function parseWaitlistSubmission(value: unknown): WaitlistSubmission | nu
   if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) return null
   if (platforms.length === 0 || !turnstileToken || turnstileToken.length > 2048) return null
   return { email, platforms, turnstileToken }
+}
+
+export function isValidTurnstileResult(
+  result: TurnstileResult,
+  expectedHostnames: ReadonlySet<string>,
+) {
+  return (
+    result.success === true &&
+    result.action === "join_waitlist" &&
+    typeof result.hostname === "string" &&
+    expectedHostnames.has(result.hostname)
+  )
 }
 
 function isWaitlistPlatform(value: unknown): value is WaitlistPlatform {

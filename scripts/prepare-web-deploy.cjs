@@ -87,10 +87,7 @@ for (const key of GUARDED_KEYS) {
 }
 console.log(`Verified ${GUARDED_KEYS.length} bundled production value(s).`)
 
-const turnstileSiteKey = productionEnv.EXPO_PUBLIC_TURNSTILE_SITE_KEY
 const clerkSignInUrl = productionEnv.EXPO_PUBLIC_CLERK_SIGN_IN_URL
-if (!turnstileSiteKey)
-  fail("EXPO_PUBLIC_TURNSTILE_SITE_KEY is missing from the production build environment.")
 if (!clerkSignInUrl)
   fail("EXPO_PUBLIC_CLERK_SIGN_IN_URL is missing from the production build environment.")
 
@@ -127,7 +124,6 @@ fs.copyFileSync(
 const waitlistHtmlPath = path.join(waitlistDirectory, "index.html")
 const waitlistHtml = fs
   .readFileSync(waitlistHtmlPath, "utf8")
-  .replaceAll("__TURNSTILE_SITE_KEY__", turnstileSiteKey)
   .replaceAll("__CLERK_SIGN_IN_URL__", clerkSignInUrl)
 fs.writeFileSync(waitlistHtmlPath, waitlistHtml)
 fs.copyFileSync(
