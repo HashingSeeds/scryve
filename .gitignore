@@ -89,8 +89,8 @@ web-build/
 !env.js
 .env
 .env.*
+!.env.development
 !.env.example
-!.env.op.*
 
 # Convex local/deployment credentials
 .convex/

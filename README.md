@@ -21,18 +21,33 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm run start
 ```
 
-Maintainers load the development environment from 1Password. The tracked
-`.env.op.development` file contains secret references, so it works in every
-checkout and worktree without copying dotenv files. Run the machine setup once:
+Development configuration is split three ways:
+
+- `.env.development` is tracked and holds only public client values, so it reaches
+  every checkout and worktree through git.
+- `~/.config/scryve/env.development` holds this machine's per-developer values and
+  local secrets, such as your own Convex deployment and `SENTRY_AUTH_TOKEN`. It
+  lives outside the repo so worktrees can share one copy. Link it with:
 
 ```bash
-./scripts/setup-onepassword.sh
+./scripts/link-dev-env.sh
 ```
 
-The regular `pnpm start`, platform, Convex, and development build commands then
-resolve those references automatically. Contributors without access to the
-Scryve vault can copy `.env.example` to the ignored `.env.local`; the same
-commands fall back to Expo and Convex's normal dotenv loading.
+  That symlinks the ignored `.env.local` to it, and Expo and Convex load it
+  natively. A `post-checkout` hook does this automatically for new worktrees, and
+  also installs dependencies. To install the hook on a fresh clone:
+
+```bash
+cp scripts/post-checkout-hook.sh "$(git rev-parse --git-common-dir)/hooks/post-checkout"
+chmod +x "$(git rev-parse --git-common-dir)/hooks/post-checkout"
+```
+
+- Backend secrets are set on each Convex deployment, not in any local file.
+  `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `CLERK_JWT_ISSUER_DOMAIN`,
+  `RESEND_API_KEY`, and `MODERATION_ALERT_*` are read by `convex/` code running on
+  the deployment. Set them with `npx convex env set`.
+
+Contributors without the shared file can copy `.env.example` to `.env.local`.
 
 Static checks run with:
 
