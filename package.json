@@ -6,8 +6,7 @@
   "packageManager": "pnpm@10.14.0",
   "scripts": {
     "start": "concurrently --kill-others \"pnpm start:expo\" \"pnpm convex:dev\"",
-    "start:expo": "pnpm start:expo",
-    "start:expo:raw": "APP_VARIANT=development npx expo start --dev-client",
+    "start:expo": "APP_VARIANT=development npx expo start --dev-client",
     "android": "env APP_VARIANT=development npx expo run:android",
     "ios": "env APP_VARIANT=development npx expo run:ios",
     "web": "env APP_VARIANT=development npx expo start --web",
