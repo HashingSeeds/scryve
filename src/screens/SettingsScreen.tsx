@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
+import { MENU_BUTTON_STYLE_LABELS, MENU_BUTTON_STYLES } from "@/components/GameMenuButtonShape"
 import { ListItem } from "@/components/ListItem"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -106,6 +107,25 @@ export function SettingsScreen({
         </View>
         <Text
           text="System follows your device appearance. Light and dark stay fixed until changed here."
+          size="xs"
+          style={themed($muted)}
+        />
+        <Text text="Game menu button" preset="subheading" accessibilityRole="header" />
+        <View style={themed($row)}>
+          {MENU_BUTTON_STYLES.map((style) => (
+            <Button
+              key={style}
+              testID={`menu-button-style-${style}`}
+              text={MENU_BUTTON_STYLE_LABELS[style]}
+              accessibilityState={{ selected: settings.menuButtonStyle === style }}
+              preset={settings.menuButtonStyle === style ? "reversed" : "default"}
+              style={themed($choice)}
+              onPress={() => update({ menuButtonStyle: style })}
+            />
+          ))}
+        </View>
+        <Text
+          text="Changes the shape at the center of the board. Prism tints the button with the colors of everyone at the table."
           size="xs"
           style={themed($muted)}
         />

@@ -20,6 +20,7 @@ import { Text } from "@/components/Text"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
 import type { LocalGame, PlayerId } from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
+import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -37,6 +38,7 @@ export function CurrentGameScreen({
   repository,
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game")
+  const menuButtonStyle = useMenuButtonStyle()
   const {
     themed,
     theme: { colors },
@@ -173,6 +175,8 @@ export function CurrentGameScreen({
           anchor={menuAnchor}
           compact={playerCount > 2}
           actions={radialActions}
+          variant={menuButtonStyle}
+          seatColors={runtime.game.players.map((player) => player.color)}
           onToggle={() => setMenuOpen((current) => !current)}
           onClose={closeMenu}
         />

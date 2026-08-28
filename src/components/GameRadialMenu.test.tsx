@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
-import { Polygon } from "react-native-svg"
+import { Polygon, Polyline } from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme, lightTheme } from "@/theme/theme"
@@ -43,17 +43,19 @@ describe("GameRadialMenu", () => {
     for (const action of actions) expect(view.getByTestId(`${action.kind}-button`)).toBeTruthy()
   })
 
-  it("draws the pentagon button with the light menu tokens", () => {
+  it("draws the pentagon button with the menu tokens", () => {
     const view = render(menu(false))
 
     expect(view.getByTestId("game-menu-pentagon")).toBeTruthy()
-    const pentagon = view.UNSAFE_getByType(Polygon)
-    expect(pentagon.props.fill).toBe(lightTheme.colors.gameMenu.anchor)
-    expect(pentagon.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
-    expect(pentagon.props.points.split(" ")).toHaveLength(5)
+    const pentagon = view
+      .UNSAFE_getAllByType(Polygon)
+      .find((polygon) => polygon.props.strokeWidth === 7)
+    expect(pentagon).toBeTruthy()
+    expect(pentagon!.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
+    expect(pentagon!.props.points.split(" ")).toHaveLength(5)
   })
 
-  it("uses distinct charcoal fill and border colors in dark mode", () => {
+  it("uses the flat Keystone II treatment by default in dark mode", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <GameRadialMenu
@@ -66,9 +68,13 @@ describe("GameRadialMenu", () => {
       </ThemeProvider>,
     )
 
-    const pentagon = view.UNSAFE_getByType(Polygon)
-    expect(pentagon.props.fill).toBe(darkTheme.colors.gameMenu.anchor)
-    expect(pentagon.props.stroke).toBe(darkTheme.colors.gameMenu.anchorBorder)
+    const pentagon = view
+      .UNSAFE_getAllByType(Polygon)
+      .find((polygon) => polygon.props.strokeWidth === 7)
+    expect(pentagon).toBeTruthy()
+    expect(pentagon!.props.fill).toBe("url(#keystoneTwoFill)")
+    expect(pentagon!.props.stroke).toBe(darkTheme.colors.gameMenu.anchorBorder)
+    expect(view.UNSAFE_queryAllByType(Polyline)).toHaveLength(0)
   })
 
   it("keeps the menu glyph in centered square bounds", () => {
