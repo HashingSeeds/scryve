@@ -5,8 +5,8 @@
   "main": "expo-router/entry",
   "packageManager": "pnpm@10.14.0",
   "scripts": {
-    "start": "concurrently --kill-others \"pnpm start:expo:raw\" \"pnpm convex:dev:raw\"",
-    "start:expo": "pnpm start:expo:raw",
+    "start": "concurrently --kill-others \"pnpm start:expo\" \"pnpm convex:dev\"",
+    "start:expo": "pnpm start:expo",
     "start:expo:raw": "APP_VARIANT=development npx expo start --dev-client",
     "android": "env APP_VARIANT=development npx expo run:android",
     "ios": "env APP_VARIANT=development npx expo run:ios",
