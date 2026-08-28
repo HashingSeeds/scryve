@@ -21,6 +21,34 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm run start
 ```
 
+Development configuration is split three ways:
+
+- `.env.development` is tracked and holds only public client values, so it reaches
+  every checkout and worktree through git.
+- `~/.config/scryve/env.development` holds this machine's per-developer values and
+  local secrets, such as your own Convex deployment and `SENTRY_AUTH_TOKEN`. It
+  lives outside the repo so worktrees can share one copy. Link it with:
+
+```bash
+./scripts/link-dev-env.sh
+```
+
+  That symlinks the ignored `.env.local` to it, and Expo and Convex load it
+  natively. A `post-checkout` hook does this automatically for new worktrees, and
+  also installs dependencies. To install the hook on a fresh clone:
+
+```bash
+cp scripts/post-checkout-hook.sh "$(git rev-parse --git-common-dir)/hooks/post-checkout"
+chmod +x "$(git rev-parse --git-common-dir)/hooks/post-checkout"
+```
+
+- Backend secrets are set on each Convex deployment, not in any local file.
+  `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `CLERK_JWT_ISSUER_DOMAIN`,
+  `RESEND_API_KEY`, and `MODERATION_ALERT_*` are read by `convex/` code running on
+  the deployment. Set them with `npx convex env set`.
+
+Contributors without the shared file can copy `.env.example` to `.env.local`.
+
 Static checks run with:
 
 ```bash
