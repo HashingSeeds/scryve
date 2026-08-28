@@ -1,3 +1,5 @@
+/* global document, URL, URLSearchParams */
+
 const form = document.querySelector("#waitlist-form")
 const submitButton = document.querySelector("#submit")
 const status = document.querySelector("#form-status")
