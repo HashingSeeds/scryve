@@ -21,6 +21,7 @@ jest.mock("@clerk/expo", () => ({
       ? {
           id: mockUserId,
           fullName: mockUserId === "user-a" ? "Ada" : "Bea",
+          username: mockUserId === "user-a" ? "ada_lovelace" : "bea_smith",
           imageUrl: `https://example.test/${mockUserId}.png`,
         }
       : null,
@@ -101,7 +102,7 @@ describe("useConnectedProfile", () => {
     expect(result.current).toMatchObject({ status: "loading", reason: "profile" })
     await waitFor(() => expect(result.current).toMatchObject({ status: "ready" }))
     expect(mockSyncCurrent).toHaveBeenCalledWith({
-      displayName: "Ada",
+      displayName: "ada_lovelace",
       avatarUrl: "https://example.test/user-a.png",
     })
   })

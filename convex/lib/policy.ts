@@ -5,6 +5,7 @@ export const MAX_PLAYERS = 6
 export const INVITE_LIFETIME_MS = 24 * 60 * 60 * 1000
 export const MAX_MANUAL_CODE_CANDIDATES = 8
 export const MAX_RULESET_LENGTH = 32
+export const MAX_DISPLAY_NAME_LENGTH = 32
 export const MAX_AVATAR_URL_LENGTH = 512
 export const MEMBERSHIP_MIGRATION_VERSION = 1
 export const HISTORY_MIGRATION_VERSION = 1
@@ -70,7 +71,8 @@ export function assertAllowedShape(shape: string) {
 
 export function assertDisplayName(name: string) {
   const value = name.trim()
-  if (value.length < 1 || value.length > 32) throw new Error("Display name must be 1–32 characters")
+  if (value.length < 1 || value.length > MAX_DISPLAY_NAME_LENGTH)
+    throw new Error(`Display name must be 1–${MAX_DISPLAY_NAME_LENGTH} characters`)
   return value
 }
 
