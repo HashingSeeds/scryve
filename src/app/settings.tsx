@@ -25,12 +25,11 @@ export default function SettingsRoute() {
       }
       onOpenCookiePolicy={() => router.push("/cookie-policy")}
       BlockedPlayers={hasCloudSession ? <BlockedPlayersSection /> : undefined}
-      onSave={(settings) => {
+      onSettingsChange={(settings) => {
         localGameRepository.saveSettings(settings)
         setThemeContextOverride(
           settings.themePreference === "system" ? undefined : settings.themePreference,
         )
-        router.back()
       }}
     />
   )
