@@ -33,6 +33,7 @@ import type * as lib_scryfall from "../lib/scryfall.js";
 import type * as lib_usernameSuggestions from "../lib/usernameSuggestions.js";
 import type * as moderation from "../moderation.js";
 import type * as users from "../users.js";
+import type * as waitlist from "../waitlist.js";
 
 import type {
   ApiFromModules,
@@ -66,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   "lib/usernameSuggestions": typeof lib_usernameSuggestions;
   moderation: typeof moderation;
   users: typeof users;
+  waitlist: typeof waitlist;
 }>;
 
 /**
