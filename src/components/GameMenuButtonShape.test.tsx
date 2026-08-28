@@ -101,6 +101,11 @@ describe("GameMenuButtonShape", () => {
     expect(shape(variant).UNSAFE_getAllByType(Polyline)).toHaveLength(2)
   })
 
+  it.each(MENU_BUTTON_STYLES)("renders %s without an exterior shadow", (variant) => {
+    const polygons = shape(variant).UNSAFE_getAllByType(Polygon)
+    expect(polygons.every((polygon) => polygon.props.translateY === undefined)).toBe(true)
+  })
+
   it.each(MENU_BUTTON_STYLES)(
     "clips the %s bevel to the visible face so it cannot overpaint the halo",
     (variant) => {

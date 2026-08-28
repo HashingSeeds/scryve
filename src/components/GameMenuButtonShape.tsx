@@ -44,12 +44,6 @@ const KEYSTONE_II_FACE = {
   dark: { top: "#46434E", bottom: "#26242C" },
 } as const
 
-const SEAT_SHADOW_COLOR = "#3A3440"
-const SEAT_SHADOW_RADIUS = 62
-const SEAT_SHADOW_OPACITY = 0.26
-const SEAT_SHADOW_SOLID_UNTIL = "0.62"
-const SEAT_SHADOW_DROP = 2.5
-
 const KEYSTONE_II_BEVEL = { shade: 0.48, light: 0.4 } as const
 const PRISM_BEVEL = { shade: 0.36, light: 0.22 } as const
 const BEVEL_SHADE_STROKE_WIDTH = 6.5
@@ -81,12 +75,6 @@ const FACE_POINTS = buildRegularPolygonPoints({
   sides: PENTAGON_SIDES,
   center: PENTAGON_CENTER,
   radius: FACE_RADIUS,
-})
-
-const SEAT_SHADOW_POINTS = buildRegularPolygonPoints({
-  sides: PENTAGON_SIDES,
-  center: PENTAGON_CENTER,
-  radius: SEAT_SHADOW_RADIUS,
 })
 
 const FACE_CORNERS_CLOCKWISE_FROM_APEX = FACE_POINTS.split(" ")
@@ -225,29 +213,6 @@ function PentagonHairline(): ReactElement {
   )
 }
 
-function PentagonSeatShadow({ gradientId }: { gradientId: string }): ReactElement {
-  return (
-    <>
-      <Defs>
-        <RadialGradient id={gradientId} cx="0.5" cy="0.5" r="0.5">
-          <Stop offset="0" stopColor={SEAT_SHADOW_COLOR} stopOpacity={SEAT_SHADOW_OPACITY} />
-          <Stop
-            offset={SEAT_SHADOW_SOLID_UNTIL}
-            stopColor={SEAT_SHADOW_COLOR}
-            stopOpacity={SEAT_SHADOW_OPACITY}
-          />
-          <Stop offset="1" stopColor={SEAT_SHADOW_COLOR} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Polygon
-        points={SEAT_SHADOW_POINTS}
-        fill={`url(#${gradientId})`}
-        translateY={SEAT_SHADOW_DROP}
-      />
-    </>
-  )
-}
-
 export interface GameMenuButtonShapeProps {
   variant: MenuButtonStyle
   isDark: boolean
@@ -300,7 +265,6 @@ function KeystoneTwoShape({
           <Stop offset="1" stopColor={face.bottom} />
         </LinearGradient>
       </Defs>
-      {isDark ? null : <PentagonSeatShadow gradientId="keystoneTwoSeatShadow" />}
       <Polygon
         points={PENTAGON_POINTS}
         fill="url(#keystoneTwoFill)"
@@ -350,7 +314,6 @@ function PrismShape({
           <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
         </RadialGradient>
       </Defs>
-      {isDark ? null : <PentagonSeatShadow gradientId="prismSeatShadow" />}
       <G clipPath="url(#prismFace)">
         {wedges.map((wedge) => (
           <Path key={wedge.key} d={wedge.path} fill={`url(#${wedge.key}-gradient)`} />
