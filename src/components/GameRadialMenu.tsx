@@ -215,7 +215,7 @@ export function GameRadialMenu({
             <GameMenuButtonShape
               variant={variant}
               isDark={isDark}
-              boardBackgroundColor={colors.gameMenu.anchorBorder}
+              boardBackgroundColor={colors.board.background}
               seatColors={seatColors}
             />
           </Animated.View>
