@@ -72,6 +72,6 @@ const $badge: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderColor: colors.separator,
 })
 const $dot: ThemedStyle<ViewStyle> = () => ({ width: 8, height: 8, borderRadius: 4 })
-const $ready: ThemedStyle<ViewStyle> = () => ({ backgroundColor: "#39755C" })
+const $ready: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.success })
 const $offline: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.error })
 const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

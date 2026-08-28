@@ -12,6 +12,7 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 
 import { api } from "../../../convex/_generated/api"
+import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
 
 export interface CreatedLobby {
   publicId: string
@@ -96,7 +97,7 @@ function ConnectedHostQuerySource({
         ...ids,
         ...setup,
         hostDisplayName: connectedProfile.profile.displayName,
-        hostColor: "#7C3AED",
+        hostColor: PLAYER_COLOR_CHOICES[0],
         deviceId,
       })
       onLobbyCreated(lobby)

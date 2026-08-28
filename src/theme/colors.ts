@@ -1,3 +1,5 @@
+import type { GameMenuActionKind } from "./gameMenu"
+
 const palette = {
   neutral100: "#FFFFFF",
   neutral200: "#F4F2F1",
@@ -30,6 +32,10 @@ const palette = {
 
   angry100: "#F2D6CD",
   angry500: "#C03403",
+
+  success500: "#39755C",
+  info500: "#41476E",
+  destructive500: "#A33A52",
 
   overlay20: "rgba(25, 16, 21, 0.2)",
   overlay50: "rgba(25, 16, 21, 0.5)",
@@ -86,4 +92,34 @@ export const colors = {
    * Error Background.
    */
   errorBackground: palette.angry100,
+  surface: palette.neutral100,
+  surfaceMuted: palette.neutral200,
+  surfaceRaised: palette.neutral100,
+  surfaceInverse: palette.neutral900,
+  textInverse: palette.neutral100,
+  overlay: palette.overlay50,
+  shadow: palette.neutral900,
+  success: palette.success500,
+  board: {
+    background: palette.neutral900,
+    surface: palette.neutral800,
+    surfaceRaised: palette.neutral700,
+    border: palette.neutral600,
+    text: palette.neutral100,
+  },
+  gameMenu: {
+    backdrop: "rgba(0, 0, 0, 0.56)",
+    anchor: palette.neutral800,
+    anchorBorder: palette.neutral100,
+    anchorGlyph: palette.neutral100,
+    shadow: palette.neutral900,
+    actions: {
+      "layout": palette.primary600,
+      "undo": palette.success500,
+      "players": "#77558A",
+      "status": palette.info500,
+      "home": "#356A86",
+      "end-game": palette.angry500,
+    } satisfies Record<GameMenuActionKind, string>,
+  },
 } as const

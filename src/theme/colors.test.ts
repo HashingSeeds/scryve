@@ -1,5 +1,6 @@
 import { colors as lightColors } from "./colors"
 import { colors as darkColors } from "./colorsDark"
+import { accessibleForeground } from "../utils/colorContrast"
 
 function relativeLuminance(hex: string): number {
   const channels = hex
@@ -31,5 +32,20 @@ describe.each([
 ] as const)("%s theme", (_name, colors) => {
   it("keeps brand text readable on the app background", () => {
     expect(contrastRatio(colors.brandText, colors.background)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it.each(Object.entries(colors.gameMenu.actions))(
+    "keeps the %s menu action readable",
+    (_tone, background) => {
+      expect(contrastRatio(accessibleForeground(background), background)).toBeGreaterThanOrEqual(
+        4.5,
+      )
+    },
+  )
+
+  it("gives every game menu action its own color", () => {
+    const actionColors = Object.values(colors.gameMenu.actions)
+
+    expect(new Set(actionColors).size).toBe(actionColors.length)
   })
 })

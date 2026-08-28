@@ -7,7 +7,7 @@ import {
   useEffect,
   useMemo,
 } from "react"
-import { StyleProp, useColorScheme } from "react-native"
+import { StyleProp, StyleSheet, useColorScheme } from "react-native"
 import { useMMKVString } from "react-native-mmkv"
 
 import { storage } from "@/utils/storage"
@@ -34,6 +34,16 @@ export const ThemeContext = createContext<ThemeContextType | null>(null)
 
 export interface ThemeProviderProps {
   initialContext?: ThemeContextModeT
+}
+
+function resolveThemedStyle<T>(style: AllowedStylesT<T>, theme: Theme): StyleProp<T> {
+  if (Array.isArray(style)) {
+    return style.map((entry) =>
+      resolveThemedStyle(entry as AllowedStylesT<T>, theme),
+    ) as StyleProp<T>
+  }
+  if (typeof style === "function") return (style as ThemedStyle<T>)(theme)
+  return style as StyleProp<T>
 }
 
 /**
@@ -92,16 +102,7 @@ export const ThemeProvider: FC<PropsWithChildren<ThemeProviderProps>> = ({
 
   const themed = useCallback(
     <T,>(styleOrStyleFn: AllowedStylesT<T>) => {
-      const flatStyles = [styleOrStyleFn].flat(3) as (ThemedStyle<T> | StyleProp<T>)[]
-      const stylesArray = flatStyles.map((f) => {
-        if (typeof f === "function") {
-          return (f as ThemedStyle<T>)(theme)
-        } else {
-          return f
-        }
-      })
-      // Flatten the array of styles into a single object
-      return Object.assign({}, ...stylesArray) as T
+      return StyleSheet.flatten(resolveThemedStyle(styleOrStyleFn, theme)) as T
     },
     [theme],
   )

@@ -109,9 +109,8 @@ export function CurrentGameScreen({
 
   const radialActions: readonly RadialMenuAction[] = [
     {
-      id: "layout",
+      kind: "layout",
       label: "Layout",
-      color: "#FBC878",
       disabled: layoutOptions.length < 2,
       onPress: (event) => {
         captureMenuDialogOrigin(event)
@@ -120,9 +119,8 @@ export function CurrentGameScreen({
       },
     },
     {
-      id: "undo",
+      kind: "undo",
       label: "Undo",
-      color: "#55C894",
       disabled: !runtime.canUndo,
       onPress: () => {
         runtime.undo()
@@ -130,9 +128,8 @@ export function CurrentGameScreen({
       },
     },
     {
-      id: "status",
+      kind: "status",
       label: "Status",
-      color: "#B48CE0",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         setMenuOpen(false)
@@ -140,18 +137,16 @@ export function CurrentGameScreen({
       },
     },
     {
-      id: "game-home",
+      kind: "home",
       label: "Home",
-      color: "#7DB7E8",
       onPress: () => {
         closeMenu()
         onHome()
       },
     },
     {
-      id: "end-game",
+      kind: "end-game",
       label: "End game",
-      color: "#D96767",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         showEndConfirmation()

@@ -1,7 +1,9 @@
 import { useEffect } from "react"
 import { useClerk } from "@clerk/expo"
 
-import { clerkAppearance } from "./clerkAppearance"
+import { useAppTheme } from "@/theme/context"
+
+import { getClerkAppearance } from "./clerkAppearance"
 
 export function ClerkAuthModal({
   visible,
@@ -11,18 +13,19 @@ export function ClerkAuthModal({
   onDismiss: () => void
 }) {
   const clerk = useClerk()
+  const { theme } = useAppTheme()
 
   useEffect(() => {
     if (!visible) return
     clerk.openSignIn({
-      appearance: clerkAppearance,
+      appearance: getClerkAppearance(theme),
       withSignUp: true,
       oauthFlow: "popup",
       fallbackRedirectUrl: "/",
       signUpFallbackRedirectUrl: "/",
     })
     onDismiss()
-  }, [clerk, onDismiss, visible])
+  }, [clerk, onDismiss, theme, visible])
 
   return null
 }

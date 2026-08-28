@@ -51,7 +51,10 @@ function ConnectedBoardShell({
   state: ConnectedBoardShellState
   onBack?: () => void
 }) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const unavailable = state.status === "unavailable"
 
   return (
@@ -85,7 +88,7 @@ function ConnectedBoardShell({
             accessibilityLiveRegion={unavailable ? "assertive" : "polite"}
             style={themed([$statusToast, unavailable && $unavailableToast])}
           >
-            {!unavailable ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+            {!unavailable ? <ActivityIndicator size="small" color={colors.board.text} /> : null}
             <Text size="xs" weight="medium" text={state.message} style={themed($statusMessage)} />
             {unavailable && state.retry ? (
               <Button
@@ -234,9 +237,8 @@ function ConnectedBoardRuntime({
   const menuAnchor = getPlayerGridMenuAnchor(players.length, gridLayout)
   const radialActions: RadialMenuAction[] = [
     {
-      id: "connected-layout",
+      kind: "layout",
       label: "Layout",
-      color: "#FBC878",
       disabled: layoutOptions.length < 2,
       onPress: (event) => {
         captureMenuDialogOrigin(event)
@@ -245,9 +247,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "connected-players",
+      kind: "players",
       label: "Players",
-      color: "#55C894",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         setMenuOpen(false)
@@ -255,14 +256,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "connected-status",
+      kind: "status",
       label: runtime.connectionStatus === "connected" ? "Status" : runtime.connectionStatus,
-      color:
-        runtime.connectionStatus === "connected"
-          ? "#55C894"
-          : runtime.connectionStatus === "offline"
-            ? "#D96767"
-            : "#FBC878",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         setMenuOpen(false)
@@ -270,9 +265,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "connected-back",
+      kind: "home",
       label: "Home",
-      color: "#7DB7E8",
       disabled: !onBack,
       onPress: () => {
         setMenuOpen(false)
@@ -280,9 +274,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      id: "finish-connected-game",
+      kind: "end-game",
       label: "End game",
-      color: "#D96767",
       disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
       onPress: (event) => {
         captureMenuDialogOrigin(event)
@@ -549,20 +542,20 @@ function ConnectedBoardRuntime({
   )
 }
 
-const $screen: ThemedStyle<ViewStyle> = () => ({
+const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flex: 1,
   width: "100%",
-  backgroundColor: "#000000",
+  backgroundColor: colors.board.background,
 })
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 const $shellGrid: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   width: "100%",
 })
-const $shellSurface: ThemedStyle<ViewStyle> = () => ({
+const $shellSurface: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flex: 1,
   width: "100%",
-  backgroundColor: "#0C0C0C",
+  backgroundColor: colors.board.surface,
 })
 const $toastLayer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
@@ -573,7 +566,7 @@ const $toastLayer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   elevation: 20,
   alignItems: "center",
 })
-const $statusToast: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $statusToast: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   maxWidth: 420,
   minHeight: 40,
   flexDirection: "row",
@@ -582,24 +575,24 @@ const $statusToast: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xs,
   paddingHorizontal: spacing.sm,
   borderWidth: 1,
-  borderColor: "#444444",
+  borderColor: colors.board.border,
   borderRadius: 4,
-  backgroundColor: "#111111",
+  backgroundColor: colors.board.surfaceRaised,
 })
 const $unavailableToast: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderColor: colors.error })
-const $statusMessage: ThemedStyle<TextStyle> = () => ({
+const $statusMessage: ThemedStyle<TextStyle> = ({ colors }) => ({
   flexShrink: 1,
-  color: "#FFFFFF",
+  color: colors.board.text,
 })
-const $statusAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $statusAction: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 32,
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.xs,
-  borderColor: "#FFFFFF",
-  backgroundColor: "transparent",
+  borderColor: colors.board.text,
+  backgroundColor: colors.transparent,
 })
-const $statusActionText: ThemedStyle<TextStyle> = () => ({
-  color: "#FFFFFF",
+const $statusActionText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.board.text,
   fontSize: 13,
   lineHeight: 16,
 })

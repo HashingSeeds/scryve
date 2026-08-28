@@ -30,11 +30,7 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
-import {
-  PLAYER_COLOR_CHOICES,
-  shapeForSeat,
-  type PlayerAppearance,
-} from "../../convex/lib/appearance"
+import { shapeForSeat, type PlayerAppearance } from "../../convex/lib/appearance"
 
 export type NewGameMode = "local" | "connected"
 
@@ -74,7 +70,7 @@ export function NewGameScreen({
   const [names, setNames] = useState<string[]>(() => Array.from({ length: MAX_SEATS }, () => ""))
   const [appearances, setAppearances] = useState<PlayerAppearance[]>(() =>
     Array.from({ length: MAX_SEATS }, (_, index) => ({
-      color: PLAYER_COLOR_CHOICES[index],
+      color: PLAYER_COLORS[index],
       shape: shapeForSeat(index + 1),
     })),
   )
