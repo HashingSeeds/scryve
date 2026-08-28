@@ -72,7 +72,7 @@ export const colors = {
   gameMenu: {
     backdrop: "rgba(0, 0, 0, 0.64)",
     anchor: palette.neutral300,
-    anchorBorder: palette.neutral400,
+    anchorBorder: palette.neutral100,
     anchorGlyph: palette.neutral900,
     shadow: palette.neutral100,
     actions: {

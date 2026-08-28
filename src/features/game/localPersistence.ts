@@ -1,3 +1,8 @@
+import {
+  DEFAULT_MENU_BUTTON_STYLE,
+  isMenuButtonStyle,
+  type MenuButtonStyle,
+} from "@/components/GameMenuButtonShape"
 import { storage as mmkvStorage } from "@/utils/storage"
 
 import {
@@ -35,6 +40,7 @@ export interface LocalSettings {
   defaultStartingLife: number
   hapticsEnabled: boolean
   themePreference: ThemePreference
+  menuButtonStyle: MenuButtonStyle
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
@@ -43,6 +49,7 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   defaultStartingLife: 20,
   hapticsEnabled: true,
   themePreference: "system",
+  menuButtonStyle: DEFAULT_MENU_BUTTON_STYLE,
 }
 
 export interface StringStorage {
@@ -215,6 +222,9 @@ function parseSettings(value: unknown): LocalSettings | null {
     defaultStartingLife: migrated.defaultStartingLife,
     hapticsEnabled: migrated.hapticsEnabled,
     themePreference: migrated.themePreference,
+    menuButtonStyle: isMenuButtonStyle(migrated.menuButtonStyle)
+      ? migrated.menuButtonStyle
+      : DEFAULT_MENU_BUTTON_STYLE,
   }
 }
 

@@ -29,6 +29,7 @@ import {
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
 import { asPlayerId } from "@/features/game/domain"
 import type { GamePlayer } from "@/features/game/types"
+import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -161,6 +162,7 @@ function ConnectedBoardRuntime({
   ownerId: string
 }) {
   useKeepAwake("count-connected-game")
+  const menuButtonStyle = useMenuButtonStyle()
   const {
     themed,
     theme: { colors },
@@ -320,6 +322,8 @@ function ConnectedBoardRuntime({
           anchor={menuAnchor}
           compact={players.length > 2}
           actions={radialActions}
+          variant={menuButtonStyle}
+          seatColors={players.map((player) => player.color)}
           onToggle={() => setMenuOpen((current) => !current)}
           onClose={() => setMenuOpen(false)}
         />

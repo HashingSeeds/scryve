@@ -8,7 +8,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated"
-import Svg, { Polygon } from "react-native-svg"
 
 import { useAppTheme } from "@/theme/context"
 import type { GameMenuActionKind } from "@/theme/gameMenu"
@@ -20,6 +19,11 @@ import {
   type ReducedMotionPreference,
 } from "@/utils/useReducedMotion"
 
+import {
+  DEFAULT_MENU_BUTTON_STYLE,
+  GameMenuButtonShape,
+  type MenuButtonStyle,
+} from "./GameMenuButtonShape"
 import { Text } from "./Text"
 
 export interface RadialMenuAction {
@@ -36,6 +40,8 @@ export interface GameRadialMenuProps {
   actions: readonly RadialMenuAction[]
   onToggle: () => void
   onClose: () => void
+  variant?: MenuButtonStyle
+  seatColors?: readonly string[]
 }
 
 export interface RadialActionPose {
@@ -50,9 +56,6 @@ const COMPACT_MENU_BUTTON_SIZE = 70
 const MENU_FALLBACK_ANIMATION_MS = 220
 
 const PENTAGON_SIDES = 5
-const PENTAGON_VIEWBOX = 100
-const PENTAGON_RADIUS = 46
-const PENTAGON_STROKE_WIDTH = 7
 export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
 
 const ACTION_WIDTH = 116
@@ -127,26 +130,6 @@ export function getRadialActionStart(pose: RadialActionPose): { x: number; y: nu
   }
 }
 
-export function buildRegularPolygonPoints(input: {
-  sides: number
-  center: number
-  radius: number
-}): string {
-  const pointingUp = -Math.PI / 2
-  return Array.from({ length: input.sides }, (_, corner) => {
-    const angle = pointingUp + (Math.PI * 2 * corner) / input.sides
-    const x = input.center + input.radius * Math.cos(angle)
-    const y = input.center + input.radius * Math.sin(angle)
-    return `${x.toFixed(2)},${y.toFixed(2)}`
-  }).join(" ")
-}
-
-const PENTAGON_POINTS = buildRegularPolygonPoints({
-  sides: PENTAGON_SIDES,
-  center: PENTAGON_VIEWBOX / 2,
-  radius: PENTAGON_RADIUS,
-})
-
 export function GameRadialMenu({
   open,
   anchor,
@@ -154,10 +137,12 @@ export function GameRadialMenu({
   actions,
   onToggle,
   onClose,
+  variant = DEFAULT_MENU_BUTTON_STYLE,
+  seatColors,
 }: GameRadialMenuProps) {
   const {
     themed,
-    theme: { colors },
+    theme: { colors, isDark },
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
@@ -227,20 +212,12 @@ export function GameRadialMenu({
           onPress={onToggle}
         >
           <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
-            <Svg
-              testID="game-menu-pentagon"
-              width="100%"
-              height="100%"
-              viewBox={`0 0 ${PENTAGON_VIEWBOX} ${PENTAGON_VIEWBOX}`}
-            >
-              <Polygon
-                points={PENTAGON_POINTS}
-                fill={colors.gameMenu.anchor}
-                stroke={colors.gameMenu.anchorBorder}
-                strokeWidth={PENTAGON_STROKE_WIDTH}
-                strokeLinejoin="round"
-              />
-            </Svg>
+            <GameMenuButtonShape
+              variant={variant}
+              isDark={isDark}
+              boardBackgroundColor={colors.gameMenu.anchorBorder}
+              seatColors={seatColors}
+            />
           </Animated.View>
           <MenuGlyph color={colors.gameMenu.anchorGlyph} open={open} />
         </Pressable>
