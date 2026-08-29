@@ -89,6 +89,7 @@ function harness(
     storage?: MemoryStorage
     send?: (queued: PendingLifeAction) => Promise<{ operationId: string }>
     finishGame?: () => Promise<unknown>
+    abandonGame?: () => Promise<unknown>
   } = {},
 ) {
   const storage = options.storage ?? new MemoryStorage()
@@ -107,6 +108,7 @@ function harness(
         return { operationId: queued.event.operationId }
       }),
     finishGame: options.finishGame ?? (async () => undefined),
+    abandonGame: options.abandonGame ?? (async () => undefined),
     now: clock.now,
     setTimeoutFn: clock.setTimeoutFn,
     clearTimeoutFn: clock.clearTimeoutFn,

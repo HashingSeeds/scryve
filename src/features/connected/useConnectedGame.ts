@@ -25,6 +25,7 @@ interface ConnectedGameRuntimeBase {
   connectionStatus: ConnectionStatus
   changeLife: (playerId: string, delta: LifeDelta) => void
   finish: (result?: ConnectedGameResult) => Promise<boolean>
+  abandon: () => Promise<boolean>
   dismissFailed: (operationId: string) => void
   changeError?: string
   finishError?: string
@@ -83,8 +84,9 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
     [changeLifeBase],
   )
   const finishMutation = useMutation(api.games.finishGame)
-  const mutations = useRef({ changeLifeMutation, finishMutation })
-  mutations.current = { changeLifeMutation, finishMutation }
+  const abandonMutation = useMutation(api.games.abandonGame)
+  const mutations = useRef({ changeLifeMutation, finishMutation, abandonMutation })
+  mutations.current = { changeLifeMutation, finishMutation, abandonMutation }
 
   const controller = useMemo(
     () =>
@@ -117,6 +119,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
                 }
               : {}),
           }),
+        abandonGame: () => mutations.current.abandonMutation({ publicId }),
       }),
     [deviceId, ownerId, publicId, repository],
   )
@@ -141,6 +144,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
     finishing: snapshot.finishing,
     changeLife: controller.changeLife,
     finish: controller.finish,
+    abandon: controller.abandon,
     dismissFailed: controller.dismissFailed,
   }
   return snapshot.projection

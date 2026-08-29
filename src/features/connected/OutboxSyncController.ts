@@ -45,6 +45,7 @@ export interface OutboxSyncControllerOptions {
   deviceId: DeviceId
   send: (action: PendingLifeAction) => Promise<OutboxAcknowledgement>
   finishGame: (result?: ConnectedGameResult) => Promise<unknown>
+  abandonGame: () => Promise<unknown>
   now?: () => number
   setTimeoutFn?: (handler: () => void, delay: number) => ReturnType<typeof setTimeout>
   clearTimeoutFn?: (handle: ReturnType<typeof setTimeout>) => void
@@ -208,37 +209,47 @@ export class OutboxSyncController {
     this.publish()
   }
 
-  finish = async (result?: ConnectedGameResult): Promise<boolean> => {
+  private endGame = async (
+    verb: "finishing" | "abandoning",
+    submit: () => Promise<unknown>,
+  ): Promise<boolean> => {
     if (this.finishing) return false
     this.finishError = undefined
     if (!this.canSync()) {
-      this.finishError = "Connect and sign in before finishing this game."
+      this.finishError = `Connect and sign in before ${verb} this game.`
       this.publish()
       return false
     }
     if (this.options.repository.loadOutbox(this.options.publicId).length > 0) {
-      this.finishError = "Wait for pending life changes to sync before finishing."
+      this.finishError = `Wait for pending life changes to sync before ${verb} this game.`
       this.publish()
       return false
     }
     if (this.failed.length > 0) {
-      this.finishError = "Review failed life changes before finishing."
+      this.finishError = `Review failed life changes before ${verb} this game.`
       this.publish()
       return false
     }
     try {
       this.finishing = true
       this.publish()
-      await this.options.finishGame(result)
+      await submit()
       return true
     } catch (cause) {
-      this.finishError = cause instanceof Error ? cause.message : "Could not finish the game"
+      const fallback = verb === "finishing" ? "finish" : "abandon"
+      this.finishError = cause instanceof Error ? cause.message : `Could not ${fallback} the game`
       return false
     } finally {
       this.finishing = false
       this.publish()
     }
   }
+
+  finish = async (result?: ConnectedGameResult): Promise<boolean> =>
+    this.endGame("finishing", () => this.options.finishGame(result))
+
+  abandon = async (): Promise<boolean> =>
+    this.endGame("abandoning", () => this.options.abandonGame())
 
   dismissFailed = (operationId: string): void => {
     this.dismissedFailureIds.add(operationId)

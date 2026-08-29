@@ -68,6 +68,7 @@ export type MockConnectedRuntime = {
   connectionStatus: "connected" | "offline" | "syncing"
   changeLife: jest.Mock
   finish: jest.Mock
+  abandon: jest.Mock
   dismissFailed: jest.Mock
   changeError?: string
   finishError?: string
@@ -92,6 +93,7 @@ export const mockBlockPlayer = jest.fn(async () => ({ blocked: true }))
 export const mockChangeLife = jest.fn()
 export const mockDismissFailed = jest.fn()
 export const mockFinish = jest.fn(async () => true)
+export const mockRuntimeAbandon = jest.fn(async () => true)
 
 function defaultProjection(): LobbyProjection {
   return {
@@ -145,6 +147,7 @@ function defaultRuntime(): MockConnectedRuntime {
     connectionStatus: "connected",
     changeLife: mockChangeLife,
     finish: mockFinish,
+    abandon: mockRuntimeAbandon,
     dismissFailed: mockDismissFailed,
     finishing: false,
   }
@@ -205,6 +208,7 @@ export function resetConnectedHarness() {
   mockChangeLife.mockReset()
   mockDismissFailed.mockReset()
   mockFinish.mockReset().mockResolvedValue(true)
+  mockRuntimeAbandon.mockReset().mockResolvedValue(true)
   mockUseConnectedGame.mockReset().mockImplementation(() => connectedHarness.runtime)
   connectedHarness.activeGames = []
   connectedHarness.activeGamesStatus = "Exhausted"

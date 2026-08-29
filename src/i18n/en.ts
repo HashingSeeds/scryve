@@ -47,6 +47,7 @@ const en = {
     undo: "Undo",
     finish: "Finish",
     abandon: "Abandon",
+    ending: "Ending…",
     endGame: "End game",
     gameMenu: "Game options",
     closeMenu: "Close game options",
