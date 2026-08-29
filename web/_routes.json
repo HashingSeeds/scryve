@@ -8,6 +8,7 @@
     "/favicon.ico",
     "/metadata.json",
     "/waitlist/*",
+    "/delete-account",
     "/privacy",
     "/terms",
     "/cookie-policy"
