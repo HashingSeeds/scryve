@@ -227,21 +227,9 @@ fieldset input {
   background: radial-gradient(circle at 50% 42%, #321c22 0, var(--surface) 55%, #10090d 100%);
 }
 
-.product-label {
-  position: absolute;
-  z-index: 1;
-  top: 28px;
-  right: 28px;
-  margin: 0;
-  color: #978f8a;
-  font-size: 11px;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-}
-
 .phone {
-  width: min(54%, 390px);
-  height: min(78vh, 720px);
+  width: min(54%, 333px, 36vh);
+  aspect-ratio: 207 / 448;
   overflow: hidden;
   border: 10px solid var(--text);
   border-radius: 48px;
@@ -313,13 +301,8 @@ fieldset input {
     min-height: 560px;
   }
 
-  .product-label {
-    display: none;
-  }
-
   .phone {
-    width: min(68%, 330px);
-    height: 520px;
+    width: min(68%, 240px);
     border-width: 8px;
   }
 }
