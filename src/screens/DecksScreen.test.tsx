@@ -3,6 +3,7 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
+import { clear } from "@/utils/storage"
 
 import { DecksScreen } from "./DecksScreen"
 
@@ -77,6 +78,7 @@ function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
 describe("DecksScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    clear()
     mockListMine.value = {
       decks: [commanderDeck, standardDeck],
       capacity: { used: 2, limit: 100, premium: true, canCreate: true },
@@ -123,16 +125,29 @@ describe("DecksScreen", () => {
     expect(onAddDeck).toHaveBeenCalledTimes(1)
   })
 
-  it("narrows the shelf to a single format", () => {
+  it("keeps search and format controls in the history-style filter dialog", () => {
     const view = renderShelf()
+    expect(view.queryByTestId("deck-search-input")).toBeNull()
+    expect(view.queryByTestId("format-filter")).toBeNull()
+
+    fireEvent.press(view.getByTestId("deck-filters-button"))
+    expect(view.getByTestId("deck-filters-dialog")).toBeTruthy()
+    expect(view.getByTestId("deck-search-input")).toBeTruthy()
+    expect(view.getByTestId("format-filter")).toBeTruthy()
+
     expect(view.getByText("Mono Red")).toBeTruthy()
     fireEvent.press(view.getByTestId("format-filter-standard"))
     expect(view.getByText("Mono Red")).toBeTruthy()
     expect(view.queryByText("Existing Deck")).toBeNull()
+
+    fireEvent.press(view.getByTestId("deck-filters-done"))
+    expect(view.queryByTestId("deck-filters-dialog")).toBeNull()
+    expect(view.getByLabelText("Remove filter Standard")).toBeTruthy()
   })
 
   it("narrows the shelf by search and offers a way back", () => {
     const view = renderShelf()
+    fireEvent.press(view.getByTestId("deck-filters-button"))
     fireEvent.changeText(view.getByTestId("deck-search-input"), "mono")
     expect(view.queryByText("Existing Deck")).toBeNull()
     fireEvent.changeText(view.getByTestId("deck-search-input"), "nothing here")
@@ -175,8 +190,10 @@ describe("DecksScreen", () => {
     const view = renderShelf()
 
     expect(view.getByText("Decks")).toBeTruthy()
-    expect(view.getByTestId("deck-search-input")).toBeTruthy()
     expect(view.getByTestId("game-filter")).toBeTruthy()
+    expect(view.getByTestId("deck-filters-button")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-filters-button"))
+    expect(view.getByTestId("deck-search-input")).toBeTruthy()
     expect(view.getByText("Decks unavailable")).toBeTruthy()
 
     mockListMine.error = undefined

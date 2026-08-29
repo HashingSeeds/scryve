@@ -106,6 +106,27 @@ describe("premium deck tracking", () => {
     })
   })
 
+  it("filters cached Top Decks by the selected format", async () => {
+    const t = convexTest(schema, modules)
+    await t.run(async (ctx) => {
+      for (const format of ["advanced", "traditional"] as const) {
+        await ctx.db.insert("deckCatalogs", {
+          game: "ygo",
+          source: "fixture",
+          externalId: format,
+          kind: "top",
+          name: `${format} deck`,
+          format,
+          fetchedAt: Date.now(),
+        })
+      }
+    })
+
+    await expect(
+      t.query(api.deckCatalogs.search, { game: "ygo", query: "", format: "traditional" }),
+    ).resolves.toMatchObject([{ name: "traditional deck", format: "traditional" }])
+  })
+
   it("blocks imports immediately when the legal release state is disabled", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "gated-owner", "Gated Owner")

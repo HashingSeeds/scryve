@@ -19,6 +19,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { catalogCardDetails } from "@/features/decks/cardFocus"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { useAppTheme } from "@/theme/context"
@@ -91,7 +92,17 @@ type GenericImportedCard = {
   quantity: number
 }
 
-type FocusedPreviewCard = PreviewCard & { scryfallId: string }
+type FocusedPreviewCard = {
+  detailKey: string
+  name: string
+  imageUrl?: string
+  smallImageUrl?: string
+  quantity: number
+  boardLabel: string
+  scryfallId?: string
+  game?: string
+  catalogCardId?: string
+}
 
 type PreconstructedDeckOutline = {
   name: string
@@ -199,6 +210,7 @@ export function AddDeckScreen({
   const searchTopDecks = useAction(api.deckCatalogs.searchTopDecks)
   const importCatalog = useMutation(api.decks.importCatalog)
   const fetchCardById = useAction(api.cards.byId)
+  const fetchCatalogCardById = useAction(api.cards.byCatalogId)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const [mode, setMode] = useState<CreationMode>("precon")
@@ -214,7 +226,7 @@ export function AddDeckScreen({
   const [resolvedPrecon, setResolvedPrecon] = useState<ResolvedPreconstructedDeck>()
   const [previewLoading, setPreviewLoading] = useState(false)
   const [focusedPreviewCard, setFocusedPreviewCard] = useState<FocusedPreviewCard>()
-  const [previewDetailsByScryfallId, setPreviewDetailsByScryfallId] = useState<
+  const [previewDetailsByKey, setPreviewDetailsByKey] = useState<
     Record<string, FocusedCardDetails>
   >({})
   const [previewDetailsError, setPreviewDetailsError] = useState<string>()
@@ -245,17 +257,23 @@ export function AddDeckScreen({
   }
 
   function chooseGame(next: string) {
+    const nextFormat = defaultDeckFormat(next)
     setGame(next)
-    setDeckFormat(creationFormat(next, ""))
+    setDeckFormat(nextFormat)
+    setPreconQuery("")
     setPrecons([])
     setCatalogDecks([])
     setSelectedCatalogDeck(undefined)
+    setSelectedPrecon(undefined)
+    setFocusedPreviewCard(undefined)
     setMode("precon")
   }
 
   function chooseFormat(next: string) {
     setDeckFormat(next)
     setFormat(next)
+    setPrecons([])
+    setCatalogDecks([])
   }
 
   const runSearch = useCallback(
@@ -297,7 +315,7 @@ export function AddDeckScreen({
       try {
         setSearching(true)
         setSearchError(undefined)
-        const found = await searchTopDecks({ game, query })
+        const found = await searchTopDecks({ game, format, query })
         if (searchToken.current === token) setCatalogDecks(found)
       } catch (cause) {
         if (searchToken.current === token)
@@ -306,7 +324,7 @@ export function AddDeckScreen({
         if (searchToken.current === token) setSearching(false)
       }
     },
-    [game, searchTopDecks],
+    [format, game, searchTopDecks],
   )
 
   useEffect(() => {
@@ -364,25 +382,59 @@ export function AddDeckScreen({
     setError(undefined)
   }
 
-  async function loadPreviewCardDetails(scryfallId: string) {
-    if (previewDetailsByScryfallId[scryfallId]) return
+  async function loadPreviewCardDetails(card: FocusedPreviewCard) {
+    if (previewDetailsByKey[card.detailKey]) return
     try {
-      const { manaCost, typeLine, oracleText, setName, collectorNumber, rarity } =
-        await fetchCardById({ scryfallId })
-      setPreviewDetailsByScryfallId((current) => ({
-        ...current,
-        [scryfallId]: { manaCost, typeLine, oracleText, setName, collectorNumber, rarity },
-      }))
+      const details = card.scryfallId
+        ? await fetchCardById({ scryfallId: card.scryfallId })
+        : card.game && card.catalogCardId
+          ? catalogCardDetails(
+              await fetchCatalogCardById({ game: card.game, cardId: card.catalogCardId }),
+            )
+          : undefined
+      if (!details) {
+        setPreviewDetailsError("No additional card details are available.")
+        return
+      }
+      setPreviewDetailsByKey((current) => ({ ...current, [card.detailKey]: details }))
     } catch (cause) {
       setPreviewDetailsError(convexErrorMessage(cause, "Could not load card details"))
     }
   }
 
-  function focusPreviewCard(card: PreviewCard) {
-    if (!card.scryfallId) return
-    setFocusedPreviewCard({ ...card, scryfallId: card.scryfallId })
+  function focusPreviewCard(card: PreviewCard, boardLabel: string) {
+    const focused = {
+      detailKey: card.scryfallId ?? `mtg:${card.name}`,
+      name: card.name,
+      imageUrl: card.imageUrl,
+      smallImageUrl: card.smallImageUrl,
+      quantity: card.quantity,
+      boardLabel,
+      scryfallId: card.scryfallId,
+    }
+    setFocusedPreviewCard(focused)
     setPreviewDetailsError(undefined)
-    void loadPreviewCardDetails(card.scryfallId)
+    void loadPreviewCardDetails(focused)
+  }
+
+  function focusCatalogCard(
+    card: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+    boardLabel: string,
+  ) {
+    const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
+    const focused = {
+      detailKey: `${card.game}:${catalogCardId ?? card.name}`,
+      name: card.name,
+      imageUrl: card.imageUrl,
+      smallImageUrl: card.smallImageUrl,
+      quantity: card.quantity,
+      boardLabel,
+      game: card.game,
+      catalogCardId,
+    }
+    setFocusedPreviewCard(focused)
+    setPreviewDetailsError(undefined)
+    void loadPreviewCardDetails(focused)
   }
 
   async function importPrecon() {
@@ -471,6 +523,20 @@ export function AddDeckScreen({
       onChangeText={setNote}
     />
   )
+  const previewCardDialog = focusedPreviewCard ? (
+    <CardFocusDialog
+      card={{
+        name: focusedPreviewCard.name,
+        imageUrl: focusedPreviewCard.imageUrl,
+        smallImageUrl: focusedPreviewCard.smallImageUrl,
+        quantity: focusedPreviewCard.quantity,
+        boardLabel: focusedPreviewCard.boardLabel,
+      }}
+      details={previewDetailsByKey[focusedPreviewCard.detailKey]}
+      detailsError={previewDetailsError}
+      onClose={() => setFocusedPreviewCard(undefined)}
+    />
+  ) : null
 
   if (selectedCatalogDeck) {
     const entries = catalogDetail?.entries ?? []
@@ -484,7 +550,10 @@ export function AddDeckScreen({
         <Header
           title="Deck preview"
           leftTx="common:back"
-          onLeftPress={() => setSelectedCatalogDeck(undefined)}
+          onLeftPress={() => {
+            setSelectedCatalogDeck(undefined)
+            setFocusedPreviewCard(undefined)
+          }}
         />
         <ScrollView
           testID="catalog-deck-preview"
@@ -520,7 +589,14 @@ export function AddDeckScreen({
                   />
                 </View>
                 {sectionEntries.map((entry) => (
-                  <View key={entry._id} style={themed($previewCardRow)}>
+                  <TouchableOpacity
+                    key={entry._id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Preview ${entry.name}`}
+                    activeOpacity={0.75}
+                    style={themed($previewCardRow)}
+                    onPress={() => focusCatalogCard(entry, section.label)}
+                  >
                     <View style={themed($previewThumbnailSlot)}>
                       {entry.smallImageUrl || entry.imageUrl ? (
                         <Image
@@ -534,7 +610,7 @@ export function AddDeckScreen({
                       style={themed($previewCardName)}
                       text={`${entry.quantity}× ${entry.name}`}
                     />
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             )
@@ -551,6 +627,7 @@ export function AddDeckScreen({
             onPress={importTopDeck}
           />
         </BottomActionBar>
+        {previewCardDialog}
       </Screen>
     )
   }
@@ -642,12 +719,11 @@ export function AddDeckScreen({
                 {section.entries.map((card) => (
                   <TouchableOpacity
                     key={`${card.board}:${card.scryfallId ?? card.name}`}
-                    accessibilityRole={card.scryfallId ? "button" : undefined}
-                    accessibilityLabel={card.scryfallId ? `Preview ${card.name}` : undefined}
-                    activeOpacity={card.scryfallId ? 0.75 : 1}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Preview ${card.name}`}
+                    activeOpacity={0.75}
                     style={themed($previewCardRow)}
-                    disabled={!card.scryfallId}
-                    onPress={() => focusPreviewCard(card)}
+                    onPress={() => focusPreviewCard(card, section.label)}
                   >
                     <View style={themed($previewThumbnailSlot)}>
                       {card.smallImageUrl || card.imageUrl ? (
@@ -691,22 +767,7 @@ export function AddDeckScreen({
             />
           </TouchableOpacity>
         </BottomActionBar>
-        {focusedPreviewCard ? (
-          <CardFocusDialog
-            card={{
-              name: focusedPreviewCard.name,
-              imageUrl: focusedPreviewCard.imageUrl,
-              smallImageUrl: focusedPreviewCard.smallImageUrl,
-              quantity: focusedPreviewCard.quantity,
-              boardLabel:
-                sections.find((section) => section.id === focusedPreviewCard.board)?.label ??
-                focusedPreviewCard.board,
-            }}
-            details={previewDetailsByScryfallId[focusedPreviewCard.scryfallId]}
-            detailsError={previewDetailsError}
-            onClose={() => setFocusedPreviewCard(undefined)}
-          />
-        ) : null}
+        {previewCardDialog}
       </Screen>
     )
   }

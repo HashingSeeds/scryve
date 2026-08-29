@@ -22,6 +22,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { catalogCardDetails } from "@/features/decks/cardFocus"
 import { cardCountLabel, recordLine } from "@/features/decks/deckCopy"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -68,6 +69,13 @@ function printingKey(card: DeckCard) {
     card.originalReference ??
     card.name
   return `${cardSection(card)}:${identity}`
+}
+
+function cardDetailsKey(card: DeckCard, game: string) {
+  return (
+    card.scryfallId ??
+    `${game}:${card.cardId ?? card.printingId ?? card.providerCardId ?? card.name}`
+  )
 }
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
@@ -272,6 +280,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   })
   const searchCards = useAction(api.cards.search)
   const fetchCardById = useAction(api.cards.byId)
+  const fetchCatalogCardById = useAction(api.cards.byCatalogId)
   const saveVersion = useMutation(api.decks.saveVersion)
   const createVersion = useMutation(api.decks.createVersion)
   const updateVersion = useMutation(api.decks.updateVersion)
@@ -290,9 +299,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
-  const [detailsByScryfallId, setDetailsByScryfallId] = useState<
-    Record<string, FocusedCardDetails>
-  >({})
+  const [detailsByCardKey, setDetailsByCardKey] = useState<Record<string, FocusedCardDetails>>({})
   const [detailsError, setDetailsError] = useState<string>()
 
   const storedCards = useMemo(
@@ -380,15 +387,22 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
     )
   }
 
-  async function loadCardDetails(scryfallId: string) {
-    if (detailsByScryfallId[scryfallId]) return
+  async function loadCardDetails(card: DeckCard) {
+    const game = detail?.deck.game ?? card.game ?? "mtg"
+    const detailsKey = cardDetailsKey(card, game)
+    if (detailsByCardKey[detailsKey]) return
     try {
-      const { manaCost, typeLine, oracleText, setName, collectorNumber, rarity } =
-        await fetchCardById({ scryfallId })
-      setDetailsByScryfallId((current) => ({
-        ...current,
-        [scryfallId]: { manaCost, typeLine, oracleText, setName, collectorNumber, rarity },
-      }))
+      const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
+      const details = card.scryfallId
+        ? await fetchCardById({ scryfallId: card.scryfallId })
+        : catalogCardId
+          ? catalogCardDetails(await fetchCatalogCardById({ game, cardId: catalogCardId }))
+          : undefined
+      if (!details) {
+        setDetailsError("No additional card details are available.")
+        return
+      }
+      setDetailsByCardKey((current) => ({ ...current, [detailsKey]: details }))
     } catch (cause) {
       setDetailsError(convexErrorMessage(cause, "Could not load card details"))
     }
@@ -397,7 +411,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   function focusCard(card: DeckCard) {
     setFocusedKey(printingKey(card))
     setDetailsError(undefined)
-    if (card.scryfallId) void loadCardDetails(card.scryfallId)
+    void loadCardDetails(card)
   }
 
   function decrementFocusedCard(card: DeckCard) {
@@ -771,7 +785,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
             quantity: focusedCard.quantity,
             boardLabel: boardLabel(configuredSections, cardSection(focusedCard)),
           }}
-          details={focusedCard.scryfallId ? detailsByScryfallId[focusedCard.scryfallId] : undefined}
+          details={detailsByCardKey[cardDetailsKey(focusedCard, detail.deck.game)]}
           detailsError={detailsError}
           {...(editing
             ? {

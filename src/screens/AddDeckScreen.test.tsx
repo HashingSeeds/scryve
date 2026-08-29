@@ -1,6 +1,7 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { clear } from "@/utils/storage"
 
 import { AddDeckScreen } from "./AddDeckScreen"
 
@@ -39,7 +40,31 @@ const mockPreviewPrecon = jest.fn(async () => ({
   ],
 }))
 const mockResolvePasted = jest.fn()
-const mockSearchTopDecks = jest.fn(async () => [])
+type MockCatalogDeck = {
+  _id: string
+  game: string
+  name: string
+  kind: string
+  format?: string
+}
+const mockSearchTopDecks = jest.fn(async (): Promise<MockCatalogDeck[]> => [])
+const mockCatalogDetail: {
+  value:
+    | {
+        deck: { _id: string; game: string; name: string; kind: string; format?: string }
+        entries: Array<{
+          _id: string
+          game: string
+          cardId?: string
+          name: string
+          quantity: number
+          section: string
+          imageUrl?: string
+          smallImageUrl?: string
+        }>
+      }
+    | undefined
+} = { value: undefined }
 const mockCardById = jest.fn(async () => ({
   manaCost: "{1}{G}{U}",
   typeLine: "Legendary Creature — Merfolk Scout",
@@ -47,6 +72,13 @@ const mockCardById = jest.fn(async () => ({
   setName: "The Lost Caverns of Ixalan Commander",
   collectorNumber: "3",
   rarity: "mythic",
+}))
+const mockCatalogCardById = jest.fn(async () => ({
+  typeLabel: "Effect Monster",
+  text: "Discard this card; negate that effect.",
+  setCode: "MACR",
+  collectorNumber: "036",
+  rarity: "secret rare",
 }))
 type DeckShelfState = {
   decks: Array<{
@@ -88,7 +120,7 @@ const mockListMine: {
 
 jest.mock("convex/react", () => ({
   useQuery: (reference: string) => {
-    if (reference === "deckCatalogs.detail") return undefined
+    if (reference === "deckCatalogs.detail") return mockCatalogDetail.value
     if (mockListMine.error) throw mockListMine.error
     return mockListMine.value
   },
@@ -98,6 +130,7 @@ jest.mock("convex/react", () => ({
       : mockCreate,
   useAction: (reference: string) => {
     if (reference === "cards.byId") return mockCardById
+    if (reference === "cards.byCatalogId") return mockCatalogCardById
     if (reference === "deckCatalogs.searchTopDecks") return mockSearchTopDecks
     if (reference === "deckImports.searchPreconstructed") return mockSearch
     if (reference === "deckImports.previewPreconstructed") return mockPreviewPrecon
@@ -122,6 +155,7 @@ jest.mock("../../convex/_generated/api", () => ({
     },
     cards: {
       byId: "cards.byId",
+      byCatalogId: "cards.byCatalogId",
     },
     deckCatalogs: {
       detail: "deckCatalogs.detail",
@@ -158,12 +192,14 @@ function continueSetup(_view: ReturnType<typeof renderAddDeck>) {}
 describe("AddDeckScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    clear()
     jest.useFakeTimers()
     mockListMine.value = {
       ...readyShelf,
       capacity: { used: 1, limit: 100, premium: true, canCreate: true },
     }
     mockListMine.error = undefined
+    mockCatalogDetail.value = undefined
   })
 
   afterEach(() => {
@@ -306,6 +342,80 @@ describe("AddDeckScreen", () => {
       jest.advanceTimersByTime(400)
     })
     expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "brawl" })
+  })
+
+  it("loads each system with a valid default format and filters Top Decks by format", async () => {
+    const view = renderAddDeck()
+
+    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(
+      view.getByTestId("format-picker-options-advanced").props.accessibilityState.selected,
+    ).toBe(true)
+    expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      game: "ygo",
+      format: "advanced",
+      query: "",
+    })
+
+    chooseFormat(view, "traditional")
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      game: "ygo",
+      format: "traditional",
+      query: "",
+    })
+
+    fireEvent.press(view.getByTestId("game-picker-options-mtg"))
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(
+      view.getByTestId("format-picker-options-commander").props.accessibilityState.selected,
+    ).toBe(true)
+    expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "commander" })
+  })
+
+  it("opens the shared card dialog from a Top Deck preview", async () => {
+    mockSearchTopDecks.mockResolvedValueOnce([
+      {
+        _id: "catalog-ygo",
+        game: "ygo",
+        name: "Sample Yu-Gi-Oh deck",
+        kind: "tournament",
+        format: "advanced",
+      },
+    ])
+    mockCatalogDetail.value = {
+      deck: {
+        _id: "catalog-ygo",
+        game: "ygo",
+        name: "Sample Yu-Gi-Oh deck",
+        kind: "tournament",
+        format: "advanced",
+      },
+      entries: [
+        {
+          _id: "catalog-card-ygo",
+          game: "ygo",
+          cardId: "14558127",
+          name: "Ash Blossom & Joyous Spring",
+          quantity: 3,
+          section: "main",
+          imageUrl: "https://example.com/ash.jpg",
+        },
+      ],
+    }
+    const view = renderAddDeck()
+
+    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Sample Yu-Gi-Oh deck")).toBeTruthy())
+    fireEvent.press(view.getByText("Sample Yu-Gi-Oh deck"))
+    fireEvent.press(view.getByLabelText("Preview Ash Blossom & Joyous Spring"))
+
+    expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
+    expect(view.getByText("Ash Blossom & Joyous Spring")).toBeTruthy()
+    await waitFor(() => expect(view.getByText("Effect Monster")).toBeTruthy())
+    expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
   })
 
   it("carries the chosen game, format, and note into a new deck", async () => {

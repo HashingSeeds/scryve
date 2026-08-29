@@ -12,6 +12,13 @@ const mockUpdateDeck = jest.fn(async () => null)
 const mockArchiveDeck = jest.fn(async () => null)
 const mockSearchCards = jest.fn(async () => [])
 const mockCardById = jest.fn(async () => ({}))
+const mockCatalogCardById = jest.fn(async () => ({
+  typeLabel: "Effect Monster",
+  text: "When a card or effect is activated that includes an effect that Special Summons a monster: You can discard this card; negate that effect.",
+  setCode: "MACR",
+  collectorNumber: "036",
+  rarity: "secret rare",
+}))
 const queryArgs: Array<Record<string, unknown>> = []
 
 const solRing = {
@@ -84,7 +91,11 @@ jest.mock("convex/react", () => ({
     if (reference === "decks.update") return mockUpdateDeck
     return mockArchiveDeck
   },
-  useAction: (reference: string) => (reference === "cards.search" ? mockSearchCards : mockCardById),
+  useAction: (reference: string) => {
+    if (reference === "cards.search") return mockSearchCards
+    if (reference === "cards.byCatalogId") return mockCatalogCardById
+    return mockCardById
+  },
 }))
 
 jest.mock("../../convex/_generated/api", () => ({
@@ -98,7 +109,11 @@ jest.mock("../../convex/_generated/api", () => ({
       update: "decks.update",
       archive: "decks.archive",
     },
-    cards: { search: "cards.search", byId: "cards.byId" },
+    cards: {
+      search: "cards.search",
+      byId: "cards.byId",
+      byCatalogId: "cards.byCatalogId",
+    },
   },
 }))
 
@@ -187,6 +202,34 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("discard-edits-button"))
     expect(view.getByText("1× Sol Ring")).toBeTruthy()
     expect(mockSaveVersion).not.toHaveBeenCalled()
+  })
+
+  it("opens the shared card dialog with provider details for a Yu-Gi-Oh card", async () => {
+    mockDetail.value = {
+      ...loadedDetail,
+      deck: { ...loadedDetail.deck, game: "ygo", format: "advanced" },
+      cards: [
+        {
+          _id: "card-ygo",
+          _creationTime: 0,
+          deckVersionId: "version-main",
+          game: "ygo",
+          cardId: "14558127",
+          providerCardId: "14558127",
+          printingId: "14558127",
+          name: "Ash Blossom & Joyous Spring",
+          quantity: 3,
+          section: "main",
+        },
+      ],
+    }
+    const view = renderDetail()
+
+    fireEvent.press(view.getByText("3× Ash Blossom & Joyous Spring"))
+
+    await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
+    expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
+    expect(view.getByText("Effect Monster")).toBeTruthy()
   })
 
   it("switches the version being viewed", () => {

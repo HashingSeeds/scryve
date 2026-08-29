@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { SectionList, TouchableOpacity, View } from "react-native"
+import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useQuery } from "convex/react"
 
 import { Button } from "@/components/Button"
+import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import type { FilterChip } from "@/components/FilterChips"
 import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
@@ -95,6 +96,21 @@ function DeckRow({ deck, game, onPress }: { deck: ShelfDeck; game: string; onPre
         />
       </View>
       <Text size="lg" style={themed($dimmedText)} text="›" />
+    </TouchableOpacity>
+  )
+}
+
+function ActiveFilterChip({ label, onPress }: { label: string; onPress: () => void }) {
+  const { themed } = useAppTheme()
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`Remove filter ${label}`}
+      activeOpacity={0.8}
+      style={themed($activeFilter)}
+      onPress={onPress}
+    >
+      <Text size="xxs" weight="medium" style={themed($activeFilterText)} text={`${label}  ✕`} />
     </TouchableOpacity>
   )
 }
@@ -253,6 +269,7 @@ export function DecksScreen({
   const { themed } = useAppTheme()
   const { game, format, setGame, setFormat } = useDeckFilters()
   const [search, setSearch] = useState("")
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const formatChips = useMemo<FilterChip[]>(() => {
     const known = deckFormats(game).map((candidate) => ({
@@ -261,6 +278,14 @@ export function DecksScreen({
     }))
     return [{ id: ALL_FORMATS, label: "All formats" }, ...known]
   }, [game])
+  const selectedFormat = formatChips.find((candidate) => candidate.id === format)
+  const filterCount = Number(format !== ALL_FORMATS) + Number(Boolean(search.trim()))
+
+  function clearFilters() {
+    setFormat(ALL_FORMATS)
+    setSearch("")
+  }
+
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
       <Header
@@ -280,33 +305,38 @@ export function DecksScreen({
         }
       />
       <View style={themed($content)}>
-        <FilterChips
-          testID="game-filter"
-          accessibilityLabel="Game"
-          chips={DECK_GAME_LIST.map((candidate) => ({
-            id: candidate.id,
-            label: candidate.shortLabel,
-          }))}
-          selectedId={game}
-          onSelect={setGame}
-        />
-        <TextField
-          testID="deck-search-input"
-          placeholder="Search decks"
-          value={search}
-          maxLength={80}
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          onChangeText={setSearch}
-        />
-        {formatChips.length > 1 ? (
-          <FilterChips
-            testID="format-filter"
-            accessibilityLabel="Format"
-            chips={formatChips}
-            selectedId={format}
-            onSelect={setFormat}
+        <View style={themed($filterRow)}>
+          <View style={$gameFilter}>
+            <FilterChips
+              testID="game-filter"
+              accessibilityLabel="Game"
+              chips={DECK_GAME_LIST.map((candidate) => ({
+                id: candidate.id,
+                label: candidate.shortLabel,
+              }))}
+              selectedId={game}
+              onSelect={setGame}
+            />
+          </View>
+          <Button
+            testID="deck-filters-button"
+            style={themed($filtersButton)}
+            text={filterCount ? `Filters (${filterCount})` : "Filters"}
+            onPress={() => setFiltersOpen(true)}
           />
+        </View>
+        {filterCount > 0 ? (
+          <View style={themed($activeFilters)}>
+            {format !== ALL_FORMATS && selectedFormat ? (
+              <ActiveFilterChip
+                label={selectedFormat.label}
+                onPress={() => setFormat(ALL_FORMATS)}
+              />
+            ) : null}
+            {search.trim() ? (
+              <ActiveFilterChip label={`Search: ${search.trim()}`} onPress={() => setSearch("")} />
+            ) : null}
+          </View>
         ) : null}
         <ConvexQueryBoundary
           resetKey={`${game}:${format}`}
@@ -322,6 +352,56 @@ export function DecksScreen({
           />
         </ConvexQueryBoundary>
       </View>
+      <DialogCard
+        visible={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        dialogTestID="deck-filters-dialog"
+        dialogAccessibilityRole="alert"
+        backdropAccessibilityLabel="Dismiss filters"
+      >
+        <Text preset="subheading" text="Filters" />
+        <ScrollView contentContainerStyle={themed($dialogBody)}>
+          <View style={themed($filterGroup)}>
+            <Text weight="bold" size="xxs" style={themed($groupHeading)} text="SEARCH" />
+            <TextField
+              testID="deck-search-input"
+              placeholder="Search decks"
+              value={search}
+              maxLength={80}
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              onChangeText={setSearch}
+            />
+          </View>
+          {formatChips.length > 1 ? (
+            <View style={themed($filterGroup)}>
+              <Text weight="bold" size="xxs" style={themed($groupHeading)} text="FORMAT" />
+              <FilterChips
+                testID="format-filter"
+                accessibilityLabel="Format"
+                chips={formatChips}
+                selectedId={format}
+                onSelect={setFormat}
+              />
+            </View>
+          ) : null}
+        </ScrollView>
+        <View style={themed($dialogActions)}>
+          <Button
+            style={themed($dialogButton)}
+            text="Clear all"
+            disabled={filterCount === 0}
+            onPress={clearFilters}
+          />
+          <Button
+            testID="deck-filters-done"
+            style={themed($dialogButton)}
+            preset="reversed"
+            text="Show decks"
+            onPress={() => setFiltersOpen(false)}
+          />
+        </View>
+      </DialogCard>
     </Screen>
   )
 }
@@ -333,6 +413,40 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: 720,
   alignSelf: "center",
   paddingHorizontal: spacing.lg,
+})
+const $filterRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+  paddingVertical: spacing.xs,
+})
+const $gameFilter: ViewStyle = { flex: 1 }
+const $filtersButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 36,
+  paddingHorizontal: spacing.sm,
+  paddingVertical: 0,
+})
+const $activeFilters: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: spacing.xs,
+  paddingBottom: spacing.xs,
+})
+const $activeFilter: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  paddingVertical: spacing.xxs,
+  paddingHorizontal: spacing.sm,
+  borderRadius: spacing.lg,
+  backgroundColor: colors.tint,
+})
+const $activeFilterText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.palette.neutral100,
+})
+const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
+const $filterGroup: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $groupHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.textDim,
+  textTransform: "uppercase",
+  letterSpacing: 1,
 })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.lg })
 const $sectionHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({

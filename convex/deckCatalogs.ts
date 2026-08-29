@@ -5,6 +5,7 @@ import type { Doc } from "./_generated/dataModel"
 import type { ActionCtx, QueryCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery, query } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
+import { assertDeckGameFormat } from "./lib/deckGames"
 import type { NormalizedCard } from "./lib/games/cards"
 import {
   normalizeLimitlessStandings,
@@ -37,36 +38,43 @@ const entryValidator = v.object({
   smallImageUrl: v.optional(v.string()),
 })
 
-async function searchRows(ctx: QueryCtx, args: { game: string; query: string; kind?: string }) {
+async function searchRows(
+  ctx: QueryCtx,
+  args: { game: string; query: string; format?: string; kind?: string },
+) {
   const term = args.query.trim()
   if (term.length === 1 || term.length > 120) return []
+  let rows: Doc<"deckCatalogs">[]
   if (!term) {
-    if (args.kind)
-      return await ctx.db
+    if (args.kind) {
+      rows = await ctx.db
         .query("deckCatalogs")
         .withIndex("by_game_and_kind_and_fetched_at", (query) =>
           query.eq("game", args.game).eq("kind", args.kind!),
         )
         .order("desc")
         .take(30)
-    return await ctx.db
-      .query("deckCatalogs")
-      .withIndex("by_game_and_fetched_at", (query) => query.eq("game", args.game))
-      .order("desc")
-      .take(30)
-  }
-  if (args.kind) {
-    return await ctx.db
+    } else {
+      rows = await ctx.db
+        .query("deckCatalogs")
+        .withIndex("by_game_and_fetched_at", (query) => query.eq("game", args.game))
+        .order("desc")
+        .take(30)
+    }
+  } else if (args.kind) {
+    rows = await ctx.db
       .query("deckCatalogs")
       .withSearchIndex("search_name", (search) =>
         search.search("name", term).eq("game", args.game).eq("kind", args.kind!),
       )
       .take(30)
+  } else {
+    rows = await ctx.db
+      .query("deckCatalogs")
+      .withSearchIndex("search_name", (search) => search.search("name", term).eq("game", args.game))
+      .take(30)
   }
-  return await ctx.db
-    .query("deckCatalogs")
-    .withSearchIndex("search_name", (search) => search.search("name", term).eq("game", args.game))
-    .take(30)
+  return args.format ? rows.filter((row) => row.format === args.format) : rows
 }
 
 export const upsert = internalMutation({
@@ -118,26 +126,40 @@ export const upsert = internalMutation({
 })
 
 export const search = query({
-  args: { game: v.string(), query: v.string(), kind: v.optional(v.string()) },
+  args: {
+    game: v.string(),
+    query: v.string(),
+    format: v.optional(v.string()),
+    kind: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const game = assertGameSystem(args.game)
     await requireReleasedCapability(ctx, game, "exampleDecks")
     return await searchRows(ctx, {
       game,
       query: args.query,
+      ...(args.format ? { format: assertDeckGameFormat(game, args.format) } : {}),
       ...(args.kind ? { kind: args.kind } : {}),
     })
   },
 })
 
 export const searchCached = internalQuery({
-  args: { game: v.string(), query: v.string(), kind: v.optional(v.string()) },
-  handler: async (ctx, args) =>
-    await searchRows(ctx, {
-      game: assertGameSystem(args.game),
+  args: {
+    game: v.string(),
+    query: v.string(),
+    format: v.optional(v.string()),
+    kind: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const game = assertGameSystem(args.game)
+    return await searchRows(ctx, {
+      game,
       query: args.query,
+      ...(args.format ? { format: assertDeckGameFormat(game, args.format) } : {}),
       ...(args.kind ? { kind: args.kind } : {}),
-    }),
+    })
+  },
 })
 
 export const latestFetch = internalQuery({
@@ -256,19 +278,25 @@ async function refreshPokemonTopDecks(
 }
 
 export const searchTopDecks = action({
-  args: { game: v.string(), query: v.string() },
+  args: { game: v.string(), query: v.string(), format: v.optional(v.string()) },
   handler: async (ctx, args): Promise<Doc<"deckCatalogs">[]> => {
     if (!(await ctx.auth.getUserIdentity()))
       throw new ConvexError({ code: "unauthenticated", message: "Authentication required" })
     const game = assertGameSystem(args.game)
+    const format = args.format ? assertDeckGameFormat(game, args.format) : undefined
     await requireActionCapability(ctx, game, "exampleDecks")
     const includeImages = await actionCapabilityEnabled(ctx, game, "images")
     if (game === "mtg")
-      return await ctx.runQuery(internal.deckCatalogs.searchCached, { game, query: args.query })
+      return await ctx.runQuery(internal.deckCatalogs.searchCached, {
+        game,
+        query: args.query,
+        ...(format ? { format } : {}),
+      })
 
     const cached: Doc<"deckCatalogs">[] = await ctx.runQuery(internal.deckCatalogs.searchCached, {
       game,
       query: args.query,
+      ...(format ? { format } : {}),
     })
     const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game })
     if (latest && Date.now() - latest.fetchedAt < FEED_TTL_MS) return cached
@@ -292,6 +320,7 @@ export const searchTopDecks = action({
         return await ctx.runQuery(internal.deckCatalogs.searchCached, {
           game,
           query: args.query,
+          ...(format ? { format } : {}),
         })
       } catch (error) {
         const finishedAt = Date.now()
@@ -400,6 +429,7 @@ export const searchTopDecks = action({
       return await ctx.runQuery(internal.deckCatalogs.searchCached, {
         game,
         query: args.query,
+        ...(format ? { format } : {}),
       })
     } catch (error) {
       const finishedAt = Date.now()
