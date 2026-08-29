@@ -1,14 +1,13 @@
 import { createClerkClient } from "@clerk/backend"
 
 import { type PagesEnv, requireEnv } from "./env"
-
-const PUBLIC_FUNCTION_PATHS = new Set(["/api/waitlist"])
+import { shouldBypassWaitlistGate } from "./waitlistGateRoutes"
 
 export const onRequest: PagesFunction<PagesEnv> = async (context) => {
   if (context.env.WAITLIST_GATE_ENABLED !== "true") return context.next()
 
   const url = new URL(context.request.url)
-  if (PUBLIC_FUNCTION_PATHS.has(url.pathname)) return context.next()
+  if (shouldBypassWaitlistGate(url.pathname)) return context.next()
 
   try {
     const origin = requireEnv(context.env, "APP_ORIGIN")
