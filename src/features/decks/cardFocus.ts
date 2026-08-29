@@ -1,6 +1,8 @@
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 
 export function catalogCardDetails(card: {
+  imageUrl?: string
+  smallImageUrl?: string
   typeLabel?: string
   text?: string
   setCode?: string
@@ -8,6 +10,8 @@ export function catalogCardDetails(card: {
   rarity?: string
 }): FocusedCardDetails {
   return {
+    imageUrl: card.imageUrl,
+    smallImageUrl: card.smallImageUrl,
     typeLine: card.typeLabel,
     oracleText: card.text,
     setName: card.setCode,

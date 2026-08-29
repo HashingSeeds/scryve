@@ -18,6 +18,8 @@ export type FocusedCard = {
 }
 
 export type FocusedCardDetails = {
+  imageUrl?: string
+  smallImageUrl?: string
   manaCost?: string
   typeLine?: string
   oracleText?: string
@@ -61,8 +63,9 @@ export function CardFocusDialog({
 }: CardFocusDialogProps) {
   const { themed } = useAppTheme()
   const printing = details ? printingLine(details) : ""
-  const displayImageUrl = card.imageUrl ?? card.smallImageUrl
-  const cachedThumbnailUrl = displayImageUrl === card.smallImageUrl ? undefined : card.smallImageUrl
+  const smallImageUrl = details?.smallImageUrl ?? card.smallImageUrl
+  const displayImageUrl = details?.imageUrl ?? card.imageUrl ?? smallImageUrl
+  const cachedThumbnailUrl = displayImageUrl === smallImageUrl ? undefined : smallImageUrl
 
   return (
     <DialogCard

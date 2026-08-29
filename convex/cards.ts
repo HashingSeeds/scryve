@@ -7,7 +7,7 @@ import { action, internalMutation, internalQuery } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
-import { pokemonCardById, searchPokemon } from "./lib/games/pokemon"
+import { pokemonCardById, pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
 import { cardsByYgoIds, searchYgo } from "./lib/games/yugioh"
 import { assertGameSystem, type GameSystemId } from "./lib/integrations"
 import {
@@ -225,6 +225,52 @@ export const byCatalogId = action({
         status: "unavailable",
         ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
         message: error instanceof Error ? error.message : "Provider lookup failed",
+      })
+      if (error instanceof ConvexError) throw error
+      throw new ConvexError({
+        code: "card_provider_unavailable",
+        message: "Card lookup is temporarily unavailable",
+      })
+    }
+  },
+})
+
+export const byPokemonReference = action({
+  args: { name: v.string(), originalReference: v.string() },
+  handler: async (ctx, args): Promise<CatalogCard> => {
+    await requireActionIdentity(ctx)
+    await requireActionCapability(ctx, "pokemon", "cardCatalog")
+    const includeImages = await actionCapabilityEnabled(ctx, "pokemon", "images")
+    const name = args.name.trim()
+    const originalReference = args.originalReference.trim()
+    if (!name || name.length > 200 || !originalReference || originalReference.length > 80)
+      throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card reference" })
+
+    const startedAt = Date.now()
+    try {
+      const result = await pokemonCardByReference(ctx, name, originalReference, includeImages)
+      const card = result.cards[0]
+      if (!card) throw new ConvexError({ code: "card_not_found", message: "Card not found" })
+      await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
+      await recordHealth(ctx, {
+        game: "pokemon",
+        provider: "tcgdex",
+        operation: "card-reference-lookup",
+        startedAt,
+        status: "healthy",
+        httpStatus: result.status,
+        message: "Card reference normalized",
+      })
+      return catalogResult(card, includeImages)
+    } catch (error) {
+      await recordHealth(ctx, {
+        game: "pokemon",
+        provider: "tcgdex",
+        operation: "card-reference-lookup",
+        startedAt,
+        status: "unavailable",
+        ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
+        message: error instanceof Error ? error.message : "Provider reference lookup failed",
       })
       if (error instanceof ConvexError) throw error
       throw new ConvexError({

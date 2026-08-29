@@ -19,6 +19,13 @@ const mockCatalogCardById = jest.fn(async () => ({
   collectorNumber: "036",
   rarity: "secret rare",
 }))
+const mockPokemonCardByReference = jest.fn(async () => ({
+  typeLabel: "Pokemon · Basic · Fighting",
+  text: "Punch · 20",
+  setCode: "me01",
+  collectorNumber: "76",
+  rarity: "common",
+}))
 const queryArgs: Array<Record<string, unknown>> = []
 
 const solRing = {
@@ -94,6 +101,7 @@ jest.mock("convex/react", () => ({
   useAction: (reference: string) => {
     if (reference === "cards.search") return mockSearchCards
     if (reference === "cards.byCatalogId") return mockCatalogCardById
+    if (reference === "cards.byPokemonReference") return mockPokemonCardByReference
     return mockCardById
   },
 }))
@@ -113,6 +121,7 @@ jest.mock("../../convex/_generated/api", () => ({
       search: "cards.search",
       byId: "cards.byId",
       byCatalogId: "cards.byCatalogId",
+      byPokemonReference: "cards.byPokemonReference",
     },
   },
 }))
@@ -230,6 +239,34 @@ describe("DeckDetailScreen", () => {
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
     expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
     expect(view.getByText("Effect Monster")).toBeTruthy()
+  })
+
+  it("resolves a saved Pokemon card from its original set reference", async () => {
+    mockDetail.value = {
+      ...loadedDetail,
+      deck: { ...loadedDetail.deck, game: "pokemon", format: "standard" },
+      cards: [
+        {
+          _id: "card-pokemon",
+          _creationTime: 0,
+          deckVersionId: "version-main",
+          game: "pokemon",
+          originalReference: "MEG 76",
+          name: "Riolu",
+          quantity: 3,
+          section: "main",
+        },
+      ],
+    }
+    const view = renderDetail()
+
+    fireEvent.press(view.getByText("3× Riolu"))
+
+    await waitFor(() => expect(view.getByText("Pokemon · Basic · Fighting")).toBeTruthy())
+    expect(mockPokemonCardByReference).toHaveBeenCalledWith({
+      name: "Riolu",
+      originalReference: "MEG 76",
+    })
   })
 
   it("switches the version being viewed", () => {

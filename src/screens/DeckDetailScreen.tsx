@@ -281,6 +281,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   const searchCards = useAction(api.cards.search)
   const fetchCardById = useAction(api.cards.byId)
   const fetchCatalogCardById = useAction(api.cards.byCatalogId)
+  const fetchPokemonCardByReference = useAction(api.cards.byPokemonReference)
   const saveVersion = useMutation(api.decks.saveVersion)
   const createVersion = useMutation(api.decks.createVersion)
   const updateVersion = useMutation(api.decks.updateVersion)
@@ -397,7 +398,14 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
         ? await fetchCardById({ scryfallId: card.scryfallId })
         : catalogCardId
           ? catalogCardDetails(await fetchCatalogCardById({ game, cardId: catalogCardId }))
-          : undefined
+          : game === "pokemon" && card.originalReference
+            ? catalogCardDetails(
+                await fetchPokemonCardByReference({
+                  name: card.name,
+                  originalReference: card.originalReference,
+                }),
+              )
+            : undefined
       if (!details) {
         setDetailsError("No additional card details are available.")
         return

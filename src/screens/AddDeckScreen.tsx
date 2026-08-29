@@ -102,6 +102,7 @@ type FocusedPreviewCard = {
   scryfallId?: string
   game?: string
   catalogCardId?: string
+  originalReference?: string
 }
 
 type PreconstructedDeckOutline = {
@@ -211,6 +212,7 @@ export function AddDeckScreen({
   const importCatalog = useMutation(api.decks.importCatalog)
   const fetchCardById = useAction(api.cards.byId)
   const fetchCatalogCardById = useAction(api.cards.byCatalogId)
+  const fetchPokemonCardByReference = useAction(api.cards.byPokemonReference)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const [mode, setMode] = useState<CreationMode>("precon")
@@ -391,7 +393,14 @@ export function AddDeckScreen({
           ? catalogCardDetails(
               await fetchCatalogCardById({ game: card.game, cardId: card.catalogCardId }),
             )
-          : undefined
+          : card.game === "pokemon" && card.originalReference
+            ? catalogCardDetails(
+                await fetchPokemonCardByReference({
+                  name: card.name,
+                  originalReference: card.originalReference,
+                }),
+              )
+            : undefined
       if (!details) {
         setPreviewDetailsError("No additional card details are available.")
         return
@@ -431,6 +440,7 @@ export function AddDeckScreen({
       boardLabel,
       game: card.game,
       catalogCardId,
+      originalReference: card.originalReference,
     }
     setFocusedPreviewCard(focused)
     setPreviewDetailsError(undefined)

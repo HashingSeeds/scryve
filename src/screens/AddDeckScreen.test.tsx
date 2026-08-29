@@ -56,6 +56,7 @@ const mockCatalogDetail: {
           _id: string
           game: string
           cardId?: string
+          originalReference?: string
           name: string
           quantity: number
           section: string
@@ -79,6 +80,14 @@ const mockCatalogCardById = jest.fn(async () => ({
   setCode: "MACR",
   collectorNumber: "036",
   rarity: "secret rare",
+}))
+const mockPokemonCardByReference = jest.fn(async () => ({
+  typeLabel: "Pokemon · Basic · Fighting",
+  text: "Punch · 20",
+  setCode: "me01",
+  collectorNumber: "76",
+  rarity: "common",
+  imageUrl: "https://assets.example/riolu/high.webp",
 }))
 type DeckShelfState = {
   decks: Array<{
@@ -131,6 +140,7 @@ jest.mock("convex/react", () => ({
   useAction: (reference: string) => {
     if (reference === "cards.byId") return mockCardById
     if (reference === "cards.byCatalogId") return mockCatalogCardById
+    if (reference === "cards.byPokemonReference") return mockPokemonCardByReference
     if (reference === "deckCatalogs.searchTopDecks") return mockSearchTopDecks
     if (reference === "deckImports.searchPreconstructed") return mockSearch
     if (reference === "deckImports.previewPreconstructed") return mockPreviewPrecon
@@ -156,6 +166,7 @@ jest.mock("../../convex/_generated/api", () => ({
     cards: {
       byId: "cards.byId",
       byCatalogId: "cards.byCatalogId",
+      byPokemonReference: "cards.byPokemonReference",
     },
     deckCatalogs: {
       detail: "deckCatalogs.detail",
@@ -416,6 +427,51 @@ describe("AddDeckScreen", () => {
     expect(view.getByText("Ash Blossom & Joyous Spring")).toBeTruthy()
     await waitFor(() => expect(view.getByText("Effect Monster")).toBeTruthy())
     expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
+  })
+
+  it("resolves a Pokemon Top Deck card from its provider reference", async () => {
+    mockSearchTopDecks.mockResolvedValueOnce([
+      {
+        _id: "catalog-pokemon",
+        game: "pokemon",
+        name: "Lucario Hariyama",
+        kind: "tournament",
+        format: "standard",
+      },
+    ])
+    mockCatalogDetail.value = {
+      deck: {
+        _id: "catalog-pokemon",
+        game: "pokemon",
+        name: "Lucario Hariyama",
+        kind: "tournament",
+        format: "standard",
+      },
+      entries: [
+        {
+          _id: "catalog-card-riolu",
+          game: "pokemon",
+          originalReference: "MEG 76",
+          name: "Riolu",
+          quantity: 3,
+          section: "main",
+        },
+      ],
+    }
+    const view = renderAddDeck()
+
+    fireEvent.press(view.getByTestId("game-picker-options-pokemon"))
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Lucario Hariyama")).toBeTruthy())
+    fireEvent.press(view.getByText("Lucario Hariyama"))
+    fireEvent.press(view.getByLabelText("Preview Riolu"))
+
+    await waitFor(() => expect(view.getByText("Pokemon · Basic · Fighting")).toBeTruthy())
+    expect(view.getByTestId("card-focus-image")).toBeTruthy()
+    expect(mockPokemonCardByReference).toHaveBeenCalledWith({
+      name: "Riolu",
+      originalReference: "MEG 76",
+    })
   })
 
   it("carries the chosen game, format, and note into a new deck", async () => {
