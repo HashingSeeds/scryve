@@ -717,6 +717,25 @@ describe("deck versions", () => {
     })
   })
 
+  it("favorites and unfavorites an owned deck without changing its content order", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "favorite-owner", "Favorite Owner")
+    const deckId = await actor.mutation(api.decks.create, {
+      name: "Favorite me",
+      format: "commander",
+    })
+    const before = await actor.query(api.decks.listMine)
+
+    await actor.mutation(api.decks.setFavorite, { deckId, favorite: true })
+    const favorite = await actor.query(api.decks.listMine)
+    expect(favorite.decks[0]).toMatchObject({ _id: deckId, name: "Favorite me" })
+    expect(favorite.decks[0].favoritedAt).toEqual(expect.any(Number))
+    expect(favorite.decks[0].updatedAt).toBe(before.decks[0].updatedAt)
+
+    await actor.mutation(api.decks.setFavorite, { deckId, favorite: false })
+    expect((await actor.query(api.decks.listMine)).decks[0].favoritedAt).toBeUndefined()
+  })
+
   it("accepts released systems and rejects unknown system or format pairs", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "game-owner", "Game Owner")

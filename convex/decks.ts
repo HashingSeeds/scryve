@@ -537,6 +537,16 @@ export const update = mutation({
   },
 })
 
+export const setFavorite = mutation({
+  args: { deckId: v.id("decks"), favorite: v.boolean() },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    assertNotArchived(deck)
+    await ctx.db.patch(deck._id, { favoritedAt: args.favorite ? Date.now() : undefined })
+    return null
+  },
+})
+
 export const detail = query({
   args: { deckId: v.id("decks"), versionId: v.optional(v.id("deckVersions")) },
   handler: async (ctx, args) => {

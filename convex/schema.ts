@@ -191,6 +191,7 @@ export default defineSchema({
     format: v.string(),
     game: v.optional(v.string()),
     note: v.optional(v.string()),
+    favoritedAt: v.optional(v.number()),
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
