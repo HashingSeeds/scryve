@@ -61,6 +61,7 @@ a {
   min-width: 0;
   flex-direction: column;
   padding: clamp(32px, 5.5vw, 84px);
+  padding-top: clamp(28px, 3vw, 48px);
 }
 
 .brand {
