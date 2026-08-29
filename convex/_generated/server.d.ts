@@ -30,6 +30,7 @@ type Env = {
   readonly MODERATION_ALERT_FROM: string | undefined;
   readonly MODERATION_ALERT_TO: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
+  readonly WAITLIST_INGEST_SECRET: string | undefined;
 };
 
 /**

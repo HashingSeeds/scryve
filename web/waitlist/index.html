@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>Join the Scryve wait list</title>
+    <meta
+      name="description"
+      content="Join the wait list for Scryve, a local-first life counter and deck tracker for trading card games."
+    />
+    <link rel="icon" href="/waitlist/icon.png" />
+    <link rel="stylesheet" href="/waitlist/styles.css" />
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script src="/waitlist/waitlist.js" defer></script>
+  </head>
+  <body>
+    <main class="page">
+      <section class="content" aria-labelledby="waitlist-title">
+        <a class="brand" href="/waitlist/" aria-label="Scryve wait list">
+          <img src="/waitlist/icon.png" alt="" width="36" height="36" />
+          <span>Scryve</span>
+        </a>
+
+        <div class="pitch">
+          <p class="eyebrow">Early access</p>
+          <h1 id="waitlist-title">Play offline.<br />Connect when you want.</h1>
+          <p class="summary">
+            Scryve is a fast life counter and deck tracker for trading card games. Start without an
+            account or connection. Sign in when you want sync and multiplayer.
+          </p>
+
+          <form id="waitlist-form" novalidate>
+            <div class="primary-fields">
+              <label class="sr-only" for="email">Email address</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autocomplete="email"
+                inputmode="email"
+                placeholder="you@example.com"
+                required
+              />
+              <button id="submit" type="submit">Join the wait list</button>
+            </div>
+
+            <fieldset>
+              <legend>Where do you want to play?</legend>
+              <label><input type="checkbox" name="platform" value="web" checked /> Web</label>
+              <label><input type="checkbox" name="platform" value="ios" /> iOS</label>
+              <label><input type="checkbox" name="platform" value="android" /> Android</label>
+            </fieldset>
+
+            <div
+              class="cf-turnstile"
+              data-sitekey="0x4AAAAAAEfxy1oXJTjQ3boz"
+              data-theme="dark"
+              data-size="flexible"
+              data-appearance="interaction-only"
+              data-action="join_waitlist"
+            ></div>
+            <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+          </form>
+
+          <p class="existing-account">
+            Already have access? <a id="sign-in" href="__CLERK_SIGN_IN_URL__">Sign in</a>
+          </p>
+          <p class="legal">
+            By joining, you agree to receive email about your access request. Read our
+            <a href="/privacy">Privacy Policy</a>.
+          </p>
+        </div>
+      </section>
+
+      <section class="product" aria-label="Scryve running on iPhone">
+        <p class="product-label">Real app · current build</p>
+        <div class="phone" aria-hidden="true">
+          <img src="/waitlist/app.png" alt="" />
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

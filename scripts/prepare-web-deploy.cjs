@@ -7,6 +7,7 @@ const path = require("node:path")
 const CLOUDFLARE_SKIPPED_DIR = "assets/node_modules/"
 const DEPLOYABLE_DIR = "assets/vendor/"
 const REWRITABLE_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".map"])
+const WAITLIST_SOURCE = path.join(process.cwd(), "web", "waitlist")
 
 function collectRewritableFiles(directory, found = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -56,19 +57,20 @@ const GUARDED_KEYS = ["EXPO_PUBLIC_CONVEX_URL", "EXPO_PUBLIC_CLERK_PUBLISHABLE_K
 
 function readProductionEnv() {
   const envPath = path.join(process.cwd(), ".env.production")
-  if (!fs.existsSync(envPath)) fail(".env.production not found; cannot verify the bundled values.")
   const values = {}
-  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
-    const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line)
-    if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, "")
+  if (fs.existsSync(envPath)) {
+    for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
+      const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line)
+      if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, "")
+    }
   }
-  return values
+  return { ...values, ...process.env }
 }
 
 const productionEnv = readProductionEnv()
 for (const key of GUARDED_KEYS) {
   const expected = productionEnv[key]
-  if (!expected) fail(`${key} is missing from .env.production.`)
+  if (!expected) fail(`${key} is missing from the production build environment.`)
   const bundled = new Set()
   for (const file of collectRewritableFiles(distDirectory))
     for (const [, value] of fs
@@ -84,3 +86,48 @@ for (const key of GUARDED_KEYS) {
     )
 }
 console.log(`Verified ${GUARDED_KEYS.length} bundled production value(s).`)
+
+const clerkSignInUrl = productionEnv.EXPO_PUBLIC_CLERK_SIGN_IN_URL
+if (!clerkSignInUrl)
+  fail("EXPO_PUBLIC_CLERK_SIGN_IN_URL is missing from the production build environment.")
+
+const waitlistDirectory = path.join(distDirectory, "waitlist")
+fs.rmSync(waitlistDirectory, { force: true, recursive: true })
+fs.cpSync(WAITLIST_SOURCE, waitlistDirectory, { recursive: true })
+fs.copyFileSync(
+  path.join(process.cwd(), "assets", "images", "app-icon-all.png"),
+  path.join(waitlistDirectory, "icon.png"),
+)
+fs.copyFileSync(
+  path.join(
+    process.cwd(),
+    "node_modules",
+    "@expo-google-fonts",
+    "space-grotesk",
+    "400Regular",
+    "SpaceGrotesk_400Regular.ttf",
+  ),
+  path.join(waitlistDirectory, "space-grotesk-regular.ttf"),
+)
+fs.copyFileSync(
+  path.join(
+    process.cwd(),
+    "node_modules",
+    "@expo-google-fonts",
+    "space-grotesk",
+    "600SemiBold",
+    "SpaceGrotesk_600SemiBold.ttf",
+  ),
+  path.join(waitlistDirectory, "space-grotesk-semibold.ttf"),
+)
+
+const waitlistHtmlPath = path.join(waitlistDirectory, "index.html")
+const waitlistHtml = fs
+  .readFileSync(waitlistHtmlPath, "utf8")
+  .replaceAll("__CLERK_SIGN_IN_URL__", clerkSignInUrl)
+fs.writeFileSync(waitlistHtmlPath, waitlistHtml)
+fs.copyFileSync(
+  path.join(process.cwd(), "web", "_routes.json"),
+  path.join(distDirectory, "_routes.json"),
+)
+console.log("Prepared the wait-list page and Pages routing rules.")

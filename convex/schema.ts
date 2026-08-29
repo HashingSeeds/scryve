@@ -2,6 +2,22 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
 export default defineSchema({
+  waitlistSubmissions: defineTable({
+    email: v.string(),
+    platforms: v.array(v.union(v.literal("web"), v.literal("ios"), v.literal("android"))),
+    status: v.union(
+      v.literal("waiting"),
+      v.literal("invited"),
+      v.literal("onboarded"),
+      v.literal("declined"),
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    invitedAt: v.optional(v.number()),
+  })
+    .index("by_email", ["email"])
+    .index("by_status_and_created_at", ["status", "createdAt"]),
+
   users: defineTable({
     clerkUserId: v.string(),
     displayName: v.string(),

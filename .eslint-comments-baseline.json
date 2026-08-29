@@ -70,6 +70,9 @@
       "2e853d3a8e17040c29a001b8b821bb38ef885981cd4a6340230a278ad21f5102": 1,
       "500fe70ccfa74d25aeb0b84ba96f870f1fb02df96b074b3e2b32f7d3e7343474": 1
     },
+    "functions/cloudflare.d.ts": {
+      "0c49a647de48080b1b78ec99ab83935d3ebdfa40c910d1e0fea8d752ef0acc0f": 1
+    },
     "jest.config.js": {
       "530730d6c7f712f77b68e001b4b038a3f09b8ab1ae620d02bc853e8446ec864a": 1
     },

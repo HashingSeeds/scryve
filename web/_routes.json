@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/_expo/*",
+    "/assets/*",
+    "/apple-touch-icon*",
+    "/favicon.ico",
+    "/metadata.json",
+    "/waitlist/*",
+    "/delete-account",
+    "/privacy",
+    "/terms",
+    "/cookie-policy"
+  ]
+}

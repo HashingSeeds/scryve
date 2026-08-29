@@ -12,6 +12,7 @@
     "web": "env APP_VARIANT=development npx expo start --web",
     "bundle:web": "set -a && . ./.env.development && set +a && env APP_VARIANT=development npx expo export --platform web --clear",
     "bundle:web:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx expo export --platform web --clear",
+    "build:web:pages": "APP_VARIANT=production npx expo export --platform web --clear && node scripts/prepare-web-deploy.cjs",
     "deploy:web:prod": "node scripts/prepare-web-deploy.cjs && wrangler pages deploy \"$PWD/dist\" --project-name=scryve --branch=main",
     "convex:dev": "pnpm convex:dev:raw",
     "convex:dev:raw": "convex dev",
@@ -45,6 +46,7 @@
     "build:android:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx eas-cli@latest build --profile production --platform android --local"
   },
   "dependencies": {
+    "@clerk/backend": "^3.16.12",
     "@clerk/expo": "3.7.3",
     "@expo-google-fonts/space-grotesk": "^0.4.0",
     "@expo/metro-runtime": "~55.0.6",
@@ -101,6 +103,7 @@
     "@babel/core": "^7.20.0",
     "@babel/preset-env": "^7.20.0",
     "@babel/runtime": "^7.20.0",
+    "@cloudflare/workers-types": "^5.20260827.1",
     "@testing-library/react-native": "^13.2.0",
     "@types/jest": "^29.5.14",
     "@types/node": "20.19.43",
