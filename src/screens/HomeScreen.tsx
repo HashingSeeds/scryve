@@ -34,14 +34,14 @@ export function HomeScreen({
   return (
     <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentContainerStyle={themed($screen)}>
       <View style={themed($hero)}>
-        <Text tx="localGame:appName" preset="formLabel" style={themed($eyebrow)} />
+        <Text tx="game:appName" preset="formLabel" style={themed($eyebrow)} />
         <Text
-          tx="localGame:homeTitle"
+          tx="game:homeTitle"
           preset="heading"
           accessibilityRole="header"
           style={themed($title)}
         />
-        <Text tx="localGame:homeSubtitle" style={themed($subtitle)} />
+        <Text tx="game:homeSubtitle" style={themed($subtitle)} />
       </View>
       <View style={themed($spacer)} />
       <View style={themed($actions)}>
@@ -49,18 +49,18 @@ export function HomeScreen({
           <>
             <Button
               testID="resume-game-button"
-              tx="localGame:resume"
+              tx="game:resume"
               preset="reversed"
               style={themed($primaryButton)}
               textStyle={themed($primaryText)}
               onPress={onResumeGame}
             />
-            <Text tx="localGame:activeGameHint" size="xs" style={themed($primaryHint)} />
+            <Text tx="game:activeGameHint" size="xs" style={themed($primaryHint)} />
           </>
         ) : (
           <Button
             testID="new-game-button"
-            tx="localGame:newGame"
+            tx="game:newGame"
             preset="reversed"
             style={themed($primaryButton)}
             textStyle={themed($primaryText)}
@@ -69,7 +69,7 @@ export function HomeScreen({
         )}
         <Button
           testID="connected-play-button"
-          tx="localGame:connectedPlay"
+          tx="game:connectedPlay"
           style={themed($secondaryButton)}
           textStyle={themed($secondaryText)}
           onPress={onConnected}
@@ -83,13 +83,13 @@ export function HomeScreen({
         />
         <View style={themed($utilityRow)}>
           <Button
-            tx="localGame:history"
+            tx="game:history"
             style={themed($utilityButton)}
             textStyle={themed($utilityText)}
             onPress={onHistory}
           />
           <Button
-            tx="localGame:settings"
+            tx="game:settings"
             style={themed($utilityButton)}
             textStyle={themed($utilityText)}
             onPress={onSettings}
@@ -99,13 +99,13 @@ export function HomeScreen({
       <View style={themed($footer)}>
         <Button
           testID="account-button"
-          tx={isSignedIn ? "localGame:account" : "localGame:signUpOrLogIn"}
+          tx={isSignedIn ? "game:account" : "game:signUpOrLogIn"}
           style={themed($accountButton)}
           textStyle={themed($accountText)}
           pressedStyle={themed($accountPressed)}
           onPress={onAccount}
         />
-        <Text tx="localGame:localPlayNote" size="xxs" style={themed($footerNote)} />
+        <Text tx="game:localPlayNote" size="xxs" style={themed($footerNote)} />
       </View>
     </Screen>
   )

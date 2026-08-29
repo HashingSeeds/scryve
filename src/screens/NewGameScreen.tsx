@@ -138,7 +138,7 @@ export function NewGameScreen({
       <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
         <Header
           title={connectedMode ? "New connected game" : undefined}
-          titleTx={connectedMode ? undefined : "localGame:newGame"}
+          titleTx={connectedMode ? undefined : "game:newGame"}
           leftTx="common:back"
           onLeftPress={onBack}
         />
@@ -185,7 +185,7 @@ export function NewGameScreen({
         </View>
 
         <View style={themed($section)}>
-          <Text tx="localGame:startingLife" preset="subheading" accessibilityRole="header" />
+          <Text tx="game:startingLife" preset="subheading" accessibilityRole="header" />
           <View style={themed($choiceRow)}>
             {STARTING_LIFE_PRESETS.map((life) => (
               <ChoiceButton
@@ -213,7 +213,7 @@ export function NewGameScreen({
           {showCustomStartingLife ? (
             <TextField
               testID={connectedMode ? "connected-starting-life" : "custom-starting-life"}
-              labelTx="localGame:customStartingLife"
+              labelTx="game:customStartingLife"
               value={lifeText}
               keyboardType="number-pad"
               status={validLife ? undefined : "error"}
@@ -243,7 +243,7 @@ export function NewGameScreen({
           </View>
         ) : (
           <View style={themed($section)}>
-            <Text tx="localGame:playerNames" preset="subheading" accessibilityRole="header" />
+            <Text tx="game:playerNames" preset="subheading" accessibilityRole="header" />
             <View style={themed($nameList)}>
               {players.map((player, index) => (
                 <View key={index} style={themed($nameRow)}>
@@ -322,7 +322,7 @@ export function NewGameScreen({
           <Button
             testID={connectedMode ? "host-connected-button" : "start-game-button"}
             text={connectedMode ? (busy ? "Creating…" : "Host lobby") : undefined}
-            tx={connectedMode ? undefined : "localGame:startGame"}
+            tx={connectedMode ? undefined : "game:startGame"}
             preset="reversed"
             disabled={!valid || busy}
             accessibilityHint={

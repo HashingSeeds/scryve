@@ -23,10 +23,10 @@ describe("shipping index route", () => {
         <Index />
       </ThemeProvider>,
     )
-    expect(view.getByText("localGame:localPlayNote")).toBeTruthy()
+    expect(view.getByText("game:localPlayNote")).toBeTruthy()
     expect(view.queryByTestId("quick-local-game-button")).toBeNull()
     expect(view.queryByText("On this device")).toBeNull()
-    expect(view.getByText("localGame:signUpOrLogIn")).toBeTruthy()
+    expect(view.getByText("game:signUpOrLogIn")).toBeTruthy()
     fireEvent.press(view.getByTestId("new-game-button"))
     expect(jest.requireMock("expo-router").router.push).toHaveBeenCalledWith("/game/new")
     fireEvent.press(view.getByTestId("decks-button"))

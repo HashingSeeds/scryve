@@ -1,7 +1,7 @@
 import en, { type Translations } from "./en"
 
 const es: Translations = {
-  localGame: en.localGame,
+  game: en.game,
   common: {
     ok: "OK",
     cancel: "Cancelar",
