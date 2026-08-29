@@ -32,6 +32,32 @@ function makeGame(now = 1) {
 }
 
 describe("LocalGameRepository", () => {
+  it("keeps the analytics id stable and independent of gameplay identity", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+
+    const analyticsId = repository.getAnalyticsId()
+    const deviceId = repository.getDeviceId()
+
+    expect(analyticsId).toMatch(/^analytics_[0-9a-f]{32}$/)
+    expect(analyticsId).not.toBe(deviceId)
+    expect(repository.getAnalyticsId()).toBe(analyticsId)
+    expect(new LocalGameRepository(storage).getAnalyticsId()).toBe(analyticsId)
+  })
+
+  it("rotates the analytics id without disturbing the device id", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const deviceId = repository.getDeviceId()
+    const before = repository.getAnalyticsId()
+
+    const after = repository.resetAnalyticsId()
+
+    expect(after).not.toBe(before)
+    expect(repository.getAnalyticsId()).toBe(after)
+    expect(repository.getDeviceId()).toBe(deviceId)
+  })
+
   it("recovers an active game and its negative life/event history", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)

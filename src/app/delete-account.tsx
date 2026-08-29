@@ -14,6 +14,7 @@ import {
   saveAccountDeletionReceiptToken,
 } from "@/features/auth/accountDeletionReceiptStore"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { AccountDeletionReceiptScreen, DeleteAccountScreen } from "@/screens/DeleteAccountScreen"
 
 import { api } from "../../convex/_generated/api"
@@ -139,6 +140,7 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
     setError(undefined)
     try {
       const result = await requestDeletion({ confirmation: "DELETE" })
+      new LocalGameRepository().resetAnalyticsId()
       onReceipt(result.receiptToken)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not submit the deletion request")

@@ -24,6 +24,7 @@ const EVENT_CHUNK_SIZE = 100
 
 export const LOCAL_KEYS = {
   device: "count.local.device.v1",
+  analytics: "count.local.analytics.v1",
   settings: "count.local.settings.v1",
   legacySettings: "count.local.settings",
   active: "count.local.active.v1",
@@ -265,6 +266,20 @@ export class LocalGameRepository {
     if (existing) return asDeviceId(existing)
     const created = asDeviceId(createClientId("device"))
     this.storage.set(LOCAL_KEYS.device, created)
+    return created
+  }
+
+  getAnalyticsId(): string {
+    const existing = this.storage.getString(LOCAL_KEYS.analytics)
+    if (existing) return existing
+    const created = createClientId("analytics")
+    this.storage.set(LOCAL_KEYS.analytics, created)
+    return created
+  }
+
+  resetAnalyticsId(): string {
+    const created = createClientId("analytics")
+    this.storage.set(LOCAL_KEYS.analytics, created)
     return created
   }
 
