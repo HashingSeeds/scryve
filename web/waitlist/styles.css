@@ -289,6 +289,11 @@ fieldset input {
     flex-direction: column;
   }
 
+  .primary-fields input {
+    width: 100%;
+    flex: none;
+  }
+
   .primary-fields button {
     width: 100%;
   }
