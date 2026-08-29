@@ -126,7 +126,6 @@ describe("DecksScreen", () => {
   it("narrows the shelf to a single format", () => {
     const view = renderShelf()
     expect(view.getByText("Mono Red")).toBeTruthy()
-    fireEvent.press(view.getByTestId("deck-filter-button"))
     fireEvent.press(view.getByTestId("format-filter-standard"))
     expect(view.getByText("Mono Red")).toBeTruthy()
     expect(view.queryByText("Existing Deck")).toBeNull()
@@ -142,10 +141,10 @@ describe("DecksScreen", () => {
     expect(view.getByText("Existing Deck")).toBeTruthy()
   })
 
-  it("keeps only games that are actually supported selectable", () => {
+  it("keeps all released systems selectable", () => {
     const view = renderShelf()
-    fireEvent.press(view.getByTestId("deck-filter-button"))
-    expect(view.getByTestId("game-filter-ygo")).toBeDisabled()
+    expect(view.getByTestId("game-filter-ygo")).toBeEnabled()
+    expect(view.getByTestId("game-filter-pokemon")).toBeEnabled()
   })
 
   it("hints when the chosen game has no decks yet", () => {
@@ -177,7 +176,7 @@ describe("DecksScreen", () => {
 
     expect(view.getByText("Decks")).toBeTruthy()
     expect(view.getByTestId("deck-search-input")).toBeTruthy()
-    expect(view.getByTestId("deck-filter-button")).toBeTruthy()
+    expect(view.getByTestId("game-filter")).toBeTruthy()
     expect(view.getByText("Decks unavailable")).toBeTruthy()
 
     mockListMine.error = undefined

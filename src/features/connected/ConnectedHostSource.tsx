@@ -76,7 +76,7 @@ function ConnectedHostQuerySource({
         : undefined
   const hostReady = ready && activeGamesState.status === "ready"
 
-  async function host(setup: { playerCount: number; startingLife: number; ruleset: string }) {
+  async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
     if (connectedProfile.status === "offline") {
       setHostError("Reconnect before hosting; lobby creation is not queued.")
       return

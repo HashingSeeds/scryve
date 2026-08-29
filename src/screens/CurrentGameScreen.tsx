@@ -18,6 +18,7 @@ import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
+import { counterValueLabel, playFormatLabel, playSystemId } from "@/features/game/playSystems"
 import type { LocalGame, PlayerId } from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
@@ -44,6 +45,7 @@ export function CurrentGameScreen({
     theme: { colors },
   } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)
+  const system = playSystemId(runtime.game.system)
   const { width, height, fontScale } = useWindowDimensions()
   const [menuOpen, setMenuOpen] = useState(false)
   const [endConfirmationOpen, setEndConfirmationOpen] = useState(false)
@@ -167,6 +169,7 @@ export function CurrentGameScreen({
       <View testID="game-board" style={themed($board)}>
         <PlayerGrid
           players={runtime.game.players}
+          system={system}
           layoutVariant={layoutVariant}
           disabled={menuOpen}
           onChange={runtime.changeLife}
@@ -228,7 +231,7 @@ export function CurrentGameScreen({
           <Text text="Game status" preset="subheading" style={themed($dialogText)} />
           <Text
             testID="game-status-summary"
-            text={`${playerCount} players · started at ${runtime.game.startingLife} life`}
+            text={`${playerCount} players · ${playFormatLabel(system, runtime.game.format)} · started with ${counterValueLabel(system, runtime.game.startingLife)}`}
             style={themed($dialogText)}
           />
           <Text
@@ -266,12 +269,12 @@ export function CurrentGameScreen({
                   key={player.id}
                   testID={`end-game-winner-${player.seat}`}
                   text={player.name}
-                  detail={`${player.life} life`}
+                  detail={counterValueLabel(system, player.life)}
                   accentColor={player.color}
                   Leading={({ color }) => (
                     <PlayerMark seatNumber={player.seat} color={color} size={28} />
                   )}
-                  accessibilityLabel={`${player.name}, ${player.life} life${selected ? ", winner" : ""}`}
+                  accessibilityLabel={`${player.name}, ${counterValueLabel(system, player.life)}${selected ? ", winner" : ""}`}
                   selected={selected}
                   onPress={() => toggleWinner(player.id)}
                 />

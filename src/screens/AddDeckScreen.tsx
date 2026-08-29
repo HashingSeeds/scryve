@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
@@ -27,11 +27,13 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
+import type { Id } from "../../convex/_generated/dataModel"
 import {
   DECK_GAME_LIST,
   deckFormatLabel,
   deckFormats,
   deckSections,
+  defaultDeckFormat,
   preconSearchFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
@@ -49,8 +51,6 @@ const MODES: Array<{ id: CreationMode; label: string }> = [
 ]
 
 const SEARCH_DEBOUNCE_MS = 350
-
-type SetupField = "game" | "format" | "mode"
 
 type PreconstructedDeck = {
   fileName: string
@@ -75,6 +75,22 @@ type ImportedCard = PreviewCard & {
   scryfallId: string
 }
 
+type GenericImportedCard = {
+  game: "ygo" | "pokemon"
+  identityNamespace?: string
+  cardId?: string
+  providerCardId?: string
+  printingId?: string
+  section: string
+  entryKind: string
+  originalReference: string
+  category?: string
+  name: string
+  imageUrl?: string
+  smallImageUrl?: string
+  quantity: number
+}
+
 type FocusedPreviewCard = PreviewCard & { scryfallId: string }
 
 type PreconstructedDeckOutline = {
@@ -86,6 +102,14 @@ type ResolvedPreconstructedDeck = {
   name: string
   unresolved: string[]
   cards: ImportedCard[]
+}
+
+type CatalogDeck = {
+  _id: Id<"deckCatalogs">
+  game: string
+  name: string
+  kind: string
+  format?: string
 }
 
 function CapacityQuery({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {
@@ -117,16 +141,8 @@ function DeckCapacityStatus({ onReady }: { onReady: (capacity: DeckCapacity) => 
   )
 }
 
-function importCards(cards: ImportedCard[]) {
-  return cards.map(({ oracleId, scryfallId, name, imageUrl, smallImageUrl, quantity, board }) => ({
-    oracleId,
-    scryfallId,
-    name,
-    ...(imageUrl ? { imageUrl } : {}),
-    ...(smallImageUrl ? { smallImageUrl } : {}),
-    quantity,
-    board,
-  }))
+function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
+  return cards.map((card) => ({ ...card }))
 }
 
 function preconDetail(deck: PreconstructedDeck) {
@@ -180,17 +196,19 @@ export function AddDeckScreen({
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
+  const searchTopDecks = useAction(api.deckCatalogs.searchTopDecks)
+  const importCatalog = useMutation(api.decks.importCatalog)
   const fetchCardById = useAction(api.cards.byId)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const [mode, setMode] = useState<CreationMode>("precon")
-  const [setupComplete, setSetupComplete] = useState(false)
-  const [openField, setOpenField] = useState<SetupField>()
   const [name, setName] = useState("")
   const [note, setNote] = useState("")
   const [deckList, setDeckList] = useState("")
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
+  const [catalogDecks, setCatalogDecks] = useState<CatalogDeck[]>([])
+  const [selectedCatalogDeck, setSelectedCatalogDeck] = useState<CatalogDeck>()
   const [selectedPrecon, setSelectedPrecon] = useState<PreconstructedDeck>()
   const [preconOutline, setPreconOutline] = useState<PreconstructedDeckOutline>()
   const [resolvedPrecon, setResolvedPrecon] = useState<ResolvedPreconstructedDeck>()
@@ -207,6 +225,10 @@ export function AddDeckScreen({
   const [previewError, setPreviewError] = useState<string>()
   const searchToken = useRef(0)
   const previewToken = useRef(0)
+  const catalogDetail = useQuery(
+    api.deckCatalogs.detail,
+    selectedCatalogDeck ? { catalogDeckId: selectedCatalogDeck._id } : "skip",
+  )
   const preconFormat = preconSearchFormat(format)
   const handleCapacity = useCallback(
     (next: DeckCapacity) => setCapacityState({ status: "ready", capacity: next }),
@@ -226,13 +248,14 @@ export function AddDeckScreen({
     setGame(next)
     setDeckFormat(creationFormat(next, ""))
     setPrecons([])
-    setOpenField(undefined)
+    setCatalogDecks([])
+    setSelectedCatalogDeck(undefined)
+    setMode("precon")
   }
 
   function chooseFormat(next: string) {
     setDeckFormat(next)
     setFormat(next)
-    setOpenField(undefined)
   }
 
   const runSearch = useCallback(
@@ -262,10 +285,35 @@ export function AddDeckScreen({
   )
 
   useEffect(() => {
-    if (!setupComplete || mode !== "precon") return undefined
+    if (mode !== "precon" || game !== "mtg") return undefined
     const timer = setTimeout(() => void runSearch(preconQuery), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [mode, preconQuery, runSearch, setupComplete])
+  }, [game, mode, preconQuery, runSearch])
+
+  const runCatalogSearch = useCallback(
+    async (query: string) => {
+      const token = searchToken.current + 1
+      searchToken.current = token
+      try {
+        setSearching(true)
+        setSearchError(undefined)
+        const found = await searchTopDecks({ game, query })
+        if (searchToken.current === token) setCatalogDecks(found)
+      } catch (cause) {
+        if (searchToken.current === token)
+          setSearchError(convexErrorMessage(cause, "Could not load Top Decks"))
+      } finally {
+        if (searchToken.current === token) setSearching(false)
+      }
+    },
+    [game, searchTopDecks],
+  )
+
+  useEffect(() => {
+    if (mode !== "precon" || game === "mtg") return undefined
+    const timer = setTimeout(() => void runCatalogSearch(preconQuery), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [game, mode, preconQuery, runCatalogSearch])
 
   async function createBlank() {
     if (!capacityReady || atCapacity) return
@@ -362,11 +410,24 @@ export function AddDeckScreen({
     }
   }
 
+  async function importTopDeck() {
+    if (!capacityReady || atCapacity || !selectedCatalogDeck) return
+    try {
+      begin()
+      const deckId = await importCatalog({ catalogDeckId: selectedCatalogDeck._id })
+      onCreated(deckId)
+    } catch (cause) {
+      fail(cause, "Could not import Top Deck")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function importPasted() {
     if (!capacityReady || atCapacity) return
     try {
       begin()
-      const resolved = await resolvePasted({ list: deckList })
+      const resolved = await resolvePasted({ list: deckList, game })
       const problems = [
         resolved.unresolved.length
           ? `Unmatched cards: ${resolved.unresolved.join(", ")}`
@@ -410,6 +471,89 @@ export function AddDeckScreen({
       onChangeText={setNote}
     />
   )
+
+  if (selectedCatalogDeck) {
+    const entries = catalogDetail?.entries ?? []
+    const quantity = entries.reduce((total, entry) => total + entry.quantity, 0)
+    return (
+      <Screen
+        preset="fixed"
+        safeAreaEdges={["bottom"]}
+        contentContainerStyle={themed($previewScreen)}
+      >
+        <Header
+          title="Deck preview"
+          leftTx="common:back"
+          onLeftPress={() => setSelectedCatalogDeck(undefined)}
+        />
+        <ScrollView
+          testID="catalog-deck-preview"
+          contentContainerStyle={themed($previewContent)}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={themed($previewSummary)}>
+            <Text preset="subheading" text={selectedCatalogDeck.name} />
+            <Text
+              size="sm"
+              style={themed($label)}
+              text={`${DECK_GAME_LIST.find((candidate) => candidate.id === selectedCatalogDeck.game)?.shortLabel ?? selectedCatalogDeck.game} · ${deckFormatLabel(selectedCatalogDeck.game, selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game))}${entries.length ? ` · ${cardCountLabel(quantity)}` : ""}`}
+            />
+            <LoadingProgress
+              state={catalogDetail ? "complete" : "loading"}
+              accessibilityText={catalogDetail ? "Preview ready" : "Loading Top Deck"}
+            />
+          </View>
+          {deckSections(
+            selectedCatalogDeck.game,
+            selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
+          ).map((section) => {
+            const sectionEntries = entries.filter((entry) => entry.section === section.id)
+            if (sectionEntries.length === 0) return null
+            return (
+              <View key={section.id}>
+                <View style={themed($previewSectionHeader)}>
+                  <Text weight="bold" text={section.label} />
+                  <Text
+                    size="xs"
+                    style={themed($label)}
+                    text={`${sectionEntries.reduce((total, entry) => total + entry.quantity, 0)}`}
+                  />
+                </View>
+                {sectionEntries.map((entry) => (
+                  <View key={entry._id} style={themed($previewCardRow)}>
+                    <View style={themed($previewThumbnailSlot)}>
+                      {entry.smallImageUrl || entry.imageUrl ? (
+                        <Image
+                          source={entry.smallImageUrl ?? entry.imageUrl}
+                          style={themed($previewThumbnail)}
+                          cachePolicy="memory-disk"
+                        />
+                      ) : null}
+                    </View>
+                    <Text
+                      style={themed($previewCardName)}
+                      text={`${entry.quantity}× ${entry.name}`}
+                    />
+                  </View>
+                ))}
+              </View>
+            )
+          })}
+        </ScrollView>
+        <BottomActionBar>
+          <DeckCapacityStatus onReady={handleCapacity} />
+          {error ? <AlertNote text={error} /> : null}
+          <Button
+            testID="import-catalog-deck"
+            text={busy ? "Importing…" : "Import deck"}
+            preset="reversed"
+            disabled={busy || !capacityReady || atCapacity || !catalogDetail}
+            onPress={importTopDeck}
+          />
+        </BottomActionBar>
+      </Screen>
+    )
+  }
 
   if (selectedPrecon) {
     const previewFormat = preconSearchFormat(format)
@@ -569,105 +713,43 @@ export function AddDeckScreen({
 
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
-      <Header
-        title={setupComplete && mode === "precon" ? "Find a deck" : "Add a deck"}
-        leftTx="common:back"
-        onLeftPress={onBack}
-      />
+      <Header title="Add a deck" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($stack)}>
-        {!setupComplete ? (
-          <View style={themed($setup)}>
-            <Text size="xxs" style={themed($label)} text="Step 1 of 2" />
-            <SelectorField
-              testID="game-picker"
-              label="Game"
-              value={DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game}
-              open={openField === "game"}
-              onPress={() => setOpenField((current) => (current === "game" ? undefined : "game"))}
-            >
-              <FilterChips
-                testID="game-picker-options"
-                accessibilityLabel="Game"
-                chips={DECK_GAME_LIST.map((candidate) => ({
-                  id: candidate.id,
-                  label: candidate.available
-                    ? candidate.shortLabel
-                    : `${candidate.shortLabel} · soon`,
-                  disabled: !candidate.available,
-                }))}
-                selectedId={game}
-                onSelect={chooseGame}
-              />
-            </SelectorField>
-            <SelectorField
-              testID="format-picker"
-              label="Format"
-              value={deckFormatLabel(game, format)}
-              open={openField === "format"}
-              onPress={() =>
-                setOpenField((current) => (current === "format" ? undefined : "format"))
-              }
-            >
-              <FilterChips
-                testID="format-picker-options"
-                accessibilityLabel="Format"
-                chips={deckFormats(game).map((candidate) => ({
-                  id: candidate.id,
-                  label: candidate.label,
-                }))}
-                selectedId={format}
-                onSelect={chooseFormat}
-              />
-            </SelectorField>
-            <SelectorField
-              testID="mode-picker"
-              label="Start from"
-              value={MODES.find((candidate) => candidate.id === mode)?.label ?? mode}
-              open={openField === "mode"}
-              onPress={() => setOpenField((current) => (current === "mode" ? undefined : "mode"))}
-            >
-              <FilterChips
-                testID="mode-picker-options"
-                accessibilityLabel="Starting point"
-                chips={MODES.map((candidate) => ({ id: candidate.id, label: candidate.label }))}
-                selectedId={mode}
-                onSelect={(next) => {
-                  setMode(next as CreationMode)
-                  setOpenField(undefined)
-                }}
-              />
-            </SelectorField>
-            <Button
-              testID="continue-add-deck"
-              text="Continue"
-              preset="reversed"
-              onPress={() => setSetupComplete(true)}
-            />
-          </View>
-        ) : (
-          <View style={themed($summary)}>
-            <View style={themed($summaryCopy)}>
-              <Text
-                weight="medium"
-                text={`${DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game} · ${deckFormatLabel(game, format)}`}
-              />
-              <Text
-                size="xxs"
-                style={themed($label)}
-                text={MODES.find((candidate) => candidate.id === mode)?.label}
-              />
-            </View>
-            <TouchableOpacity
-              testID="change-deck-setup"
-              accessibilityRole="button"
-              onPress={() => setSetupComplete(false)}
-            >
-              <Text size="sm" weight="medium" style={themed($link)} text="Change" />
-            </TouchableOpacity>
-          </View>
-        )}
+        <Text preset="subheading" text="System" />
+        <FilterChips
+          testID="game-picker-options"
+          accessibilityLabel="Game"
+          chips={DECK_GAME_LIST.map((candidate) => ({
+            id: candidate.id,
+            label: candidate.shortLabel,
+          }))}
+          selectedId={game}
+          onSelect={chooseGame}
+        />
+        <Text preset="subheading" text="Format" />
+        <FilterChips
+          testID="format-picker-options"
+          accessibilityLabel="Format"
+          chips={deckFormats(game).map((candidate) => ({
+            id: candidate.id,
+            label: candidate.label,
+          }))}
+          selectedId={format}
+          onSelect={chooseFormat}
+        />
+        <Text preset="subheading" text="Start from" />
+        <FilterChips
+          testID="mode-picker-options"
+          accessibilityLabel="Starting point"
+          chips={MODES.map((candidate) => ({
+            id: candidate.id,
+            label: candidate.id === "precon" && game !== "mtg" ? "Top Decks" : candidate.label,
+          }))}
+          selectedId={mode}
+          onSelect={(next) => setMode(next as CreationMode)}
+        />
 
-        {setupComplete && mode === "precon" ? (
+        {mode === "precon" && game === "mtg" ? (
           <View style={themed($stack)}>
             <TextField
               testID="precon-search-input"
@@ -705,7 +787,38 @@ export function AddDeckScreen({
           </View>
         ) : null}
 
-        {setupComplete && mode === "paste" ? (
+        {mode === "precon" && game !== "mtg" ? (
+          <View style={themed($stack)}>
+            <TextField
+              testID="top-deck-search-input"
+              placeholder="Search Top Decks"
+              value={preconQuery}
+              maxLength={120}
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              onChangeText={setPreconQuery}
+            />
+            {searching ? (
+              <Text size="xs" style={themed($label)} text="Loading Top Decks…" />
+            ) : searchError ? (
+              <View style={themed($inlineStatus)}>
+                <AlertNote text={searchError} />
+                <Button text="Retry" onPress={() => void runCatalogSearch(preconQuery)} />
+              </View>
+            ) : null}
+            {catalogDecks.map((deck) => (
+              <Card
+                key={deck._id}
+                heading={deck.name}
+                content={deck.kind === "tournament" ? "Tournament deck" : "Community deck"}
+                footer="Preview deck"
+                onPress={() => setSelectedCatalogDeck(deck)}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {mode === "paste" ? (
           <View style={themed($stack)}>
             <TextField
               testID="deck-name-input"
@@ -717,7 +830,11 @@ export function AddDeckScreen({
             <TextField
               label="Deck list"
               helper={
-                'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.'
+                game === "ygo"
+                  ? "Paste YDK card IDs or lines like 3 Ash Blossom. Main, Extra, and Side headings are supported."
+                  : game === "pokemon"
+                    ? "Paste a Pokemon TCG Live list with quantities, names, set codes, and card numbers."
+                    : 'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.'
               }
               value={deckList}
               multiline
@@ -736,7 +853,7 @@ export function AddDeckScreen({
           </View>
         ) : null}
 
-        {setupComplete && mode === "blank" ? (
+        {mode === "blank" ? (
           <View style={themed($stack)}>
             <TextField
               testID="deck-name-input"
@@ -771,42 +888,6 @@ export function AddDeckScreen({
   )
 }
 
-function SelectorField({
-  testID,
-  label,
-  value,
-  open,
-  onPress,
-  children,
-}: {
-  testID: string
-  label: string
-  value: string
-  open: boolean
-  onPress: () => void
-  children: ReactNode
-}) {
-  const { themed } = useAppTheme()
-  return (
-    <View style={themed($field)}>
-      <TouchableOpacity
-        testID={testID}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        style={themed($selector)}
-        onPress={onPress}
-      >
-        <View style={themed($summaryCopy)}>
-          <Text size="xxs" style={themed($label)} text={label} />
-          <Text weight="medium" text={value} />
-        </View>
-        <Text style={themed($label)} text={open ? "⌃" : "⌄"} />
-      </TouchableOpacity>
-      {open ? children : null}
-    </View>
-  )
-}
-
 const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   marginTop: spacing.sm,
@@ -820,29 +901,7 @@ const $inlineStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   alignItems: "flex-start",
 })
-const $field: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
-const $setup: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
-const $selector: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minHeight: 64,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingHorizontal: spacing.sm,
-  borderWidth: 1,
-  borderColor: colors.separator,
-})
-const $summary: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minHeight: 56,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingBottom: spacing.sm,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $summaryCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxxs })
 const $previewScreen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 const $previewContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",

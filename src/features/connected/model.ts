@@ -1,3 +1,4 @@
+import { playSystemId, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeChangedEvent } from "@/features/game/types"
 
 export type ConnectedGameStatus = "lobby" | "active" | "finished" | "abandoned"
@@ -20,6 +21,8 @@ export interface ConnectedProjection {
   publicId: string
   status: ConnectedGameStatus
   playerCount: number
+  system?: PlaySystemId
+  format?: string
   startingLife: number
   ruleset: string
   isHost: boolean
@@ -48,17 +51,26 @@ export interface ConnectedDisplayProjection extends ConnectedProjection {
   players: Array<ConnectedPlayerProjection & { pendingDelta: number }>
 }
 
-export function toConnectedProjection(value: any): ConnectedProjection | null {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+export function toConnectedProjection(value: unknown): ConnectedProjection | null {
   if (
-    !value ||
-    typeof value !== "object" ||
+    !isRecord(value) ||
     value.schemaVersion !== 1 ||
     typeof value.publicId !== "string" ||
-    !["lobby", "active", "finished", "abandoned"].includes(value.status) ||
+    typeof value.status !== "string" ||
+    !(["lobby", "active", "finished", "abandoned"] as const).includes(
+      value.status as ConnectedGameStatus,
+    ) ||
+    typeof value.playerCount !== "number" ||
     !Number.isInteger(value.playerCount) ||
+    typeof value.startingLife !== "number" ||
     !Number.isInteger(value.startingLife) ||
     typeof value.ruleset !== "string" ||
     typeof value.isHost !== "boolean" ||
+    typeof value.eventSequence !== "number" ||
     !Number.isInteger(value.eventSequence) ||
     typeof value.serverUpdatedAt !== "number" ||
     !Array.isArray(value.recentOperationIds) ||
@@ -68,8 +80,9 @@ export function toConnectedProjection(value: any): ConnectedProjection | null {
   const players: ConnectedPlayerProjection[] = []
   for (const player of value.players) {
     if (
-      !player ||
+      !isRecord(player) ||
       typeof player.playerId !== "string" ||
+      typeof player.seat !== "number" ||
       !Number.isInteger(player.seat) ||
       typeof player.displayName !== "string" ||
       typeof player.color !== "string" ||
@@ -93,8 +106,10 @@ export function toConnectedProjection(value: any): ConnectedProjection | null {
   return {
     schemaVersion: 1,
     publicId: value.publicId,
-    status: value.status,
+    status: value.status as ConnectedGameStatus,
     playerCount: value.playerCount,
+    system: playSystemId(value.system),
+    format: typeof value.format === "string" ? value.format : value.ruleset,
     startingLife: value.startingLife,
     ruleset: value.ruleset,
     isHost: value.isHost,

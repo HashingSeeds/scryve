@@ -1,4 +1,11 @@
 import type { NextPageState, RemoteValue } from "@/features/async/remoteState"
+import {
+  counterChangeLabel,
+  counterValueLabel,
+  playFormatLabel,
+  playSystemId,
+  type PlaySystemId,
+} from "@/features/game/playSystems"
 import type { LifeChangedEvent, LocalGame } from "@/features/game/types"
 
 import type { HistorySource } from "./historyEntries"
@@ -30,6 +37,7 @@ export interface GameSummaryModel {
   finishedAt?: number
   startedAt?: number
   startingLife?: number
+  system: PlaySystemId
   format: string
   changeCount: number
   players: SummaryPlayer[]
@@ -62,13 +70,17 @@ export function localOutcome(result: LocalGame["result"], playerId: string): Sum
 }
 
 export function localSummaryModel(game: LocalGame): GameSummaryModel {
+  const system = playSystemId(game.system)
   return {
     source: "local",
     status: game.status === "abandoned" ? "abandoned" : "finished",
     finishedAt: game.finishedAt ?? game.updatedAt,
     startedAt: game.createdAt,
     startingLife: game.startingLife,
-    format: `${game.startingLife} life`,
+    system,
+    format: game.format
+      ? playFormatLabel(system, game.format)
+      : counterValueLabel(system, game.startingLife),
     changeCount: localChanges(game).length,
     players: game.players.map((player) => ({
       id: player.id,
@@ -96,6 +108,8 @@ export interface ConnectedSummaryDocument {
   terminalStatus?: "finished" | "abandoned"
   terminalReason?: string
   startingLife: number
+  system?: string
+  format?: string
   ruleset: string
   eventCount: number
   finishedAt: number
@@ -114,12 +128,14 @@ export interface ConnectedSummaryDocument {
 }
 
 export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSummaryModel {
+  const system = playSystemId(summary.system)
   return {
     source: "connected",
     status: summary.terminalStatus === "abandoned" ? "abandoned" : "finished",
     finishedAt: summary.finishedAt,
     startingLife: summary.startingLife,
-    format: summary.ruleset,
+    system,
+    format: playFormatLabel(system, summary.format ?? summary.ruleset),
     changeCount: summary.eventCount,
     terminalReason: summary.terminalReason,
     players: summary.players.map((player) => ({
@@ -195,7 +211,7 @@ export function metaLine(model: GameSummaryModel) {
     `${model.players.length} player${model.players.length === 1 ? "" : "s"}`,
     model.format,
     playedFor(model),
-    `${model.changeCount} life change${model.changeCount === 1 ? "" : "s"}`,
+    counterChangeLabel(model.system, model.changeCount),
   ]
     .filter(Boolean)
     .join(" · ")

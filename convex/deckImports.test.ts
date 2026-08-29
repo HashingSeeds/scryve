@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
-import { parsePastedDeckList } from "./deckImports"
+import { parseGenericDeckList, parsePastedDeckList } from "./deckImports"
 import schema from "./schema"
 
 const REFRESH_LEASE_MS = 5 * 60 * 1000
@@ -10,9 +10,12 @@ const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
   "./cards.ts": async () => jest.requireActual("./cards"),
+  "./cardCatalog.ts": async () => jest.requireActual("./cardCatalog"),
   "./deckImports.ts": async () => jest.requireActual("./deckImports"),
   "./decks.ts": async () => jest.requireActual("./decks"),
   "./externalApiRateLimits.ts": async () => jest.requireActual("./externalApiRateLimits"),
+  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
+  "./providerHealth.ts": async () => jest.requireActual("./providerHealth"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
 
@@ -117,6 +120,55 @@ Sideboard
         entries: [{ name: "Forest", quantity: 1, board: "main" }],
         invalidLines: [],
       },
+    )
+  })
+})
+
+describe("Yu-Gi-Oh! deck list parsing", () => {
+  function ydkeSection(ids: number[]) {
+    const bytes = new Uint8Array(ids.length * 4)
+    const view = new DataView(bytes.buffer)
+    ids.forEach((id, index) => view.setUint32(index * 4, id, true))
+    return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""))
+  }
+
+  it("decodes YDKE links and retains main, extra, and side sections", () => {
+    const list = `ydke://${ydkeSection([46986414, 46986414])}!${ydkeSection([84013237])}!${ydkeSection([14558127])}!`
+
+    expect(parseGenericDeckList(list, "ygo")).toEqual({
+      entries: [
+        {
+          name: "Card 46986414",
+          quantity: 2,
+          section: "main",
+          originalReference: "46986414",
+          providerCardId: "46986414",
+          sectionExplicit: true,
+        },
+        {
+          name: "Card 84013237",
+          quantity: 1,
+          section: "extra",
+          originalReference: "84013237",
+          providerCardId: "84013237",
+          sectionExplicit: true,
+        },
+        {
+          name: "Card 14558127",
+          quantity: 1,
+          section: "side",
+          originalReference: "14558127",
+          providerCardId: "14558127",
+          sectionExplicit: true,
+        },
+      ],
+      invalidLines: [],
+    })
+  })
+
+  it("rejects malformed YDKE payloads", () => {
+    expect(() => parseGenericDeckList("ydke://broken!also-broken!still-broken!", "ygo")).toThrow(
+      "This YDKE link is invalid",
     )
   })
 })

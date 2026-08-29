@@ -1,5 +1,6 @@
 import { randomUUID as secureRandomUUID } from "expo-crypto"
 
+import { playSystemFormat, playSystemId, playSystemRules, type PlaySystemId } from "./playSystems"
 import type {
   ActorId,
   CommandContext,
@@ -68,8 +69,10 @@ export function validatePlayerCount(count: number): boolean {
   return Number.isInteger(count) && count >= MIN_PLAYERS && count <= MAX_PLAYERS
 }
 
-export function validateStartingLife(life: number): boolean {
-  return Number.isInteger(life) && life > 0 && life <= 999
+export function validateStartingLife(life: number, system: PlaySystemId = "mtg"): boolean {
+  return (
+    Number.isInteger(life) && life > 0 && life <= playSystemRules(system).counter.maxStartingValue
+  )
 }
 
 export function isLifeDelta(value: unknown): value is LifeDelta {
@@ -84,14 +87,20 @@ export function isLifeDelta(value: unknown): value is LifeDelta {
 export function createLocalGame(input: {
   players: NewPlayerInput[]
   startingLife: number
+  system?: PlaySystemId
+  format?: string
   now?: number
   gameId?: GameId
 }): LocalGame {
+  const system = playSystemId(input.system)
+  const format = playSystemFormat(system, input.format)
   if (!validatePlayerCount(input.players.length)) {
     throw new Error("A local game requires 2–6 players.")
   }
-  if (!validateStartingLife(input.startingLife)) {
-    throw new Error("Starting life must be a whole number from 1 to 999.")
+  if (!validateStartingLife(input.startingLife, system)) {
+    throw new Error(
+      `Starting ${playSystemRules(system).counter.label} must be a whole number from 1 to ${playSystemRules(system).counter.maxStartingValue}.`,
+    )
   }
   const validatedNames = validatePlayerNames(input.players.map(({ name }) => name))
   if (!validatedNames.valid) {
@@ -113,6 +122,8 @@ export function createLocalGame(input: {
     schemaVersion: 1,
     id,
     status: "active",
+    system,
+    format,
     startingLife: input.startingLife,
     players,
     events: [],

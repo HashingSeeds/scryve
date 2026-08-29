@@ -34,19 +34,40 @@ import { deckFormatLabel, deckGame, deckSections } from "../../convex/lib/deckGa
 import { versionLabel } from "../../convex/lib/deckVersions"
 
 type DeckCard = {
-  oracleId: string
-  scryfallId: string
+  game?: string
+  identityNamespace?: string
+  cardId?: string
+  providerCardId?: string
+  printingId?: string
+  section?: string
+  entryKind?: string
+  originalReference?: string
+  category?: string
+  oracleId?: string
+  scryfallId?: string
   name: string
   imageUrl?: string
   smallImageUrl?: string
   quantity: number
-  board: "main" | "sideboard" | "commander"
+  board?: "main" | "sideboard" | "commander"
 }
 
 type DeckDetailTab = "cards" | "versions" | "notes"
 
-function printingKey(card: Pick<DeckCard, "board" | "scryfallId">) {
-  return `${card.board}:${card.scryfallId}`
+function cardSection(card: DeckCard) {
+  return card.section ?? card.board ?? "main"
+}
+
+function printingKey(card: DeckCard) {
+  const identity =
+    card.printingId ??
+    card.providerCardId ??
+    card.scryfallId ??
+    card.cardId ??
+    card.oracleId ??
+    card.originalReference ??
+    card.name
+  return `${cardSection(card)}:${identity}`
 }
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
@@ -67,7 +88,7 @@ function mergedPrintings(cards: DeckCard[]) {
 
 function groupedCards(cards: DeckCard[], sections: readonly { id: string; label: string }[]) {
   const known = sections.map((section) => {
-    const boardCards = cards.filter((card) => card.board === section.id)
+    const boardCards = cards.filter((card) => cardSection(card) === section.id)
     return {
       board: section.id,
       label: section.label,
@@ -76,9 +97,9 @@ function groupedCards(cards: DeckCard[], sections: readonly { id: string; label:
     }
   })
   const knownIds = new Set(sections.map((section) => section.id))
-  const extraIds = [...new Set(cards.map((card) => card.board).filter((id) => !knownIds.has(id)))]
+  const extraIds = [...new Set(cards.map(cardSection).filter((id) => !knownIds.has(id)))]
   const extra = extraIds.map((board) => {
-    const boardCards = cards.filter((card) => card.board === board)
+    const boardCards = cards.filter((card) => cardSection(card) === board)
     return {
       board,
       label: board.charAt(0).toUpperCase() + board.slice(1),
@@ -323,8 +344,16 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
 
   async function runSearch() {
     await run(async () => {
-      const found = await searchCards({ query: search })
-      setResults(found.map((card) => ({ ...card, quantity: 1, board: "main" as const })))
+      const found = await searchCards({ query: search, game: detail?.deck.game })
+      setResults(
+        found.map((card) => ({
+          ...card,
+          quantity: 1,
+          ...(detail?.deck.game === "mtg"
+            ? { board: "main" as const }
+            : { section: configuredSections[0]?.id ?? "main" }),
+        })),
+      )
     }, "Could not search cards")
   }
 
@@ -368,7 +397,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   function focusCard(card: DeckCard) {
     setFocusedKey(printingKey(card))
     setDetailsError(undefined)
-    void loadCardDetails(card.scryfallId)
+    if (card.scryfallId) void loadCardDetails(card.scryfallId)
   }
 
   function decrementFocusedCard(card: DeckCard) {
@@ -682,7 +711,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
               />
               {results.map((card) => (
                 <ListItem
-                  key={card.scryfallId}
+                  key={printingKey(card)}
                   bottomSeparator
                   height={84}
                   style={$centeredRow}
@@ -740,9 +769,9 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
             imageUrl: focusedCard.imageUrl,
             smallImageUrl: focusedCard.smallImageUrl,
             quantity: focusedCard.quantity,
-            boardLabel: boardLabel(configuredSections, focusedCard.board),
+            boardLabel: boardLabel(configuredSections, cardSection(focusedCard)),
           }}
-          details={detailsByScryfallId[focusedCard.scryfallId]}
+          details={focusedCard.scryfallId ? detailsByScryfallId[focusedCard.scryfallId] : undefined}
           detailsError={detailsError}
           {...(editing
             ? {

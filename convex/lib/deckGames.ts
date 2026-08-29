@@ -26,6 +26,8 @@ const YUGIOH_SECTIONS = [
   { id: "side", label: "Side Deck" },
 ] as const
 
+const POKEMON_SECTIONS = [{ id: "main", label: "Deck" }] as const
+
 export type DeckGame = {
   id: string
   label: string
@@ -101,7 +103,13 @@ const MTG_FORMATS = [
 const YUGIOH_FORMATS = [
   { id: "advanced", label: "Advanced", sections: YUGIOH_SECTIONS },
   { id: "traditional", label: "Traditional", sections: YUGIOH_SECTIONS },
-  { id: "speed", label: "Speed Duel", sections: YUGIOH_SECTIONS },
+  { id: "rush", label: "Rush Duel", sections: YUGIOH_SECTIONS },
+] as const
+
+const POKEMON_FORMATS = [
+  { id: "standard", label: "Standard", sections: POKEMON_SECTIONS },
+  { id: "expanded", label: "Expanded", sections: POKEMON_SECTIONS },
+  { id: "unlimited", label: "Unlimited", sections: POKEMON_SECTIONS },
 ] as const
 
 export const DECK_GAMES: Record<string, DeckGame> = {
@@ -117,9 +125,17 @@ export const DECK_GAMES: Record<string, DeckGame> = {
     id: "ygo",
     label: "Yu-Gi-Oh!",
     shortLabel: "Yu-Gi-Oh!",
-    available: false,
+    available: true,
     defaultFormat: "advanced",
     formats: YUGIOH_FORMATS,
+  },
+  pokemon: {
+    id: "pokemon",
+    label: "Pokemon TCG",
+    shortLabel: "Pokemon",
+    available: true,
+    defaultFormat: "standard",
+    formats: POKEMON_FORMATS,
   },
 }
 
@@ -146,6 +162,16 @@ export function assertPlayableDeckGame(game: string): DeckGameId {
       message: `${known.label} decks are not supported yet`,
     })
   return known.id
+}
+
+export function assertDeckGameFormat(game: string, format: string) {
+  const known = deckGame(assertPlayableDeckGame(game))!
+  if (!known.formats.some((candidate) => candidate.id === format))
+    throw new ConvexError({
+      code: "unknown_format",
+      message: `${format} is not a ${known.label} format`,
+    })
+  return format
 }
 
 export function deckFormats(game: string): readonly DeckFormat[] {

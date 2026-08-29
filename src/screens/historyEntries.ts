@@ -1,3 +1,9 @@
+import {
+  counterValueLabel,
+  playFormatLabel,
+  playSystemId,
+  type PlaySystemId,
+} from "@/features/game/playSystems"
 import type { LocalGameSummary } from "@/features/game/types"
 
 export type HistorySource = "local" | "connected"
@@ -20,10 +26,12 @@ export interface HistoryEntry {
   winnerNames?: string[]
   eventCount: number
   players: HistoryPlayerSummary[]
+  system: PlaySystemId
   format: string
 }
 
 export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
+  const system = playSystemId(game.system)
   const result = game.result
   const winnerNames =
     result?.kind === "win"
@@ -40,12 +48,15 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
     outcome: result?.kind === "draw" ? "draw" : winnerNames.length > 0 ? "win" : "unrecorded",
     ...(winnerNames.length > 0 ? { winnerNames } : {}),
     eventCount: game.eventCount,
+    system,
     players: game.players.map((player) => ({
       id: player.id,
       name: player.name,
       color: player.color,
     })),
-    format: `${game.startingLife} life`,
+    format: game.format
+      ? playFormatLabel(system, game.format)
+      : counterValueLabel(system, game.startingLife),
   }
 }
 
@@ -55,6 +66,8 @@ export function connectedHistoryEntry(game: {
   eventCount: number
   finishedAt: number
   ruleset?: string
+  system?: string
+  format?: string
   startingLife?: number
   terminalStatus?: string
   players: {
@@ -64,6 +77,7 @@ export function connectedHistoryEntry(game: {
     deckNameAtFinish?: string
   }[]
 }): HistoryEntry {
+  const system = playSystemId(game.system)
   return {
     key: `connected:${game.publicId}`,
     source: "connected",
@@ -75,13 +89,19 @@ export function connectedHistoryEntry(game: {
         ? game.outcome
         : "unrecorded",
     eventCount: game.eventCount,
+    system,
     players: (game.players ?? []).map((player, index) => ({
       id: player.playerId ?? `${game.publicId}:${index}`,
       name: player.displayName ?? "",
       color: player.color,
       deckName: player.deckNameAtFinish,
     })),
-    format: game.ruleset ?? (game.startingLife ? `${game.startingLife} life` : "connected"),
+    format:
+      game.format || game.ruleset
+        ? playFormatLabel(system, game.format ?? game.ruleset)
+        : game.startingLife
+          ? counterValueLabel(system, game.startingLife)
+          : "Connected",
   }
 }
 

@@ -12,6 +12,13 @@ import {
   PlayerActionsDialog,
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
+import {
+  counterChangeLabel,
+  counterDeltaFromStartLabel,
+  counterValueLabel,
+  playSystemRules,
+  type PlaySystemId,
+} from "@/features/game/playSystems"
 import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -23,7 +30,7 @@ import type {
   SummaryPlayer,
   SummaryTimelineState,
 } from "./gameSummary"
-import { anyResultRecorded, finishedOnLabel, metaLine, netSwing, standings } from "./gameSummary"
+import { anyResultRecorded, finishedOnLabel, metaLine, standings } from "./gameSummary"
 
 export interface GameSummaryScreenProps {
   summary: GameSummaryState
@@ -47,11 +54,13 @@ function StandingRow({
   player,
   rank,
   startingLife,
+  system,
   showOutcome,
 }: {
   player: SummaryPlayer
   rank: number
   startingLife?: number
+  system: PlaySystemId
   showOutcome: boolean
 }) {
   const { theme, themed } = useAppTheme()
@@ -62,7 +71,10 @@ function StandingRow({
       : player.outcome === "loss"
         ? theme.colors.error
         : theme.colors.textDim
-  const swing = netSwing(player, startingLife)
+  const changeFromStart =
+    startingLife === undefined
+      ? undefined
+      : counterDeltaFromStartLabel(system, player.life, startingLife)
   const detail = [
     player.username ? `@${player.username}` : undefined,
     player.deckLabel,
@@ -74,7 +86,7 @@ function StandingRow({
   return (
     <View
       style={themed($standingRow)}
-      accessibilityLabel={`${showOutcome ? `${badge.accessibilityLabel}, ` : ""}${player.name}, ${player.life} life`}
+      accessibilityLabel={`${showOutcome ? `${badge.accessibilityLabel}, ` : ""}${player.name}, ${counterValueLabel(system, player.life)}`}
     >
       <View style={[themed($colorBar), { backgroundColor: player.color }]} />
       {showOutcome ? (
@@ -97,12 +109,8 @@ function StandingRow({
       </View>
       <View style={themed($lifeColumn)}>
         <Text size="lg" weight="bold" text={String(player.life)} />
-        {swing === undefined ? null : (
-          <Text
-            size="xxs"
-            style={themed($muted)}
-            text={swing === 0 ? "even" : `${signed(swing)} from start`}
-          />
+        {changeFromStart === undefined ? null : (
+          <Text size="xxs" style={themed($muted)} text={changeFromStart} />
         )}
       </View>
     </View>
@@ -147,13 +155,13 @@ function SummaryLoadingShell({ onBack }: { onBack: () => void }) {
   )
 }
 
-function TimelineLoading() {
+function TimelineLoading({ counterLabel }: { counterLabel: string }) {
   const { themed } = useAppTheme()
   return (
     <View
       testID="summary-timeline-loading"
       accessibilityRole="progressbar"
-      accessibilityLabel="Loading life changes"
+      accessibilityLabel={`Loading ${counterLabel} changes`}
       style={themed($timeline)}
     >
       {Array.from({ length: 3 }).map((_, index) => (
@@ -206,6 +214,7 @@ export function GameSummaryScreen({
   }
 
   const showOutcome = anyResultRecorded(model)
+  const counter = playSystemRules(model.system).counter
   const rows = standings(model)
   const playersById = new Map(model.players.map((player) => [player.id, player]))
   const timelineItems = timeline.status === "ready" ? timeline.items : []
@@ -258,7 +267,7 @@ export function GameSummaryScreen({
           weight="bold"
           size="xs"
           style={themed($sectionHeading)}
-          text={showOutcome ? "Result" : "Final life totals"}
+          text={showOutcome ? "Result" : `Final ${counter.heading}`}
         />
         <View>
           {rows.map((player, index) => (
@@ -267,6 +276,7 @@ export function GameSummaryScreen({
               player={player}
               rank={index + 1}
               startingLife={model.startingLife}
+              system={model.system}
               showOutcome={showOutcome}
             />
           ))}
@@ -287,7 +297,7 @@ export function GameSummaryScreen({
           testID="summary-timeline-toggle"
           accessibilityRole="button"
           accessibilityState={{ expanded: timelineOpen, disabled: model.changeCount === 0 }}
-          accessibilityLabel={`Life changes, ${model.changeCount}`}
+          accessibilityLabel={counterChangeLabel(model.system, model.changeCount)}
           activeOpacity={0.8}
           style={themed($timelineToggle)}
           onPress={() => {
@@ -300,7 +310,7 @@ export function GameSummaryScreen({
             weight="bold"
             size="xs"
             style={themed($toggleHeading)}
-            text={`Life changes · ${model.changeCount}`}
+            text={`${counter.heading} changes · ${model.changeCount}`}
           />
           {model.changeCount > 0 ? (
             <Text size="xxs" style={themed($muted)} text={timelineOpen ? "Hide" : "Show"} />
@@ -308,17 +318,21 @@ export function GameSummaryScreen({
         </TouchableOpacity>
 
         {model.changeCount === 0 ? (
-          <Text size="xs" style={themed($muted)} text="No life changes were recorded." />
+          <Text
+            size="xs"
+            style={themed($muted)}
+            text={`No ${counter.label} changes were recorded.`}
+          />
         ) : timelineOpen ? (
           timeline.status === "loading" || timeline.status === "idle" ? (
-            <TimelineLoading />
+            <TimelineLoading counterLabel={counter.label} />
           ) : timeline.status === "error" ? (
             <View
               testID="summary-timeline-error"
               accessibilityRole="alert"
               style={themed($timelineStatus)}
             >
-              <Text size="xs" text="Could not load life changes." />
+              <Text size="xs" text={`Could not load ${counter.label} changes.`} />
               <Button
                 testID="summary-timeline-retry"
                 style={themed($timelineStatusButton)}
@@ -332,7 +346,7 @@ export function GameSummaryScreen({
               accessibilityRole="alert"
               size="xs"
               style={themed($muted)}
-              text="Life change details are unavailable."
+              text={`${counter.heading} change details are unavailable.`}
             />
           ) : (
             <View style={themed($timeline)}>
@@ -363,7 +377,11 @@ export function GameSummaryScreen({
                 )
               })}
               {timelineItems.length === 0 ? (
-                <Text size="xs" style={themed($muted)} text="No life change details were found." />
+                <Text
+                  size="xs"
+                  style={themed($muted)}
+                  text={`No ${counter.label} change details were found.`}
+                />
               ) : null}
               {timeline.nextPage.status !== "exhausted" ? (
                 <Button

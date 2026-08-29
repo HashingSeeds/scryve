@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "scryve-ygo-image-mirror-multigame-preview",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "r2_buckets": [
+    {
+      "binding": "YGO_IMAGES",
+      "bucket_name": "scryve-ygo-images-multigame-preview"
+    }
+  ],
+  "secrets": {
+    "required": ["MIRROR_TOKEN"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

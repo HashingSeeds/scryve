@@ -2,8 +2,14 @@ import { ConvexError, v } from "convex/values"
 
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
-import type { MutationCtx } from "./_generated/server"
+import type { ActionCtx, MutationCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery } from "./_generated/server"
+import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
+import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
+import { normalizeScryfallCatalogCard } from "./lib/games/magic"
+import { pokemonCardById, searchPokemon } from "./lib/games/pokemon"
+import { cardsByYgoIds, searchYgo } from "./lib/games/yugioh"
+import { assertGameSystem, type GameSystemId } from "./lib/integrations"
 import {
   type CardReference,
   fetchScryfall,
@@ -18,12 +24,125 @@ async function requireActionIdentity(ctx: { auth: { getUserIdentity: () => Promi
     throw new ConvexError({ code: "unauthenticated", message: "Authentication required" })
 }
 
+function catalogWithoutImages(card: CatalogCard): CatalogCard {
+  const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...cardWithoutImages } = card
+  return {
+    ...cardWithoutImages,
+    faces: card.faces.map((face) => {
+      const { imageUrl: _faceImage, smallImageUrl: _faceSmallImage, ...faceWithoutImages } = face
+      return faceWithoutImages
+    }),
+  }
+}
+
+function catalogResult(card: NormalizedCard, includeImages = true): CatalogCard {
+  const printing = card.printings[0]
+  const face = printing?.faces[0]
+  const result: CatalogCard = {
+    game: card.game,
+    identityNamespace: card.identityNamespace,
+    cardId: card.cardId,
+    name: card.name,
+    category: card.category,
+    facets: card.facets,
+    providerCardId: printing?.providerCardId,
+    printingId: printing?.printingId,
+    setCode: printing?.setCode,
+    collectorNumber: printing?.collectorNumber,
+    rarity: printing?.rarity,
+    typeLabel: printing?.typeLabel,
+    text: face?.text,
+    imageUrl: face?.imageUrl,
+    smallImageUrl: face?.smallImageUrl,
+    faces: printing?.faces ?? [],
+  }
+  return includeImages ? result : catalogWithoutImages(result)
+}
+
+function responseStatus(error: unknown) {
+  if (typeof error !== "object" || error === null || !("response" in error)) return undefined
+  const response = error.response
+  return response instanceof Response ? response.status : undefined
+}
+
+async function recordHealth(
+  ctx: ActionCtx,
+  input: {
+    game: GameSystemId
+    provider: string
+    operation: string
+    startedAt: number
+    status: "healthy" | "degraded" | "unavailable"
+    httpStatus?: number
+    message: string
+  },
+) {
+  const finishedAt = Date.now()
+  await ctx.runMutation(internal.providerHealth.record, {
+    game: input.game,
+    provider: input.provider,
+    operation: input.operation,
+    status: input.status,
+    lastAttemptAt: finishedAt,
+    ...(input.status === "healthy" ? { lastSuccessAt: finishedAt } : {}),
+    responseMs: Math.max(0, finishedAt - input.startedAt),
+    ...(input.httpStatus === undefined ? {} : { httpStatus: input.httpStatus }),
+    message: input.message,
+  })
+}
+
 export const search = action({
-  args: { query: v.string() },
-  handler: async (ctx, args): Promise<CardReference[]> => {
+  args: { query: v.string(), game: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<CardReference[] | CatalogCard[]> => {
     await requireActionIdentity(ctx)
     const query = args.query.trim()
     if (query.length < 2 || query.length > 120) return []
+    const game = assertGameSystem(args.game ?? "mtg")
+    await requireActionCapability(ctx, game, "cardCatalog")
+    const includeImages = await actionCapabilityEnabled(ctx, game, "images")
+    if (game !== "mtg") {
+      const cached: CatalogCard[] = await ctx.runQuery(internal.cardCatalog.searchCached, {
+        game,
+        query,
+        limit: MAX_SEARCH_RESULTS,
+      })
+      if (cached.length > 0)
+        return includeImages ? cached : cached.map((card) => catalogWithoutImages(card))
+      const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
+      const startedAt = Date.now()
+      try {
+        const result =
+          game === "ygo"
+            ? await searchYgo(ctx, query, includeImages)
+            : await searchPokemon(ctx, query, includeImages)
+        if (result.cards.length > 0)
+          await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
+        await recordHealth(ctx, {
+          game,
+          provider,
+          operation: "card-search",
+          startedAt,
+          status: "healthy",
+          httpStatus: result.status,
+          message: `${result.cards.length} cards normalized`,
+        })
+        return result.cards.map((card) => catalogResult(card, includeImages))
+      } catch (error) {
+        await recordHealth(ctx, {
+          game,
+          provider,
+          operation: "card-search",
+          startedAt,
+          status: "unavailable",
+          ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
+          message: error instanceof Error ? error.message : "Provider search failed",
+        })
+        throw new ConvexError({
+          code: "card_provider_unavailable",
+          message: "Card search is temporarily unavailable",
+        })
+      }
+    }
     const path = `/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
     const response = await fetchScryfall(ctx, path)
     if (response.status === 404) return []
@@ -39,7 +158,80 @@ export const search = action({
       .filter((card): card is CardReference => card !== null)
       .slice(0, MAX_SEARCH_RESULTS)
     if (cards.length > 0) await ctx.runMutation(internal.cards.cacheMany, { cards })
+    const catalogCards = data
+      .map(normalizeScryfallCatalogCard)
+      .filter((card): card is NormalizedCard => card !== null)
+      .slice(0, MAX_SEARCH_RESULTS)
+    if (catalogCards.length > 0)
+      await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: catalogCards })
     return cards
+  },
+})
+
+export const byCatalogId = action({
+  args: { game: v.string(), cardId: v.string() },
+  handler: async (ctx, args): Promise<CatalogCard> => {
+    await requireActionIdentity(ctx)
+    const game = assertGameSystem(args.game)
+    await requireActionCapability(ctx, game, "cardCatalog")
+    const includeImages = await actionCapabilityEnabled(ctx, game, "images")
+    const cardId = args.cardId.trim()
+    if (!cardId || cardId.length > 200)
+      throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
+    const cached: CatalogCard | null = await ctx.runQuery(internal.cardCatalog.lookupCached, {
+      game,
+      cardId,
+    })
+    if (cached) return includeImages ? cached : catalogWithoutImages(cached)
+    if (game === "mtg") {
+      const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(cardId)}`)
+      if (!response.ok)
+        throw new ConvexError({ code: "scryfall_unavailable", message: "Card lookup failed" })
+      const card = normalizeScryfallCatalogCard((await response.json()) as unknown)
+      if (!card)
+        throw new ConvexError({
+          code: "scryfall_invalid_response",
+          message: "Invalid card response",
+        })
+      await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: [card] })
+      return catalogResult(card, includeImages)
+    }
+    const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
+    const startedAt = Date.now()
+    try {
+      const result =
+        game === "ygo"
+          ? await cardsByYgoIds(ctx, [cardId], includeImages)
+          : await pokemonCardById(ctx, cardId, includeImages)
+      const card = result.cards[0]
+      if (!card) throw new ConvexError({ code: "card_not_found", message: "Card not found" })
+      await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
+      await recordHealth(ctx, {
+        game,
+        provider,
+        operation: "card-lookup",
+        startedAt,
+        status: "healthy",
+        httpStatus: result.status,
+        message: "Card normalized",
+      })
+      return catalogResult(card, includeImages)
+    } catch (error) {
+      await recordHealth(ctx, {
+        game,
+        provider,
+        operation: "card-lookup",
+        startedAt,
+        status: "unavailable",
+        ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
+        message: error instanceof Error ? error.message : "Provider lookup failed",
+      })
+      if (error instanceof ConvexError) throw error
+      throw new ConvexError({
+        code: "card_provider_unavailable",
+        message: "Card lookup is temporarily unavailable",
+      })
+    }
   },
 })
 

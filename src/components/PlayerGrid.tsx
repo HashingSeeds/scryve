@@ -2,6 +2,7 @@ import { useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
 
+import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -17,6 +18,7 @@ import {
 
 export interface PlayerGridProps {
   players: GamePlayer[]
+  system?: PlaySystemId
   layoutVariant?: PlayerGridLayoutVariant
   disabled?: boolean
   isPlayerDisabled?: (player: GamePlayer) => boolean
@@ -30,6 +32,7 @@ const SINGLE_PLAYER_ROW_FLEX = 0.8
 
 export function PlayerGrid({
   players,
+  system = "mtg",
   layoutVariant = "auto",
   disabled,
   isPlayerDisabled,
@@ -44,6 +47,7 @@ export function PlayerGrid({
     theme: { spacing },
   } = useAppTheme()
   const [board, setBoard] = useState({ width: 0, height: 0 })
+  const counter = playSystemRules(system).counter
   const layout = getPlayerGridLayout({
     playerCount: players.length,
     width,
@@ -72,7 +76,7 @@ export function PlayerGrid({
   return (
     <View
       testID="player-grid"
-      accessibilityLabel={`${players.length} player life grid`}
+      accessibilityLabel={`${players.length} player ${counter.label} grid`}
       onLayout={measureBoard}
       style={[themed($grid), style]}
     >
@@ -129,6 +133,7 @@ export function PlayerGrid({
                   compact={layout.compact}
                   contentRotation={contentRotation}
                   lifeFontSize={lifeFontSize}
+                  system={system}
                   disabled={disabled || playerDisabled}
                   ownership={ownership}
                   pendingCount={getPendingCount?.(player)}

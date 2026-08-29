@@ -10,6 +10,7 @@ import {
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
+import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -19,11 +20,17 @@ import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import {
   MAX_PLAYER_NAME_LENGTH,
   PLAYER_COLORS,
-  STARTING_LIFE_PRESETS,
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
 import type { LocalSettings } from "@/features/game/localPersistence"
+import {
+  PLAY_SYSTEM_LIST,
+  playSystemFormat,
+  playSystemFormats,
+  playSystemRules,
+  type PlaySystemId,
+} from "@/features/game/playSystems"
 import type { NewPlayerInput } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -41,7 +48,13 @@ export interface ConnectedHostFeed {
   blockedReason?: string
   error?: string
   retry?: () => void
-  host: (setup: { playerCount: number; startingLife: number; ruleset: string }) => void
+  host: (setup: {
+    playerCount: number
+    startingLife: number
+    ruleset: string
+    system: PlaySystemId
+    format: string
+  }) => void
 }
 
 export interface NewGameScreenProps {
@@ -49,7 +62,11 @@ export interface NewGameScreenProps {
   mode: NewGameMode
   onModeChange: (mode: NewGameMode) => void
   onBack: () => void
-  onStartLocal: (players: NewPlayerInput[], startingLife: number) => void
+  onStartLocal: (
+    players: NewPlayerInput[],
+    startingLife: number,
+    setup: { system: PlaySystemId; format: string },
+  ) => void
   connected?: ConnectedHostFeed
 }
 
@@ -77,21 +94,21 @@ export function NewGameScreen({
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
+  const [system, setSystem] = useState<PlaySystemId>("mtg")
+  const [format, setFormat] = useState(() => playSystemFormat("mtg"))
   const [lifeText, setLifeText] = useState(String(defaults.defaultStartingLife))
-  const [ruleset, setRuleset] = useState("standard")
+  const counter = playSystemRules(system).counter
   const [showCustomStartingLife, setShowCustomStartingLife] = useState(() =>
-    STARTING_LIFE_PRESETS.every((life) => life !== defaults.defaultStartingLife),
+    playSystemRules("mtg").counter.presets.every((life) => life !== defaults.defaultStartingLife),
   )
   const connectedMode = mode === "connected"
   const startingLife = Number(lifeText)
-  const validLife = validateStartingLife(startingLife)
+  const validLife = validateStartingLife(startingLife, system)
   const seatNames = useMemo(
     () => names.slice(0, playerCount).map((name, index) => name.trim() || defaultName(index)),
     [names, playerCount],
   )
   const nameValidation = validatePlayerNames(seatNames)
-  const normalizedRuleset = ruleset.trim()
-  const validRuleset = normalizedRuleset.length > 0 && normalizedRuleset.length <= 32
   const players = useMemo(
     () =>
       nameValidation.names.map((name, index) => ({
@@ -102,14 +119,24 @@ export function NewGameScreen({
     [appearances, nameValidation.names],
   )
   const valid = connectedMode
-    ? validLife && validRuleset && Boolean(connected?.ready) && !connected?.blockedReason
+    ? validLife && Boolean(connected?.ready) && !connected?.blockedReason
     : validLife && nameValidation.valid
   const busy = Boolean(connected?.busy)
 
   function submit() {
     if (!valid || busy) return
-    if (connectedMode) connected?.host({ playerCount, startingLife, ruleset: normalizedRuleset })
-    else onStartLocal(players, startingLife)
+    if (connectedMode)
+      connected?.host({ playerCount, startingLife, ruleset: format, system, format })
+    else onStartLocal(players, startingLife, { system, format })
+  }
+
+  function chooseSystem(value: string) {
+    const next = PLAY_SYSTEM_LIST.find((candidate) => candidate.id === value)
+    if (!next) return
+    setSystem(next.id)
+    setFormat(playSystemFormat(next.id))
+    setLifeText(String(next.counter.defaultValue))
+    setShowCustomStartingLife(false)
   }
 
   function openAppearancePicker(index: number, event?: GestureResponderEvent) {
@@ -164,6 +191,31 @@ export function NewGameScreen({
         </View>
 
         <View style={themed($section)}>
+          <Text text="System" preset="subheading" accessibilityRole="header" />
+          <FilterChips
+            testID="play-system"
+            accessibilityLabel="Game system"
+            chips={PLAY_SYSTEM_LIST.map((candidate) => ({
+              id: candidate.id,
+              label: candidate.shortLabel,
+            }))}
+            selectedId={system}
+            onSelect={chooseSystem}
+          />
+          <Text text="Format" preset="subheading" accessibilityRole="header" />
+          <FilterChips
+            testID="play-format"
+            accessibilityLabel={`${playSystemRules(system).shortLabel} format`}
+            chips={playSystemFormats(system).map((candidate) => ({
+              id: candidate.id,
+              label: candidate.label,
+            }))}
+            selectedId={format}
+            onSelect={setFormat}
+          />
+        </View>
+
+        <View style={themed($section)}>
           <Text
             text={connectedMode ? "Seats" : "Players"}
             preset="subheading"
@@ -185,14 +237,14 @@ export function NewGameScreen({
         </View>
 
         <View style={themed($section)}>
-          <Text tx="game:startingLife" preset="subheading" accessibilityRole="header" />
+          <Text text={`Starting ${counter.label}`} preset="subheading" accessibilityRole="header" />
           <View style={themed($choiceRow)}>
-            {STARTING_LIFE_PRESETS.map((life) => (
+            {counter.presets.map((life) => (
               <ChoiceButton
                 compact
                 key={life}
                 text={String(life)}
-                accessibilityLabel={`Start at ${life} life`}
+                accessibilityLabel={`Start at ${life} ${counter.label}`}
                 selected={startingLife === life}
                 style={themed($choice)}
                 onPress={() => {
@@ -213,35 +265,17 @@ export function NewGameScreen({
           {showCustomStartingLife ? (
             <TextField
               testID={connectedMode ? "connected-starting-life" : "custom-starting-life"}
-              labelTx="game:customStartingLife"
+              label={`Custom starting ${counter.label}`}
               value={lifeText}
               keyboardType="number-pad"
               status={validLife ? undefined : "error"}
-              helper={
-                validLife ? "Whole number from 1 to 999." : "Enter a whole number from 1 to 999."
-              }
+              helper={`Whole number from 1 to ${counter.maxStartingValue}.`}
               onChangeText={setLifeText}
             />
           ) : null}
         </View>
 
-        {connectedMode ? (
-          <View style={themed($section)}>
-            <Text text="Ruleset" preset="subheading" accessibilityRole="header" />
-            <TextField
-              testID="connected-ruleset"
-              value={ruleset}
-              maxLength={32}
-              status={validRuleset ? undefined : "error"}
-              helper={
-                validRuleset
-                  ? "Players name themselves as they join."
-                  : "Enter a ruleset name up to 32 characters."
-              }
-              onChangeText={setRuleset}
-            />
-          </View>
-        ) : (
+        {!connectedMode ? (
           <View style={themed($section)}>
             <Text tx="game:playerNames" preset="subheading" accessibilityRole="header" />
             <View style={themed($nameList)}>
@@ -279,7 +313,7 @@ export function NewGameScreen({
               ))}
             </View>
           </View>
-        )}
+        ) : null}
       </Screen>
       <View style={[themed($footer), $footerSafeArea]}>
         <View style={themed($footerContent)}>

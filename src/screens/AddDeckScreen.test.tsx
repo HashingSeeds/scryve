@@ -39,6 +39,7 @@ const mockPreviewPrecon = jest.fn(async () => ({
   ],
 }))
 const mockResolvePasted = jest.fn()
+const mockSearchTopDecks = jest.fn(async () => [])
 const mockCardById = jest.fn(async () => ({
   manaCost: "{1}{G}{U}",
   typeLine: "Legendary Creature — Merfolk Scout",
@@ -86,14 +87,18 @@ const mockListMine: {
 }
 
 jest.mock("convex/react", () => ({
-  useQuery: () => {
+  useQuery: (reference: string) => {
+    if (reference === "deckCatalogs.detail") return undefined
     if (mockListMine.error) throw mockListMine.error
     return mockListMine.value
   },
   useMutation: (reference: string) =>
-    reference === "decks.importResolved" ? mockImport : mockCreate,
+    reference === "decks.importResolved" || reference === "decks.importCatalog"
+      ? mockImport
+      : mockCreate,
   useAction: (reference: string) => {
     if (reference === "cards.byId") return mockCardById
+    if (reference === "deckCatalogs.searchTopDecks") return mockSearchTopDecks
     if (reference === "deckImports.searchPreconstructed") return mockSearch
     if (reference === "deckImports.previewPreconstructed") return mockPreviewPrecon
     if (reference === "deckImports.resolvePreconstructed") return mockResolvePrecon
@@ -107,6 +112,7 @@ jest.mock("../../convex/_generated/api", () => ({
       listMine: "decks.listMine",
       create: "decks.create",
       importResolved: "decks.importResolved",
+      importCatalog: "decks.importCatalog",
     },
     deckImports: {
       searchPreconstructed: "deckImports.searchPreconstructed",
@@ -116,6 +122,10 @@ jest.mock("../../convex/_generated/api", () => ({
     },
     cards: {
       byId: "cards.byId",
+    },
+    deckCatalogs: {
+      detail: "deckCatalogs.detail",
+      searchTopDecks: "deckCatalogs.searchTopDecks",
     },
   },
 }))
@@ -136,18 +146,14 @@ function renderAddDeck(onCreated = jest.fn()) {
 }
 
 function chooseFormat(view: ReturnType<typeof renderAddDeck>, format: string) {
-  fireEvent.press(view.getByTestId("format-picker"))
   fireEvent.press(view.getByTestId(`format-picker-options-${format}`))
 }
 
 function chooseMode(view: ReturnType<typeof renderAddDeck>, mode: string) {
-  fireEvent.press(view.getByTestId("mode-picker"))
   fireEvent.press(view.getByTestId(`mode-picker-options-${mode}`))
 }
 
-function continueSetup(view: ReturnType<typeof renderAddDeck>) {
-  fireEvent.press(view.getByTestId("continue-add-deck"))
-}
+function continueSetup(_view: ReturnType<typeof renderAddDeck>) {}
 
 describe("AddDeckScreen", () => {
   beforeEach(() => {
@@ -168,11 +174,8 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     expect(view.getByText("Official precon")).toBeTruthy()
     chooseMode(view, "paste")
-    continueSetup(view)
     expect(view.getByText("Deck list")).toBeTruthy()
-    fireEvent.press(view.getByTestId("change-deck-setup"))
     chooseMode(view, "blank")
-    continueSetup(view)
     expect(view.getByText("Create deck")).toBeTruthy()
   })
 

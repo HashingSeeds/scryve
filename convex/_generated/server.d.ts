@@ -31,6 +31,7 @@ type Env = {
   readonly MODERATION_ALERT_TO: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
   readonly WAITLIST_INGEST_SECRET: string | undefined;
+  readonly YGO_IMAGE_BASE_URL: string | undefined;
 };
 
 /**

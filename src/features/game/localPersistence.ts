@@ -14,6 +14,7 @@ import {
   createClientId,
   isLifeDelta,
 } from "./domain"
+import { playSystemId } from "./playSystems"
 import type { GameEvent, GamePlayer, LocalGame, LocalGameResult, LocalGameSummary } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 
@@ -189,6 +190,8 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     schemaVersion: 1,
     id: asGameId(value.id),
     status: value.status,
+    system: playSystemId(value.system),
+    ...(typeof value.format === "string" ? { format: value.format } : {}),
     startingLife: value.startingLife,
     players,
     events,
@@ -248,6 +251,8 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         schemaVersion: 1,
         id: asGameId(value.id),
         status: value.status,
+        system: playSystemId(value.system),
+        ...(typeof value.format === "string" ? { format: value.format } : {}),
         startingLife: value.startingLife,
         players,
         eventCount: value.eventCount,
@@ -366,6 +371,8 @@ export class LocalGameRepository {
       schemaVersion: 1,
       id: game.id,
       status: game.status,
+      system: playSystemId(game.system),
+      ...(game.format ? { format: game.format } : {}),
       startingLife: game.startingLife,
       players: game.players,
       eventCount: game.events.length,

@@ -253,7 +253,6 @@ export function DecksScreen({
   const { themed } = useAppTheme()
   const { game, format, setGame, setFormat } = useDeckFilters()
   const [search, setSearch] = useState("")
-  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const formatChips = useMemo<FilterChip[]>(() => {
     const known = deckFormats(game).map((candidate) => ({
@@ -262,11 +261,6 @@ export function DecksScreen({
     }))
     return [{ id: ALL_FORMATS, label: "All formats" }, ...known]
   }, [game])
-  const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? "deck"
-  const filterSummary = `${gameLabel} · ${
-    format === ALL_FORMATS ? "All formats" : deckFormatLabel(game, format)
-  }`
-
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
       <Header
@@ -286,50 +280,33 @@ export function DecksScreen({
         }
       />
       <View style={themed($content)}>
-        <View style={themed($searchRow)}>
-          <TextField
-            testID="deck-search-input"
-            containerStyle={themed($searchField)}
-            placeholder="Search decks or formats"
-            value={search}
-            maxLength={80}
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            onChangeText={setSearch}
+        <FilterChips
+          testID="game-filter"
+          accessibilityLabel="Game"
+          chips={DECK_GAME_LIST.map((candidate) => ({
+            id: candidate.id,
+            label: candidate.shortLabel,
+          }))}
+          selectedId={game}
+          onSelect={setGame}
+        />
+        <TextField
+          testID="deck-search-input"
+          placeholder="Search decks"
+          value={search}
+          maxLength={80}
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          onChangeText={setSearch}
+        />
+        {formatChips.length > 1 ? (
+          <FilterChips
+            testID="format-filter"
+            accessibilityLabel="Format"
+            chips={formatChips}
+            selectedId={format}
+            onSelect={setFormat}
           />
-          <Button
-            testID="deck-filter-button"
-            text="Filters"
-            style={themed($filterButton)}
-            onPress={() => setFiltersOpen((open) => !open)}
-          />
-        </View>
-        <Text size="xxs" style={themed($dimmedText)} text={filterSummary} />
-        {filtersOpen ? (
-          <View style={themed($filters)}>
-            <FilterChips
-              testID="game-filter"
-              accessibilityLabel="Game"
-              chips={DECK_GAME_LIST.map((candidate) => ({
-                id: candidate.id,
-                label: candidate.available
-                  ? candidate.shortLabel
-                  : `${candidate.shortLabel} · soon`,
-                disabled: !candidate.available,
-              }))}
-              selectedId={game}
-              onSelect={setGame}
-            />
-            {formatChips.length > 1 ? (
-              <FilterChips
-                testID="format-filter"
-                accessibilityLabel="Format"
-                chips={formatChips}
-                selectedId={format}
-                onSelect={setFormat}
-              />
-            ) : null}
-          </View>
         ) : null}
         <ConvexQueryBoundary
           resetKey={`${game}:${format}`}
@@ -357,14 +334,6 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   paddingHorizontal: spacing.lg,
 })
-const $searchRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.xs,
-})
-const $searchField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-const $filterButton: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
-const $filters: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.lg })
 const $sectionHeader: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",

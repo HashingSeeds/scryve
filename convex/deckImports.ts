@@ -4,7 +4,12 @@ import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
 import type { ActionCtx } from "./_generated/server"
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server"
+import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { preconstructedFormat } from "./lib/deckGames"
+import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
+import { searchPokemon } from "./lib/games/pokemon"
+import { cardsByYgoIds, searchYgo, ygoSection } from "./lib/games/yugioh"
+import { assertGameSystem, type GameSystemId } from "./lib/integrations"
 import { MAX_DECK_CARDS } from "./lib/policy"
 import {
   type CardReference,
@@ -92,6 +97,268 @@ const preconstructedOutlineCardValidator = v.object({
 async function requireActionIdentity(ctx: { auth: { getUserIdentity: () => Promise<unknown> } }) {
   if (!(await ctx.auth.getUserIdentity()))
     throw new ConvexError({ code: "unauthenticated", message: "Authentication required" })
+}
+
+type GenericParsedEntry = {
+  name: string
+  quantity: number
+  section: string
+  originalReference: string
+  providerCardId?: string
+  sectionExplicit: boolean
+}
+
+type GenericDeckCard = {
+  game: Exclude<GameSystemId, "mtg">
+  identityNamespace?: string
+  cardId?: string
+  providerCardId?: string
+  printingId?: string
+  section: string
+  entryKind: string
+  originalReference: string
+  category?: string
+  name: string
+  imageUrl?: string
+  smallImageUrl?: string
+  quantity: number
+}
+
+function genericSection(line: string, game: GameSystemId) {
+  const heading = line
+    .replace(/[:\s]+$/g, "")
+    .trim()
+    .toLocaleLowerCase()
+  if (game === "ygo") {
+    if (["#main", "main", "main deck"].includes(heading)) return "main"
+    if (["#extra", "extra", "extra deck"].includes(heading)) return "extra"
+    if (["!side", "side", "side deck", "sideboard"].includes(heading)) return "side"
+  }
+  if (game === "pokemon" && ["pokémon", "pokemon", "trainer", "energy", "deck"].includes(heading))
+    return "main"
+  return undefined
+}
+
+function pokemonName(reference: string) {
+  const match = reference.match(/^(.+?)\s+[A-Z0-9-]{2,8}\s+[A-Za-z0-9-]+$/)
+  return (match?.[1] ?? reference).trim()
+}
+
+function decodeYdkeSection(encoded: string) {
+  if (!encoded) return []
+  let bytes: Uint8Array
+  try {
+    bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))
+  } catch {
+    throw new ConvexError({ code: "invalid_deck_list", message: "This YDKE link is invalid" })
+  }
+  if (bytes.byteLength % 4 !== 0)
+    throw new ConvexError({ code: "invalid_deck_list", message: "This YDKE link is invalid" })
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  return Array.from({ length: bytes.byteLength / 4 }, (_, index) =>
+    String(view.getUint32(index * 4, true)),
+  )
+}
+
+function parseYdkeDeckList(list: string) {
+  const payload = list.trim().slice("ydke://".length)
+  const encodedSections = payload.split("!")
+  if (encodedSections.length < 3 || encodedSections.length > 4)
+    throw new ConvexError({ code: "invalid_deck_list", message: "This YDKE link is invalid" })
+  const entries = new Map<string, GenericParsedEntry>()
+  for (const [section, encoded] of ["main", "extra", "side"].map(
+    (section, index) => [section, encodedSections[index]] as const,
+  )) {
+    for (const providerCardId of decodeYdkeSection(encoded)) {
+      const key = `${section}:${providerCardId}`
+      const current = entries.get(key)
+      entries.set(key, {
+        name: `Card ${providerCardId}`,
+        quantity: (current?.quantity ?? 0) + 1,
+        section,
+        originalReference: providerCardId,
+        providerCardId,
+        sectionExplicit: true,
+      })
+    }
+  }
+  return { entries: [...entries.values()], invalidLines: [] }
+}
+
+export function parseGenericDeckList(list: string, game: Exclude<GameSystemId, "mtg">) {
+  if (list.length > MAX_PASTED_LIST_LENGTH)
+    throw new ConvexError({ code: "deck_list_too_large", message: "Deck list is too large" })
+  if (game === "ygo" && list.trim().toLocaleLowerCase().startsWith("ydke://"))
+    return parseYdkeDeckList(list)
+  let section = "main"
+  let sectionExplicit = false
+  const entries = new Map<string, GenericParsedEntry>()
+  const invalidLines: string[] = []
+  for (const sourceLine of list.split(/\r?\n/)) {
+    const line = sourceLine.trim()
+    if (!line || line.startsWith("//") || line.startsWith("#created")) continue
+    const nextSection = genericSection(line, game)
+    if (nextSection) {
+      section = nextSection
+      sectionExplicit = true
+      continue
+    }
+    if (game === "pokemon" && /^(pok[eé]mon|trainer|energy):\s*\d+$/i.test(line)) continue
+
+    const ydkId = game === "ygo" ? line.match(/^\d{5,12}$/)?.[0] : undefined
+    const quantityMatch = line.match(/^(\d{1,3})\s*x?\s+(.+)$/i)
+    const quantity = ydkId ? 1 : quantityMatch ? Number(quantityMatch[1]) : 0
+    const originalReference = ydkId ?? quantityMatch?.[2]?.trim() ?? ""
+    if (!originalReference || quantity < 1 || quantity > 999) {
+      invalidLines.push(sourceLine)
+      continue
+    }
+    const providerCardId =
+      game === "ygo" && /^\d{5,12}$/.test(originalReference) ? originalReference : undefined
+    const name =
+      providerCardId !== undefined
+        ? `Card ${providerCardId}`
+        : game === "pokemon"
+          ? pokemonName(originalReference)
+          : originalReference
+    const key = `${section}:${providerCardId ?? name.toLocaleLowerCase()}`
+    const current = entries.get(key)
+    entries.set(key, {
+      name,
+      quantity: (current?.quantity ?? 0) + quantity,
+      section,
+      originalReference,
+      ...(providerCardId ? { providerCardId } : {}),
+      sectionExplicit,
+    })
+  }
+  return { entries: [...entries.values()], invalidLines }
+}
+
+function genericDeckCard(
+  game: Exclude<GameSystemId, "mtg">,
+  card: NormalizedCard,
+  entry: GenericParsedEntry,
+): GenericDeckCard {
+  const printing =
+    card.printings.find((candidate) => candidate.printingId === entry.providerCardId) ??
+    card.printings[0]
+  const face = printing?.faces[0]
+  const section = entry.sectionExplicit || card.game !== "ygo" ? entry.section : ygoSection(card)
+  return {
+    game,
+    identityNamespace: card.identityNamespace,
+    cardId: card.cardId,
+    providerCardId: printing?.providerCardId,
+    printingId: printing?.printingId,
+    section,
+    entryKind: "card",
+    originalReference: entry.originalReference,
+    ...(card.category ? { category: card.category } : {}),
+    name: card.name,
+    ...(face?.imageUrl ? { imageUrl: face.imageUrl } : {}),
+    ...(face?.smallImageUrl ? { smallImageUrl: face.smallImageUrl } : {}),
+    quantity: entry.quantity,
+  }
+}
+
+function unresolvedDeckCard(game: Exclude<GameSystemId, "mtg">, entry: GenericParsedEntry) {
+  return {
+    game,
+    section: entry.section,
+    entryKind: "card",
+    originalReference: entry.originalReference,
+    name: entry.name,
+    quantity: entry.quantity,
+  }
+}
+
+async function resolveGenericEntries(
+  ctx: ActionCtx,
+  game: Exclude<GameSystemId, "mtg">,
+  entries: GenericParsedEntry[],
+): Promise<{ cards: GenericDeckCard[]; unresolved: string[] }> {
+  if (entries.length === 0)
+    throw new ConvexError({
+      code: "empty_deck_list",
+      message: "No cards were found in this deck list",
+    })
+  if (entries.length > MAX_DECK_CARDS)
+    throw new ConvexError({
+      code: "deck_too_large",
+      message: `A deck may contain at most ${MAX_DECK_CARDS} entries`,
+    })
+
+  const fetchedCards: NormalizedCard[] = []
+  const includeImages = await actionCapabilityEnabled(ctx, game, "images")
+  if (game === "ygo") {
+    const ids = [
+      ...new Set(entries.flatMap((entry) => (entry.providerCardId ? [entry.providerCardId] : []))),
+    ]
+    for (let offset = 0; offset < ids.length; offset += 40) {
+      const result = await cardsByYgoIds(ctx, ids.slice(offset, offset + 40), includeImages)
+      fetchedCards.push(...result.cards)
+    }
+  }
+  const byIdentity = new Map<string, NormalizedCard>()
+  for (const card of fetchedCards) {
+    byIdentity.set(card.cardId, card)
+    for (const printing of card.printings) byIdentity.set(printing.printingId, card)
+  }
+
+  const cards: GenericDeckCard[] = []
+  const unresolved: string[] = []
+  for (const entry of entries) {
+    let card = entry.providerCardId ? byIdentity.get(entry.providerCardId) : undefined
+    if (!card) {
+      const cached: CatalogCard[] = await ctx.runQuery(internal.cardCatalog.searchCached, {
+        game,
+        query: entry.name,
+        limit: 5,
+      })
+      const exact = cached.find(
+        (candidate) => candidate.name.toLocaleLowerCase() === entry.name.toLocaleLowerCase(),
+      )
+      if (exact) {
+        cards.push({
+          game,
+          identityNamespace: exact.identityNamespace,
+          cardId: exact.cardId,
+          providerCardId: exact.providerCardId,
+          printingId: exact.printingId,
+          section: entry.section,
+          entryKind: "card",
+          originalReference: entry.originalReference,
+          name: exact.name,
+          ...(exact.category ? { category: exact.category } : {}),
+          ...(exact.imageUrl ? { imageUrl: exact.imageUrl } : {}),
+          ...(exact.smallImageUrl ? { smallImageUrl: exact.smallImageUrl } : {}),
+          quantity: entry.quantity,
+        })
+        continue
+      }
+      const result =
+        game === "ygo"
+          ? await searchYgo(ctx, entry.name, includeImages)
+          : await searchPokemon(ctx, entry.name, includeImages)
+      card = result.cards.find(
+        (candidate) => candidate.name.toLocaleLowerCase() === entry.name.toLocaleLowerCase(),
+      )
+      if (result.cards.length > 0) fetchedCards.push(...result.cards)
+    }
+    if (card) cards.push(genericDeckCard(game, card, entry))
+    else {
+      cards.push(unresolvedDeckCard(game, entry))
+      unresolved.push(entry.originalReference)
+    }
+  }
+  if (fetchedCards.length > 0)
+    await ctx.runMutation(internal.cardCatalog.cacheMany, {
+      cards: [
+        ...new Map(fetchedCards.map((card) => [`${card.game}:${card.cardId}`, card])).values(),
+      ].slice(0, 25),
+    })
+  return { cards, unresolved: unresolved.sort() }
 }
 
 function sectionBoard(line: string): DeckBoard | "ignore" | undefined {
@@ -750,9 +1017,51 @@ export const resolvePreconstructed = action({
 })
 
 export const resolvePasted = action({
-  args: { list: v.string() },
-  handler: async (ctx, args) => {
+  args: { list: v.string(), game: v.optional(v.string()) },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    | { cards: ResolvedDeckCard[]; unresolved: string[]; invalidLines: string[] }
+    | { cards: GenericDeckCard[]; unresolved: string[]; invalidLines: string[] }
+  > => {
     await requireActionIdentity(ctx)
+    const game = assertGameSystem(args.game ?? "mtg")
+    await requireActionCapability(ctx, game, "deckImport")
+    if (game !== "mtg") {
+      const parsed = parseGenericDeckList(args.list, game)
+      const startedAt = Date.now()
+      try {
+        const resolved: { cards: GenericDeckCard[]; unresolved: string[] } =
+          await resolveGenericEntries(ctx, game, parsed.entries)
+        const finishedAt = Date.now()
+        await ctx.runMutation(internal.providerHealth.record, {
+          game,
+          provider: game === "ygo" ? "ygoprodeck" : "tcgdex",
+          operation: "deck-resolution",
+          status: resolved.unresolved.length > 0 ? "degraded" : "healthy",
+          lastAttemptAt: finishedAt,
+          ...(resolved.cards.length > resolved.unresolved.length
+            ? { lastSuccessAt: finishedAt }
+            : {}),
+          responseMs: Math.max(0, finishedAt - startedAt),
+          message: `${resolved.cards.length - resolved.unresolved.length} resolved, ${resolved.unresolved.length} unresolved`,
+        })
+        return { ...resolved, invalidLines: parsed.invalidLines }
+      } catch (error) {
+        const finishedAt = Date.now()
+        await ctx.runMutation(internal.providerHealth.record, {
+          game,
+          provider: game === "ygo" ? "ygoprodeck" : "tcgdex",
+          operation: "deck-resolution",
+          status: "unavailable",
+          lastAttemptAt: finishedAt,
+          responseMs: Math.max(0, finishedAt - startedAt),
+          message: error instanceof Error ? error.message : "Deck resolution failed",
+        })
+        throw error
+      }
+    }
     const parsed = parsePastedDeckList(args.list)
     const resolved = await resolveEntries(ctx, parsed.entries)
     return { ...resolved, invalidLines: parsed.invalidLines }

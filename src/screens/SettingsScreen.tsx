@@ -23,6 +23,7 @@ export interface SettingsScreenProps {
   onOpenTerms?: () => void
   onOpenLicenseAgreement?: () => void
   onOpenCookiePolicy?: () => void
+  onOpenGameContentNotices?: () => void
   BlockedPlayers?: ReactNode
 }
 
@@ -36,6 +37,7 @@ export function SettingsScreen({
   onOpenTerms,
   onOpenLicenseAgreement,
   onOpenCookiePolicy,
+  onOpenGameContentNotices,
   BlockedPlayers,
 }: SettingsScreenProps) {
   const { themed } = useAppTheme()
@@ -179,6 +181,14 @@ export function SettingsScreen({
                 rightIcon="caretRight"
                 topSeparator
                 onPress={onOpenCookiePolicy}
+              />
+            ) : null}
+            {onOpenGameContentNotices ? (
+              <ListItem
+                text="Third-party game content"
+                rightIcon="caretRight"
+                topSeparator
+                onPress={onOpenGameContentNotices}
               />
             ) : null}
           </View>
