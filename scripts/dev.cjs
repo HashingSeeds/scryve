@@ -15,8 +15,6 @@ const CONVEX_PREFIX = "\u001b[36m[convex]\u001b[0m "
 const FORCED_KILL_DELAY_MS = 4000
 const localBin = (name) => path.join(process.cwd(), "node_modules", ".bin", name)
 
-// Detached so convex leads its own process group, which shutdown can signal as a
-// unit; the CLI's own children would otherwise outlive it.
 const convex = spawn(localBin("convex"), ["dev"], {
   stdio: ["ignore", "pipe", "pipe"],
   detached: true,
