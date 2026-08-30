@@ -157,6 +157,17 @@ describe("delete account route", () => {
         <DeleteAccountRoute />
       </ThemeProvider>,
     )
+
+    // The query drops to undefined while it re-loads, then republishes an
+    // equal-but-distinct result carrying the same token.
+    const republished = { ...mockDeletion }
+    mockDeletion = undefined
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <DeleteAccountRoute />
+      </ThemeProvider>,
+    )
+    mockDeletion = republished
     view.rerender(
       <ThemeProvider initialContext="dark">
         <DeleteAccountRoute />
