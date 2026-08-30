@@ -5,7 +5,7 @@
   "main": "expo-router/entry",
   "packageManager": "pnpm@10.14.0",
   "scripts": {
-    "start": "concurrently --kill-others \"pnpm start:expo\" \"pnpm convex:dev\"",
+    "start": "node scripts/dev.cjs",
     "start:expo": "APP_VARIANT=development npx expo start --dev-client",
     "android": "env APP_VARIANT=development npx expo run:android",
     "ios": "env APP_VARIANT=development npx expo run:ios",
@@ -43,7 +43,8 @@
     "build:android:sim": "env APP_VARIANT=development npx eas-cli@latest build --profile development --platform android --local",
     "build:android:dev": "env APP_VARIANT=development npx eas-cli@latest build --profile development:device --platform android --local",
     "build:android:preview": "npx eas-cli@latest build --profile preview:device --platform android --local",
-    "build:android:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx eas-cli@latest build --profile production --platform android --local"
+    "build:android:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx eas-cli@latest build --profile production --platform android --local",
+    "start:concurrent": "concurrently --kill-others \"pnpm start:expo\" \"pnpm convex:dev\""
   },
   "dependencies": {
     "@clerk/backend": "^3.16.12",
