@@ -99,39 +99,38 @@ function DeckRow({
   const game = deck.game ?? DEFAULT_DECK_GAME
   const favorite = deck.favoritedAt !== undefined
   return (
-    <TouchableOpacity
-      style={themed($row)}
-      accessibilityRole="button"
-      accessibilityLabel={deck.name}
-      activeOpacity={0.75}
-      onPress={onPress}
-    >
-      {deck.coverImageUrl ? (
-        <Image source={deck.coverImageUrl} style={themed($cover)} cachePolicy="memory-disk" />
-      ) : (
-        <View style={themed($coverPlaceholder)}>
-          <Text weight="bold" size="md" text={coverInitial(deck.name)} />
+    <View style={themed($row)}>
+      <TouchableOpacity
+        style={themed($openButton)}
+        accessibilityRole="button"
+        accessibilityLabel={deck.name}
+        activeOpacity={0.75}
+        onPress={onPress}
+      >
+        {deck.coverImageUrl ? (
+          <Image source={deck.coverImageUrl} style={themed($cover)} cachePolicy="memory-disk" />
+        ) : (
+          <View style={themed($coverPlaceholder)}>
+            <Text weight="bold" size="md" text={coverInitial(deck.name)} />
+          </View>
+        )}
+        <View style={themed($rowCopy)}>
+          <Text weight="medium" numberOfLines={1} text={deck.name} />
+          <Text
+            size="xxs"
+            numberOfLines={2}
+            style={themed($dimmedText)}
+            text={deckSubtitle(deck, game, showGame)}
+          />
         </View>
-      )}
-      <View style={themed($rowCopy)}>
-        <Text weight="medium" numberOfLines={1} text={deck.name} />
-        <Text
-          size="xxs"
-          numberOfLines={2}
-          style={themed($dimmedText)}
-          text={deckSubtitle(deck, game, showGame)}
-        />
-      </View>
+      </TouchableOpacity>
       <TouchableOpacity
         testID={`favorite-deck-${deck._id}`}
         accessibilityRole="button"
         accessibilityLabel={`${favorite ? "Remove" : "Add"} ${deck.name} ${favorite ? "from" : "to"} favorites`}
         hitSlop={8}
         style={themed($favoriteButton)}
-        onPress={(event) => {
-          event?.stopPropagation()
-          onToggleFavorite()
-        }}
+        onPress={onToggleFavorite}
       >
         <Text
           size="lg"
@@ -140,7 +139,7 @@ function DeckRow({
         />
       </TouchableOpacity>
       <Text size="lg" style={themed($dimmedText)} text="›" />
-    </TouchableOpacity>
+    </View>
   )
 }
 
@@ -197,7 +196,6 @@ function DeckShelf({
   collection,
   recentDeckIds,
   clearVisibleFilters,
-  recordDeckOpened,
   onSelect,
 }: {
   system: string
@@ -206,7 +204,6 @@ function DeckShelf({
   collection: DeckCollection
   recentDeckIds: string[]
   clearVisibleFilters: () => void
-  recordDeckOpened: (deckId: string) => void
   onSelect: (deck: DeckSelection) => void
 }) {
   const { themed } = useAppTheme()
@@ -279,7 +276,6 @@ function DeckShelf({
           showGame={system === ALL_SYSTEMS}
           onToggleFavorite={() => void toggleFavorite(deck)}
           onPress={() => {
-            recordDeckOpened(deck._id)
             onSelect({
               deckId: deck._id,
               name: deck.name,
@@ -322,7 +318,7 @@ export function DecksScreen({
 }) {
   const { themed } = useAppTheme()
   const { format, setGame, setFormat } = useDeckFilters()
-  const { deckIds: recentDeckIds, recordDeckOpened } = useRecentDecks()
+  const { deckIds: recentDeckIds } = useRecentDecks()
   const [collection, setCollection] = useState<DeckCollection>("all")
   const [system, setSystem] = useState(ALL_SYSTEMS)
   const [search, setSearch] = useState("")
@@ -432,7 +428,6 @@ export function DecksScreen({
             collection={collection}
             recentDeckIds={recentDeckIds}
             clearVisibleFilters={clearVisibleFilters}
-            recordDeckOpened={recordDeckOpened}
             onSelect={onSelect}
           />
         </ConvexQueryBoundary>
@@ -546,6 +541,12 @@ const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.sm,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
+})
+const $openButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
 })
 const $cover: ThemedStyle<ImageStyle> = ({ spacing }) => ({
   width: 46,

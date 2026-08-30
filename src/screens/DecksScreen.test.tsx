@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native"
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 import { clear } from "@/utils/storage"
@@ -226,11 +227,12 @@ describe("DecksScreen", () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it("keeps recently opened decks on this device", () => {
+  it("updates an already-mounted shelf when a deck is opened elsewhere", () => {
     const view = renderShelf()
-
-    fireEvent.press(view.getByLabelText("Existing Deck"))
     fireEvent.press(view.getByTestId("collection-filter-recent"))
+    expect(view.getByText("No recent decks yet")).toBeTruthy()
+
+    act(() => recordRecentDeck("existing-deck"))
 
     expect(view.getByText("Existing Deck")).toBeTruthy()
     expect(view.queryByText("Mono Red")).toBeNull()
