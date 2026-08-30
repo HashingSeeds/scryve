@@ -1,4 +1,4 @@
-import { emitTelemetry, setTelemetryAdapter } from "./telemetry"
+import { emitTelemetry, setTelemetryAdapter, type TelemetryEventName } from "./telemetry"
 
 describe("privacy-safe telemetry", () => {
   afterEach(() => setTelemetryAdapter())
@@ -78,5 +78,12 @@ describe("privacy-safe telemetry", () => {
       }),
     )
     expect(emit).toHaveBeenNthCalledWith(2, expect.objectContaining({ metadata: {} }))
+  })
+
+  it("drops an event whose name is not on the allowlist", () => {
+    const emit = jest.fn()
+    setTelemetryAdapter({ emit })
+    emitTelemetry("deck.exfiltrate" as TelemetryEventName, { playerCount: 4 })
+    expect(emit).not.toHaveBeenCalled()
   })
 })

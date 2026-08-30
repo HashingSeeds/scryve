@@ -132,6 +132,22 @@ describe("batching telemetry adapter", () => {
 
     expect(send).toHaveBeenCalledTimes(1)
   })
+
+  it("keeps draining when maxBatchSize is not a usable size", async () => {
+    const send = jest.fn(async () => undefined)
+    const adapter = createBatchingTelemetryAdapter({
+      sink: { send },
+      maxBatchSize: 0,
+      scheduleInterval: () => ({ cancel: () => undefined }),
+    })
+
+    adapter.emit(event())
+    adapter.emit(event())
+
+    await expect(adapter.flush()).resolves.toBeUndefined()
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(adapter.pendingCount()).toBe(0)
+  })
 })
 
 describe("combineTelemetryAdapters", () => {

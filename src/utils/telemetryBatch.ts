@@ -50,6 +50,9 @@ export function createBatchingTelemetryAdapter(
     scheduleInterval = defaultScheduleInterval,
   } = options
 
+  const batchSize =
+    Number.isSafeInteger(maxBatchSize) && maxBatchSize > 0 ? maxBatchSize : DEFAULT_MAX_BATCH_SIZE
+
   let buffer: TelemetryEvent[] = []
   let inFlight: Promise<void> | null = null
   let stopped = false
@@ -76,7 +79,7 @@ export function createBatchingTelemetryAdapter(
 
   async function drain(): Promise<void> {
     while (buffer.length > 0) {
-      const batch = buffer.slice(0, maxBatchSize)
+      const batch = buffer.slice(0, batchSize)
       buffer = buffer.slice(batch.length)
       await sendDiscardingBatchOnFailure(batch)
     }
@@ -102,7 +105,7 @@ export function createBatchingTelemetryAdapter(
       })
       if (buffer.length > maxBufferedEventsBeforeDroppingOldest)
         buffer = buffer.slice(buffer.length - maxBufferedEventsBeforeDroppingOldest)
-      if (buffer.length >= maxBatchSize) void flush()
+      if (buffer.length >= batchSize) void flush()
     },
     flush,
     async stop() {

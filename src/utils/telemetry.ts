@@ -1,15 +1,18 @@
-export type TelemetryEventName =
-  | "join.completed"
-  | "join.failed"
-  | "reconnect.ready"
-  | "outbox.drain"
-  | "mutation.ack"
-  | "error.handled"
-  | "game.started"
-  | "game.completed"
-  | "game.dropped"
-  | "deck.import"
-  | "premium.blocked"
+const EVENT_NAMES = [
+  "join.completed",
+  "join.failed",
+  "reconnect.ready",
+  "outbox.drain",
+  "mutation.ack",
+  "error.handled",
+  "game.started",
+  "game.completed",
+  "game.dropped",
+  "deck.import",
+  "premium.blocked",
+] as const
+
+export type TelemetryEventName = (typeof EVENT_NAMES)[number]
 
 export type TelemetryPlatform = "ios" | "android" | "web"
 export type TelemetryOutcome = "success" | "retry" | "rejected" | "cancelled"
@@ -78,6 +81,8 @@ const VALIDATORS: Record<keyof SafeMetadata, (value: unknown) => boolean> = {
   analyticsId: isLocallyMintedAnalyticsId,
 }
 
+const RECOGNIZED_EVENT_NAMES: ReadonlySet<string> = new Set(EVENT_NAMES)
+
 let adapter: TelemetryAdapter = { emit: () => undefined }
 
 export function setTelemetryAdapter(next?: TelemetryAdapter): void {
@@ -88,6 +93,7 @@ export function emitTelemetry(
   name: TelemetryEventName,
   candidate: Record<string, unknown> = {},
 ): void {
+  if (!RECOGNIZED_EVENT_NAMES.has(name)) return
   const metadata: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(candidate)) {
     const isAllowed = Object.prototype.hasOwnProperty.call(VALIDATORS, key)
