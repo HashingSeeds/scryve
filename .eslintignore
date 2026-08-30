@@ -7,3 +7,4 @@ dist
 ignite/ignite.json
 package.json
 .eslintignore
+dist-export-check
