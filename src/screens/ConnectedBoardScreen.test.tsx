@@ -9,6 +9,7 @@ import {
   mockChangeLife,
   mockDismissFailed,
   mockFinish,
+  mockRuntimeAbandon,
   mockReportPlayer,
   mockUseConnectedGame,
   resetConnectedHarness,
@@ -285,13 +286,28 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("connected-finish-confirmation").props.accessibilityRole).toBe(
       "alert",
     )
-    fireEvent.press(screen.getByText("Cancel"))
+    fireEvent.press(screen.getByTestId("cancel-connected-finish-button"))
     expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull()
     expect(mockFinish).not.toHaveBeenCalled()
 
     openConnectedFinish()
+    fireEvent.press(screen.getByText("Ada"))
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+  })
+
+  it("abandons the connected game when no result is chosen", async () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, isHost: true },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedFinish()
+    fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+
+    await waitFor(() => expect(mockRuntimeAbandon).toHaveBeenCalledTimes(1))
+    expect(mockFinish).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
   })
 
@@ -308,6 +324,7 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedFinish()
+    fireEvent.press(screen.getByText("Ada"))
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     expect(mockFinish).toHaveBeenCalledTimes(1)
@@ -355,7 +372,23 @@ describe("ConnectedBoardScreen", () => {
     expect(
       screen.getByTestId("cancel-connected-finish-button").props.accessibilityState.disabled,
     ).toBe(true)
-    expect(screen.getByText("Ending…")).toBeTruthy()
+    expect(screen.getByText(/localGame:ending/)).toBeTruthy()
+  })
+
+  it("offers to abandon until a result is chosen, then to finish", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, isHost: true },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedFinish()
+
+    expect(screen.getByText(/localGame:abandon/)).toBeTruthy()
+
+    fireEvent.press(screen.getByText("Ada"))
+
+    expect(screen.getByText(/localGame:finish/)).toBeTruthy()
+    expect(screen.queryByText(/localGame:abandon/)).toBeNull()
   })
 
   it("keeps finish confirmation open and shows a mutation error there", async () => {
@@ -371,6 +404,7 @@ describe("ConnectedBoardScreen", () => {
     )
     mockFinish.mockResolvedValueOnce(false)
     openConnectedFinish()
+    fireEvent.press(screen.getByText("Ada"))
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
     expect(screen.getByTestId("connected-finish-confirmation")).toBeTruthy()

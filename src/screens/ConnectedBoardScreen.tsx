@@ -220,6 +220,8 @@ function ConnectedBoardRuntime({
   )
   const active = game.status === "active"
   const finished = game.status === "finished"
+  const finishResultSelected = winnerPlayerIds.length > 0 || drawSelected
+
   const finishBlockedReason =
     runtime.connectionStatus === "offline"
       ? "Reconnect before finishing; this operation is online-only."
@@ -514,26 +516,35 @@ function ConnectedBoardRuntime({
           <View style={themed($dialogActions)}>
             <Button
               testID="cancel-connected-finish-button"
-              text="Cancel"
+              tx="localGame:cancel"
               disabled={runtime.finishing}
               style={themed($dialogAction)}
               onPress={() => setConfirmingFinish(false)}
             />
             <Button
               testID="confirm-connected-finish-button"
-              text={runtime.finishing ? "Ending…" : "End game"}
-              preset="reversed"
+              tx={
+                runtime.finishing
+                  ? "localGame:ending"
+                  : finishResultSelected
+                    ? "localGame:finish"
+                    : "localGame:abandon"
+              }
+              preset={finishResultSelected ? "reversed" : "filled"}
               disabled={runtime.finishing || Boolean(finishBlockedReason)}
               style={themed($dialogAction)}
               onPress={async () => {
                 if (finishSubmitInFlight.current) return
                 finishSubmitInFlight.current = true
-                const result =
-                  winnerPlayerIds.length > 0
-                    ? { kind: "win" as const, winnerPlayerIds }
-                    : { kind: drawSelected ? ("draw" as const) : ("unknown" as const) }
                 try {
-                  if (await runtime.finish(result)) setConfirmingFinish(false)
+                  const ended = finishResultSelected
+                    ? await runtime.finish(
+                        winnerPlayerIds.length > 0
+                          ? { kind: "win" as const, winnerPlayerIds }
+                          : { kind: "draw" as const },
+                      )
+                    : await runtime.abandon()
+                  if (ended) setConfirmingFinish(false)
                 } finally {
                   finishSubmitInFlight.current = false
                 }

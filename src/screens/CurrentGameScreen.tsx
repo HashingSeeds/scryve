@@ -71,13 +71,12 @@ export function CurrentGameScreen({
   const menuAnchor = getPlayerGridMenuAnchor(playerCount, gridLayout)
 
   function confirmEnd() {
-    const ended = runtime.finish(
+    const ended =
       winnerPlayerIds.length > 0
-        ? { kind: "win", winnerPlayerIds }
+        ? runtime.finish({ kind: "win", winnerPlayerIds })
         : drawSelected
-          ? { kind: "draw" }
-          : undefined,
-    )
+          ? runtime.finish({ kind: "draw" })
+          : runtime.abandon()
     setEndConfirmationOpen(false)
     if (ended.status !== "active") setTimeout(() => onGameEnded(ended.id), 0)
   }
@@ -88,6 +87,8 @@ export function CurrentGameScreen({
       current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId],
     )
   }
+
+  const endResultSelected = winnerPlayerIds.length > 0 || drawSelected
 
   function selectDraw() {
     setWinnerPlayerIds([])
@@ -293,8 +294,8 @@ export function CurrentGameScreen({
             />
             <Button
               testID="confirm-end-game-button"
-              tx="localGame:endGame"
-              preset="reversed"
+              tx={endResultSelected ? "localGame:finish" : "localGame:abandon"}
+              preset={endResultSelected ? "reversed" : "filled"}
               style={themed($dialogAction)}
               onPress={confirmEnd}
             />

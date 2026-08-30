@@ -171,7 +171,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("layout-featured-first")).toBeTruthy()
   })
 
-  it("confirms ending the game in a centered pop-up and archives final totals", async () => {
+  it("archives the game as abandoned when ended from the pop-up with no result", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()
     repository.saveActiveGame(initial)
@@ -204,8 +204,39 @@ describe("CurrentGameScreen", () => {
     await waitFor(() => {
       expect(onGameEnded).toHaveBeenCalledWith(initial.id)
       expect(repository.loadActiveGame()).toBeNull()
-      expect(repository.loadHistory()[0].status).toBe("finished")
+      expect(repository.loadHistory()[0].status).toBe("abandoned")
     })
+  })
+
+  it("offers to abandon until a result is chosen, then to finish", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onHome={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+
+    expect(view.getByText(/localGame:abandon/)).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("end-game-winner-1"))
+    expect(view.getByText(/localGame:finish/)).toBeTruthy()
+    expect(view.queryByText(/localGame:abandon/)).toBeNull()
+
+    fireEvent.press(view.getByTestId("end-game-result-draw"))
+    expect(view.getByText(/localGame:finish/)).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("end-game-result-draw"))
+    expect(view.getByText(/localGame:abandon/)).toBeTruthy()
   })
 
   it("records the winner the host picks before ending the game", async () => {
