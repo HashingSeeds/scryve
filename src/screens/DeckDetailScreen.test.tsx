@@ -2,7 +2,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { DeckDetailScreen } from "./DeckDetailScreen"
+import { cardDetailsKey, DeckDetailScreen } from "./DeckDetailScreen"
 
 const mockSaveVersion = jest.fn(async () => "version-main")
 const mockCreateVersion = jest.fn(async () => "version-new")
@@ -12,6 +12,20 @@ const mockUpdateDeck = jest.fn(async () => null)
 const mockArchiveDeck = jest.fn(async () => null)
 const mockSearchCards = jest.fn(async () => [])
 const mockCardById = jest.fn(async () => ({}))
+const mockCatalogCardById = jest.fn(async () => ({
+  typeLabel: "Effect Monster",
+  text: "When a card or effect is activated that includes an effect that Special Summons a monster: You can discard this card; negate that effect.",
+  setCode: "MACR",
+  collectorNumber: "036",
+  rarity: "secret rare",
+}))
+const mockPokemonCardByReference = jest.fn(async () => ({
+  typeLabel: "Pokemon · Basic · Fighting",
+  text: "Punch · 20",
+  setCode: "me01",
+  collectorNumber: "76",
+  rarity: "common",
+}))
 const queryArgs: Array<Record<string, unknown>> = []
 
 const solRing = {
@@ -84,7 +98,12 @@ jest.mock("convex/react", () => ({
     if (reference === "decks.update") return mockUpdateDeck
     return mockArchiveDeck
   },
-  useAction: (reference: string) => (reference === "cards.search" ? mockSearchCards : mockCardById),
+  useAction: (reference: string) => {
+    if (reference === "cards.search") return mockSearchCards
+    if (reference === "cards.byCatalogId") return mockCatalogCardById
+    if (reference === "cards.byPokemonReference") return mockPokemonCardByReference
+    return mockCardById
+  },
 }))
 
 jest.mock("../../convex/_generated/api", () => ({
@@ -98,7 +117,12 @@ jest.mock("../../convex/_generated/api", () => ({
       update: "decks.update",
       archive: "decks.archive",
     },
-    cards: { search: "cards.search", byId: "cards.byId" },
+    cards: {
+      search: "cards.search",
+      byId: "cards.byId",
+      byCatalogId: "cards.byCatalogId",
+      byPokemonReference: "cards.byPokemonReference",
+    },
   },
 }))
 
@@ -120,6 +144,20 @@ describe("DeckDetailScreen", () => {
       capacity: { used: 2, limit: 5, premium: true, canCreate: true },
     }
     mockDetail.error = undefined
+  })
+
+  it("keeps same-name Pokemon reprints distinct when only original references identify them", () => {
+    expect(
+      cardDetailsKey(
+        { game: "pokemon", name: "Pikachu", originalReference: "MEG 76", quantity: 1 },
+        "pokemon",
+      ),
+    ).not.toBe(
+      cardDetailsKey(
+        { game: "pokemon", name: "Pikachu", originalReference: "SVI 62", quantity: 1 },
+        "pokemon",
+      ),
+    )
   })
 
   it("opens read-only with the deck, its notes, and the selected version's record", () => {
@@ -187,6 +225,62 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("discard-edits-button"))
     expect(view.getByText("1× Sol Ring")).toBeTruthy()
     expect(mockSaveVersion).not.toHaveBeenCalled()
+  })
+
+  it("opens the shared card dialog with provider details for a Yu-Gi-Oh card", async () => {
+    mockDetail.value = {
+      ...loadedDetail,
+      deck: { ...loadedDetail.deck, game: "ygo", format: "advanced" },
+      cards: [
+        {
+          _id: "card-ygo",
+          _creationTime: 0,
+          deckVersionId: "version-main",
+          game: "ygo",
+          cardId: "14558127",
+          providerCardId: "14558127",
+          printingId: "14558127",
+          name: "Ash Blossom & Joyous Spring",
+          quantity: 3,
+          section: "main",
+        },
+      ],
+    }
+    const view = renderDetail()
+
+    fireEvent.press(view.getByText("3× Ash Blossom & Joyous Spring"))
+
+    await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
+    expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
+    expect(view.getByText("Effect Monster")).toBeTruthy()
+  })
+
+  it("resolves a saved Pokemon card from its original set reference", async () => {
+    mockDetail.value = {
+      ...loadedDetail,
+      deck: { ...loadedDetail.deck, game: "pokemon", format: "standard" },
+      cards: [
+        {
+          _id: "card-pokemon",
+          _creationTime: 0,
+          deckVersionId: "version-main",
+          game: "pokemon",
+          originalReference: "MEG 76",
+          name: "Riolu",
+          quantity: 3,
+          section: "main",
+        },
+      ],
+    }
+    const view = renderDetail()
+
+    fireEvent.press(view.getByText("3× Riolu"))
+
+    await waitFor(() => expect(view.getByText("Pokemon · Basic · Fighting")).toBeTruthy())
+    expect(mockPokemonCardByReference).toHaveBeenCalledWith({
+      name: "Riolu",
+      originalReference: "MEG 76",
+    })
   })
 
   it("switches the version being viewed", () => {

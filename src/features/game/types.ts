@@ -1,3 +1,4 @@
+import type { PlaySystemId } from "./playSystems"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name }
@@ -53,6 +54,8 @@ export interface LocalGame {
   schemaVersion: 1
   id: GameId
   status: GameStatus
+  system?: PlaySystemId
+  format?: string
   startingLife: number
   players: GamePlayer[]
   events: GameEvent[]
@@ -85,6 +88,8 @@ export interface LocalGameSummary {
   schemaVersion: 1
   id: GameId
   status: "finished" | "abandoned"
+  system?: PlaySystemId
+  format?: string
   startingLife: number
   players: GamePlayer[]
   eventCount: number

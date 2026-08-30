@@ -95,8 +95,37 @@ describe("NewGameScreen", () => {
     expect(onStartLocal).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ name: "Six" })]),
       37,
+      { format: "standard", system: "mtg" },
     )
     expect(onStartLocal.mock.calls[0][0]).toHaveLength(6)
+  })
+
+  it("starts Yu-Gi-Oh! at 8000 Life Points with the Advanced format", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
+
+    fireEvent.press(view.getByTestId("play-system-ygo"))
+    expect(view.getByLabelText("Start at 8000 Life Points")).toBeTruthy()
+    fireEvent.press(view.getByTestId("start-game-button"))
+
+    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 8000, {
+      format: "advanced",
+      system: "ygo",
+    })
+  })
+
+  it("starts Pokémon at six Prize cards", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
+
+    fireEvent.press(view.getByTestId("play-system-pokemon"))
+    expect(view.getByLabelText("Start at 6 Prize cards")).toBeTruthy()
+    fireEvent.press(view.getByTestId("start-game-button"))
+
+    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 6, {
+      format: "standard",
+      system: "pokemon",
+    })
   })
 
   it("falls back to the placeholder name for seats left blank", () => {
@@ -130,6 +159,7 @@ describe("NewGameScreen", () => {
         expect.objectContaining({ name: "Player 1", color: "#39755C", shape: "hexagon" }),
       ]),
       20,
+      { format: "standard", system: "mtg" },
     )
   })
 
@@ -187,10 +217,16 @@ describe("NewGameScreen", () => {
     expect(view.queryByTestId("player-name-1")).toBeNull()
     expect(view.getByLabelText("4 seats")).toBeTruthy()
     fireEvent.press(view.getByLabelText("4 seats"))
-    fireEvent.changeText(view.getByTestId("connected-ruleset"), "commander")
+    fireEvent.press(view.getByTestId("play-format-commander"))
     fireEvent.press(view.getByTestId("host-connected-button"))
 
-    expect(host).toHaveBeenCalledWith({ playerCount: 4, startingLife: 20, ruleset: "commander" })
+    expect(host).toHaveBeenCalledWith({
+      playerCount: 4,
+      startingLife: 20,
+      ruleset: "commander",
+      system: "mtg",
+      format: "commander",
+    })
   })
 
   it("keeps hosting unavailable until the connected session is ready", () => {

@@ -57,6 +57,42 @@ describe("LifeControls", () => {
     }
   })
 
+  it("uses Yu-Gi-Oh! Life Point increments", () => {
+    const onChange = jest.fn()
+    const onLongChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeControls
+          playerName="Yugi"
+          system="ygo"
+          onChange={onChange}
+          onLongChange={onLongChange}
+        />
+      </ThemeProvider>,
+    )
+
+    const subtract = view.getByTestId("life-seat-1--100")
+    fireEvent.press(subtract)
+    fireEvent(subtract, "pressIn")
+    fireEvent(subtract, "longPress")
+
+    expect(subtract.props.accessibilityLabel).toContain("subtract 100 Life Points")
+    expect(onChange).toHaveBeenCalledWith(-100)
+    expect(onLongChange).toHaveBeenCalledWith(-1, 1000)
+  })
+
+  it("uses Prize card language for Pokémon", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeControls playerName="Red" system="pokemon" onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("life-seat-1--1").props.accessibilityLabel).toContain(
+      "subtract 1 Prize card",
+    )
+  })
+
   it("turns sideways controls toward each player's outside edge", () => {
     const left = render(
       <ThemeProvider initialContext="light">

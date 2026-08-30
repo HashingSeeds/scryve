@@ -1,4 +1,5 @@
 import {
+  lobbyDetail,
   lobbyExitCopy,
   relativeTime,
   resumeDetail,
@@ -6,6 +7,7 @@ import {
   seatDetail,
   seatSummary,
 } from "./connectedCopy"
+import { toConnectedProjection } from "./model"
 
 const NOW = 1_800_000_000_000
 
@@ -35,7 +37,42 @@ describe("connected copy", () => {
 
     expect(resumeTitle(lobby)).toBe("Hosting · waiting to start")
     expect(resumeTitle({ ...lobby, status: "active", isHost: false })).toBe("Playing · in progress")
-    expect(resumeDetail(lobby, NOW)).toBe("2 seats · standard · 20 life · 1m ago")
+    expect(resumeDetail(lobby, NOW)).toBe("2 seats · Standard · 20 life · 1m ago")
+  })
+
+  it("uses ruleset when an older connected projection has an empty format", () => {
+    expect(
+      toConnectedProjection({
+        schemaVersion: 1,
+        publicId: "legacy-game",
+        status: "lobby",
+        playerCount: 2,
+        startingLife: 20,
+        format: "",
+        ruleset: "commander",
+        isHost: true,
+        eventSequence: 0,
+        serverUpdatedAt: NOW,
+        recentOperationIds: [],
+        players: [],
+      })?.format,
+    ).toBe("commander")
+    expect(
+      resumeDetail(
+        {
+          publicId: "legacy-game",
+          status: "lobby",
+          isHost: true,
+          playerCount: 2,
+          format: "",
+          ruleset: "standard",
+          startingLife: 20,
+          updatedAt: NOW - 60_000,
+        },
+        NOW,
+      ),
+    ).toBe("2 seats · Standard · 20 life · 1m ago")
+    expect(lobbyDetail(20, "commander", "mtg", "")).toBe("20 life · Commander")
   })
 
   it("says how many players a lobby is still waiting on", () => {

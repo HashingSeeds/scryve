@@ -1,3 +1,10 @@
+import {
+  counterValueLabel,
+  playFormatLabel,
+  playSystemId,
+  type PlaySystemId,
+} from "@/features/game/playSystems"
+
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
@@ -9,6 +16,8 @@ export type ResumableGame = {
   status: ConnectedGameStatus
   isHost: boolean
   playerCount: number
+  system?: string
+  format?: string
   ruleset: string
   startingLife?: number
   updatedAt: number
@@ -36,10 +45,11 @@ export function resumeTitle(game: ResumableGame) {
 }
 
 export function resumeDetail(game: ResumableGame, now: number) {
+  const system = playSystemId(game.system)
   return [
     `${game.playerCount} seats`,
-    game.ruleset,
-    game.startingLife ? `${game.startingLife} life` : undefined,
+    playFormatLabel(system, game.format || game.ruleset),
+    game.startingLife ? counterValueLabel(system, game.startingLife) : undefined,
     relativeTime(game.updatedAt, now),
   ]
     .filter(Boolean)
@@ -52,8 +62,13 @@ export function seatSummary(claimed: number, total: number) {
   return `Waiting for ${open} more ${open === 1 ? "player" : "players"}`
 }
 
-export function lobbyDetail(startingLife: number, ruleset: string) {
-  return `${startingLife} life · ${ruleset}`
+export function lobbyDetail(
+  startingLife: number,
+  ruleset: string,
+  system: PlaySystemId = "mtg",
+  format?: string,
+) {
+  return `${counterValueLabel(system, startingLife)} · ${playFormatLabel(system, format || ruleset)}`
 }
 
 export function seatDetail({

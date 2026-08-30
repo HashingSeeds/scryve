@@ -370,9 +370,11 @@ describe("connected MMKV repository", () => {
     )
     expect(new ConnectedGameRepository(storage).loadProjection("game-public")).toBeNull()
     storage.set(CONNECTED_KEYS.projection("game-public"), JSON.stringify(validProjection))
-    expect(new ConnectedGameRepository(storage).loadProjection("game-public")).toEqual(
-      validProjection,
-    )
+    expect(new ConnectedGameRepository(storage).loadProjection("game-public")).toEqual({
+      ...validProjection,
+      system: "mtg",
+      format: "standard",
+    })
   })
 
   it("repairs a projection whose payload belongs to a different scoped game", () => {

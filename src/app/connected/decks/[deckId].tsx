@@ -1,6 +1,8 @@
+import { useEffect } from "react"
 import { Redirect, router, useLocalSearchParams } from "expo-router"
 
 import { ConnectedGate } from "@/features/connected/ConnectedGate"
+import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { DeckDetailScreen, type DeckDetailSummary } from "@/screens/DeckDetailScreen"
 
 export default function DeckDetailRoute() {
@@ -11,6 +13,9 @@ export default function DeckDetailRoute() {
     deckFormat?: string
     deckCardQuantity?: string
   }>()
+  useEffect(() => {
+    if (deckId) recordRecentDeck(deckId)
+  }, [deckId])
   if (!deckId) return <Redirect href="/connected/decks" />
   const cardQuantity = deckCardQuantity === undefined ? undefined : Number(deckCardQuantity)
   const summary: DeckDetailSummary | undefined =

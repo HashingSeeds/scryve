@@ -24,6 +24,7 @@ export default function SettingsRoute() {
         Platform.OS === "ios" ? () => void Linking.openURL(APPLE_STANDARD_EULA_URL) : undefined
       }
       onOpenCookiePolicy={() => router.push("/cookie-policy")}
+      onOpenGameContentNotices={() => router.push("/game-content-notices")}
       BlockedPlayers={hasCloudSession ? <BlockedPlayersSection /> : undefined}
       onSettingsChange={(settings) => {
         localGameRepository.saveSettings(settings)

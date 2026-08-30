@@ -22,6 +22,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { catalogCardDetails } from "@/features/decks/cardFocus"
 import { cardCountLabel, recordLine } from "@/features/decks/deckCopy"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -34,19 +35,52 @@ import { deckFormatLabel, deckGame, deckSections } from "../../convex/lib/deckGa
 import { versionLabel } from "../../convex/lib/deckVersions"
 
 type DeckCard = {
-  oracleId: string
-  scryfallId: string
+  game?: string
+  identityNamespace?: string
+  cardId?: string
+  providerCardId?: string
+  printingId?: string
+  section?: string
+  entryKind?: string
+  originalReference?: string
+  category?: string
+  oracleId?: string
+  scryfallId?: string
   name: string
   imageUrl?: string
   smallImageUrl?: string
   quantity: number
-  board: "main" | "sideboard" | "commander"
+  board?: "main" | "sideboard" | "commander"
 }
 
 type DeckDetailTab = "cards" | "versions" | "notes"
 
-function printingKey(card: Pick<DeckCard, "board" | "scryfallId">) {
-  return `${card.board}:${card.scryfallId}`
+function cardSection(card: DeckCard) {
+  return card.section ?? card.board ?? "main"
+}
+
+function printingKey(card: DeckCard) {
+  const identity =
+    card.printingId ??
+    card.providerCardId ??
+    card.scryfallId ??
+    card.cardId ??
+    card.oracleId ??
+    card.originalReference ??
+    card.name
+  return `${cardSection(card)}:${identity}`
+}
+
+export function cardDetailsKey(card: DeckCard, game: string) {
+  if (card.scryfallId) return card.scryfallId
+  const identity = [
+    card.cardId,
+    card.printingId,
+    card.providerCardId,
+    card.originalReference,
+    card.name,
+  ].find(Boolean)
+  return `${game}:${identity ?? "unknown"}:${card.originalReference ?? ""}`
 }
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
@@ -67,7 +101,7 @@ function mergedPrintings(cards: DeckCard[]) {
 
 function groupedCards(cards: DeckCard[], sections: readonly { id: string; label: string }[]) {
   const known = sections.map((section) => {
-    const boardCards = cards.filter((card) => card.board === section.id)
+    const boardCards = cards.filter((card) => cardSection(card) === section.id)
     return {
       board: section.id,
       label: section.label,
@@ -76,9 +110,9 @@ function groupedCards(cards: DeckCard[], sections: readonly { id: string; label:
     }
   })
   const knownIds = new Set(sections.map((section) => section.id))
-  const extraIds = [...new Set(cards.map((card) => card.board).filter((id) => !knownIds.has(id)))]
+  const extraIds = [...new Set(cards.map(cardSection).filter((id) => !knownIds.has(id)))]
   const extra = extraIds.map((board) => {
-    const boardCards = cards.filter((card) => card.board === board)
+    const boardCards = cards.filter((card) => cardSection(card) === board)
     return {
       board,
       label: board.charAt(0).toUpperCase() + board.slice(1),
@@ -251,6 +285,8 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   })
   const searchCards = useAction(api.cards.search)
   const fetchCardById = useAction(api.cards.byId)
+  const fetchCatalogCardById = useAction(api.cards.byCatalogId)
+  const fetchPokemonCardByReference = useAction(api.cards.byPokemonReference)
   const saveVersion = useMutation(api.decks.saveVersion)
   const createVersion = useMutation(api.decks.createVersion)
   const updateVersion = useMutation(api.decks.updateVersion)
@@ -269,9 +305,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
-  const [detailsByScryfallId, setDetailsByScryfallId] = useState<
-    Record<string, FocusedCardDetails>
-  >({})
+  const [detailsByCardKey, setDetailsByCardKey] = useState<Record<string, FocusedCardDetails>>({})
   const [detailsError, setDetailsError] = useState<string>()
 
   const storedCards = useMemo(
@@ -323,8 +357,16 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
 
   async function runSearch() {
     await run(async () => {
-      const found = await searchCards({ query: search })
-      setResults(found.map((card) => ({ ...card, quantity: 1, board: "main" as const })))
+      const found = await searchCards({ query: search, game: detail?.deck.game })
+      setResults(
+        found.map((card) => ({
+          ...card,
+          quantity: 1,
+          ...(detail?.deck.game === "mtg"
+            ? { board: "main" as const }
+            : { section: configuredSections[0]?.id ?? "main" }),
+        })),
+      )
     }, "Could not search cards")
   }
 
@@ -351,15 +393,29 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
     )
   }
 
-  async function loadCardDetails(scryfallId: string) {
-    if (detailsByScryfallId[scryfallId]) return
+  async function loadCardDetails(card: DeckCard) {
+    const game = detail?.deck.game ?? card.game ?? "mtg"
+    const detailsKey = cardDetailsKey(card, game)
+    if (detailsByCardKey[detailsKey]) return
     try {
-      const { manaCost, typeLine, oracleText, setName, collectorNumber, rarity } =
-        await fetchCardById({ scryfallId })
-      setDetailsByScryfallId((current) => ({
-        ...current,
-        [scryfallId]: { manaCost, typeLine, oracleText, setName, collectorNumber, rarity },
-      }))
+      const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
+      const details = card.scryfallId
+        ? await fetchCardById({ scryfallId: card.scryfallId })
+        : catalogCardId
+          ? catalogCardDetails(await fetchCatalogCardById({ game, cardId: catalogCardId }))
+          : game === "pokemon" && card.originalReference
+            ? catalogCardDetails(
+                await fetchPokemonCardByReference({
+                  name: card.name,
+                  originalReference: card.originalReference,
+                }),
+              )
+            : undefined
+      if (!details) {
+        setDetailsError("No additional card details are available.")
+        return
+      }
+      setDetailsByCardKey((current) => ({ ...current, [detailsKey]: details }))
     } catch (cause) {
       setDetailsError(convexErrorMessage(cause, "Could not load card details"))
     }
@@ -368,7 +424,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   function focusCard(card: DeckCard) {
     setFocusedKey(printingKey(card))
     setDetailsError(undefined)
-    void loadCardDetails(card.scryfallId)
+    void loadCardDetails(card)
   }
 
   function decrementFocusedCard(card: DeckCard) {
@@ -682,7 +738,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
               />
               {results.map((card) => (
                 <ListItem
-                  key={card.scryfallId}
+                  key={printingKey(card)}
                   bottomSeparator
                   height={84}
                   style={$centeredRow}
@@ -740,9 +796,9 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
             imageUrl: focusedCard.imageUrl,
             smallImageUrl: focusedCard.smallImageUrl,
             quantity: focusedCard.quantity,
-            boardLabel: boardLabel(configuredSections, focusedCard.board),
+            boardLabel: boardLabel(configuredSections, cardSection(focusedCard)),
           }}
-          details={detailsByScryfallId[focusedCard.scryfallId]}
+          details={detailsByCardKey[cardDetailsKey(focusedCard, detail.deck.game)]}
           detailsError={detailsError}
           {...(editing
             ? {

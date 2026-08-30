@@ -78,6 +78,7 @@ describe("SettingsScreen", () => {
       onOpenPrivacy: jest.fn(),
       onOpenTerms: jest.fn(),
       onOpenCookiePolicy: jest.fn(),
+      onOpenGameContentNotices: jest.fn(),
     }
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -93,10 +94,12 @@ describe("SettingsScreen", () => {
     fireEvent.press(view.getByText("Privacy Policy"))
     fireEvent.press(view.getByText("Terms of Use"))
     fireEvent.press(view.getByText("Cookie Policy"))
+    fireEvent.press(view.getByText("Third-party game content"))
 
     expect(handlers.onOpenPrivacy).toHaveBeenCalledTimes(1)
     expect(handlers.onOpenTerms).toHaveBeenCalledTimes(1)
     expect(handlers.onOpenCookiePolicy).toHaveBeenCalledTimes(1)
+    expect(handlers.onOpenGameContentNotices).toHaveBeenCalledTimes(1)
     expect(view.queryByText("License Agreement")).toBeNull()
   })
 

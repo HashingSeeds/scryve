@@ -214,7 +214,7 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("connected-game-board")).toBeTruthy()
     openConnectedStatus()
     expect(screen.getByText("Connected summary")).toBeTruthy()
-    expect(screen.getByText("12 accepted life changes · final")).toBeTruthy()
+    expect(screen.getByText("12 life changes accepted · final")).toBeTruthy()
     expect(
       [1, 2].every(
         (seat) => screen.getByTestId(`life-seat-${seat}-1`).props.accessibilityState.disabled,
@@ -226,6 +226,31 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.queryByTestId("connected-history-button")).toBeNull()
     expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
     expect(screen.getByTestId("players-button").props.accessibilityState.disabled).toBeFalsy()
+  })
+
+  it("falls back to ruleset and singular counter copy for legacy projections", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        format: "",
+        ruleset: "commander",
+        eventSequence: 1,
+      } as typeof connectedHarness.runtime.projection,
+    }
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedStatus()
+    expect(screen.getByText("Commander · starts with 40 life")).toBeTruthy()
+    fireEvent.press(screen.getByText("Close"))
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, status: "finished" },
+    }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedStatus()
+    expect(screen.getByText("1 life change accepted · final")).toBeTruthy()
+    view.unmount()
   })
 
   it("reports an opponent from the board and confirms the block took effect", async () => {

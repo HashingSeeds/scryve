@@ -13,7 +13,9 @@ import {
   type PlayerMarkShape,
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
+import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
+import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
 import {
   boundedPaginationOptions,
@@ -339,6 +341,9 @@ async function terminalizeGame(
     terminalReason: reason,
     startingLife: game.startingLife,
     ruleset: game.ruleset,
+    game: game.game ?? DEFAULT_DECK_GAME,
+    system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
+    format: game.format ?? game.ruleset,
     eventCount: totalEventCount(game, players),
     finishedAt: now,
     players: summaryPlayers,
@@ -416,6 +421,9 @@ export const createLobby = mutation({
     playerCount: v.number(),
     startingLife: v.number(),
     ruleset: v.string(),
+    game: v.optional(v.string()),
+    system: v.optional(v.string()),
+    format: v.optional(v.string()),
     inviteToken: v.string(),
     manualCodeCandidates: v.array(v.string()),
     hostDisplayName: v.string(),
@@ -425,14 +433,23 @@ export const createLobby = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    if (args.game !== undefined && args.system !== undefined && args.game !== args.system)
+      throw new Error("Game system fields must match")
+    const gameSystem = assertGameSystem(args.system ?? args.game ?? DEFAULT_DECK_GAME)
+    await requireReleasedCapability(ctx, gameSystem, "playTracking")
     assertPlayerCount(args.playerCount)
-    assertStartingLife(args.startingLife)
+    assertStartingLife(
+      args.startingLife,
+      gameSystem === "ygo" ? 999_999 : gameSystem === "pokemon" ? 99 : 999,
+    )
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
     assertAllowedColor(args.hostColor)
     if (args.hostShape !== undefined) assertAllowedShape(args.hostShape)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const ruleset = assertRuleset(args.ruleset)
+    const format =
+      args.format === undefined ? ruleset : assertDeckGameFormat(gameSystem, args.format)
     const hostDisplayName = assertDisplayName(args.hostDisplayName)
     assertPublicId(args.publicId)
     for (const status of ["lobby", "active"] as const) {
@@ -460,6 +477,9 @@ export const createLobby = mutation({
       playerCount: args.playerCount,
       startingLife: args.startingLife,
       ruleset,
+      game: gameSystem,
+      system: gameSystem,
+      format,
       createdAt: now,
       updatedAt: now,
       eventSequence: 0,
@@ -619,6 +639,9 @@ export const lobbyProjection = query({
       playerCount: game.playerCount,
       startingLife: game.startingLife,
       ruleset: game.ruleset,
+      game: game.game ?? DEFAULT_DECK_GAME,
+      system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
+      format: game.format ?? game.ruleset,
       isHost,
       eventSequence: eventCount,
       serverUpdatedAt,
@@ -958,6 +981,8 @@ export const connectedHistory = query({
           startingLife: summary.startingLife,
           ruleset: summary.ruleset,
           eventCount: summary.eventCount,
+          system: summary.system ?? summary.game ?? DEFAULT_DECK_GAME,
+          format: summary.format ?? summary.ruleset,
           finishedAt: summary.finishedAt,
           outcome: entry.outcome,
           terminalStatus: summary.terminalStatus ?? "finished",
@@ -1092,6 +1117,9 @@ export const activeConnectedGames = query({
             isHost: true,
             playerCount: game.playerCount,
             ruleset: game.ruleset,
+            game: game.game ?? DEFAULT_DECK_GAME,
+            system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
+            format: game.format ?? game.ruleset,
             startingLife: game.startingLife,
             updatedAt: game.updatedAt,
           })
@@ -1109,6 +1137,9 @@ export const activeConnectedGames = query({
           isHost: game.hostUserId === user._id,
           playerCount: game.playerCount,
           ruleset: game.ruleset,
+          game: game.game ?? DEFAULT_DECK_GAME,
+          system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
+          format: game.format ?? game.ruleset,
           startingLife: game.startingLife,
           updatedAt: game.updatedAt,
         })
@@ -1134,6 +1165,9 @@ export const connectedSummary = query({
     const blocked = await blockedUserIdsFor(ctx, viewer._id)
     return {
       ...summary,
+      game: summary.game ?? DEFAULT_DECK_GAME,
+      system: summary.system ?? summary.game ?? DEFAULT_DECK_GAME,
+      format: summary.format ?? summary.ruleset,
       players: maskSummaryPlayersForViewer(summary.players, blocked),
       viewerPlayerIds: summary.players
         .filter((player) => player.userId === viewer._id)

@@ -1,8 +1,9 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { clear } from "@/utils/storage"
 
-import { AddDeckScreen } from "./AddDeckScreen"
+import { AddDeckScreen, catalogPreviewSections } from "./AddDeckScreen"
 
 const mockCreate = jest.fn()
 const mockImport = jest.fn(async () => "deck-imported")
@@ -39,6 +40,32 @@ const mockPreviewPrecon = jest.fn(async () => ({
   ],
 }))
 const mockResolvePasted = jest.fn()
+type MockCatalogDeck = {
+  _id: string
+  game: string
+  name: string
+  kind: string
+  format?: string
+}
+const mockSearchTopDecks = jest.fn(async (): Promise<MockCatalogDeck[]> => [])
+const mockCatalogDetail: {
+  value:
+    | {
+        deck: { _id: string; game: string; name: string; kind: string; format?: string }
+        entries: Array<{
+          _id: string
+          game: string
+          cardId?: string
+          originalReference?: string
+          name: string
+          quantity: number
+          section: string
+          imageUrl?: string
+          smallImageUrl?: string
+        }>
+      }
+    | undefined
+} = { value: undefined }
 const mockCardById = jest.fn(async () => ({
   manaCost: "{1}{G}{U}",
   typeLine: "Legendary Creature — Merfolk Scout",
@@ -46,6 +73,21 @@ const mockCardById = jest.fn(async () => ({
   setName: "The Lost Caverns of Ixalan Commander",
   collectorNumber: "3",
   rarity: "mythic",
+}))
+const mockCatalogCardById = jest.fn(async () => ({
+  typeLabel: "Effect Monster",
+  text: "Discard this card; negate that effect.",
+  setCode: "MACR",
+  collectorNumber: "036",
+  rarity: "secret rare",
+}))
+const mockPokemonCardByReference = jest.fn(async () => ({
+  typeLabel: "Pokemon · Basic · Fighting",
+  text: "Punch · 20",
+  setCode: "me01",
+  collectorNumber: "76",
+  rarity: "common",
+  imageUrl: "https://assets.example/riolu/high.webp",
 }))
 type DeckShelfState = {
   decks: Array<{
@@ -86,14 +128,20 @@ const mockListMine: {
 }
 
 jest.mock("convex/react", () => ({
-  useQuery: () => {
+  useQuery: (reference: string) => {
+    if (reference === "deckCatalogs.detail") return mockCatalogDetail.value
     if (mockListMine.error) throw mockListMine.error
     return mockListMine.value
   },
   useMutation: (reference: string) =>
-    reference === "decks.importResolved" ? mockImport : mockCreate,
+    reference === "decks.importResolved" || reference === "decks.importCatalog"
+      ? mockImport
+      : mockCreate,
   useAction: (reference: string) => {
     if (reference === "cards.byId") return mockCardById
+    if (reference === "cards.byCatalogId") return mockCatalogCardById
+    if (reference === "cards.byPokemonReference") return mockPokemonCardByReference
+    if (reference === "deckCatalogs.searchTopDecks") return mockSearchTopDecks
     if (reference === "deckImports.searchPreconstructed") return mockSearch
     if (reference === "deckImports.previewPreconstructed") return mockPreviewPrecon
     if (reference === "deckImports.resolvePreconstructed") return mockResolvePrecon
@@ -107,6 +155,7 @@ jest.mock("../../convex/_generated/api", () => ({
       listMine: "decks.listMine",
       create: "decks.create",
       importResolved: "decks.importResolved",
+      importCatalog: "decks.importCatalog",
     },
     deckImports: {
       searchPreconstructed: "deckImports.searchPreconstructed",
@@ -116,6 +165,12 @@ jest.mock("../../convex/_generated/api", () => ({
     },
     cards: {
       byId: "cards.byId",
+      byCatalogId: "cards.byCatalogId",
+      byPokemonReference: "cards.byPokemonReference",
+    },
+    deckCatalogs: {
+      detail: "deckCatalogs.detail",
+      searchTopDecks: "deckCatalogs.searchTopDecks",
     },
   },
 }))
@@ -136,28 +191,49 @@ function renderAddDeck(onCreated = jest.fn()) {
 }
 
 function chooseFormat(view: ReturnType<typeof renderAddDeck>, format: string) {
-  fireEvent.press(view.getByTestId("format-picker"))
   fireEvent.press(view.getByTestId(`format-picker-options-${format}`))
 }
 
 function chooseMode(view: ReturnType<typeof renderAddDeck>, mode: string) {
-  fireEvent.press(view.getByTestId("mode-picker"))
   fireEvent.press(view.getByTestId(`mode-picker-options-${mode}`))
 }
 
-function continueSetup(view: ReturnType<typeof renderAddDeck>) {
-  fireEvent.press(view.getByTestId("continue-add-deck"))
-}
+function continueSetup(_view: ReturnType<typeof renderAddDeck>) {}
 
 describe("AddDeckScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    clear()
     jest.useFakeTimers()
     mockListMine.value = {
       ...readyShelf,
       capacity: { used: 1, limit: 100, premium: true, canCreate: true },
     }
     mockListMine.error = undefined
+    mockCatalogDetail.value = undefined
+  })
+
+  it("puts unknown catalog sections in a visible deterministic fallback", () => {
+    const sections = catalogPreviewSections(
+      [
+        { _id: "main-card", name: "Known", section: "main", quantity: 2 },
+        { _id: "unknown-card", name: "Mystery", section: "bench", quantity: 3 },
+      ] as never,
+      [{ id: "main", label: "Deck" }],
+    )
+
+    expect(sections).toEqual([
+      {
+        id: "main",
+        label: "Deck",
+        entries: [{ _id: "main-card", name: "Known", section: "main", quantity: 2 }],
+      },
+      {
+        id: "other",
+        label: "Other",
+        entries: [{ _id: "unknown-card", name: "Mystery", section: "bench", quantity: 3 }],
+      },
+    ])
   })
 
   afterEach(() => {
@@ -168,11 +244,8 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     expect(view.getByText("Official precon")).toBeTruthy()
     chooseMode(view, "paste")
-    continueSetup(view)
     expect(view.getByText("Deck list")).toBeTruthy()
-    fireEvent.press(view.getByTestId("change-deck-setup"))
     chooseMode(view, "blank")
-    continueSetup(view)
     expect(view.getByText("Create deck")).toBeTruthy()
   })
 
@@ -303,6 +376,182 @@ describe("AddDeckScreen", () => {
       jest.advanceTimersByTime(400)
     })
     expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "brawl" })
+  })
+
+  it("loads each system with a valid default format and filters Top Decks by format", async () => {
+    const view = renderAddDeck()
+
+    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(
+      view.getByTestId("format-picker-options-advanced").props.accessibilityState.selected,
+    ).toBe(true)
+    expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      game: "ygo",
+      format: "advanced",
+      query: "",
+    })
+
+    chooseFormat(view, "traditional")
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      game: "ygo",
+      format: "traditional",
+      query: "",
+    })
+
+    fireEvent.press(view.getByTestId("game-picker-options-mtg"))
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(
+      view.getByTestId("format-picker-options-commander").props.accessibilityState.selected,
+    ).toBe(true)
+    expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "commander" })
+  })
+
+  it("ignores a Top Deck search that finishes after the format changes", async () => {
+    let finishAdvancedSearch: ((decks: MockCatalogDeck[]) => void) | undefined
+    mockSearchTopDecks
+      .mockImplementationOnce(
+        () =>
+          new Promise<MockCatalogDeck[]>((resolve) => {
+            finishAdvancedSearch = resolve
+          }),
+      )
+      .mockResolvedValueOnce([
+        {
+          _id: "traditional-deck",
+          game: "ygo",
+          name: "Current Traditional Deck",
+          kind: "tournament",
+          format: "traditional",
+        },
+      ])
+    const view = renderAddDeck()
+
+    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      game: "ygo",
+      format: "advanced",
+      query: "",
+    })
+
+    chooseFormat(view, "traditional")
+    await act(async () => {
+      finishAdvancedSearch?.([
+        {
+          _id: "stale-advanced-deck",
+          game: "ygo",
+          name: "Stale Advanced Deck",
+          kind: "tournament",
+          format: "advanced",
+        },
+      ])
+    })
+    expect(view.queryByText("Stale Advanced Deck")).toBeNull()
+
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Current Traditional Deck")).toBeTruthy())
+  })
+
+  it("resets the shared format when changing systems", () => {
+    const view = renderAddDeck()
+
+    chooseFormat(view, "modern")
+    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+
+    expect(
+      view.getByTestId("format-picker-options-advanced").props.accessibilityState.selected,
+    ).toBe(true)
+  })
+
+  it("opens the shared card dialog from a Top Deck preview", async () => {
+    mockSearchTopDecks.mockResolvedValueOnce([
+      {
+        _id: "catalog-ygo",
+        game: "ygo",
+        name: "Sample Yu-Gi-Oh deck",
+        kind: "tournament",
+        format: "advanced",
+      },
+    ])
+    mockCatalogDetail.value = {
+      deck: {
+        _id: "catalog-ygo",
+        game: "ygo",
+        name: "Sample Yu-Gi-Oh deck",
+        kind: "tournament",
+        format: "advanced",
+      },
+      entries: [
+        {
+          _id: "catalog-card-ygo",
+          game: "ygo",
+          cardId: "14558127",
+          name: "Ash Blossom & Joyous Spring",
+          quantity: 3,
+          section: "main",
+          imageUrl: "https://example.com/ash.jpg",
+        },
+      ],
+    }
+    const view = renderAddDeck()
+
+    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Sample Yu-Gi-Oh deck")).toBeTruthy())
+    fireEvent.press(view.getByText("Sample Yu-Gi-Oh deck"))
+    fireEvent.press(view.getByLabelText("Preview Ash Blossom & Joyous Spring"))
+
+    expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
+    expect(view.getByText("Ash Blossom & Joyous Spring")).toBeTruthy()
+    await waitFor(() => expect(view.getByText("Effect Monster")).toBeTruthy())
+    expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
+  })
+
+  it("resolves a Pokemon Top Deck card from its provider reference", async () => {
+    mockSearchTopDecks.mockResolvedValueOnce([
+      {
+        _id: "catalog-pokemon",
+        game: "pokemon",
+        name: "Lucario Hariyama",
+        kind: "tournament",
+        format: "standard",
+      },
+    ])
+    mockCatalogDetail.value = {
+      deck: {
+        _id: "catalog-pokemon",
+        game: "pokemon",
+        name: "Lucario Hariyama",
+        kind: "tournament",
+        format: "standard",
+      },
+      entries: [
+        {
+          _id: "catalog-card-riolu",
+          game: "pokemon",
+          originalReference: "MEG 76",
+          name: "Riolu",
+          quantity: 3,
+          section: "main",
+        },
+      ],
+    }
+    const view = renderAddDeck()
+
+    fireEvent.press(view.getByTestId("game-picker-options-pokemon"))
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Lucario Hariyama")).toBeTruthy())
+    fireEvent.press(view.getByText("Lucario Hariyama"))
+    fireEvent.press(view.getByLabelText("Preview Riolu"))
+
+    await waitFor(() => expect(view.getByText("Pokemon · Basic · Fighting")).toBeTruthy())
+    expect(view.getByTestId("card-focus-image")).toBeTruthy()
+    expect(mockPokemonCardByReference).toHaveBeenCalledWith({
+      name: "Riolu",
+      originalReference: "MEG 76",
+    })
   })
 
   it("carries the chosen game, format, and note into a new deck", async () => {

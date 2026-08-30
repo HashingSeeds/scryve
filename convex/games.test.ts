@@ -277,6 +277,65 @@ describe("Convex connected-game authorization", () => {
     ).rejects.toThrow("Manual code candidates must be 6–16")
     expect(await t.run((ctx) => ctx.db.query("games").collect())).toEqual([])
   })
+
+  it("validates the connected game format for its system", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "format-host", "Host")
+    const base = {
+      publicId: "format-public-game-id",
+      playerCount: 2,
+      startingLife: 8000,
+      ruleset: "advanced",
+      system: "ygo",
+      inviteToken: "f".repeat(43),
+      manualCodeCandidates: ["FMT234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+    }
+
+    await expect(host.mutation(api.games.createLobby, base)).resolves.toMatchObject({
+      publicId: base.publicId,
+    })
+    await expect(
+      host.mutation(api.games.createLobby, {
+        ...base,
+        publicId: "invalid-format-public-id",
+        inviteToken: "g".repeat(43),
+        manualCodeCandidates: ["BAD234"],
+        format: "commander",
+      }),
+    ).rejects.toMatchObject({ data: { code: "unknown_format" } })
+
+    const games = await t.run((ctx) => ctx.db.query("games").collect())
+    expect(games).toHaveLength(1)
+    expect(games[0]).toMatchObject({ system: "ygo", format: "advanced" })
+  })
+
+  it("preserves a legacy ruleset as the format when no format is supplied", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "legacy-format-host", "Host")
+
+    await expect(
+      host.mutation(api.games.createLobby, {
+        publicId: "legacy-format-public-id",
+        playerCount: 2,
+        startingLife: 8000,
+        ruleset: "legacy-custom-format",
+        system: "ygo",
+        inviteToken: "l".repeat(43),
+        manualCodeCandidates: ["LEG234"],
+        hostDisplayName: "Host",
+        hostColor: "#7C3AED",
+      }),
+    ).resolves.toMatchObject({ publicId: "legacy-format-public-id" })
+
+    const games = await t.run((ctx) => ctx.db.query("games").collect())
+    expect(games).toHaveLength(1)
+    expect(games[0]).toMatchObject({
+      ruleset: "legacy-custom-format",
+      format: "legacy-custom-format",
+    })
+  })
 })
 
 async function activeGame(t: ReturnType<typeof convexTest>) {

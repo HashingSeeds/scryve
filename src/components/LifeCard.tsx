@@ -3,6 +3,7 @@ import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-n
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
+import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -41,6 +42,7 @@ export interface LifeCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   lifeFontSize?: number
+  system?: PlaySystemId
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
   pendingCount?: number
@@ -57,6 +59,7 @@ export function LifeCard({
   compact,
   contentRotation = 0,
   lifeFontSize,
+  system = "mtg",
   disabled,
   ownership,
   pendingCount = 0,
@@ -68,6 +71,7 @@ export function LifeCard({
     theme: { spacing },
   } = useAppTheme()
   const foreground = accessibleForeground(color)
+  const counter = playSystemRules(system).counter
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
@@ -109,12 +113,14 @@ export function LifeCard({
     previousLife.current = life
     if (difference === 0) return
     if (Platform.OS === "ios") {
-      AccessibilityInfo.announceForAccessibility(`${identity}, now ${life} life`)
+      AccessibilityInfo.announceForAccessibility(
+        `${identity}, now ${counterValueLabel(system, life)}`,
+      )
     }
     setRecentDelta((current) => current + difference)
     if (deltaTimer.current) clearTimeout(deltaTimer.current)
     deltaTimer.current = setTimeout(() => setRecentDelta(0), DELTA_VISIBLE_MS)
-  }, [identity, life])
+  }, [identity, life, system])
   useEffect(() => () => void (deltaTimer.current && clearTimeout(deltaTimer.current)), [])
 
   const ownershipLabel =
@@ -159,7 +165,11 @@ export function LifeCard({
   }
 
   const editTitle =
-    editMode === "add" ? "Add life" : editMode === "subtract" ? "Subtract life" : "Set life"
+    editMode === "add"
+      ? `Add ${counter.label}`
+      : editMode === "subtract"
+        ? `Subtract ${counter.label}`
+        : `Set ${counter.label}`
 
   return (
     <View
@@ -194,8 +204,8 @@ export function LifeCard({
             disabled={disabled}
             accessibilityRole="button"
             accessibilityState={{ disabled: !!disabled }}
-            accessibilityLabel={`${identity}, ${life} life`}
-            accessibilityHint="Long press to set life to a new number"
+            accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
+            accessibilityHint={`Long press to set ${counter.label} to a new number`}
             delayLongPress={450}
             onLongPress={() => openEditor("set")}
             style={({ pressed }) => [
@@ -207,7 +217,7 @@ export function LifeCard({
               testID={`life-total-seat-${seatNumber}`}
               text={String(life)}
               accessible={false}
-              accessibilityLabel={`${identity}, ${life} life`}
+              accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
               accessibilityLiveRegion="polite"
               maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
               numberOfLines={1}
@@ -265,15 +275,19 @@ export function LifeCard({
         contrastCheckedForeground={foreground}
         compact={compact}
         contentRotation={contentRotation}
+        system={system}
         onChange={onChange}
-        onLongChange={(direction) => openEditor(direction > 0 ? "add" : "subtract")}
+        onLongChange={(direction, amount) => {
+          if (amount) onChange(direction * amount)
+          else openEditor(direction > 0 ? "add" : "subtract")
+        }}
       />
       {editMode ? (
         <DialogCard
           visible
           onClose={closeEditor}
           backdropTestID={`life-editor-backdrop-seat-${seatNumber}`}
-          backdropAccessibilityLabel="Cancel life edit"
+          backdropAccessibilityLabel={`Cancel ${counter.label} edit`}
           dialogTestID={`life-editor-dialog-seat-${seatNumber}`}
           accessibilityViewIsModal
         >
@@ -282,7 +296,7 @@ export function LifeCard({
             testID={`life-editor-input-seat-${seatNumber}`}
             autoFocus
             selectTextOnFocus
-            label={editMode === "set" ? "New life total" : "Amount"}
+            label={editMode === "set" ? `New ${counter.label} total` : "Amount"}
             value={editValue}
             keyboardType={editMode === "set" ? "numbers-and-punctuation" : "number-pad"}
             returnKeyType="done"
@@ -301,7 +315,7 @@ export function LifeCard({
             <Button text="Cancel" style={themed($dialogButton)} onPress={closeEditor} />
             <Button
               testID={`life-editor-apply-seat-${seatNumber}`}
-              text={editMode === "set" ? "Set life" : editTitle}
+              text={editMode === "set" ? `Set ${counter.label}` : editTitle}
               preset="reversed"
               disabled={!validEdit}
               style={themed($dialogButton)}

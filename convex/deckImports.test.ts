@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
-import { parsePastedDeckList } from "./deckImports"
+import { parseGenericDeckList, parsePastedDeckList } from "./deckImports"
 import schema from "./schema"
 
 const REFRESH_LEASE_MS = 5 * 60 * 1000
@@ -10,9 +10,12 @@ const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
   "./cards.ts": async () => jest.requireActual("./cards"),
+  "./cardCatalog.ts": async () => jest.requireActual("./cardCatalog"),
   "./deckImports.ts": async () => jest.requireActual("./deckImports"),
   "./decks.ts": async () => jest.requireActual("./decks"),
   "./externalApiRateLimits.ts": async () => jest.requireActual("./externalApiRateLimits"),
+  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
+  "./providerHealth.ts": async () => jest.requireActual("./providerHealth"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
 
@@ -118,6 +121,215 @@ Sideboard
         invalidLines: [],
       },
     )
+  })
+})
+
+describe("Yu-Gi-Oh! deck list parsing", () => {
+  function ydkeSection(ids: number[]) {
+    const bytes = new Uint8Array(ids.length * 4)
+    const view = new DataView(bytes.buffer)
+    ids.forEach((id, index) => view.setUint32(index * 4, id, true))
+    return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""))
+  }
+
+  it("decodes YDKE links and retains main, extra, and side sections", () => {
+    const list = `ydke://${ydkeSection([46986414, 46986414])}!${ydkeSection([84013237])}!${ydkeSection([14558127])}!`
+
+    expect(parseGenericDeckList(list, "ygo")).toEqual({
+      entries: [
+        {
+          name: "Card 46986414",
+          quantity: 2,
+          section: "main",
+          originalReference: "46986414",
+          providerCardId: "46986414",
+          sectionExplicit: true,
+        },
+        {
+          name: "Card 84013237",
+          quantity: 1,
+          section: "extra",
+          originalReference: "84013237",
+          providerCardId: "84013237",
+          sectionExplicit: true,
+        },
+        {
+          name: "Card 14558127",
+          quantity: 1,
+          section: "side",
+          originalReference: "14558127",
+          providerCardId: "14558127",
+          sectionExplicit: true,
+        },
+      ],
+      invalidLines: [],
+    })
+  })
+
+  it("rejects malformed YDKE payloads", () => {
+    expect(() => parseGenericDeckList("ydke://broken!also-broken!still-broken!", "ygo")).toThrow(
+      "This YDKE link is invalid",
+    )
+  })
+})
+
+describe("generic deck resolution", () => {
+  it("reuses normalized lookups across sections", async () => {
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: 1,
+              name: "Shared Card",
+              type: "Effect Monster",
+              frameType: "effect",
+              card_images: [{ id: 1 }],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "generic-deck-importer" })
+
+      const result = await actor.action(api.deckImports.resolvePasted, {
+        game: "ygo",
+        list: "Main Deck\n1 Shared Card\nSide Deck\n2 shared   card",
+      })
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(result.cards).toMatchObject([
+        {
+          name: "Shared Card",
+          quantity: 1,
+          section: "main",
+          originalReference: "Shared Card",
+        },
+        {
+          name: "Shared Card",
+          quantity: 2,
+          section: "side",
+          originalReference: "shared   card",
+        },
+      ])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("caches every unique card returned by batched provider lookups", async () => {
+    const ids = Array.from({ length: 53 }, (_, index) => String(10_000 + index))
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestedIds = new URL(String(input)).searchParams.get("id")?.split(",") ?? []
+      return new Response(
+        JSON.stringify({
+          data: requestedIds.map((id) => ({
+            id: Number(id),
+            name: `Card ${id}`,
+            type: "Effect Monster",
+            frameType: "effect",
+            card_images: [{ id: Number(id) }],
+          })),
+        }),
+        { status: 200 },
+      )
+    })
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "batched-deck-importer" })
+
+      await actor.action(api.deckImports.resolvePasted, {
+        game: "ygo",
+        list: ids.join("\n"),
+      })
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+      expect(
+        fetchSpy.mock.calls.map(
+          ([input]) => new URL(String(input)).searchParams.get("id")?.split(",").length,
+        ),
+      ).toEqual([40, 13])
+      await expect(
+        t.run(async (ctx) => await ctx.db.query("gameCards").collect()),
+      ).resolves.toHaveLength(ids.length)
+      await expect(
+        t.run(async (ctx) => await ctx.db.query("cardPrintings").collect()),
+      ).resolves.toHaveLength(ids.length)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("preserves distinct Pokémon printings with the same card name", async () => {
+    const pokemonCard = (id: string, localId: string) => ({
+      id,
+      localId,
+      name: "Pikachu",
+      category: "Pokemon",
+      set: { id: id.split("-")[0] },
+    })
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input))
+      if (url.pathname.endsWith("/cards/seta-1"))
+        return new Response(JSON.stringify(pokemonCard("seta-1", "1")), { status: 200 })
+      if (url.pathname.endsWith("/cards/setb-2"))
+        return new Response(JSON.stringify(pokemonCard("setb-2", "2")), { status: 200 })
+      const localId = url.searchParams.get("localId")
+      return new Response(
+        JSON.stringify(
+          localId === "1" ? [pokemonCard("seta-1", "1")] : [pokemonCard("setb-2", "2")],
+        ),
+        { status: 200 },
+      )
+    })
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "pokemon-printing-importer" })
+
+      const result = await actor.action(api.deckImports.resolvePasted, {
+        game: "pokemon",
+        list: "1 Pikachu SVA 1\n1 Pikachu SVB 2",
+      })
+
+      expect(result.cards).toMatchObject([
+        { name: "Pikachu", quantity: 1, originalReference: "Pikachu SVA 1", printingId: "seta-1" },
+        { name: "Pikachu", quantity: 1, originalReference: "Pikachu SVB 2", printingId: "setb-2" },
+      ])
+      expect(fetchSpy).toHaveBeenCalledTimes(4)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it.each([
+    ["empty_deck_list", ""],
+    [
+      "deck_too_large",
+      Array.from({ length: 301 }, (_, index) => `1 Card ${index} SET ${index}`).join("\n"),
+    ],
+  ])("does not report %s validation as provider downtime", async (code, list) => {
+    const fetchSpy = jest.spyOn(globalThis, "fetch")
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: `validation-${code}` })
+
+      await expect(
+        actor.action(api.deckImports.resolvePasted, { game: "pokemon", list }),
+      ).rejects.toMatchObject({ data: { code } })
+      await expect(
+        actor.query(api.providerHealth.current, {
+          game: "pokemon",
+          provider: "tcgdex",
+          operation: "deck-resolution",
+        }),
+      ).resolves.toBeNull()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
 

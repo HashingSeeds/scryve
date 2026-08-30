@@ -4,7 +4,12 @@ import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
 import { requireSeatOwner, requireUser } from "./lib/auth"
-import { assertPlayableDeckGame, DEFAULT_DECK_GAME } from "./lib/deckGames"
+import {
+  assertDeckGameFormat,
+  assertPlayableDeckGame,
+  DEFAULT_DECK_GAME,
+  defaultDeckFormat,
+} from "./lib/deckGames"
 import { DEFAULT_VERSION_NAME } from "./lib/deckVersions"
 import {
   deckCapacity,
@@ -14,6 +19,7 @@ import {
   requireDeckCapacity,
   requireVersionCapacity,
 } from "./lib/entitlements"
+import { capabilityReleased, requireReleasedCapability } from "./lib/integrations"
 import {
   assertDeckFormat,
   assertDeckName,
@@ -26,23 +32,41 @@ import {
 
 const boardValidator = v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander"))
 const cardValidator = v.object({
-  oracleId: v.string(),
-  scryfallId: v.string(),
+  game: v.optional(v.string()),
+  identityNamespace: v.optional(v.string()),
+  cardId: v.optional(v.string()),
+  providerCardId: v.optional(v.string()),
+  printingId: v.optional(v.string()),
+  section: v.optional(v.string()),
+  entryKind: v.optional(v.string()),
+  originalReference: v.optional(v.string()),
+  category: v.optional(v.string()),
+  oracleId: v.optional(v.string()),
+  scryfallId: v.optional(v.string()),
   name: v.string(),
   imageUrl: v.optional(v.string()),
   smallImageUrl: v.optional(v.string()),
   quantity: v.number(),
-  board: boardValidator,
+  board: v.optional(boardValidator),
 })
 
 type DeckCardInput = {
-  oracleId: string
-  scryfallId: string
+  game?: string
+  identityNamespace?: string
+  cardId?: string
+  providerCardId?: string
+  printingId?: string
+  section?: string
+  entryKind?: string
+  originalReference?: string
+  category?: string
+  oracleId?: string
+  scryfallId?: string
   name: string
   imageUrl?: string
   smallImageUrl?: string
   quantity: number
-  board: "main" | "sideboard" | "commander"
+  board?: "main" | "sideboard" | "commander"
 }
 
 const VERSION_SCAN = MAX_DECK_VERSIONS * 4
@@ -72,16 +96,45 @@ function assertCardImage(imageUrl: string) {
     })
 }
 
-function assertCard(card: {
-  oracleId: string
-  scryfallId: string
-  name: string
-  imageUrl?: string
-  smallImageUrl?: string
-  quantity: number
-}) {
-  if (!/^[0-9a-f-]{36}$/i.test(card.oracleId) || !/^[0-9a-f-]{36}$/i.test(card.scryfallId))
-    throw new ConvexError({ code: "invalid_card", message: "Card identifiers are invalid" })
+function assertCard(
+  card: {
+    game?: string
+    cardId?: string
+    providerCardId?: string
+    printingId?: string
+    section?: string
+    originalReference?: string
+    oracleId?: string
+    scryfallId?: string
+    name: string
+    imageUrl?: string
+    smallImageUrl?: string
+    quantity: number
+  },
+  game: string,
+) {
+  if (card.game !== undefined && card.game !== game)
+    throw new ConvexError({
+      code: "deck_system_mismatch",
+      message: "Card belongs to another system",
+    })
+  if (game === DEFAULT_DECK_GAME) {
+    if (
+      !card.oracleId ||
+      !card.scryfallId ||
+      !/^[0-9a-f-]{36}$/i.test(card.oracleId) ||
+      !/^[0-9a-f-]{36}$/i.test(card.scryfallId)
+    )
+      throw new ConvexError({ code: "invalid_card", message: "Card identifiers are invalid" })
+  } else if (!(card.cardId || card.providerCardId || card.printingId || card.originalReference)) {
+    throw new ConvexError({
+      code: "invalid_card",
+      message: "Card needs an identity or unresolved source reference",
+    })
+  }
+  const section = card.section ?? (game === DEFAULT_DECK_GAME ? undefined : "main")
+  if (section !== undefined && (section.trim().length < 1 || section.length > 80))
+    throw new ConvexError({ code: "invalid_deck_section", message: "Deck section is invalid" })
   if (card.name.trim().length < 1 || card.name.trim().length > 200)
     throw new ConvexError({ code: "invalid_card_name", message: "Card name is invalid" })
   if (!Number.isInteger(card.quantity) || card.quantity < 1 || card.quantity > 999)
@@ -90,20 +143,21 @@ function assertCard(card: {
   if (card.smallImageUrl) assertCardImage(card.smallImageUrl)
 }
 
-function assertDeckSize(cards: DeckCardInput[]) {
+function assertDeckSize(cards: DeckCardInput[], game: string) {
   if (cards.length > MAX_DECK_CARDS)
     throw new ConvexError({
       code: "deck_too_large",
       message: `A deck may contain at most ${MAX_DECK_CARDS} entries`,
     })
-  for (const card of cards) assertCard(card)
+  for (const card of cards) assertCard(card, game)
 }
 
-function fingerprint(
-  cards: Array<{ oracleId: string; scryfallId: string; quantity: number; board: string }>,
-) {
+function fingerprint(cards: DeckCardInput[]) {
   const canonical = cards
-    .map((card) => `${card.board}:${card.oracleId}:${card.scryfallId}:${card.quantity}`)
+    .map(
+      (card) =>
+        `${card.section ?? card.board ?? "main"}:${card.cardId ?? card.oracleId ?? ""}:${card.printingId ?? card.providerCardId ?? card.scryfallId ?? card.originalReference ?? ""}:${card.quantity}`,
+    )
     .sort()
     .join("|")
   let hash = 2166136261
@@ -122,22 +176,40 @@ function cardTotals(cards: DeckCardInput[]) {
   }
 }
 
-function cardRow(versionId: Id<"deckVersions">, card: DeckCardInput) {
+function cardRow(versionId: Id<"deckVersions">, game: string, card: DeckCardInput) {
+  const isMagic = game === DEFAULT_DECK_GAME
+  const section = card.section ?? card.board ?? "main"
   return {
     deckVersionId: versionId,
-    oracleId: card.oracleId,
-    scryfallId: card.scryfallId,
+    game,
+    identityNamespace:
+      card.identityNamespace ??
+      (isMagic ? "scryfall-oracle" : game === "ygo" ? "ygoprodeck-card" : "tcgdex-card"),
+    ...((card.cardId ?? card.oracleId) ? { cardId: card.cardId ?? card.oracleId } : {}),
+    ...((card.providerCardId ?? card.scryfallId)
+      ? { providerCardId: card.providerCardId ?? card.scryfallId }
+      : {}),
+    ...((card.printingId ?? card.scryfallId)
+      ? { printingId: card.printingId ?? card.scryfallId }
+      : {}),
+    section,
+    entryKind: card.entryKind ?? "card",
+    ...(card.originalReference ? { originalReference: card.originalReference } : {}),
+    ...(card.category ? { category: card.category } : {}),
+    ...(card.oracleId ? { oracleId: card.oracleId } : {}),
+    ...(card.scryfallId ? { scryfallId: card.scryfallId } : {}),
     name: card.name.trim(),
     ...(card.imageUrl ? { imageUrl: card.imageUrl } : {}),
     ...(card.smallImageUrl ? { smallImageUrl: card.smallImageUrl } : {}),
     quantity: card.quantity,
-    board: card.board,
+    ...(card.board ? { board: card.board } : {}),
   }
 }
 
 async function insertDeckVersion(
   ctx: MutationCtx,
   deckId: Id<"decks">,
+  game: string,
   version: { versionNumber: number; name: string; note?: string },
   cards: DeckCardInput[],
   now: number,
@@ -151,13 +223,14 @@ async function insertDeckVersion(
     createdAt: now,
     updatedAt: now,
   })
-  for (const card of cards) await ctx.db.insert("deckCards", cardRow(versionId, card))
+  for (const card of cards) await ctx.db.insert("deckCards", cardRow(versionId, game, card))
   return versionId
 }
 
 async function replaceVersionCards(
   ctx: MutationCtx,
   versionId: Id<"deckVersions">,
+  game: string,
   cards: DeckCardInput[],
 ) {
   const existing = await ctx.db
@@ -165,7 +238,7 @@ async function replaceVersionCards(
     .withIndex("by_deck_version", (q) => q.eq("deckVersionId", versionId))
     .take(MAX_DECK_CARDS + 1)
   for (const card of existing) await ctx.db.delete(card._id)
-  for (const card of cards) await ctx.db.insert("deckCards", cardRow(versionId, card))
+  for (const card of cards) await ctx.db.insert("deckCards", cardRow(versionId, game, card))
 }
 
 const DECK_COVER_SCAN = 20
@@ -262,6 +335,11 @@ export const listMine = query({
         .map(async (deck) => {
           const versions = await activeVersions(ctx, deck._id)
           const latest = versions[versions.length - 1]
+          const includeImages = await capabilityReleased(
+            ctx,
+            deck.game ?? DEFAULT_DECK_GAME,
+            "images",
+          )
           return {
             ...publicDeck(deck),
             latestVersionId: latest?._id,
@@ -273,7 +351,8 @@ export const listMine = query({
               versionNumber: version.versionNumber,
             })),
             cardQuantity: latest?.cardQuantity,
-            coverImageUrl: latest ? await deckCoverImageUrl(ctx, latest._id) : undefined,
+            coverImageUrl:
+              latest && includeImages ? await deckCoverImageUrl(ctx, latest._id) : undefined,
             lastPlayedAt: await lastPlayedAt(ctx, deck._id),
             record: analytics ? await deckRecord(ctx, deck._id) : undefined,
           }
@@ -294,18 +373,27 @@ export const create = mutation({
     const user = await requireUser(ctx)
     await requireDeckCapacity(ctx, user)
     const game = assertPlayableDeckGame(args.game ?? DEFAULT_DECK_GAME)
+    await requireReleasedCapability(ctx, game, "deckImport")
+    const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
     const note = args.note ? assertDeckNote(args.note) : ""
     const now = Date.now()
     const deckId = await ctx.db.insert("decks", {
       ownerUserId: user._id,
       name: assertDeckName(args.name),
-      format: assertDeckFormat(args.format),
+      format,
       game,
       ...(note ? { note } : {}),
       createdAt: now,
       updatedAt: now,
     })
-    await insertDeckVersion(ctx, deckId, { versionNumber: 1, name: DEFAULT_VERSION_NAME }, [], now)
+    await insertDeckVersion(
+      ctx,
+      deckId,
+      game,
+      { versionNumber: 1, name: DEFAULT_VERSION_NAME },
+      [],
+      now,
+    )
     return deckId
   },
 })
@@ -326,15 +414,17 @@ export const importResolved = mutation({
         code: "empty_import",
         message: "Import at least one resolved card",
       })
-    assertDeckSize(args.cards)
     const game = assertPlayableDeckGame(args.game ?? DEFAULT_DECK_GAME)
+    await requireReleasedCapability(ctx, game, "deckImport")
+    assertDeckSize(args.cards, game)
+    const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
     const note = args.note ? assertDeckNote(args.note) : ""
 
     const now = Date.now()
     const deckId = await ctx.db.insert("decks", {
       ownerUserId: user._id,
       name: assertDeckName(args.name),
-      format: assertDeckFormat(args.format),
+      format,
       game,
       ...(note ? { note } : {}),
       createdAt: now,
@@ -343,8 +433,70 @@ export const importResolved = mutation({
     await insertDeckVersion(
       ctx,
       deckId,
+      game,
       { versionNumber: 1, name: DEFAULT_VERSION_NAME },
       args.cards,
+      now,
+    )
+    return deckId
+  },
+})
+
+export const importCatalog = mutation({
+  args: { catalogDeckId: v.id("deckCatalogs"), name: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    await requireDeckCapacity(ctx, user)
+    const catalogDeck = await ctx.db.get(args.catalogDeckId)
+    if (!catalogDeck)
+      throw new ConvexError({ code: "catalog_deck_not_found", message: "Catalog deck not found" })
+    const game = assertPlayableDeckGame(catalogDeck.game)
+    await requireReleasedCapability(ctx, game, "exampleDecks")
+    await requireReleasedCapability(ctx, game, "deckImport")
+    const entries = await ctx.db
+      .query("deckCatalogCards")
+      .withIndex("by_catalog_deck_id", (query) => query.eq("catalogDeckId", catalogDeck._id))
+      .take(MAX_DECK_CARDS + 1)
+    if (entries.length < 1)
+      throw new ConvexError({ code: "empty_import", message: "Catalog deck has no cards" })
+    const includeImages = await capabilityReleased(ctx, game, "images")
+    const cards = entries.slice(0, MAX_DECK_CARDS).map((storedEntry) => {
+      const {
+        _id: _,
+        _creationTime: __,
+        catalogDeckId: ___,
+        imageUrl: _imageUrl,
+        smallImageUrl: _smallImageUrl,
+        ...entry
+      } = storedEntry
+      return includeImages
+        ? {
+            ...entry,
+            ...(storedEntry.imageUrl ? { imageUrl: storedEntry.imageUrl } : {}),
+            ...(storedEntry.smallImageUrl ? { smallImageUrl: storedEntry.smallImageUrl } : {}),
+          }
+        : entry
+    })
+    assertDeckSize(cards, game)
+    const format = assertDeckGameFormat(
+      game,
+      assertDeckFormat(catalogDeck.format ?? defaultDeckFormat(game)),
+    )
+    const now = Date.now()
+    const deckId = await ctx.db.insert("decks", {
+      ownerUserId: user._id,
+      name: assertDeckName(args.name ?? catalogDeck.name),
+      format,
+      game,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await insertDeckVersion(
+      ctx,
+      deckId,
+      game,
+      { versionNumber: 1, name: DEFAULT_VERSION_NAME },
+      cards,
       now,
     )
     return deckId
@@ -363,14 +515,34 @@ export const update = mutation({
     const { deck } = await ownedDeck(ctx, args.deckId)
     assertNotArchived(deck)
     const game = args.game === undefined ? undefined : assertPlayableDeckGame(args.game)
+    const currentGame = deck.game ?? DEFAULT_DECK_GAME
+    if (game !== undefined && game !== currentGame)
+      throw new ConvexError({
+        code: "deck_game_immutable",
+        message: "Create a new deck to change game systems",
+      })
+    const format =
+      args.format === undefined
+        ? undefined
+        : assertDeckGameFormat(currentGame, assertDeckFormat(args.format))
     const note = args.note === undefined ? undefined : assertDeckNote(args.note)
     await ctx.db.patch(deck._id, {
       ...(args.name === undefined ? {} : { name: assertDeckName(args.name) }),
-      ...(args.format === undefined ? {} : { format: assertDeckFormat(args.format) }),
+      ...(format === undefined ? {} : { format }),
       ...(game === undefined ? {} : { game }),
       ...(note === undefined ? {} : { note }),
       updatedAt: Date.now(),
     })
+    return null
+  },
+})
+
+export const setFavorite = mutation({
+  args: { deckId: v.id("decks"), favorite: v.boolean() },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    assertNotArchived(deck)
+    await ctx.db.patch(deck._id, { favoritedAt: args.favorite ? Date.now() : undefined })
     return null
   },
 })
@@ -402,11 +574,16 @@ export const detail = query({
           .withIndex("by_deck_version", (q) => q.eq("deckVersionId", selected._id))
           .take(MAX_DECK_CARDS + 1)
       : []
+    const includeImages = await capabilityReleased(ctx, deck.game ?? DEFAULT_DECK_GAME, "images")
     return {
       deck: publicDeck(deck),
       versions,
       version: selected ?? null,
-      cards: cards.slice(0, MAX_DECK_CARDS),
+      cards: cards.slice(0, MAX_DECK_CARDS).map((card) => {
+        if (includeImages) return card
+        const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...textCard } = card
+        return textCard
+      }),
       capacity: await deckVersionCapacity(ctx, user, stored.length),
       record: analytics ? await deckRecord(ctx, deck._id) : undefined,
       analyticsLocked: !analytics,
@@ -423,7 +600,9 @@ export const saveVersion = mutation({
   handler: async (ctx, args) => {
     const { deck } = await ownedDeck(ctx, args.deckId)
     assertNotArchived(deck)
-    assertDeckSize(args.cards)
+    const game = deck.game ?? DEFAULT_DECK_GAME
+    await requireReleasedCapability(ctx, game, "deckImport")
+    assertDeckSize(args.cards, game)
     const versions = await activeVersions(ctx, deck._id)
     const target = args.versionId
       ? versions.find((version) => version._id === args.versionId)
@@ -433,6 +612,7 @@ export const saveVersion = mutation({
       const versionId = await insertDeckVersion(
         ctx,
         deck._id,
+        game,
         { versionNumber: 1, name: DEFAULT_VERSION_NAME },
         args.cards,
         now,
@@ -442,7 +622,7 @@ export const saveVersion = mutation({
     }
     const totals = cardTotals(args.cards)
     if (target.fingerprint === totals.fingerprint) return target._id
-    await replaceVersionCards(ctx, target._id, args.cards)
+    await replaceVersionCards(ctx, target._id, game, args.cards)
     await ctx.db.patch(target._id, { ...totals, updatedAt: now })
     await ctx.db.patch(deck._id, { updatedAt: now })
     return target._id
@@ -477,11 +657,13 @@ export const createVersion = mutation({
           .map(({ _id: _, _creationTime: __, deckVersionId: ___, ...card }) => card)
       : []
     const now = Date.now()
+    const game = deck.game ?? DEFAULT_DECK_GAME
     const versionNumber =
       versions.reduce((highest, version) => Math.max(highest, version.versionNumber), 0) + 1
     const versionId = await insertDeckVersion(
       ctx,
       deck._id,
+      game,
       { versionNumber, name: args.name, ...(args.note ? { note: args.note } : {}) },
       cards,
       now,
@@ -553,6 +735,13 @@ export const selectForSeat = mutation({
       throw new ConvexError({
         code: "deck_selection_not_allowed",
         message: "Decks can only be selected in a lobby",
+      })
+    const deckGame = deck.game ?? DEFAULT_DECK_GAME
+    const lobbyGame = game.system ?? game.game ?? DEFAULT_DECK_GAME
+    if (deckGame !== lobbyGame)
+      throw new ConvexError({
+        code: "deck_system_mismatch",
+        message: "This deck belongs to another game system",
       })
     const { player } = await requireSeatOwner(ctx, game._id, args.seat)
     await ctx.db.patch(player._id, { deckVersionId: version._id })

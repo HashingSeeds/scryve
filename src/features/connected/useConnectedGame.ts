@@ -13,7 +13,6 @@ import { toConnectedProjection } from "./model"
 import { OutboxSyncController } from "./OutboxSyncController"
 import type { ConnectedGameResult } from "./OutboxSyncController"
 import { ConnectedGameRepository } from "./persistence"
-import { optimisticallyApplyLife } from "./reconciliation"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -60,8 +59,17 @@ export function connectedLifeOptimisticUpdater(
     deviceId: args.deviceId,
   }) as OptimisticLobbyProjection | undefined
   if (!current) return
+  const alreadyConfirmed = current.recentOperationIds.includes(args.operationId)
   const next: OptimisticLobbyProjection = {
-    ...optimisticallyApplyLife(current, args),
+    ...current,
+    recentOperationIds: alreadyConfirmed
+      ? current.recentOperationIds
+      : [args.operationId, ...current.recentOperationIds].slice(0, 100),
+    players: current.players.map((player) =>
+      !alreadyConfirmed && player.playerId === args.playerId
+        ? { ...player, currentLife: player.currentLife + args.delta }
+        : player,
+    ),
     __optimisticOperationIds: [...(current.__optimisticOperationIds ?? []), args.operationId],
   }
   store.setQuery(

@@ -9,5 +9,6 @@ export default defineApp({
     MODERATION_ALERT_TO: v.optional(v.string()),
     MODERATION_ALERT_FROM: v.optional(v.string()),
     WAITLIST_INGEST_SECRET: v.optional(v.string()),
+    YGO_IMAGE_BASE_URL: v.optional(v.string()),
   },
 })

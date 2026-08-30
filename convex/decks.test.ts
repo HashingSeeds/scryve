@@ -6,9 +6,11 @@ import schema from "./schema"
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
+  "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
   "./decks.ts": async () => jest.requireActual("./decks"),
   "./entitlements.ts": async () => jest.requireActual("./entitlements"),
   "./games.ts": async () => jest.requireActual("./games"),
+  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
 
@@ -56,6 +58,169 @@ describe("premium deck tracking", () => {
     await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
       decks: [{ coverImageUrl: "https://cards.scryfall.io/small/example.jpg" }],
     })
+  })
+
+  it("imports a Yu-Gi-Oh! catalog deck without crossing system identities", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "catalog-owner", "Catalog Owner")
+    const catalogDeckId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("deckCatalogs", {
+        game: "ygo",
+        source: "ygoprodeck-decks",
+        externalId: "catalog-example",
+        kind: "top",
+        name: "Catalog Example",
+        format: "advanced",
+        fetchedAt: Date.now(),
+      })
+      await ctx.db.insert("deckCatalogCards", {
+        catalogDeckId: id,
+        game: "ygo",
+        identityNamespace: "ygoprodeck-card",
+        cardId: "46986414",
+        providerCardId: "46986414",
+        printingId: "46986414",
+        name: "Dark Magician",
+        quantity: 3,
+        section: "main",
+        entryKind: "card",
+        originalReference: "46986414",
+      })
+      return id
+    })
+
+    const deckId = await actor.mutation(api.decks.importCatalog, { catalogDeckId })
+
+    await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      deck: { game: "ygo", format: "advanced", name: "Catalog Example" },
+      cards: [
+        {
+          game: "ygo",
+          identityNamespace: "ygoprodeck-card",
+          cardId: "46986414",
+          section: "main",
+          name: "Dark Magician",
+          quantity: 3,
+        },
+      ],
+    })
+  })
+
+  it("filters cached Top Decks by the selected format", async () => {
+    const t = convexTest(schema, modules)
+    await t.run(async (ctx) => {
+      for (const format of ["advanced", "traditional"] as const) {
+        await ctx.db.insert("deckCatalogs", {
+          game: "ygo",
+          source: "fixture",
+          externalId: format,
+          kind: "top",
+          name: `${format} deck`,
+          format,
+          fetchedAt: Date.now(),
+        })
+      }
+    })
+
+    await expect(
+      t.query(api.deckCatalogs.search, { game: "ygo", query: "", format: "traditional" }),
+    ).resolves.toMatchObject([{ name: "traditional deck", format: "traditional" }])
+  })
+
+  it("blocks imports immediately when the legal release state is disabled", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "gated-owner", "Gated Owner")
+    await t.mutation(internal.integrationManifest.setCapabilityOverride, {
+      game: "ygo",
+      capability: "deckImport",
+      release: "disabled",
+      note: "Preview gate test",
+    })
+
+    await expect(
+      actor.mutation(api.decks.importResolved, {
+        name: "Gated deck",
+        game: "ygo",
+        format: "advanced",
+        cards: [
+          {
+            game: "ygo",
+            identityNamespace: "ygoprodeck-card",
+            cardId: "46986414",
+            providerCardId: "46986414",
+            printingId: "46986414",
+            section: "main",
+            entryKind: "card",
+            originalReference: "46986414",
+            name: "Dark Magician",
+            quantity: 1,
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
+  })
+
+  it("keeps card text available while an image release gate is disabled", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "image-gate-owner", "Image Gate Owner")
+    const catalogDeckId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("deckCatalogs", {
+        game: "ygo",
+        source: "ygoprodeck-decks",
+        externalId: "image-gate-example",
+        kind: "top",
+        name: "Text-only Example",
+        format: "advanced",
+        fetchedAt: Date.now(),
+      })
+      await ctx.db.insert("deckCatalogCards", {
+        catalogDeckId: id,
+        game: "ygo",
+        cardId: "46986414",
+        name: "Dark Magician",
+        quantity: 3,
+        section: "main",
+        entryKind: "card",
+        imageUrl: "https://example.test/card.jpg",
+        smallImageUrl: "https://example.test/card-small.jpg",
+      })
+      return id
+    })
+    await t.mutation(internal.integrationManifest.setCapabilityOverride, {
+      game: "ygo",
+      capability: "images",
+      release: "disabled",
+      note: "Preview gate test",
+    })
+
+    await expect(t.query(api.deckCatalogs.detail, { catalogDeckId })).resolves.toMatchObject({
+      entries: [{ name: "Dark Magician" }],
+    })
+    const catalog = await t.query(api.deckCatalogs.detail, { catalogDeckId })
+    expect(catalog.entries[0].imageUrl).toBeUndefined()
+    expect(catalog.entries[0].smallImageUrl).toBeUndefined()
+
+    const deckId = await actor.mutation(api.decks.importCatalog, { catalogDeckId })
+    const detail = await actor.query(api.decks.detail, { deckId })
+    expect(detail.cards[0]).not.toHaveProperty("imageUrl")
+    expect(detail.cards[0]).not.toHaveProperty("smallImageUrl")
+    const decks = await actor.query(api.decks.listMine)
+    expect(decks.decks[0]).not.toHaveProperty("coverImageUrl")
+  })
+
+  it("blocks Top Deck provider actions behind the example-decks release gate", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "feed-gate-owner", "Feed Gate Owner")
+    await t.mutation(internal.integrationManifest.setCapabilityOverride, {
+      game: "ygo",
+      capability: "exampleDecks",
+      release: "permission_required",
+      note: "Registration pending",
+    })
+
+    await expect(
+      actor.action(api.deckCatalogs.searchTopDecks, { game: "ygo", query: "" }),
+    ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
   })
 
   it("keeps one deck free and unlocks additional decks through server entitlements", async () => {
@@ -552,14 +717,40 @@ describe("deck versions", () => {
     })
   })
 
-  it("refuses games that are not playable yet", async () => {
+  it("favorites and unfavorites an owned deck without changing its content order", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "favorite-owner", "Favorite Owner")
+    const deckId = await actor.mutation(api.decks.create, {
+      name: "Favorite me",
+      format: "commander",
+    })
+    const before = await actor.query(api.decks.listMine)
+
+    await actor.mutation(api.decks.setFavorite, { deckId, favorite: true })
+    const favorite = await actor.query(api.decks.listMine)
+    expect(favorite.decks[0]).toMatchObject({ _id: deckId, name: "Favorite me" })
+    expect(favorite.decks[0].favoritedAt).toEqual(expect.any(Number))
+    expect(favorite.decks[0].updatedAt).toBe(before.decks[0].updatedAt)
+
+    await actor.mutation(api.decks.setFavorite, { deckId, favorite: false })
+    expect((await actor.query(api.decks.listMine)).decks[0].favoritedAt).toBeUndefined()
+  })
+
+  it("accepts released systems and rejects unknown system or format pairs", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "game-owner", "Game Owner")
     await expect(
-      actor.mutation(api.decks.create, { name: "Duel", format: "advanced", game: "ygo" }),
-    ).rejects.toMatchObject({ data: { code: "game_unavailable" } })
-    await expect(
-      actor.mutation(api.decks.create, { name: "Duel", format: "advanced", game: "pokemon" }),
+      actor.mutation(api.decks.create, { name: "Duel", format: "advanced", game: "other" }),
     ).rejects.toMatchObject({ data: { code: "unknown_game" } })
+    await expect(
+      actor.mutation(api.decks.create, {
+        name: "Wrong format",
+        format: "advanced",
+        game: "pokemon",
+      }),
+    ).rejects.toMatchObject({ data: { code: "unknown_format" } })
+    await expect(
+      actor.mutation(api.decks.create, { name: "Duel", format: "advanced", game: "ygo" }),
+    ).resolves.toBeDefined()
   })
 })

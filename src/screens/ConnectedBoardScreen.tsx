@@ -28,6 +28,13 @@ import {
 } from "@/features/connected/PlayerActionsDialog"
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
 import { asPlayerId } from "@/features/game/domain"
+import {
+  counterChangeLabel,
+  counterValueLabel,
+  playFormatLabel,
+  playSystemId,
+  playSystemRules,
+} from "@/features/game/playSystems"
 import type { GamePlayer } from "@/features/game/types"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
@@ -206,6 +213,8 @@ function ConnectedBoardRuntime({
     )
 
   const game = runtime.projection
+  const system = playSystemId(game.system)
+  const counter = playSystemRules(system).counter
 
   const players: GamePlayer[] = game.players.map((player) => ({
     id: asPlayerId(player.playerId),
@@ -228,7 +237,7 @@ function ConnectedBoardRuntime({
       : runtime.pending.length > 0
         ? `Wait for ${runtime.pending.length} pending ${runtime.pending.length === 1 ? "change" : "changes"} to sync before finishing.`
         : runtime.failed.length > 0
-          ? "Review failed life changes before finishing."
+          ? `Review failed ${counter.label} changes before finishing.`
           : undefined
   const layoutOptions = getPlayerGridLayoutOptions(players.length)
   const gridLayout = getPlayerGridLayout({
@@ -310,6 +319,7 @@ function ConnectedBoardRuntime({
       <View testID="connected-game-board" style={themed($board)}>
         <PlayerGrid
           players={players}
+          system={system}
           layoutVariant={layoutVariant}
           disabled={!active || overlayOpen}
           isPlayerDisabled={(player) => !controlled.has(player.id)}
@@ -399,8 +409,8 @@ function ConnectedBoardRuntime({
           <Text
             text={
               finished
-                ? `${game.eventSequence} accepted life changes · final`
-                : `${game.ruleset} · ${game.startingLife} starting life`
+                ? `${counterChangeLabel(system, game.eventSequence)} accepted · final`
+                : `${playFormatLabel(system, game.format || game.ruleset)} · starts with ${counterValueLabel(system, game.startingLife)}`
             }
             size="xs"
             style={themed($muted)}
@@ -414,7 +424,7 @@ function ConnectedBoardRuntime({
                 style={themed($failure)}
               >
                 <Text
-                  text={`A ${failure.action.event.delta > 0 ? "+" : ""}${failure.action.event.delta} life change could not sync: ${failure.reason}`}
+                  text={`A ${failure.action.event.delta > 0 ? "+" : ""}${failure.action.event.delta} ${counter.label} change could not sync: ${failure.reason}`}
                 />
                 <Button
                   text="Dismiss after reviewing"
@@ -486,7 +496,7 @@ function ConnectedBoardRuntime({
                 <ChoiceButton
                   key={player.playerId}
                   text={player.displayName}
-                  detail={`${player.currentLife} life`}
+                  detail={counterValueLabel(system, player.currentLife)}
                   accentColor={player.color}
                   Leading={({ color }) => (
                     <PlayerMark
@@ -496,7 +506,7 @@ function ConnectedBoardRuntime({
                       size={28}
                     />
                   )}
-                  accessibilityLabel={`${player.displayName}, ${player.currentLife} life${selected ? ", winner" : ""}`}
+                  accessibilityLabel={`${player.displayName}, ${counterValueLabel(system, player.currentLife)}${selected ? ", winner" : ""}`}
                   selected={selected}
                   onPress={() => toggleWinner(player.playerId)}
                 />

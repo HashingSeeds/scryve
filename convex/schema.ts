@@ -1,6 +1,23 @@
 import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
+const genericDeckCardFields = {
+  game: v.optional(v.string()),
+  identityNamespace: v.optional(v.string()),
+  cardId: v.optional(v.string()),
+  providerCardId: v.optional(v.string()),
+  printingId: v.optional(v.string()),
+  section: v.optional(v.string()),
+  entryKind: v.optional(v.string()),
+  originalReference: v.optional(v.string()),
+  category: v.optional(v.string()),
+}
+
+const legacyMagicDeckCardFields = {
+  oracleId: v.optional(v.string()),
+  scryfallId: v.optional(v.string()),
+}
+
 export default defineSchema({
   waitlistSubmissions: defineTable({
     email: v.string(),
@@ -57,6 +74,9 @@ export default defineSchema({
     playerCount: v.number(),
     startingLife: v.number(),
     ruleset: v.string(),
+    game: v.optional(v.string()),
+    system: v.optional(v.string()),
+    format: v.optional(v.string()),
     createdAt: v.number(),
     startedAt: v.optional(v.number()),
     updatedAt: v.number(),
@@ -141,6 +161,9 @@ export default defineSchema({
     terminalReason: v.optional(v.string()),
     startingLife: v.number(),
     ruleset: v.string(),
+    game: v.optional(v.string()),
+    system: v.optional(v.string()),
+    format: v.optional(v.string()),
     eventCount: v.number(),
     finishedAt: v.number(),
     players: v.array(
@@ -185,6 +208,7 @@ export default defineSchema({
     format: v.string(),
     game: v.optional(v.string()),
     note: v.optional(v.string()),
+    favoritedAt: v.optional(v.number()),
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -210,14 +234,113 @@ export default defineSchema({
 
   deckCards: defineTable({
     deckVersionId: v.id("deckVersions"),
-    oracleId: v.string(),
-    scryfallId: v.string(),
+    ...genericDeckCardFields,
+    ...legacyMagicDeckCardFields,
     name: v.string(),
     imageUrl: v.optional(v.string()),
     smallImageUrl: v.optional(v.string()),
     quantity: v.number(),
-    board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
-  }).index("by_deck_version", ["deckVersionId"]),
+    board: v.optional(v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander"))),
+  })
+    .index("by_deck_version", ["deckVersionId"])
+    .index("by_game_and_printing_id", ["game", "printingId"]),
+
+  gameCards: defineTable({
+    game: v.string(),
+    identityNamespace: v.string(),
+    cardId: v.string(),
+    name: v.string(),
+    nameNormalized: v.string(),
+    category: v.optional(v.string()),
+    facets: v.array(v.object({ key: v.string(), value: v.string() })),
+    updatedAt: v.number(),
+  })
+    .index("by_game_and_identity_namespace_and_card_id", ["game", "identityNamespace", "cardId"])
+    .index("by_game_and_name_normalized", ["game", "nameNormalized"])
+    .searchIndex("search_name", { searchField: "name", filterFields: ["game"] }),
+
+  cardPrintings: defineTable({
+    gameCardId: v.id("gameCards"),
+    game: v.string(),
+    provider: v.string(),
+    providerCardId: v.string(),
+    printingId: v.string(),
+    setCode: v.optional(v.string()),
+    collectorNumber: v.optional(v.string()),
+    language: v.optional(v.string()),
+    rarity: v.optional(v.string()),
+    typeLabel: v.optional(v.string()),
+    costLabel: v.optional(v.string()),
+    faces: v.array(
+      v.object({
+        index: v.number(),
+        name: v.optional(v.string()),
+        text: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
+        smallImageUrl: v.optional(v.string()),
+      }),
+    ),
+    updatedAt: v.number(),
+  })
+    .index("by_game_and_provider_and_provider_card_id", ["game", "provider", "providerCardId"])
+    .index("by_game_card_id", ["gameCardId"])
+    .index("by_game_and_printing_id", ["game", "printingId"]),
+
+  providerHealth: defineTable({
+    game: v.string(),
+    provider: v.string(),
+    operation: v.string(),
+    status: v.union(v.literal("healthy"), v.literal("degraded"), v.literal("unavailable")),
+    lastAttemptAt: v.number(),
+    lastSuccessAt: v.optional(v.number()),
+    responseMs: v.optional(v.number()),
+    httpStatus: v.optional(v.number()),
+    message: v.string(),
+    updatedAt: v.number(),
+  }).index("by_game_and_provider_and_operation", ["game", "provider", "operation"]),
+
+  integrationOverrides: defineTable({
+    game: v.string(),
+    capability: v.string(),
+    release: v.union(v.literal("enabled"), v.literal("permission_required"), v.literal("disabled")),
+    note: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_game_and_capability", ["game", "capability"]),
+
+  deckCatalogs: defineTable({
+    game: v.string(),
+    source: v.string(),
+    externalId: v.string(),
+    kind: v.string(),
+    name: v.string(),
+    format: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    publishedAt: v.optional(v.number()),
+    fetchedAt: v.number(),
+  })
+    .index("by_game_and_source_and_external_id", ["game", "source", "externalId"])
+    .index("by_game_and_fetched_at", ["game", "fetchedAt"])
+    .index("by_game_and_kind_and_fetched_at", ["game", "kind", "fetchedAt"])
+    .searchIndex("search_name", { searchField: "name", filterFields: ["game", "kind"] }),
+
+  deckCatalogCards: defineTable({
+    catalogDeckId: v.id("deckCatalogs"),
+    game: v.string(),
+    identityNamespace: v.optional(v.string()),
+    cardId: v.optional(v.string()),
+    providerCardId: v.optional(v.string()),
+    printingId: v.optional(v.string()),
+    name: v.string(),
+    quantity: v.number(),
+    section: v.string(),
+    entryKind: v.string(),
+    originalReference: v.optional(v.string()),
+    category: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    smallImageUrl: v.optional(v.string()),
+  })
+    .index("by_catalog_deck_id", ["catalogDeckId"])
+    .index("by_game_and_printing_id", ["game", "printingId"]),
 
   deckGameResults: defineTable({
     deckId: v.id("decks"),

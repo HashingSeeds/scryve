@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { fireEvent, render, screen } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
+import { counterChangeLabel } from "@/features/game/playSystems"
 import type { GameEvent, LocalGame } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
 
@@ -107,12 +108,18 @@ function renderLocal(game = localGame(), eventsTruncated = false) {
 }
 
 describe("game summary", () => {
+  it("uses the system's singular lowercase counter noun in change metadata", () => {
+    expect(counterChangeLabel("ygo", 1)).toBe("1 life point change")
+    expect(counterChangeLabel("ygo", -1)).toBe("-1 life point change")
+    expect(counterChangeLabel("pokemon", 2)).toBe("2 prize cards changes")
+  })
+
   it("summarises a local game above its life totals", () => {
     renderLocal()
 
     expect(screen.getByText("Finished")).toBeTruthy()
     expect(screen.getByText("2 players · 20 life · 34 min · 0 life changes")).toBeTruthy()
-    expect(screen.getByText("Final life totals")).toBeTruthy()
+    expect(screen.getByText("Final Life")).toBeTruthy()
   })
 
   it("numbers local seats for humans, starting at one like the board does", () => {
@@ -197,7 +204,7 @@ describe("game summary", () => {
     expect(screen.getByText("@token · Krenko v3")).toBeTruthy()
     expect(screen.getByLabelText("Winner, Player, 7 life")).toBeTruthy()
     expect(screen.getByLabelText("Loss, Player, -1 life")).toBeTruthy()
-    expect(screen.getByText("2 players · commander · 48 life changes")).toBeTruthy()
+    expect(screen.getByText("2 players · Commander · 48 life changes")).toBeTruthy()
   })
 
   it("says when a connected game finished without a recorded winner", () => {
@@ -221,7 +228,7 @@ describe("game summary", () => {
       ),
     )
 
-    expect(screen.getByText("Final life totals")).toBeTruthy()
+    expect(screen.getByText("Final Life")).toBeTruthy()
     expect(screen.getByText("No winner was recorded for this game.")).toBeTruthy()
   })
 

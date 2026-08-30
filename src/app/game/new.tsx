@@ -20,8 +20,8 @@ export default function NewLocalGameRoute() {
       mode="local"
       onModeChange={(mode) => mode === "connected" && router.replace("/connected/new")}
       onBack={() => router.back()}
-      onStartLocal={(players, startingLife) => {
-        const game = createLocalGame({ players, startingLife })
+      onStartLocal={(players, startingLife, setup) => {
+        const game = createLocalGame({ players, startingLife, ...setup })
         localGameRepository.saveActiveGame(game)
         router.replace("/game/current")
       }}

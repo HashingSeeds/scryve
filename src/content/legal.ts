@@ -3,7 +3,7 @@ export type LegalDocumentBlock =
   | { type: "list"; items: string[] }
   | { type: "table"; rows: string[] }
 
-export type LegalDocumentId = "terms" | "privacy" | "cookiePolicy"
+export type LegalDocumentId = "terms" | "privacy" | "cookiePolicy" | "gameContentNotices"
 
 export interface LegalDocumentContent {
   id: LegalDocumentId
