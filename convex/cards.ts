@@ -59,6 +59,14 @@ function catalogResult(card: NormalizedCard, includeImages = true): CatalogCard 
   return includeImages ? result : catalogWithoutImages(result)
 }
 
+function hasCatalogImage(card: CatalogCard) {
+  return Boolean(
+    card.imageUrl ??
+    card.smallImageUrl ??
+    card.faces.find((face) => face.imageUrl !== undefined || face.smallImageUrl !== undefined),
+  )
+}
+
 function responseStatus(error: unknown) {
   if (typeof error !== "object" || error === null || !("response" in error)) return undefined
   const response = error.response
@@ -106,7 +114,7 @@ export const search = action({
         query,
         limit: MAX_SEARCH_RESULTS,
       })
-      if (cached.length > 0)
+      if (cached.length > 0 && (!includeImages || cached.every(hasCatalogImage)))
         return includeImages ? cached : cached.map((card) => catalogWithoutImages(card))
       const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
       const startedAt = Date.now()
@@ -182,9 +190,12 @@ export const byCatalogId = action({
       game,
       cardId,
     })
-    if (cached) return includeImages ? cached : catalogWithoutImages(cached)
+    if (cached && (!includeImages || game === "mtg" || hasCatalogImage(cached)))
+      return includeImages ? cached : catalogWithoutImages(cached)
     if (game === "mtg") {
       const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(cardId)}`)
+      if (response.status === 404)
+        throw new ConvexError({ code: "card_not_found", message: "Card not found" })
       if (!response.ok)
         throw new ConvexError({ code: "scryfall_unavailable", message: "Card lookup failed" })
       const card = normalizeScryfallCatalogCard((await response.json()) as unknown)
@@ -198,40 +209,40 @@ export const byCatalogId = action({
     }
     const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
     const startedAt = Date.now()
-    try {
-      const result =
-        game === "ygo"
+    const result = await (async () => {
+      try {
+        return game === "ygo"
           ? await cardsByYgoIds(ctx, [cardId], includeImages)
           : await pokemonCardById(ctx, cardId, includeImages)
-      const card = result.cards[0]
-      if (!card) throw new ConvexError({ code: "card_not_found", message: "Card not found" })
-      await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
-      await recordHealth(ctx, {
-        game,
-        provider,
-        operation: "card-lookup",
-        startedAt,
-        status: "healthy",
-        httpStatus: result.status,
-        message: "Card normalized",
-      })
-      return catalogResult(card, includeImages)
-    } catch (error) {
-      await recordHealth(ctx, {
-        game,
-        provider,
-        operation: "card-lookup",
-        startedAt,
-        status: "unavailable",
-        ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
-        message: error instanceof Error ? error.message : "Provider lookup failed",
-      })
-      if (error instanceof ConvexError) throw error
-      throw new ConvexError({
-        code: "card_provider_unavailable",
-        message: "Card lookup is temporarily unavailable",
-      })
-    }
+      } catch (error) {
+        await recordHealth(ctx, {
+          game,
+          provider,
+          operation: "card-lookup",
+          startedAt,
+          status: "unavailable",
+          ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
+          message: error instanceof Error ? error.message : "Provider lookup failed",
+        })
+        throw new ConvexError({
+          code: "card_provider_unavailable",
+          message: "Card lookup is temporarily unavailable",
+        })
+      }
+    })()
+    const card = result.cards[0]
+    await recordHealth(ctx, {
+      game,
+      provider,
+      operation: "card-lookup",
+      startedAt,
+      status: "healthy",
+      httpStatus: result.status,
+      message: card ? "Card normalized" : "Card not found",
+    })
+    if (!card) throw new ConvexError({ code: "card_not_found", message: "Card not found" })
+    await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
+    return catalogResult(card, includeImages)
   },
 })
 
@@ -247,37 +258,38 @@ export const byPokemonReference = action({
       throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card reference" })
 
     const startedAt = Date.now()
-    try {
-      const result = await pokemonCardByReference(ctx, name, originalReference, includeImages)
-      const card = result.cards[0]
-      if (!card) throw new ConvexError({ code: "card_not_found", message: "Card not found" })
-      await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
-      await recordHealth(ctx, {
-        game: "pokemon",
-        provider: "tcgdex",
-        operation: "card-reference-lookup",
-        startedAt,
-        status: "healthy",
-        httpStatus: result.status,
-        message: "Card reference normalized",
-      })
-      return catalogResult(card, includeImages)
-    } catch (error) {
-      await recordHealth(ctx, {
-        game: "pokemon",
-        provider: "tcgdex",
-        operation: "card-reference-lookup",
-        startedAt,
-        status: "unavailable",
-        ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
-        message: error instanceof Error ? error.message : "Provider reference lookup failed",
-      })
-      if (error instanceof ConvexError) throw error
-      throw new ConvexError({
-        code: "card_provider_unavailable",
-        message: "Card lookup is temporarily unavailable",
-      })
-    }
+    const result = await (async () => {
+      try {
+        return await pokemonCardByReference(ctx, name, originalReference, includeImages)
+      } catch (error) {
+        await recordHealth(ctx, {
+          game: "pokemon",
+          provider: "tcgdex",
+          operation: "card-reference-lookup",
+          startedAt,
+          status: "unavailable",
+          ...(responseStatus(error) === undefined ? {} : { httpStatus: responseStatus(error) }),
+          message: error instanceof Error ? error.message : "Provider reference lookup failed",
+        })
+        throw new ConvexError({
+          code: "card_provider_unavailable",
+          message: "Card lookup is temporarily unavailable",
+        })
+      }
+    })()
+    const card = result.cards[0]
+    await recordHealth(ctx, {
+      game: "pokemon",
+      provider: "tcgdex",
+      operation: "card-reference-lookup",
+      startedAt,
+      status: "healthy",
+      httpStatus: result.status,
+      message: card ? "Card reference normalized" : "Card not found",
+    })
+    if (!card) throw new ConvexError({ code: "card_not_found", message: "Card not found" })
+    await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: result.cards })
+    return catalogResult(card, includeImages)
   },
 })
 
@@ -299,6 +311,8 @@ export const byId = action({
     const cached: Doc<"cardReferences"> | null = await ctx.runQuery(internal.cards.cachedById, args)
     if (cached && isCompleteReference(cached)) return toCardReference(cached)
     const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(args.scryfallId)}`)
+    if (response.status === 404)
+      throw new ConvexError({ code: "card_not_found", message: "Card not found" })
     if (!response.ok)
       throw new ConvexError({
         code: "scryfall_unavailable",
