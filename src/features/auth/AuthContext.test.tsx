@@ -38,9 +38,11 @@ jest.mock("@clerk/expo/native", () => {
   const NativeText = jest.requireActual("react-native").Text
   return { AuthView: () => <NativeText testID="native-auth-view">Auth</NativeText> }
 })
-jest.mock("convex/react", () => ({ ConvexReactClient: jest.fn() }))
-jest.mock("convex/react-clerk", () => ({
-  ConvexProviderWithClerk: ({ children }: { children: ReactNode }) => children,
+jest.mock("convex/react", () => ({
+  ConvexProviderWithAuth: ({ children }: { children: ReactNode }) => children,
+  ConvexReactClient: jest.fn(),
+  useConvexAuth: () => ({ isAuthenticated: false, isLoading: true }),
+  useConvexConnectionState: () => ({ isWebSocketConnected: false }),
 }))
 jest.mock("@/features/billing/RevenueCatContext", () => ({
   RevenueCatProvider: ({ children }: { children: ReactNode }) => children,

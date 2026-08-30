@@ -24,6 +24,7 @@ import { mergeConfirmedProjection, oldestFirst, overlayPendingDeltas } from "./r
 export interface OutboxSyncEnvironment {
   isAuthenticated: boolean
   isLoading: boolean
+  isRefreshing: boolean
   isWebSocketConnected: boolean
   remoteReady: boolean
 }
@@ -94,6 +95,7 @@ export class OutboxSyncController {
   private environment: OutboxSyncEnvironment = {
     isAuthenticated: false,
     isLoading: true,
+    isRefreshing: false,
     isWebSocketConnected: false,
     remoteReady: false,
   }
@@ -140,6 +142,7 @@ export class OutboxSyncController {
     const changed =
       previous.isAuthenticated !== environment.isAuthenticated ||
       previous.isLoading !== environment.isLoading ||
+      previous.isRefreshing !== environment.isRefreshing ||
       previous.isWebSocketConnected !== environment.isWebSocketConnected ||
       previous.remoteReady !== environment.remoteReady
     this.environment = environment
@@ -268,8 +271,9 @@ export class OutboxSyncController {
   }
 
   private canSync(): boolean {
-    const { isAuthenticated, isLoading, isWebSocketConnected, remoteReady } = this.environment
-    return isAuthenticated && !isLoading && isWebSocketConnected && remoteReady
+    const { isAuthenticated, isLoading, isRefreshing, isWebSocketConnected, remoteReady } =
+      this.environment
+    return isAuthenticated && !isLoading && !isRefreshing && isWebSocketConnected && remoteReady
   }
 
   private buildSnapshot(): OutboxSyncSnapshot {

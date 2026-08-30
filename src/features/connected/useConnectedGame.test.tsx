@@ -6,6 +6,7 @@ const mockFinishMutation = jest.fn(async () => undefined)
 const mockDrain = jest.fn()
 const mockEmitTelemetry = jest.fn()
 let mockSocketConnected = false
+let mockConvexRefreshing = false
 let mockPending: any[] = []
 const mockRemoteProjection = {
   schemaVersion: 1,
@@ -79,7 +80,11 @@ jest.mock("../../../convex/_generated/api", () => ({
   },
 }))
 jest.mock("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
+  useConvexAuth: () => ({
+    isAuthenticated: true,
+    isLoading: false,
+    isRefreshing: mockConvexRefreshing,
+  }),
   useConvexConnectionState: () => ({ isWebSocketConnected: mockSocketConnected }),
   useQuery: () => mockRemote,
   useMutation: (reference: string) => {
@@ -93,6 +98,7 @@ describe("useConnectedGame connection readiness", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockSocketConnected = false
+    mockConvexRefreshing = false
     mockRemote = mockRemoteProjection
     mockPending = []
     mockRepository.loadProjection.mockReturnValue(null)
@@ -155,6 +161,17 @@ describe("useConnectedGame connection readiness", () => {
     const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
 
     expect(result.current).toMatchObject({ status: "loading", projection: null })
+    expect(mockDrain).not.toHaveBeenCalled()
+  })
+
+  it("does not drain the outbox while Convex refreshes authentication", async () => {
+    mockSocketConnected = true
+    mockConvexRefreshing = true
+    mockPending = [{ attempts: 0, event: { operationId: "operation-refreshing" } }]
+
+    renderHook(() => useConnectedGame("game-public", "user-1"))
+    await act(async () => Promise.resolve())
+
     expect(mockDrain).not.toHaveBeenCalled()
   })
 

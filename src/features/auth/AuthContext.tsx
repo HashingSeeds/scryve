@@ -1,14 +1,14 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from "react"
+import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from "react"
 import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
 import { tokenCache } from "@clerk/expo/token-cache"
-import { ConvexReactClient } from "convex/react"
-import { ConvexProviderWithClerk } from "convex/react-clerk"
+import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
 
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { readRevenueCatConfig } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
+import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
 import { resourceCache } from "./resourceCache"
 
 interface AuthAccess {
@@ -45,6 +45,7 @@ export function ConfiguredAuth({
   const { user } = useUser()
   const revenueCat = readRevenueCatConfig()
   const [visible, setVisible] = useState(false)
+  const [convexAuthRetryKey, setConvexAuthRetryKey] = useState(0)
   const value = useMemo<AuthAccess>(
     () => ({
       configured: true,
@@ -56,10 +57,21 @@ export function ConfiguredAuth({
     }),
     [isLoaded, isSignedIn, user?.id],
   )
-  const client = useMemo(() => new ConvexReactClient(convexUrl), [convexUrl])
+  const client = useMemo(
+    () => new ConvexReactClient(convexUrl, { initialAuthTokenReuse: true }),
+    [convexUrl],
+  )
+  const convexUseAuth = useMemo(
+    () => createConvexAuthHook(useAuth, convexAuthRetryKey),
+    [convexAuthRetryKey],
+  )
+  const retryConvexAuth = useCallback(() => {
+    setConvexAuthRetryKey((key) => key + 1)
+  }, [])
 
   return (
-    <ConvexProviderWithClerk client={client} useAuth={useAuth}>
+    <ConvexProviderWithAuth client={client} useAuth={convexUseAuth}>
+      <ConvexAuthReconnect onReconnect={retryConvexAuth} />
       <RevenueCatProvider
         apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
         appUserID={user?.id}
@@ -71,7 +83,7 @@ export function ConfiguredAuth({
           <ClerkAuthModal visible={visible} onDismiss={() => setVisible(false)} />
         </AuthAccessContext.Provider>
       </RevenueCatProvider>
-    </ConvexProviderWithClerk>
+    </ConvexProviderWithAuth>
   )
 }
 
