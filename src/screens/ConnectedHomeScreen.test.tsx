@@ -95,7 +95,7 @@ describe("ConnectedHomeScreen", () => {
 
     await waitFor(() => expect(screen.getByTestId("resume-connected-hosted-lobby")).toBeTruthy())
     expect(screen.getByText("Hosting · waiting to start")).toBeTruthy()
-    expect(screen.getByText(/2 seats · standard/)).toBeTruthy()
+    expect(screen.getByText(/2 seats · Standard/)).toBeTruthy()
     expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
     expect(screen.getByText(/Resume or finish\/abandon your hosted game/i)).toBeTruthy()
   })
