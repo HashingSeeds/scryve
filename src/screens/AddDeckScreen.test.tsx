@@ -408,6 +408,52 @@ describe("AddDeckScreen", () => {
     expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "commander" })
   })
 
+  it("ignores a Top Deck search that finishes after the format changes", async () => {
+    let finishAdvancedSearch: ((decks: MockCatalogDeck[]) => void) | undefined
+    mockSearchTopDecks
+      .mockImplementationOnce(
+        () =>
+          new Promise<MockCatalogDeck[]>((resolve) => {
+            finishAdvancedSearch = resolve
+          }),
+      )
+      .mockResolvedValueOnce([
+        {
+          _id: "traditional-deck",
+          game: "ygo",
+          name: "Current Traditional Deck",
+          kind: "tournament",
+          format: "traditional",
+        },
+      ])
+    const view = renderAddDeck()
+
+    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      game: "ygo",
+      format: "advanced",
+      query: "",
+    })
+
+    chooseFormat(view, "traditional")
+    await act(async () => {
+      finishAdvancedSearch?.([
+        {
+          _id: "stale-advanced-deck",
+          game: "ygo",
+          name: "Stale Advanced Deck",
+          kind: "tournament",
+          format: "advanced",
+        },
+      ])
+    })
+    expect(view.queryByText("Stale Advanced Deck")).toBeNull()
+
+    await act(async () => jest.advanceTimersByTime(400))
+    await waitFor(() => expect(view.getByText("Current Traditional Deck")).toBeTruthy())
+  })
+
   it("resets the shared format when changing systems", () => {
     const view = renderAddDeck()
 

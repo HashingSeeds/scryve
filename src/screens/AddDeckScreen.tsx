@@ -324,7 +324,10 @@ export function AddDeckScreen({
   useEffect(() => {
     if (mode !== "precon" || game !== "mtg") return undefined
     const timer = setTimeout(() => void runSearch(preconQuery), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      searchToken.current += 1
+    }
   }, [game, mode, preconQuery, runSearch])
 
   const runCatalogSearch = useCallback(
@@ -349,7 +352,10 @@ export function AddDeckScreen({
   useEffect(() => {
     if (mode !== "precon" || game === "mtg") return undefined
     const timer = setTimeout(() => void runCatalogSearch(preconQuery), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      searchToken.current += 1
+    }
   }, [game, mode, preconQuery, runCatalogSearch])
 
   async function createBlank() {
