@@ -311,7 +311,7 @@ function RadialAction({
 }
 
 const $backdrop: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  ...StyleSheet.absoluteFillObject,
+  ...StyleSheet.absoluteFill,
   zIndex: 10,
   backgroundColor: colors.gameMenu.backdrop,
 })

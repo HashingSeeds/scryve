@@ -53,9 +53,11 @@
   },
   "plugins": [
     "@clerk/expo",
+    "expo-router",
     "expo-secure-store",
     "expo-localization",
     "expo-font",
+    "expo-web-browser",
     [
       "expo-camera",
       {
@@ -84,7 +86,7 @@
     ],
     "expo-build-properties",
     [
-      "@sentry/react-native/expo",
+      "@sentry/react-native",
       {
         "url": "https://sentry.io/",
         "project": "scryve",

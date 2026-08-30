@@ -150,15 +150,15 @@ export function LifeControls({
 }
 
 const $zones: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFillObject,
+  ...StyleSheet.absoluteFill,
   flexDirection: "row",
 })
 const $zonesFacingLeft: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFillObject,
+  ...StyleSheet.absoluteFill,
   flexDirection: "column",
 })
 const $zonesFacingRight: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFillObject,
+  ...StyleSheet.absoluteFill,
   flexDirection: "column-reverse",
 })
 

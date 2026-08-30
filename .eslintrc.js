@@ -59,6 +59,10 @@ module.exports = {
     ],
     // react
     "react/prop-types": 0,
+    "react-hooks/preserve-manual-memoization": 0,
+    "react-hooks/purity": 0,
+    "react-hooks/refs": 0,
+    "react-hooks/set-state-in-effect": 0,
     // react-native
     "react-native/no-raw-text": 0,
     // reactotron

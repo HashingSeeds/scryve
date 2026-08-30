@@ -1,7 +1,7 @@
 import "react-native-url-polyfill/auto"
 
 import { useCallback, useEffect, useState } from "react"
-import { AppMetrics, AppMetricsRoot } from "expo-observe"
+import { AppMetrics, ObserveRoot } from "expo-observe"
 import { Slot, SplashScreen, type ErrorBoundaryProps } from "expo-router"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
@@ -65,4 +65,4 @@ function Root() {
   )
 }
 
-export default AppMetricsRoot.wrap(Root)
+export default ObserveRoot.wrap(Root)
