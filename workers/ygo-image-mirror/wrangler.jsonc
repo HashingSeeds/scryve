@@ -2,21 +2,53 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "scryve-ygo-image-mirror-multigame-preview",
   "main": "src/index.ts",
-  "compatibility_date": "2026-08-29",
+  "compatibility_date": "2026-08-30",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true,
+  "cache": {
+    "enabled": false,
+  },
   "r2_buckets": [
     {
       "binding": "YGO_IMAGES",
-      "bucket_name": "scryve-ygo-images-multigame-preview"
-    }
+      "bucket_name": "scryve-ygo-images-multigame-preview",
+    },
   ],
   "secrets": {
-    "required": ["MIRROR_TOKEN"]
+    "required": ["MIRROR_TOKEN"],
   },
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
-  }
+    "head_sampling_rate": 1,
+  },
+  "env": {
+    "production": {
+      "name": "scryve-ygo-image-mirror",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [
+        {
+          "pattern": "ygo-images.scryve.sow.care",
+          "custom_domain": true,
+        },
+      ],
+      "cache": {
+        "enabled": true,
+      },
+      "r2_buckets": [
+        {
+          "binding": "YGO_IMAGES",
+          "bucket_name": "scryve-ygo-images",
+        },
+      ],
+      "secrets": {
+        "required": ["MIRROR_TOKEN"],
+      },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+      },
+    },
+  },
 }

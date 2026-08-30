@@ -1,0 +1,51 @@
+name: remove Yu-Gi-Oh image
+
+on:
+  workflow_dispatch:
+    inputs:
+      printing_id:
+        description: YGOPRODeck printing ID to remove
+        required: true
+        type: string
+
+concurrency:
+  group: remove-ygo-image-${{ inputs.printing_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  remove:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    environment: ygo-image-mirror-production
+    steps:
+      - name: Remove object and purge CDN cache
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          PRINTING_ID: ${{ inputs.printing_id }}
+          YGO_MIRROR_TOKEN: ${{ secrets.YGO_MIRROR_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$PRINTING_ID" =~ ^[0-9]{1,20}$ ]]; then
+            echo "printing_id must contain 1-20 digits" >&2
+            exit 1
+          fi
+
+          image_url="https://ygo-images.scryve.sow.care/images/yugioh/cards/$PRINTING_ID.jpg"
+          curl --silent --show-error --fail-with-body \
+            --request DELETE \
+            --header "Authorization: Bearer $YGO_MIRROR_TOKEN" \
+            "$image_url"
+
+          purge_body=$(jq --null-input --compact-output --arg url "$image_url" '{files: [$url]}')
+          purge_response=$(curl --silent --show-error --fail-with-body \
+            --request POST \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "$purge_body" \
+            "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache")
+          jq --exit-status '.success == true' <<< "$purge_response" >/dev/null
