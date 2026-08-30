@@ -211,7 +211,7 @@ export function CurrentGameScreen({
               />
             ))}
           </View>
-          <Button tx="localGame:cancel" style={themed($menuItem)} onPress={closePanel} />
+          <Button tx="game:cancel" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>
       ) : null}
 
@@ -288,13 +288,13 @@ export function CurrentGameScreen({
           </View>
           <View style={themed($dialogActions)}>
             <Button
-              tx="localGame:cancel"
+              tx="game:cancel"
               style={themed($dialogAction)}
               onPress={() => setEndConfirmationOpen(false)}
             />
             <Button
               testID="confirm-end-game-button"
-              tx={endResultSelected ? "localGame:finish" : "localGame:abandon"}
+              tx={endResultSelected ? "game:finish" : "game:abandon"}
               preset={endResultSelected ? "reversed" : "filled"}
               style={themed($dialogAction)}
               onPress={confirmEnd}

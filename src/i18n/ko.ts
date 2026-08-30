@@ -1,7 +1,7 @@
 import en, { type Translations } from "./en"
 
 const ko: Translations = {
-  localGame: en.localGame,
+  game: en.game,
   common: {
     ok: "확인",
     cancel: "취소",

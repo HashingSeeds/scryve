@@ -516,7 +516,7 @@ function ConnectedBoardRuntime({
           <View style={themed($dialogActions)}>
             <Button
               testID="cancel-connected-finish-button"
-              tx="localGame:cancel"
+              tx="game:cancel"
               disabled={runtime.finishing}
               style={themed($dialogAction)}
               onPress={() => setConfirmingFinish(false)}
@@ -525,10 +525,10 @@ function ConnectedBoardRuntime({
               testID="confirm-connected-finish-button"
               tx={
                 runtime.finishing
-                  ? "localGame:ending"
+                  ? "game:ending"
                   : finishResultSelected
-                    ? "localGame:finish"
-                    : "localGame:abandon"
+                    ? "game:finish"
+                    : "game:abandon"
               }
               preset={finishResultSelected ? "reversed" : "filled"}
               disabled={runtime.finishing || Boolean(finishBlockedReason)}

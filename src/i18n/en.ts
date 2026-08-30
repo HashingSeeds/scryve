@@ -21,7 +21,7 @@ const en = {
     comingSoonMessage: "This entry point is ready for the next Scryve implementation phase.",
     dismissComingSoon: "Got it",
   },
-  localGame: {
+  game: {
     appName: "COUNT",
     homeTitle: "Life totals, without the fuss.",
     homeSubtitle: "Start a complete local game with no account and no network.",

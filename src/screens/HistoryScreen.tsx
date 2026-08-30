@@ -407,7 +407,7 @@ export function HistoryScreen({
               buttonOnPress={() => setFilters(NO_FILTERS)}
             />
           ) : (
-            <EmptyState headingTx="localGame:noGames" contentTx="localGame:noGamesContent" />
+            <EmptyState headingTx="game:noGames" contentTx="game:noGamesContent" />
           )
         }
         ListFooterComponent={

@@ -226,17 +226,17 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("end-game-button"))
 
-    expect(view.getByText(/localGame:abandon/)).toBeTruthy()
+    expect(view.getByText(/game:abandon/)).toBeTruthy()
 
     fireEvent.press(view.getByTestId("end-game-winner-1"))
-    expect(view.getByText(/localGame:finish/)).toBeTruthy()
-    expect(view.queryByText(/localGame:abandon/)).toBeNull()
+    expect(view.getByText(/game:finish/)).toBeTruthy()
+    expect(view.queryByText(/game:abandon/)).toBeNull()
 
     fireEvent.press(view.getByTestId("end-game-result-draw"))
-    expect(view.getByText(/localGame:finish/)).toBeTruthy()
+    expect(view.getByText(/game:finish/)).toBeTruthy()
 
     fireEvent.press(view.getByTestId("end-game-result-draw"))
-    expect(view.getByText(/localGame:abandon/)).toBeTruthy()
+    expect(view.getByText(/game:abandon/)).toBeTruthy()
   })
 
   it("records the winner the host picks before ending the game", async () => {

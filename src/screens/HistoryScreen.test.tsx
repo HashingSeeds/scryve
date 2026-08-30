@@ -304,7 +304,7 @@ describe("unified history screen", () => {
   it("shows a settled empty state only after connected history finishes", () => {
     renderHistory({ games: [], connected: connectedFeed([]) })
 
-    expect(screen.getByText("localGame:noGames")).toBeTruthy()
+    expect(screen.getByText("game:noGames")).toBeTruthy()
     expect(screen.queryByTestId("history-skeleton-row")).toBeNull()
   })
 

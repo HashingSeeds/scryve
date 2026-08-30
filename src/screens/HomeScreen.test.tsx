@@ -43,15 +43,15 @@ describe("HomeScreen", () => {
         <HomeScreen hasActiveGame={false} isSignedIn={false} {...callbacks} />
       </ThemeProvider>,
     )
-    expect(view.getByText("localGame:signUpOrLogIn")).toBeTruthy()
+    expect(view.getByText("game:signUpOrLogIn")).toBeTruthy()
 
     view.rerender(
       <ThemeProvider initialContext="light">
         <HomeScreen hasActiveGame={false} isSignedIn {...callbacks} />
       </ThemeProvider>,
     )
-    expect(view.getByText("localGame:account")).toBeTruthy()
-    expect(view.queryByText("localGame:signUpOrLogIn")).toBeNull()
+    expect(view.getByText("game:account")).toBeTruthy()
+    expect(view.queryByText("game:signUpOrLogIn")).toBeNull()
   })
 
   it("exposes deck building directly from the landing screen", () => {

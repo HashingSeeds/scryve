@@ -16,12 +16,12 @@ export function ActiveGameGuardScreen({
   const { themed } = useAppTheme()
   return (
     <Screen preset="auto" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header titleTx="localGame:newGame" leftTx="common:back" onLeftPress={onBack} />
+      <Header titleTx="game:newGame" leftTx="common:back" onLeftPress={onBack} />
       <EmptyState
         imageSource={null}
-        headingTx="localGame:activeGameTitle"
-        contentTx="localGame:activeGameContent"
-        buttonTx="localGame:resume"
+        headingTx="game:activeGameTitle"
+        contentTx="game:activeGameContent"
+        buttonTx="game:resume"
         buttonOnPress={onResume}
         ButtonProps={{ testID: "guard-resume-game-button" }}
       />
