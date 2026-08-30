@@ -187,9 +187,13 @@ async function limitlessJson(ctx: ActionCtx, path: string) {
   return { value: (await response.json()) as unknown, status: response.status }
 }
 
-async function pokemonSummariesWhenAvailable(ctx: ActionCtx, includeImages: boolean) {
+async function pokemonSummariesWhenAvailable(
+  ctx: ActionCtx,
+  references: readonly { name: string; collectorNumber: string }[],
+  includeImages: boolean,
+) {
   try {
-    return (await pokemonCardSummaries(ctx, includeImages)).cards
+    return (await pokemonCardSummaries(ctx, references, includeImages)).cards
   } catch {
     return []
   }
@@ -215,7 +219,11 @@ async function refreshPokemonTopDecks(
   }
   if (decks.length === 0) throw new Error("Limitless returned no usable public deck lists")
 
-  const summaries = await pokemonSummariesWhenAvailable(ctx, includeImages)
+  const summaries = await pokemonSummariesWhenAvailable(
+    ctx,
+    decks.flatMap((deck) => deck.entries),
+    includeImages,
+  )
   const byNameAndNumber = new Map<string, NormalizedCard[]>()
   for (const card of summaries) {
     const collectorNumber = card.cardId.match(/-([0-9]+[a-z]?)$/i)?.[1]

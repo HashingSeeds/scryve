@@ -12,6 +12,9 @@ import type { ActionCtx } from "../../_generated/server"
 const BASE_URL = "https://api.tcgdex.net/v2/en"
 const REQUEST_INTERVAL_MS = 100
 const REQUEST_TIMEOUT_MS = 10_000
+const CATALOG_REFERENCES_PER_REQUEST = 10
+const MAX_CATALOG_REFERENCES = 120
+const MAX_CATALOG_RESULTS_PER_REQUEST = 500
 
 function textBlock(value: unknown) {
   const item = objectRecord(value)
@@ -204,11 +207,37 @@ export async function pokemonCardByReference(
   return await pokemonCardById(ctx, selected.cardId, includeImages)
 }
 
-export async function pokemonCardSummaries(ctx: ActionCtx, includeImages = true) {
-  const response = await request(ctx, "/cards")
-  if (!response.ok) throw Object.assign(new Error("TCGdex card list failed"), { response })
-  return {
-    cards: normalizePokemonCards((await response.json()) as unknown, includeImages),
-    status: response.status,
+export async function pokemonCardSummaries(
+  ctx: ActionCtx,
+  references: readonly { name: string; collectorNumber: string }[],
+  includeImages = true,
+) {
+  const uniqueReferences = [
+    ...new Map(
+      references.flatMap((reference) => {
+        const name = reference.name.trim()
+        const collectorNumber = reference.collectorNumber.trim()
+        const key = `${normalizeCardName(name)}:${normalizedCollectorNumber(collectorNumber)}`
+        return name && collectorNumber ? [[key, { name, collectorNumber }] as const] : []
+      }),
+    ).values(),
+  ].slice(0, MAX_CATALOG_REFERENCES)
+  const cards: NormalizedCard[] = []
+  let status = 200
+  for (let offset = 0; offset < uniqueReferences.length; offset += CATALOG_REFERENCES_PER_REQUEST) {
+    const batch = uniqueReferences.slice(offset, offset + CATALOG_REFERENCES_PER_REQUEST)
+    const query = new URLSearchParams({
+      "name": `eq:${[...new Set(batch.map((reference) => reference.name))].join("|")}`,
+      "localId": `eq:${[...new Set(batch.map((reference) => reference.collectorNumber))].join(
+        "|",
+      )}`,
+      "pagination:page": "1",
+      "pagination:itemsPerPage": String(MAX_CATALOG_RESULTS_PER_REQUEST),
+    })
+    const response = await request(ctx, `/cards?${query}`)
+    if (!response.ok) throw Object.assign(new Error("TCGdex card list failed"), { response })
+    cards.push(...normalizePokemonCards((await response.json()) as unknown, includeImages))
+    status = response.status
   }
+  return { cards, status }
 }

@@ -173,6 +173,97 @@ describe("Yu-Gi-Oh! deck list parsing", () => {
   })
 })
 
+describe("generic deck resolution", () => {
+  it("reuses normalized lookups across sections", async () => {
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: 1,
+              name: "Shared Card",
+              type: "Effect Monster",
+              frameType: "effect",
+              card_images: [{ id: 1 }],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "generic-deck-importer" })
+
+      const result = await actor.action(api.deckImports.resolvePasted, {
+        game: "ygo",
+        list: "Main Deck\n1 Shared Card\nSide Deck\n2 shared   card",
+      })
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(result.cards).toMatchObject([
+        {
+          name: "Shared Card",
+          quantity: 1,
+          section: "main",
+          originalReference: "Shared Card",
+        },
+        {
+          name: "Shared Card",
+          quantity: 2,
+          section: "side",
+          originalReference: "shared   card",
+        },
+      ])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("caches every unique card returned by batched provider lookups", async () => {
+    const ids = Array.from({ length: 53 }, (_, index) => String(10_000 + index))
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const requestedIds = new URL(String(input)).searchParams.get("id")?.split(",") ?? []
+      return new Response(
+        JSON.stringify({
+          data: requestedIds.map((id) => ({
+            id: Number(id),
+            name: `Card ${id}`,
+            type: "Effect Monster",
+            frameType: "effect",
+            card_images: [{ id: Number(id) }],
+          })),
+        }),
+        { status: 200 },
+      )
+    })
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "batched-deck-importer" })
+
+      await actor.action(api.deckImports.resolvePasted, {
+        game: "ygo",
+        list: ids.join("\n"),
+      })
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+      expect(
+        fetchSpy.mock.calls.map(
+          ([input]) => new URL(String(input)).searchParams.get("id")?.split(",").length,
+        ),
+      ).toEqual([40, 13])
+      await expect(
+        t.run(async (ctx) => await ctx.db.query("gameCards").collect()),
+      ).resolves.toHaveLength(ids.length)
+      await expect(
+        t.run(async (ctx) => await ctx.db.query("cardPrintings").collect()),
+      ).resolves.toHaveLength(ids.length)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+})
+
 describe("preconstructed catalog caching", () => {
   it("fetches the official deck list once and serves later searches from the cache", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(deckListResponse)

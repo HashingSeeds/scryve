@@ -6,7 +6,12 @@ import type { ActionCtx } from "./_generated/server"
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { preconstructedFormat } from "./lib/deckGames"
-import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
+import {
+  MAX_CATALOG_BATCH,
+  normalizeCardName,
+  type CatalogCard,
+  type NormalizedCard,
+} from "./lib/games/cards"
 import { searchPokemon } from "./lib/games/pokemon"
 import { cardsByYgoIds, searchYgo, ygoSection } from "./lib/games/yugioh"
 import { assertGameSystem, type GameSystemId } from "./lib/integrations"
@@ -262,6 +267,28 @@ function genericDeckCard(
   }
 }
 
+function cachedGenericDeckCard(
+  game: Exclude<GameSystemId, "mtg">,
+  card: CatalogCard,
+  entry: GenericParsedEntry,
+): GenericDeckCard {
+  return {
+    game,
+    identityNamespace: card.identityNamespace,
+    cardId: card.cardId,
+    providerCardId: card.providerCardId,
+    printingId: card.printingId,
+    section: entry.section,
+    entryKind: "card",
+    originalReference: entry.originalReference,
+    ...(card.category ? { category: card.category } : {}),
+    name: card.name,
+    ...(card.imageUrl ? { imageUrl: card.imageUrl } : {}),
+    ...(card.smallImageUrl ? { smallImageUrl: card.smallImageUrl } : {}),
+    quantity: entry.quantity,
+  }
+}
+
 function unresolvedDeckCard(game: Exclude<GameSystemId, "mtg">, entry: GenericParsedEntry) {
   return {
     game,
@@ -271,6 +298,12 @@ function unresolvedDeckCard(game: Exclude<GameSystemId, "mtg">, entry: GenericPa
     name: entry.name,
     quantity: entry.quantity,
   }
+}
+
+function genericLookupKey(entry: GenericParsedEntry) {
+  return entry.providerCardId
+    ? `reference:${entry.providerCardId.toLocaleLowerCase()}`
+    : `name:${normalizeCardName(entry.name)}`
 }
 
 async function resolveGenericEntries(
@@ -306,58 +339,66 @@ async function resolveGenericEntries(
     for (const printing of card.printings) byIdentity.set(printing.printingId, card)
   }
 
+  type Resolution =
+    { source: "provider"; card: NormalizedCard } | { source: "cache"; card: CatalogCard } | null
+  const resolutions = new Map<string, Resolution>()
+  for (const entry of entries) {
+    const lookupKey = genericLookupKey(entry)
+    if (resolutions.has(lookupKey)) continue
+
+    const card = entry.providerCardId ? byIdentity.get(entry.providerCardId) : undefined
+    if (card) {
+      resolutions.set(lookupKey, { source: "provider", card })
+      continue
+    }
+
+    const cached: CatalogCard[] = await ctx.runQuery(internal.cardCatalog.searchCached, {
+      game,
+      query: entry.name,
+      limit: 5,
+    })
+    const exact = cached.find(
+      (candidate) => normalizeCardName(candidate.name) === normalizeCardName(entry.name),
+    )
+    if (exact) {
+      resolutions.set(lookupKey, { source: "cache", card: exact })
+      continue
+    }
+
+    const result =
+      game === "ygo"
+        ? await searchYgo(ctx, entry.name, includeImages)
+        : await searchPokemon(ctx, entry.name, includeImages)
+    const resolved = result.cards.find(
+      (candidate) => normalizeCardName(candidate.name) === normalizeCardName(entry.name),
+    )
+    if (result.cards.length > 0) fetchedCards.push(...result.cards)
+    resolutions.set(lookupKey, resolved ? { source: "provider", card: resolved } : null)
+  }
+
   const cards: GenericDeckCard[] = []
   const unresolved: string[] = []
   for (const entry of entries) {
-    let card = entry.providerCardId ? byIdentity.get(entry.providerCardId) : undefined
-    if (!card) {
-      const cached: CatalogCard[] = await ctx.runQuery(internal.cardCatalog.searchCached, {
-        game,
-        query: entry.name,
-        limit: 5,
-      })
-      const exact = cached.find(
-        (candidate) => candidate.name.toLocaleLowerCase() === entry.name.toLocaleLowerCase(),
-      )
-      if (exact) {
-        cards.push({
-          game,
-          identityNamespace: exact.identityNamespace,
-          cardId: exact.cardId,
-          providerCardId: exact.providerCardId,
-          printingId: exact.printingId,
-          section: entry.section,
-          entryKind: "card",
-          originalReference: entry.originalReference,
-          name: exact.name,
-          ...(exact.category ? { category: exact.category } : {}),
-          ...(exact.imageUrl ? { imageUrl: exact.imageUrl } : {}),
-          ...(exact.smallImageUrl ? { smallImageUrl: exact.smallImageUrl } : {}),
-          quantity: entry.quantity,
-        })
-        continue
-      }
-      const result =
-        game === "ygo"
-          ? await searchYgo(ctx, entry.name, includeImages)
-          : await searchPokemon(ctx, entry.name, includeImages)
-      card = result.cards.find(
-        (candidate) => candidate.name.toLocaleLowerCase() === entry.name.toLocaleLowerCase(),
-      )
-      if (result.cards.length > 0) fetchedCards.push(...result.cards)
-    }
-    if (card) cards.push(genericDeckCard(game, card, entry))
-    else {
+    const resolution = resolutions.get(genericLookupKey(entry))
+    if (resolution?.source === "provider") {
+      cards.push(genericDeckCard(game, resolution.card, entry))
+    } else if (resolution?.source === "cache") {
+      cards.push(cachedGenericDeckCard(game, resolution.card, entry))
+    } else {
       cards.push(unresolvedDeckCard(game, entry))
       unresolved.push(entry.originalReference)
     }
   }
-  if (fetchedCards.length > 0)
-    await ctx.runMutation(internal.cardCatalog.cacheMany, {
-      cards: [
-        ...new Map(fetchedCards.map((card) => [`${card.game}:${card.cardId}`, card])).values(),
-      ].slice(0, 25),
-    })
+  if (fetchedCards.length > 0) {
+    const uniqueCards = [
+      ...new Map(fetchedCards.map((card) => [`${card.game}:${card.cardId}`, card])).values(),
+    ]
+    for (let offset = 0; offset < uniqueCards.length; offset += MAX_CATALOG_BATCH) {
+      await ctx.runMutation(internal.cardCatalog.cacheMany, {
+        cards: uniqueCards.slice(offset, offset + MAX_CATALOG_BATCH),
+      })
+    }
+  }
   return { cards, unresolved: unresolved.sort() }
 }
 
