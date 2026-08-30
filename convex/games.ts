@@ -13,7 +13,7 @@ import {
   type PlayerMarkShape,
 } from "./lib/appearance"
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
-import { DEFAULT_DECK_GAME } from "./lib/deckGames"
+import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
@@ -448,6 +448,7 @@ export const createLobby = mutation({
     if (args.hostShape !== undefined) assertAllowedShape(args.hostShape)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const ruleset = assertRuleset(args.ruleset)
+    const format = assertDeckGameFormat(gameSystem, args.format ?? ruleset)
     const hostDisplayName = assertDisplayName(args.hostDisplayName)
     assertPublicId(args.publicId)
     for (const status of ["lobby", "active"] as const) {
@@ -477,7 +478,7 @@ export const createLobby = mutation({
       ruleset,
       game: gameSystem,
       system: gameSystem,
-      format: args.format ?? ruleset,
+      format,
       createdAt: now,
       updatedAt: now,
       eventSequence: 0,

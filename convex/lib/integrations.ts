@@ -136,7 +136,12 @@ export async function capabilityState(ctx: DatabaseCtx, game: string, capability
     .unique()
   return {
     ...known.capabilities[capability],
-    ...(override ? { release: override.release, note: override.note } : {}),
+    ...(override
+      ? {
+          release: override.release,
+          ...(override.note === undefined ? {} : { note: override.note }),
+        }
+      : {}),
   }
 }
 
