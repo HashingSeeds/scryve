@@ -131,8 +131,8 @@ export const DECK_GAMES: Record<string, DeckGame> = {
   },
   pokemon: {
     id: "pokemon",
-    label: "Pokemon TCG",
-    shortLabel: "Pokemon",
+    label: "Pokémon TCG",
+    shortLabel: "Pokémon",
     available: true,
     defaultFormat: "standard",
     formats: POKEMON_FORMATS,

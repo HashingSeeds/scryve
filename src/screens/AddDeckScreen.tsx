@@ -923,7 +923,7 @@ export function AddDeckScreen({
                 game === "ygo"
                   ? "Paste YDK card IDs or lines like 3 Ash Blossom. Main, Extra, and Side headings are supported."
                   : game === "pokemon"
-                    ? "Paste a Pokemon TCG Live list with quantities, names, set codes, and card numbers."
+                    ? "Paste a Pokémon TCG Live list with quantities, names, set codes, and card numbers."
                     : 'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.'
               }
               value={deckList}

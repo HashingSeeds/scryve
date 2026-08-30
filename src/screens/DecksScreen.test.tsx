@@ -206,7 +206,7 @@ describe("DecksScreen", () => {
     }
     const view = renderShelf()
     expect(view.getByText("Magic · Commander · 100 cards · 3 versions · 75% of 4")).toBeTruthy()
-    expect(view.getByText("Pokemon · Standard · 60 cards")).toBeTruthy()
+    expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
   })
 
   it("shows synced favorites and toggles them without opening the deck", () => {

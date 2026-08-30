@@ -89,7 +89,7 @@ export const INTEGRATIONS = {
   },
   pokemon: {
     id: "pokemon",
-    displayName: "Pokemon TCG",
+    displayName: "Pokémon TCG",
     identityNamespace: "tcgdex-card",
     capabilities: {
       integration: available("scryve"),
@@ -105,7 +105,7 @@ export const INTEGRATIONS = {
       basis: "fair_use",
       imageUse: "functional_card_context",
       requiredNotices: [
-        "Pokemon, card artwork, and related marks remain property of their respective owners.",
+        "Pokémon, card artwork, and related marks remain property of their respective owners.",
       ],
     },
   },

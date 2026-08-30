@@ -71,8 +71,8 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
   },
   pokemon: {
     id: "pokemon",
-    label: SYSTEM_LABELS.get("pokemon")?.label ?? "Pokemon TCG",
-    shortLabel: SYSTEM_LABELS.get("pokemon")?.shortLabel ?? "Pokemon",
+    label: SYSTEM_LABELS.get("pokemon")?.label ?? "Pokémon TCG",
+    shortLabel: SYSTEM_LABELS.get("pokemon")?.shortLabel ?? "Pokémon",
     defaultFormat: "standard",
     counter: {
       label: "Prize cards",
