@@ -11,6 +11,30 @@ permissions:
   contents: read
 
 jobs:
+  ygo-image-mirror:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Yu-Gi-Oh image mirror
+        run: pnpm check:ygo-worker
+
   checks:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15

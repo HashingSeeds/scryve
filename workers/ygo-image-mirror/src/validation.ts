@@ -1,10 +1,18 @@
-const IMAGE_KEY = /^yugioh\/cards\/([0-9]+)\.jpg$/
+const PRINTING_ID = /^[0-9]{1,20}$/
+const IMAGE_KEY = /^yugioh\/cards\/([0-9]{1,20})\.jpg$/
 const SOURCE_PATH = /^\/images\/cards(?:_small)?\/([0-9]+)\.jpg$/
 const ALLOWED_SOURCE_HOST = "images.ygoprodeck.com"
+export const MAX_MIRROR_TARGETS = 1
 
-type MirrorRequest = {
+export type MirrorTarget = {
+  printingId: string
   key: string
   sourceUrl: string
+}
+
+export type MirrorRequest = {
+  kind: "batch" | "legacy"
+  targets: MirrorTarget[]
 }
 
 export class RequestFailure extends Error {
@@ -27,12 +35,43 @@ export function sourceUrlForKey(key: string): string | undefined {
     : undefined
 }
 
+export function mirrorTargetForPrintingId(printingId: string): MirrorTarget | undefined {
+  if (!PRINTING_ID.test(printingId)) return undefined
+  const key = `yugioh/cards/${printingId}.jpg`
+  const sourceUrl = sourceUrlForKey(key)
+  return sourceUrl ? { printingId, key, sourceUrl } : undefined
+}
+
+function batchTargets(record: Record<string, unknown>): MirrorTarget[] | undefined {
+  if (!Array.isArray(record.printingIds)) return undefined
+  if (record.printingIds.length === 0 || record.printingIds.length > MAX_MIRROR_TARGETS) {
+    throw new RequestFailure(400, `printingIds must contain 1-${MAX_MIRROR_TARGETS} items`)
+  }
+
+  const uniqueIds = new Set<string>()
+  for (const value of record.printingIds) {
+    if (typeof value !== "string" || !PRINTING_ID.test(value)) {
+      throw new RequestFailure(400, "Invalid printing ID")
+    }
+    uniqueIds.add(value)
+  }
+
+  return [...uniqueIds].map((printingId) => {
+    const target = mirrorTargetForPrintingId(printingId)
+    if (!target) throw new RequestFailure(400, "Invalid printing ID")
+    return target
+  })
+}
+
 export function validateMirrorInput(value: unknown): MirrorRequest {
   if (!value || typeof value !== "object") {
     throw new RequestFailure(400, "Invalid mirror request")
   }
 
   const record = value as Record<string, unknown>
+  const targets = batchTargets(record)
+  if (targets) return { kind: "batch", targets }
+
   if (typeof record.key !== "string" || typeof record.sourceUrl !== "string") {
     throw new RequestFailure(400, "Invalid mirror request")
   }
@@ -61,7 +100,10 @@ export function validateMirrorInput(value: unknown): MirrorRequest {
     throw new RequestFailure(400, "Source is not allowed")
   }
 
-  return { key: record.key, sourceUrl: source.toString() }
+  return {
+    kind: "legacy",
+    targets: [{ printingId, key: record.key, sourceUrl: source.toString() }],
+  }
 }
 
 async function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {

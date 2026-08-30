@@ -1,0 +1,69 @@
+name: sync Yu-Gi-Oh images
+
+on:
+  schedule:
+    - cron: "23 5 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Inspect provider data without writing images
+        required: true
+        default: false
+        type: boolean
+      limit:
+        description: Optional maximum number of printing IDs
+        required: false
+        type: string
+
+concurrency:
+  group: sync-ygo-images-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    if: github.event_name == 'workflow_dispatch' || vars.YGO_IMAGE_SYNC_ENABLED == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 360
+    environment: ygo-image-mirror-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync image mirror
+        shell: bash
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          SYNC_LIMIT: ${{ inputs.limit }}
+          YGO_MIRROR_BASE_URL: https://ygo-images.scryve.sow.care
+          YGO_MIRROR_TOKEN: ${{ secrets.YGO_MIRROR_TOKEN }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ "$DRY_RUN" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+          if [[ -n "$SYNC_LIMIT" ]]; then
+            if [[ ! "$SYNC_LIMIT" =~ ^[1-9][0-9]*$ ]]; then
+              echo "limit must be a positive integer" >&2
+              exit 1
+            fi
+            args+=(--limit="$SYNC_LIMIT")
+          fi
+          pnpm sync:ygo-images -- "${args[@]}"

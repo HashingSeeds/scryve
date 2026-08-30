@@ -30,6 +30,9 @@
     "align-deps": "expo install --fix",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:ygo-worker": "jest workers/ygo-image-mirror/src/index.test.ts workers/ygo-image-mirror/sync/index.test.ts --runInBand && vitest run --config workers/ygo-image-mirror/vitest.config.mts",
+    "check:ygo-worker": "wrangler types --check --cwd workers/ygo-image-mirror && tsc --noEmit -p workers/ygo-image-mirror/tsconfig.json && tsc --noEmit -p workers/ygo-image-mirror/sync/tsconfig.json && tsc --noEmit -p workers/ygo-image-mirror/test/tsconfig.json && pnpm test:ygo-worker && wrangler deploy --dry-run --cwd workers/ygo-image-mirror --env= --outdir .wrangler/dry-run-preview && wrangler deploy --dry-run --cwd workers/ygo-image-mirror --env production --outdir .wrangler/dry-run-production",
+    "sync:ygo-images": "tsx workers/ygo-image-mirror/sync/index.ts",
     "e2e": "bash scripts/maestro-run.sh",
     "test:maestro": "maestro test -e MAESTRO_APP_ID=com.sowinghope.count .maestro/flows",
     "test:maestro:smoke": "maestro test -e MAESTRO_APP_ID=com.sowinghope.count --include-tags smoke .maestro/flows",
@@ -104,7 +107,8 @@
     "@babel/core": "^7.20.0",
     "@babel/preset-env": "^7.20.0",
     "@babel/runtime": "^7.20.0",
-    "@cloudflare/workers-types": "^5.20260827.1",
+    "@cloudflare/vitest-plugin": "1.1.2",
+    "@cloudflare/workers-types": "^5.20260830.1",
     "@testing-library/react-native": "^13.2.0",
     "@types/jest": "^29.5.14",
     "@types/node": "20.19.43",
@@ -131,7 +135,9 @@
     "reactotron-react-native-mmkv": "^0.2.6",
     "ts-jest": "^29.1.1",
     "tsx": "^4.20.3",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "4.1.11",
+    "wrangler": "4.127.1"
   },
   "engines": {
     "node": "24.18.1",
