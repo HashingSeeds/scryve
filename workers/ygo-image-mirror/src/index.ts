@@ -61,7 +61,7 @@ async function jsonBody(request: Request): Promise<unknown> {
     throw new RequestFailure(413, "Request is too large")
   }
 
-  const bytes = await readBoundedBody(request.body, MAX_REQUEST_BYTES)
+  const bytes = await readBoundedBody(request.body, MAX_REQUEST_BYTES, "Request body is too large")
   try {
     return JSON.parse(new TextDecoder().decode(bytes)) as unknown
   } catch {

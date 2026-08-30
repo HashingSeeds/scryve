@@ -15,15 +15,20 @@ export type YgoDeckFeedItem = {
 }
 
 const SOURCE_URL = "https://ygoprodeck.com/api/decks/getDecks.php"
-
 function numericReferences(value: unknown) {
   if (typeof value !== "string") return []
   try {
     const parsed: unknown = JSON.parse(value)
     return Array.isArray(parsed)
-      ? parsed.filter(
-          (entry): entry is string => typeof entry === "string" && /^\d{5,12}$/.test(entry),
-        )
+      ? parsed.flatMap((entry) => {
+          const reference =
+            typeof entry === "number" && Number.isSafeInteger(entry)
+              ? String(entry)
+              : typeof entry === "string"
+                ? entry
+                : undefined
+          return reference !== undefined && /^\d{5,12}$/.test(reference) ? [reference] : []
+        })
       : []
   } catch {
     return []

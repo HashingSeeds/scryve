@@ -67,6 +67,7 @@ export function validateMirrorInput(value: unknown): MirrorRequest {
 export async function readBoundedBody(
   body: ReadableStream<Uint8Array> | null,
   maximumBytes: number,
+  tooLargeMessage = "Image is too large",
 ): Promise<Uint8Array> {
   if (!body) throw new RequestFailure(502, "Source returned no body")
 
@@ -79,7 +80,7 @@ export async function readBoundedBody(
       const chunk = await reader.read()
       if (chunk.done) break
       if (length + chunk.value.byteLength > maximumBytes) {
-        throw new RequestFailure(413, "Image is too large")
+        throw new RequestFailure(413, tooLargeMessage)
       }
       result.set(chunk.value, length)
       length += chunk.value.byteLength

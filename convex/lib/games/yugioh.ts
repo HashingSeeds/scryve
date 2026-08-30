@@ -22,9 +22,13 @@ function records(value: unknown) {
 
 function mirroredImageUrl(baseUrl: string | undefined, printingId: string) {
   if (!baseUrl) return undefined
-  const parsed = new URL(baseUrl)
-  if (parsed.protocol !== "https:" || parsed.username || parsed.password) return undefined
-  return `${baseUrl.replace(/\/$/, "")}/images/yugioh/cards/${encodeURIComponent(printingId)}.jpg`
+  try {
+    const parsed = new URL(baseUrl)
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return undefined
+    return `${baseUrl.replace(/\/$/, "")}/images/yugioh/cards/${encodeURIComponent(printingId)}.jpg`
+  } catch {
+    return undefined
+  }
 }
 
 export function normalizeYgoCards(value: unknown, imageBaseUrl?: string): NormalizedCard[] {
@@ -125,5 +129,15 @@ export async function cardsByYgoIds(ctx: ActionCtx, ids: readonly string[], incl
 
 export function ygoSection(card: NormalizedCard) {
   const frameType = card.facets.find((item) => item.key === "frameType")?.value
-  return ["fusion", "synchro", "xyz", "link"].includes(frameType ?? "") ? "extra" : "main"
+  return [
+    "fusion",
+    "fusion_pendulum",
+    "synchro",
+    "synchro_pendulum",
+    "xyz",
+    "xyz_pendulum",
+    "link",
+  ].includes(frameType ?? "")
+    ? "extra"
+    : "main"
 }

@@ -37,4 +37,15 @@ describe("normalizeYgoDeckFeed", () => {
     )
     expect(normalizeYgoDeckFeed({ data: [] })).toEqual([])
   })
+
+  it("accepts numeric passcodes in deck sections", () => {
+    const deck = (deckNum: unknown) => ({
+      deckNum,
+      deck_name: "Example deck",
+      main_deck: JSON.stringify(Array.from({ length: 40 }, (_, index) => 10000 + index)),
+    })
+
+    expect(normalizeYgoDeckFeed([deck(42)])).toHaveLength(1)
+    expect(normalizeYgoDeckFeed([deck(42)])[0]?.entries).toHaveLength(40)
+  })
 })

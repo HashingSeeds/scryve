@@ -47,6 +47,12 @@ describe("Yu-Gi-Oh image mirror validation", () => {
     await expect(readBoundedBody(body([1, 2], [3]), 3)).resolves.toEqual(Uint8Array.from([1, 2, 3]))
   })
 
+  it("uses a generic diagnostic for oversized request bodies", async () => {
+    await expect(
+      readBoundedBody(body([1, 2], [3, 4]), 3, "Request body is too large"),
+    ).rejects.toThrow("Request body is too large")
+  })
+
   it("checks JPEG magic bytes", () => {
     expect(isJpeg(Uint8Array.from([0xff, 0xd8, 0xff, 0x00]))).toBe(true)
     expect(isJpeg(Uint8Array.from([0x89, 0x50, 0x4e, 0x47]))).toBe(false)
