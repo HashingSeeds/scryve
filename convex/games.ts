@@ -448,7 +448,8 @@ export const createLobby = mutation({
     if (args.hostShape !== undefined) assertAllowedShape(args.hostShape)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const ruleset = assertRuleset(args.ruleset)
-    const format = assertDeckGameFormat(gameSystem, args.format ?? ruleset)
+    const format =
+      args.format === undefined ? ruleset : assertDeckGameFormat(gameSystem, args.format)
     const hostDisplayName = assertDisplayName(args.hostDisplayName)
     assertPublicId(args.publicId)
     for (const status of ["lobby", "active"] as const) {

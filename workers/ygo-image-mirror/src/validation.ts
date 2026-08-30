@@ -64,6 +64,14 @@ export function validateMirrorInput(value: unknown): MirrorRequest {
   return { key: record.key, sourceUrl: source.toString() }
 }
 
+async function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+  try {
+    await reader.cancel()
+  } catch {
+    return
+  }
+}
+
 export async function readBoundedBody(
   body: ReadableStream<Uint8Array> | null,
   maximumBytes: number,
@@ -80,6 +88,7 @@ export async function readBoundedBody(
       const chunk = await reader.read()
       if (chunk.done) break
       if (length + chunk.value.byteLength > maximumBytes) {
+        await cancelReader(reader)
         throw new RequestFailure(413, tooLargeMessage)
       }
       result.set(chunk.value, length)

@@ -154,6 +154,7 @@ describe("DecksScreen", () => {
 
     fireEvent.press(view.getByTestId("system-filter-mtg"))
     expect(view.getByTestId("format-filter")).toBeTruthy()
+    expect(view.getByTestId("format-filter-all").props.accessibilityState.selected).toBe(true)
 
     expect(view.getByText("Mono Red")).toBeTruthy()
     fireEvent.press(view.getByTestId("format-filter-standard"))

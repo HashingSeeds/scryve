@@ -262,6 +262,75 @@ describe("generic deck resolution", () => {
       fetchSpy.mockRestore()
     }
   })
+
+  it("preserves distinct Pokémon printings with the same card name", async () => {
+    const pokemonCard = (id: string, localId: string) => ({
+      id,
+      localId,
+      name: "Pikachu",
+      category: "Pokemon",
+      set: { id: id.split("-")[0] },
+    })
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input))
+      if (url.pathname.endsWith("/cards/seta-1"))
+        return new Response(JSON.stringify(pokemonCard("seta-1", "1")), { status: 200 })
+      if (url.pathname.endsWith("/cards/setb-2"))
+        return new Response(JSON.stringify(pokemonCard("setb-2", "2")), { status: 200 })
+      const localId = url.searchParams.get("localId")
+      return new Response(
+        JSON.stringify(
+          localId === "1" ? [pokemonCard("seta-1", "1")] : [pokemonCard("setb-2", "2")],
+        ),
+        { status: 200 },
+      )
+    })
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: "pokemon-printing-importer" })
+
+      const result = await actor.action(api.deckImports.resolvePasted, {
+        game: "pokemon",
+        list: "1 Pikachu SVA 1\n1 Pikachu SVB 2",
+      })
+
+      expect(result.cards).toMatchObject([
+        { name: "Pikachu", quantity: 1, originalReference: "Pikachu SVA 1", printingId: "seta-1" },
+        { name: "Pikachu", quantity: 1, originalReference: "Pikachu SVB 2", printingId: "setb-2" },
+      ])
+      expect(fetchSpy).toHaveBeenCalledTimes(4)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it.each([
+    ["empty_deck_list", ""],
+    [
+      "deck_too_large",
+      Array.from({ length: 301 }, (_, index) => `1 Card ${index} SET ${index}`).join("\n"),
+    ],
+  ])("does not report %s validation as provider downtime", async (code, list) => {
+    const fetchSpy = jest.spyOn(globalThis, "fetch")
+    try {
+      const t = convexTest(schema, modules)
+      const actor = t.withIdentity({ subject: `validation-${code}` })
+
+      await expect(
+        actor.action(api.deckImports.resolvePasted, { game: "pokemon", list }),
+      ).rejects.toMatchObject({ data: { code } })
+      await expect(
+        actor.query(api.providerHealth.current, {
+          game: "pokemon",
+          provider: "tcgdex",
+          operation: "deck-resolution",
+        }),
+      ).resolves.toBeNull()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })
 
 describe("preconstructed catalog caching", () => {

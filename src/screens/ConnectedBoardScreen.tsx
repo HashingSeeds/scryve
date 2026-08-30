@@ -410,7 +410,7 @@ function ConnectedBoardRuntime({
             text={
               finished
                 ? `${counterChangeLabel(system, game.eventSequence)} accepted · final`
-                : `${playFormatLabel(system, game.format ?? game.ruleset)} · starts with ${counterValueLabel(system, game.startingLife)}`
+                : `${playFormatLabel(system, game.format || game.ruleset)} · starts with ${counterValueLabel(system, game.startingLife)}`
             }
             size="xs"
             style={themed($muted)}

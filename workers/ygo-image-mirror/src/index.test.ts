@@ -6,6 +6,8 @@ import {
   validateMirrorInput,
 } from "./validation"
 
+import worker from "./index"
+
 function body(...chunks: number[][]) {
   return new ReadableStream<Uint8Array>({
     start(controller) {
@@ -45,6 +47,40 @@ describe("Yu-Gi-Oh image mirror validation", () => {
   it("bounds streamed images before buffering them", async () => {
     await expect(readBoundedBody(body([1, 2], [3, 4]), 3)).rejects.toThrow("too large")
     await expect(readBoundedBody(body([1, 2], [3]), 3)).resolves.toEqual(Uint8Array.from([1, 2, 3]))
+  })
+
+  it("preserves the size error when stream cancellation fails", async () => {
+    const cancel = jest.fn().mockRejectedValue(new Error("cancel failed"))
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(Uint8Array.from([1, 2, 3, 4]))
+      },
+      cancel,
+    })
+
+    await expect(readBoundedBody(stream, 3)).rejects.toThrow("Image is too large")
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not populate the mirror from an anonymous image request", async () => {
+    const get = jest.fn().mockResolvedValue(null)
+    const put = jest.fn()
+    const fetchSpy = jest.spyOn(globalThis, "fetch")
+    const env: Env = {
+      MIRROR_TOKEN: "test-token",
+      YGO_IMAGES: { get, put } as R2Bucket,
+    }
+
+    const response = await worker.fetch(
+      new Request("https://images.example/images/yugioh%2Fcards%2F46986414.jpg"),
+      env,
+    )
+
+    expect(response.status).toBe(404)
+    expect(get).toHaveBeenCalledWith("yugioh/cards/46986414.jpg")
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(put).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
   })
 
   it("uses a generic diagnostic for oversized request bodies", async () => {

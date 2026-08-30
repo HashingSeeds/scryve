@@ -277,7 +277,7 @@ export function AddDeckScreen({
 
   function chooseGame(next: string) {
     const nextFormat = defaultDeckFormat(next)
-    setGame(next)
+    setGame(next, nextFormat)
     setDeckFormat(nextFormat)
     setPreconQuery("")
     setPrecons([])

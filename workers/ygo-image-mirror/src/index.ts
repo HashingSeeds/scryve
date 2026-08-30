@@ -3,7 +3,6 @@ import {
   printingIdFromKey,
   readBoundedBody,
   RequestFailure,
-  sourceUrlForKey,
   validateMirrorInput,
 } from "./validation"
 
@@ -80,14 +79,8 @@ async function serveObject(request: Request, env: Env, key: string): Promise<Res
     return new Response(null, { headers })
   }
 
-  let object = await env.YGO_IMAGES.get(key)
-  if (!object) {
-    const sourceUrl = sourceUrlForKey(key)
-    if (!sourceUrl) return new Response("Not found", { status: 404 })
-    await fetchAndStoreImage(env, { key, sourceUrl })
-    object = await env.YGO_IMAGES.get(key)
-    if (!object) throw new RequestFailure(502, "Mirrored image could not be read")
-  }
+  const object = await env.YGO_IMAGES.get(key)
+  if (!object) return new Response("Not found", { status: 404 })
   const headers = new Headers(CORS_HEADERS)
   object.writeHttpMetadata(headers)
   headers.set("etag", object.httpEtag)

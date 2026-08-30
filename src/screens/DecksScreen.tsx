@@ -339,7 +339,9 @@ export function DecksScreen({
 
   function chooseSystem(next: string) {
     setSystem(next)
-    if (next !== ALL_SYSTEMS) setGame(next)
+    if (next !== ALL_SYSTEMS) {
+      setGame(next, ALL_FORMATS)
+    }
   }
 
   function clearFilters() {

@@ -135,7 +135,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
     finishedAt: summary.finishedAt,
     startingLife: summary.startingLife,
     system,
-    format: playFormatLabel(system, summary.format ?? summary.ruleset),
+    format: playFormatLabel(system, summary.format || summary.ruleset),
     changeCount: summary.eventCount,
     terminalReason: summary.terminalReason,
     players: summary.players.map((player) => ({

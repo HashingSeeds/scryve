@@ -13,6 +13,8 @@ import {
 } from "./lib/games/cards"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 
+const MAX_CARD_PRINTINGS = 100
+
 const faceValidator = v.object({
   index: v.number(),
   name: v.optional(v.string()),
@@ -50,9 +52,9 @@ function assertNormalizedCard(card: NormalizedCard) {
     throw new ConvexError({ code: "invalid_card", message: "Card identity is invalid" })
   if (card.facets.length > MAX_CARD_FACETS)
     throw new ConvexError({ code: "invalid_card", message: "Card has too many facets" })
-  if (card.printings.length < 1 || card.printings.length > MAX_CATALOG_BATCH)
-    throw new ConvexError({ code: "invalid_card", message: "Card has too many printings" })
-  for (const printing of card.printings) {
+  if (card.printings.length < 1)
+    throw new ConvexError({ code: "invalid_card", message: "Card has no printings" })
+  for (const printing of card.printings.slice(0, MAX_CARD_PRINTINGS)) {
     if (printing.faces.length < 1 || printing.faces.length > MAX_CARD_FACES)
       throw new ConvexError({ code: "invalid_card", message: "Card has too many faces" })
   }
@@ -83,7 +85,7 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard) {
   const gameCardId = existing?._id ?? (await ctx.db.insert("gameCards", logicalValue))
   if (existing) await ctx.db.replace(existing._id, logicalValue)
 
-  for (const printing of card.printings) {
+  for (const printing of card.printings.slice(0, MAX_CARD_PRINTINGS)) {
     const stored = await ctx.db
       .query("cardPrintings")
       .withIndex("by_game_and_printing_id", (query) =>
@@ -107,12 +109,17 @@ export const cacheMany = internalMutation({
   },
 })
 
-async function projectedCard(ctx: QueryCtx, card: Doc<"gameCards">): Promise<CatalogCard> {
-  const printings = await ctx.db
-    .query("cardPrintings")
-    .withIndex("by_game_card_id", (query) => query.eq("gameCardId", card._id))
-    .take(MAX_CATALOG_BATCH)
-  const printing = printings[0]
+async function projectedCard(
+  ctx: QueryCtx,
+  card: Doc<"gameCards">,
+  matchedPrinting?: Doc<"cardPrintings">,
+): Promise<CatalogCard> {
+  const printing =
+    matchedPrinting ??
+    (await ctx.db
+      .query("cardPrintings")
+      .withIndex("by_game_card_id", (query) => query.eq("gameCardId", card._id))
+      .first())
   const face = printing?.faces[0]
   return {
     game: assertGameSystem(card.game),
@@ -174,7 +181,7 @@ export const lookupCached = internalQuery({
       )
       .unique()
     const card = printing ? await ctx.db.get(printing.gameCardId) : null
-    return card ? await projectedCard(ctx, card) : null
+    return card ? await projectedCard(ctx, card, printing ?? undefined) : null
   },
 })
 

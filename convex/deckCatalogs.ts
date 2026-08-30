@@ -47,34 +47,50 @@ async function searchRows(
   let rows: Doc<"deckCatalogs">[]
   if (!term) {
     if (args.kind) {
-      rows = await ctx.db
+      const query = ctx.db
         .query("deckCatalogs")
         .withIndex("by_game_and_kind_and_fetched_at", (query) =>
           query.eq("game", args.game).eq("kind", args.kind!),
         )
         .order("desc")
-        .take(30)
+      rows = await (
+        args.format
+          ? query.filter((filter) => filter.eq(filter.field("format"), args.format!))
+          : query
+      ).take(30)
     } else {
-      rows = await ctx.db
+      const query = ctx.db
         .query("deckCatalogs")
         .withIndex("by_game_and_fetched_at", (query) => query.eq("game", args.game))
         .order("desc")
-        .take(30)
+      rows = await (
+        args.format
+          ? query.filter((filter) => filter.eq(filter.field("format"), args.format!))
+          : query
+      ).take(30)
     }
   } else if (args.kind) {
-    rows = await ctx.db
+    const query = ctx.db
       .query("deckCatalogs")
       .withSearchIndex("search_name", (search) =>
         search.search("name", term).eq("game", args.game).eq("kind", args.kind!),
       )
-      .take(30)
+    rows = await (
+      args.format
+        ? query.filter((filter) => filter.eq(filter.field("format"), args.format!))
+        : query
+    ).take(30)
   } else {
-    rows = await ctx.db
+    const query = ctx.db
       .query("deckCatalogs")
       .withSearchIndex("search_name", (search) => search.search("name", term).eq("game", args.game))
-      .take(30)
+    rows = await (
+      args.format
+        ? query.filter((filter) => filter.eq(filter.field("format"), args.format!))
+        : query
+    ).take(30)
   }
-  return args.format ? rows.filter((row) => row.format === args.format) : rows
+  return rows
 }
 
 export const upsert = internalMutation({

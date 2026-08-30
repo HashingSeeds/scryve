@@ -310,6 +310,32 @@ describe("Convex connected-game authorization", () => {
     expect(games).toHaveLength(1)
     expect(games[0]).toMatchObject({ system: "ygo", format: "advanced" })
   })
+
+  it("preserves a legacy ruleset as the format when no format is supplied", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "legacy-format-host", "Host")
+
+    await expect(
+      host.mutation(api.games.createLobby, {
+        publicId: "legacy-format-public-id",
+        playerCount: 2,
+        startingLife: 8000,
+        ruleset: "legacy-custom-format",
+        system: "ygo",
+        inviteToken: "l".repeat(43),
+        manualCodeCandidates: ["LEG234"],
+        hostDisplayName: "Host",
+        hostColor: "#7C3AED",
+      }),
+    ).resolves.toMatchObject({ publicId: "legacy-format-public-id" })
+
+    const games = await t.run((ctx) => ctx.db.query("games").collect())
+    expect(games).toHaveLength(1)
+    expect(games[0]).toMatchObject({
+      ruleset: "legacy-custom-format",
+      format: "legacy-custom-format",
+    })
+  })
 })
 
 async function activeGame(t: ReturnType<typeof convexTest>) {

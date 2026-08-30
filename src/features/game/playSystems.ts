@@ -123,8 +123,9 @@ export function counterValueLabel(value: unknown, count: number): string {
 }
 
 export function counterChangeLabel(value: unknown, count: number): string {
-  const label = playSystemRules(value).counter.label
-  return `${count} ${label} ${count === 1 ? "change" : "changes"}`
+  const { singular, plural } = playSystemRules(value).counter
+  const one = Math.abs(count) === 1
+  return `${count} ${(one ? singular : plural).toLowerCase()} ${one ? "change" : "changes"}`
 }
 
 export function counterDeltaFromStartLabel(

@@ -109,7 +109,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     status: value.status as ConnectedGameStatus,
     playerCount: value.playerCount,
     system: playSystemId(value.system),
-    format: typeof value.format === "string" ? value.format : value.ruleset,
+    format: typeof value.format === "string" && value.format ? value.format : value.ruleset,
     startingLife: value.startingLife,
     ruleset: value.ruleset,
     isHost: value.isHost,

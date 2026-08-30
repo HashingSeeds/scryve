@@ -33,10 +33,12 @@ export function useDeckFilters() {
     [game],
   )
 
-  const setGame = useCallback((next: string) => {
+  const setGame = useCallback((next: string, nextFormat?: string) => {
     setGameState(next)
     saveString(GAME_KEY, next)
-    setFormatState(loadString(formatKey(next)) ?? ALL_FORMATS)
+    const format = nextFormat ?? loadString(formatKey(next)) ?? ALL_FORMATS
+    setFormatState(format)
+    if (nextFormat !== undefined) saveString(formatKey(next), nextFormat)
   }, [])
 
   return { game, format, setGame, setFormat }

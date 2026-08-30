@@ -1,6 +1,23 @@
 import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
+const genericDeckCardFields = {
+  game: v.optional(v.string()),
+  identityNamespace: v.optional(v.string()),
+  cardId: v.optional(v.string()),
+  providerCardId: v.optional(v.string()),
+  printingId: v.optional(v.string()),
+  section: v.optional(v.string()),
+  entryKind: v.optional(v.string()),
+  originalReference: v.optional(v.string()),
+  category: v.optional(v.string()),
+}
+
+const legacyMagicDeckCardFields = {
+  oracleId: v.optional(v.string()),
+  scryfallId: v.optional(v.string()),
+}
+
 export default defineSchema({
   waitlistSubmissions: defineTable({
     email: v.string(),
@@ -217,26 +234,13 @@ export default defineSchema({
 
   deckCards: defineTable({
     deckVersionId: v.id("deckVersions"),
-    // Generic fields stay optional while installed clients still write Magic-shaped rows.
-    game: v.optional(v.string()),
-    identityNamespace: v.optional(v.string()),
-    cardId: v.optional(v.string()),
-    providerCardId: v.optional(v.string()),
-    printingId: v.optional(v.string()),
-    section: v.optional(v.string()),
-    entryKind: v.optional(v.string()),
-    originalReference: v.optional(v.string()),
-    category: v.optional(v.string()),
-    // Legacy Magic fields remain until all installed clients use generic entries.
-    oracleId: v.optional(v.string()),
-    scryfallId: v.optional(v.string()),
+    ...genericDeckCardFields,
+    ...legacyMagicDeckCardFields,
     name: v.string(),
     imageUrl: v.optional(v.string()),
     smallImageUrl: v.optional(v.string()),
     quantity: v.number(),
-    board: v.optional(
-      v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
-    ),
+    board: v.optional(v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander"))),
   })
     .index("by_deck_version", ["deckVersionId"])
     .index("by_game_and_printing_id", ["game", "printingId"]),
@@ -251,11 +255,7 @@ export default defineSchema({
     facets: v.array(v.object({ key: v.string(), value: v.string() })),
     updatedAt: v.number(),
   })
-    .index("by_game_and_identity_namespace_and_card_id", [
-      "game",
-      "identityNamespace",
-      "cardId",
-    ])
+    .index("by_game_and_identity_namespace_and_card_id", ["game", "identityNamespace", "cardId"])
     .index("by_game_and_name_normalized", ["game", "nameNormalized"])
     .searchIndex("search_name", { searchField: "name", filterFields: ["game"] }),
 
@@ -282,11 +282,7 @@ export default defineSchema({
     ),
     updatedAt: v.number(),
   })
-    .index("by_game_and_provider_and_provider_card_id", [
-      "game",
-      "provider",
-      "providerCardId",
-    ])
+    .index("by_game_and_provider_and_provider_card_id", ["game", "provider", "providerCardId"])
     .index("by_game_card_id", ["gameCardId"])
     .index("by_game_and_printing_id", ["game", "printingId"]),
 
@@ -294,11 +290,7 @@ export default defineSchema({
     game: v.string(),
     provider: v.string(),
     operation: v.string(),
-    status: v.union(
-      v.literal("healthy"),
-      v.literal("degraded"),
-      v.literal("unavailable"),
-    ),
+    status: v.union(v.literal("healthy"), v.literal("degraded"), v.literal("unavailable")),
     lastAttemptAt: v.number(),
     lastSuccessAt: v.optional(v.number()),
     responseMs: v.optional(v.number()),
@@ -310,11 +302,7 @@ export default defineSchema({
   integrationOverrides: defineTable({
     game: v.string(),
     capability: v.string(),
-    release: v.union(
-      v.literal("enabled"),
-      v.literal("permission_required"),
-      v.literal("disabled"),
-    ),
+    release: v.union(v.literal("enabled"), v.literal("permission_required"), v.literal("disabled")),
     note: v.optional(v.string()),
     updatedAt: v.number(),
   }).index("by_game_and_capability", ["game", "capability"]),

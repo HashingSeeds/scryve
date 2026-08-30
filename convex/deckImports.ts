@@ -12,7 +12,7 @@ import {
   type CatalogCard,
   type NormalizedCard,
 } from "./lib/games/cards"
-import { searchPokemon } from "./lib/games/pokemon"
+import { pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
 import { cardsByYgoIds, searchYgo, ygoSection } from "./lib/games/yugioh"
 import { assertGameSystem, type GameSystemId } from "./lib/integrations"
 import { MAX_DECK_CARDS } from "./lib/policy"
@@ -226,7 +226,11 @@ export function parseGenericDeckList(list: string, game: Exclude<GameSystemId, "
         : game === "pokemon"
           ? pokemonName(originalReference)
           : originalReference
-    const key = `${section}:${providerCardId ?? name.toLocaleLowerCase()}`
+    const key = `${section}:${
+      game === "pokemon"
+        ? normalizeCardName(originalReference)
+        : (providerCardId ?? name.toLocaleLowerCase())
+    }`
     const current = entries.get(key)
     entries.set(key, {
       name,
@@ -300,10 +304,16 @@ function unresolvedDeckCard(game: Exclude<GameSystemId, "mtg">, entry: GenericPa
   }
 }
 
-function genericLookupKey(entry: GenericParsedEntry) {
+function genericLookupKey(game: Exclude<GameSystemId, "mtg">, entry: GenericParsedEntry) {
+  if (game === "pokemon") return `reference:${normalizeCardName(entry.originalReference)}`
   return entry.providerCardId
     ? `reference:${entry.providerCardId.toLocaleLowerCase()}`
     : `name:${normalizeCardName(entry.name)}`
+}
+
+function pokemonPrintingReference(entry: GenericParsedEntry) {
+  const reference = entry.originalReference.slice(entry.name.length).trim()
+  return reference && reference !== entry.originalReference ? reference : undefined
 }
 
 async function resolveGenericEntries(
@@ -343,7 +353,8 @@ async function resolveGenericEntries(
     { source: "provider"; card: NormalizedCard } | { source: "cache"; card: CatalogCard } | null
   const resolutions = new Map<string, Resolution>()
   for (const entry of entries) {
-    const lookupKey = genericLookupKey(entry)
+    const lookupKey = genericLookupKey(game, entry)
+    const pokemonReference = game === "pokemon" ? pokemonPrintingReference(entry) : undefined
     if (resolutions.has(lookupKey)) continue
 
     const card = entry.providerCardId ? byIdentity.get(entry.providerCardId) : undefined
@@ -352,11 +363,13 @@ async function resolveGenericEntries(
       continue
     }
 
-    const cached: CatalogCard[] = await ctx.runQuery(internal.cardCatalog.searchCached, {
-      game,
-      query: entry.name,
-      limit: 5,
-    })
+    const cached: CatalogCard[] = pokemonReference
+      ? []
+      : await ctx.runQuery(internal.cardCatalog.searchCached, {
+          game,
+          query: entry.name,
+          limit: 5,
+        })
     const exact = cached.find(
       (candidate) => normalizeCardName(candidate.name) === normalizeCardName(entry.name),
     )
@@ -368,7 +381,9 @@ async function resolveGenericEntries(
     const result =
       game === "ygo"
         ? await searchYgo(ctx, entry.name, includeImages)
-        : await searchPokemon(ctx, entry.name, includeImages)
+        : pokemonReference
+          ? await pokemonCardByReference(ctx, entry.name, pokemonReference, includeImages)
+          : await searchPokemon(ctx, entry.name, includeImages)
     const resolved = result.cards.find(
       (candidate) => normalizeCardName(candidate.name) === normalizeCardName(entry.name),
     )
@@ -379,7 +394,7 @@ async function resolveGenericEntries(
   const cards: GenericDeckCard[] = []
   const unresolved: string[] = []
   for (const entry of entries) {
-    const resolution = resolutions.get(genericLookupKey(entry))
+    const resolution = resolutions.get(genericLookupKey(game, entry))
     if (resolution?.source === "provider") {
       cards.push(genericDeckCard(game, resolution.card, entry))
     } else if (resolution?.source === "cache") {
@@ -1090,6 +1105,8 @@ export const resolvePasted = action({
         })
         return { ...resolved, invalidLines: parsed.invalidLines }
       } catch (error) {
+        const data = error instanceof ConvexError ? objectRecord(error.data) : null
+        if (data?.code === "empty_deck_list" || data?.code === "deck_too_large") throw error
         const finishedAt = Date.now()
         await ctx.runMutation(internal.providerHealth.record, {
           game,

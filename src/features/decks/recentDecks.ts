@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
 
 import { load, save } from "@/utils/storage"
 
@@ -16,6 +16,17 @@ function storedRecentDeckIds() {
 
 const listeners = new Set<() => void>()
 let recentDeckIds = storedRecentDeckIds()
+
+function subscribeRecentDecks(listener: () => void) {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+function getRecentDeckSnapshot() {
+  return recentDeckIds
+}
 
 function notifyRecentDecks() {
   listeners.forEach((listener) => listener())
@@ -36,18 +47,11 @@ export function nextRecentDeckIds(current: string[], deckId: string) {
 }
 
 export function useRecentDecks() {
-  const [deckIds, setDeckIds] = useState(() => {
-    recentDeckIds = storedRecentDeckIds()
-    return recentDeckIds
-  })
-
-  useEffect(() => {
-    const listener = () => setDeckIds(recentDeckIds)
-    listeners.add(listener)
-    return () => {
-      listeners.delete(listener)
-    }
-  }, [])
+  const deckIds = useSyncExternalStore(
+    subscribeRecentDecks,
+    getRecentDeckSnapshot,
+    getRecentDeckSnapshot,
+  )
 
   return { deckIds }
 }

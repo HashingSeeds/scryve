@@ -408,6 +408,17 @@ describe("AddDeckScreen", () => {
     expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "commander" })
   })
 
+  it("resets the shared format when changing systems", () => {
+    const view = renderAddDeck()
+
+    chooseFormat(view, "modern")
+    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+
+    expect(
+      view.getByTestId("format-picker-options-advanced").props.accessibilityState.selected,
+    ).toBe(true)
+  })
+
   it("opens the shared card dialog from a Top Deck preview", async () => {
     mockSearchTopDecks.mockResolvedValueOnce([
       {

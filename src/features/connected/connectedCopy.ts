@@ -48,7 +48,7 @@ export function resumeDetail(game: ResumableGame, now: number) {
   const system = playSystemId(game.system)
   return [
     `${game.playerCount} seats`,
-    playFormatLabel(system, game.format ?? game.ruleset),
+    playFormatLabel(system, game.format || game.ruleset),
     game.startingLife ? counterValueLabel(system, game.startingLife) : undefined,
     relativeTime(game.updatedAt, now),
   ]
@@ -68,7 +68,7 @@ export function lobbyDetail(
   system: PlaySystemId = "mtg",
   format?: string,
 ) {
-  return `${counterValueLabel(system, startingLife)} · ${playFormatLabel(system, format ?? ruleset)}`
+  return `${counterValueLabel(system, startingLife)} · ${playFormatLabel(system, format || ruleset)}`
 }
 
 export function seatDetail({
