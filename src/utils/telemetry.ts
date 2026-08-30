@@ -1,10 +1,28 @@
-export type TelemetryEventName =
-  | "join.completed"
-  | "join.failed"
-  | "reconnect.ready"
-  | "outbox.drain"
-  | "mutation.ack"
-  | "error.handled"
+const EVENT_NAMES = [
+  "join.completed",
+  "join.failed",
+  "reconnect.ready",
+  "outbox.drain",
+  "mutation.ack",
+  "error.handled",
+  "game.started",
+  "game.completed",
+  "game.dropped",
+  "deck.import",
+  "premium.blocked",
+] as const
+
+export type TelemetryEventName = (typeof EVENT_NAMES)[number]
+
+export type TelemetryPlatform = "ios" | "android" | "web"
+export type TelemetryOutcome = "success" | "retry" | "rejected" | "cancelled"
+export type TelemetryMode = "local" | "connected"
+export type TelemetrySource = "link" | "scan" | "code" | "precon" | "manual"
+export type TelemetryReason =
+  "expired" | "invalid" | "full" | "network" | "permission" | "rate_limited" | "unknown"
+export type TelemetryFeature = "deck_limit" | "version_limit" | "full_history" | "deck_analytics"
+export type TelemetryErrorCode =
+  "FATAL" | "HANDLED" | "AUTH_EXPIRED" | "MUTATION_REJECTED" | "NETWORK_UNAVAILABLE"
 
 type SafeMetadata = {
   durationMs?: number
@@ -12,32 +30,58 @@ type SafeMetadata = {
   pendingCount?: number
   acknowledgedCount?: number
   failedCount?: number
-  platform?: "ios" | "android" | "web"
-  outcome?: "success" | "retry" | "rejected" | "cancelled"
-  errorCode?: "FATAL" | "HANDLED" | "AUTH_EXPIRED" | "MUTATION_REJECTED" | "NETWORK_UNAVAILABLE"
+  playerCount?: number
+  platform?: TelemetryPlatform
+  outcome?: TelemetryOutcome
+  mode?: TelemetryMode
+  source?: TelemetrySource
+  reason?: TelemetryReason
+  feature?: TelemetryFeature
+  errorCode?: TelemetryErrorCode
+  analyticsId?: string
 }
 
 export interface TelemetryAdapter {
   emit(event: { name: TelemetryEventName; at: number; metadata: SafeMetadata }): void
 }
 
-const ALLOWED = new Set<keyof SafeMetadata>([
-  "durationMs",
-  "attemptCount",
-  "pendingCount",
-  "acknowledgedCount",
-  "failedCount",
-  "platform",
-  "outcome",
-  "errorCode",
-])
-const ERROR_CODES = new Set<NonNullable<SafeMetadata["errorCode"]>>([
-  "FATAL",
-  "HANDLED",
-  "AUTH_EXPIRED",
-  "MUTATION_REJECTED",
-  "NETWORK_UNAVAILABLE",
-])
+const isNonNegativeCount = (value: unknown): boolean =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0
+
+const isOneOf =
+  <T extends string>(...values: readonly T[]) =>
+  (value: unknown): boolean =>
+    typeof value === "string" && (values as readonly string[]).includes(value)
+
+const LOCALLY_MINTED_ANALYTICS_ID = /^analytics_[0-9a-f]{32}$/
+
+const isLocallyMintedAnalyticsId = (value: unknown): boolean =>
+  typeof value === "string" && LOCALLY_MINTED_ANALYTICS_ID.test(value)
+
+const VALIDATORS: Record<keyof SafeMetadata, (value: unknown) => boolean> = {
+  durationMs: isNonNegativeCount,
+  attemptCount: isNonNegativeCount,
+  pendingCount: isNonNegativeCount,
+  acknowledgedCount: isNonNegativeCount,
+  failedCount: isNonNegativeCount,
+  playerCount: isNonNegativeCount,
+  platform: isOneOf("ios", "android", "web"),
+  outcome: isOneOf("success", "retry", "rejected", "cancelled"),
+  mode: isOneOf("local", "connected"),
+  source: isOneOf("link", "scan", "code", "precon", "manual"),
+  reason: isOneOf("expired", "invalid", "full", "network", "permission", "rate_limited", "unknown"),
+  feature: isOneOf("deck_limit", "version_limit", "full_history", "deck_analytics"),
+  errorCode: isOneOf(
+    "FATAL",
+    "HANDLED",
+    "AUTH_EXPIRED",
+    "MUTATION_REJECTED",
+    "NETWORK_UNAVAILABLE",
+  ),
+  analyticsId: isLocallyMintedAnalyticsId,
+}
+
+const RECOGNIZED_EVENT_NAMES: ReadonlySet<string> = new Set(EVENT_NAMES)
 
 let adapter: TelemetryAdapter = { emit: () => undefined }
 
@@ -49,19 +93,12 @@ export function emitTelemetry(
   name: TelemetryEventName,
   candidate: Record<string, unknown> = {},
 ): void {
+  if (!RECOGNIZED_EVENT_NAMES.has(name)) return
   const metadata: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(candidate)) {
-    if (!ALLOWED.has(key as keyof SafeMetadata)) continue
-    if (typeof value === "number" && Number.isFinite(value) && value >= 0) metadata[key] = value
-    if (key === "platform" && (value === "ios" || value === "android" || value === "web"))
-      metadata[key] = value
-    if (
-      key === "outcome" &&
-      (value === "success" || value === "retry" || value === "rejected" || value === "cancelled")
-    )
-      metadata[key] = value
-    if (key === "errorCode" && ERROR_CODES.has(value as NonNullable<SafeMetadata["errorCode"]>))
-      metadata[key] = value
+    const isAllowed = Object.prototype.hasOwnProperty.call(VALIDATORS, key)
+    if (!isAllowed) continue
+    if (VALIDATORS[key as keyof SafeMetadata](value)) metadata[key] = value
   }
   adapter.emit({ name, at: Date.now(), metadata: metadata as SafeMetadata })
 }

@@ -16,25 +16,43 @@ let mockReceipt:
   | null
   | undefined
 const mockOpenAuth = jest.fn()
+const mockResetAnalyticsId = jest.fn()
+let mockIsSignedIn = false
+let mockDeletion:
+  | {
+      status: string
+      requestedAt: number
+      updatedAt: number
+      canRetry: boolean
+      receiptToken?: string
+    }
+  | null
+  | undefined
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), replace: jest.fn() },
 }))
-jest.mock("@clerk/expo", () => ({ useUser: jest.fn() }))
+jest.mock("@clerk/expo", () => ({
+  useUser: () => ({ isLoaded: true, user: { primaryEmailAddress: { emailAddress: "a@b.co" } } }),
+}))
 jest.mock("convex/react", () => ({
-  useConvexAuth: jest.fn(),
-  useMutation: jest.fn(),
-  useQuery: jest.fn(() => mockReceipt),
+  useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
+  useMutation: () => jest.fn(),
+  useQuery: () => (mockIsSignedIn ? mockDeletion : mockReceipt),
+}))
+jest.mock("@/features/game/localPersistence", () => ({
+  LocalGameRepository: jest.fn(() => ({ resetAnalyticsId: mockResetAnalyticsId })),
 }))
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({
     configured: true,
     isLoaded: true,
-    isSignedIn: false,
+    isSignedIn: mockIsSignedIn,
     openAuth: mockOpenAuth,
   }),
 }))
 jest.mock("@/features/auth/accountDeletionReceiptStore", () => ({
+  isValidReceiptToken: (token: string) => /^[0-9a-f]{64}$/.test(token),
   loadAccountDeletionReceiptToken: () => mockReceiptToken,
   saveAccountDeletionReceiptToken: jest.fn(() => true),
   clearAccountDeletionReceiptToken: jest.fn(),
@@ -45,6 +63,8 @@ describe("delete account route", () => {
     jest.clearAllMocks()
     mockReceiptToken = undefined
     mockReceipt = undefined
+    mockIsSignedIn = false
+    mockDeletion = undefined
   })
 
   it("contains query failures and offers a scoped retry", () => {
@@ -101,5 +121,57 @@ describe("delete account route", () => {
 
     fireEvent.press(view.getByText("Sign in to retry"))
     expect(mockOpenAuth).toHaveBeenCalledTimes(1)
+  })
+
+  it("rotates the analytics id for a deletion requested on another device", () => {
+    mockIsSignedIn = true
+    mockDeletion = {
+      status: "processing",
+      requestedAt: Date.UTC(2026, 7, 23, 18, 40),
+      updatedAt: Date.UTC(2026, 7, 23, 18, 45),
+      canRetry: false,
+      receiptToken: "c".repeat(64),
+    }
+
+    render(
+      <ThemeProvider initialContext="dark">
+        <DeleteAccountRoute />
+      </ThemeProvider>,
+    )
+
+    expect(mockResetAnalyticsId).toHaveBeenCalledTimes(1)
+  })
+
+  it("rotates once per receipt token no matter how often the query republishes it", () => {
+    mockIsSignedIn = true
+    mockDeletion = {
+      status: "processing",
+      requestedAt: Date.UTC(2026, 7, 23, 18, 40),
+      updatedAt: Date.UTC(2026, 7, 23, 18, 45),
+      canRetry: false,
+      receiptToken: "d".repeat(64),
+    }
+
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <DeleteAccountRoute />
+      </ThemeProvider>,
+    )
+    const rerenderRoute = () =>
+      view.rerender(
+        <ThemeProvider initialContext="dark">
+          <DeleteAccountRoute />
+        </ThemeProvider>,
+      )
+
+    const republishedWithSameToken = { ...mockDeletion }
+    const queryReloading = undefined
+
+    mockDeletion = queryReloading
+    rerenderRoute()
+    mockDeletion = republishedWithSameToken
+    rerenderRoute()
+
+    expect(mockResetAnalyticsId).toHaveBeenCalledTimes(1)
   })
 })

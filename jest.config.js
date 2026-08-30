@@ -2,6 +2,7 @@
 module.exports = {
   preset: "jest-expo",
   cacheDirectory: "<rootDir>/.jest-cache",
+  modulePathIgnorePatterns: ["<rootDir>/\\.delta/", "<rootDir>/\\.agents-work/"],
   setupFiles: ["<rootDir>/test/setup.ts"],
   transformIgnorePatterns: [
     "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|convex-test|react-native-purchases|react-native-purchases-ui|@revenuecat))",
