@@ -9,6 +9,7 @@ import { readRevenueCatConfig } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
+import { resourceCache } from "./resourceCache"
 
 interface AuthAccess {
   configured: boolean
@@ -94,7 +95,11 @@ export function CloudProviders({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ClerkProvider publishableKey={config.value.clerkPublishableKey} tokenCache={tokenCache}>
+    <ClerkProvider
+      publishableKey={config.value.clerkPublishableKey}
+      tokenCache={tokenCache}
+      __experimental_resourceCache={resourceCache}
+    >
       <ConfiguredAuth convexUrl={config.value.convexUrl}>{children}</ConfiguredAuth>
     </ClerkProvider>
   )
