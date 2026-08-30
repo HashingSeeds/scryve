@@ -71,11 +71,16 @@ function printingKey(card: DeckCard) {
   return `${cardSection(card)}:${identity}`
 }
 
-function cardDetailsKey(card: DeckCard, game: string) {
-  return (
-    card.scryfallId ??
-    `${game}:${card.cardId ?? card.printingId ?? card.providerCardId ?? card.name}`
-  )
+export function cardDetailsKey(card: DeckCard, game: string) {
+  if (card.scryfallId) return card.scryfallId
+  const identity = [
+    card.cardId,
+    card.printingId,
+    card.providerCardId,
+    card.originalReference,
+    card.name,
+  ].find(Boolean)
+  return `${game}:${identity ?? "unknown"}:${card.originalReference ?? ""}`
 }
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {

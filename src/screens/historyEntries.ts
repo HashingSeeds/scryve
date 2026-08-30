@@ -98,7 +98,7 @@ export function connectedHistoryEntry(game: {
     })),
     format:
       game.format || game.ruleset
-        ? playFormatLabel(system, game.format ?? game.ruleset)
+        ? playFormatLabel(system, game.format || game.ruleset)
         : game.startingLife
           ? counterValueLabel(system, game.startingLife)
           : "Connected",

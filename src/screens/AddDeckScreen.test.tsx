@@ -3,7 +3,7 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 import { clear } from "@/utils/storage"
 
-import { AddDeckScreen } from "./AddDeckScreen"
+import { AddDeckScreen, catalogPreviewSections } from "./AddDeckScreen"
 
 const mockCreate = jest.fn()
 const mockImport = jest.fn(async () => "deck-imported")
@@ -211,6 +211,29 @@ describe("AddDeckScreen", () => {
     }
     mockListMine.error = undefined
     mockCatalogDetail.value = undefined
+  })
+
+  it("puts unknown catalog sections in a visible deterministic fallback", () => {
+    const sections = catalogPreviewSections(
+      [
+        { _id: "main-card", name: "Known", section: "main", quantity: 2 },
+        { _id: "unknown-card", name: "Mystery", section: "bench", quantity: 3 },
+      ] as never,
+      [{ id: "main", label: "Deck" }],
+    )
+
+    expect(sections).toEqual([
+      {
+        id: "main",
+        label: "Deck",
+        entries: [{ _id: "main-card", name: "Known", section: "main", quantity: 2 }],
+      },
+      {
+        id: "other",
+        label: "Other",
+        entries: [{ _id: "unknown-card", name: "Mystery", section: "bench", quantity: 3 }],
+      },
+    ])
   })
 
   afterEach(() => {

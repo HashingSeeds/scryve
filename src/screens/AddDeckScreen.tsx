@@ -167,6 +167,23 @@ function totalQuantity(cards: PreviewCard[]) {
   return cards.reduce((total, card) => total + card.quantity, 0)
 }
 
+export function catalogPreviewSections(
+  entries: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"],
+  configured: readonly { id: string; label: string }[],
+) {
+  const knownIds = new Set(configured.map((section) => section.id))
+  const unknownEntries = entries.filter((entry) => !knownIds.has(entry.section))
+  return [
+    ...configured.map((section) => ({
+      ...section,
+      entries: entries.filter((entry) => entry.section === section.id),
+    })),
+    ...(unknownEntries.length > 0
+      ? [{ id: "other", label: "Other", entries: unknownEntries }]
+      : []),
+  ].filter((section) => section.entries.length > 0)
+}
+
 function previewSections(
   cards: PreviewCard[],
   configured: readonly { id: string; label: string }[],
@@ -582,12 +599,14 @@ export function AddDeckScreen({
               accessibilityText={catalogDetail ? "Preview ready" : "Loading Top Deck"}
             />
           </View>
-          {deckSections(
-            selectedCatalogDeck.game,
-            selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
+          {catalogPreviewSections(
+            entries,
+            deckSections(
+              selectedCatalogDeck.game,
+              selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
+            ),
           ).map((section) => {
-            const sectionEntries = entries.filter((entry) => entry.section === section.id)
-            if (sectionEntries.length === 0) return null
+            const sectionEntries = section.entries
             return (
               <View key={section.id}>
                 <View style={themed($previewSectionHeader)}>

@@ -105,6 +105,12 @@ describe("unified history screen", () => {
     ])
   })
 
+  it("falls back to ruleset when connected format is empty", () => {
+    expect(connectedHistoryEntry(connectedGame({ format: "", ruleset: "commander" })).format).toBe(
+      "Commander",
+    )
+  })
+
   it("routes each row to the detail screen matching its source", () => {
     const { onSelectLocal, onSelectConnected } = renderHistory({
       connected: connectedFeed([connectedGame()]),

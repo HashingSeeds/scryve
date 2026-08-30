@@ -2,7 +2,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { DeckDetailScreen } from "./DeckDetailScreen"
+import { cardDetailsKey, DeckDetailScreen } from "./DeckDetailScreen"
 
 const mockSaveVersion = jest.fn(async () => "version-main")
 const mockCreateVersion = jest.fn(async () => "version-new")
@@ -144,6 +144,20 @@ describe("DeckDetailScreen", () => {
       capacity: { used: 2, limit: 5, premium: true, canCreate: true },
     }
     mockDetail.error = undefined
+  })
+
+  it("keeps same-name Pokemon reprints distinct when only original references identify them", () => {
+    expect(
+      cardDetailsKey(
+        { game: "pokemon", name: "Pikachu", originalReference: "MEG 76", quantity: 1 },
+        "pokemon",
+      ),
+    ).not.toBe(
+      cardDetailsKey(
+        { game: "pokemon", name: "Pikachu", originalReference: "SVI 62", quantity: 1 },
+        "pokemon",
+      ),
+    )
   })
 
   it("opens read-only with the deck, its notes, and the selected version's record", () => {
