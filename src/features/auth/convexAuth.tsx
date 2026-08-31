@@ -10,7 +10,6 @@ type ClerkAuth = {
   orgId: string | undefined | null
   orgRole: string | undefined | null
   sessionId: string | undefined | null
-  sessionClaims: unknown
 }
 
 export function createConvexAuthHook(
@@ -18,30 +17,19 @@ export function createConvexAuthHook(
   authenticationAttempt: number,
 ) {
   return function useConvexAuthFromClerk() {
-    const { isLoaded, isSignedIn, getToken, orgId, orgRole, sessionId, sessionClaims } =
-      useAuthFromClerk()
-    const currentClerkSession = useRef({ getToken, sessionClaims })
+    const { isLoaded, isSignedIn, getToken, orgId, orgRole, sessionId } = useAuthFromClerk()
+    const currentGetToken = useRef(getToken)
 
     useEffect(() => {
-      currentClerkSession.current = { getToken, sessionClaims }
-    }, [getToken, sessionClaims])
+      currentGetToken.current = getToken
+    }, [getToken])
 
     const fetchAccessToken = useCallback(
       async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
         try {
-          const { getToken: getCurrentToken, sessionClaims: currentSessionClaims } =
-            currentClerkSession.current
-          const usesNativeIntegration =
-            typeof currentSessionClaims === "object" &&
-            currentSessionClaims !== null &&
-            "aud" in currentSessionClaims &&
-            currentSessionClaims.aud === "convex"
-          if (usesNativeIntegration) {
-            return forceRefreshToken
-              ? await getCurrentToken({ skipCache: true })
-              : await getCurrentToken()
-          }
-          return await getCurrentToken({ template: "convex", skipCache: forceRefreshToken })
+          return forceRefreshToken
+            ? await currentGetToken.current({ skipCache: true })
+            : await currentGetToken.current()
         } catch (cause) {
           reportCrash(
             cause instanceof Error ? cause : new Error("Clerk token request failed"),
