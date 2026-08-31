@@ -19,7 +19,10 @@ export function createConvexAuthHook(
     const { isLoaded, isSignedIn, getToken, orgId, orgRole, sessionId, sessionClaims } =
       useAuthFromClerk()
     const currentClerkSession = useRef({ getToken, sessionClaims })
-    currentClerkSession.current = { getToken, sessionClaims }
+
+    useEffect(() => {
+      currentClerkSession.current = { getToken, sessionClaims }
+    }, [getToken, sessionClaims])
 
     const fetchAccessToken = useCallback(
       async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {

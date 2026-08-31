@@ -64,6 +64,30 @@ describe("createConvexAuthHook", () => {
 
     expect(getToken).toHaveBeenCalledWith({ template: "convex", skipCache: false })
   })
+
+  it("keeps the last committed Clerk session after a discarded render", async () => {
+    const committedGetToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
+    committedGetToken.mockResolvedValue("committed-token")
+    const discardedGetToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
+    discardedGetToken.mockResolvedValue("discarded-token")
+    let auth = clerkAuth(committedGetToken, { aud: "convex" })
+    let discardRender = false
+    const useConvexAuth = createConvexAuthHook(() => auth, 0)
+    const view = renderHook(() => {
+      const result = useConvexAuth()
+      if (discardRender) throw new Error("Discard this render")
+      return result
+    })
+    const fetchAccessToken = view.result.current.fetchAccessToken
+
+    auth = clerkAuth(discardedGetToken, { aud: "convex" })
+    discardRender = true
+    expect(() => view.rerender(undefined)).toThrow("Discard this render")
+    await fetchAccessToken({ forceRefreshToken: false })
+
+    expect(committedGetToken).toHaveBeenCalledWith()
+    expect(discardedGetToken).not.toHaveBeenCalled()
+  })
 })
 
 describe("ConvexAuthReconnect", () => {

@@ -173,10 +173,10 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
       message: "You are signed out or your session expired.",
       retry,
     }
-  } else if (isAuthenticated && readyUserId === profile.userId) {
-    state = { status: "ready", profile, retry }
   } else if (isAuthenticationLoading || isAuthenticationRefreshing) {
     state = { status: "loading", reason: "authentication", profile, retry }
+  } else if (isAuthenticated && readyUserId === profile.userId) {
+    state = { status: "ready", profile, retry }
   } else if (!isAuthenticated) {
     state = {
       status: "error",

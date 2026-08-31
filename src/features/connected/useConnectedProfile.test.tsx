@@ -118,6 +118,16 @@ describe("useConnectedProfile", () => {
     expect(mockSyncCurrent).not.toHaveBeenCalled()
   })
 
+  it("returns to authentication loading when refresh starts after profile sync", async () => {
+    const { result, rerender } = renderHook(useConnectedProfile, { wrapper })
+    await waitFor(() => expect(result.current).toMatchObject({ status: "ready" }))
+
+    mockConvexRefreshing = true
+    rerender(undefined)
+
+    expect(result.current).toMatchObject({ status: "loading", reason: "authentication" })
+  })
+
   it("retries a failed profile sync", async () => {
     mockSyncCurrent
       .mockRejectedValueOnce(new Error("Profile sync failed"))
