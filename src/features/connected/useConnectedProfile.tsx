@@ -92,7 +92,11 @@ export function resetConnectedProfileBootstrapForTests() {
 
 export function ConnectedProfileProvider({ children }: { children: ReactNode }) {
   const { isLoaded: isUserLoaded, user } = useUser()
-  const { isAuthenticated, isLoading: isAuthenticationLoading } = useConvexAuth()
+  const {
+    isAuthenticated,
+    isLoading: isAuthenticationLoading,
+    isRefreshing: isAuthenticationRefreshing,
+  } = useConvexAuth()
   const { isWebSocketConnected } = useConvexConnectionState()
   const syncCurrent = useMutation(api.users.syncCurrent)
   const [readyUserId, setReadyUserId] = useState<string | undefined>(bootstrapCache.profile?.userId)
@@ -111,7 +115,14 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
   )
 
   useEffect(() => {
-    if (!isUserLoaded || !isAuthenticated || !isWebSocketConnected || !profile) return
+    if (
+      !isUserLoaded ||
+      !isAuthenticated ||
+      isAuthenticationRefreshing ||
+      !isWebSocketConnected ||
+      !profile
+    )
+      return
     let cancelled = false
     void syncProfile(profile, syncCurrent)
       .then(() => {
@@ -132,7 +143,15 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
     return () => {
       cancelled = true
     }
-  }, [isAuthenticated, isUserLoaded, isWebSocketConnected, profile, syncAttempt, syncCurrent])
+  }, [
+    isAuthenticated,
+    isAuthenticationRefreshing,
+    isUserLoaded,
+    isWebSocketConnected,
+    profile,
+    syncAttempt,
+    syncCurrent,
+  ])
 
   const retry = useCallback(() => {
     if (profile?.userId && bootstrapCache.profile?.userId === profile.userId)
@@ -154,10 +173,10 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
       message: "You are signed out or your session expired.",
       retry,
     }
+  } else if (isAuthenticationLoading || isAuthenticationRefreshing) {
+    state = { status: "loading", reason: "authentication", profile, retry }
   } else if (isAuthenticated && readyUserId === profile.userId) {
     state = { status: "ready", profile, retry }
-  } else if (isAuthenticationLoading) {
-    state = { status: "loading", reason: "authentication", profile, retry }
   } else if (!isAuthenticated) {
     state = {
       status: "error",

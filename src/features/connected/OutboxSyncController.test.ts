@@ -57,6 +57,7 @@ class ManualClock {
 const ONLINE: OutboxSyncEnvironment = {
   isAuthenticated: true,
   isLoading: false,
+  isRefreshing: false,
   isWebSocketConnected: true,
   remoteReady: true,
 }
@@ -211,7 +212,7 @@ describe("outbox sync controller", () => {
     ).toEqual([blocked.event.operationId])
   })
 
-  it("abandons a drain whose epoch was bumped instead of resending the action", async () => {
+  it("reruns a drain after authentication refresh invalidates the active drain", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
     const first = action("operation-flap-first-1", 1, 1)
@@ -240,11 +241,6 @@ describe("outbox sync controller", () => {
     controller.setEnvironment(ONLINE)
     releaseFirst({ operationId: first.event.operationId })
     await settle()
-    expect(sent).toEqual([first.event.operationId])
-
-    controller.setEnvironment({ ...ONLINE, isLoading: true })
-    controller.setEnvironment(ONLINE)
-    await settle()
     expect(sent).toEqual([first.event.operationId, second.event.operationId])
     expect(repository.loadOutbox("game-public")).toEqual([])
   })
@@ -260,6 +256,16 @@ describe("outbox sync controller", () => {
     const online = controller.getSnapshot()
     expect(online).not.toBe(initial)
     expect(controller.getSnapshot()).toBe(online)
+  })
+
+  it("does not drain while Convex is refreshing authentication", async () => {
+    const { controller } = harness()
+    controller.getSnapshot()
+    controller.setEnvironment({ ...ONLINE, isRefreshing: true })
+    controller.changeLife("player-1", 1)
+    await settle()
+
+    expect(controller.getSnapshot().pending).toHaveLength(1)
   })
 
   it("notifies subscribers and stops after they unsubscribe", () => {
