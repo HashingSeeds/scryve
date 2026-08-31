@@ -57,6 +57,7 @@ class ManualClock {
 const ONLINE: OutboxSyncEnvironment = {
   isAuthenticated: true,
   isLoading: false,
+  isRefreshing: false,
   isWebSocketConnected: true,
   remoteReady: true,
 }
@@ -260,6 +261,16 @@ describe("outbox sync controller", () => {
     const online = controller.getSnapshot()
     expect(online).not.toBe(initial)
     expect(controller.getSnapshot()).toBe(online)
+  })
+
+  it("does not drain while Convex is refreshing authentication", async () => {
+    const { controller } = harness()
+    controller.getSnapshot()
+    controller.setEnvironment({ ...ONLINE, isRefreshing: true })
+    controller.changeLife("player-1", 1)
+    await settle()
+
+    expect(controller.getSnapshot().pending).toHaveLength(1)
   })
 
   it("notifies subscribers and stops after they unsubscribe", () => {

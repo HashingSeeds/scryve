@@ -12,6 +12,7 @@ let mockUserId: string | undefined = "user-a"
 let mockSocketConnected = true
 let mockConvexAuthenticated = true
 let mockConvexLoading = false
+let mockConvexRefreshing = false
 const mockSyncCurrent = jest.fn<Promise<string>, [{ displayName: string; avatarUrl?: string }]>()
 
 jest.mock("@clerk/expo", () => ({
@@ -31,6 +32,7 @@ jest.mock("convex/react", () => ({
   useConvexAuth: () => ({
     isAuthenticated: mockConvexAuthenticated,
     isLoading: mockConvexLoading,
+    isRefreshing: mockConvexRefreshing,
   }),
   useConvexConnectionState: () => ({ isWebSocketConnected: mockSocketConnected }),
   useMutation: () => mockSyncCurrent,
@@ -52,6 +54,7 @@ describe("useConnectedProfile", () => {
     mockSocketConnected = true
     mockConvexAuthenticated = true
     mockConvexLoading = false
+    mockConvexRefreshing = false
     mockSyncCurrent.mockResolvedValue("convex-user-a")
   })
 
@@ -105,6 +108,33 @@ describe("useConnectedProfile", () => {
       displayName: "ada_lovelace",
       avatarUrl: "https://example.test/user-a.png",
     })
+  })
+
+  it("waits for Convex authentication refresh before syncing the profile", async () => {
+    mockConvexRefreshing = true
+    const { result } = renderHook(useConnectedProfile, { wrapper })
+
+    expect(result.current).toMatchObject({ status: "loading", reason: "authentication" })
+    expect(mockSyncCurrent).not.toHaveBeenCalled()
+  })
+
+  it("stays offline when authentication refresh starts without a connection", () => {
+    mockSocketConnected = false
+    mockConvexRefreshing = true
+    const { result } = renderHook(useConnectedProfile, { wrapper })
+
+    expect(result.current).toMatchObject({ status: "offline" })
+    expect(mockSyncCurrent).not.toHaveBeenCalled()
+  })
+
+  it("returns to authentication loading when refresh starts after profile sync", async () => {
+    const { result, rerender } = renderHook(useConnectedProfile, { wrapper })
+    await waitFor(() => expect(result.current).toMatchObject({ status: "ready" }))
+
+    mockConvexRefreshing = true
+    rerender(undefined)
+
+    expect(result.current).toMatchObject({ status: "loading", reason: "authentication" })
   })
 
   it("retries a failed profile sync", async () => {

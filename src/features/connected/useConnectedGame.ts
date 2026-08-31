@@ -80,7 +80,7 @@ export function connectedLifeOptimisticUpdater(
 }
 
 export function useConnectedGame(publicId: string, ownerId = "anonymous"): ConnectedGameRuntime {
-  const { isAuthenticated, isLoading } = useConvexAuth()
+  const { isAuthenticated, isLoading, isRefreshing } = useConvexAuth()
   const { isWebSocketConnected } = useConvexConnectionState()
   const repository = useMemo(() => new ConnectedGameRepository(undefined, ownerId), [ownerId])
   const deviceId = useRef(asDeviceId(new LocalGameRepository().getDeviceId())).current
@@ -134,8 +134,14 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
 
   useEffect(() => {
-    controller.setEnvironment({ isAuthenticated, isLoading, isWebSocketConnected, remoteReady })
-  }, [controller, isAuthenticated, isLoading, isWebSocketConnected, remoteReady])
+    controller.setEnvironment({
+      isAuthenticated,
+      isLoading,
+      isRefreshing,
+      isWebSocketConnected,
+      remoteReady,
+    })
+  }, [controller, isAuthenticated, isLoading, isRefreshing, isWebSocketConnected, remoteReady])
 
   useEffect(() => {
     controller.onRemoteProjection(remote)
