@@ -343,7 +343,7 @@ const $content: ThemedStyle<ViewStyle> = () => ({
 })
 
 const $readout: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFillObject,
+  ...StyleSheet.absoluteFill,
   alignItems: "center",
   justifyContent: "center",
 })
@@ -430,7 +430,7 @@ const $delta: ThemedStyle<TextStyle> = ({ spacing }) => ({
 })
 
 const $statusLayer: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFillObject,
+  ...StyleSheet.absoluteFill,
   alignItems: "center",
 })
 

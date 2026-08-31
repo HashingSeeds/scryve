@@ -59,7 +59,7 @@ describe("EAS release profile isolation", () => {
 
     expect(app).not.toHaveProperty("expo")
     expect(app.plugins).toContainEqual(
-      expect.arrayContaining(["@sentry/react-native/expo", expect.any(Object)]),
+      expect.arrayContaining(["@sentry/react-native", expect.any(Object)]),
     )
     expect(dynamicConfig).not.toContain("tsx/cjs")
   })
