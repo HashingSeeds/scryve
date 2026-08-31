@@ -118,6 +118,15 @@ describe("useConnectedProfile", () => {
     expect(mockSyncCurrent).not.toHaveBeenCalled()
   })
 
+  it("stays offline when authentication refresh starts without a connection", () => {
+    mockSocketConnected = false
+    mockConvexRefreshing = true
+    const { result } = renderHook(useConnectedProfile, { wrapper })
+
+    expect(result.current).toMatchObject({ status: "offline" })
+    expect(mockSyncCurrent).not.toHaveBeenCalled()
+  })
+
   it("returns to authentication loading when refresh starts after profile sync", async () => {
     const { result, rerender } = renderHook(useConnectedProfile, { wrapper })
     await waitFor(() => expect(result.current).toMatchObject({ status: "ready" }))
