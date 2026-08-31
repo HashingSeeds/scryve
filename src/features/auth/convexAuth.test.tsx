@@ -21,10 +21,7 @@ jest.mock("@/utils/crashReporting", () => ({
   reportCrash: jest.fn(),
 }))
 
-function clerkAuth(
-  getToken: jest.Mock<Promise<string | null>, [options?: TokenOptions]>,
-  sessionClaims?: Record<string, unknown>,
-) {
+function clerkAuth(getToken: jest.Mock<Promise<string | null>, [options?: TokenOptions]>) {
   return {
     isLoaded: true,
     isSignedIn: true,
@@ -32,7 +29,6 @@ function clerkAuth(
     orgId: null,
     orgRole: null,
     sessionId: "session-1",
-    sessionClaims,
   }
 }
 
@@ -41,10 +37,10 @@ describe("createConvexAuthHook", () => {
     jest.clearAllMocks()
   })
 
-  it("uses Clerk's no-options cached-token path for native Convex integration", async () => {
+  it("uses Clerk's no-options cached-token path", async () => {
     const getToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
     getToken.mockResolvedValue("cached-token")
-    const useAuthFromClerk = jest.fn(() => clerkAuth(getToken, { aud: "convex" }))
+    const useAuthFromClerk = jest.fn(() => clerkAuth(getToken))
     const useConvexAuth = createConvexAuthHook(useAuthFromClerk, 0)
     const { result } = renderHook(useConvexAuth)
 
@@ -56,7 +52,7 @@ describe("createConvexAuthHook", () => {
   it("bypasses the cache only for forced native refreshes", async () => {
     const getToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
     getToken.mockResolvedValue("fresh-token")
-    const useConvexAuth = createConvexAuthHook(() => clerkAuth(getToken, { aud: "convex" }), 0)
+    const useConvexAuth = createConvexAuthHook(() => clerkAuth(getToken), 0)
     const { result } = renderHook(useConvexAuth)
 
     await result.current.fetchAccessToken({ forceRefreshToken: true })
@@ -64,22 +60,11 @@ describe("createConvexAuthHook", () => {
     expect(getToken).toHaveBeenCalledWith({ skipCache: true })
   })
 
-  it("uses the Convex JWT template when native integration claims are absent", async () => {
-    const getToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
-    getToken.mockResolvedValue("template-token")
-    const useConvexAuth = createConvexAuthHook(() => clerkAuth(getToken), 0)
-    const { result } = renderHook(useConvexAuth)
-
-    await result.current.fetchAccessToken({ forceRefreshToken: false })
-
-    expect(getToken).toHaveBeenCalledWith({ template: "convex", skipCache: false })
-  })
-
   it("reports Clerk token failures and returns null to Convex", async () => {
     const tokenError = new Error("Token request failed")
     const getToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
     getToken.mockRejectedValue(tokenError)
-    const useConvexAuth = createConvexAuthHook(() => clerkAuth(getToken, { aud: "convex" }), 0)
+    const useConvexAuth = createConvexAuthHook(() => clerkAuth(getToken), 0)
     const { result } = renderHook(useConvexAuth)
 
     await expect(result.current.fetchAccessToken({ forceRefreshToken: true })).resolves.toBeNull()
@@ -92,7 +77,7 @@ describe("createConvexAuthHook", () => {
     committedGetToken.mockResolvedValue("committed-token")
     const discardedGetToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
     discardedGetToken.mockResolvedValue("discarded-token")
-    let auth = clerkAuth(committedGetToken, { aud: "convex" })
+    let auth = clerkAuth(committedGetToken)
     let discardRender = false
     const useConvexAuth = createConvexAuthHook(() => auth, 0)
     const view = renderHook(() => {
@@ -102,7 +87,7 @@ describe("createConvexAuthHook", () => {
     })
     const fetchAccessToken = view.result.current.fetchAccessToken
 
-    auth = clerkAuth(discardedGetToken, { aud: "convex" })
+    auth = clerkAuth(discardedGetToken)
     discardRender = true
     expect(() => view.rerender(undefined)).toThrow("Discard this render")
     await fetchAccessToken({ forceRefreshToken: false })
