@@ -212,7 +212,7 @@ describe("outbox sync controller", () => {
     ).toEqual([blocked.event.operationId])
   })
 
-  it("abandons a drain whose epoch was bumped instead of resending the action", async () => {
+  it("reruns a drain after authentication refresh invalidates the active drain", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
     const first = action("operation-flap-first-1", 1, 1)
@@ -240,11 +240,6 @@ describe("outbox sync controller", () => {
     controller.setEnvironment({ ...ONLINE, isLoading: true })
     controller.setEnvironment(ONLINE)
     releaseFirst({ operationId: first.event.operationId })
-    await settle()
-    expect(sent).toEqual([first.event.operationId])
-
-    controller.setEnvironment({ ...ONLINE, isLoading: true })
-    controller.setEnvironment(ONLINE)
     await settle()
     expect(sent).toEqual([first.event.operationId, second.event.operationId])
     expect(repository.loadOutbox("game-public")).toEqual([])

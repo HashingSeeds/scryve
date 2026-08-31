@@ -1,5 +1,7 @@
 import { act, renderHook } from "@testing-library/react-native"
 
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
+
 import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
 
 type TokenOptions = { template?: "convex"; skipCache?: boolean }
@@ -13,6 +15,10 @@ const mockUseConvexConnectionState = jest.fn(() => ({ isWebSocketConnected: fals
 jest.mock("convex/react", () => ({
   useConvexAuth: () => mockUseConvexAuth(),
   useConvexConnectionState: () => mockUseConvexConnectionState(),
+}))
+jest.mock("@/utils/crashReporting", () => ({
+  ErrorType: { HANDLED: "Handled" },
+  reportCrash: jest.fn(),
 }))
 
 function clerkAuth(
@@ -31,6 +37,10 @@ function clerkAuth(
 }
 
 describe("createConvexAuthHook", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
   it("uses Clerk's no-options cached-token path for native Convex integration", async () => {
     const getToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
     getToken.mockResolvedValue("cached-token")
@@ -63,6 +73,18 @@ describe("createConvexAuthHook", () => {
     await result.current.fetchAccessToken({ forceRefreshToken: false })
 
     expect(getToken).toHaveBeenCalledWith({ template: "convex", skipCache: false })
+  })
+
+  it("reports Clerk token failures and returns null to Convex", async () => {
+    const tokenError = new Error("Token request failed")
+    const getToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
+    getToken.mockRejectedValue(tokenError)
+    const useConvexAuth = createConvexAuthHook(() => clerkAuth(getToken, { aud: "convex" }), 0)
+    const { result } = renderHook(useConvexAuth)
+
+    await expect(result.current.fetchAccessToken({ forceRefreshToken: true })).resolves.toBeNull()
+
+    expect(reportCrash).toHaveBeenCalledWith(tokenError, ErrorType.HANDLED)
   })
 
   it("keeps the last committed Clerk session after a discarded render", async () => {
@@ -107,7 +129,7 @@ describe("ConvexAuthReconnect", () => {
     view.unmount()
   })
 
-  it("does not retry a reconnect while Convex is still authenticated or loading", () => {
+  it("waits for loading to finish before retrying a reconnect without authentication", () => {
     const onReconnect = jest.fn()
     const view = renderHook(() => ConvexAuthReconnect({ onReconnect }))
 
@@ -122,6 +144,10 @@ describe("ConvexAuthReconnect", () => {
     mockUseConvexConnectionState.mockReturnValue({ isWebSocketConnected: true })
     act(() => view.rerender(undefined))
     expect(onReconnect).not.toHaveBeenCalled()
+
+    mockUseConvexAuth.mockReturnValue({ isAuthenticated: false, isLoading: false })
+    act(() => view.rerender(undefined))
+    expect(onReconnect).toHaveBeenCalledTimes(1)
     view.unmount()
   })
 })

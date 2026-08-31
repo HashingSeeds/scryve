@@ -24,6 +24,10 @@ jest.mock("@clerk/expo", () => ({
 }))
 jest.mock("@clerk/expo/token-cache", () => ({ tokenCache: {} }))
 jest.mock("@clerk/expo/resource-cache", () => ({ resourceCache: "native-resource-cache" }))
+jest.mock("@/utils/crashReporting", () => ({
+  ErrorType: { HANDLED: "Handled" },
+  reportCrash: jest.fn(),
+}))
 jest.mock("@/features/auth/config", () => ({
   readPublicCloudConfig: () => ({
     configured: true,

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useConvexAuth, useConvexConnectionState } from "convex/react"
 
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
+
 type ClerkAuth = {
   isLoaded: boolean
   isSignedIn: boolean | undefined
@@ -40,7 +42,11 @@ export function createConvexAuthHook(
               : await getCurrentToken()
           }
           return await getCurrentToken({ template: "convex", skipCache: forceRefreshToken })
-        } catch {
+        } catch (cause) {
+          reportCrash(
+            cause instanceof Error ? cause : new Error("Clerk token request failed"),
+            ErrorType.HANDLED,
+          )
           return null
         }
       },
@@ -63,11 +69,15 @@ export function ConvexAuthReconnect({ onReconnect }: { onReconnect: () => void }
   const { isAuthenticated, isLoading } = useConvexAuth()
   const { isWebSocketConnected } = useConvexConnectionState()
   const wasConnected = useRef(isWebSocketConnected)
+  const reconnectPending = useRef(false)
 
   useEffect(() => {
     const reconnected = !wasConnected.current && isWebSocketConnected
     wasConnected.current = isWebSocketConnected
-    if (reconnected && !isLoading && !isAuthenticated) onReconnect()
+    if (reconnected) reconnectPending.current = true
+    if (!isWebSocketConnected || !reconnectPending.current || isLoading) return
+    reconnectPending.current = false
+    if (!isAuthenticated) onReconnect()
   }, [isAuthenticated, isLoading, isWebSocketConnected, onReconnect])
 
   return null

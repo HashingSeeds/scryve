@@ -370,11 +370,7 @@ export class OutboxSyncController {
             this.retryTimer = undefined
             this.scheduleDrain()
           }, delay)
-        } else if (
-          !result.blockedByFailureCapacity &&
-          this.drainEpoch === epoch &&
-          this.pending.length > 0
-        ) {
+        } else if (!result.blockedByFailureCapacity && this.pending.length > 0 && this.canSync()) {
           rerunAfterDrain = true
         }
       } finally {
