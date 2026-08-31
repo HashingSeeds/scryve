@@ -17,24 +17,22 @@
   <body>
     <main class="page">
       <section class="content" aria-labelledby="waitlist-title">
-        <a class="brand" href="/waitlist/" aria-label="Scryve wait list">
-          <img src="/waitlist/icon.png" alt="" width="36" height="36" />
-          <span>Scryve</span>
-        </a>
-
         <div class="pitch">
+          <a class="brand" href="/waitlist/" aria-label="Scryve wait list">
+            <img src="/waitlist/icon.png" alt="" width="36" height="36" />
+            <span>Scryve</span>
+          </a>
+
           <div class="mobile-hero">
-            <div>
+            <div class="hero-copy">
               <p class="eyebrow">Early access</p>
-              <h1 id="waitlist-title">Play offline.<br />Connect when you want.</h1>
+              <h1 id="waitlist-title">Build.<br />Play.<br />See.</h1>
             </div>
             <div class="mobile-phone" aria-hidden="true">
               <img src="/waitlist/app.png" alt="" />
             </div>
           </div>
-          <p class="summary">
-            A fast life counter and deck tracker. Sign in only when you want sync and multiplayer.
-          </p>
+          <p class="summary">Your decks. Your games. Your stats. Connected when you want.</p>
 
           <form id="waitlist-form" novalidate>
             <div class="primary-fields">
@@ -69,6 +67,21 @@
             <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
           </form>
 
+          <dl class="facts">
+            <div>
+              <dt>At the table</dt>
+              <dd>Fast life tracking</dd>
+            </div>
+            <div>
+              <dt>Between games</dt>
+              <dd>Decks and stats</dd>
+            </div>
+            <div>
+              <dt>Everywhere</dt>
+              <dd>Works offline</dd>
+            </div>
+          </dl>
+
           <p class="existing-account">
             Already have access? <a id="sign-in" href="__CLERK_SIGN_IN_URL__">Sign in</a>
           </p>
@@ -80,7 +93,10 @@
       </section>
 
       <section class="product" aria-label="Scryve running on iPhone">
-        <div class="phone" aria-hidden="true">
+        <div class="phone phone-secondary" aria-hidden="true">
+          <img src="/waitlist/multiplayer.jpg" alt="" />
+        </div>
+        <div class="phone phone-primary" aria-hidden="true">
           <img src="/waitlist/app.png" alt="" />
         </div>
       </section>

@@ -17,11 +17,11 @@
 :root {
   color-scheme: dark;
   --background: #000000;
-  --surface: #191015;
-  --text: #f4f2f1;
-  --text-dim: #b6aca6;
-  --border: #3c3836;
-  --accent: #e8c1b4;
+  --surface: #130f10;
+  --text: #f6f4f2;
+  --text-dim: #aaa29e;
+  --border: #35302e;
+  --accent: #e8b9a8;
   --accent-strong: #d28468;
 }
 
@@ -57,6 +57,8 @@ a {
 }
 
 .content {
+  position: relative;
+  z-index: 2;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -69,7 +71,7 @@ a {
   width: max-content;
   align-items: center;
   gap: 12px;
-  margin-top: 16px;
+  margin: 0 0 36px;
   color: var(--text);
   font-size: 16px;
   font-weight: 700;
@@ -85,12 +87,15 @@ a {
 .pitch {
   width: min(100%, 720px);
   margin: auto 0;
-  padding: 64px 0;
-  transform: translateY(-20px);
+  padding: clamp(32px, 3vw, 48px);
+  border: 1px solid #2b2524;
+  border-radius: 28px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px #00000099;
 }
 
 .eyebrow {
-  margin: 0;
+  margin: 0 0 20px;
   color: var(--accent);
   font-size: 12px;
   font-weight: 700;
@@ -99,19 +104,19 @@ a {
 }
 
 h1 {
-  margin: 24px 0 28px;
-  font-size: clamp(50px, 6vw, 92px);
+  margin: 0 0 28px;
+  font-size: clamp(58px, 7vw, 112px);
   font-weight: 700;
-  letter-spacing: -0.065em;
-  line-height: 0.94;
+  letter-spacing: -0.075em;
+  line-height: 0.88;
 }
 
 .summary {
   max-width: 650px;
   margin: 0 0 30px;
   color: var(--text-dim);
-  font-size: 18px;
-  line-height: 1.5;
+  font-size: clamp(17px, 1.45vw, 21px);
+  line-height: 1.4;
 }
 
 .mobile-phone {
@@ -129,23 +134,24 @@ h1 {
   height: 58px;
   flex: 1;
   border: 1px solid var(--border);
-  border-radius: 0;
+  border-radius: 12px;
   outline: none;
-  background: transparent;
+  background: #0a0809;
   color: var(--text);
   padding: 0 18px;
 }
 
 .primary-fields input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px #e8b9a824;
 }
 
 .primary-fields button {
   height: 58px;
-  border: 0;
-  border-radius: 0;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
   background: var(--accent);
-  color: var(--surface);
+  color: #171111;
   cursor: pointer;
   font-weight: 700;
   padding: 0 24px;
@@ -204,6 +210,33 @@ fieldset input {
   color: var(--accent);
 }
 
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: min(100%, 650px);
+  margin: 20px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.facts div {
+  padding: 17px 16px 0 0;
+}
+
+.facts dt {
+  color: #817975;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.facts dd {
+  margin: 6px 0 0;
+  color: #d7d1ce;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .existing-account,
 .legal {
   color: var(--text-dim);
@@ -211,7 +244,7 @@ fieldset input {
 }
 
 .existing-account {
-  margin: 14px 0 0;
+  margin: 24px 0 0;
 }
 
 .existing-account a,
@@ -226,30 +259,42 @@ fieldset input {
 }
 
 .product {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  place-items: center;
+  position: absolute;
+  z-index: 1;
+  inset: 0;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 42%, #321c22 0, var(--surface) 55%, #10090d 100%);
+  pointer-events: none;
 }
 
 .phone {
-  width: min(54%, 333px, 36vh);
-  aspect-ratio: 207 / 448;
+  position: absolute;
   overflow: hidden;
   border: 10px solid var(--text);
-  border-radius: 48px;
+  border-radius: 52px;
   background: var(--background);
-  box-shadow: 0 34px 80px #000000bb;
+  box-shadow: 0 30px 90px #000000dd;
+}
+
+.phone-primary {
+  z-index: 2;
+  top: 3%;
+  right: 7vw;
+  width: min(29vw, 560px);
   transform: rotate(4deg);
 }
 
-.phone img {
+.phone-secondary {
+  z-index: 1;
+  top: 12%;
+  right: 24vw;
+  width: min(26vw, 500px);
+  transform: rotate(-5deg);
+}
+
+.phone img,
+.mobile-phone img {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .sr-only {
@@ -266,82 +311,87 @@ fieldset input {
 
 @media (max-width: 820px) {
   .page {
-    display: block;
+    min-height: 100svh;
+    overflow: visible;
   }
 
   .content {
-    min-height: auto;
-    padding: 16px 18px 32px;
+    width: 100%;
+    min-height: 100svh;
+    padding: 20px 18px 32px;
   }
 
   .brand {
-    margin-top: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 28px;
   }
 
   .pitch {
     margin: 0;
     padding: 0;
-    transform: none;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .mobile-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) clamp(88px, 27vw, 110px);
+    grid-template-columns: minmax(0, 1fr) clamp(102px, 30vw, 132px);
     align-items: center;
-    gap: 15px;
+    gap: 16px;
   }
 
-  .mobile-hero > div:first-child {
+  .hero-copy {
     min-width: 0;
   }
 
+  .eyebrow {
+    margin-bottom: 12px;
+  }
+
   h1 {
-    margin: 14px 0 0;
-    font-size: clamp(34px, 9.5vw, 39px);
-    letter-spacing: -0.055em;
+    margin: 0;
+    font-size: clamp(46px, 14vw, 66px);
   }
 
   .mobile-phone {
     display: block;
     width: 100%;
-    aspect-ratio: 207 / 448;
     overflow: hidden;
     border: 5px solid var(--text);
-    border-radius: 25px;
+    border-radius: 26px;
     background: var(--background);
     box-shadow: 0 18px 40px #000000aa;
     transform: rotate(3deg);
   }
 
-  .mobile-phone img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
   .summary {
-    margin: 16px 0;
+    margin: 20px 0 24px;
     font-size: 16px;
-    line-height: 1.42;
   }
 
   .primary-fields {
     flex-direction: column;
+    gap: 8px;
   }
 
-  .primary-fields input {
+  .primary-fields input,
+  .primary-fields button {
     width: 100%;
     flex: none;
   }
 
-  .primary-fields button {
-    width: 100%;
-  }
-
   fieldset {
     flex-wrap: wrap;
+  }
+
+  .facts {
+    grid-template-columns: repeat(2, 1fr);
+    margin-top: 12px;
+  }
+
+  .facts div:last-child {
+    display: none;
   }
 
   .product {
