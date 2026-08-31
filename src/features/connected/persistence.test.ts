@@ -85,6 +85,26 @@ describe("connected MMKV repository", () => {
     ])
   })
 
+  it("keeps client-created time as the tie-breaker for equal queue times", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage)
+    const laterClientTime = {
+      ...action("operation-client-time-later", 10),
+      event: { ...action("operation-client-time-later", 10).event, clientCreatedAt: 20 },
+    }
+    const earlierClientTime = {
+      ...action("operation-client-time-earlier", 10),
+      event: { ...action("operation-client-time-earlier", 10).event, clientCreatedAt: 5 },
+    }
+    repository.enqueue(laterClientTime)
+    repository.enqueue(earlierClientTime)
+
+    expect(repository.loadOutbox("game-public").map((item) => item.event.operationId)).toEqual([
+      earlierClientTime.event.operationId,
+      laterClientTime.event.operationId,
+    ])
+  })
+
   it("recovers both torn enqueue write boundaries after process death", () => {
     const storage = new MemoryStorage()
     const orphan = action("operation-orphaned", 1)
