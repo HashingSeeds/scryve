@@ -225,4 +225,3 @@ value into `theme.background`, `frame.variant`, `theme.fontFamily`,
 starts from what they see. The
 current on-disk values are also in `goldie/out/web/store.json` under `design`,
 which is the fastest way to confirm what the studio is showing right now.
-
