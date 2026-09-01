@@ -11,7 +11,7 @@ import type { ThemedStyle } from "@/theme/types"
 const GETTING_STARTED = [
   {
     title: "Start a game",
-    body: "Open Scryve and choose New game from the home screen.",
+    body: "Open Play. Your fresh board uses the defaults saved in Settings.",
   },
   {
     title: "Choose how to play",

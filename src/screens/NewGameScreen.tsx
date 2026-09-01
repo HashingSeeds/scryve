@@ -31,7 +31,7 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { NewPlayerInput } from "@/features/game/types"
+import type { LocalGame, NewPlayerInput } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -68,6 +68,9 @@ export interface NewGameScreenProps {
     setup: { system: PlaySystemId; format: string },
   ) => void
   connected?: ConnectedHostFeed
+  localSubmitText?: string
+  initialGame?: LocalGame
+  confirmLocalSubmit?: boolean
 }
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
@@ -80,27 +83,40 @@ export function NewGameScreen({
   onBack,
   onStartLocal,
   connected,
+  localSubmitText,
+  initialGame,
+  confirmLocalSubmit = false,
 }: NewGameScreenProps) {
   const { themed } = useAppTheme()
   const $footerSafeArea = useSafeAreaInsetsStyle(["bottom"])
-  const [playerCount, setPlayerCount] = useState(defaults.defaultPlayerCount)
-  const [names, setNames] = useState<string[]>(() => Array.from({ length: MAX_SEATS }, () => ""))
+  const [playerCount, setPlayerCount] = useState(
+    initialGame?.players.length ?? defaults.defaultPlayerCount,
+  )
+  const [names, setNames] = useState<string[]>(() =>
+    Array.from({ length: MAX_SEATS }, (_, index) => initialGame?.players[index]?.name ?? ""),
+  )
   const [appearances, setAppearances] = useState<PlayerAppearance[]>(() =>
     Array.from({ length: MAX_SEATS }, (_, index) => ({
-      color: PLAYER_COLORS[index],
-      shape: shapeForSeat(index + 1),
+      color: initialGame?.players[index]?.color ?? PLAYER_COLORS[index],
+      shape: initialGame?.players[index]?.shape ?? shapeForSeat(index + 1),
     })),
   )
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
-  const [system, setSystem] = useState<PlaySystemId>("mtg")
-  const [format, setFormat] = useState(() => playSystemFormat("mtg"))
-  const [lifeText, setLifeText] = useState(String(defaults.defaultStartingLife))
+  const initialSystem = initialGame?.system ?? "mtg"
+  const [system, setSystem] = useState<PlaySystemId>(initialSystem)
+  const [format, setFormat] = useState(() => initialGame?.format ?? playSystemFormat(initialSystem))
+  const [lifeText, setLifeText] = useState(
+    String(initialGame?.startingLife ?? defaults.defaultStartingLife),
+  )
   const counter = playSystemRules(system).counter
   const [showCustomStartingLife, setShowCustomStartingLife] = useState(() =>
-    playSystemRules("mtg").counter.presets.every((life) => life !== defaults.defaultStartingLife),
+    playSystemRules(initialSystem).counter.presets.every(
+      (life) => life !== (initialGame?.startingLife ?? defaults.defaultStartingLife),
+    ),
   )
+  const [confirmingLocalSubmit, setConfirmingLocalSubmit] = useState(false)
   const connectedMode = mode === "connected"
   const startingLife = Number(lifeText)
   const validLife = validateStartingLife(startingLife, system)
@@ -127,6 +143,7 @@ export function NewGameScreen({
     if (!valid || busy) return
     if (connectedMode)
       connected?.host({ playerCount, startingLife, ruleset: format, system, format })
+    else if (confirmLocalSubmit) setConfirmingLocalSubmit(true)
     else onStartLocal(players, startingLife, { system, format })
   }
 
@@ -355,8 +372,8 @@ export function NewGameScreen({
           ) : null}
           <Button
             testID={connectedMode ? "host-connected-button" : "start-game-button"}
-            text={connectedMode ? (busy ? "Creating…" : "Host lobby") : undefined}
-            tx={connectedMode ? undefined : "game:startGame"}
+            text={connectedMode ? (busy ? "Creating…" : "Host lobby") : localSubmitText}
+            tx={connectedMode || localSubmitText ? undefined : "game:startGame"}
             preset="reversed"
             disabled={!valid || busy}
             accessibilityHint={
@@ -392,6 +409,34 @@ export function NewGameScreen({
               preset="reversed"
               style={themed($dialogButton)}
               onPress={saveAppearance}
+            />
+          </View>
+        </DialogCard>
+      ) : null}
+      {confirmingLocalSubmit ? (
+        <DialogCard
+          visible
+          onClose={() => setConfirmingLocalSubmit(false)}
+          dialogTestID="confirm-reset-game-dialog"
+          dialogAccessibilityRole="alert"
+        >
+          <Text preset="subheading" text="Reset this game?" />
+          <Text text="The current board will be replaced with these starting values." />
+          <View style={themed($dialogActions)}>
+            <Button
+              text="Cancel"
+              style={themed($dialogButton)}
+              onPress={() => setConfirmingLocalSubmit(false)}
+            />
+            <Button
+              testID="confirm-reset-game-button"
+              text="Reset game"
+              preset="reversed"
+              style={themed($dialogButton)}
+              onPress={() => {
+                setConfirmingLocalSubmit(false)
+                onStartLocal(players, startingLife, { system, format })
+              }}
             />
           </View>
         </DialogCard>

@@ -55,5 +55,9 @@ export function useLocalGame(
     undo: () => dispatch({ type: "life.undo" }),
     finish: (result?: LocalGameResult) => dispatch({ type: "game.finish", result }),
     abandon: () => dispatch({ type: "game.abandon" }),
+    discard: () => {
+      repository.clearActiveGame()
+      return gameRef.current
+    },
   }
 }

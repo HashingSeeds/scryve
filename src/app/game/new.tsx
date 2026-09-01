@@ -1,12 +1,14 @@
-import { router } from "expo-router"
+import { router, useLocalSearchParams } from "expo-router"
 
-import { createLocalGame } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { ActiveGameGuardScreen } from "@/screens/ActiveGameGuardScreen"
 import { NewGameScreen } from "@/screens/NewGameScreen"
 
 export default function NewLocalGameRoute() {
-  if (localGameRepository.loadActiveGame()) {
+  const { setup } = useLocalSearchParams<{ setup?: string }>()
+  const activeGame = localGameRepository.loadActiveGame()
+  const changingCurrentSetup = setup === "1" && activeGame !== null
+  if (activeGame && !changingCurrentSetup) {
     return (
       <ActiveGameGuardScreen
         onBack={() => router.back()}
@@ -16,14 +18,30 @@ export default function NewLocalGameRoute() {
   }
   return (
     <NewGameScreen
-      defaults={localGameRepository.loadSettings()}
+      defaults={
+        activeGame
+          ? {
+              ...localGameRepository.loadSettings(),
+              defaultPlayerCount: activeGame.players.length,
+              defaultStartingLife: activeGame.startingLife,
+            }
+          : localGameRepository.loadSettings()
+      }
       mode="local"
+      localSubmitText={changingCurrentSetup ? "Apply and reset" : undefined}
+      initialGame={changingCurrentSetup ? activeGame : undefined}
+      confirmLocalSubmit={changingCurrentSetup}
       onModeChange={(mode) => mode === "connected" && router.replace("/connected/new")}
       onBack={() => router.back()}
       onStartLocal={(players, startingLife, setup) => {
-        const game = createLocalGame({ players, startingLife, ...setup })
-        localGameRepository.saveActiveGame(game)
-        router.replace("/game/current")
+        if (changingCurrentSetup) localGameRepository.clearActiveGame()
+        router.replace({
+          pathname: "/",
+          params: {
+            destination: "play",
+            prepared: JSON.stringify({ players, startingLife, ...setup }),
+          },
+        })
       }}
     />
   )

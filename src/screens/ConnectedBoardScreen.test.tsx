@@ -56,7 +56,7 @@ function openConnectedPlayers() {
 
 function openConnectedStatus() {
   openConnectedMenu()
-  fireEvent.press(screen.getByTestId("status-button"))
+  fireEvent.press(screen.getByTestId("setup-button"))
 }
 
 function openConnectedFinish() {
@@ -367,7 +367,7 @@ describe("ConnectedBoardScreen", () => {
     const offline = render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
     expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
-    fireEvent.press(screen.getByTestId("status-button"))
+    fireEvent.press(screen.getByTestId("setup-button"))
     expect(screen.getByText(/Reconnect before finishing/i)).toBeTruthy()
     offline.unmount()
 
@@ -380,7 +380,7 @@ describe("ConnectedBoardScreen", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
     expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
-    fireEvent.press(screen.getByTestId("status-button"))
+    fireEvent.press(screen.getByTestId("setup-button"))
     expect(screen.getByText(/Wait for 1 pending change/i)).toBeTruthy()
     expect(screen.getByText("1 pending")).toBeTruthy()
   })
