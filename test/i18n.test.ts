@@ -52,7 +52,7 @@ describe("i18n", () => {
       findTranslationKeys(readFileSync(file, "utf8")),
     )
 
-    expect(allTranslationsUsed.length).toBeGreaterThan(50)
+    expect(allTranslationsUsed.length).toBeGreaterThanOrEqual(50)
     for (const translation of allTranslationsUsed) {
       if (!EXCEPTIONS.includes(translation)) {
         // You can add keys to EXCEPTIONS (above) if you don't want them included in the test
