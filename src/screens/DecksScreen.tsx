@@ -4,11 +4,11 @@ import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useMutation, useQuery } from "convex/react"
 
-import { AppUtilityMenu } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import type { FilterChip } from "@/components/FilterChips"
 import { FilterChips } from "@/components/FilterChips"
+import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -369,18 +369,7 @@ export function DecksScreen({
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header
-        title="Decks"
-        leftText={hasCurrentGame ? "Return to game" : "Play"}
-        onLeftPress={onPlay ?? onBack}
-        RightActionComponent={
-          <AppUtilityMenu
-            accountLabel={accountLabel}
-            onSettings={onSettings}
-            onAccount={onAccount}
-          />
-        }
-      />
+      <Header title="Decks" />
       <View style={themed($content)}>
         {!unavailableMessage ? (
           <View style={themed($shelfActions)}>
@@ -463,6 +452,13 @@ export function DecksScreen({
           </ConvexQueryBoundary>
         )}
       </View>
+      <FloatingAppNavigation
+        destinationLabel={hasCurrentGame ? "Return to game" : "Play"}
+        accountLabel={accountLabel}
+        onDestination={onPlay ?? onBack ?? (() => undefined)}
+        onSettings={onSettings}
+        onAccount={onAccount}
+      />
       <DialogCard
         visible={filtersOpen}
         onClose={() => setFiltersOpen(false)}
@@ -569,7 +565,9 @@ const $groupHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
   textTransform: "uppercase",
   letterSpacing: 1,
 })
-const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.lg })
+const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingBottom: spacing.xxxl + spacing.lg,
+})
 const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 88,
   flexDirection: "row",

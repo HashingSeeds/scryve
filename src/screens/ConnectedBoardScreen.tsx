@@ -1,15 +1,15 @@
 import { useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View } from "react-native"
+import { ActivityIndicator, ScrollView, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
 import { AlertNote } from "@/components/AlertNote"
-import { AppUtilityMenu } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { ConnectionBadge } from "@/components/ConnectionBadge"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
+import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
   getPlayerGridLayout,
@@ -354,22 +354,13 @@ function ConnectedBoardRuntime({
           onClose={() => setMenuOpen(false)}
         />
         {menuOpen && onDecks && onSettings && onAccount ? (
-          <View pointerEvents="box-none" style={themed($cornerNavigation)}>
-            <Pressable
-              testID="open-decks-button"
-              accessibilityRole="button"
-              accessibilityLabel="Decks"
-              style={themed($cornerButton)}
-              onPress={onDecks}
-            >
-              <Text text="Decks" weight="bold" size="xs" />
-            </Pressable>
-            <AppUtilityMenu
-              accountLabel={accountLabel}
-              onSettings={onSettings}
-              onAccount={onAccount}
-            />
-          </View>
+          <FloatingAppNavigation
+            destinationLabel="Decks"
+            accountLabel={accountLabel}
+            onDestination={onDecks}
+            onSettings={onSettings}
+            onAccount={onAccount}
+          />
         ) : null}
         <ConnectedBoardSyncToast
           connectionStatus={runtime.connectionStatus}
@@ -605,25 +596,6 @@ const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.board.background,
 })
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
-const $cornerNavigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  zIndex: 50,
-  top: spacing.lg,
-  left: spacing.md,
-  right: spacing.md,
-  flexDirection: "row",
-  justifyContent: "space-between",
-})
-const $cornerButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: 92,
-  height: 44,
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 1,
-  borderColor: colors.separator,
-  backgroundColor: colors.background,
-  paddingHorizontal: spacing.sm,
-})
 const $shellGrid: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   width: "100%",

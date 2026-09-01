@@ -20,4 +20,22 @@ describe("AppUtilityMenu", () => {
     fireEvent.press(view.getByTestId("utility-settings-button"))
     expect(onSettings).toHaveBeenCalledTimes(1)
   })
+
+  it("supports the compact bottom-left version used by floating navigation", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          compact
+          placement="bottomLeft"
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("•••")).toBeTruthy()
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    expect(view.getByText("Settings")).toBeTruthy()
+    expect(view.getByText("Account")).toBeTruthy()
+  })
 })

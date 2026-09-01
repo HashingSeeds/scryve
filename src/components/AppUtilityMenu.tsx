@@ -16,11 +16,15 @@ import { Text } from "./Text"
 
 export function AppUtilityMenu({
   visible = true,
+  compact = false,
+  placement = "topRight",
   onSettings,
   onAccount,
   accountLabel = "Account",
 }: {
   visible?: boolean
+  compact?: boolean
+  placement?: "topRight" | "bottomLeft"
   onSettings: () => void
   onAccount: () => void
   accountLabel?: "Account" | "Sign in"
@@ -41,7 +45,7 @@ export function AppUtilityMenu({
   }, [open, progress, reducedMotion])
 
   const containerStyle = useAnimatedStyle(() => ({
-    width: interpolate(progress.value, [0, 1], [92, 188]),
+    width: interpolate(progress.value, [0, 1], [compact ? 48 : 92, compact ? 148 : 188]),
     height: interpolate(progress.value, [0, 1], [44, 108]),
   }))
   const triggerStyle = useAnimatedStyle(() => ({ opacity: progress.value < 0.05 ? 1 : 0 }))
@@ -56,7 +60,7 @@ export function AppUtilityMenu({
   }
 
   return (
-    <View pointerEvents="box-none" style={$slot}>
+    <View pointerEvents="box-none" style={compact ? $compactSlot : $slot}>
       {open ? (
         <Pressable
           testID="utility-menu-backdrop"
@@ -65,7 +69,14 @@ export function AppUtilityMenu({
           onPress={() => setOpen(false)}
         />
       ) : null}
-      <Animated.View testID="utility-menu" style={[themed($menu), containerStyle]}>
+      <Animated.View
+        testID="utility-menu"
+        style={[
+          themed($menu),
+          placement === "bottomLeft" ? $bottomLeft : $topRight,
+          containerStyle,
+        ]}
+      >
         <Animated.View pointerEvents={open ? "none" : "auto"} style={[$fill, triggerStyle]}>
           <Pressable
             testID="utility-menu-button"
@@ -75,7 +86,7 @@ export function AppUtilityMenu({
             style={themed($trigger)}
             onPress={() => setOpen(true)}
           >
-            <Text text="Utility" weight="bold" size="xs" />
+            <Text text={compact ? "•••" : "Utility"} weight="bold" size="xs" />
           </Pressable>
         </Animated.View>
         <Animated.View
@@ -105,6 +116,7 @@ export function AppUtilityMenu({
 }
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
+const $compactSlot: ViewStyle = { width: 48, height: 48, zIndex: 80 }
 const $backdrop: ViewStyle = {
   position: "absolute",
   top: -1000,
@@ -115,13 +127,13 @@ const $backdrop: ViewStyle = {
 const $fill: ViewStyle = { ...StyleSheet.absoluteFill }
 const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
   position: "absolute",
-  right: 0,
-  top: 0,
   overflow: "hidden",
   borderWidth: 1,
   borderColor: colors.separator,
   backgroundColor: colors.background,
 })
+const $topRight: ViewStyle = { right: 0, top: 0 }
+const $bottomLeft: ViewStyle = { bottom: 0, left: 0 }
 const $trigger: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",

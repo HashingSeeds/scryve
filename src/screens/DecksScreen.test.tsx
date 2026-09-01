@@ -104,6 +104,16 @@ describe("DecksScreen", () => {
     mockListMine.error = undefined
   })
 
+  it("puts app navigation at the bottom and returns to the active game", () => {
+    const onPlay = jest.fn()
+    const view = renderShelf({ hasCurrentGame: true, onPlay })
+
+    expect(view.getByText("Return to game")).toBeTruthy()
+    expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Return to game"))
+    expect(onPlay).toHaveBeenCalledTimes(1)
+  })
+
   it("shows dense rows with format, size, versions, and record", () => {
     const onSelect = jest.fn()
     const view = renderShelf({ onSelect })

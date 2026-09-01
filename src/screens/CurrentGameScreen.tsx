@@ -1,12 +1,12 @@
 import { useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { Pressable, useWindowDimensions, View } from "react-native"
+import { useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 
-import { AppUtilityMenu } from "@/components/AppUtilityMenu"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
+import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
   getPlayerGridLayoutOptions,
@@ -224,22 +224,13 @@ export function CurrentGameScreen({
           onClose={closeMenu}
         />
         {menuOpen && onDecks && onSettings && onAccount ? (
-          <View pointerEvents="box-none" style={themed($cornerNavigation)}>
-            <Pressable
-              testID="open-decks-button"
-              accessibilityRole="button"
-              accessibilityLabel="Decks"
-              style={themed($cornerButton)}
-              onPress={onDecks}
-            >
-              <Text text="Decks" weight="bold" size="xs" />
-            </Pressable>
-            <AppUtilityMenu
-              accountLabel={accountLabel}
-              onSettings={onSettings}
-              onAccount={onAccount}
-            />
-          </View>
+          <FloatingAppNavigation
+            destinationLabel="Decks"
+            accountLabel={accountLabel}
+            onDestination={onDecks}
+            onSettings={onSettings}
+            onAccount={onAccount}
+          />
         ) : null}
       </View>
 
@@ -350,25 +341,6 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
-const $cornerNavigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  zIndex: 50,
-  top: spacing.lg,
-  left: spacing.md,
-  right: spacing.md,
-  flexDirection: "row",
-  justifyContent: "space-between",
-})
-const $cornerButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: 92,
-  height: 44,
-  alignItems: "center",
-  justifyContent: "center",
-  borderWidth: 1,
-  borderColor: colors.separator,
-  backgroundColor: colors.background,
-  paddingHorizontal: spacing.sm,
-})
 const $layoutOptions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
