@@ -17,11 +17,7 @@ import {
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import {
-  incomingCommanderDamage,
-  isEliminatedByCommanderDamage,
-  MAX_COMMANDER_DAMAGE,
-} from "@/features/game/domain"
+import { incomingCommanderDamage, isEliminatedByCommanderDamage } from "@/features/game/domain"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
 import {
   counterValueLabel,
@@ -64,43 +60,16 @@ export function CurrentGameScreen({
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
-  const [armed, setArmed] = useState<{
-    playerId: PlayerId
-    staged: Partial<Record<PlayerId, number>>
-  } | null>(null)
+  const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
 
-  function sendStagedCommanderDamage() {
-    if (!armed) return
-    for (const [toPlayerId, amount] of Object.entries(armed.staged)) {
-      if (!amount) continue
-      runtime.assignCommanderDamage(armed.playerId, toPlayerId as PlayerId, amount)
-    }
-    setArmed(null)
-  }
-
   function toggleSword(player: GamePlayer) {
-    if (armed?.playerId === player.id) {
-      sendStagedCommanderDamage()
-      return
-    }
-    setArmed({ playerId: player.id, staged: {} })
+    setArmedPlayerId((current) => (current === player.id ? null : player.id))
   }
 
-  function stageCommanderDamage(target: GamePlayer, step: number) {
-    setArmed((current) => {
-      if (!current || current.playerId === target.id) return current
-      const currentIncoming =
-        incomingCommanderDamage(runtime.game, target.id)[current.playerId] ?? 0
-      const next = Math.max(
-        -currentIncoming,
-        Math.min(MAX_COMMANDER_DAMAGE - currentIncoming, (current.staged[target.id] ?? 0) + step),
-      )
-      const staged = { ...current.staged }
-      if (next === 0) delete staged[target.id]
-      else staged[target.id] = next
-      return { ...current, staged }
-    })
+  function assignCommanderDamage(target: GamePlayer, step: number) {
+    if (!armedPlayerId || armedPlayerId === target.id) return
+    runtime.assignCommanderDamage(armedPlayerId, target.id, step)
   }
 
   function captureMenuDialogOrigin(event?: GestureResponderEvent) {
@@ -229,15 +198,9 @@ export function CurrentGameScreen({
             commanderDamageEnabled
               ? {
                   incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
-                  armedPlayerId: armed?.playerId ?? null,
-                  stagedFor: (player) => armed?.staged[player.id] ?? 0,
-                  stagedTargets: armed
-                    ? Object.values(armed.staged).filter((amount) => amount).length
-                    : 0,
+                  armedPlayerId,
                   onPressSword: toggleSword,
-                  onStage: stageCommanderDamage,
-                  onSend: sendStagedCommanderDamage,
-                  onCancel: () => setArmed(null),
+                  onStage: assignCommanderDamage,
                 }
               : undefined
           }
@@ -251,7 +214,7 @@ export function CurrentGameScreen({
           variant={menuButtonStyle}
           seatColors={runtime.game.players.map((player) => player.color)}
           onToggle={() => {
-            setArmed(null)
+            setArmedPlayerId(null)
             setMenuOpen((current) => !current)
           }}
           onClose={closeMenu}

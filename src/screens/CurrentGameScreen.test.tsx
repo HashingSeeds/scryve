@@ -415,11 +415,9 @@ describe("CurrentGameScreen", () => {
       fireEvent.press(view.getByTestId("commander-sword-seat-3"))
       expect(view.queryByTestId("commander-stage-seat-3-1")).toBeNull()
       expect(view.getByTestId("commander-stage-seat-1-1")).toBeTruthy()
-      expect(view.getByTestId("commander-send-seat-3")).toBeTruthy()
-      expect(view.queryByTestId("commander-send-seat-1")).toBeNull()
     })
 
-    it("stages several targets and sends them in one press", () => {
+    it("applies each press straight to the counter and the life total", () => {
       const view = renderGame()
       fireEvent.press(view.getByTestId("commander-sword-seat-1"))
       for (let press = 0; press < 7; press += 1)
@@ -427,17 +425,21 @@ describe("CurrentGameScreen", () => {
       for (let press = 0; press < 3; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-3-1"))
 
-      expect(view.getByTestId("commander-send-seat-1")).toBeTruthy()
-      fireEvent.press(view.getByTestId("commander-send-seat-1"))
-
       expect(life(view, 2)).toBe("33")
       expect(life(view, 3)).toBe("37")
       expect(life(view, 4)).toBe("40")
       expect(life(view, 1)).toBe("40")
-      expect(view.queryByTestId("commander-stage-seat-2-1")).toBeNull()
     })
 
-    it("sends by pressing the armed sword again", () => {
+    it("offers no send or cancel bar with nobody to confirm to", () => {
+      const view = renderGame()
+      fireEvent.press(view.getByTestId("commander-sword-seat-1"))
+      fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+      expect(view.queryByTestId("commander-send-seat-1")).toBeNull()
+      expect(view.queryByTestId("commander-cancel-seat-1")).toBeNull()
+    })
+
+    it("disarms by pressing the armed sword again", () => {
       const view = renderGame()
       fireEvent.press(view.getByTestId("commander-sword-seat-2"))
       for (let press = 0; press < 4; press += 1)
@@ -447,7 +449,7 @@ describe("CurrentGameScreen", () => {
       expect(view.queryByTestId("commander-stage-seat-1-1")).toBeNull()
     })
 
-    it("stages commander damage reductions down to the recorded total", () => {
+    it("gives life back on the way down and stops at the recorded total", () => {
       const initial = commanderGame()
       initial.commanderDamage = {
         [commanderDamageKey(initial.players[0].id, initial.players[1].id)]: 7,
@@ -459,18 +461,7 @@ describe("CurrentGameScreen", () => {
       for (let press = 0; press < 8; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2--1"))
 
-      expect(view.getAllByText("0").length).toBeGreaterThan(0)
-      fireEvent.press(view.getByTestId("commander-send-seat-1"))
       expect(life(view, 2)).toBe("40")
-    })
-
-    it("drops the staged set on cancel without touching any life total", () => {
-      const view = renderGame()
-      fireEvent.press(view.getByTestId("commander-sword-seat-1"))
-      fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
-      fireEvent.press(view.getByTestId("commander-cancel-seat-1"))
-      expect(life(view, 2)).toBe("40")
-      expect(view.queryByTestId("commander-stage-seat-2-1")).toBeNull()
     })
 
     it("marks 21 from one commander as eliminated and leaves the game running", () => {
@@ -478,7 +469,6 @@ describe("CurrentGameScreen", () => {
       fireEvent.press(view.getByTestId("commander-sword-seat-1"))
       for (let press = 0; press < 21; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
-      fireEvent.press(view.getByTestId("commander-send-seat-1"))
 
       expect(view.getByTestId("life-eliminated-seat-2")).toBeTruthy()
       expect(view.queryByTestId("life-eliminated-seat-3")).toBeNull()
@@ -487,17 +477,16 @@ describe("CurrentGameScreen", () => {
       expect(life(view, 2)).toBe("19")
     })
 
-    it("undoes a sent assignment as one action", () => {
+    it("undoes one assignment press as a single action", () => {
       const view = renderGame()
       fireEvent.press(view.getByTestId("commander-sword-seat-1"))
       for (let press = 0; press < 5; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
-      fireEvent.press(view.getByTestId("commander-send-seat-1"))
       expect(life(view, 2)).toBe("35")
 
       fireEvent.press(view.getByTestId("game-menu-button"))
       fireEvent.press(view.getByTestId("undo-button"))
-      expect(life(view, 2)).toBe("40")
+      expect(life(view, 2)).toBe("36")
     })
   })
 })

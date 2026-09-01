@@ -20,13 +20,20 @@ import {
 export interface CommanderDamageGridBinding {
   incomingFor: (player: GamePlayer) => Record<PlayerId, number>
   armedPlayerId: PlayerId | null
-  stagedFor: (player: GamePlayer) => number
-  stagedTargets: number
+  /**
+   * Only set when assignment and confirmation live on separate devices. Local
+   * play has nobody to confirm to, so each step applies as it is pressed and
+   * there is nothing to stage or send.
+   */
+  staging?: {
+    stagedFor: (player: GamePlayer) => number
+    stagedTargets: number
+    onSend: () => void
+    onCancel: () => void
+  }
   pendingFor?: (player: GamePlayer) => LifeCardCommanderDamage["pendingClaims"]
   onPressSword: (player: GamePlayer) => void
   onStage: (player: GamePlayer, step: number) => void
-  onSend: () => void
-  onCancel: () => void
 }
 
 export interface PlayerGridProps {
@@ -170,16 +177,16 @@ export function PlayerGrid({
                           columns: boardSeats.columns,
                           incoming: commanderDamage.incomingFor(player),
                           armedPlayerId: commanderDamage.armedPlayerId,
-                          stagedAgainstOwner: commanderDamage.stagedFor(player),
+                          stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
                           pendingClaims: commanderDamage.pendingFor?.(player),
                           onPressSword: () => commanderDamage.onPressSword(player),
                           onStage: (step) => commanderDamage.onStage(player, step),
-                          ...(commanderDamage.armedPlayerId === player.id
+                          ...(commanderDamage.staging && commanderDamage.armedPlayerId === player.id
                             ? {
                                 armBar: {
-                                  stagedTargets: commanderDamage.stagedTargets,
-                                  onSend: commanderDamage.onSend,
-                                  onCancel: commanderDamage.onCancel,
+                                  stagedTargets: commanderDamage.staging.stagedTargets,
+                                  onSend: commanderDamage.staging.onSend,
+                                  onCancel: commanderDamage.staging.onCancel,
                                 },
                               }
                             : {}),

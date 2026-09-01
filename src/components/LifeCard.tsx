@@ -38,7 +38,7 @@ export type { LifeCardContentRotation } from "./playerCardTypes"
 
 export type LifeCardCommanderDamage = Omit<
   CommanderDamageBoardProps,
-  "contentRotation" | "compact" | "foreground" | "seatNumber"
+  "contentRotation" | "compact" | "foreground" | "seatNumber" | "armedAction"
 > & {
   armBar?: { stagedTargets: number; onSend: () => void; onCancel: () => void }
   /**
@@ -328,6 +328,7 @@ export function LifeCard({
                 <CommanderDamageBoard
                   {...commanderDamage}
                   seatNumber={seatNumber}
+                  armedAction={commanderDamage.armBar ? "send" : "done"}
                   contentRotation={contentRotation}
                   compact={compact}
                   foreground={foreground}

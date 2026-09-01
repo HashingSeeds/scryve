@@ -28,6 +28,7 @@ export interface CommanderDamageBoardProps {
   contentRotation: LifeCardContentRotation
   incoming: Record<PlayerId, number>
   armedPlayerId?: PlayerId | null
+  armedAction?: "send" | "done"
   stagedAgainstOwner?: number
   /** Space the card reserved for the board, already mapped onto the board's own axes. */
   maxSize?: { width: number; height: number }
@@ -63,6 +64,7 @@ export function CommanderDamageBoard({
   contentRotation,
   incoming,
   armedPlayerId,
+  armedAction = "done",
   stagedAgainstOwner = 0,
   maxSize,
   compact,
@@ -82,7 +84,7 @@ export function CommanderDamageBoard({
     maxSize,
   })
   const armed = armedPlayerId === ownerPlayerId
-  const staging = Boolean(armedPlayerId) && armedPlayerId !== ownerPlayerId
+  const targetable = Boolean(armedPlayerId) && armedPlayerId !== ownerPlayerId
 
   return (
     <View
@@ -103,9 +105,11 @@ export function CommanderDamageBoard({
                   accessibilityRole="button"
                   accessibilityState={{ selected: armed }}
                   accessibilityLabel={
-                    armed
-                      ? `Send commander damage from seat ${seatNumber}`
-                      : `Assign commander damage from seat ${seatNumber}`
+                    !armed
+                      ? `Assign commander damage from seat ${seatNumber}`
+                      : armedAction === "send"
+                        ? `Send commander damage from seat ${seatNumber}`
+                        : `Done assigning commander damage from seat ${seatNumber}`
                   }
                   onPress={onPressSword}
                   hitSlop={7}
@@ -120,7 +124,7 @@ export function CommanderDamageBoard({
               )
 
             const total = incoming[playerId] ?? 0
-            const attacker = staging && playerId === armedPlayerId
+            const attacker = targetable && playerId === armedPlayerId
             const staged = attacker ? stagedAgainstOwner : 0
             const projected = total + staged
             const lethal = projected >= COMMANDER_LETHAL_DAMAGE

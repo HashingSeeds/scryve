@@ -401,10 +401,14 @@ function ConnectedBoardRuntime({
               ? {
                   incomingFor: incomingCommanderDamage,
                   armedPlayerId: armedCommander?.playerId ?? null,
-                  stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
-                  stagedTargets: armedCommander
-                    ? Object.values(armedCommander.staged).filter((delta) => delta !== 0).length
-                    : 0,
+                  staging: {
+                    stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
+                    stagedTargets: armedCommander
+                      ? Object.values(armedCommander.staged).filter((delta) => delta !== 0).length
+                      : 0,
+                    onSend: sendCommanderDamage,
+                    onCancel: () => setArmedCommander(null),
+                  },
                   pendingFor: (player) =>
                     (game.commanderDamage?.pendingClaims ?? [])
                       .filter((claim) => claim.toPlayerId === player.id)
@@ -417,8 +421,6 @@ function ConnectedBoardRuntime({
                       })),
                   onPressSword: toggleCommanderSword,
                   onStage: stageCommanderDamage,
-                  onSend: sendCommanderDamage,
-                  onCancel: () => setArmedCommander(null),
                 }
               : undefined
           }
