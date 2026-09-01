@@ -18,6 +18,7 @@ export interface LifeControlsProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   system?: PlaySystemId
+  recentDelta?: number
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1, amount?: number) => void
   style?: StyleProp<ViewStyle>
@@ -48,6 +49,7 @@ export function LifeControls({
   compact,
   contentRotation = 0,
   system = "mtg",
+  recentDelta = 0,
   onChange,
   onLongChange,
   style,
@@ -81,6 +83,12 @@ export function LifeControls({
       >
         {HALF_CARD_ZONES.map(({ direction, glyph, edge }) => {
           const delta = direction * counter.tapStep
+          const feedback =
+            direction * recentDelta > 0
+              ? recentDelta > 0
+                ? `+${recentDelta}`
+                : `-${Math.abs(recentDelta)}`
+              : glyph
           return (
             <Pressable
               key={delta}
@@ -132,7 +140,7 @@ export function LifeControls({
               }}
             >
               <Text
-                text={glyph}
+                text={feedback}
                 maxFontSizeMultiplier={1.3}
                 numberOfLines={1}
                 style={[

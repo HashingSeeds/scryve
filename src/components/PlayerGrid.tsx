@@ -7,7 +7,8 @@ import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { LifeCard } from "./LifeCard"
+import { commanderBoardSeats } from "./commanderDamageLayout"
+import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
 import {
   COMPACT_LIFE_TARGET_SIZE,
   getLifeFontSizeThatFits,
@@ -15,6 +16,18 @@ import {
   LIFE_TARGET_SIZE,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
+
+export interface CommanderDamageGridBinding {
+  incomingFor: (player: GamePlayer) => Record<PlayerId, number>
+  armedPlayerId: PlayerId | null
+  stagedFor: (player: GamePlayer) => number
+  stagedTargets: number
+  pendingFor?: (player: GamePlayer) => LifeCardCommanderDamage["pendingClaims"]
+  onPressSword: (player: GamePlayer) => void
+  onStage: (player: GamePlayer, step: number) => void
+  onSend: () => void
+  onCancel: () => void
+}
 
 export interface PlayerGridProps {
   players: GamePlayer[]
@@ -24,6 +37,8 @@ export interface PlayerGridProps {
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
   getPendingCount?: (player: GamePlayer) => number
+  isPlayerEliminated?: (player: GamePlayer) => boolean
+  commanderDamage?: CommanderDamageGridBinding
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -38,6 +53,8 @@ export function PlayerGrid({
   isPlayerDisabled,
   isPlayerOwned,
   getPendingCount,
+  isPlayerEliminated,
+  commanderDamage,
   onChange,
   style,
 }: PlayerGridProps) {
@@ -72,6 +89,12 @@ export function PlayerGrid({
   }
 
   const rows = getPlayerGridRows(players.length, layout)
+  const boardSeats = commanderDamage
+    ? commanderBoardSeats(
+        rows,
+        players.map(({ id }) => id),
+      )
+    : null
 
   return (
     <View
@@ -137,6 +160,32 @@ export function PlayerGrid({
                   disabled={disabled || playerDisabled}
                   ownership={ownership}
                   pendingCount={getPendingCount?.(player)}
+                  eliminated={isPlayerEliminated?.(player)}
+                  commanderDamage={
+                    commanderDamage && boardSeats
+                      ? {
+                          ownerPlayerId: player.id,
+                          seats: boardSeats.seats,
+                          rows: boardSeats.rows,
+                          columns: boardSeats.columns,
+                          incoming: commanderDamage.incomingFor(player),
+                          armedPlayerId: commanderDamage.armedPlayerId,
+                          stagedAgainstOwner: commanderDamage.stagedFor(player),
+                          pendingClaims: commanderDamage.pendingFor?.(player),
+                          onPressSword: () => commanderDamage.onPressSword(player),
+                          onStage: (step) => commanderDamage.onStage(player, step),
+                          ...(commanderDamage.armedPlayerId === player.id
+                            ? {
+                                armBar: {
+                                  stagedTargets: commanderDamage.stagedTargets,
+                                  onSend: commanderDamage.onSend,
+                                  onCancel: commanderDamage.onCancel,
+                                },
+                              }
+                            : {}),
+                        }
+                      : undefined
+                  }
                   onChange={(delta) => onChange(player.id, delta)}
                   style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
                 />

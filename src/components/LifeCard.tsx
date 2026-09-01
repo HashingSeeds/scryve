@@ -10,6 +10,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
 import { Button } from "./Button"
+import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import { DialogCard, $dialogActions, $dialogButton } from "./DialogCard"
 import { LifeControls, overlayTint } from "./LifeControls"
 import {
@@ -29,9 +30,29 @@ import { TextField } from "./TextField"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
 const DELTA_VISIBLE_MS = 1800
+// Room reserved for the "N pending" status label between the life number and the commander board
+const STATUS_LABEL_SPACE = 18
 type LifeEditMode = "add" | "subtract" | "set"
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
+
+export type LifeCardCommanderDamage = Omit<
+  CommanderDamageBoardProps,
+  "contentRotation" | "compact" | "foreground" | "seatNumber"
+> & {
+  armBar?: { stagedTargets: number; onSend: () => void; onCancel: () => void }
+  /**
+   * Claims awaiting this seat's decision, shown as bubbles under the board so the
+   * life total stays visible while the defender decides.
+   */
+  pendingClaims?: readonly {
+    claimId: string
+    attackerName: string
+    delta: number
+    onConfirm: () => void
+    onDecline: () => void
+  }[]
+}
 
 export interface LifeCardProps {
   playerName: string
@@ -46,6 +67,8 @@ export interface LifeCardProps {
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
   pendingCount?: number
+  commanderDamage?: LifeCardCommanderDamage
+  eliminated?: boolean
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -63,6 +86,8 @@ export function LifeCard({
   disabled,
   ownership,
   pendingCount = 0,
+  commanderDamage,
+  eliminated,
   onChange,
   style,
 }: LifeCardProps) {
@@ -71,6 +96,7 @@ export function LifeCard({
     theme: { spacing },
   } = useAppTheme()
   const foreground = accessibleForeground(color)
+  const frozen = disabled || eliminated
   const counter = playSystemRules(system).counter
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
@@ -132,6 +158,22 @@ export function LifeCard({
           ? "Controls unavailable"
           : undefined
   const statusLabel = pendingCount ? `${pendingCount} pending` : ""
+  // Overlays hang below the life target instead of a fixed pixel offset, so they
+  // hug the life number on small cards (5-6 player grids).
+  const statusTopOffset = lifeTargetRadius + (compact ? spacing.xxxs : spacing.xxs)
+  const commanderTopOffset = statusTopOffset + (statusLabel ? STATUS_LABEL_SPACE + spacing.xxs : 0)
+  // The board lives in the rotated layer, so on quarter turns its width axis maps
+  // to the card's height axis.
+  const quarterTurn = contentRotation === 90 || contentRotation === -90
+  const boardAxis = quarterTurn ? cardSize.width : cardSize.height
+  const boardCrossAxis = quarterTurn ? cardSize.height : cardSize.width
+  const commanderMaxSize =
+    cardSize.width > 0
+      ? {
+          width: boardCrossAxis - cardPadding * 2,
+          height: boardAxis / 2 - cardPadding - commanderTopOffset,
+        }
+      : undefined
   const parsedValue = Number(editValue)
   const isWholeNumber = editValue.trim() !== "" && Number.isInteger(parsedValue)
   const requestedDelta =
@@ -174,7 +216,9 @@ export function LifeCard({
   return (
     <View
       testID={`life-card-seat-${seatNumber}`}
-      accessibilityLabel={`${identity}${ownershipLabel ? `, ${ownershipLabel}` : ""}`}
+      accessibilityLabel={`${identity}${ownershipLabel ? `, ${ownershipLabel}` : ""}${
+        eliminated ? ", eliminated by commander damage" : ""
+      }`}
       onLayout={measureCard}
       style={[
         themed($card),
@@ -199,18 +243,31 @@ export function LifeCard({
           pointerEvents="box-none"
           style={themed($readout)}
         >
+          {eliminated ? (
+            <View
+              testID={`life-eliminated-seat-${seatNumber}`}
+              pointerEvents="none"
+              style={themed($eliminated)}
+            >
+              <Text
+                text="✕"
+                style={[themed($eliminatedMark), { color: foreground }]}
+                maxFontSizeMultiplier={1}
+              />
+            </View>
+          ) : null}
           <Pressable
             testID={`life-total-button-seat-${seatNumber}`}
-            disabled={disabled}
+            disabled={frozen}
             accessibilityRole="button"
-            accessibilityState={{ disabled: !!disabled }}
+            accessibilityState={{ disabled: !!frozen }}
             accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
             accessibilityHint={`Long press to set ${counter.label} to a new number`}
             delayLongPress={450}
             onLongPress={() => openEditor("set")}
             style={({ pressed }) => [
               themed(compact ? $compactLifeButton : $lifeButton),
-              pressed && !disabled && { backgroundColor: overlayTint(foreground, 0.14) },
+              pressed && !frozen && { backgroundColor: overlayTint(foreground, 0.14) },
             ]}
           >
             <Text
@@ -232,29 +289,19 @@ export function LifeCard({
               ]}
             />
           </Pressable>
-          <View
-            testID={`life-status-layer-seat-${seatNumber}`}
-            pointerEvents="none"
-            style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
-          >
+          {statusLabel ? (
             <View
-              testID={`life-status-seat-${seatNumber}`}
-              style={themed(compact ? $compactStatusPosition : $statusPosition)}
+              testID={`life-status-layer-seat-${seatNumber}`}
+              pointerEvents="none"
+              style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
             >
-              <Text
-                testID={`life-delta-seat-${seatNumber}`}
-                text={recentDelta > 0 ? `+${recentDelta}` : String(recentDelta)}
-                weight="bold"
-                size="xs"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.3}
+              <View
+                testID={`life-status-seat-${seatNumber}`}
                 style={[
-                  themed($delta),
-                  recentDelta === 0 ? themed($deltaIdle) : themed($deltaActive),
-                  { color: foreground, backgroundColor: overlayTint(foreground, 0.16) },
+                  themed(compact ? $compactStatusPosition : $statusPosition),
+                  { marginTop: statusTopOffset },
                 ]}
-              />
-              {statusLabel ? (
+              >
                 <Text
                   text={statusLabel}
                   weight="bold"
@@ -263,19 +310,147 @@ export function LifeCard({
                   numberOfLines={1}
                   style={[themed($status), { color: foreground }]}
                 />
-              ) : null}
+              </View>
             </View>
-          </View>
+          ) : null}
+          {commanderDamage ? (
+            <View
+              pointerEvents="box-none"
+              style={[
+                themed($commanderLayer),
+                { transform: [{ rotate: `${contentRotation}deg` }] },
+              ]}
+            >
+              <View
+                pointerEvents="box-none"
+                style={[themed($commanderPosition), { marginTop: commanderTopOffset }]}
+              >
+                <CommanderDamageBoard
+                  {...commanderDamage}
+                  seatNumber={seatNumber}
+                  contentRotation={contentRotation}
+                  compact={compact}
+                  foreground={foreground}
+                  maxSize={commanderMaxSize}
+                />
+                {(commanderDamage.pendingClaims ?? []).map((claim) => (
+                  <View
+                    key={claim.claimId}
+                    testID={`commander-claim-seat-${seatNumber}-${claim.claimId}`}
+                    style={[
+                      themed($claimBubble),
+                      {
+                        borderColor: overlayTint(foreground, 0.5),
+                        backgroundColor: overlayTint(foreground, 0.16),
+                      },
+                    ]}
+                  >
+                    <Text
+                      text={`${claim.attackerName} dealt ${Math.abs(claim.delta)}`}
+                      size="xxs"
+                      weight="medium"
+                      numberOfLines={1}
+                      style={[themed($claimLabel), { color: foreground }]}
+                    />
+                    <View style={themed($claimActions)}>
+                      <Pressable
+                        testID={`commander-decline-seat-${seatNumber}-${claim.claimId}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Decline ${Math.abs(claim.delta)} commander damage from ${claim.attackerName}`}
+                        onPress={claim.onDecline}
+                        hitSlop={8}
+                        style={[
+                          themed($claimButton),
+                          { borderColor: overlayTint(foreground, 0.4) },
+                        ]}
+                      >
+                        <Text
+                          text="Decline"
+                          size="xxs"
+                          weight="bold"
+                          style={{ color: foreground }}
+                        />
+                      </Pressable>
+                      <Pressable
+                        testID={`commander-confirm-seat-${seatNumber}-${claim.claimId}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Confirm ${Math.abs(claim.delta)} commander damage from ${claim.attackerName}`}
+                        onPress={claim.onConfirm}
+                        hitSlop={8}
+                        style={[
+                          themed($claimButton),
+                          {
+                            borderColor: overlayTint(foreground, 0.6),
+                            backgroundColor: overlayTint(foreground, 0.32),
+                          },
+                        ]}
+                      >
+                        <Text
+                          text="Confirm"
+                          size="xxs"
+                          weight="bold"
+                          style={{ color: foreground }}
+                        />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+                {commanderDamage.armBar ? (
+                  <View style={themed($armBar)}>
+                    <Pressable
+                      testID={`commander-cancel-seat-${seatNumber}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Cancel commander damage from seat ${seatNumber}`}
+                      onPress={commanderDamage.armBar.onCancel}
+                      style={[themed($armButton), { borderColor: overlayTint(foreground, 0.4) }]}
+                    >
+                      <Text text="Cancel" size="xxs" weight="bold" style={{ color: foreground }} />
+                    </Pressable>
+                    <Pressable
+                      testID={`commander-send-seat-${seatNumber}`}
+                      accessibilityRole="button"
+                      disabled={commanderDamage.armBar.stagedTargets === 0}
+                      accessibilityState={{
+                        disabled: commanderDamage.armBar.stagedTargets === 0,
+                      }}
+                      accessibilityLabel={`Send commander damage from seat ${seatNumber}`}
+                      onPress={commanderDamage.armBar.onSend}
+                      style={[
+                        themed($armButton),
+                        {
+                          borderColor: overlayTint(foreground, 0.4),
+                          backgroundColor: overlayTint(foreground, 0.24),
+                        },
+                        commanderDamage.armBar.stagedTargets === 0 && themed($armButtonIdle),
+                      ]}
+                    >
+                      <Text
+                        text={
+                          commanderDamage.armBar.stagedTargets > 1
+                            ? `Send ${commanderDamage.armBar.stagedTargets}`
+                            : "Send"
+                        }
+                        size="xxs"
+                        weight="bold"
+                        style={{ color: foreground }}
+                      />
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
       <LifeControls
         playerName={displayName}
         seatNumber={seatNumber}
-        disabled={disabled}
+        disabled={frozen}
         contrastCheckedForeground={foreground}
         compact={compact}
         contentRotation={contentRotation}
         system={system}
+        recentDelta={recentDelta}
         onChange={onChange}
         onLongChange={(direction, amount) => {
           if (amount) onChange(direction * amount)
@@ -420,15 +595,6 @@ const $compactLifeButton: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
-const $delta: ThemedStyle<TextStyle> = ({ spacing }) => ({
-  paddingHorizontal: spacing.xs,
-  paddingVertical: spacing.xxxs,
-  borderRadius: spacing.sm,
-  overflow: "hidden",
-  textAlign: "center",
-  fontVariant: ["tabular-nums"],
-})
-
 const $statusLayer: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFill,
   alignItems: "center",
@@ -452,8 +618,72 @@ const $compactStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,
 })
 
-const $deltaIdle: ThemedStyle<TextStyle> = () => ({ opacity: 0, display: "none" })
-const $deltaActive: ThemedStyle<TextStyle> = () => ({ opacity: 1 })
+const $commanderLayer: ThemedStyle<ViewStyle> = () => ({
+  ...StyleSheet.absoluteFill,
+  alignItems: "center",
+})
+
+const $commanderPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  top: "50%",
+  marginTop: 58 + spacing.lg,
+  alignItems: "center",
+  gap: spacing.xxs,
+})
+
+const $claimBubble: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "center",
+  gap: spacing.xxs,
+  paddingHorizontal: spacing.xs,
+  paddingVertical: spacing.xxs,
+  borderWidth: 1,
+  borderRadius: spacing.sm,
+})
+
+const $claimLabel: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
+
+const $claimActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.xxs,
+  alignItems: "center",
+})
+
+const $claimButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minWidth: 66,
+  alignItems: "center",
+  paddingHorizontal: spacing.xs,
+  paddingVertical: spacing.xxs,
+  borderWidth: 1,
+  borderRadius: spacing.xs,
+})
+
+const $armBar: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.xxs,
+  alignItems: "center",
+})
+
+const $armButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingHorizontal: spacing.xs,
+  paddingVertical: spacing.xxxs,
+  borderWidth: 1,
+  borderRadius: spacing.xs,
+})
+
+const $armButtonIdle: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
+
+const $eliminated: ThemedStyle<ViewStyle> = () => ({
+  ...StyleSheet.absoluteFill,
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 3,
+})
+
+const $eliminatedMark: ThemedStyle<TextStyle> = () => ({
+  fontSize: 176,
+  lineHeight: 184,
+  opacity: 0.22,
+})
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })

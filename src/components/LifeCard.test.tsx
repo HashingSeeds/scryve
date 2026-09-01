@@ -4,6 +4,7 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import { ThemeProvider } from "@/theme/context"
 
 import { getPlayerMarkPlacement, LifeCard } from "./LifeCard"
+import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
 
 function card(life: number) {
@@ -24,12 +25,6 @@ function interactiveCard(life: number, onChange: jest.Mock) {
 
 const renderCard = (life: number) => render(card(life))
 
-function deltaOpacity(view: ReturnType<typeof renderCard>) {
-  return StyleSheet.flatten(
-    view.getByTestId("life-delta-seat-1", { includeHiddenElements: true }).props.style,
-  ).opacity
-}
-
 describe("LifeCard", () => {
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => jest.useRealTimers())
@@ -48,9 +43,11 @@ describe("LifeCard", () => {
     expect(sixDigits.fontSize * 6 * 0.62).toBeLessThanOrEqual(LIFE_TARGET_SIZE)
   })
 
-  it("hides the delta chip until a life change happens", () => {
+  it("keeps life controls unchanged until a life change happens", () => {
     const view = renderCard(20)
-    expect(deltaOpacity(view)).toBe(0)
+    expect(view.getByText("+")).toBeTruthy()
+    expect(view.getByText("−")).toBeTruthy()
+    expect(view.queryByTestId("life-delta-seat-1")).toBeNull()
   })
 
   it("uses a visual player mark while keeping the name available to assistive technology", () => {
@@ -157,20 +154,22 @@ describe("LifeCard", () => {
     })
   })
 
-  it("sums a run of changes into one signed delta chip", () => {
+  it("temporarily moves positive feedback into the plus control", () => {
     const view = renderCard(20)
     view.rerender(card(21))
     view.rerender(card(22))
-    expect(view.getByTestId("life-delta-seat-1").props.children).toBe("+2")
-    expect(deltaOpacity(view)).toBe(1)
+    expect(view.getByText("+2")).toBeTruthy()
+    expect(view.getByText("−")).toBeTruthy()
+    expect(view.queryByTestId("life-delta-seat-1")).toBeNull()
   })
 
-  it("shows losses as a negative delta and clears the chip after the window", () => {
+  it("temporarily moves negative feedback into the minus control", () => {
     const view = renderCard(20)
     view.rerender(card(15))
-    expect(view.getByTestId("life-delta-seat-1").props.children).toBe("-5")
+    expect(view.getByText("-5")).toBeTruthy()
+    expect(view.getByText("+")).toBeTruthy()
     act(() => jest.advanceTimersByTime(2000))
-    expect(deltaOpacity(view)).toBe(0)
+    expect(view.getByText("−")).toBeTruthy()
   })
 
   it("uses a circular life target to set a new total", () => {
@@ -193,9 +192,6 @@ describe("LifeCard", () => {
       justifyContent: "center",
     })
     expect(view.getByTestId("life-total-seat-1").props.adjustsFontSizeToFit).toBeUndefined()
-    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style).position).toBe(
-      "absolute",
-    )
     fireEvent(target, "longPress")
     fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "37")
     fireEvent.press(view.getByTestId("life-editor-apply-seat-1"))
@@ -229,5 +225,34 @@ describe("LifeCard", () => {
       true,
     )
     expect(view.getByText("Enter a whole number from 1 to 999999.")).toBeTruthy()
+  })
+
+  it("mounts no commander board unless the game asks for one", () => {
+    const view = renderCard(40)
+    expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
+    expect(view.queryByTestId("life-eliminated-seat-1")).toBeNull()
+  })
+
+  it("freezes an eliminated card without ending the game", () => {
+    const onChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={13}
+          color="#41476E"
+          eliminated
+          onChange={onChange}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByTestId("life-eliminated-seat-1")).toBeTruthy()
+    act(() => {
+      fireEvent.press(view.getByTestId(lifeControlTestId(1, -1)))
+      fireEvent.press(view.getByTestId(lifeControlTestId(1, 1)))
+    })
+    expect(onChange).not.toHaveBeenCalled()
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("13")
   })
 })
