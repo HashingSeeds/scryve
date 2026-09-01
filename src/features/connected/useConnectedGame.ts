@@ -7,6 +7,7 @@ import type { ConnectionStatus } from "@/components/ConnectionBadge"
 import { asDeviceId } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { LifeDelta } from "@/features/game/types"
+import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 
 import type {
   ConnectedCommanderDamageChange,
@@ -54,6 +55,13 @@ export type ConnectedGameRuntime = ConnectedGameRuntimeBase &
 
 type LobbyProjection = FunctionReturnType<typeof api.games.lobbyProjection>
 type OptimisticLobbyProjection = LobbyProjection & { __optimisticOperationIds?: string[] }
+
+function acknowledgementForQueuedResolution(
+  claimAcknowledgement: OutboxAcknowledgement,
+  queuedResolutionOperationId: string,
+): OutboxAcknowledgement {
+  return { ...claimAcknowledgement, operationId: queuedResolutionOperationId }
+}
 
 export function connectedLifeOptimisticUpdater(
   store: OptimisticLocalStore,
@@ -160,7 +168,9 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
             operationId: event.claimOperationId,
             deviceId: event.deviceId,
             clientCreatedAt: event.clientCreatedAt,
-          })
+          }).then((claimAcknowledgement) =>
+            acknowledgementForQueuedResolution(claimAcknowledgement, event.operationId),
+          )
         },
         finishGame: (result) =>
           mutations.current.finishMutation({
