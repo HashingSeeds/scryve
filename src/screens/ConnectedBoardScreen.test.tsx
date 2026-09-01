@@ -11,6 +11,8 @@ import {
   mockFinish,
   mockRuntimeAbandon,
   mockReportPlayer,
+  mockResolveCommanderDamageClaim,
+  mockSubmitCommanderDamage,
   mockUseConnectedGame,
   resetConnectedHarness,
   themed,
@@ -89,6 +91,53 @@ describe("ConnectedBoardScreen", () => {
     expect(useKeepAwake).toHaveBeenCalledWith("count-connected-game")
   })
 
+  it("lets the attacking seat stage commander damage against several defenders", async () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+    fireEvent.press(screen.getByTestId("commander-sword-seat-1"))
+    fireEvent.press(screen.getByTestId("commander-stage-seat-2-1"))
+    fireEvent.press(screen.getByTestId("commander-send-seat-1"))
+
+    await waitFor(() =>
+      expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
+        { toPlayerId: "player-2", delta: 1 },
+      ]),
+    )
+  })
+
+  it("lets the defending seat confirm a claim from the bubble under its board", () => {
+    const claim = {
+      claimId: "claim-1",
+      operationId: "commander-claim-0001",
+      fromPlayerId: "player-2",
+      toPlayerId: "player-1",
+      delta: 4,
+      clientCreatedAt: 10,
+      createdAt: 11,
+    }
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        commanderDamage: { totals: [], pendingClaims: [claim], eliminatedPlayerIds: [] },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+    fireEvent.press(screen.getByTestId("commander-confirm-seat-1-claim-1"))
+    expect(mockResolveCommanderDamageClaim).toHaveBeenCalledWith(claim, true)
+
+    fireEvent.press(screen.getByTestId("commander-decline-seat-1-claim-1"))
+    expect(mockResolveCommanderDamageClaim).toHaveBeenCalledWith(claim, false)
+  })
+
   it("shows pending, connection, and retained failure state accessibly", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -129,7 +178,9 @@ describe("ConnectedBoardScreen", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       connectionStatus: "offline",
-      pending: [{ event: { operationId: "operation-1", playerId: "player-1" } }],
+      pending: [
+        { event: { type: "life.changed", operationId: "operation-1", playerId: "player-1" } },
+      ],
     }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(
@@ -160,7 +211,9 @@ describe("ConnectedBoardScreen", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       connectionStatus: "syncing",
-      pending: [{ event: { operationId: "operation-1", playerId: "player-1" } }],
+      pending: [
+        { event: { type: "life.changed", operationId: "operation-1", playerId: "player-1" } },
+      ],
     }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.queryByText("Syncing 1 change\u2026")).toBeNull()
@@ -183,7 +236,9 @@ describe("ConnectedBoardScreen", () => {
       status: "ready",
       source: "cache",
       connectionStatus: "offline",
-      pending: [{ event: { operationId: "operation-cached", playerId: "player-1" } }],
+      pending: [
+        { event: { type: "life.changed", operationId: "operation-cached", playerId: "player-1" } },
+      ],
     }
 
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
@@ -374,7 +429,9 @@ describe("ConnectedBoardScreen", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       connectionStatus: "syncing",
-      pending: [{ event: { operationId: "operation-1", playerId: "player-1" } }],
+      pending: [
+        { event: { type: "life.changed", operationId: "operation-1", playerId: "player-1" } },
+      ],
       projection: { ...connectedHarness.runtime.projection, isHost: true },
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))

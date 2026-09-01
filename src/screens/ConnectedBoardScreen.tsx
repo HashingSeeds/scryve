@@ -34,8 +34,9 @@ import {
   playFormatLabel,
   playSystemId,
   playSystemRules,
+  supportsCommanderDamage,
 } from "@/features/game/playSystems"
-import type { GamePlayer } from "@/features/game/types"
+import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -185,6 +186,10 @@ function ConnectedBoardRuntime({
   const [drawSelected, setDrawSelected] = useState(false)
   const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
+  const [armedCommander, setArmedCommander] = useState<{
+    playerId: PlayerId
+    staged: Partial<Record<PlayerId, number>>
+  } | null>(null)
   const finishSubmitInFlight = useRef(false)
 
   function toggleWinner(playerId: string) {
@@ -215,6 +220,8 @@ function ConnectedBoardRuntime({
   const game = runtime.projection
   const system = playSystemId(game.system)
   const counter = playSystemRules(system).counter
+  const active = game.status === "active"
+  const finished = game.status === "finished"
 
   const players: GamePlayer[] = game.players.map((player) => ({
     id: asPlayerId(player.playerId),
@@ -224,11 +231,60 @@ function ConnectedBoardRuntime({
     life: player.currentLife,
     seat: player.seat,
   }))
+  const commanderDamageEnabled =
+    supportsCommanderDamage(system, game.format || game.ruleset) &&
+    game.commanderDamage !== undefined
+  const commanderTotals = game.commanderDamage?.totals ?? []
+  const failedActionLabel = (event: (typeof runtime.pending)[number]["event"]) => {
+    if (event.type === "life.changed")
+      return `A ${event.delta > 0 ? "+" : ""}${event.delta} ${counter.label} change could not sync`
+    if (event.type === "commanderDamage.submitted")
+      return `A ${event.delta > 0 ? "+" : ""}${event.delta} commander damage assignment could not sync`
+    return `${event.accepted ? "Confirming" : "Declining"} commander damage could not sync`
+  }
+  const displayNameOf = (playerId: string) =>
+    game.players.find((candidate) => candidate.playerId === playerId)?.displayName ?? "Another seat"
+  const incomingCommanderDamage = (player: GamePlayer): Record<PlayerId, number> =>
+    Object.fromEntries(
+      players
+        .filter(({ id }) => id !== player.id)
+        .map((source) => [
+          source.id,
+          commanderTotals.find(
+            (total) => total.fromPlayerId === source.id && total.toPlayerId === player.id,
+          )?.total ?? 0,
+        ]),
+    ) as Record<PlayerId, number>
+  function toggleCommanderSword(player: GamePlayer) {
+    if (!active || runtime.connectionStatus !== "connected" || !controlled.has(player.id)) return
+    if (armedCommander?.playerId === player.id) {
+      sendCommanderDamage()
+      return
+    }
+    setArmedCommander({ playerId: player.id, staged: {} })
+  }
+  function stageCommanderDamage(target: GamePlayer, step: number) {
+    setArmedCommander((current) => {
+      if (!current || current.playerId === target.id) return current
+      const next = (current.staged[target.id] ?? 0) + step
+      const staged = { ...current.staged }
+      if (next === 0) delete staged[target.id]
+      else staged[target.id] = next
+      return { ...current, staged }
+    })
+  }
+  function sendCommanderDamage() {
+    if (!armedCommander) return
+    const changes = Object.entries(armedCommander.staged).flatMap(([toPlayerId, delta]) =>
+      delta === undefined || delta === 0 ? [] : [{ toPlayerId, delta }],
+    )
+    if (!changes.length) return
+    runtime.submitCommanderDamage(armedCommander.playerId, changes)
+    setArmedCommander(null)
+  }
   const controlled = new Set(
     game.players.filter((player) => player.controlledByMe).map((player) => player.playerId),
   )
-  const active = game.status === "active"
-  const finished = game.status === "finished"
   const finishResultSelected = winnerPlayerIds.length > 0 || drawSelected
 
   const finishBlockedReason =
@@ -324,8 +380,47 @@ function ConnectedBoardRuntime({
           disabled={!active || overlayOpen}
           isPlayerDisabled={(player) => !controlled.has(player.id)}
           isPlayerOwned={(player) => controlled.has(player.id)}
+          isPlayerEliminated={(player) =>
+            commanderDamageEnabled &&
+            Boolean(
+              game.players.find((candidate) => candidate.playerId === player.id)
+                ?.eliminatedByCommanderDamage,
+            )
+          }
           getPendingCount={(player) =>
-            runtime.pending.filter((action) => action.event.playerId === player.id).length
+            runtime.pending.filter((action) =>
+              action.event.type === "life.changed"
+                ? action.event.playerId === player.id
+                : action.event.type === "commanderDamage.submitted"
+                  ? action.event.fromPlayerId === player.id
+                  : action.event.toPlayerId === player.id,
+            ).length
+          }
+          commanderDamage={
+            commanderDamageEnabled
+              ? {
+                  incomingFor: incomingCommanderDamage,
+                  armedPlayerId: armedCommander?.playerId ?? null,
+                  stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
+                  stagedTargets: armedCommander
+                    ? Object.values(armedCommander.staged).filter((delta) => delta !== 0).length
+                    : 0,
+                  pendingFor: (player) =>
+                    (game.commanderDamage?.pendingClaims ?? [])
+                      .filter((claim) => claim.toPlayerId === player.id)
+                      .map((claim) => ({
+                        claimId: claim.claimId,
+                        attackerName: displayNameOf(claim.fromPlayerId),
+                        delta: claim.delta,
+                        onConfirm: () => runtime.resolveCommanderDamageClaim(claim, true),
+                        onDecline: () => runtime.resolveCommanderDamageClaim(claim, false),
+                      })),
+                  onPressSword: toggleCommanderSword,
+                  onStage: stageCommanderDamage,
+                  onSend: sendCommanderDamage,
+                  onCancel: () => setArmedCommander(null),
+                }
+              : undefined
           }
           onChange={(playerId, delta) => runtime.changeLife(playerId, delta)}
         />
@@ -423,9 +518,7 @@ function ConnectedBoardRuntime({
                 accessibilityRole="alert"
                 style={themed($failure)}
               >
-                <Text
-                  text={`A ${failure.action.event.delta > 0 ? "+" : ""}${failure.action.event.delta} ${counter.label} change could not sync: ${failure.reason}`}
-                />
+                <Text text={`${failedActionLabel(failure.action.event)}: ${failure.reason}`} />
                 <Button
                   text="Dismiss after reviewing"
                   onPress={() => runtime.dismissFailed(failure.action.event.operationId)}

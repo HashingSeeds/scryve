@@ -87,7 +87,7 @@ describe("connected outbox drain", () => {
     const send = async (queued: PendingLifeAction) => {
       if (!committed.has(queued.event.operationId)) {
         committed.add(queued.event.operationId)
-        total += queued.event.delta
+        total += queued.event.type === "life.changed" ? queued.event.delta : 0
       }
       if (loseFirstAck) {
         loseFirstAck = false

@@ -8,7 +8,13 @@ import { asDeviceId } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { LifeDelta } from "@/features/game/types"
 
-import type { ConnectedDisplayProjection, FailedLifeAction, PendingLifeAction } from "./model"
+import type {
+  ConnectedCommanderDamageChange,
+  ConnectedCommanderDamageClaim,
+  ConnectedDisplayProjection,
+  FailedLifeAction,
+  PendingLifeAction,
+} from "./model"
 import { toConnectedProjection } from "./model"
 import { OutboxSyncController } from "./OutboxSyncController"
 import type { ConnectedGameResult } from "./OutboxSyncController"
@@ -23,6 +29,11 @@ interface ConnectedGameRuntimeBase {
   failed: FailedLifeAction[]
   connectionStatus: ConnectionStatus
   changeLife: (playerId: string, delta: LifeDelta) => void
+  submitCommanderDamage: (
+    fromPlayerId: string,
+    changes: readonly ConnectedCommanderDamageChange[],
+  ) => void
+  resolveCommanderDamageClaim: (claim: ConnectedCommanderDamageClaim, accepted: boolean) => void
   finish: (result?: ConnectedGameResult) => Promise<boolean>
   abandon: () => Promise<boolean>
   dismissFailed: (operationId: string) => void
@@ -93,8 +104,25 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
   )
   const finishMutation = useMutation(api.games.finishGame)
   const abandonMutation = useMutation(api.games.abandonGame)
-  const mutations = useRef({ changeLifeMutation, finishMutation, abandonMutation })
-  mutations.current = { changeLifeMutation, finishMutation, abandonMutation }
+  const submitCommanderDamageMutation = useMutation(api.games.submitCommanderDamage)
+  const confirmCommanderDamageMutation = useMutation(api.games.confirmCommanderDamage)
+  const declineCommanderDamageMutation = useMutation(api.games.declineCommanderDamage)
+  const mutations = useRef({
+    changeLifeMutation,
+    submitCommanderDamageMutation,
+    confirmCommanderDamageMutation,
+    declineCommanderDamageMutation,
+    finishMutation,
+    abandonMutation,
+  })
+  mutations.current = {
+    changeLifeMutation,
+    submitCommanderDamageMutation,
+    confirmCommanderDamageMutation,
+    declineCommanderDamageMutation,
+    finishMutation,
+    abandonMutation,
+  }
 
   const controller = useMemo(
     () =>
@@ -103,15 +131,37 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
         publicId,
         ownerId,
         deviceId,
-        send: (action) =>
-          mutations.current.changeLifeMutation({
+        send: (action) => {
+          const { event } = action
+          if (event.type === "life.changed")
+            return mutations.current.changeLifeMutation({
+              publicId,
+              playerId: event.playerId as unknown as Id<"gamePlayers">,
+              operationId: event.operationId,
+              delta: event.delta,
+              deviceId: event.deviceId,
+              clientCreatedAt: event.clientCreatedAt,
+            })
+          if (event.type === "commanderDamage.submitted")
+            return mutations.current.submitCommanderDamageMutation({
+              publicId,
+              fromPlayerId: event.fromPlayerId as unknown as Id<"gamePlayers">,
+              toPlayerId: event.toPlayerId as unknown as Id<"gamePlayers">,
+              operationId: event.operationId,
+              delta: event.delta,
+              deviceId: event.deviceId,
+              clientCreatedAt: event.clientCreatedAt,
+            })
+          const resolve = event.accepted
+            ? mutations.current.confirmCommanderDamageMutation
+            : mutations.current.declineCommanderDamageMutation
+          return resolve({
             publicId,
-            playerId: action.event.playerId as unknown as Id<"gamePlayers">,
-            operationId: action.event.operationId,
-            delta: action.event.delta,
-            deviceId: action.event.deviceId,
-            clientCreatedAt: action.event.clientCreatedAt,
-          }),
+            operationId: event.claimOperationId,
+            deviceId: event.deviceId,
+            clientCreatedAt: event.clientCreatedAt,
+          })
+        },
         finishGame: (result) =>
           mutations.current.finishMutation({
             publicId,
@@ -157,6 +207,8 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
     finishError: snapshot.finishError,
     finishing: snapshot.finishing,
     changeLife: controller.changeLife,
+    submitCommanderDamage: controller.submitCommanderDamage,
+    resolveCommanderDamageClaim: controller.resolveCommanderDamage,
     finish: controller.finish,
     abandon: controller.abandon,
     dismissFailed: controller.dismissFailed,

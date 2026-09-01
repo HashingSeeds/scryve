@@ -12,6 +12,8 @@ import { emitTelemetry } from "@/utils/telemetry"
 import type { DrainOutboxSnapshot, OutboxAcknowledgement } from "./drainOutbox"
 import { drainConnectedOutbox } from "./drainOutbox"
 import type {
+  ConnectedCommanderDamageChange,
+  ConnectedCommanderDamageClaim,
   ConnectedDisplayProjection,
   ConnectedProjection,
   FailedLifeAction,
@@ -193,6 +195,75 @@ export class OutboxSyncController {
         gameId: asGameId(this.options.publicId),
         playerId: asPlayerId(playerId),
         delta,
+        actorId: asActorId(this.options.ownerId),
+        deviceId: this.options.deviceId,
+        clientCreatedAt: now,
+      },
+      queuedAt: now,
+      attempts: 0,
+    }
+    const result = this.options.repository.enqueue(action, this.pending)
+    if (!result.accepted) {
+      this.changeError =
+        "The offline queue for pending changes is full. Reconnect and sync before making more changes."
+      this.publish()
+      return
+    }
+    this.pending = result.pending
+    this.changeError = undefined
+    this.publish()
+  }
+
+  submitCommanderDamage = (
+    fromPlayerId: string,
+    changes: readonly ConnectedCommanderDamageChange[],
+  ): void => {
+    for (const { toPlayerId, delta } of changes) {
+      const now = this.now()
+      const action: PendingLifeAction = {
+        schemaVersion: 1,
+        event: {
+          type: "commanderDamage.submitted",
+          operationId: asOperationId(createClientId("commander", now)),
+          gameId: asGameId(this.options.publicId),
+          fromPlayerId: asPlayerId(fromPlayerId),
+          toPlayerId: asPlayerId(toPlayerId),
+          delta,
+          actorId: asActorId(this.options.ownerId),
+          deviceId: this.options.deviceId,
+          clientCreatedAt: now,
+        },
+        queuedAt: now,
+        attempts: 0,
+      }
+      const result = this.options.repository.enqueue(action, this.pending)
+      if (!result.accepted) {
+        this.changeError =
+          "The offline queue for pending changes is full. Reconnect and sync before making more changes."
+        this.publish()
+        continue
+      }
+      this.pending = result.pending
+      this.changeError = undefined
+      this.publish()
+    }
+  }
+
+  /**
+   * Queues the defender's decision. Confirming offline is legitimate — the claim is
+   * already on the server, so the resolution just replays when the socket returns.
+   */
+  resolveCommanderDamage = (claim: ConnectedCommanderDamageClaim, accepted: boolean): void => {
+    const now = this.now()
+    const action: PendingLifeAction = {
+      schemaVersion: 1,
+      event: {
+        type: "commanderDamage.resolved",
+        operationId: asOperationId(createClientId("commanderResolve", now)),
+        claimOperationId: asOperationId(claim.operationId),
+        gameId: asGameId(this.options.publicId),
+        toPlayerId: asPlayerId(claim.toPlayerId),
+        accepted,
         actorId: asActorId(this.options.ownerId),
         deviceId: this.options.deviceId,
         clientCreatedAt: now,

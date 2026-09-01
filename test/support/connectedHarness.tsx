@@ -20,6 +20,7 @@ type LobbyPlayer = {
   currentLife?: number
   controlledByMe?: boolean
   deckVersionId?: string
+  eliminatedByCommanderDamage?: boolean
 }
 
 type LobbyProjection = {
@@ -31,6 +32,19 @@ type LobbyProjection = {
   isHost: boolean
   invitation?: { token: string; manualCode: string } | null
   players: LobbyPlayer[]
+  commanderDamage?: {
+    totals: Array<{ fromPlayerId: string; toPlayerId: string; total: number }>
+    pendingClaims: Array<{
+      claimId: string
+      operationId: string
+      fromPlayerId: string
+      toPlayerId: string
+      delta: number
+      clientCreatedAt: number
+      createdAt: number
+    }>
+    eliminatedPlayerIds: string[]
+  }
 }
 
 type SeatDeck = {
@@ -43,6 +57,16 @@ type RuntimePlayer = Required<Pick<LobbyPlayer, "playerId" | "controlledByMe" | 
   Omit<LobbyPlayer, "playerId" | "controlledByMe" | "currentLife"> & {
     pendingDelta: number
   }
+
+type RuntimeActionEvent = {
+  type?: "life.changed" | "commanderDamage.submitted" | "commanderDamage.resolved"
+  operationId: string
+  playerId?: string
+  fromPlayerId?: string
+  toPlayerId?: string
+  delta?: number
+  accepted?: boolean
+}
 
 export type MockConnectedRuntime = {
   status: "loading" | "ready"
@@ -58,15 +82,15 @@ export type MockConnectedRuntime = {
     eventSequence: number
     serverUpdatedAt: number
     recentOperationIds: string[]
+    commanderDamage?: LobbyProjection["commanderDamage"]
     players: RuntimePlayer[]
   }
-  pending: Array<{ event: { operationId: string; playerId?: string; delta?: number } }>
-  failed: Array<{
-    action: { event: { operationId: string; playerId?: string; delta?: number } }
-    reason: string
-  }>
+  pending: Array<{ event: RuntimeActionEvent }>
+  failed: Array<{ action: { event: RuntimeActionEvent }; reason: string }>
   connectionStatus: "connected" | "offline" | "syncing"
   changeLife: jest.Mock
+  submitCommanderDamage: jest.Mock
+  resolveCommanderDamageClaim: jest.Mock
   finish: jest.Mock
   abandon: jest.Mock
   dismissFailed: jest.Mock
@@ -91,6 +115,8 @@ export const mockMigrate = jest.fn(async () => ({ isDone: true, continueCursor: 
 export const mockReportPlayer = jest.fn(async () => ({ blocked: true, held: false }))
 export const mockBlockPlayer = jest.fn(async () => ({ blocked: true }))
 export const mockChangeLife = jest.fn()
+export const mockSubmitCommanderDamage = jest.fn(async () => undefined)
+export const mockResolveCommanderDamageClaim = jest.fn(async () => undefined)
 export const mockDismissFailed = jest.fn()
 export const mockFinish = jest.fn(async () => true)
 export const mockRuntimeAbandon = jest.fn(async () => true)
@@ -146,6 +172,8 @@ function defaultRuntime(): MockConnectedRuntime {
     failed: [],
     connectionStatus: "connected",
     changeLife: mockChangeLife,
+    submitCommanderDamage: mockSubmitCommanderDamage,
+    resolveCommanderDamageClaim: mockResolveCommanderDamageClaim,
     finish: mockFinish,
     abandon: mockRuntimeAbandon,
     dismissFailed: mockDismissFailed,
@@ -206,6 +234,8 @@ export function resetConnectedHarness() {
   mockReportPlayer.mockReset().mockResolvedValue({ blocked: true, held: false })
   mockBlockPlayer.mockReset().mockResolvedValue({ blocked: true })
   mockChangeLife.mockReset()
+  mockSubmitCommanderDamage.mockReset().mockResolvedValue(undefined)
+  mockResolveCommanderDamageClaim.mockReset().mockResolvedValue(undefined)
   mockDismissFailed.mockReset()
   mockFinish.mockReset().mockResolvedValue(true)
   mockRuntimeAbandon.mockReset().mockResolvedValue(true)
