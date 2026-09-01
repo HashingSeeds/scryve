@@ -10,6 +10,20 @@
       content="Join the wait list for Scryve, a local-first life counter and deck tracker for trading card games."
     />
     <link rel="icon" href="/waitlist/icon.png" />
+    <link
+      rel="preload"
+      href="/waitlist/space-grotesk-regular.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/waitlist/space-grotesk-semibold.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
     <link rel="stylesheet" href="/waitlist/styles.css" />
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <script src="/waitlist/waitlist.js" defer></script>
@@ -18,10 +32,16 @@
     <main class="page">
       <section class="content" aria-labelledby="waitlist-title">
         <div class="pitch">
-          <a class="brand" href="/waitlist/" aria-label="Scryve wait list">
-            <img src="/waitlist/icon.png" alt="" width="36" height="36" />
-            <span>Scryve</span>
-          </a>
+          <div class="panel-header">
+            <a class="brand" href="/waitlist/" aria-label="Scryve wait list">
+              <img src="/waitlist/icon.png" alt="" width="36" height="36" />
+              <span>Scryve</span>
+            </a>
+            <p class="existing-account">
+              <span>Already have access?</span>
+              <a id="sign-in" href="__CLERK_SIGN_IN_URL__">Sign in</a>
+            </p>
+          </div>
 
           <div class="mobile-hero">
             <div class="hero-copy">
@@ -29,7 +49,7 @@
               <h1 id="waitlist-title">Build.<br />Play.<br />See.</h1>
             </div>
             <div class="mobile-phone" aria-hidden="true">
-              <img src="/waitlist/app.png" alt="" />
+              <img src="/waitlist/multiplayer.png" alt="" />
             </div>
           </div>
           <p class="summary">Your decks. Your games. Your stats. Connected when you want.</p>
@@ -82,11 +102,8 @@
             </div>
           </dl>
 
-          <p class="existing-account">
-            Already have access? <a id="sign-in" href="__CLERK_SIGN_IN_URL__">Sign in</a>
-          </p>
           <p class="legal">
-            By joining, you agree to email about your request.
+            By joining, you agree to receive emails about Scryve early access.
             <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Use</a>
           </p>
         </div>
@@ -94,10 +111,10 @@
 
       <section class="product" aria-label="Scryve running on iPhone">
         <div class="phone phone-secondary" aria-hidden="true">
-          <img src="/waitlist/multiplayer.jpg" alt="" />
+          <img src="/waitlist/multiplayer.png" alt="" />
         </div>
         <div class="phone phone-primary" aria-hidden="true">
-          <img src="/waitlist/app.png" alt="" />
+          <img src="/waitlist/multiplayer.png" alt="" />
         </div>
       </section>
     </main>
