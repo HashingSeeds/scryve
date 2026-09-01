@@ -3,6 +3,7 @@ import { randomUUID as secureRandomUUID } from "expo-crypto"
 import { playSystemFormat, playSystemId, playSystemRules, type PlaySystemId } from "./playSystems"
 import type {
   ActorId,
+  CommanderDamageAssignedEvent,
   CommandContext,
   DeviceId,
   GameCommand,
@@ -26,6 +27,8 @@ export const STARTING_LIFE_PRESETS = [20, 30, 40] as const
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
 export const MAX_PLAYER_NAME_LENGTH = 24
+export const COMMANDER_LETHAL_DAMAGE = 21
+export const MAX_COMMANDER_DAMAGE = 99
 
 export function validatePlayerNames(values: readonly string[]): {
   valid: boolean
@@ -132,6 +135,51 @@ export function createLocalGame(input: {
   }
 }
 
+export const commanderDamageKey = (fromPlayerId: PlayerId, toPlayerId: PlayerId): string =>
+  `${fromPlayerId}>${toPlayerId}`
+
+export function commanderDamageBetween(
+  game: LocalGame,
+  fromPlayerId: PlayerId,
+  toPlayerId: PlayerId,
+): number {
+  return game.commanderDamage?.[commanderDamageKey(fromPlayerId, toPlayerId)] ?? 0
+}
+
+export function incomingCommanderDamage(
+  game: LocalGame,
+  toPlayerId: PlayerId,
+): Record<PlayerId, number> {
+  const incoming = {} as Record<PlayerId, number>
+  for (const player of game.players) {
+    if (player.id === toPlayerId) continue
+    incoming[player.id] = commanderDamageBetween(game, player.id, toPlayerId)
+  }
+  return incoming
+}
+
+export function isEliminatedByCommanderDamage(game: LocalGame, playerId: PlayerId): boolean {
+  return game.players.some(
+    (player) =>
+      player.id !== playerId &&
+      commanderDamageBetween(game, player.id, playerId) >= COMMANDER_LETHAL_DAMAGE,
+  )
+}
+
+type CompensatableEvent = LifeChangedEvent | CommanderDamageAssignedEvent
+
+function isCompensatable(event: GameEvent): event is CompensatableEvent {
+  return event.type === "life.changed" || event.type === "commanderDamage.assigned"
+}
+
+function compensatedOperationIds(game: LocalGame): Set<OperationId> {
+  return new Set(
+    game.events.flatMap((event) =>
+      isCompensatable(event) && event.compensatesOperationId ? [event.compensatesOperationId] : [],
+    ),
+  )
+}
+
 export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
   if (
     event.gameId !== game.id ||
@@ -153,12 +201,12 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
           candidate.playerId === event.playerId &&
           candidate.delta === -event.delta,
       )
-      const alreadyCompensated = game.events.some(
-        (candidate) =>
-          candidate.type === "life.changed" &&
-          candidate.compensatesOperationId === event.compensatesOperationId,
+      if (
+        !target ||
+        target.compensatesOperationId ||
+        compensatedOperationIds(game).has(event.compensatesOperationId)
       )
-      if (!target || target.compensatesOperationId || alreadyCompensated) return game
+        return game
     }
 
     const players = game.players.map((player, index) =>
@@ -167,6 +215,45 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
     return {
       ...game,
       players,
+      events: [...game.events, event],
+      updatedAt: Math.max(game.updatedAt, event.clientCreatedAt),
+    }
+  }
+
+  if (event.type === "commanderDamage.assigned") {
+    if (event.fromPlayerId === event.toPlayerId) return game
+    if (!Number.isInteger(event.delta) || event.delta === 0) return game
+    const source = game.players.some(({ id }) => id === event.fromPlayerId)
+    const targetIndex = game.players.findIndex(({ id }) => id === event.toPlayerId)
+    if (!source || targetIndex < 0) return game
+    if (event.compensatesOperationId) {
+      const compensated = game.events.find(
+        (candidate): candidate is CommanderDamageAssignedEvent =>
+          candidate.type === "commanderDamage.assigned" &&
+          candidate.operationId === event.compensatesOperationId &&
+          candidate.fromPlayerId === event.fromPlayerId &&
+          candidate.toPlayerId === event.toPlayerId &&
+          candidate.delta === -event.delta,
+      )
+      if (
+        !compensated ||
+        compensated.compensatesOperationId ||
+        compensatedOperationIds(game).has(event.compensatesOperationId)
+      )
+        return game
+    }
+
+    const key = commanderDamageKey(event.fromPlayerId, event.toPlayerId)
+    const total = (game.commanderDamage?.[key] ?? 0) + event.delta
+    if (total < 0 || total > MAX_COMMANDER_DAMAGE) return game
+
+    const players = game.players.map((player, index) =>
+      index === targetIndex ? { ...player, life: player.life - event.delta } : player,
+    )
+    return {
+      ...game,
+      players,
+      commanderDamage: { ...game.commanderDamage, [key]: total },
       events: [...game.events, event],
       updatedAt: Math.max(game.updatedAt, event.clientCreatedAt),
     }
@@ -219,30 +306,47 @@ export function commandToEvent(
     }
     return { ...base, type: "life.changed", playerId: command.playerId, delta: command.delta }
   }
-  if (command.type === "life.undo") {
-    const compensated = new Set(
-      game.events.flatMap((event) =>
-        event.type === "life.changed" && event.compensatesOperationId
-          ? [event.compensatesOperationId]
-          : [],
-      ),
+  if (command.type === "commanderDamage.assign") {
+    const { fromPlayerId, toPlayerId } = command
+    if (fromPlayerId === toPlayerId) return null
+    if (!Number.isInteger(command.delta) || command.delta === 0) return null
+    if (
+      !game.players.some(({ id }) => id === fromPlayerId) ||
+      !game.players.some(({ id }) => id === toPlayerId)
     )
+      return null
+    const current = commanderDamageBetween(game, fromPlayerId, toPlayerId)
+    const clamped = Math.max(0, Math.min(MAX_COMMANDER_DAMAGE, current + command.delta))
+    const delta = clamped - current
+    if (delta === 0) return null
+    return { ...base, type: "commanderDamage.assigned", fromPlayerId, toPlayerId, delta }
+  }
+  if (command.type === "life.undo") {
+    const compensated = compensatedOperationIds(game)
     const target = game.events.findLast(
-      (event): event is LifeChangedEvent =>
-        event.type === "life.changed" &&
+      (event): event is CompensatableEvent =>
+        isCompensatable(event) &&
         !event.compensatesOperationId &&
         event.actorId === context.actorId &&
         !compensated.has(event.operationId),
     )
-    return target
-      ? {
-          ...base,
-          type: "life.changed",
-          playerId: target.playerId,
-          delta: -target.delta as LifeDelta,
-          compensatesOperationId: target.operationId,
-        }
-      : null
+    if (!target) return null
+    if (target.type === "commanderDamage.assigned")
+      return {
+        ...base,
+        type: "commanderDamage.assigned",
+        fromPlayerId: target.fromPlayerId,
+        toPlayerId: target.toPlayerId,
+        delta: -target.delta,
+        compensatesOperationId: target.operationId,
+      }
+    return {
+      ...base,
+      type: "life.changed",
+      playerId: target.playerId,
+      delta: -target.delta as LifeDelta,
+      compensatesOperationId: target.operationId,
+    }
   }
   if (command.type === "game.finish") {
     const result = sanitizeGameResult(game, command.result)
@@ -261,16 +365,10 @@ export function applyGameCommand(
 }
 
 export function canUndo(game: LocalGame, actorId: ActorId): boolean {
-  const compensated = new Set(
-    game.events.flatMap((event) =>
-      event.type === "life.changed" && event.compensatesOperationId
-        ? [event.compensatesOperationId]
-        : [],
-    ),
-  )
+  const compensated = compensatedOperationIds(game)
   return game.events.some(
     (event) =>
-      event.type === "life.changed" &&
+      isCompensatable(event) &&
       !event.compensatesOperationId &&
       event.actorId === actorId &&
       !compensated.has(event.operationId),

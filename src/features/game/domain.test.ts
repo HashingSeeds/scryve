@@ -1,6 +1,13 @@
 import {
   applyGameCommand,
   asActorId,
+  canUndo,
+  commanderDamageBetween,
+  commandToEvent,
+  COMMANDER_LETHAL_DAMAGE,
+  incomingCommanderDamage,
+  isEliminatedByCommanderDamage,
+  MAX_COMMANDER_DAMAGE,
   asDeviceId,
   asGameId,
   asOperationId,
@@ -10,7 +17,7 @@ import {
   reduceGameEvent,
   validatePlayerNames,
 } from "./domain"
-import type { CommandContext, GameEvent, LifeDelta } from "./types"
+import type { CommandContext, GameEvent, LifeDelta, LocalGame } from "./types"
 
 function makeContext(actor = "local") {
   let now = 100
@@ -230,5 +237,140 @@ describe("local game domain", () => {
         ),
       ).toBe(ended)
     }
+  })
+})
+
+describe("commander damage", () => {
+  const assign = (
+    game: LocalGame,
+    from: number,
+    to: number,
+    delta: number,
+    context = sharedContext,
+  ) =>
+    applyGameCommand(
+      game,
+      {
+        type: "commanderDamage.assign",
+        fromPlayerId: game.players[from].id,
+        toPlayerId: game.players[to].id,
+        delta,
+      },
+      context,
+    )
+
+  let sharedContext: CommandContext
+  beforeEach(() => {
+    sharedContext = makeContext()
+  })
+
+  it("moves the counter and the life total in one event", () => {
+    const game = assign(makeGame(4, 40), 0, 1, 7)
+    expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(7)
+    expect(game.players[1].life).toBe(33)
+    expect(game.players[0].life).toBe(40)
+    expect(game.events).toHaveLength(1)
+  })
+
+  it("accumulates from the same commander and keeps sources separate", () => {
+    let game = makeGame(4, 40)
+    game = assign(game, 0, 1, 7)
+    game = assign(game, 0, 1, 6)
+    game = assign(game, 2, 1, 4)
+    expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(13)
+    expect(commanderDamageBetween(game, game.players[2].id, game.players[1].id)).toBe(4)
+    expect(game.players[1].life).toBe(23)
+  })
+
+  it("reports incoming damage keyed by the commander that dealt it", () => {
+    let game = makeGame(3, 40)
+    game = assign(game, 0, 1, 5)
+    const incoming = incomingCommanderDamage(game, game.players[1].id)
+    expect(incoming[game.players[0].id]).toBe(5)
+    expect(incoming[game.players[2].id]).toBe(0)
+    expect(incoming[game.players[1].id]).toBeUndefined()
+  })
+
+  it("clamps at zero and records only the delta that lands", () => {
+    let game = makeGame(2, 40)
+    game = assign(game, 0, 1, 3)
+    game = assign(game, 0, 1, -10)
+    expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(0)
+    expect(game.players[1].life).toBe(40)
+  })
+
+  it("clamps at the maximum", () => {
+    let game = makeGame(2, 40)
+    game = assign(game, 0, 1, MAX_COMMANDER_DAMAGE + 20)
+    expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(
+      MAX_COMMANDER_DAMAGE,
+    )
+    const before = game.events.length
+    game = assign(game, 0, 1, 5)
+    expect(game.events).toHaveLength(before)
+  })
+
+  it("rejects self-assignment, zero, and fractional deltas", () => {
+    const game = makeGame(2, 40)
+    expect(assign(game, 0, 0, 5)).toBe(game)
+    expect(assign(game, 0, 1, 0)).toBe(game)
+    expect(assign(game, 0, 1, 1.5)).toBe(game)
+  })
+
+  it("ignores a replayed operationId", () => {
+    const game = assign(makeGame(2, 40), 0, 1, 7)
+    const replayed = reduceGameEvent(game, game.events[0])
+    expect(replayed).toBe(game)
+  })
+
+  it("undoes the counter and the life together", () => {
+    let game = assign(makeGame(4, 40), 0, 1, 7)
+    expect(canUndo(game, sharedContext.actorId)).toBe(true)
+    game = applyGameCommand(game, { type: "life.undo" }, sharedContext)
+    expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(0)
+    expect(game.players[1].life).toBe(40)
+    expect(canUndo(game, sharedContext.actorId)).toBe(false)
+  })
+
+  it("undoes commander damage and life changes in the order they happened", () => {
+    let game = makeGame(4, 40)
+    game = assign(game, 0, 1, 7)
+    game = applyGameCommand(
+      game,
+      { type: "life.change", playerId: game.players[1].id, delta: -3 as LifeDelta },
+      sharedContext,
+    )
+    game = applyGameCommand(game, { type: "life.undo" }, sharedContext)
+    expect(game.players[1].life).toBe(33)
+    expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(7)
+    game = applyGameCommand(game, { type: "life.undo" }, sharedContext)
+    expect(game.players[1].life).toBe(40)
+    expect(commanderDamageBetween(game, game.players[0].id, game.players[1].id)).toBe(0)
+  })
+
+  it("refuses to compensate the same assignment twice", () => {
+    let game = assign(makeGame(2, 40), 0, 1, 7)
+    const undo = commandToEvent(game, { type: "life.undo" }, sharedContext)
+    expect(undo).not.toBeNull()
+    game = reduceGameEvent(game, undo as GameEvent)
+    const duplicate = { ...(undo as GameEvent), operationId: asOperationId("op-duplicate") }
+    expect(reduceGameEvent(game, duplicate)).toBe(game)
+  })
+
+  it.each([
+    [COMMANDER_LETHAL_DAMAGE - 1, false],
+    [COMMANDER_LETHAL_DAMAGE, true],
+    [COMMANDER_LETHAL_DAMAGE + 1, true],
+  ])("marks elimination at %i damage: %s", (damage, eliminated) => {
+    const game = assign(makeGame(4, 40), 0, 1, damage)
+    expect(isEliminatedByCommanderDamage(game, game.players[1].id)).toBe(eliminated)
+    expect(isEliminatedByCommanderDamage(game, game.players[0].id)).toBe(false)
+  })
+
+  it("does not eliminate on 21 spread across two commanders", () => {
+    let game = makeGame(4, 40)
+    game = assign(game, 0, 1, 11)
+    game = assign(game, 2, 1, 10)
+    expect(isEliminatedByCommanderDamage(game, game.players[1].id)).toBe(false)
   })
 })
