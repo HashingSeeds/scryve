@@ -77,7 +77,7 @@ type RecursiveKeyOfHandleValue<
   TValue,
   Text extends string,
   IsFirstLevel extends boolean,
-> = TValue extends any[]
+> = TValue extends readonly unknown[]
   ? Text
   : TValue extends object
     ? IsFirstLevel extends true
