@@ -25,6 +25,7 @@ import {
   asGameId,
   asOperationId,
   asPlayerId,
+  isCommanderDamageDelta,
   isLifeDelta,
 } from "../game/domain"
 import type { LifeChangedEvent } from "../game/types"
@@ -125,10 +126,7 @@ function parseCommanderDamageEvent(
     typeof value.gameId !== "string" ||
     typeof value.fromPlayerId !== "string" ||
     typeof value.toPlayerId !== "string" ||
-    typeof value.delta !== "number" ||
-    !Number.isInteger(value.delta) ||
-    value.delta === 0 ||
-    Math.abs(value.delta) > 99 ||
+    !isCommanderDamageDelta(value.delta) ||
     typeof value.actorId !== "string" ||
     typeof value.deviceId !== "string" ||
     !/^[A-Za-z0-9_-]{16,128}$/.test(value.operationId) ||

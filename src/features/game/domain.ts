@@ -87,6 +87,15 @@ export function isLifeDelta(value: unknown): value is LifeDelta {
   )
 }
 
+export function isCommanderDamageDelta(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value !== 0 &&
+    Math.abs(value) <= MAX_COMMANDER_DAMAGE
+  )
+}
+
 export function createLocalGame(input: {
   players: NewPlayerInput[]
   startingLife: number

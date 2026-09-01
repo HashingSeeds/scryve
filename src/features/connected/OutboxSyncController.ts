@@ -5,6 +5,8 @@ import {
   asOperationId,
   asPlayerId,
   createClientId,
+  isCommanderDamageDelta,
+  MAX_COMMANDER_DAMAGE,
 } from "@/features/game/domain"
 import type { DeviceId, LifeDelta } from "@/features/game/types"
 import { emitTelemetry } from "@/utils/telemetry"
@@ -218,6 +220,11 @@ export class OutboxSyncController {
     fromPlayerId: string,
     changes: readonly ConnectedCommanderDamageChange[],
   ): void => {
+    if (!changes.every(({ delta }) => isCommanderDamageDelta(delta))) {
+      this.changeError = `Commander damage changes have to be between 1 and ${MAX_COMMANDER_DAMAGE}.`
+      this.publish()
+      return
+    }
     for (const { toPlayerId, delta } of changes) {
       const now = this.now()
       const action: PendingLifeAction = {

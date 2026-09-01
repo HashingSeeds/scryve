@@ -158,6 +158,20 @@ describe("outbox sync controller", () => {
     expect(repository.loadOutbox("game-public")).toEqual([])
   })
 
+  it("queues nothing when any staged commander damage sits outside the supported range", () => {
+    const { controller, repository } = harness()
+    controller.setEnvironment(ONLINE)
+
+    controller.submitCommanderDamage("player-1", [
+      { toPlayerId: "player-2", delta: 4 },
+      { toPlayerId: "player-3", delta: 120 },
+    ])
+
+    expect(controller.getSnapshot().pending).toEqual([])
+    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(controller.getSnapshot().changeError).toMatch(/between 1 and 99/i)
+  })
+
   it("keeps a declined claim distinct from a confirmed one", () => {
     const { clock, controller } = harness()
     const claim = {
