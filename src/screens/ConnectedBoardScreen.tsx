@@ -27,7 +27,7 @@ import {
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
-import { asPlayerId } from "@/features/game/domain"
+import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import {
   counterChangeLabel,
   counterValueLabel,
@@ -266,7 +266,11 @@ function ConnectedBoardRuntime({
   function stageCommanderDamage(target: GamePlayer, step: number) {
     setArmedCommander((current) => {
       if (!current || current.playerId === target.id) return current
-      const next = (current.staged[target.id] ?? 0) + step
+      const recorded = incomingCommanderDamage(target)[current.playerId] ?? 0
+      const next = Math.max(
+        -recorded,
+        Math.min(MAX_COMMANDER_DAMAGE - recorded, (current.staged[target.id] ?? 0) + step),
+      )
       const staged = { ...current.staged }
       if (next === 0) delete staged[target.id]
       else staged[target.id] = next

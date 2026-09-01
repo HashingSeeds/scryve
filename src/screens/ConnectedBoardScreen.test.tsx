@@ -112,6 +112,32 @@ describe("ConnectedBoardScreen", () => {
     )
   })
 
+  it("stops staging where the recorded total would leave the supported range", async () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        commanderDamage: {
+          totals: [{ fromPlayerId: "player-1", toPlayerId: "player-2", total: 97 }],
+          pendingClaims: [],
+          eliminatedPlayerIds: [],
+        },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+    fireEvent.press(screen.getByTestId("commander-sword-seat-1"))
+    for (let press = 0; press < 5; press += 1)
+      fireEvent.press(screen.getByTestId("commander-stage-seat-2-1"))
+    fireEvent.press(screen.getByTestId("commander-send-seat-1"))
+
+    await waitFor(() =>
+      expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
+        { toPlayerId: "player-2", delta: 2 },
+      ]),
+    )
+  })
+
   it("lets the defending seat confirm a claim from the bubble under its board", () => {
     const claim = {
       claimId: "claim-1",
