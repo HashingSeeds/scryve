@@ -44,6 +44,8 @@ import {
 const MAX_PLAYERS_PER_GAME_READ = 7
 const MAX_INVITES_PER_GAME_READ = 20
 const MAX_HOSTED_GAMES_RECOVERY_READ = 25
+const MAX_COMMANDER_DAMAGE = 99
+const MAX_PENDING_COMMANDER_CLAIMS = 100
 
 async function gameByPublicId(ctx: QueryCtx, publicId: string) {
   assertPublicId(publicId)
@@ -62,6 +64,23 @@ function assertPublicId(publicId: string) {
 function assertLifeDelta(delta: number) {
   if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 999_999)
     throw new Error("Life delta must be a non-zero whole number from -999999 to 999999")
+}
+
+function assertCommanderDelta(delta: number) {
+  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > MAX_COMMANDER_DAMAGE)
+    throw new Error("Commander damage delta must be a non-zero whole number from -99 to 99")
+}
+
+function isCommanderGame(game: Doc<"games">) {
+  return (
+    (game.system ?? game.game ?? DEFAULT_DECK_GAME) === "mtg" &&
+    (game.format ?? game.ruleset) === "commander"
+  )
+}
+
+function assertCommanderGame(game: Doc<"games">) {
+  if (!isCommanderGame(game))
+    throw new Error("Commander damage is only available in Commander games")
 }
 
 function assertOperationId(operationId: string) {
@@ -170,6 +189,51 @@ async function playersForGame(ctx: QueryCtx, gameId: Id<"games">) {
     .take(MAX_PLAYERS_PER_GAME_READ)
   if (players.length > 6) throw new Error("Game has more than six seats")
   return players
+}
+
+async function commanderDamageProjection(
+  ctx: QueryCtx,
+  game: Doc<"games">,
+  user: Doc<"users">,
+  players: Doc<"gamePlayers">[],
+) {
+  if (!isCommanderGame(game)) return null
+  const totals = await ctx.db
+    .query("gameCommanderDamage")
+    .withIndex("by_game", (q) => q.eq("gameId", game._id))
+    .take(MAX_PLAYERS_PER_GAME_READ * (MAX_PLAYERS_PER_GAME_READ - 1))
+  const pending = await ctx.db
+    .query("gameCommanderClaims")
+    .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
+    .take(MAX_PENDING_COMMANDER_CLAIMS + 1)
+  if (pending.length > MAX_PENDING_COMMANDER_CLAIMS)
+    throw new Error("Too many pending commander damage claims")
+  const ownedPlayerIds = new Set(
+    players.filter((player) => player.userId === user._id).map((player) => player._id),
+  )
+  const eliminatedPlayerIds = new Set<Id<"gamePlayers">>()
+  for (const total of totals) {
+    if (total.total >= 21) eliminatedPlayerIds.add(total.toPlayerId)
+  }
+  return {
+    totals: totals.map((total) => ({
+      fromPlayerId: total.fromPlayerId,
+      toPlayerId: total.toPlayerId,
+      total: total.total,
+    })),
+    pendingClaims: pending
+      .filter((claim) => ownedPlayerIds.has(claim.toPlayerId))
+      .map((claim) => ({
+        claimId: claim._id,
+        operationId: claim.operationId,
+        fromPlayerId: claim.fromPlayerId,
+        toPlayerId: claim.toPlayerId,
+        delta: claim.delta,
+        clientCreatedAt: claim.clientCreatedAt,
+        createdAt: claim.createdAt,
+      })),
+    eliminatedPlayerIds: [...eliminatedPlayerIds],
+  }
 }
 
 async function deckSelectionIsPlayable(ctx: QueryCtx, deckVersionId: Id<"deckVersions">) {
@@ -627,6 +691,8 @@ export const lobbyProjection = query({
         : []
     const invite = isHost ? await currentUsableInvite(ctx, game, Date.now()) : null
     const displayNames = await displayNamesForViewer(ctx, user._id, players)
+    const commanderDamage = await commanderDamageProjection(ctx, game, user, players)
+    const eliminatedPlayerIds = new Set(commanderDamage?.eliminatedPlayerIds ?? [])
     const eventCount = totalEventCount(game, players)
     const serverUpdatedAt = players.reduce(
       (latest, player) => Math.max(latest, player.lastEventAt ?? 0),
@@ -664,10 +730,14 @@ export const lobbyProjection = query({
           color: p.color,
           shape: appearanceOf(p).shape,
           currentLife: p.currentLife,
+          ...(commanderDamage
+            ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
+            : {}),
           controlledByMe:
             p.userId === user._id &&
             (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
         })),
+      ...(commanderDamage ? { commanderDamage } : {}),
     }
   },
 })
@@ -858,6 +928,335 @@ export const changeLife = mutation({
       deduplicated: false,
     }
   },
+})
+
+async function commanderPlayerForWrite(
+  ctx: MutationCtx,
+  game: Doc<"games">,
+  playerId: Id<"gamePlayers">,
+  user: Doc<"users">,
+  deviceId: string,
+  label: "source" | "target",
+) {
+  const player = await ctx.db.get(playerId)
+  if (
+    !player ||
+    player.gameId !== game._id ||
+    player.userId !== user._id ||
+    (player.deviceId !== undefined && player.deviceId !== deviceId)
+  )
+    throw new Error(
+      `${label === "source" ? "Attacking" : "Defending"} seat-owner permission required`,
+    )
+  return player
+}
+
+function commanderClaimMatches(
+  claim: Doc<"gameCommanderClaims">,
+  args: {
+    operationId: string
+    fromPlayerId: Id<"gamePlayers">
+    toPlayerId: Id<"gamePlayers">
+    delta: number
+    deviceId: string
+    clientCreatedAt: number
+  },
+  userId: Id<"users">,
+) {
+  return (
+    claim.operationId === args.operationId &&
+    claim.fromPlayerId === args.fromPlayerId &&
+    claim.toPlayerId === args.toPlayerId &&
+    claim.delta === args.delta &&
+    claim.actorUserId === userId &&
+    claim.deviceId === args.deviceId &&
+    claim.clientCreatedAt === args.clientCreatedAt
+  )
+}
+
+export const submitCommanderDamage = mutation({
+  args: {
+    publicId: v.string(),
+    fromPlayerId: v.id("gamePlayers"),
+    toPlayerId: v.id("gamePlayers"),
+    operationId: v.string(),
+    delta: v.number(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    assertCommanderDelta(args.delta)
+    assertOperationId(args.operationId)
+    assertDeviceId(args.deviceId)
+    if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
+      throw new Error("Invalid client timestamp")
+    if (args.fromPlayerId === args.toPlayerId) throw new Error("A commander cannot damage itself")
+
+    const game = await gameByPublicId(ctx, args.publicId)
+    assertCommanderGame(game)
+    const user = await requireUser(ctx)
+    if (game.status !== "active") throw new Error("Game is not active")
+    const source = await commanderPlayerForWrite(
+      ctx,
+      game,
+      args.fromPlayerId,
+      user,
+      args.deviceId,
+      "source",
+    )
+    const target = await ctx.db.get(args.toPlayerId)
+    if (!target || target.gameId !== game._id)
+      throw new Error("Commander damage target must belong to this game")
+
+    const existing = await ctx.db
+      .query("gameCommanderClaims")
+      .withIndex("by_game_operation", (q) =>
+        q.eq("gameId", game._id).eq("operationId", args.operationId),
+      )
+      .unique()
+    if (existing) {
+      if (!commanderClaimMatches(existing, args, user._id))
+        throw new Error("Operation identifier was reused with different data")
+      return {
+        operationId: existing.operationId,
+        claimId: existing._id,
+        status: existing.status,
+        deduplicated: true,
+      }
+    }
+    const eventWithOperation = await ctx.db
+      .query("gameEvents")
+      .withIndex("by_game_operation", (q) =>
+        q.eq("gameId", game._id).eq("operationId", args.operationId),
+      )
+      .unique()
+    if (eventWithOperation) throw new Error("Operation identifier was reused with different data")
+
+    const pair = await ctx.db
+      .query("gameCommanderDamage")
+      .withIndex("by_game_and_pair", (q) =>
+        q.eq("gameId", game._id).eq("fromPlayerId", source._id).eq("toPlayerId", target._id),
+      )
+      .unique()
+    const nextTotal = (pair?.total ?? 0) + args.delta
+    if (nextTotal < 0 || nextTotal > MAX_COMMANDER_DAMAGE)
+      throw new Error("Commander damage total must remain between 0 and 99")
+    const pending = await ctx.db
+      .query("gameCommanderClaims")
+      .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
+      .take(MAX_PENDING_COMMANDER_CLAIMS + 1)
+    if (
+      pending.some((claim) => claim.fromPlayerId === source._id && claim.toPlayerId === target._id)
+    )
+      throw new Error("A pending commander damage claim already exists for this pair")
+    if (pending.length >= MAX_PENDING_COMMANDER_CLAIMS)
+      throw new Error("Too many pending commander damage claims")
+
+    const now = Date.now()
+    const claimId = await ctx.db.insert("gameCommanderClaims", {
+      gameId: game._id,
+      operationId: args.operationId,
+      fromPlayerId: source._id,
+      toPlayerId: target._id,
+      delta: args.delta,
+      status: "pending",
+      actorUserId: user._id,
+      deviceId: args.deviceId,
+      clientCreatedAt: args.clientCreatedAt,
+      createdAt: now,
+    })
+    await ctx.db.insert("gameEvents", {
+      gameId: game._id,
+      playerId: target._id,
+      operationId: args.operationId,
+      kind: "commanderDamage.claimed",
+      delta: args.delta,
+      fromPlayerId: source._id,
+      toPlayerId: target._id,
+      claimOperationId: args.operationId,
+      actorUserId: user._id,
+      deviceId: args.deviceId,
+      clientCreatedAt: args.clientCreatedAt,
+      serverCreatedAt: now,
+    })
+    await ctx.db.patch(target._id, {
+      eventCount: (target.eventCount ?? 0) + 1,
+      lastEventAt: now,
+    })
+    return {
+      operationId: args.operationId,
+      claimId,
+      status: "pending" as const,
+      deduplicated: false,
+    }
+  },
+})
+
+async function resolveCommanderClaim(
+  ctx: MutationCtx,
+  args: {
+    publicId: string
+    operationId: string
+    deviceId: string
+    clientCreatedAt: number
+  },
+  decision: "confirmed" | "declined",
+) {
+  assertOperationId(args.operationId)
+  assertDeviceId(args.deviceId)
+  if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
+    throw new Error("Invalid client timestamp")
+  const game = await gameByPublicId(ctx, args.publicId)
+  assertCommanderGame(game)
+  const user = await requireUser(ctx)
+  const claim = await ctx.db
+    .query("gameCommanderClaims")
+    .withIndex("by_game_operation", (q) =>
+      q.eq("gameId", game._id).eq("operationId", args.operationId),
+    )
+    .unique()
+  if (!claim) throw new Error("Commander damage claim not found")
+  const target = await commanderPlayerForWrite(
+    ctx,
+    game,
+    claim.toPlayerId,
+    user,
+    args.deviceId,
+    "target",
+  )
+  if (claim.status !== "pending")
+    return {
+      operationId: claim.operationId,
+      claimId: claim._id,
+      status: claim.status,
+      deduplicated: true,
+      ...(decision === "confirmed" && claim.status === "confirmed"
+        ? {
+            total:
+              (
+                await ctx.db
+                  .query("gameCommanderDamage")
+                  .withIndex("by_game_and_pair", (q) =>
+                    q
+                      .eq("gameId", game._id)
+                      .eq("fromPlayerId", claim.fromPlayerId)
+                      .eq("toPlayerId", claim.toPlayerId),
+                  )
+                  .unique()
+              )?.total ?? 0,
+            currentLife: target.currentLife,
+          }
+        : {}),
+    }
+  if (game.status !== "active") throw new Error("Game is not active")
+
+  const now = Date.now()
+  const eventOperationId = `${claim.operationId}_${decision}`
+  if (decision === "confirmed") {
+    const pair = await ctx.db
+      .query("gameCommanderDamage")
+      .withIndex("by_game_and_pair", (q) =>
+        q
+          .eq("gameId", game._id)
+          .eq("fromPlayerId", claim.fromPlayerId)
+          .eq("toPlayerId", claim.toPlayerId),
+      )
+      .unique()
+    const total = (pair?.total ?? 0) + claim.delta
+    if (total < 0 || total > MAX_COMMANDER_DAMAGE)
+      throw new Error("Commander damage total must remain between 0 and 99")
+    await ctx.db.insert("gameEvents", {
+      gameId: game._id,
+      playerId: target._id,
+      operationId: eventOperationId,
+      kind: "commanderDamage.confirmed",
+      delta: claim.delta,
+      fromPlayerId: claim.fromPlayerId,
+      toPlayerId: claim.toPlayerId,
+      claimOperationId: claim.operationId,
+      actorUserId: user._id,
+      deviceId: args.deviceId,
+      clientCreatedAt: args.clientCreatedAt,
+      serverCreatedAt: now,
+    })
+    if (pair) await ctx.db.patch(pair._id, { total, updatedAt: now })
+    else
+      await ctx.db.insert("gameCommanderDamage", {
+        gameId: game._id,
+        fromPlayerId: claim.fromPlayerId,
+        toPlayerId: claim.toPlayerId,
+        total,
+        updatedAt: now,
+      })
+    await ctx.db.patch(target._id, {
+      currentLife: target.currentLife - claim.delta,
+      eventCount: (target.eventCount ?? 0) + 1,
+      lastEventAt: now,
+    })
+    await ctx.db.patch(claim._id, {
+      status: "confirmed",
+      resolvedAt: now,
+      resolvedByUserId: user._id,
+    })
+    return {
+      operationId: claim.operationId,
+      claimId: claim._id,
+      status: "confirmed" as const,
+      total,
+      currentLife: target.currentLife - claim.delta,
+      deduplicated: false,
+    }
+  }
+
+  await ctx.db.insert("gameEvents", {
+    gameId: game._id,
+    playerId: target._id,
+    operationId: eventOperationId,
+    kind: "commanderDamage.declined",
+    delta: claim.delta,
+    fromPlayerId: claim.fromPlayerId,
+    toPlayerId: claim.toPlayerId,
+    claimOperationId: claim.operationId,
+    actorUserId: user._id,
+    deviceId: args.deviceId,
+    clientCreatedAt: args.clientCreatedAt,
+    serverCreatedAt: now,
+  })
+  await ctx.db.patch(claim._id, {
+    status: "declined",
+    resolvedAt: now,
+    resolvedByUserId: user._id,
+  })
+  await ctx.db.patch(target._id, {
+    eventCount: (target.eventCount ?? 0) + 1,
+    lastEventAt: now,
+  })
+  return {
+    operationId: claim.operationId,
+    claimId: claim._id,
+    status: "declined" as const,
+    deduplicated: false,
+  }
+}
+
+export const confirmCommanderDamage = mutation({
+  args: {
+    publicId: v.string(),
+    operationId: v.string(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  },
+  handler: async (ctx, args) => resolveCommanderClaim(ctx, args, "confirmed"),
+})
+
+export const declineCommanderDamage = mutation({
+  args: {
+    publicId: v.string(),
+    operationId: v.string(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  },
+  handler: async (ctx, args) => resolveCommanderClaim(ctx, args, "declined"),
 })
 
 export const finishGame = mutation({
@@ -1193,6 +1592,9 @@ export const connectedEvents = query({
         playerId: event.playerId,
         kind: event.kind,
         delta: event.delta,
+        fromPlayerId: event.fromPlayerId,
+        toPlayerId: event.toPlayerId,
+        claimOperationId: event.claimOperationId,
         clientCreatedAt: event.clientCreatedAt,
         serverCreatedAt: event.serverCreatedAt,
         eventId: event._id,

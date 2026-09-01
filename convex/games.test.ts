@@ -915,3 +915,258 @@ describe("connected game lifecycle and API hardening", () => {
     })
   })
 })
+
+function commanderArgs(
+  publicId: string,
+  fromPlayerId: Id<"gamePlayers">,
+  toPlayerId: Id<"gamePlayers">,
+  operationId: string,
+  delta: number,
+  deviceId = "device-host-0001",
+) {
+  return {
+    publicId,
+    fromPlayerId,
+    toPlayerId,
+    operationId,
+    delta,
+    deviceId,
+    clientCreatedAt: 1_700_000_000_000,
+  }
+}
+
+describe("connected commander damage claims", () => {
+  it("projects defender-only pending claims and confirms them atomically", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const submitted = await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(
+        game.publicId,
+        game.hostPlayerId,
+        game.joinerPlayerId,
+        "commander-claim-0001",
+        7,
+      ),
+    )
+    expect(submitted).toMatchObject({ status: "pending", deduplicated: false })
+    await expect(
+      game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(
+          game.publicId,
+          game.hostPlayerId,
+          game.joinerPlayerId,
+          "commander-claim-0001",
+          7,
+        ),
+      ),
+    ).resolves.toMatchObject({ status: "pending", deduplicated: true })
+    await expect(
+      game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(
+          game.publicId,
+          game.hostPlayerId,
+          game.joinerPlayerId,
+          "commander-claim-0007",
+          1,
+        ),
+      ),
+    ).rejects.toThrow("pending commander damage claim already exists")
+
+    const attackerProjection = await game.host.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+      deviceId: "device-host-0001",
+    })
+    const defenderProjection = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(attackerProjection.commanderDamage?.pendingClaims).toEqual([])
+    expect(defenderProjection.commanderDamage?.pendingClaims).toMatchObject([
+      expect.objectContaining({
+        operationId: "commander-claim-0001",
+        fromPlayerId: game.hostPlayerId,
+        toPlayerId: game.joinerPlayerId,
+        delta: 7,
+      }),
+    ])
+
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        publicId: game.publicId,
+        operationId: "commander-claim-0001",
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_001,
+      }),
+    ).resolves.toMatchObject({ status: "confirmed", total: 7, currentLife: 33 })
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        publicId: game.publicId,
+        operationId: "commander-claim-0001",
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_002,
+      }),
+    ).resolves.toMatchObject({ status: "confirmed", deduplicated: true, total: 7 })
+
+    const projection = await game.host.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.players.map((player) => player.currentLife)).toEqual([40, 33])
+    expect(projection.commanderDamage).toMatchObject({
+      totals: [
+        expect.objectContaining({
+          fromPlayerId: game.hostPlayerId,
+          toPlayerId: game.joinerPlayerId,
+          total: 7,
+        }),
+      ],
+    })
+    expect(await t.run((ctx) => ctx.db.query("gameEvents").collect())).toHaveLength(2)
+  })
+
+  it("supports negative claims, declines without changing life, and projects lethal damage", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(
+        game.publicId,
+        game.hostPlayerId,
+        game.joinerPlayerId,
+        "commander-claim-0002",
+        21,
+      ),
+    )
+    await game.joiner.mutation(api.games.confirmCommanderDamage, {
+      publicId: game.publicId,
+      operationId: "commander-claim-0002",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_001,
+    })
+    let projection = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(projection.players[1]).toMatchObject({
+      currentLife: 19,
+      eliminatedByCommanderDamage: true,
+    })
+
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(
+        game.publicId,
+        game.hostPlayerId,
+        game.joinerPlayerId,
+        "commander-claim-0003",
+        -3,
+      ),
+    )
+    await game.joiner.mutation(api.games.confirmCommanderDamage, {
+      publicId: game.publicId,
+      operationId: "commander-claim-0003",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_002,
+    })
+    projection = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(projection.players[1]).toMatchObject({
+      currentLife: 22,
+      eliminatedByCommanderDamage: false,
+    })
+    expect(projection.commanderDamage?.totals[0]).toMatchObject({ total: 18 })
+
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(
+        game.publicId,
+        game.hostPlayerId,
+        game.joinerPlayerId,
+        "commander-claim-0004",
+        1,
+      ),
+    )
+    await expect(
+      game.host.mutation(api.games.declineCommanderDamage, {
+        publicId: game.publicId,
+        operationId: "commander-claim-0004",
+        deviceId: "device-host-0001",
+        clientCreatedAt: 1_700_000_000_003,
+      }),
+    ).rejects.toThrow("Defending seat-owner")
+    await expect(
+      game.joiner.mutation(api.games.declineCommanderDamage, {
+        publicId: game.publicId,
+        operationId: "commander-claim-0004",
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_003,
+      }),
+    ).resolves.toMatchObject({ status: "declined", deduplicated: false })
+    projection = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(projection.players[1].currentLife).toBe(22)
+    expect(projection.commanderDamage?.pendingClaims).toEqual([])
+    const events = await game.joiner.query(api.games.connectedEvents, {
+      publicId: game.publicId,
+      paginationOpts: { cursor: null, numItems: 20 },
+    })
+    expect(events.page.map((event) => event.kind)).toEqual(
+      expect.arrayContaining([
+        "commanderDamage.declined",
+        "commanderDamage.confirmed",
+        "commanderDamage.confirmed",
+        "commanderDamage.claimed",
+        "commanderDamage.confirmed",
+        "commanderDamage.claimed",
+        "commanderDamage.claimed",
+      ]),
+    )
+  })
+
+  it("rejects non-owners and non-Commander games", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await expect(
+      game.joiner.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(
+          game.publicId,
+          game.hostPlayerId,
+          game.joinerPlayerId,
+          "commander-claim-0005",
+          1,
+          "device-joiner-001",
+        ),
+      ),
+    ).rejects.toThrow("Attacking seat-owner")
+
+    const host = await synced(t, "noncommander-host", "Host")
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "standard-public-game-123456",
+      playerCount: 2,
+      startingLife: 20,
+      ruleset: "standard",
+      inviteToken: "n".repeat(43),
+      manualCodeCandidates: ["STD234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+      deviceId: "device-standard-0001",
+    })
+    const joiner = await synced(t, "noncommander-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, {
+      token: "n".repeat(43),
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    await expect(
+      host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(
+          created.publicId,
+          projection.players[0].playerId,
+          projection.players[1].playerId,
+          "commander-claim-0006",
+          1,
+        ),
+      ),
+    ).rejects.toThrow("only available in Commander games")
+  })
+})
