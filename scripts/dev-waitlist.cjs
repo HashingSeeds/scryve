@@ -11,6 +11,11 @@ const waitlist = path.join(output, "waitlist")
 function sync() {
   fs.rmSync(waitlist, { force: true, recursive: true })
   fs.cpSync(source, waitlist, { recursive: true })
+  const htmlPath = path.join(waitlist, "index.html")
+  const html = fs
+    .readFileSync(htmlPath, "utf8")
+    .replaceAll("__CLERK_SIGN_IN_URL__", process.env.EXPO_PUBLIC_CLERK_SIGN_IN_URL || "/")
+  fs.writeFileSync(htmlPath, html)
   fs.copyFileSync(path.join(root, "assets", "images", "app-icon-all.png"), path.join(waitlist, "icon.png"))
   fs.copyFileSync(
     path.join(root, "node_modules", "@expo-google-fonts", "space-grotesk", "400Regular", "SpaceGrotesk_400Regular.ttf"),
@@ -24,8 +29,9 @@ function sync() {
 
 sync()
 const watcher = fs.watch(source, { recursive: true }, sync)
+const wranglerExecutable = process.platform === "win32" ? "wrangler.cmd" : "wrangler"
 const wrangler = spawn(
-  path.join(root, "node_modules", ".bin", "wrangler"),
+  path.join(root, "node_modules", ".bin", wranglerExecutable),
   ["pages", "dev", output, "--live-reload", ...process.argv.slice(2)],
   { stdio: "inherit" },
 )
