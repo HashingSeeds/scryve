@@ -77,7 +77,12 @@ export function AppUtilityMenu({
           containerStyle,
         ]}
       >
-        <Animated.View pointerEvents={open ? "none" : "auto"} style={[$fill, triggerStyle]}>
+        <Animated.View
+          pointerEvents={open ? "none" : "auto"}
+          accessibilityElementsHidden={open}
+          importantForAccessibility={open ? "no-hide-descendants" : "auto"}
+          style={[$fill, triggerStyle]}
+        >
           <Pressable
             testID="utility-menu-button"
             accessibilityRole="button"
@@ -91,6 +96,8 @@ export function AppUtilityMenu({
         </Animated.View>
         <Animated.View
           pointerEvents={open ? "auto" : "none"}
+          accessibilityElementsHidden={!open}
+          importantForAccessibility={open ? "auto" : "no-hide-descendants"}
           style={[$fill, themed($items), itemsStyle]}
         >
           <Pressable

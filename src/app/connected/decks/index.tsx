@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { router } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -7,7 +8,7 @@ import { DecksScreen } from "@/screens/DecksScreen"
 
 export default function DecksRoute() {
   const auth = useAuthAccess()
-  const hasCurrentGame = localGameRepository.loadActiveGame() !== null
+  const hasCurrentGame = useMemo(() => localGameRepository.loadActiveGame() !== null, [])
   const screen = (
     <DecksScreen
       onPlay={() => router.replace({ pathname: "/", params: { destination: "play" } })}

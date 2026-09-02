@@ -311,21 +311,19 @@ function DeckShelf({
 export function DecksScreen({
   onPlay,
   hasCurrentGame = false,
-  onBack,
   onSelect,
   onAddDeck,
-  onSettings = () => undefined,
-  onAccount = () => undefined,
+  onSettings,
+  onAccount,
   accountLabel = "Account",
   unavailableMessage,
 }: {
-  onPlay?: () => void
+  onPlay: () => void
   hasCurrentGame?: boolean
-  onBack?: () => void
   onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
-  onSettings?: () => void
-  onAccount?: () => void
+  onSettings: () => void
+  onAccount: () => void
   accountLabel?: "Account" | "Sign in"
   unavailableMessage?: string
 }) {
@@ -455,7 +453,7 @@ export function DecksScreen({
       <FloatingAppNavigation
         destinationLabel={hasCurrentGame ? "Return to game" : "Play"}
         accountLabel={accountLabel}
-        onDestination={onPlay ?? onBack ?? (() => undefined)}
+        onDestination={onPlay}
         onSettings={onSettings}
         onAccount={onAccount}
       />

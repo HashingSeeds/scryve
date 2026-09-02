@@ -87,7 +87,14 @@ jest.mock("../../convex/_generated/api", () => ({
 function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
   return render(
     <ThemeProvider initialContext="light">
-      <DecksScreen onBack={jest.fn()} onSelect={jest.fn()} onAddDeck={jest.fn()} {...props} />
+      <DecksScreen
+        onPlay={jest.fn()}
+        onSelect={jest.fn()}
+        onAddDeck={jest.fn()}
+        onSettings={jest.fn()}
+        onAccount={jest.fn()}
+        {...props}
+      />
     </ThemeProvider>,
   )
 }

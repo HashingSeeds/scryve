@@ -39,10 +39,10 @@ export default function Index() {
   }>()
   const auth = useAuthAccess()
   const { themed } = useAppTheme()
-  const settings = localGameRepository.loadSettings()
+  const settings = useMemo(() => localGameRepository.loadSettings(), [])
   const [dismissedGameId, setDismissedGameId] = useState<string>()
   const [oldGameChoice, setOldGameChoice] = useState<"continue" | "end">()
-  const loadedGame = localGameRepository.loadActiveGame()
+  const loadedGame = useMemo(() => localGameRepository.loadActiveGame(), [])
   const activeGame = loadedGame?.id === dismissedGameId ? null : loadedGame
   const freshGame = useMemo(() => {
     const preparedGame = createPreparedGame(prepared)

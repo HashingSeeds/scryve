@@ -40,12 +40,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game()}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
@@ -65,12 +60,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game()}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("life-seat-1-1"))
@@ -81,12 +71,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game()}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("life-seat-1-1"))
@@ -154,7 +139,6 @@ describe("CurrentGameScreen", () => {
         <CurrentGameScreen
           initialGame={game(6)}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onHome={jest.fn()}
           onGameEnded={jest.fn()}
         />
       </ThemeProvider>,
@@ -175,7 +159,6 @@ describe("CurrentGameScreen", () => {
         <CurrentGameScreen
           initialGame={game(5)}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onHome={jest.fn()}
           onGameEnded={jest.fn()}
         />
       </ThemeProvider>,
@@ -239,12 +222,7 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
 
@@ -274,12 +252,7 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
 
@@ -306,12 +279,7 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
 
@@ -330,12 +298,7 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
 

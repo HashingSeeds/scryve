@@ -37,7 +37,6 @@ export interface CurrentGameScreenProps {
   onSettings?: () => void
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
-  onHome?: () => void
   onGameEnded: (gameId: string) => void
   onGameAbandoned?: () => void
   repository?: LocalGameRepository

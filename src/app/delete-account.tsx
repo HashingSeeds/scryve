@@ -116,7 +116,7 @@ function SignedOutDeletionReceipt({
       updatedAt={receipt.updatedAt}
       onBack={() => router.back()}
       onSignIn={receipt.canRetry ? onSignIn : undefined}
-      onReturnHome={() => router.replace("/")}
+      onReturnHome={() => router.replace({ pathname: "/", params: { destination: "play" } })}
     />
   )
 }
