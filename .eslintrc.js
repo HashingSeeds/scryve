@@ -110,4 +110,13 @@ module.exports = {
     ],
     "import/newline-after-import": 1,
   },
+  overrides: [
+    {
+      files: ["src/**/*.{ts,tsx}", "convex/**/*.ts", "functions/**/*.ts"],
+      excludedFiles: ["**/*.test.{ts,tsx}", "convex/_generated/**"],
+      rules: {
+        "@typescript-eslint/no-explicit-any": "error",
+      },
+    },
+  ],
 }
