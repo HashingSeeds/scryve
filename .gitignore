@@ -69,6 +69,7 @@ buck-out/
 
 # Expo
 .expo/
+.wrangler/
 bin/Exponent.app
 /android
 /ios

@@ -137,6 +137,12 @@ The production Pages deployment uses `functions/_middleware.ts` to admit signed-
 redirect everyone else to `/waitlist/`. The gate is disabled unless the production Pages environment
 sets `WAITLIST_GATE_ENABLED=true`, so local and preview deployments remain open.
 
+Preview the wait-list source with live reload at `http://localhost:8788/waitlist/`:
+
+```bash
+pnpm waitlist
+```
+
 The production Pages environment also needs `APP_ORIGIN`, `CLERK_SECRET_KEY`,
 `TURNSTILE_SECRET_KEY`, `TURNSTILE_HOSTNAMES=scryve.sow.care`, and `WAITLIST_INGEST_SECRET`, along with the existing
 `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` and `EXPO_PUBLIC_CONVEX_SITE_URL`. Set the same
