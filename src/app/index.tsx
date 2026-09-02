@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import type { ViewStyle } from "react-native"
-import { Redirect, router, useLocalSearchParams } from "expo-router"
+import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
@@ -39,10 +39,16 @@ export default function Index() {
   }>()
   const auth = useAuthAccess()
   const { themed } = useAppTheme()
-  const settings = useMemo(() => localGameRepository.loadSettings(), [])
+  const [settings, setSettings] = useState(() => localGameRepository.loadSettings())
   const [dismissedGameId, setDismissedGameId] = useState<string>()
   const [oldGameChoice, setOldGameChoice] = useState<"continue" | "end">()
-  const loadedGame = useMemo(() => localGameRepository.loadActiveGame(), [])
+  const [loadedGame, setLoadedGame] = useState(() => localGameRepository.loadActiveGame())
+  useFocusEffect(
+    useCallback(() => {
+      setSettings(localGameRepository.loadSettings())
+      setLoadedGame(localGameRepository.loadActiveGame())
+    }, []),
+  )
   const activeGame = loadedGame?.id === dismissedGameId ? null : loadedGame
   const freshGame = useMemo(() => {
     const preparedGame = createPreparedGame(prepared)
