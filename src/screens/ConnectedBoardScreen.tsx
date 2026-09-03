@@ -414,15 +414,17 @@ function ConnectedBoardRuntime({
                     onCancel: () => setArmedCommander(null),
                   },
                   pendingFor: (player) =>
-                    (game.commanderDamage?.pendingClaims ?? [])
-                      .filter((claim) => claim.toPlayerId === player.id)
-                      .map((claim) => ({
-                        claimId: claim.claimId,
-                        attackerName: displayNameOf(claim.fromPlayerId),
-                        delta: claim.delta,
-                        onConfirm: () => runtime.resolveCommanderDamageClaim(claim, true),
-                        onDecline: () => runtime.resolveCommanderDamageClaim(claim, false),
-                      })),
+                    controlled.has(player.id)
+                      ? (game.commanderDamage?.pendingClaims ?? [])
+                          .filter((claim) => claim.toPlayerId === player.id)
+                          .map((claim) => ({
+                            claimId: claim.claimId,
+                            attackerName: displayNameOf(claim.fromPlayerId),
+                            delta: claim.delta,
+                            onConfirm: () => runtime.resolveCommanderDamageClaim(claim, true),
+                            onDecline: () => runtime.resolveCommanderDamageClaim(claim, false),
+                          }))
+                      : [],
                   onPressSword: toggleCommanderSword,
                   onStage: stageCommanderDamage,
                 }

@@ -101,6 +101,7 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
+    fireEvent.press(screen.getByTestId("commander-mark-seat-1"))
     fireEvent.press(screen.getByTestId("commander-sword-seat-1"))
     fireEvent.press(screen.getByTestId("commander-stage-seat-2-1"))
     fireEvent.press(screen.getByTestId("commander-send-seat-1"))
@@ -126,6 +127,7 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
+    fireEvent.press(screen.getByTestId("commander-mark-seat-1"))
     fireEvent.press(screen.getByTestId("commander-sword-seat-1"))
     for (let press = 0; press < 5; press += 1)
       fireEvent.press(screen.getByTestId("commander-stage-seat-2-1"))

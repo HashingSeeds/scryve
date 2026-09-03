@@ -1,7 +1,5 @@
 import type { PlayerId } from "@/features/game/types"
 
-import type { LifeCardContentRotation } from "./playerCardTypes"
-
 export interface CommanderBoardSeat {
   playerId: PlayerId
   row: number
@@ -32,35 +30,16 @@ export function commanderBoardSeats(
   return { seats, rows: Math.max(gridRows.length, 1), columns: Math.max(columns, 1) }
 }
 
-function rotateSeat(
-  seat: CommanderBoardSeat,
-  rows: number,
-  columns: number,
-  rotation: LifeCardContentRotation,
-): { row: number; column: number } {
-  if (rotation === 90) return { row: columns - 1 - seat.column, column: seat.row }
-  if (rotation === -90) return { row: seat.column, column: rows - 1 - seat.row }
-  if (rotation === 180) return { row: rows - 1 - seat.row, column: columns - 1 - seat.column }
-  return { row: seat.row, column: seat.column }
-}
-
 export function commanderBoardGrid(input: {
   seats: readonly CommanderBoardSeat[]
   rows: number
   columns: number
-  rotation: LifeCardContentRotation
 }): CommanderBoardGrid {
-  const quarterTurn = input.rotation === 90 || input.rotation === -90
-  const rows = quarterTurn ? input.columns : input.rows
-  const columns = quarterTurn ? input.rows : input.columns
-  const cells: (PlayerId | null)[][] = Array.from({ length: rows }, () =>
-    Array.from({ length: columns }, () => null),
+  const cells: (PlayerId | null)[][] = Array.from({ length: input.rows }, () =>
+    Array.from({ length: input.columns }, () => null),
   )
-  for (const seat of input.seats) {
-    const placed = rotateSeat(seat, input.rows, input.columns, input.rotation)
-    cells[placed.row][placed.column] = seat.playerId
-  }
-  return { rows, columns, cells }
+  for (const seat of input.seats) cells[seat.row][seat.column] = seat.playerId
+  return { rows: input.rows, columns: input.columns, cells }
 }
 
 export const COMMANDER_CELL_SIZE = 30
@@ -69,11 +48,6 @@ export const COMMANDER_COMPACT_CELL_SIZE = 24
 // its board out of the reserved space rather than shrinking past legibility.
 export const COMMANDER_MIN_CELL_SIZE = 14
 
-/**
- * Shrinks the square cell so the whole grid fits the space the card reserved for
- * it. `maxSize` is measured on the board's own axes, which the card has already
- * mapped through the content rotation.
- */
 export function commanderCellSize(input: {
   rows: number
   columns: number

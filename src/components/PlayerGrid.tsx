@@ -177,6 +177,9 @@ export function PlayerGrid({
                           columns: boardSeats.columns,
                           incoming: commanderDamage.incomingFor(player),
                           armedPlayerId: commanderDamage.armedPlayerId,
+                          attackerName: commanderDamage.armedPlayerId
+                            ? players.find(({ id }) => id === commanderDamage.armedPlayerId)?.name
+                            : undefined,
                           stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
                           pendingClaims: commanderDamage.pendingFor?.(player),
                           onPressSword: () => commanderDamage.onPressSword(player),

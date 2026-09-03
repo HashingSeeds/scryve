@@ -1,13 +1,13 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
-import { ThemeProvider } from "@/theme/context"
 import { asPlayerId } from "@/features/game/domain"
+import { ThemeProvider } from "@/theme/context"
 
-import { getCommanderDamageLaneStyle, getPlayerMarkPlacement, LifeCard } from "./LifeCard"
+import { commanderBoardSeats } from "./commanderDamageLayout"
+import { getPlayerMarkPlacement, LifeCard } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
-import { commanderBoardSeats } from "./commanderDamageLayout"
 
 const commanderIds = [asPlayerId("player-1"), asPlayerId("player-2")]
 const commanderSeats = commanderBoardSeats([[0], [1]], commanderIds)
@@ -121,7 +121,7 @@ describe("LifeCard", () => {
     },
   )
 
-  it("keeps commander steppers inward from the card edge", () => {
+  it("hides the commander grid behind the player mark", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -141,25 +141,11 @@ describe("LifeCard", () => {
       </ThemeProvider>,
     )
 
-    expect(
-      StyleSheet.flatten(view.getByTestId("commander-position-seat-1").props.style),
-    ).toMatchObject({
-      bottom: 0,
-      height: "50%",
-      justifyContent: "center",
-    })
+    expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
+    expect(view.getByTestId("commander-mark-seat-1")).toBeTruthy()
   })
 
-  it.each([
-    [0, { left: 0, right: 0, bottom: 0, height: 242, paddingBottom: 29 }],
-    [90, { left: 0, top: 0, bottom: 0, width: 170, paddingLeft: 29 }],
-    [-90, { right: 0, top: 0, bottom: 0, width: 170, paddingRight: 29 }],
-    [180, { left: 0, right: 0, top: 0, height: 242, paddingTop: 29 }],
-  ] as const)("places the commander lane in the outer half at %s degrees", (rotation, style) => {
-    expect(getCommanderDamageLaneStyle(rotation, { width: 456, height: 600 }, 58)).toEqual(style)
-  })
-
-  it("uses the same centered outer lane for compact commander boards", () => {
+  it("expands the commander grid from the player mark and closes it again", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -167,7 +153,6 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          compact
           commanderDamage={{
             ownerPlayerId: commanderIds[0],
             seats: commanderSeats.seats,
@@ -180,13 +165,116 @@ describe("LifeCard", () => {
       </ThemeProvider>,
     )
 
-    expect(
-      StyleSheet.flatten(view.getByTestId("commander-position-seat-1").props.style),
-    ).toMatchObject({
-      bottom: 0,
-      height: "50%",
-      justifyContent: "center",
-    })
+    fireEvent.press(view.getByTestId("commander-mark-seat-1"))
+    expect(view.getByTestId("commander-overview-seat-1")).toBeTruthy()
+    expect(view.getByTestId("commander-board-seat-1")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("commander-overview-close-seat-1"))
+    act(() => jest.runAllTimers())
+    expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
+    expect(view.queryByTestId("commander-overview-seat-1")).toBeNull()
+  })
+
+  it("turns the whole defending card into commander damage controls", () => {
+    const onStage = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Grace"
+          seatNumber={2}
+          life={20}
+          color="#397B61"
+          commanderDamage={{
+            ownerPlayerId: commanderIds[1],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: { [commanderIds[0]]: 7 },
+            armedPlayerId: commanderIds[0],
+            attackerName: "Ada",
+            stagedAgainstOwner: 4,
+            onStage,
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("commander-target-seat-2")).toBeTruthy()
+    expect(view.getByText("11")).toBeTruthy()
+    expect(view.getByText("↓")).toBeTruthy()
+    expect(view.queryByText("from Ada")).toBeNull()
+    expect(view.queryByTestId(lifeControlTestId(2, 1))).toBeNull()
+
+    fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+    fireEvent.press(view.getByTestId("commander-stage-seat-2--1"))
+    expect(onStage.mock.calls).toEqual([[1], [-1]])
+  })
+
+  it("turns the attacking card into the assignment exit", () => {
+    const onPressSword = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            armedPlayerId: commanderIds[0],
+            onPressSword,
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Done")).toBeTruthy()
+    fireEvent.press(view.getByTestId("commander-done-seat-1"))
+    expect(onPressSword).toHaveBeenCalledTimes(1)
+  })
+
+  it("turns the defender's card into a claim decision", () => {
+    const onConfirm = jest.fn()
+    const onDecline = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            pendingClaims: [
+              {
+                claimId: "claim-1",
+                attackerName: "Grace",
+                delta: 4,
+                onConfirm,
+                onDecline,
+              },
+            ],
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Grace dealt 4")).toBeTruthy()
+    fireEvent.press(view.getByTestId("commander-confirm-seat-1-claim-1"))
+    fireEvent.press(view.getByTestId("commander-decline-seat-1-claim-1"))
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(onDecline).toHaveBeenCalledTimes(1)
   })
 
   it("keeps a player marker inside a cramped card edge", () => {

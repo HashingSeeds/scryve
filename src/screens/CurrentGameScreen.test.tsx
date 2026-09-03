@@ -380,6 +380,11 @@ describe("CurrentGameScreen", () => {
     const life = (view: ReturnType<typeof renderGame>, seat: number) =>
       view.getByTestId(`life-total-seat-${seat}`).props.children
 
+    const armCommander = (view: ReturnType<typeof renderGame>, seat: number) => {
+      fireEvent.press(view.getByTestId(`commander-mark-seat-${seat}`))
+      fireEvent.press(view.getByTestId(`commander-sword-seat-${seat}`))
+    }
+
     it("stays out of the way outside Commander", () => {
       const view = renderGame(
         createLocalGame({
@@ -396,30 +401,31 @@ describe("CurrentGameScreen", () => {
       expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
     })
 
-    it("shows a board on every card with nothing else open", () => {
+    it("shows a commander badge on every card and keeps each board hidden", () => {
       const view = renderGame()
       for (const seat of [1, 2, 3, 4]) {
-        expect(view.getByTestId(`commander-board-seat-${seat}`)).toBeTruthy()
-        expect(view.getByTestId(`commander-sword-seat-${seat}`)).toBeTruthy()
+        expect(view.getByTestId(`commander-mark-seat-${seat}`)).toBeTruthy()
+        expect(view.queryByTestId(`commander-board-seat-${seat}`)).toBeNull()
       }
       expect(view.queryByTestId("commander-stage-seat-2-1")).toBeNull()
     })
 
-    it("arms one sword at a time and reveals steppers only on opponents", () => {
+    it("arms one commander at a time and reveals controls only on opponents", () => {
       const view = renderGame()
-      fireEvent.press(view.getByTestId("commander-sword-seat-1"))
+      armCommander(view, 1)
       for (const seat of [2, 3, 4])
         expect(view.getByTestId(`commander-stage-seat-${seat}-1`)).toBeTruthy()
       expect(view.queryByTestId("commander-stage-seat-1-1")).toBeNull()
 
-      fireEvent.press(view.getByTestId("commander-sword-seat-3"))
+      fireEvent.press(view.getByTestId("commander-done-seat-1"))
+      armCommander(view, 3)
       expect(view.queryByTestId("commander-stage-seat-3-1")).toBeNull()
       expect(view.getByTestId("commander-stage-seat-1-1")).toBeTruthy()
     })
 
     it("applies each press straight to the counter and the life total", () => {
       const view = renderGame()
-      fireEvent.press(view.getByTestId("commander-sword-seat-1"))
+      armCommander(view, 1)
       for (let press = 0; press < 7; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
       for (let press = 0; press < 3; press += 1)
@@ -433,18 +439,18 @@ describe("CurrentGameScreen", () => {
 
     it("offers no send or cancel bar with nobody to confirm to", () => {
       const view = renderGame()
-      fireEvent.press(view.getByTestId("commander-sword-seat-1"))
+      armCommander(view, 1)
       fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
       expect(view.queryByTestId("commander-send-seat-1")).toBeNull()
       expect(view.queryByTestId("commander-cancel-seat-1")).toBeNull()
     })
 
-    it("disarms by pressing the armed sword again", () => {
+    it("disarms from the attacking card", () => {
       const view = renderGame()
-      fireEvent.press(view.getByTestId("commander-sword-seat-2"))
+      armCommander(view, 2)
       for (let press = 0; press < 4; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-1-1"))
-      fireEvent.press(view.getByTestId("commander-sword-seat-2"))
+      fireEvent.press(view.getByTestId("commander-done-seat-2"))
       expect(life(view, 1)).toBe("36")
       expect(view.queryByTestId("commander-stage-seat-1-1")).toBeNull()
     })
@@ -457,7 +463,7 @@ describe("CurrentGameScreen", () => {
       initial.players[1].life = 33
       const view = renderGame(initial)
 
-      fireEvent.press(view.getByTestId("commander-sword-seat-1"))
+      armCommander(view, 1)
       for (let press = 0; press < 8; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2--1"))
 
@@ -466,20 +472,21 @@ describe("CurrentGameScreen", () => {
 
     it("marks 21 from one commander as eliminated and leaves the game running", () => {
       const view = renderGame()
-      fireEvent.press(view.getByTestId("commander-sword-seat-1"))
+      armCommander(view, 1)
       for (let press = 0; press < 21; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
 
       expect(view.getByTestId("life-eliminated-seat-2")).toBeTruthy()
       expect(view.queryByTestId("life-eliminated-seat-3")).toBeNull()
       expect(view.getByTestId("game-board")).toBeTruthy()
+      fireEvent.press(view.getByTestId("commander-done-seat-1"))
       fireEvent.press(view.getByTestId("life-seat-2--1"))
       expect(life(view, 2)).toBe("19")
     })
 
     it("undoes one assignment press as a single action", () => {
       const view = renderGame()
-      fireEvent.press(view.getByTestId("commander-sword-seat-1"))
+      armCommander(view, 1)
       for (let press = 0; press < 5; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
       expect(life(view, 2)).toBe("35")

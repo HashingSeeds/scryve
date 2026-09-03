@@ -9,11 +9,12 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated"
-import Svg, { Circle, Line, Path, Polygon, Rect } from "react-native-svg"
+import Svg, { Circle, G, Line, Path, Polygon, Rect } from "react-native-svg"
 
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import type { LifeCardContentRotation } from "./playerCardTypes"
+import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const SPIN_DURATION_MS = 7000
@@ -23,6 +24,7 @@ export interface PlayerMarkProps {
   color: string
   shape?: PlayerMarkShape
   rotation?: LifeCardContentRotation
+  insetSwordColor?: string
   spinning?: boolean
   size?: number
   style?: StyleProp<ViewStyle>
@@ -33,6 +35,7 @@ export function PlayerMark({
   color,
   shape: chosenShape,
   rotation = 0,
+  insetSwordColor,
   spinning = false,
   size = 44,
   style,
@@ -76,7 +79,9 @@ export function PlayerMark({
       >
         <Svg width="100%" height="100%" viewBox="0 0 44 44">
           <MarkShape shape={shape} color={color} />
-          {spinning ? (
+          {insetSwordColor ? (
+            <SwordInset shape={shape} color={insetSwordColor} />
+          ) : spinning ? (
             <Line
               testID="player-mark-spin-line"
               x1="22"
@@ -108,6 +113,32 @@ export function DrawMark({ color, size = 44 }: { color: string; size?: number })
         <Rect fill={color} x="10" y="20" width="24" height="4" rx="2" />
       </Svg>
     </View>
+  )
+}
+
+const SWORD_INSET_THAT_FITS_SHAPE: Record<
+  PlayerMarkShape,
+  { centerX: number; centerY: number; size: number }
+> = {
+  circle: { centerX: 22, centerY: 22, size: 14 },
+  square: { centerX: 22, centerY: 22, size: 15 },
+  diamond: { centerX: 22, centerY: 22, size: 14 },
+  hexagon: { centerX: 22, centerY: 22, size: 16 },
+  triangle: { centerX: 22, centerY: 25, size: 13 },
+  star: { centerX: 22, centerY: 22, size: 12 },
+}
+
+function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
+  const { centerX, centerY, size } = SWORD_INSET_THAT_FITS_SHAPE[shape]
+  return (
+    <G
+      testID="player-mark-sword"
+      transform={`translate(${centerX - size / 2} ${centerY - size / 2}) scale(${
+        size / SWORD_VIEW_BOX
+      })`}
+    >
+      <SwordShapes color={color} />
+    </G>
   )
 }
 

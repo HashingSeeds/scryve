@@ -66,14 +66,10 @@ describe("CommanderDamageBoard", () => {
     expect(view.queryByTestId(commanderStageTestId(2, -1))).toBeNull()
   })
 
-  it("puts steppers only on the armed attacker's cell", () => {
-    const onStage = jest.fn()
-    const view = board({ armedPlayerId: ids[0], onStage }, 1)
-    expect(view.getByTestId(commanderStageTestId(2, 1))).toBeTruthy()
-    fireEvent.press(view.getByTestId(commanderStageTestId(2, 1)))
-    expect(onStage).toHaveBeenCalledWith(1)
-    fireEvent.press(view.getByTestId(commanderStageTestId(2, -1)))
-    expect(onStage).toHaveBeenCalledWith(-1)
+  it("keeps the compact grid read-only while a commander is armed", () => {
+    const view = board({ armedPlayerId: ids[0] }, 1)
+    expect(view.queryByTestId(commanderStageTestId(2, 1))).toBeNull()
+    expect(view.queryByTestId(commanderStageTestId(2, -1))).toBeNull()
   })
 
   it("does not put steppers on the attacker's own board", () => {
@@ -81,17 +77,15 @@ describe("CommanderDamageBoard", () => {
     expect(view.queryByTestId(commanderStageTestId(1, 1))).toBeNull()
   })
 
-  it("previews the total the staged damage would leave behind", () => {
+  it("keeps showing the recorded total while assignment happens on the card", () => {
     const view = board(
       {
         armedPlayerId: ids[0],
-        stagedAgainstOwner: 4,
         incoming: { [ids[0]]: 7 } as Record<PlayerId, number>,
       },
       1,
     )
-    expect(view.getByText("11")).toBeTruthy()
-    expect(view.queryByText("7")).toBeNull()
+    expect(view.getByText("7")).toBeTruthy()
   })
 
   it("presses the sword to arm and again to send", () => {
@@ -99,6 +93,15 @@ describe("CommanderDamageBoard", () => {
     const view = board({ onPressSword }, 1)
     fireEvent.press(view.getByTestId(commanderSwordTestId(2)))
     expect(onPressSword).toHaveBeenCalledTimes(1)
+  })
+
+  it("turns the cell glyphs with the rest of the card's content", () => {
+    const view = board(
+      { contentRotation: 90, incoming: { [ids[0]]: 3 } as Record<PlayerId, number> },
+      1,
+    )
+    const total = view.getByText("3")
+    expect(StyleSheet.flatten(total.props.style).transform).toEqual([{ rotate: "90deg" }])
   })
 
   it("shrinks cells to fit the space the card reserved", () => {
