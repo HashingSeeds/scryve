@@ -37,7 +37,7 @@ describe("AppUtilityMenu", () => {
       </ThemeProvider>,
     )
 
-    expect(view.getByText("•••")).toBeTruthy()
+    expect(view.getByTestId("utility-menu-dots")).toBeTruthy()
     expect(view.queryByText("Settings")).toBeNull()
     expect(view.queryByText("Account")).toBeNull()
     fireEvent.press(view.getByTestId("utility-menu-button"))

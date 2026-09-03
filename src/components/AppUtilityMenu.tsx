@@ -45,8 +45,9 @@ export function AppUtilityMenu({
   }, [open, progress, reducedMotion])
 
   const containerStyle = useAnimatedStyle(() => ({
-    width: interpolate(progress.value, [0, 1], [compact ? 48 : 92, compact ? 148 : 188]),
+    width: interpolate(progress.value, [0, 1], [compact ? 44 : 92, compact ? 148 : 188]),
     height: interpolate(progress.value, [0, 1], [44, 108]),
+    borderRadius: compact ? interpolate(progress.value, [0, 1], [22, 16]) : 0,
   }))
   const triggerStyle = useAnimatedStyle(() => ({ opacity: progress.value < 0.05 ? 1 : 0 }))
   const itemsStyle = useAnimatedStyle(() => ({
@@ -91,7 +92,15 @@ export function AppUtilityMenu({
             style={themed($trigger)}
             onPress={() => setOpen(true)}
           >
-            <Text text={compact ? "•••" : "Utility"} weight="bold" size="xs" />
+            {compact ? (
+              <View testID="utility-menu-dots" accessible={false} style={$dotsRow}>
+                <View style={themed($dot)} />
+                <View style={themed($dot)} />
+                <View style={themed($dot)} />
+              </View>
+            ) : (
+              <Text text="Utility" weight="bold" size="xs" />
+            )}
           </Pressable>
         </Animated.View>
         <Animated.View
@@ -123,7 +132,7 @@ export function AppUtilityMenu({
 }
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
-const $compactSlot: ViewStyle = { width: 48, height: 48, zIndex: 80 }
+const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
 const $backdrop: ViewStyle = {
   position: "absolute",
   top: -1000,
@@ -145,6 +154,18 @@ const $trigger: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
+})
+const $dotsRow: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+}
+const $dot: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 5,
+  height: 5,
+  borderRadius: 2.5,
+  backgroundColor: colors.text,
 })
 const $items: ThemedStyle<ViewStyle> = () => ({ justifyContent: "center" })
 const $item: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
