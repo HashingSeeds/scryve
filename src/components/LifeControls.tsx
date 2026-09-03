@@ -173,7 +173,7 @@ const $zonesFacingRight: ThemedStyle<ViewStyle> = () => ({
 const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   justifyContent: "center",
-  paddingHorizontal: spacing.sm,
+  paddingHorizontal: spacing.xs,
 })
 
 const $zoneLeft: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-start" })
@@ -181,7 +181,7 @@ const $zoneRight: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-end" })
 const $zoneSideways: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   paddingHorizontal: 0,
-  paddingVertical: spacing.sm,
+  paddingVertical: spacing.xs,
 })
 
 const $glyph: ThemedStyle<TextStyle> = () => ({

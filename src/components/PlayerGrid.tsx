@@ -231,8 +231,8 @@ export function getPlayerGridLayoutOptions(playerCount: number): PlayerGridLayou
       ]
 }
 
-const LIFE_CONTROL_GUTTER = 40
-const LIFE_HEIGHT_RATIO = 0.24
+const LIFE_CONTROL_GUTTER = 32
+const LIFE_HEIGHT_RATIO = 0.5
 
 export function getCellSize(input: {
   board: { width: number; height: number }

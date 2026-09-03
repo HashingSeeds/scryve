@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
-import Animated, { Keyframe } from "react-native-reanimated"
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
@@ -22,12 +22,15 @@ import { LifeControls, overlayTint } from "./LifeControls"
 import {
   COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
+  COMPACT_PLAYER_MARK_SIZE,
   getLifeFontSizeThatFits,
   getLifeLineHeight,
   getLifeTargetTextSpace,
   LIFE_FONT_SIZE,
   LIFE_MAX_FONT_SCALE,
   LIFE_TARGET_SIZE,
+  PLAYER_MARK_MUTED_OPACITY,
+  PLAYER_MARK_SIZE,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
@@ -113,7 +116,7 @@ export function LifeCard({
     : undefined
   const displayName = playerName.trim() || "unnamed player"
   const identity = `Seat ${seatNumber}, ${displayName}`
-  const markSize = compact ? 36 : 44
+  const markSize = compact ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const lifeTargetRadius = lifeTargetSize / 2
   const resolvedLifeFontSize =
@@ -129,37 +132,12 @@ export function LifeCard({
     )
   const cardPadding = compact ? spacing.xxs : spacing.xs
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
-  const [markCenter, setMarkCenter] = useState({ x: 0, y: 0 })
   const [commanderOverviewOpen, setCommanderOverviewOpen] = useState(false)
-  const markAxisLength =
-    contentRotation === 90 || contentRotation === -90 ? cardSize.width : cardSize.height
-  const markStyle = getPlayerMarkPlacement(
-    contentRotation,
-    markSize,
-    lifeTargetRadius + spacing.xs,
-    cardPadding,
-    markAxisLength,
-  )
-
-  const commanderOverviewStart = {
-    opacity: 0,
-    transform: [
-      { translateX: markCenter.x - cardSize.width / 2 },
-      { translateY: markCenter.y - cardSize.height / 2 },
-      { scaleX: cardSize.width > 0 ? markSize / cardSize.width : 0.1 },
-      { scaleY: cardSize.height > 0 ? markSize / cardSize.height : 0.1 },
-    ],
-  }
-  const commanderOverviewEnd = {
-    opacity: 1,
-    transform: [{ translateX: 0 }, { translateY: 0 }, { scaleX: 1 }, { scaleY: 1 }],
-  }
+  const markStyle = getPlayerMarkCorner(contentRotation, cardPadding)
   const commanderOverviewEntering =
-    reducedMotion === false
-      ? new Keyframe({ 0: commanderOverviewStart, 100: commanderOverviewEnd }).duration(
-          commanderOverviewDuration,
-        )
-      : undefined
+    reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
+  const commanderOverviewExiting =
+    reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [recentDelta, setRecentDelta] = useState(0)
   const [editMode, setEditMode] = useState<LifeEditMode | null>(null)
@@ -254,11 +232,6 @@ export function LifeCard({
     )
   }
 
-  function measureMark(event: LayoutChangeEvent) {
-    const { x, y, width, height } = event.nativeEvent.layout
-    setMarkCenter({ x: x + width / 2, y: y + height / 2 })
-  }
-
   function openCommanderOverview() {
     setCommanderOverviewOpen(true)
   }
@@ -297,7 +270,6 @@ export function LifeCard({
       {commanderDamage && !commanderCardMode ? (
         <View
           pointerEvents="none"
-          onLayout={measureMark}
           style={[
             themed($mark),
             markStyle,
@@ -411,6 +383,7 @@ export function LifeCard({
         <Animated.View
           testID={`commander-overview-seat-${seatNumber}`}
           entering={commanderOverviewEntering}
+          exiting={commanderOverviewExiting}
           accessibilityViewIsModal
           style={[
             themed($commanderOverview),
@@ -433,8 +406,8 @@ export function LifeCard({
               foreground={foreground}
               style={themed($expandedCommanderBoard)}
               maxSize={{
-                width: Math.max(cardSize.width - spacing.xl, 0),
-                height: Math.max(cardSize.height - spacing.xl, 0),
+                width: Math.max(cardSize.width - cardPadding * 2, 0),
+                height: Math.max(cardSize.height - cardPadding * 2, 0),
               }}
             />
           </View>
@@ -444,6 +417,7 @@ export function LifeCard({
               accessibilityRole="button"
               accessibilityLabel={`Close commander damage for ${identity}`}
               onPress={closeCommanderOverview}
+              hitSlop={12}
               style={[themed($overviewClose), markStyle, { width: markSize, height: markSize }]}
             >
               <PlayerMark
@@ -451,6 +425,8 @@ export function LifeCard({
                 shape={shape}
                 color={foreground}
                 rotation={contentRotation}
+                insetSwordColor={color}
+                closeIcon
                 size={markSize}
               />
             </Pressable>
@@ -489,7 +465,7 @@ export function LifeCard({
           accessibilityLabel={`Show commander damage for ${identity}`}
           accessibilityHint="Expands the commander damage grid"
           accessibilityState={{ expanded: false }}
-          hitSlop={8}
+          hitSlop={12}
           onPress={openCommanderOverview}
           style={({ pressed }) => [
             themed($markHitTarget),
@@ -569,50 +545,18 @@ const $compactCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderRadius: spacing.md,
 })
 
-const $mark: ThemedStyle<ViewStyle> = () => ({ position: "absolute", zIndex: 9 })
+const $mark: ThemedStyle<ViewStyle> = () => ({
+  position: "absolute",
+  zIndex: 9,
+  opacity: PLAYER_MARK_MUTED_OPACITY,
+})
 const $markHitTarget: ThemedStyle<ViewStyle> = () => ({ position: "absolute", zIndex: 10 })
 
-export function getPlayerMarkPlacement(
-  rotation: LifeCardContentRotation,
-  size: number,
-  distanceFromLifeCenter: number,
-  cardPadding = 0,
-  cardAxisLength = 0,
-): ViewStyle {
-  const centeredOffset = -size / 2 + cardPadding
-  const preferredDirectionalOffset = distanceFromLifeCenter + cardPadding
-  const maximumDirectionalOffset = cardAxisLength / 2 - size - cardPadding
-  const directionalOffset =
-    cardAxisLength > 0
-      ? Math.max(0, Math.min(preferredDirectionalOffset, maximumDirectionalOffset))
-      : preferredDirectionalOffset
-  if (rotation === 90)
-    return {
-      left: "50%",
-      marginLeft: directionalOffset,
-      top: "50%",
-      marginTop: centeredOffset,
-    }
-  if (rotation === -90)
-    return {
-      right: "50%",
-      marginRight: directionalOffset,
-      top: "50%",
-      marginTop: centeredOffset,
-    }
-  if (rotation === 180)
-    return {
-      top: "50%",
-      marginTop: directionalOffset,
-      left: "50%",
-      marginLeft: centeredOffset,
-    }
-  return {
-    bottom: "50%",
-    marginBottom: directionalOffset,
-    left: "50%",
-    marginLeft: centeredOffset,
-  }
+export function getPlayerMarkCorner(rotation: LifeCardContentRotation, padding: number): ViewStyle {
+  if (rotation === 90) return { left: padding, bottom: padding }
+  if (rotation === -90) return { right: padding, top: padding }
+  if (rotation === 180) return { left: padding, top: padding }
+  return { right: padding, bottom: padding }
 }
 
 const $life: ThemedStyle<TextStyle> = () => ({
@@ -645,7 +589,7 @@ const $statusLayer: ThemedStyle<ViewStyle> = () => ({
 const $statusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
   top: "50%",
-  marginTop: 58 + spacing.xxs,
+  marginTop: LIFE_TARGET_SIZE / 2 + spacing.xxs,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xxs,
@@ -653,7 +597,7 @@ const $statusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $compactStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   top: "50%",
-  marginTop: 42 + spacing.xxs,
+  marginTop: COMPACT_LIFE_TARGET_SIZE / 2 + spacing.xxxs,
   position: "absolute",
   flexDirection: "row",
   alignItems: "center",
@@ -686,6 +630,7 @@ const $overviewClose: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
   alignItems: "center",
   justifyContent: "center",
+  zIndex: 3,
 })
 
 const $mutedContent: ThemedStyle<ViewStyle> = () => ({ opacity: 0 })

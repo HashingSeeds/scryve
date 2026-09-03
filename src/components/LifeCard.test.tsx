@@ -5,7 +5,7 @@ import { asPlayerId } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
-import { getPlayerMarkPlacement, LifeCard } from "./LifeCard"
+import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
 
@@ -42,8 +42,8 @@ describe("LifeCard", () => {
       renderCard(123456).getByTestId("life-total-seat-1").props.style,
     )
 
-    expect(twoDigits.fontSize).toBe(60)
-    expect(twoDigits.lineHeight).toBe(66)
+    expect(twoDigits.fontSize).toBe(120)
+    expect(twoDigits.lineHeight).toBe(132)
     expect(sixDigits.fontSize).toBeLessThan(twoDigits.fontSize)
     expect(sixDigits.fontSize * 6 * 0.62).toBeLessThanOrEqual(LIFE_TARGET_SIZE)
   })
@@ -62,35 +62,17 @@ describe("LifeCard", () => {
     const marker = view.getByTestId("player-mark-seat-1", { includeHiddenElements: true })
     expect(marker).toBeTruthy()
     expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
-      left: "50%",
-      marginLeft: -14,
-      bottom: "50%",
-      marginBottom: 74,
+      right: 8,
+      bottom: 8,
     })
     expect(view.getByTestId("life-card-seat-1").props.accessibilityLabel).toBe("Seat 1, Ada")
   })
 
-  it("places each rotated player marker above its life total", () => {
-    expect(getPlayerMarkPlacement(0, 44, 66, 8)).toMatchObject({
-      bottom: "50%",
-      marginBottom: 74,
-      marginLeft: -14,
-    })
-    expect(getPlayerMarkPlacement(180, 44, 66, 8)).toMatchObject({
-      top: "50%",
-      marginTop: 74,
-      marginLeft: -14,
-    })
-    expect(getPlayerMarkPlacement(90, 44, 66, 8)).toMatchObject({
-      left: "50%",
-      marginLeft: 74,
-      marginTop: -14,
-    })
-    expect(getPlayerMarkPlacement(-90, 44, 66, 8)).toMatchObject({
-      right: "50%",
-      marginRight: 74,
-      marginTop: -14,
-    })
+  it("pins each rotated player marker to the corner after its life total", () => {
+    expect(getPlayerMarkCorner(0, 8)).toMatchObject({ right: 8, bottom: 8 })
+    expect(getPlayerMarkCorner(180, 8)).toMatchObject({ left: 8, top: 8 })
+    expect(getPlayerMarkCorner(90, 8)).toMatchObject({ left: 8, bottom: 8 })
+    expect(getPlayerMarkCorner(-90, 8)).toMatchObject({ right: 8, top: 8 })
   })
 
   it.each([0, 90, -90, 180] as const)(
@@ -116,7 +98,7 @@ describe("LifeCard", () => {
       expect(statusLayer.transform).toEqual([{ rotate: `${contentRotation}deg` }])
       expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
         top: "50%",
-        marginTop: 62,
+        marginTop: 104,
       })
     },
   )
@@ -168,11 +150,13 @@ describe("LifeCard", () => {
     fireEvent.press(view.getByTestId("commander-mark-seat-1"))
     expect(view.getByTestId("commander-overview-seat-1")).toBeTruthy()
     expect(view.getByTestId("commander-board-seat-1")).toBeTruthy()
+    expect(view.getByTestId("player-mark-close", { includeHiddenElements: true })).toBeTruthy()
 
     fireEvent.press(view.getByTestId("commander-overview-close-seat-1"))
     act(() => jest.runAllTimers())
     expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
     expect(view.queryByTestId("commander-overview-seat-1")).toBeNull()
+    expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
   })
 
   it("turns the whole defending card into commander damage controls", () => {
@@ -277,20 +261,12 @@ describe("LifeCard", () => {
     expect(onDecline).toHaveBeenCalledTimes(1)
   })
 
-  it("keeps a player marker inside a cramped card edge", () => {
-    expect(getPlayerMarkPlacement(90, 44, 66, 8, 181)).toMatchObject({
-      left: "50%",
-      marginLeft: 38.5,
-      marginTop: -14,
-    })
-    expect(getPlayerMarkPlacement(180, 44, 66, 8, 170)).toMatchObject({
-      top: "50%",
-      marginTop: 33,
-      marginLeft: -14,
-    })
+  it("keeps the marker cornered instead of clamping it into a cramped card", () => {
+    expect(getPlayerMarkCorner(90, 8)).toMatchObject({ left: 8, bottom: 8 })
+    expect(getPlayerMarkCorner(180, 8)).toMatchObject({ left: 8, top: 8 })
   })
 
-  it("repositions the marker after measuring a cramped sideways card", () => {
+  it("keeps the marker cornered after measuring a cramped sideways card", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -310,8 +286,8 @@ describe("LifeCard", () => {
 
     const marker = view.getByTestId("player-mark-seat-1", { includeHiddenElements: true })
     expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
-      left: "50%",
-      marginLeft: 38.5,
+      left: 8,
+      bottom: 8,
     })
   })
 
@@ -339,9 +315,9 @@ describe("LifeCard", () => {
     const target = view.getByTestId("life-total-button-seat-1")
 
     expect(StyleSheet.flatten(target.props.style)).toMatchObject({
-      width: 116,
-      height: 116,
-      borderRadius: 58,
+      width: 200,
+      height: 200,
+      borderRadius: 100,
     })
     expect(StyleSheet.flatten(target.props.style).borderWidth).toBeUndefined()
     expect(StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style)).toMatchObject({

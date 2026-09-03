@@ -71,8 +71,8 @@ export function CommanderDamageBoard({
     gap: CELL_GAP,
     preferred: expanded
       ? compact
-        ? 52
-        : 68
+        ? 88
+        : 120
       : compact
         ? COMMANDER_COMPACT_CELL_SIZE
         : COMMANDER_CELL_SIZE,
@@ -119,6 +119,7 @@ export function CommanderDamageBoard({
 
             const total = incoming[playerId] ?? 0
             const lethal = total >= COMMANDER_LETHAL_DAMAGE
+            const fontSize = Math.max(9, Math.round(size * 0.6))
             return (
               <View
                 key={columnIndex}
@@ -137,7 +138,7 @@ export function CommanderDamageBoard({
                   maxFontSizeMultiplier={1.2}
                   style={[
                     themed($cellText),
-                    { color: foreground, fontSize: Math.max(9, Math.round(size * 0.44)) },
+                    { color: foreground, fontSize, lineHeight: Math.round(fontSize * 1.1) },
                     seatedGlyphRotation,
                   ]}
                 />
@@ -168,7 +169,7 @@ const $cell: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderRadius: spacing.xs,
 })
 
-const $cellIdle: ThemedStyle<ViewStyle> = () => ({ opacity: 0.35 })
+const $cellIdle: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 
 const $cellText: ThemedStyle<TextStyle> = () => ({
   textAlign: "center",

@@ -224,7 +224,7 @@ describe("PlayerGrid", () => {
       expect(two).toBeGreaterThanOrEqual(four)
       expect(six).toBeLessThan(four)
       expect(six).toBeGreaterThanOrEqual(22)
-      expect(two).toBeLessThanOrEqual(80)
+      expect(two).toBeLessThanOrEqual(160)
     })
 
     it("shrinks for longer totals once width rather than height binds", () => {

@@ -60,6 +60,14 @@ describe("CommanderDamageBoard", () => {
     expect(active.opacity).toBeUndefined()
   })
 
+  it("fits a two-digit total inside its cell", () => {
+    const view = board({ incoming: { [ids[0]]: 11 } as Record<PlayerId, number> }, 1)
+    const cell = StyleSheet.flatten(view.getByTestId(commanderCellTestId(2, ids[0])).props.style)
+    const total = StyleSheet.flatten(view.getByText("11").props.style)
+
+    expect(total.fontSize * 2 * 0.62).toBeLessThanOrEqual(cell.width)
+  })
+
   it("shows no steppers until someone is armed", () => {
     const view = board({}, 1)
     expect(view.queryByTestId(commanderStageTestId(2, 1))).toBeNull()

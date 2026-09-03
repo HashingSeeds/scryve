@@ -47,6 +47,28 @@ describe("PlayerMark", () => {
     ).toBeTruthy()
   })
 
+  it("shows a close X instead of a sword when the mark becomes the close button", () => {
+    const view = render(
+      <PlayerMark seatNumber={1} color="#FFFFFF" insetSwordColor="#2F7D5F" closeIcon />,
+    )
+
+    expect(view.getByTestId("player-mark-close", { includeHiddenElements: true })).toBeTruthy()
+    expect(view.queryByTestId("player-mark-sword", { includeHiddenElements: true })).toBeNull()
+  })
+
+  it("keeps a single sword while the mark opens its board", () => {
+    const view = render(<PlayerMark seatNumber={1} color="#FFFFFF" insetSwordColor="#2F7D5F" />)
+
+    expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
+    expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
+  })
+
+  it("needs an inset color before a close X can render", () => {
+    const view = render(<PlayerMark seatNumber={1} color="#FFFFFF" closeIcon />)
+
+    expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
+  })
+
   it("cuts the sword out of the mark instead of stacking it on the direction line", () => {
     const view = render(
       <PlayerMark seatNumber={1} color="#FFFFFF" insetSwordColor="#2F7D5F" spinning />,
