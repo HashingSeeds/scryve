@@ -35,6 +35,7 @@ export const LOCAL_KEYS = {
 } as const
 
 export type ThemePreference = "system" | "light" | "dark"
+export type LaunchDestination = "play" | "decks"
 
 export interface LocalSettings {
   schemaVersion: 1
@@ -43,6 +44,7 @@ export interface LocalSettings {
   hapticsEnabled: boolean
   themePreference: ThemePreference
   menuButtonStyle: MenuButtonStyle
+  launchDestination: LaunchDestination
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
@@ -52,6 +54,7 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   hapticsEnabled: true,
   themePreference: "system",
   menuButtonStyle: DEFAULT_MENU_BUTTON_STYLE,
+  launchDestination: "play",
 }
 
 export interface StringStorage {
@@ -229,6 +232,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     menuButtonStyle: isMenuButtonStyle(migrated.menuButtonStyle)
       ? migrated.menuButtonStyle
       : DEFAULT_MENU_BUTTON_STYLE,
+    launchDestination: migrated.launchDestination === "decks" ? "decks" : "play",
   }
 }
 

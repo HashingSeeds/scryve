@@ -124,6 +124,7 @@ describe("LocalGameRepository", () => {
       hapticsEnabled: false,
       themePreference: "dark",
       menuButtonStyle: "keystoneIIFlat",
+      launchDestination: "play",
     })
   })
 

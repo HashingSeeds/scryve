@@ -9,6 +9,7 @@ import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { ConnectionBadge } from "@/components/ConnectionBadge"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
+import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
   getPlayerGridLayout,
@@ -46,6 +47,10 @@ type ConnectedBoardScreenProps = {
   publicId: string
   onBack?: () => void
   onHistory?: () => void
+  onDecks?: () => void
+  onSettings?: () => void
+  onAccount?: () => void
+  accountLabel?: "Account" | "Sign in"
 }
 
 type ConnectedBoardShellState =
@@ -161,11 +166,20 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
 function ConnectedBoardRuntime({
   publicId,
   onBack,
+  onHistory,
+  onDecks,
+  onSettings,
+  onAccount,
+  accountLabel,
   ownerId,
 }: {
   publicId: string
   onBack?: () => void
   onHistory?: () => void
+  onDecks?: () => void
+  onSettings?: () => void
+  onAccount?: () => void
+  accountLabel?: "Account" | "Sign in"
   ownerId: string
 }) {
   useKeepAwake("count-connected-game")
@@ -269,8 +283,8 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      kind: "status",
-      label: runtime.connectionStatus === "connected" ? "Status" : runtime.connectionStatus,
+      kind: "setup",
+      label: "Setup",
       onPress: (event) => {
         captureMenuDialogOrigin(event)
         setMenuOpen(false)
@@ -278,17 +292,17 @@ function ConnectedBoardRuntime({
       },
     },
     {
-      kind: "home",
-      label: "Home",
-      disabled: !onBack,
+      kind: "history",
+      label: "History",
+      disabled: !onHistory,
       onPress: () => {
         setMenuOpen(false)
-        onBack?.()
+        onHistory?.()
       },
     },
     {
       kind: "end-game",
-      label: "End game",
+      label: "End",
       disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
       onPress: (event) => {
         captureMenuDialogOrigin(event)
@@ -339,6 +353,15 @@ function ConnectedBoardRuntime({
           onToggle={() => setMenuOpen((current) => !current)}
           onClose={() => setMenuOpen(false)}
         />
+        {menuOpen && onDecks && onSettings && onAccount ? (
+          <FloatingAppNavigation
+            destinationLabel="Decks"
+            accountLabel={accountLabel}
+            onDestination={onDecks}
+            onSettings={onSettings}
+            onAccount={onAccount}
+          />
+        ) : null}
         <ConnectedBoardSyncToast
           connectionStatus={runtime.connectionStatus}
           pendingCount={runtime.pending.length}

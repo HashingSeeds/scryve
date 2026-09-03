@@ -6,6 +6,7 @@ import { useKeepAwake } from "expo-keep-awake"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
+import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
   getPlayerGridLayoutOptions,
@@ -18,7 +19,7 @@ import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
-import { counterValueLabel, playFormatLabel, playSystemId } from "@/features/game/playSystems"
+import { counterValueLabel, playSystemId } from "@/features/game/playSystems"
 import type { LocalGame, PlayerId } from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
@@ -27,15 +28,33 @@ import type { ThemedStyle } from "@/theme/types"
 
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
-  onHome: () => void
+  fresh?: boolean
+  initialEndOpen?: boolean
+  onDecks?: () => void
+  onHistory?: () => void
+  onSetup?: () => void
+  onConnect?: () => void
+  onSettings?: () => void
+  onAccount?: () => void
+  accountLabel?: "Account" | "Sign in"
   onGameEnded: (gameId: string) => void
+  onGameAbandoned?: () => void
   repository?: LocalGameRepository
 }
 
 export function CurrentGameScreen({
   initialGame,
-  onHome,
+  fresh = false,
+  initialEndOpen = false,
+  onDecks,
+  onHistory,
+  onSetup,
+  onConnect,
+  onSettings,
+  onAccount,
+  accountLabel = "Account",
   onGameEnded,
+  onGameAbandoned,
   repository,
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game")
@@ -48,11 +67,11 @@ export function CurrentGameScreen({
   const system = playSystemId(runtime.game.system)
   const { width, height, fontScale } = useWindowDimensions()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [endConfirmationOpen, setEndConfirmationOpen] = useState(false)
+  const [isFresh, setIsFresh] = useState(fresh)
+  const [endConfirmationOpen, setEndConfirmationOpen] = useState(initialEndOpen)
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<PlayerId[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
-  const [statusOpen, setStatusOpen] = useState(false)
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
 
   function captureMenuDialogOrigin(event?: GestureResponderEvent) {
@@ -73,14 +92,19 @@ export function CurrentGameScreen({
   const menuAnchor = getPlayerGridMenuAnchor(playerCount, gridLayout)
 
   function confirmEnd() {
-    const ended =
-      winnerPlayerIds.length > 0
-        ? runtime.finish({ kind: "win", winnerPlayerIds })
-        : drawSelected
-          ? runtime.finish({ kind: "draw" })
-          : runtime.abandon()
+    if (!endResultSelected) return
+    const ended = winnerPlayerIds.length
+      ? runtime.finish({ kind: "win", winnerPlayerIds })
+      : runtime.finish({ kind: "draw" })
     setEndConfirmationOpen(false)
     if (ended.status !== "active") setTimeout(() => onGameEnded(ended.id), 0)
+  }
+
+  function abandonGame() {
+    if (!onGameAbandoned) return
+    runtime.discard()
+    setEndConfirmationOpen(false)
+    setTimeout(onGameAbandoned, 0)
   }
 
   function toggleWinner(playerId: PlayerId) {
@@ -133,30 +157,41 @@ export function CurrentGameScreen({
       },
     },
     {
-      kind: "status",
-      label: "Status",
-      onPress: (event) => {
-        captureMenuDialogOrigin(event)
-        setMenuOpen(false)
-        setStatusOpen(true)
-      },
-    },
-    {
-      kind: "home",
-      label: "Home",
+      kind: "setup",
+      label: "Setup",
+      disabled: !onSetup,
       onPress: () => {
         closeMenu()
-        onHome()
+        onSetup?.()
       },
     },
     {
-      kind: "end-game",
-      label: "End game",
-      onPress: (event) => {
-        captureMenuDialogOrigin(event)
-        showEndConfirmation()
+      kind: "history",
+      label: "History",
+      disabled: !onHistory,
+      onPress: () => {
+        closeMenu()
+        onHistory?.()
       },
     },
+    isFresh
+      ? {
+          kind: "connect",
+          label: "Connect",
+          disabled: !onConnect,
+          onPress: () => {
+            closeMenu()
+            onConnect?.()
+          },
+        }
+      : {
+          kind: "end-game",
+          label: "End",
+          onPress: (event) => {
+            captureMenuDialogOrigin(event)
+            showEndConfirmation()
+          },
+        },
   ]
 
   return (
@@ -172,7 +207,10 @@ export function CurrentGameScreen({
           system={system}
           layoutVariant={layoutVariant}
           disabled={menuOpen}
-          onChange={runtime.changeLife}
+          onChange={(playerId, delta) => {
+            runtime.changeLife(playerId, delta)
+            setIsFresh(false)
+          }}
         />
         <GameRadialMenu
           open={menuOpen}
@@ -184,6 +222,15 @@ export function CurrentGameScreen({
           onToggle={() => setMenuOpen((current) => !current)}
           onClose={closeMenu}
         />
+        {menuOpen && onDecks && onSettings && onAccount ? (
+          <FloatingAppNavigation
+            destinationLabel="Decks"
+            accountLabel={accountLabel}
+            onDestination={onDecks}
+            onSettings={onSettings}
+            onAccount={onAccount}
+          />
+        ) : null}
       </View>
 
       {layoutPickerOpen ? (
@@ -218,31 +265,6 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
-      {statusOpen ? (
-        <DialogCard
-          visible
-          onClose={() => setStatusOpen(false)}
-          origin={menuDialogOrigin}
-          backdropTestID="game-status-backdrop"
-          backdropAccessibilityLabel="Close game status"
-          dialogTestID="game-status-dialog"
-          accessibilityViewIsModal
-        >
-          <Text text="Game status" preset="subheading" style={themed($dialogText)} />
-          <Text
-            testID="game-status-summary"
-            text={`${playerCount} players · ${playFormatLabel(system, runtime.game.format)} · started with ${counterValueLabel(system, runtime.game.startingLife)}`}
-            style={themed($dialogText)}
-          />
-          <Text
-            text="Local game — everything is saved on this device."
-            size="xs"
-            style={themed($dialogText)}
-          />
-          <Button text="Close" style={themed($menuItem)} onPress={() => setStatusOpen(false)} />
-        </DialogCard>
-      ) : null}
-
       {endConfirmationOpen ? (
         <DialogCard
           visible
@@ -256,7 +278,7 @@ export function CurrentGameScreen({
           <View style={themed($dialogHeader)}>
             <Text text="Who won?" preset="subheading" />
             <Text
-              text="Skip to end without recording a result."
+              text="Choose a winner or record a draw."
               size="xs"
               style={themed($dialogSubtitle)}
             />
@@ -291,14 +313,17 @@ export function CurrentGameScreen({
           </View>
           <View style={themed($dialogActions)}>
             <Button
-              tx="game:cancel"
+              testID="abandon-game-button"
+              text="Abandon"
+              disabled={!onGameAbandoned}
               style={themed($dialogAction)}
-              onPress={() => setEndConfirmationOpen(false)}
+              onPress={abandonGame}
             />
             <Button
               testID="confirm-end-game-button"
-              tx={endResultSelected ? "game:finish" : "game:abandon"}
-              preset={endResultSelected ? "reversed" : "filled"}
+              text="End game"
+              disabled={!endResultSelected}
+              preset="reversed"
               style={themed($dialogAction)}
               onPress={confirmEnd}
             />

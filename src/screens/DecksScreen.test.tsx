@@ -87,7 +87,14 @@ jest.mock("../../convex/_generated/api", () => ({
 function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
   return render(
     <ThemeProvider initialContext="light">
-      <DecksScreen onBack={jest.fn()} onSelect={jest.fn()} onAddDeck={jest.fn()} {...props} />
+      <DecksScreen
+        onPlay={jest.fn()}
+        onSelect={jest.fn()}
+        onAddDeck={jest.fn()}
+        onSettings={jest.fn()}
+        onAccount={jest.fn()}
+        {...props}
+      />
     </ThemeProvider>,
   )
 }
@@ -102,6 +109,16 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     mockListMine.error = undefined
+  })
+
+  it("puts app navigation at the bottom and returns to the active game", () => {
+    const onPlay = jest.fn()
+    const view = renderShelf({ hasCurrentGame: true, onPlay })
+
+    expect(view.getByText("Return to game")).toBeTruthy()
+    expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Return to game"))
+    expect(onPlay).toHaveBeenCalledTimes(1)
   })
 
   it("shows dense rows with format, size, versions, and record", () => {

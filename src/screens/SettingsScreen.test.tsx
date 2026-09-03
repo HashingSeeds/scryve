@@ -38,7 +38,8 @@ describe("SettingsScreen", () => {
     fireEvent.press(view.getByTestId("haptics-switch"))
     fireEvent.press(view.getByText("Dark"))
     fireEvent.press(view.getByTestId("menu-button-style-prismFlat"))
-    expect(onSettingsChange).toHaveBeenCalledTimes(5)
+    fireEvent.press(view.getByTestId("launch-destination-decks"))
+    expect(onSettingsChange).toHaveBeenCalledTimes(6)
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         defaultPlayerCount: 6,
@@ -46,6 +47,7 @@ describe("SettingsScreen", () => {
         hapticsEnabled: false,
         themePreference: "dark",
         menuButtonStyle: "prismFlat",
+        launchDestination: "decks",
       }),
     )
   })
