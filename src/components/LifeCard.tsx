@@ -161,7 +161,6 @@ export function LifeCard({
   // Overlays hang below the life target instead of a fixed pixel offset, so they
   // hug the life number on small cards (5-6 player grids).
   const statusTopOffset = lifeTargetRadius + (compact ? spacing.xxxs : spacing.xxs)
-  const commanderTopOffset = statusTopOffset + (statusLabel ? STATUS_LABEL_SPACE + spacing.xxs : 0)
   // The board lives in the rotated layer, so on quarter turns its width axis maps
   // to the card's height axis.
   const quarterTurn = contentRotation === 90 || contentRotation === -90
@@ -171,7 +170,7 @@ export function LifeCard({
     cardSize.width > 0
       ? {
           width: boardCrossAxis - cardPadding * 2,
-          height: boardAxis / 2 - cardPadding - commanderTopOffset,
+          height: boardAxis / 2 - cardPadding * 2,
         }
       : undefined
   const parsedValue = Number(editValue)
@@ -316,15 +315,23 @@ export function LifeCard({
           {commanderDamage ? (
             <View
               pointerEvents="box-none"
-              style={[
-                themed($commanderLayer),
-                { transform: [{ rotate: `${contentRotation}deg` }] },
-              ]}
+              style={themed($commanderLayer)}
             >
               <View
+                testID={`commander-position-seat-${seatNumber}`}
                 pointerEvents="box-none"
-                style={[themed($commanderPosition), { marginTop: commanderTopOffset }]}
+                style={[
+                  themed($commanderLane),
+                  getCommanderDamageLaneStyle(contentRotation, cardSize, lifeTargetRadius),
+                ]}
               >
+                <View
+                  pointerEvents="box-none"
+                  style={[
+                    themed($commanderPosition),
+                    { transform: [{ rotate: `${contentRotation}deg` }] },
+                  ]}
+                >
                 <CommanderDamageBoard
                   {...commanderDamage}
                   seatNumber={seatNumber}
@@ -438,6 +445,7 @@ export function LifeCard({
                     </Pressable>
                   </View>
                 ) : null}
+                </View>
               </View>
             </View>
           ) : null}
@@ -624,11 +632,56 @@ const $commanderLayer: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
 })
 
-const $commanderPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $commanderLane: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
-  top: "50%",
-  marginTop: 58 + spacing.lg,
+  justifyContent: "center",
   alignItems: "center",
+})
+
+export function getCommanderDamageLaneStyle(
+  rotation: LifeCardContentRotation,
+  cardSize: { width: number; height: number },
+  lifeTargetRadius: number,
+): ViewStyle {
+  const sideLaneSize =
+    cardSize.width > 0 ? Math.max(cardSize.width / 2 - lifeTargetRadius, 0) : undefined
+  const verticalLaneSize =
+    cardSize.height > 0 ? Math.max(cardSize.height / 2 - lifeTargetRadius, 0) : undefined
+  const laneInset = lifeTargetRadius / 2
+  if (rotation === 90)
+    return {
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: sideLaneSize ?? "50%",
+      paddingLeft: laneInset,
+    }
+  if (rotation === -90)
+    return {
+      right: 0,
+      top: 0,
+      bottom: 0,
+      width: sideLaneSize ?? "50%",
+      paddingRight: laneInset,
+    }
+  if (rotation === 180)
+    return {
+      left: 0,
+      right: 0,
+      top: 0,
+      height: verticalLaneSize ?? "50%",
+      paddingTop: laneInset,
+    }
+  return {
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: verticalLaneSize ?? "50%",
+    paddingBottom: laneInset,
+  }
+}
+
+const $commanderPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
 })
 

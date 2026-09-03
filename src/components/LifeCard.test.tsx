@@ -2,10 +2,15 @@ import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { asPlayerId } from "@/features/game/domain"
 
-import { getPlayerMarkPlacement, LifeCard } from "./LifeCard"
+import { getCommanderDamageLaneStyle, getPlayerMarkPlacement, LifeCard } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
+import { commanderBoardSeats } from "./commanderDamageLayout"
+
+const commanderIds = [asPlayerId("player-1"), asPlayerId("player-2")]
+const commanderSeats = commanderBoardSeats([[0], [1]], commanderIds)
 
 function card(life: number) {
   return (
@@ -115,6 +120,74 @@ describe("LifeCard", () => {
       })
     },
   )
+
+  it("keeps commander steppers inward from the card edge", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("commander-position-seat-1").props.style),
+    ).toMatchObject({
+      bottom: 0,
+      height: "50%",
+      justifyContent: "center",
+    })
+  })
+
+  it.each([
+    [0, { left: 0, right: 0, bottom: 0, height: 242, paddingBottom: 29 }],
+    [90, { left: 0, top: 0, bottom: 0, width: 170, paddingLeft: 29 }],
+    [-90, { right: 0, top: 0, bottom: 0, width: 170, paddingRight: 29 }],
+    [180, { left: 0, right: 0, top: 0, height: 242, paddingTop: 29 }],
+  ] as const)("places the commander lane in the outer half at %s degrees", (rotation, style) => {
+    expect(getCommanderDamageLaneStyle(rotation, { width: 456, height: 600 }, 58)).toEqual(style)
+  })
+
+  it("uses the same centered outer lane for compact commander boards", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          compact
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("commander-position-seat-1").props.style),
+    ).toMatchObject({
+      bottom: 0,
+      height: "50%",
+      justifyContent: "center",
+    })
+  })
 
   it("keeps a player marker inside a cramped card edge", () => {
     expect(getPlayerMarkPlacement(90, 44, 66, 8, 181)).toMatchObject({
