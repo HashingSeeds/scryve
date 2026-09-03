@@ -261,6 +261,70 @@ describe("LifeCard", () => {
     expect(onDecline).toHaveBeenCalledTimes(1)
   })
 
+  it("keeps claim text readable on the dark overlay for light seat colors", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#F5F0E6"
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            pendingClaims: [
+              {
+                claimId: "claim-1",
+                attackerName: "Grace",
+                delta: 4,
+                onConfirm: jest.fn(),
+                onDecline: jest.fn(),
+              },
+            ],
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    const headline = StyleSheet.flatten(view.getByText("Grace dealt 4").props.style)
+    const caption = StyleSheet.flatten(view.getByText("Confirm commander damage").props.style)
+    expect(headline.color).toBe("#FFFFFF")
+    expect(caption.color).toBe("#FFFFFF")
+  })
+
+  it("closes the life editor without saving once the card freezes", () => {
+    const onChange = jest.fn()
+    const unfrozen = (
+      <ThemeProvider initialContext="light">
+        <LifeCard playerName="Ada" seatNumber={1} life={20} color="#41476E" onChange={onChange} />
+      </ThemeProvider>
+    )
+    const view = render(unfrozen)
+    fireEvent(view.getByTestId("life-total-button-seat-1"), "longPress")
+    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "37")
+    expect(view.getByTestId("life-editor-dialog-seat-1")).toBeTruthy()
+
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          eliminated
+          onChange={onChange}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.queryByTestId("life-editor-dialog-seat-1")).toBeNull()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it("keeps the marker cornered instead of clamping it into a cramped card", () => {
     expect(getPlayerMarkCorner(90, 8)).toMatchObject({ left: 8, bottom: 8 })
     expect(getPlayerMarkCorner(180, 8)).toMatchObject({ left: 8, top: 8 })

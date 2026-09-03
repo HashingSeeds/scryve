@@ -189,7 +189,7 @@ export function CommanderDamageCardControls({
                 weight="bold"
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.2}
-                style={[themed($headline), { color: foreground }]}
+                style={[themed($headline), { color: controlForeground }]}
               />
               <Text
                 text={
@@ -200,7 +200,7 @@ export function CommanderDamageCardControls({
                 size="xxs"
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.2}
-                style={[themed($caption), { color: foreground }]}
+                style={[themed($caption), { color: controlForeground }]}
               />
             </>
           ) : null}

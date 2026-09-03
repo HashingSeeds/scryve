@@ -220,10 +220,17 @@ export function LifeCard({
   }
 
   function applyEdit() {
-    if (!validEdit) return
+    if (frozen || !validEdit) return
     if (requestedDelta !== 0) onChange(requestedDelta)
     closeEditor()
   }
+
+  useEffect(() => {
+    if (frozen) {
+      setEditMode(null)
+      setEditValue("")
+    }
+  }, [frozen])
 
   function measureCard(event: LayoutChangeEvent) {
     const { width, height } = event.nativeEvent.layout
