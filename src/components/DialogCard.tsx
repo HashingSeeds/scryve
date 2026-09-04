@@ -29,6 +29,7 @@ export interface DialogCardProps {
   dialogAccessibilityRole?: AccessibilityRole
   accessibilityViewIsModal?: boolean
   wide?: boolean
+  placement?: "center" | "bottom"
   origin?: DialogOrigin
   style?: StyleProp<ViewStyle>
   children: ReactNode
@@ -49,6 +50,7 @@ export function DialogCard({
   dialogAccessibilityRole,
   accessibilityViewIsModal,
   wide,
+  placement = "center",
   origin,
   style,
   children,
@@ -102,12 +104,25 @@ export function DialogCard({
           style={[StyleSheet.absoluteFill, themed($dialogBackdrop)]}
           onPress={requestClose}
         />
-        <View pointerEvents="box-none" style={[themed($dialogLayout), safeAreaInsets]}>
+        <View
+          pointerEvents="box-none"
+          style={[
+            themed($dialogLayout),
+            placement === "bottom" ? themed($bottomDialogLayout) : undefined,
+            safeAreaInsets,
+          ]}
+        >
           <Animated.View
             testID={dialogTestID}
             accessibilityRole={dialogAccessibilityRole}
             accessibilityViewIsModal={accessibilityViewIsModal}
-            style={[themed($dialog), wide ? themed($wideDialog) : undefined, style, entranceStyle]}
+            style={[
+              themed($dialog),
+              wide ? themed($wideDialog) : undefined,
+              placement === "bottom" ? themed($bottomDialog) : undefined,
+              style,
+              entranceStyle,
+            ]}
             onLayout={launchFromOrigin}
             onStartShouldSetResponder={claimTouchesSoTheBackdropNeverSeesThem}
           >
@@ -129,6 +144,11 @@ const $dialogLayout: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "center",
   padding: spacing.lg,
 })
+const $bottomDialogLayout: ThemedStyle<ViewStyle> = () => ({
+  justifyContent: "flex-end",
+  paddingHorizontal: 0,
+  paddingBottom: 0,
+})
 const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   width: "100%",
   maxWidth: 420,
@@ -146,6 +166,15 @@ const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   elevation: 16,
 })
 const $wideDialog: ThemedStyle<ViewStyle> = () => ({ maxWidth: 520 })
+const $bottomDialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  maxHeight: "88%",
+  borderBottomWidth: 0,
+  borderBottomLeftRadius: 0,
+  borderBottomRightRadius: 0,
+  borderTopLeftRadius: spacing.lg,
+  borderTopRightRadius: spacing.lg,
+  backgroundColor: colors.surface,
+})
 
 export const $dialogText: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
 export const $dialogActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({

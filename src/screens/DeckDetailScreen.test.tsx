@@ -1,5 +1,7 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
+import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 
 import { cardDetailsKey, DeckDetailScreen } from "./DeckDetailScreen"
@@ -165,19 +167,31 @@ describe("DeckDetailScreen", () => {
     const view = renderDetail()
     expect(view.getByText("Magic · Commander · 1 card")).toBeTruthy()
     expect(
-      view.getByTestId("deck-card-thumbnail-main:22222222-2222-2222-2222-222222222222").props
-        .contentFit,
-    ).toBe("contain")
+      view.queryByTestId("deck-card-thumbnail-main:22222222-2222-2222-2222-222222222222"),
+    ).toBeNull()
+    expect(view.getByText("1×")).toBeTruthy()
+    expect(view.getByText("Sol Ring")).toBeTruthy()
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("deck-card-row-main:22222222-2222-2222-2222-222222222222").props.style,
+      ).minHeight,
+    ).toBe(64)
     expect(view.getByTestId("deck-loading-progress").props.accessibilityValue).toEqual({
       text: "Deck loaded",
     })
-    expect(view.getByText("50% win rate · 3W 3L 0D over 6 games")).toBeTruthy()
-    expect(view.getByText("Current  ›")).toBeTruthy()
+    expect(view.getByText("3–3")).toBeTruthy()
+    expect(view.getByText("50%")).toBeTruthy()
+    expect(view.getByText("Current ›")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-tab-notes"))
     expect(view.getByText("Ramp into big spells")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-tab-versions"))
     expect(view.getByText("The list I actually sleeve")).toBeTruthy()
-    expect(view.getByText("1 card · 75% win rate · 3W 1L 0D over 4 games")).toBeTruthy()
+    expect(view.getByText("3–1")).toBeTruthy()
+    expect(view.getAllByText("1 card").length).toBeGreaterThan(0)
+    expect(
+      StyleSheet.flatten(view.getByTestId("version-marker-version-main").props.style)
+        .backgroundColor,
+    ).toBe(colors.gameMenu.actions.history)
     expect(view.queryByText(/Premium/)).toBeNull()
   })
 
@@ -226,9 +240,9 @@ describe("DeckDetailScreen", () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     fireEvent.press(view.getAllByText("+")[0])
-    expect(view.getByText("2× Sol Ring")).toBeTruthy()
+    expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
     fireEvent.press(view.getByTestId("discard-edits-button"))
-    expect(view.getByText("1× Sol Ring")).toBeTruthy()
+    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
     expect(mockSaveVersion).not.toHaveBeenCalled()
   })
 
@@ -253,7 +267,7 @@ describe("DeckDetailScreen", () => {
     }
     const view = renderDetail()
 
-    fireEvent.press(view.getByText("3× Ash Blossom & Joyous Spring"))
+    fireEvent.press(view.getByLabelText("3× Ash Blossom & Joyous Spring"))
 
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
     expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
@@ -279,7 +293,7 @@ describe("DeckDetailScreen", () => {
     }
     const view = renderDetail()
 
-    fireEvent.press(view.getByText("3× Riolu"))
+    fireEvent.press(view.getByLabelText("3× Riolu"))
 
     await waitFor(() => expect(view.getByText("Pokemon · Basic · Fighting")).toBeTruthy())
     expect(mockPokemonCardByReference).toHaveBeenCalledWith({
@@ -377,7 +391,7 @@ describe("DeckDetailScreen", () => {
 
     mockDetail.error = undefined
     fireEvent.press(view.getByTestId("retry-deck-detail"))
-    expect(view.getByText("1× Sol Ring")).toBeTruthy()
+    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
     consoleError.mockRestore()
   })
 

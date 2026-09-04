@@ -1,3 +1,4 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -56,5 +57,15 @@ describe("DialogCard", () => {
 
     expect(view.queryByTestId("dialog-backdrop")).toBeNull()
     expect(view.queryByText("Dialog body")).toBeNull()
+  })
+
+  it("supports an edge-aligned bottom sheet", () => {
+    const { view } = renderDialog({ placement: "bottom" })
+
+    expect(StyleSheet.flatten(view.getByTestId("dialog-card").props.style)).toMatchObject({
+      maxHeight: "88%",
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+    })
   })
 })
