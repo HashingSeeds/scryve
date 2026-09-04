@@ -87,6 +87,7 @@ export interface ConnectedProjection {
   playerCount: number
   system?: PlaySystemId
   format?: string
+  deckRequired?: boolean
   startingLife: number
   lifeStep?: number
   ruleset: string
@@ -150,6 +151,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     !Array.isArray(value.players)
   )
     return null
+  if (value.deckRequired !== undefined && typeof value.deckRequired !== "boolean") return null
   const players: ConnectedPlayerProjection[] = []
   for (const player of value.players) {
     if (
@@ -255,6 +257,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
           format: typeof value.format === "string" && value.format ? value.format : value.ruleset,
         }
       : {}),
+    deckRequired: value.deckRequired ?? false,
     startingLife: value.startingLife,
     ...(typeof value.lifeStep === "number" && Number.isInteger(value.lifeStep) && value.lifeStep > 0
       ? { lifeStep: value.lifeStep }

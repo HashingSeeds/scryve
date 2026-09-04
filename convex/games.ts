@@ -487,6 +487,7 @@ export const createLobby = mutation({
     startingLife: v.number(),
     lifeStep: v.optional(v.number()),
     ruleset: v.string(),
+    deckRequired: v.optional(v.boolean()),
     game: v.optional(v.string()),
     system: v.optional(v.string()),
     format: v.optional(v.string()),
@@ -554,6 +555,7 @@ export const createLobby = mutation({
       startingLife: args.startingLife,
       ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
       ruleset,
+      ...(args.deckRequired === undefined ? {} : { deckRequired: args.deckRequired }),
       game: gameSystem,
       system: gameSystem,
       ...(format ? { format } : {}),
@@ -719,6 +721,7 @@ export const lobbyProjection = query({
       startingLife: game.startingLife,
       ...(game.lifeStep === undefined ? {} : { lifeStep: game.lifeStep }),
       ruleset: game.ruleset,
+      deckRequired: game.deckRequired ?? false,
       game: game.game ?? DEFAULT_DECK_GAME,
       system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
       format: game.format ?? game.ruleset,
@@ -788,6 +791,15 @@ export const startGame = mutation({
     const players = await playersForGame(ctx, game._id)
     if (players.length < 2 || players.length > 6 || players.length !== game.playerCount)
       throw new Error("All configured seats (2–6) must be claimed before starting")
+    if (game.deckRequired === true) {
+      for (const player of players) {
+        if (
+          player.deckVersionId === undefined ||
+          !(await deckSelectionIsPlayable(ctx, player.deckVersionId))
+        )
+          throw new Error("Every occupied seat must choose a deck before starting")
+      }
+    }
     const now = Date.now()
     await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
     for (const player of players) {
@@ -1530,6 +1542,7 @@ export const activeConnectedGames = query({
             isHost: true,
             playerCount: game.playerCount,
             ruleset: game.ruleset,
+            deckRequired: game.deckRequired ?? false,
             game: game.game ?? DEFAULT_DECK_GAME,
             system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
             format: game.format ?? game.ruleset,
@@ -1550,6 +1563,7 @@ export const activeConnectedGames = query({
           isHost: game.hostUserId === user._id,
           playerCount: game.playerCount,
           ruleset: game.ruleset,
+          deckRequired: game.deckRequired ?? false,
           game: game.game ?? DEFAULT_DECK_GAME,
           system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
           format: game.format ?? game.ruleset,

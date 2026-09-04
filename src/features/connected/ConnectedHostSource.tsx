@@ -1,9 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useMutation, usePaginatedQuery } from "convex/react"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remotePage } from "@/features/async/remoteState"
+import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
+import { ConnectedGameRepository } from "@/features/connected/persistence"
 import {
   useConnectedProfile,
   type ConnectedProfileState,
@@ -61,6 +63,14 @@ function ConnectedHostQuerySource({
   const createLobby = useMutation(api.games.createLobby)
   const localRepository = useMemo(() => new LocalGameRepository(), [])
   const deviceId = useMemo(() => localRepository.getDeviceId(), [localRepository])
+  const migrationRepository = useMemo(
+    () =>
+      connectedProfile.profile
+        ? new ConnectedGameRepository(undefined, connectedProfile.profile.userId)
+        : null,
+    [connectedProfile.profile],
+  )
+  const migrateMemberships = useMutation(api.games.migrateMyGameMemberships)
   const [hostError, setHostError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const ready = connectedProfile.status === "ready"
@@ -77,6 +87,27 @@ function ConnectedHostQuerySource({
         ? "Checking for an existing hosted game…"
         : undefined
   const hostReady = ready && activeGamesState.status === "ready"
+
+  useEffect(() => {
+    if (!ready || !migrationRepository || migrationRepository.isMembershipMigrationComplete())
+      return
+    let cancelled = false
+    void (async () => {
+      let cursor: string | null = null
+      let isDone = false
+      while (!isDone && !cancelled) {
+        const result: { continueCursor: string; isDone: boolean } = await migrateMemberships({
+          cursor,
+        })
+        cursor = result.continueCursor
+        isDone = result.isDone
+      }
+      if (!cancelled) migrationRepository.markMembershipMigrationComplete()
+    })().catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [migrateMemberships, migrationRepository, ready])
 
   async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
     if (connectedProfile.status === "offline") {
@@ -125,6 +156,12 @@ function ConnectedHostQuerySource({
           : undefined,
     error:
       hostError ?? (connectedProfile.status === "error" ? connectedProfile.message : undefined),
+    ...(activeGamesState.status === "ready"
+      ? {
+          activeGames: activeGamesState.items as readonly ResumableGame[],
+          activeGamesNextPage: activeGamesState.nextPage,
+        }
+      : {}),
     host: (setup) => void host(setup),
   })
 }

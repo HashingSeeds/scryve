@@ -75,6 +75,7 @@ export default defineSchema({
     startingLife: v.number(),
     lifeStep: v.optional(v.number()),
     ruleset: v.string(),
+    deckRequired: v.optional(v.boolean()),
     game: v.optional(v.string()),
     system: v.optional(v.string()),
     format: v.optional(v.string()),

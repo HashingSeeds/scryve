@@ -18,13 +18,14 @@ async function synced(t: ReturnType<typeof convexTest>, subject: string, name: s
   return actor
 }
 
-async function lobby(t: ReturnType<typeof convexTest>) {
+async function lobby(t: ReturnType<typeof convexTest>, options: { deckRequired?: boolean } = {}) {
   const host = await synced(t, "host-subject", "Host")
   const created = await host.mutation(api.games.createLobby, {
     publicId: "public-game-id-123456",
     playerCount: 2,
     startingLife: 40,
     ruleset: "commander",
+    ...(options.deckRequired === undefined ? {} : { deckRequired: options.deckRequired }),
     inviteToken: token,
     manualCodeCandidates: ["ABC234", "DEF567"],
     hostDisplayName: "Host",
@@ -184,6 +185,50 @@ describe("Convex connected-game authorization", () => {
     expect(joinerProjection.players.map((player) => player.controlledByMe)).toEqual([false, true])
     expect(hostProjection.status).toBe(joinerProjection.status)
     expect(hostProjection.players.map((player) => player.currentLife)).toEqual([40, 40])
+  })
+
+  it("keeps legacy lobbies deck-optional and blocks required lobbies without decks", async () => {
+    const t = convexTest(schema, modules)
+    const { host: requiredHost, created: requiredLobby } = await lobby(t, {
+      deckRequired: true,
+    })
+    const joiner = await synced(t, "required-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, {
+      token,
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+
+    await expect(
+      requiredHost.query(api.games.lobbyProjection, { publicId: requiredLobby.publicId }),
+    ).resolves.toMatchObject({ deckRequired: true })
+    await expect(
+      requiredHost.mutation(api.games.startGame, { publicId: requiredLobby.publicId }),
+    ).rejects.toThrow("Every occupied seat must choose a deck")
+
+    const legacy = await synced(t, "legacy-host", "Legacy host")
+    const legacyLobby = await legacy.mutation(api.games.createLobby, {
+      publicId: "legacy-public-game-id",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      inviteToken: "l".repeat(43),
+      manualCodeCandidates: ["LEG234"],
+      hostDisplayName: "Legacy host",
+      hostColor: "#7C3AED",
+    })
+    const legacyJoiner = await synced(t, "legacy-joiner", "Legacy joiner")
+    await legacyJoiner.mutation(api.games.claimSeat, {
+      token: "l".repeat(43),
+      displayName: "Legacy joiner",
+      color: "#2563EB",
+    })
+    await expect(
+      legacy.query(api.games.lobbyProjection, { publicId: legacyLobby.publicId }),
+    ).resolves.toMatchObject({ deckRequired: false })
+    await expect(
+      legacy.mutation(api.games.startGame, { publicId: legacyLobby.publicId }),
+    ).resolves.toEqual({ publicId: legacyLobby.publicId })
   })
 
   it("enforces invite revocation and manual-code collisions", async () => {

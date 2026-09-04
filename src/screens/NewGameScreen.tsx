@@ -18,7 +18,10 @@ import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ValueField } from "@/components/ValueField"
+import type { NextPageState } from "@/features/async/remoteState"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
+import type { ResumableGame } from "@/features/connected/connectedCopy"
+import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import {
   MAX_PLAYER_NAME_LENGTH,
   PLAYER_COLORS,
@@ -56,12 +59,15 @@ export interface ConnectedHostFeed {
   blockedReason?: string
   error?: string
   retry?: () => void
+  activeGames?: readonly ResumableGame[]
+  activeGamesNextPage?: NextPageState
   host: (setup: {
     playerCount: number
     startingLife: number
     ruleset: string
     system?: PlaySystemId
     format?: string
+    deckRequired: boolean
     layout: PlayerGridLayoutVariant
     lifeStep: number
   }) => void
@@ -86,6 +92,8 @@ export interface NewGameScreenProps {
   localSubmitText?: string
   initialGame?: LocalGame
   confirmLocalSubmit?: boolean
+  onJoinConnected?: () => void
+  onResumeConnected?: (game: ResumableGame) => void
 }
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
@@ -102,6 +110,8 @@ export function NewGameScreen({
   localSubmitText,
   initialGame,
   confirmLocalSubmit = false,
+  onJoinConnected,
+  onResumeConnected,
 }: NewGameScreenProps) {
   const {
     themed,
@@ -134,6 +144,7 @@ export function NewGameScreen({
   const [startingLife, setStartingLife] = useState(
     initialGame?.startingLife ?? defaults.defaultStartingLife,
   )
+  const [deckRequired, setDeckRequired] = useState(false)
   const [lifeStep, setLifeStep] = useState(
     initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
@@ -168,7 +179,13 @@ export function NewGameScreen({
       ...(system && format ? { system, format } : {}),
     }
     if (connectedMode)
-      connected?.host({ playerCount, startingLife, ruleset: format ?? NO_PLAY_SYSTEM, ...setup })
+      connected?.host({
+        playerCount,
+        startingLife,
+        ruleset: format ?? NO_PLAY_SYSTEM,
+        deckRequired,
+        ...setup,
+      })
     else if (confirmLocalSubmit) setConfirmingLocalSubmit(true)
     else onStartLocal(players, startingLife, setup)
   }
@@ -298,6 +315,22 @@ export function NewGameScreen({
           <PlayerLayoutPicker playerCount={playerCount} value={layout} onChange={setLayout} />
         </View>
 
+        {connectedMode ? (
+          <View style={themed($section)}>
+            <Text text="Decks" preset="subheading" accessibilityRole="header" />
+            <SegmentedControl
+              testID="deck-requirement"
+              accessibilityLabel="Deck requirement"
+              segments={[
+                { id: "optional", label: "Optional" },
+                { id: "required", label: "Required" },
+              ]}
+              selectedId={deckRequired ? "required" : "optional"}
+              onSelect={(value) => setDeckRequired(value === "required")}
+            />
+          </View>
+        ) : null}
+
         {!connectedMode ? (
           <View style={themed($section)}>
             <Text tx="game:playerNames" preset="subheading" accessibilityRole="header" />
@@ -336,6 +369,32 @@ export function NewGameScreen({
               ))}
             </View>
           </View>
+        ) : null}
+        {connectedMode && connected?.activeGames?.length ? (
+          <View style={themed($section)}>
+            <Text text="Your connected games" preset="subheading" accessibilityRole="header" />
+            {connected.activeGames.map((game) => (
+              <ConnectedGameRow
+                key={game.publicId}
+                game={game}
+                now={Date.now()}
+                onPress={() => onResumeConnected?.(game)}
+              />
+            ))}
+            {connected.activeGamesNextPage?.status === "available" ? (
+              <Button text="Load more" onPress={connected.activeGamesNextPage.load} />
+            ) : connected.activeGamesNextPage?.status === "loading" ? (
+              <Text size="xs" style={themed($footerStatus)} text="Loading more games…" />
+            ) : null}
+          </View>
+        ) : null}
+        {connectedMode && onJoinConnected ? (
+          <Button
+            testID="join-connected-button"
+            text="Join with code"
+            disabled={!connected?.ready}
+            onPress={onJoinConnected}
+          />
         ) : null}
       </Screen>
       <View style={[themed($footer), $footerSafeArea]}>

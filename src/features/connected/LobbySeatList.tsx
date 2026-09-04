@@ -13,6 +13,7 @@ import { seatDetail } from "./connectedCopy"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 
 export type LobbySeat = {
+  open?: boolean
   playerId?: string
   seat: number
   displayName: string
@@ -33,6 +34,7 @@ export type LobbyDeckState = RemoteValue<SeatDeck[]> | { status: "error"; retry:
 export function LobbySeatList({
   seats,
   openSeats,
+  totalSeats,
   deckState,
   versionLabel,
   selectingDeckSeats,
@@ -42,6 +44,7 @@ export function LobbySeatList({
 }: {
   seats: LobbySeat[]
   openSeats: number
+  totalSeats?: number
   deckState: LobbyDeckState
   versionLabel: (version: { versionNumber: number; name?: string }) => string
   selectingDeckSeats?: ReadonlySet<number>
@@ -50,9 +53,43 @@ export function LobbySeatList({
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
   const { themed } = useAppTheme()
+  const rows: LobbySeat[] = totalSeats
+    ? Array.from({ length: totalSeats }, (_, index) => {
+        const seat = index + 1
+        return (
+          seats.find((candidate) => candidate.seat === seat) ?? {
+            seat,
+            open: true,
+            displayName: "Open seat",
+            color: "",
+            controlledByMe: false,
+          }
+        )
+      })
+    : [
+        ...seats,
+        ...Array.from({ length: openSeats }, (_, index) => ({
+          seat: seats.length + index + 1,
+          open: true,
+          displayName: "Open seat",
+          color: "",
+          controlledByMe: false,
+        })),
+      ]
   return (
     <View style={themed($list)}>
-      {seats.map((seat) => {
+      {rows.map((seat) => {
+        if (seat.open)
+          return (
+            <View key={`open-${seat.seat}`} testID="lobby-open-seat" style={themed($openSeat)}>
+              <View style={themed($openMark)} />
+              <Text
+                size="xs"
+                style={themed($seatPending)}
+                text="Open seat · waiting for a player"
+              />
+            </View>
+          )
         const decks = deckState.status === "ready" ? deckState.value : undefined
         const usableDecks = decks?.filter((deck) => deck.versions.length > 0) ?? []
         const chosenDeck = decks?.find((deck) =>
@@ -200,12 +237,6 @@ export function LobbySeatList({
           </View>
         )
       })}
-      {Array.from({ length: openSeats }).map((_, index) => (
-        <View key={`open-${index}`} testID="lobby-open-seat" style={themed($openSeat)}>
-          <View style={themed($openMark)} />
-          <Text size="xs" style={themed($seatPending)} text="Open seat · waiting for a player" />
-        </View>
-      ))}
     </View>
   )
 }
@@ -218,9 +249,8 @@ const $deckChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $seat: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,
-  padding: spacing.sm,
-  borderRadius: spacing.sm,
-  borderWidth: 1,
+  paddingVertical: spacing.xs,
+  borderBottomWidth: 1,
   borderColor: colors.separator,
 })
 const $seatRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -279,9 +309,11 @@ const $openSeat: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
-  padding: spacing.sm,
-  borderRadius: spacing.sm,
-  borderWidth: 1,
+  paddingVertical: spacing.xs,
+  borderBottomWidth: 1,
+  borderTopWidth: 0,
+  borderLeftWidth: 0,
+  borderRightWidth: 0,
   borderStyle: "dashed",
   borderColor: colors.separator,
 })

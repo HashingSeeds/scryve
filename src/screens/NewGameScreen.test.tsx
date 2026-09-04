@@ -298,9 +298,49 @@ describe("NewGameScreen", () => {
       ruleset: "commander",
       system: "mtg",
       format: "commander",
+      deckRequired: false,
       layout: "auto",
       lifeStep: 10,
     })
+  })
+
+  it("lets connected hosts require a deck while leaving local setup unchanged", () => {
+    const host = jest.fn()
+    const view = setup({ mode: "connected", connected: { ...readyHost, host } })
+
+    expect(view.getByTestId("deck-requirement-optional").props.accessibilityState.selected).toBe(
+      true,
+    )
+    fireEvent.press(view.getByTestId("deck-requirement-required"))
+    fireEvent.press(view.getByTestId("host-connected-button"))
+
+    expect(host).toHaveBeenCalledWith(expect.objectContaining({ deckRequired: true }))
+    expect(view.queryByTestId("player-name-1")).toBeNull()
+  })
+
+  it("keeps join and resumable connected games below setup", () => {
+    const onJoinConnected = jest.fn()
+    const onResumeConnected = jest.fn()
+    const game = {
+      publicId: "resume-game",
+      status: "lobby" as const,
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: 1,
+    }
+    const view = setup({
+      mode: "connected",
+      connected: { ...readyHost, activeGames: [game] },
+      onJoinConnected,
+      onResumeConnected,
+    })
+
+    fireEvent.press(view.getByTestId("join-connected-button"))
+    fireEvent.press(view.getByTestId("resume-connected-resume-game"))
+
+    expect(onJoinConnected).toHaveBeenCalledTimes(1)
+    expect(onResumeConnected).toHaveBeenCalledWith(game)
   })
 
   it("keeps hosting unavailable until the connected session is ready", () => {

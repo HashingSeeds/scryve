@@ -18,6 +18,7 @@ export type ResumableGame = {
   playerCount: number
   system?: string
   format?: string
+  deckRequired?: boolean
   ruleset: string
   startingLife?: number
   updatedAt: number
@@ -60,6 +61,10 @@ export function seatSummary(claimed: number, total: number) {
   const open = Math.max(0, total - claimed)
   if (open === 0) return "All seats claimed"
   return `Waiting for ${open} more ${open === 1 ? "player" : "players"}`
+}
+
+export function deckRequirementLabel(required: boolean) {
+  return required ? "Decks required" : "Decks optional"
 }
 
 export function lobbyDetail(

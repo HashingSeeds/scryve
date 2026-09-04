@@ -172,6 +172,27 @@ describe("ConnectedLobbyScreen", () => {
     )
   })
 
+  it("shows the deck rule and blocks a required lobby with a missing deck", () => {
+    const requiredProjection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      deckRequired: true,
+      invitation: null,
+      players: connectedHarness.projection.players.map((player, index) => ({
+        ...player,
+        controlledByMe: index === 0,
+      })),
+    } as unknown as typeof connectedHarness.projection
+    connectedHarness.projection = requiredProjection
+
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+
+    expect(screen.getByText("Seats · 2 of 2 · Decks required")).toBeTruthy()
+    expect(screen.getByText("Every seat needs a deck to start.")).toBeTruthy()
+    expect(screen.getByTestId("start-connected-game-button")).toBeDisabled()
+  })
+
   it("keeps the lobby usable and retries a failed deck query in place", () => {
     const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
     connectedHarness.queryErrors.add("decks.listMine")

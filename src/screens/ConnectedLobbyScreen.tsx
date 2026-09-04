@@ -25,6 +25,7 @@ import {
   lobbyDetail,
   lobbyExitCopy,
   onlineOnlyNotice,
+  deckRequirementLabel,
   seatSummary,
   type LobbyExitAction,
 } from "@/features/connected/connectedCopy"
@@ -247,9 +248,10 @@ function ConnectedLobbyContent({
   const claimedSeats = lobby.players.length
   const openSeats = Math.max(0, lobby.playerCount - claimedSeats)
   const everySeatClaimed = claimedSeats === lobby.playerCount
+  const missingDeck = lobby.deckRequired && lobby.players.some((player) => !player.deckVersionId)
   const exitAction: LobbyExitAction = lobby.isHost ? "abandon" : "leave"
   const exitCopy = lobbyExitCopy(exitAction)
-  const startBlocked = !everySeatClaimed || !isWebSocketConnected || starting
+  const startBlocked = !everySeatClaimed || missingDeck || !isWebSocketConnected || starting
   const openExitCopy = leaveAction ? lobbyExitCopy(leaveAction) : undefined
   const takenAppearances = lobby.players
     .filter((player) => player.seat !== appearanceSeat)
@@ -288,13 +290,14 @@ function ConnectedLobbyContent({
           <Text
             preset="subheading"
             accessibilityRole="header"
-            text={`Seats · ${claimedSeats} of ${lobby.playerCount}`}
+            text={`Seats · ${claimedSeats} of ${lobby.playerCount} · ${deckRequirementLabel(Boolean(lobby.deckRequired))}`}
           />
           <LobbyDeckSource>
             {(deckState) => (
               <LobbySeatList
                 seats={lobby.players}
                 openSeats={openSeats}
+                totalSeats={lobby.playerCount}
                 deckState={deckState}
                 versionLabel={versionLabel}
                 selectingDeckSeats={selectingDeckSeats}
@@ -350,6 +353,13 @@ function ConnectedLobbyContent({
                 size="xxs"
                 style={themed($actionHint)}
                 text={seatSummary(claimedSeats, lobby.playerCount)}
+              />
+            ) : null}
+            {missingDeck && isWebSocketConnected ? (
+              <Text
+                size="xxs"
+                style={themed($actionHint)}
+                text="Every seat needs a deck to start."
               />
             ) : null}
           </>
