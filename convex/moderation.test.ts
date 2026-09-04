@@ -415,6 +415,58 @@ describe("moderation", () => {
     })
   })
 
+  it("keeps orphaned reports readable and resolvable after account deletion", async () => {
+    const t = convexTest(schema, modules)
+    await seatedGame(t, ["host-handle", "guest-handle"])
+    const createOrphanedReport = async () =>
+      await t.run(async (ctx) => {
+        const game = await ctx.db
+          .query("games")
+          .withIndex("by_public_id", (q) => q.eq("publicId", PUBLIC_ID))
+          .unique()
+        return await ctx.db.insert("moderationReports", {
+          gameId: game!._id,
+          reportedUsername: "former-handle",
+          reason: "harassment",
+          status: "open",
+          createdAt: Date.now(),
+        })
+      })
+
+    const upheldReportId = await createOrphanedReport()
+    const open = await t.query(internal.moderation.openReports, {})
+    expect(open).toMatchObject([
+      {
+        reportId: upheldReportId,
+        reportedUserId: null,
+        reportedUsername: "former-handle",
+        currentUsername: "(deleted account)",
+        heldAs: null,
+      },
+    ])
+    await expect(
+      t.query(internal.moderation.reportForAlert, { reportId: upheldReportId }),
+    ).resolves.toMatchObject({
+      reportedUsername: "former-handle",
+      reporterUsername: "(deleted account)",
+      gamePublicId: PUBLIC_ID,
+      heldAs: null,
+    })
+    await expect(
+      t.mutation(internal.moderation.upholdReport, { reportId: upheldReportId }),
+    ).resolves.toEqual({ held: false })
+
+    const dismissedReportId = await createOrphanedReport()
+    await expect(
+      t.mutation(internal.moderation.dismissReport, { reportId: dismissedReportId }),
+    ).resolves.toEqual({ released: false })
+
+    const statuses = await t.run(
+      async (ctx) => await Promise.all([ctx.db.get(upheldReportId), ctx.db.get(dismissedReportId)]),
+    )
+    expect(statuses.map((report) => report?.status)).toEqual(["upheld", "dismissed"])
+  })
+
   it("rejects reporting yourself or a player from another game", async () => {
     const t = convexTest(schema, modules)
     const { host } = await seatedGame(t, ["host-handle", "guest-handle"])

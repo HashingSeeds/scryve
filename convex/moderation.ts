@@ -27,6 +27,7 @@ export const AUTO_HOLD_REPORT_THRESHOLD = 2
 const HISTORY_RENAME_BATCH_SIZE = 25
 const MAX_NOTE_LENGTH = 500
 const OPEN_REPORT_PAGE_SIZE = 50
+const DELETED_ACCOUNT_LABEL = "(deleted account)"
 
 export const reportReasonValidator = v.union(
   v.literal("offensive_username"),
@@ -109,7 +110,8 @@ export const reportPlayer = mutation({
     const distinctReporters = new Set(
       priorReports
         .filter((report) => report.status === "open")
-        .map((report) => report.reporterUserId),
+        .map((report) => report.reporterUserId)
+        .filter((userId): userId is Id<"users"> => userId !== undefined),
     )
     distinctReporters.add(reporter._id)
     const heldUsername = reported.moderationHold?.heldUsername ?? reported.username ?? ""
@@ -180,7 +182,7 @@ export const myBlocks = query({
       const blocked = await ctx.db.get(block.blockedUserId)
       entries.push({
         blockedUserId: block.blockedUserId,
-        username: blocked ? (publicUsernameFor(blocked) ?? "(no username)") : "(deleted account)",
+        username: blocked ? (publicUsernameFor(blocked) ?? "(no username)") : DELETED_ACCOUNT_LABEL,
         createdAt: block.createdAt,
       })
     }
@@ -238,12 +240,12 @@ export const openReports = internalQuery({
       .take(OPEN_REPORT_PAGE_SIZE)
     const rows = []
     for (const report of reports) {
-      const reported = await ctx.db.get(report.reportedUserId)
+      const reported = report.reportedUserId ? await ctx.db.get(report.reportedUserId) : null
       rows.push({
         reportId: report._id,
-        reportedUserId: report.reportedUserId,
+        reportedUserId: report.reportedUserId ?? null,
         reportedUsername: report.reportedUsername,
-        currentUsername: reported ? (reported.username ?? null) : null,
+        currentUsername: reported ? (reported.username ?? null) : DELETED_ACCOUNT_LABEL,
         heldAs: reported?.moderationHold?.placeholderUsername ?? null,
         reason: report.reason,
         note: report.note ?? null,
@@ -261,14 +263,14 @@ export const upholdReport = internalMutation({
   handler: async (ctx, args) => {
     const report = await ctx.db.get(args.reportId)
     if (!report) throw new Error("Report not found")
-    const reported = await ctx.db.get(report.reportedUserId)
+    const reported = report.reportedUserId ? await ctx.db.get(report.reportedUserId) : null
     if (reported) await placeUsernameOnHold(ctx, reported, "operator")
     await ctx.db.patch(report._id, {
       status: "upheld",
       resolvedAt: Date.now(),
       ...(args.note ? { resolutionNote: args.note } : {}),
     })
-    return { held: true }
+    return { held: Boolean(reported) }
   },
 })
 
@@ -282,6 +284,7 @@ export const dismissReport = internalMutation({
       resolvedAt: Date.now(),
       ...(args.note ? { resolutionNote: args.note } : {}),
     })
+    if (!report.reportedUserId) return { released: false }
     const remaining = await ctx.db
       .query("moderationReports")
       .withIndex("by_reported_user", (q) => q.eq("reportedUserId", report.reportedUserId))
@@ -415,15 +418,15 @@ export const reportForAlert = internalQuery({
   handler: async (ctx, args) => {
     const report = await ctx.db.get(args.reportId)
     if (!report) return null
-    const reported = await ctx.db.get(report.reportedUserId)
-    const reporter = await ctx.db.get(report.reporterUserId)
+    const reported = report.reportedUserId ? await ctx.db.get(report.reportedUserId) : null
+    const reporter = report.reporterUserId ? await ctx.db.get(report.reporterUserId) : null
     const game = report.gameId ? await ctx.db.get(report.gameId) : null
     return {
       reportId: report._id,
       reportedUsername: report.reportedUsername,
       reporterUsername: reporter
         ? (publicUsernameFor(reporter) ?? "(no username)")
-        : "(deleted account)",
+        : DELETED_ACCOUNT_LABEL,
       gamePublicId: game?.publicId ?? "(unknown game)",
       reason: report.reason,
       note: report.note ?? null,
