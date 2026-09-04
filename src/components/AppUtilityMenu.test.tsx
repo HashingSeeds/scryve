@@ -70,4 +70,46 @@ describe("AppUtilityMenu", () => {
       height: 108,
     })
   })
+
+  it("only reports closing when a visible menu is actually open", () => {
+    const onOpenChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          visible={false}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+          onOpenChange={onOpenChange}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(onOpenChange).not.toHaveBeenCalled()
+
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          visible
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+          onOpenChange={onOpenChange}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    onOpenChange.mockClear()
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          visible={false}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+          onOpenChange={onOpenChange}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(onOpenChange).toHaveBeenCalledTimes(1)
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
 })

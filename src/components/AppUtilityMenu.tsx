@@ -37,11 +37,11 @@ export function AppUtilityMenu({
   const progress = useSharedValue(0)
 
   useEffect(() => {
-    if (!visible) {
+    if (!visible && open) {
       setOpen(false)
       onOpenChange?.(false)
     }
-  }, [onOpenChange, visible])
+  }, [onOpenChange, open, visible])
 
   useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, {
