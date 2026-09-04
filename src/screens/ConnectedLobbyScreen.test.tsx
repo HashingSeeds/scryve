@@ -188,7 +188,9 @@ describe("ConnectedLobbyScreen", () => {
 
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
 
-    expect(screen.getByText("Seats · 2 of 2 · Decks required")).toBeTruthy()
+    expect(screen.getByText("Decks required")).toBeTruthy()
+    expect(screen.getByText("0 of 2 ready")).toBeTruthy()
+    expect(screen.getAllByText("40 life · Commander")).toHaveLength(1)
     expect(screen.getByText("Every seat needs a deck to start.")).toBeTruthy()
     expect(screen.getByTestId("start-connected-game-button")).toBeDisabled()
   })
@@ -228,6 +230,9 @@ describe("ConnectedLobbyScreen", () => {
     )
     const inviteUrl = `https://play.count.example/join/${inviteToken}`
     expect(view.UNSAFE_getByType(Screen).props.preset).toBe("fixed")
+    expect(screen.queryByTestId("invite-qr")).toBeNull()
+    fireEvent.press(screen.getByTestId("open-invite-button"))
+    expect(screen.getByTestId("invite-dialog")).toBeTruthy()
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
     expect(screen.getByTestId("invite-qr").props.accessibilityHint).toBe(
       "size-184-quiet-zone-8-ecl-H",
@@ -252,6 +257,7 @@ describe("ConnectedLobbyScreen", () => {
       invitation: { token: "invalid", manualCode: "ZX90QW" },
     }
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    fireEvent.press(screen.getByTestId("open-invite-button"))
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/ZX90QW")
     fireEvent.press(screen.getByTestId("share-invite-button"))
     await waitFor(() =>

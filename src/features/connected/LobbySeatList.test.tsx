@@ -20,6 +20,7 @@ describe("LobbySeatList", () => {
           ]}
           openSeats={5}
           totalSeats={6}
+          deckRequired
           deckState={{ status: "ready", value: [] }}
           versionLabel={() => "Current"}
           onSelectVersion={jest.fn()}
@@ -29,6 +30,7 @@ describe("LobbySeatList", () => {
     )
 
     expect(screen.getByText("Ada")).toBeTruthy()
+    expect(screen.getByTestId("seat-1-readiness")).toHaveTextContent("○ Choose a deck")
     expect(screen.getAllByTestId("lobby-open-seat")).toHaveLength(5)
   })
 })

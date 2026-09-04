@@ -36,7 +36,7 @@ export function InviteCard({
   const sideBySide = inviteCardIsSideBySide(height)
   if (!qrPayload && !manualCode) return null
   return (
-    <View style={[themed($card), sideBySide && themed($sideBySideCard)]}>
+    <View style={[themed($content), sideBySide && themed($sideBySideContent)]}>
       {qrPayload ? (
         <View style={themed($qrTile)}>
           <QRCode
@@ -53,7 +53,7 @@ export function InviteCard({
       <View style={[themed($details), sideBySide && themed($sideBySideDetails)]}>
         {manualCode ? (
           <View style={[themed($codeBlock), sideBySide && themed($sideBySideCodeBlock)]}>
-            <Text size="xxs" style={themed($label)} text="INVITE CODE" />
+            <Text size="xxs" style={themed($label)} text="Invite code" />
             <Text
               testID="manual-code"
               preset={sideBySide ? "subheading" : "heading"}
@@ -84,13 +84,9 @@ export function InviteCard({
   )
 }
 
-const $card: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.sm,
-  padding: spacing.md,
-  borderRadius: spacing.md,
-  borderWidth: 1,
-  borderColor: colors.separator,
 })
 const $qrTile: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   padding: spacing.xxs,
@@ -101,7 +97,7 @@ const $codeBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xxs,
 })
-const $sideBySideCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $sideBySideContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.md,

@@ -38,6 +38,7 @@ export function LobbySeatList({
   deckState,
   versionLabel,
   selectingDeckSeats,
+  deckRequired,
   onSelectVersion,
   onReport,
   onEditAppearance,
@@ -48,6 +49,7 @@ export function LobbySeatList({
   deckState: LobbyDeckState
   versionLabel: (version: { versionNumber: number; name?: string }) => string
   selectingDeckSeats?: ReadonlySet<number>
+  deckRequired?: boolean
   onSelectVersion: (seat: number, deckVersionId: string) => void
   onReport: (seat: LobbySeat) => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
@@ -83,11 +85,8 @@ export function LobbySeatList({
           return (
             <View key={`open-${seat.seat}`} testID="lobby-open-seat" style={themed($openSeat)}>
               <View style={themed($openMark)} />
-              <Text
-                size="xs"
-                style={themed($seatPending)}
-                text="Open seat · waiting for a player"
-              />
+              <Text size="xs" style={themed($seatPending)} text="Open seat" />
+              <Text size="xxs" style={themed($seatPending)} text="Waiting" />
             </View>
           )
         const decks = deckState.status === "ready" ? deckState.value : undefined
@@ -99,6 +98,7 @@ export function LobbySeatList({
           (version) => version._id === seat.deckVersionId,
         )
         const deckReady = Boolean(seat.deckVersionId)
+        const ready = !deckRequired || deckReady
         const selectingDeck = selectingDeckSeats?.has(seat.seat) ?? false
         return (
           <View key={seat.playerId ?? `seat-${seat.seat}`} style={themed($seat)}>
@@ -144,12 +144,22 @@ export function LobbySeatList({
               {!seat.controlledByMe && seat.playerId ? (
                 <Button
                   testID={`lobby-report-player-seat-${seat.seat}`}
-                  text="Report"
+                  accessibilityLabel={`Report ${seat.displayName}`}
+                  text="•••"
                   style={themed($report)}
                   textStyle={themed($reportText)}
                   onPress={() => onReport(seat)}
                 />
               ) : null}
+              <Text
+                testID={`seat-${seat.seat}-readiness`}
+                size="xxs"
+                weight="medium"
+                style={themed(ready ? $seatReady : $seatPending)}
+                text={
+                  ready ? "✓ Ready" : seat.controlledByMe ? "○ Choose a deck" : "○ Needs a deck"
+                }
+              />
             </View>
             {seat.controlledByMe ? (
               <View style={themed($deckChoices)}>
@@ -267,10 +277,11 @@ const $markButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 })
 const $seatDetail: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $seatPending: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $seatReady: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.success })
 const $report: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 40,
-  minWidth: 84,
-  paddingHorizontal: spacing.sm,
+  minWidth: 44,
+  paddingHorizontal: spacing.xs,
 })
 const $reportText: ThemedStyle<TextStyle> = () => ({ fontSize: 14 })
 const $deckLoading: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
