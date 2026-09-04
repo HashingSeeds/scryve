@@ -41,6 +41,8 @@ describe("CardFocusDialog", () => {
     expect(view.getByText("{T}: Add {G}.")).toBeTruthy()
     expect(view.getByText("Dominaria · #168 · Common")).toBeTruthy()
     expect(view.getByText("2× in Main")).toBeTruthy()
+    expect(view.getByTestId("card-focus-image").props.contentFit).toBe("contain")
+    expect(view.getByTestId("card-focus-quantity")).toBeTruthy()
   })
 
   it("reports quantity changes to the screen", () => {

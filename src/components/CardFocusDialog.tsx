@@ -116,7 +116,7 @@ export function CardFocusDialog({
           {detailsError ? <AlertNote text={detailsError} /> : null}
         </View>
       </ScrollView>
-      <View style={themed($quantityRow)}>
+      <View testID="card-focus-quantity" style={themed($quantityRow)}>
         <Text
           size="sm"
           style={themed($quantityLabel)}
@@ -172,10 +172,13 @@ const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
 const $dimText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $quantityRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $quantityRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
+  paddingTop: spacing.sm,
+  borderTopWidth: 1,
+  borderTopColor: colors.separator,
 })
 const $quantityLabel: ThemedStyle<TextStyle> = ({ colors }) => ({
   flexGrow: 1,

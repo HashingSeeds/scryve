@@ -35,6 +35,7 @@ const solRing = {
   oracleId: "11111111-1111-1111-1111-111111111111",
   scryfallId: "22222222-2222-2222-2222-222222222222",
   name: "Sol Ring",
+  imageUrl: "https://cards.scryfall.io/normal/sol-ring.jpg",
   quantity: 1,
   board: "main" as const,
 }
@@ -163,6 +164,10 @@ describe("DeckDetailScreen", () => {
   it("opens read-only with the deck, its notes, and the selected version's record", () => {
     const view = renderDetail()
     expect(view.getByText("Magic · Commander · 1 card")).toBeTruthy()
+    expect(
+      view.getByTestId("deck-card-thumbnail-main:22222222-2222-2222-2222-222222222222").props
+        .contentFit,
+    ).toBe("contain")
     expect(view.getByTestId("deck-loading-progress").props.accessibilityValue).toEqual({
       text: "Deck loaded",
     })

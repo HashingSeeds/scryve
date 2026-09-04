@@ -524,7 +524,13 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
     return (
       <View style={themed($thumbnailSlot)}>
         {thumbnailUrl ? (
-          <Image source={thumbnailUrl} style={themed($thumbnail)} cachePolicy="memory-disk" />
+          <Image
+            testID={`deck-card-thumbnail-${printingKey(card)}`}
+            source={thumbnailUrl}
+            style={themed($thumbnail)}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+          />
         ) : null}
       </View>
     )
