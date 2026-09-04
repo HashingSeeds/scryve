@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
@@ -23,9 +24,14 @@ export function FloatingAppNavigation({
 }) {
   const { themed } = useAppTheme()
   const safeArea = useSafeAreaInsetsStyle(["bottom"], "margin")
+  const [utilityOpen, setUtilityOpen] = useState(false)
 
   return (
-    <View pointerEvents="box-none" style={[themed($navigation), safeArea]}>
+    <View
+      testID="floating-app-navigation"
+      pointerEvents="box-none"
+      style={[themed($navigation), utilityOpen && $expandedNavigation, safeArea]}
+    >
       <View style={$utility}>
         <AppUtilityMenu
           compact
@@ -33,6 +39,7 @@ export function FloatingAppNavigation({
           accountLabel={accountLabel}
           onSettings={onSettings}
           onAccount={onAccount}
+          onOpenChange={setUtilityOpen}
         />
       </View>
       <Pressable
@@ -56,12 +63,14 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   bottom: spacing.md,
   height: 48,
   alignItems: "center",
-  justifyContent: "center",
+  justifyContent: "flex-end",
 })
+const $expandedNavigation: ViewStyle = { height: 108 }
 const $utility: ViewStyle = { position: "absolute", left: 0, bottom: 0 }
 const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minWidth: 92,
   height: 44,
+  marginBottom: 2,
   alignItems: "center",
   justifyContent: "center",
   borderWidth: 1,

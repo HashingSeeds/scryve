@@ -1,3 +1,4 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -43,5 +44,72 @@ describe("AppUtilityMenu", () => {
     fireEvent.press(view.getByTestId("utility-menu-button"))
     expect(view.getByText("Settings")).toBeTruthy()
     expect(view.getByText("Account")).toBeTruthy()
+  })
+
+  it("expands the compact hit-test slot with the menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          compact
+          placement="bottomLeft"
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
+      width: 44,
+      height: 44,
+    })
+
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+
+    expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
+      width: 148,
+      height: 108,
+    })
+  })
+
+  it("only reports closing when a visible menu is actually open", () => {
+    const onOpenChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          visible={false}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+          onOpenChange={onOpenChange}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(onOpenChange).not.toHaveBeenCalled()
+
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          visible
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+          onOpenChange={onOpenChange}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+    onOpenChange.mockClear()
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          visible={false}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+          onOpenChange={onOpenChange}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(onOpenChange).toHaveBeenCalledTimes(1)
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 })
