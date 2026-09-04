@@ -10,6 +10,7 @@ import type { LifeDelta } from "@/features/game/types"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 
 import type {
+  ConnectedActionEvent,
   ConnectedCommanderDamageChange,
   ConnectedCommanderDamageClaim,
   ConnectedDisplayProjection,
@@ -56,6 +57,37 @@ export type ConnectedGameRuntime = ConnectedGameRuntimeBase &
 type LobbyProjection = FunctionReturnType<typeof api.games.lobbyProjection>
 type OptimisticLobbyProjection = LobbyProjection & { __optimisticOperationIds?: string[] }
 
+function operationCheckFor(event: ConnectedActionEvent) {
+  if (event.type === "life.changed")
+    return {
+      kind: event.type,
+      operationId: event.operationId,
+      playerId: event.playerId as unknown as Id<"gamePlayers">,
+      delta: event.delta,
+      deviceId: event.deviceId,
+      clientCreatedAt: event.clientCreatedAt,
+    } as const
+  if (event.type === "commanderDamage.submitted")
+    return {
+      kind: event.type,
+      operationId: event.operationId,
+      fromPlayerId: event.fromPlayerId as unknown as Id<"gamePlayers">,
+      toPlayerId: event.toPlayerId as unknown as Id<"gamePlayers">,
+      delta: event.delta,
+      deviceId: event.deviceId,
+      clientCreatedAt: event.clientCreatedAt,
+    } as const
+  return {
+    kind: event.type,
+    operationId: event.operationId,
+    claimOperationId: event.claimOperationId,
+    toPlayerId: event.toPlayerId as unknown as Id<"gamePlayers">,
+    accepted: event.accepted,
+    deviceId: event.deviceId,
+    clientCreatedAt: event.clientCreatedAt,
+  } as const
+}
+
 function acknowledgementForQueuedResolution(
   claimAcknowledgement: OutboxAcknowledgement,
   queuedResolutionOperationId: string,
@@ -76,6 +108,7 @@ export function connectedLifeOptimisticUpdater(
   const current = store.getQuery(api.games.lobbyProjection, {
     publicId: args.publicId,
     deviceId: args.deviceId,
+    includeRecentOperationIds: false,
   }) as OptimisticLobbyProjection | undefined
   if (!current) return
   const alreadyConfirmed = current.recentOperationIds.includes(args.operationId)
@@ -93,7 +126,7 @@ export function connectedLifeOptimisticUpdater(
   }
   store.setQuery(
     api.games.lobbyProjection,
-    { publicId: args.publicId, deviceId: args.deviceId },
+    { publicId: args.publicId, deviceId: args.deviceId, includeRecentOperationIds: false },
     next,
   )
 }
@@ -103,7 +136,11 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
   const { isWebSocketConnected } = useConvexConnectionState()
   const repository = useMemo(() => new ConnectedGameRepository(undefined, ownerId), [ownerId])
   const deviceId = useRef(asDeviceId(new LocalGameRepository().getDeviceId())).current
-  const remote: unknown = useQuery(api.games.lobbyProjection, { publicId, deviceId })
+  const remote: unknown = useQuery(api.games.lobbyProjection, {
+    publicId,
+    deviceId,
+    includeRecentOperationIds: false,
+  })
   const remoteReady = toConnectedProjection(remote) !== null
   const changeLifeBase = useMutation(api.games.changeLife)
   const changeLifeMutation = useMemo(
@@ -166,6 +203,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
           return resolve({
             publicId,
             operationId: event.claimOperationId,
+            resolutionOperationId: event.operationId,
             deviceId: event.deviceId,
             clientCreatedAt: event.clientCreatedAt,
           }).then((claimAcknowledgement) =>
@@ -188,10 +226,21 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
               : {}),
           }),
         abandonGame: () => mutations.current.abandonMutation({ publicId }),
+        awaitProjectionBarrier: true,
       }),
     [deviceId, ownerId, publicId, repository],
   )
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
+  const head = snapshot.pending[0]?.event
+  const operationStatus = useQuery(
+    api.games.connectedOperationStatus,
+    head
+      ? {
+          publicId,
+          operation: operationCheckFor(head),
+        }
+      : "skip",
+  )
 
   useEffect(() => {
     controller.setEnvironment({
@@ -206,6 +255,10 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
   useEffect(() => {
     controller.onRemoteProjection(remote)
   }, [controller, isWebSocketConnected, remote, snapshot.pending.length])
+
+  useEffect(() => {
+    controller.onOperationStatus(operationStatus)
+  }, [controller, operationStatus])
 
   useEffect(() => () => controller.dispose(), [controller])
 

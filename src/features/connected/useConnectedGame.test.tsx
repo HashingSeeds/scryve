@@ -39,6 +39,7 @@ const mockRemoteProjection = {
   ],
 } as const
 let mockRemote: unknown = mockRemoteProjection
+let mockOperationStatus: unknown
 const mockChangeMutation = Object.assign(
   jest.fn(async (args: any) => args),
   {
@@ -74,6 +75,7 @@ jest.mock("../../../convex/_generated/api", () => ({
   api: {
     games: {
       lobbyProjection: "lobbyProjection",
+      connectedOperationStatus: "connectedOperationStatus",
       changeLife: "changeLife",
       finishGame: "finishGame",
     },
@@ -86,7 +88,8 @@ jest.mock("convex/react", () => ({
     isRefreshing: mockConvexRefreshing,
   }),
   useConvexConnectionState: () => ({ isWebSocketConnected: mockSocketConnected }),
-  useQuery: () => mockRemote,
+  useQuery: (reference: string) =>
+    reference === "connectedOperationStatus" ? mockOperationStatus : mockRemote,
   useMutation: (reference: string) => {
     if (reference === "finishGame") return mockFinishMutation
     mockChangeMutation.withOptimisticUpdate.mockReturnValue(mockChangeMutation)
@@ -100,6 +103,7 @@ describe("useConnectedGame connection readiness", () => {
     mockSocketConnected = false
     mockConvexRefreshing = false
     mockRemote = mockRemoteProjection
+    mockOperationStatus = undefined
     mockPending = []
     mockRepository.loadProjection.mockReturnValue(null)
     mockRepository.enqueue.mockImplementation((_action, current) => ({
@@ -216,6 +220,11 @@ describe("useConnectedGame connection readiness", () => {
     jest.useFakeTimers()
     mockSocketConnected = true
     mockPending = [{ attempts: 0, event: { operationId: "resolution-1" } }]
+    mockOperationStatus = {
+      status: "acknowledged",
+      operationId: "resolution-1",
+      projectionEventSequence: 0,
+    }
     mockDrain.mockResolvedValue({ acknowledged: [], failed: [], stoppedForRetry: true })
     const view = renderHook(() => useConnectedGame("game-public", "user-1"))
     await waitFor(() => expect(mockDrain).toHaveBeenCalled())

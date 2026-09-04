@@ -98,6 +98,15 @@ export interface ConnectedProjection {
   players: ConnectedPlayerProjection[]
 }
 
+export type ConnectedOperationStatus =
+  | {
+      status: "acknowledged"
+      operationId: string
+      projectionEventSequence: number
+    }
+  | { status: "not_found"; operationId: string }
+  | { status: "conflict"; operationId: string; reason: string }
+
 export type ConnectedActionEvent =
   LifeChangedEvent | CommanderDamageSubmittedEvent | CommanderDamageResolvedEvent
 

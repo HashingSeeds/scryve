@@ -668,7 +668,11 @@ export const claimSeat = mutation({
 })
 
 export const lobbyProjection = query({
-  args: { publicId: v.string(), deviceId: v.optional(v.string()) },
+  args: {
+    publicId: v.string(),
+    deviceId: v.optional(v.string()),
+    includeRecentOperationIds: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     assertPublicId(args.publicId)
     if (args.deviceId) assertDeviceId(args.deviceId)
@@ -682,7 +686,7 @@ export const lobbyProjection = query({
     if (!players.some((player) => player.userId === user._id)) throw new Error("Game unavailable")
     const isHost = game.hostUserId === user._id
     const recentEvents =
-      game.status === "active"
+      args.includeRecentOperationIds !== false && game.status === "active"
         ? await ctx.db
             .query("gameEvents")
             .withIndex("by_game_server_time", (q) => q.eq("gameId", game._id))
@@ -739,6 +743,136 @@ export const lobbyProjection = query({
         })),
       ...(commanderDamage ? { commanderDamage } : {}),
     }
+  },
+})
+
+const connectedOperation = v.union(
+  v.object({
+    kind: v.literal("life.changed"),
+    operationId: v.string(),
+    playerId: v.id("gamePlayers"),
+    delta: v.number(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  }),
+  v.object({
+    kind: v.literal("commanderDamage.submitted"),
+    operationId: v.string(),
+    fromPlayerId: v.id("gamePlayers"),
+    toPlayerId: v.id("gamePlayers"),
+    delta: v.number(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  }),
+  v.object({
+    kind: v.literal("commanderDamage.resolved"),
+    operationId: v.string(),
+    claimOperationId: v.string(),
+    toPlayerId: v.id("gamePlayers"),
+    accepted: v.boolean(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  }),
+)
+
+export const connectedOperationStatus = query({
+  args: { publicId: v.string(), operation: connectedOperation },
+  handler: async (ctx, args) => {
+    assertPublicId(args.publicId)
+    assertOperationId(args.operation.operationId)
+    if (args.operation.kind === "commanderDamage.resolved")
+      assertOperationId(args.operation.claimOperationId)
+    assertDeviceId(args.operation.deviceId)
+    if (!Number.isSafeInteger(args.operation.clientCreatedAt) || args.operation.clientCreatedAt < 0)
+      throw new Error("Invalid client timestamp")
+    if (args.operation.kind === "life.changed") assertLifeDelta(args.operation.delta)
+    if (args.operation.kind === "commanderDamage.submitted") {
+      assertCommanderDelta(args.operation.delta)
+      if (args.operation.fromPlayerId === args.operation.toPlayerId)
+        throw new Error("A commander cannot damage itself")
+    }
+
+    const game = await gameByPublicId(ctx, args.publicId)
+    const user = await requireUser(ctx)
+    const players = await playersForGame(ctx, game._id)
+    if (!players.some((player) => player.userId === user._id)) throw new Error("Game unavailable")
+    const projectionEventSequence = totalEventCount(game, players)
+    const operation = args.operation
+
+    const conflict = (reason: string) => ({
+      status: "conflict" as const,
+      operationId: operation.operationId,
+      reason,
+    })
+    const notFound = () => ({
+      status: "not_found" as const,
+      operationId: operation.operationId,
+    })
+    const acknowledged = () => ({
+      status: "acknowledged" as const,
+      operationId: operation.operationId,
+      projectionEventSequence,
+    })
+
+    if (operation.kind === "commanderDamage.resolved") {
+      const claim = await ctx.db
+        .query("gameCommanderClaims")
+        .withIndex("by_game_operation", (q) =>
+          q.eq("gameId", game._id).eq("operationId", operation.claimOperationId),
+        )
+        .unique()
+      if (!claim) return notFound()
+      const expectedStatus = operation.accepted ? "confirmed" : "declined"
+      if (claim.status === "pending") return notFound()
+      if (claim.status !== expectedStatus)
+        return conflict(
+          "Operation identifier was reused with different data: Commander damage claim was resolved differently",
+        )
+      if (claim.resolutionOperationId !== operation.operationId)
+        return conflict("Operation identifier was reused with different data")
+      const decision = operation.accepted ? "confirmed" : "declined"
+      const event = await ctx.db
+        .query("gameEvents")
+        .withIndex("by_game_operation", (q) =>
+          q.eq("gameId", game._id).eq("operationId", `${claim.operationId}_${decision}`),
+        )
+        .unique()
+      if (!event) return notFound()
+      if (
+        event.kind !== `commanderDamage.${decision}` ||
+        event.claimOperationId !== operation.claimOperationId ||
+        event.playerId !== operation.toPlayerId ||
+        event.toPlayerId !== operation.toPlayerId ||
+        event.actorUserId !== user._id ||
+        event.deviceId !== operation.deviceId ||
+        event.clientCreatedAt !== operation.clientCreatedAt
+      )
+        return conflict("Operation identifier was reused with different data")
+      return acknowledged()
+    }
+
+    const event = await ctx.db
+      .query("gameEvents")
+      .withIndex("by_game_operation", (q) =>
+        q.eq("gameId", game._id).eq("operationId", operation.operationId),
+      )
+      .unique()
+    if (!event) return notFound()
+    const matches =
+      event.actorUserId === user._id &&
+      event.deviceId === operation.deviceId &&
+      event.clientCreatedAt === operation.clientCreatedAt &&
+      (operation.kind === "life.changed"
+        ? event.kind === "life.changed" &&
+          event.playerId === operation.playerId &&
+          event.delta === operation.delta
+        : event.kind === "commanderDamage.claimed" &&
+          event.fromPlayerId === operation.fromPlayerId &&
+          event.toPlayerId === operation.toPlayerId &&
+          event.delta === operation.delta)
+    return matches
+      ? acknowledged()
+      : conflict("Operation identifier was reused with different data")
   },
 })
 
@@ -1099,10 +1233,12 @@ async function resolveCommanderClaim(
     operationId: string
     deviceId: string
     clientCreatedAt: number
+    resolutionOperationId?: string
   },
   decision: "confirmed" | "declined",
 ) {
   assertOperationId(args.operationId)
+  if (args.resolutionOperationId) assertOperationId(args.resolutionOperationId)
   assertDeviceId(args.deviceId)
   if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
     throw new Error("Invalid client timestamp")
@@ -1116,6 +1252,12 @@ async function resolveCommanderClaim(
     )
     .unique()
   if (!claim) throw new Error("Commander damage claim not found")
+  if (
+    args.resolutionOperationId &&
+    claim.resolutionOperationId &&
+    claim.resolutionOperationId !== args.resolutionOperationId
+  )
+    throw new Error("Operation identifier was reused with different data")
   const target = await commanderPlayerForWrite(
     ctx,
     game,
@@ -1124,9 +1266,32 @@ async function resolveCommanderClaim(
     args.deviceId,
     "target",
   )
-  if (claim.status !== "pending")
+  if (claim.status !== "pending") {
+    if (args.resolutionOperationId) {
+      if (claim.status !== decision)
+        throw new Error("Operation identifier was reused with different data")
+      const event = await ctx.db
+        .query("gameEvents")
+        .withIndex("by_game_operation", (q) =>
+          q.eq("gameId", game._id).eq("operationId", `${claim.operationId}_${claim.status}`),
+        )
+        .unique()
+      if (
+        !event ||
+        event.kind !== `commanderDamage.${claim.status}` ||
+        event.claimOperationId !== claim.operationId ||
+        event.playerId !== claim.toPlayerId ||
+        event.toPlayerId !== claim.toPlayerId ||
+        event.actorUserId !== user._id ||
+        event.deviceId !== args.deviceId ||
+        event.clientCreatedAt !== args.clientCreatedAt
+      )
+        throw new Error("Operation identifier was reused with different data")
+      if (!claim.resolutionOperationId)
+        await ctx.db.patch(claim._id, { resolutionOperationId: args.resolutionOperationId })
+    }
     return {
-      operationId: claim.operationId,
+      operationId: args.resolutionOperationId ?? claim.operationId,
       claimId: claim._id,
       status: claim.status,
       deduplicated: true,
@@ -1148,6 +1313,7 @@ async function resolveCommanderClaim(
           }
         : {}),
     }
+  }
   if (game.status !== "active") throw new Error("Game is not active")
 
   const now = Date.now()
@@ -1195,11 +1361,12 @@ async function resolveCommanderClaim(
     })
     await ctx.db.patch(claim._id, {
       status: "confirmed",
+      ...(args.resolutionOperationId ? { resolutionOperationId: args.resolutionOperationId } : {}),
       resolvedAt: now,
       resolvedByUserId: user._id,
     })
     return {
-      operationId: claim.operationId,
+      operationId: args.resolutionOperationId ?? claim.operationId,
       claimId: claim._id,
       status: "confirmed" as const,
       total,
@@ -1224,6 +1391,7 @@ async function resolveCommanderClaim(
   })
   await ctx.db.patch(claim._id, {
     status: "declined",
+    ...(args.resolutionOperationId ? { resolutionOperationId: args.resolutionOperationId } : {}),
     resolvedAt: now,
     resolvedByUserId: user._id,
   })
@@ -1232,7 +1400,7 @@ async function resolveCommanderClaim(
     lastEventAt: now,
   })
   return {
-    operationId: claim.operationId,
+    operationId: args.resolutionOperationId ?? claim.operationId,
     claimId: claim._id,
     status: "declined" as const,
     deduplicated: false,
@@ -1245,6 +1413,7 @@ export const confirmCommanderDamage = mutation({
     operationId: v.string(),
     deviceId: v.string(),
     clientCreatedAt: v.number(),
+    resolutionOperationId: v.optional(v.string()),
   },
   handler: async (ctx, args) => resolveCommanderClaim(ctx, args, "confirmed"),
 })
@@ -1255,6 +1424,7 @@ export const declineCommanderDamage = mutation({
     operationId: v.string(),
     deviceId: v.string(),
     clientCreatedAt: v.number(),
+    resolutionOperationId: v.optional(v.string()),
   },
   handler: async (ctx, args) => resolveCommanderClaim(ctx, args, "declined"),
 })
