@@ -20,6 +20,7 @@ export function AppUtilityMenu({
   placement = "topRight",
   onSettings,
   onAccount,
+  onOpenChange,
   accountLabel = "Account",
 }: {
   visible?: boolean
@@ -27,6 +28,7 @@ export function AppUtilityMenu({
   placement?: "topRight" | "bottomLeft"
   onSettings: () => void
   onAccount: () => void
+  onOpenChange?: (open: boolean) => void
   accountLabel?: "Account" | "Sign in"
 }) {
   const { themed } = useAppTheme()
@@ -35,8 +37,11 @@ export function AppUtilityMenu({
   const progress = useSharedValue(0)
 
   useEffect(() => {
-    if (!visible) setOpen(false)
-  }, [visible])
+    if (!visible) {
+      setOpen(false)
+      onOpenChange?.(false)
+    }
+  }, [onOpenChange, visible])
 
   useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, {
@@ -55,8 +60,12 @@ export function AppUtilityMenu({
   }))
 
   if (!visible) return null
-  const choose = (action: () => void) => {
+  const close = () => {
     setOpen(false)
+    onOpenChange?.(false)
+  }
+  const choose = (action: () => void) => {
+    close()
     action()
   }
   const slotStyle = open ? (compact ? $expandedCompactSlot : $expandedSlot) : undefined
@@ -72,7 +81,7 @@ export function AppUtilityMenu({
           testID="utility-menu-backdrop"
           accessibilityLabel="Close utility menu"
           style={$backdrop}
-          onPress={() => setOpen(false)}
+          onPress={close}
         />
       ) : null}
       <Animated.View
@@ -95,7 +104,10 @@ export function AppUtilityMenu({
             accessibilityLabel="Utility"
             accessibilityState={{ expanded: open }}
             style={themed($trigger)}
-            onPress={() => setOpen(true)}
+            onPress={() => {
+              setOpen(true)
+              onOpenChange?.(true)
+            }}
           >
             {compact ? (
               <View testID="utility-menu-dots" accessible={false} style={$dotsRow}>
