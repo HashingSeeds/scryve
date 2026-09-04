@@ -144,6 +144,211 @@ describe("account deletion", () => {
     ).rejects.toThrow("Account deletion is in progress")
   })
 
+  it("anonymizes moderation-linked data in bounded, retryable phases", async () => {
+    const t = convexTest(schema, modules)
+    const host = t.withIdentity({ subject: "moderation-deleting-host" })
+    const now = 1_700_000_000_000
+    const dismissedEvidence = {
+      note: "private note",
+      matchedTerms: ["term"],
+      resolutionNote: "not substantiated",
+      autoAction: "held_on_filter" as const,
+      gameId: undefined,
+    }
+    const fixture = await t.run(async (ctx) => {
+      const deletingUserId = await ctx.db.insert("users", {
+        clerkUserId: "moderation-deleting-host",
+        displayName: "Deleting player",
+        username: "deleting-player",
+        createdAt: now,
+        updatedAt: now,
+      })
+      const remainingUserId = await ctx.db.insert("users", {
+        clerkUserId: "moderation-remaining-player",
+        displayName: "Remaining player",
+        username: "remaining-player",
+        createdAt: now,
+        updatedAt: now,
+      })
+      const gameId = await ctx.db.insert("games", {
+        publicId: "moderation-deletion-game",
+        hostUserId: deletingUserId,
+        mode: "connected",
+        status: "active",
+        playerCount: 2,
+        startingLife: 40,
+        ruleset: "commander",
+        game: "mtg",
+        system: "mtg",
+        format: "commander",
+        createdAt: now,
+        updatedAt: now,
+      })
+      const deletingPlayerId = await ctx.db.insert("gamePlayers", {
+        gameId,
+        seat: 1,
+        userId: deletingUserId,
+        deviceId: "device-delete-01",
+        displayName: "Deleting player",
+        color: "#7C3AED",
+        currentLife: 40,
+        joinedAt: now,
+      })
+      const remainingPlayerId = await ctx.db.insert("gamePlayers", {
+        gameId,
+        seat: 2,
+        userId: remainingUserId,
+        deviceId: "device-remain-01",
+        displayName: "Remaining player",
+        color: "#2563EB",
+        currentLife: 40,
+        joinedAt: now,
+      })
+      const reporterReportId = await ctx.db.insert("moderationReports", {
+        reporterUserId: deletingUserId,
+        reportedUserId: remainingUserId,
+        reportedUsername: "remaining-player",
+        reason: "harassment",
+        note: "keep this open evidence",
+        status: "open",
+        createdAt: now,
+      })
+      const dismissedReportId = await ctx.db.insert("moderationReports", {
+        reporterUserId: remainingUserId,
+        reportedUserId: deletingUserId,
+        reportedUsername: "deleting-player",
+        reason: "other",
+        ...dismissedEvidence,
+        status: "dismissed",
+        resolvedAt: now + 1,
+        createdAt: now,
+      })
+      const upheldReportId = await ctx.db.insert("moderationReports", {
+        reporterUserId: remainingUserId,
+        reportedUserId: deletingUserId,
+        reportedUsername: "deleting-player",
+        reason: "impersonation",
+        note: "bounded upheld evidence",
+        matchedTerms: ["identity"],
+        resolutionNote: "confirmed",
+        status: "upheld",
+        resolvedAt: now + 2,
+        createdAt: now,
+      })
+      await ctx.db.insert("userBlocks", {
+        blockerUserId: deletingUserId,
+        blockedUserId: remainingUserId,
+        createdAt: now,
+      })
+      await ctx.db.insert("userBlocks", {
+        blockerUserId: remainingUserId,
+        blockedUserId: deletingUserId,
+        createdAt: now,
+      })
+      const actorClaimId = await ctx.db.insert("gameCommanderClaims", {
+        gameId,
+        operationId: "claim-actor-deletion",
+        fromPlayerId: deletingPlayerId,
+        toPlayerId: remainingPlayerId,
+        delta: 3,
+        status: "confirmed",
+        actorUserId: deletingUserId,
+        deviceId: "device-delete-01",
+        clientCreatedAt: now,
+        createdAt: now,
+        resolvedAt: now + 3,
+        resolvedByUserId: remainingUserId,
+      })
+      const resolverClaimId = await ctx.db.insert("gameCommanderClaims", {
+        gameId,
+        operationId: "claim-resolver-deletion",
+        fromPlayerId: remainingPlayerId,
+        toPlayerId: deletingPlayerId,
+        delta: 4,
+        status: "declined",
+        actorUserId: remainingUserId,
+        deviceId: "device-remain-01",
+        clientCreatedAt: now,
+        createdAt: now,
+        resolvedAt: now + 4,
+        resolvedByUserId: deletingUserId,
+      })
+      return {
+        deletingUserId,
+        remainingUserId,
+        reporterReportId,
+        dismissedReportId,
+        upheldReportId,
+        actorClaimId,
+        resolverClaimId,
+      }
+    })
+
+    const request = await host.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+      confirmation: "DELETE",
+    })
+    for (let phase = 0; phase < 7; phase += 1)
+      await t.mutation(internal.accountDeletion.processModerationData, {
+        requestId: request.requestId,
+      })
+
+    const beforeRetry = await t.run(async (ctx) => ({
+      reports: await ctx.db.query("moderationReports").take(10),
+      blocks: await ctx.db.query("userBlocks").take(10),
+      claims: await ctx.db.query("gameCommanderClaims").take(10),
+    }))
+    await t.mutation(internal.accountDeletion.processModerationData, {
+      requestId: request.requestId,
+    })
+    const afterRetry = await t.run(async (ctx) => ({
+      reports: await ctx.db.query("moderationReports").take(10),
+      blocks: await ctx.db.query("userBlocks").take(10),
+      claims: await ctx.db.query("gameCommanderClaims").take(10),
+    }))
+    expect(afterRetry).toEqual(beforeRetry)
+
+    const reports = [...beforeRetry.reports].sort((a, b) => a._id.localeCompare(b._id))
+    const reporterReport = reports.find((report) => report._id === fixture.reporterReportId)!
+    const dismissedReport = reports.find((report) => report._id === fixture.dismissedReportId)!
+    const upheldReport = reports.find((report) => report._id === fixture.upheldReportId)!
+    expect(reporterReport).toMatchObject({
+      reportedUserId: fixture.remainingUserId,
+      note: "keep this open evidence",
+    })
+    expect(reporterReport.reporterUserId).toBeUndefined()
+    expect(dismissedReport).toMatchObject({
+      reporterUserId: fixture.remainingUserId,
+      reportedUsername: "(deleted account)",
+      status: "dismissed",
+      retentionExpiresAt: now + 1 + 90 * 24 * 60 * 60 * 1000,
+    })
+    expect(dismissedReport.reportedUserId).toBeUndefined()
+    expect(dismissedReport.note).toBeUndefined()
+    expect(dismissedReport.matchedTerms).toBeUndefined()
+    expect(dismissedReport.resolutionNote).toBeUndefined()
+    expect(dismissedReport.gameId).toBeUndefined()
+    expect(dismissedReport.autoAction).toBeUndefined()
+    expect(upheldReport).toMatchObject({
+      reporterUserId: fixture.remainingUserId,
+      status: "upheld",
+      retentionExpiresAt: now + 2 + 365 * 24 * 60 * 60 * 1000,
+      note: "bounded upheld evidence",
+      matchedTerms: ["identity"],
+      resolutionNote: "confirmed",
+    })
+    expect(upheldReport.reportedUserId).toBeUndefined()
+    expect(beforeRetry.blocks).toHaveLength(0)
+
+    const actorClaim = beforeRetry.claims.find((claim) => claim._id === fixture.actorClaimId)!
+    const resolverClaim = beforeRetry.claims.find((claim) => claim._id === fixture.resolverClaimId)!
+    expect(actorClaim.actorUserId).toBeUndefined()
+    expect(actorClaim.deviceId).toBeUndefined()
+    expect(actorClaim.resolvedByUserId).toBe(fixture.remainingUserId)
+    expect(resolverClaim.actorUserId).toBe(fixture.remainingUserId)
+    expect(resolverClaim.deviceId).toBe("device-remain-01")
+    expect(resolverClaim.resolvedByUserId).toBeUndefined()
+  })
+
   it("accepts deletion for a Clerk identity that has no Scryve projection", async () => {
     const t = convexTest(schema, modules)
     const actor = t.withIdentity({ subject: "clerk-only-user" })

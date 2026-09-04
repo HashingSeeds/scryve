@@ -6,11 +6,14 @@ import { env, internalMutation, internalQuery, mutation, query } from "./_genera
 import type { MutationCtx } from "./_generated/server"
 import { terminalizeGameForAccountDeletion } from "./games"
 import { requireIdentity } from "./lib/auth"
+import { moderationRetentionExpiresAt } from "./lib/moderationRetention"
 
 const DELETED_PLAYER_NAME = "Deleted player"
 const MEMBERSHIP_BATCH_SIZE = 5
 const EVENT_BATCH_SIZE = 50
 const USER_DATA_BATCH_SIZE = 50
+const MODERATION_BATCH_SIZE = 50
+const DELETED_ACCOUNT_LABEL = "(deleted account)"
 
 type AccountDeletionStatus = Doc<"accountDeletionRequests">["status"]
 
@@ -266,7 +269,7 @@ export const processEvents = internalMutation({
         .withIndex("by_actor_user", (q) => q.eq("actorUserId", request.userId))
         .take(EVENT_BATCH_SIZE)
       if (events.length === 0) {
-        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, {
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processModerationData, {
           requestId: request._id,
         })
         return null
@@ -284,6 +287,150 @@ export const processEvents = internalMutation({
         ctx,
         request,
         cause instanceof Error ? cause.message : "Could not anonymize game events",
+      )
+    }
+    return null
+  },
+})
+
+function shouldClearDismissedReportEvidence(report: Doc<"moderationReports">, now: number) {
+  return (
+    report.status === "dismissed" &&
+    (report.legalHoldUntil === undefined || report.legalHoldUntil <= now)
+  )
+}
+
+async function continueModerationData(ctx: MutationCtx, request: Doc<"accountDeletionRequests">) {
+  await touchRequest(ctx, request)
+  await ctx.scheduler.runAfter(0, internal.accountDeletion.processModerationData, {
+    requestId: request._id,
+  })
+}
+
+export const processModerationData = internalMutation({
+  args: { requestId: v.id("accountDeletionRequests") },
+  handler: async (ctx, args) => {
+    const request = await ctx.db.get(args.requestId)
+    if (!request || request.status !== "processing" || !request.userId) return null
+    const userId = request.userId
+    try {
+      const reportsAsReporter = await ctx.db
+        .query("moderationReports")
+        .withIndex("by_reporter_and_reported", (q) => q.eq("reporterUserId", userId))
+        .take(MODERATION_BATCH_SIZE)
+      if (reportsAsReporter.length) {
+        const now = Date.now()
+        for (const report of reportsAsReporter) {
+          await ctx.db.patch(report._id, {
+            reporterUserId: undefined,
+            ...(report.status !== "open" && report.retentionExpiresAt === undefined
+              ? {
+                  retentionExpiresAt: moderationRetentionExpiresAt(
+                    report.status,
+                    report.resolvedAt,
+                    report.createdAt,
+                  ),
+                }
+              : {}),
+            ...(shouldClearDismissedReportEvidence(report, now)
+              ? {
+                  note: undefined,
+                  matchedTerms: undefined,
+                  resolutionNote: undefined,
+                  gameId: undefined,
+                  autoAction: undefined,
+                }
+              : {}),
+          })
+        }
+        await continueModerationData(ctx, request)
+        return null
+      }
+
+      const reportsAsTarget = await ctx.db
+        .query("moderationReports")
+        .withIndex("by_reported_user", (q) => q.eq("reportedUserId", userId))
+        .take(MODERATION_BATCH_SIZE)
+      if (reportsAsTarget.length) {
+        const now = Date.now()
+        for (const report of reportsAsTarget) {
+          await ctx.db.patch(report._id, {
+            reportedUserId: undefined,
+            ...(report.status !== "open" && report.retentionExpiresAt === undefined
+              ? {
+                  retentionExpiresAt: moderationRetentionExpiresAt(
+                    report.status,
+                    report.resolvedAt,
+                    report.createdAt,
+                  ),
+                }
+              : {}),
+            ...(shouldClearDismissedReportEvidence(report, now)
+              ? {
+                  note: undefined,
+                  matchedTerms: undefined,
+                  resolutionNote: undefined,
+                  gameId: undefined,
+                  autoAction: undefined,
+                  reportedUsername: DELETED_ACCOUNT_LABEL,
+                }
+              : {}),
+          })
+        }
+        await continueModerationData(ctx, request)
+        return null
+      }
+
+      const blocksAsBlocker = await ctx.db
+        .query("userBlocks")
+        .withIndex("by_blocker", (q) => q.eq("blockerUserId", userId))
+        .take(MODERATION_BATCH_SIZE)
+      if (blocksAsBlocker.length) {
+        for (const block of blocksAsBlocker) await ctx.db.delete(block._id)
+        await continueModerationData(ctx, request)
+        return null
+      }
+
+      const blocksAsBlocked = await ctx.db
+        .query("userBlocks")
+        .withIndex("by_blocked", (q) => q.eq("blockedUserId", userId))
+        .take(MODERATION_BATCH_SIZE)
+      if (blocksAsBlocked.length) {
+        for (const block of blocksAsBlocked) await ctx.db.delete(block._id)
+        await continueModerationData(ctx, request)
+        return null
+      }
+
+      const claimsAsActor = await ctx.db
+        .query("gameCommanderClaims")
+        .withIndex("by_actor_user", (q) => q.eq("actorUserId", userId))
+        .take(MODERATION_BATCH_SIZE)
+      if (claimsAsActor.length) {
+        for (const claim of claimsAsActor)
+          await ctx.db.patch(claim._id, { actorUserId: undefined, deviceId: undefined })
+        await continueModerationData(ctx, request)
+        return null
+      }
+
+      const claimsAsResolver = await ctx.db
+        .query("gameCommanderClaims")
+        .withIndex("by_resolved_by_user", (q) => q.eq("resolvedByUserId", userId))
+        .take(MODERATION_BATCH_SIZE)
+      if (claimsAsResolver.length) {
+        for (const claim of claimsAsResolver)
+          await ctx.db.patch(claim._id, { resolvedByUserId: undefined })
+        await continueModerationData(ctx, request)
+        return null
+      }
+
+      await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, {
+        requestId: request._id,
+      })
+    } catch (cause) {
+      await recordFailure(
+        ctx,
+        request,
+        cause instanceof Error ? cause.message : "Could not anonymize moderation data",
       )
     }
     return null
