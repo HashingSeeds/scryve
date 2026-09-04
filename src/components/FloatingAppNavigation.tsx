@@ -62,7 +62,13 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   justifyContent: "center",
 })
-const $utility: ViewStyle = { position: "absolute", left: 0, bottom: 0 }
+const $utility: ViewStyle = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  bottom: 0,
+  justifyContent: "center",
+}
 const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minWidth: 92,
   height: 44,
