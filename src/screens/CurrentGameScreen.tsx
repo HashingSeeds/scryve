@@ -88,6 +88,7 @@ export function CurrentGameScreen({
   function assignCommanderDamage(target: GamePlayer, step: number) {
     if (!armedPlayerId || armedPlayerId === target.id) return
     runtime.assignCommanderDamage(armedPlayerId, target.id, step)
+    setIsFresh(false)
   }
 
   function captureMenuDialogOrigin(event?: GestureResponderEvent) {

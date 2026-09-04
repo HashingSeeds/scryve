@@ -445,6 +445,31 @@ describe("CurrentGameScreen", () => {
       expect(life(view, 2)).toBe("19")
     })
 
+    it("switches a fresh board from Connect to End after a commander assignment", () => {
+      const view = render(
+        <ThemeProvider initialContext="light">
+          <CurrentGameScreen
+            fresh
+            initialGame={commanderGame()}
+            repository={new LocalGameRepository(new MemoryStorage())}
+            onGameEnded={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      expect(view.getByTestId("connect-button")).toBeTruthy()
+      expect(view.queryByTestId("end-game-button")).toBeNull()
+      fireEvent.press(view.getByTestId("game-menu-button"))
+
+      armCommander(view, 1)
+      fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      expect(view.getByTestId("end-game-button")).toBeTruthy()
+      expect(view.queryByTestId("connect-button")).toBeNull()
+    })
+
     it("undoes one assignment press as a single action", () => {
       const view = renderGame()
       armCommander(view, 1)
