@@ -1,3 +1,4 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -43,5 +44,30 @@ describe("AppUtilityMenu", () => {
     fireEvent.press(view.getByTestId("utility-menu-button"))
     expect(view.getByText("Settings")).toBeTruthy()
     expect(view.getByText("Account")).toBeTruthy()
+  })
+
+  it("expands the compact hit-test slot with the menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AppUtilityMenu
+          compact
+          placement="bottomLeft"
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
+      width: 44,
+      height: 44,
+    })
+
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+
+    expect(StyleSheet.flatten(view.getByTestId("utility-menu-slot").props.style)).toMatchObject({
+      width: 148,
+      height: 108,
+    })
   })
 })

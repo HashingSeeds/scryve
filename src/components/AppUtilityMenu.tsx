@@ -59,9 +59,14 @@ export function AppUtilityMenu({
     setOpen(false)
     action()
   }
+  const slotStyle = open ? (compact ? $expandedCompactSlot : $expandedSlot) : undefined
 
   return (
-    <View pointerEvents="box-none" style={compact ? $compactSlot : $slot}>
+    <Animated.View
+      testID="utility-menu-slot"
+      pointerEvents="box-none"
+      style={[compact ? $compactSlot : $slot, slotStyle]}
+    >
       {open ? (
         <Pressable
           testID="utility-menu-backdrop"
@@ -127,12 +132,14 @@ export function AppUtilityMenu({
           </Pressable>
         </Animated.View>
       </Animated.View>
-    </View>
+    </Animated.View>
   )
 }
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
 const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
+const $expandedSlot: ViewStyle = { width: 188, height: 108 }
+const $expandedCompactSlot: ViewStyle = { width: 148, height: 108 }
 const $backdrop: ViewStyle = {
   position: "absolute",
   top: -1000,
