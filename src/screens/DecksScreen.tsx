@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
-import type { ImageStyle } from "expo-image"
 import { useMutation, useQuery } from "convex/react"
 import Svg, { Path } from "react-native-svg"
 
@@ -20,9 +19,8 @@ import type { DeckRecord } from "@/features/decks/deckCopy"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { useRecentDecks } from "@/features/decks/recentDecks"
-import { PLAYER_COLORS } from "@/features/game/domain"
 import { useAppTheme } from "@/theme/context"
-import type { ThemedStyle } from "@/theme/types"
+import type { Theme, ThemedStyle } from "@/theme/types"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
@@ -57,31 +55,24 @@ export type DeckSelection = {
 type DeckCollection = "all" | "favorites" | "recent"
 
 const ALL_SYSTEMS = "all"
-const DECK_SURFACES: Record<string, string> = {
-  mtg: PLAYER_COLORS[0],
-  ygo: PLAYER_COLORS[4],
-  pokemon: PLAYER_COLORS[3],
-}
 const COLLECTIONS = [
   { id: "all", label: "All" },
   { id: "favorites", label: "Favorites" },
   { id: "recent", label: "Recent" },
 ] as const
-const ABSOLUTE_FILL = { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 } as const
-
-function coverInitial(name: string) {
-  return name.trim().charAt(0).toUpperCase() || "?"
-}
 
 function deckSubtitle(deck: ShelfDeck, game: string, showGame: boolean) {
   const cards = deck.cardQuantity ? cardCountLabel(deck.cardQuantity) : "Empty list"
-  const versions =
-    deck.versionCount && deck.versionCount > 1 ? `${deck.versionCount} versions` : null
-  const record = recordSummary(deck.record)
   const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel
-  return [showGame ? gameLabel : null, deckFormatLabel(game, deck.format), cards, versions, record]
+  return [showGame ? gameLabel : null, deckFormatLabel(game, deck.format), cards]
     .filter(Boolean)
     .join(" · ")
+}
+
+function deckMarkerColor(game: string, colors: Theme["colors"]) {
+  if (game === "pokemon") return colors.gameMenu.actions.setup
+  if (game === "ygo") return colors.gameMenu.actions.players
+  return colors.gameMenu.actions.history
 }
 
 function matchesSearch(deck: ShelfDeck, search: string) {
@@ -105,20 +96,17 @@ function DeckRow({
   onPress: () => void
   onToggleFavorite: () => void
 }) {
-  const { themed } = useAppTheme()
+  const { theme, themed } = useAppTheme()
   const game = deck.game ?? DEFAULT_DECK_GAME
   const favorite = deck.favoritedAt !== undefined
-  const foreground = "#FFFFFF"
+  const record = recordSummary(deck.record)
+  const versions =
+    deck.versionCount && deck.versionCount > 1 ? `${deck.versionCount} versions` : undefined
   return (
-    <View
-      testID={`deck-card-${deck._id}`}
-      style={[themed($row), { backgroundColor: DECK_SURFACES[game] ?? PLAYER_COLORS[1] }]}
-    >
-      <Text
-        testID={`deck-initial-${deck._id}`}
-        pointerEvents="none"
-        text={coverInitial(deck.name)}
-        style={[themed($coverInitial), { color: foreground }]}
+    <View testID={`deck-card-${deck._id}`} style={themed($row)}>
+      <View
+        testID={`deck-system-marker-${deck._id}`}
+        style={[themed($systemMarker), { backgroundColor: deckMarkerColor(game, theme.colors) }]}
       />
       <TouchableOpacity
         style={themed($openButton)}
@@ -128,21 +116,22 @@ function DeckRow({
         onPress={onPress}
       >
         <View style={themed($rowCopy)}>
+          <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} />
           <Text
-            weight="bold"
-            size="md"
+            size="xxs"
             numberOfLines={1}
-            text={deck.name}
-            style={{ color: foreground }}
-          />
-          <Text
-            size="xs"
-            numberOfLines={2}
-            style={themed($deckSubtitle)}
+            style={themed($dimmedText)}
             text={deckSubtitle(deck, game, showGame)}
           />
         </View>
-        <Icon icon="caretRight" color={foreground} size={20} style={themed($cardIcon)} />
+        {record || versions ? (
+          <View style={themed($rowContext)}>
+            {record ? <Text size="xs" weight="bold" numberOfLines={1} text={record} /> : null}
+            {versions ? (
+              <Text size="xxs" numberOfLines={1} style={themed($dimmedText)} text={versions} />
+            ) : null}
+          </View>
+        ) : null}
       </TouchableOpacity>
       <TouchableOpacity
         testID={`favorite-deck-${deck._id}`}
@@ -152,7 +141,7 @@ function DeckRow({
         style={themed($favoriteButton)}
         onPress={onToggleFavorite}
       >
-        <StarIcon selected={favorite} color={foreground} />
+        <StarIcon selected={favorite} color={favorite ? theme.colors.tint : theme.colors.textDim} />
       </TouchableOpacity>
     </View>
   )
@@ -226,7 +215,7 @@ function DeckShelfSkeleton() {
     <View accessibilityRole="progressbar" accessibilityLabel="Loading decks">
       {Array.from({ length: 4 }).map((_, index) => (
         <View key={index} testID="deck-skeleton-row" style={themed($row)}>
-          <View testID="deck-skeleton-cover" style={themed($skeletonCover)} />
+          <View testID="deck-skeleton-marker" style={themed($skeletonMarker)} />
           <View style={themed($skeletonContent)}>
             <View style={themed($rowCopy)}>
               <View style={themed($skeletonName)} />
@@ -387,7 +376,7 @@ export function DecksScreen({
   accountLabel?: "Account" | "Sign in"
   unavailableMessage?: string
 }) {
-  const { themed } = useAppTheme()
+  const { theme, themed } = useAppTheme()
   const { format, setGame, setFormat } = useDeckFilters()
   const { deckIds: recentDeckIds } = useRecentDecks()
   const [collection, setCollection] = useState<DeckCollection>("all")
@@ -426,9 +415,15 @@ export function DecksScreen({
   }
 
   return (
-    <Screen preset="fixed" safeAreaEdges={[]} contentContainerStyle={themed($screen)}>
+    <Screen
+      preset="fixed"
+      safeAreaEdges={[]}
+      backgroundColor={theme.colors.surface}
+      contentContainerStyle={themed($screen)}
+    >
       <Header
         title="Decks"
+        backgroundColor={theme.colors.surface}
         rightText={unavailableMessage ? undefined : "Add deck"}
         onRightPress={unavailableMessage ? undefined : onAddDeck}
       />
@@ -572,7 +567,11 @@ export function DecksScreen({
   )
 }
 
-const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
+const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  flex: 1,
+  width: "100%",
+  backgroundColor: colors.surface,
+})
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   width: "100%",
@@ -638,53 +637,52 @@ const $groupHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
   letterSpacing: 1,
 })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.sm,
   paddingTop: spacing.xs,
   paddingBottom: spacing.xxxl + spacing.lg,
 })
-const $row: ThemedStyle<ViewStyle> = () => ({
-  minHeight: 124,
-  overflow: "hidden",
-  borderRadius: 16,
+const $row: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  minHeight: 72,
+  flexDirection: "row",
+  alignItems: "center",
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
 })
 const $openButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   flexDirection: "row",
-  alignItems: "flex-end",
+  alignItems: "center",
   gap: spacing.sm,
-  paddingHorizontal: spacing.md,
-  paddingTop: spacing.xl,
-  paddingBottom: spacing.md,
+  paddingVertical: spacing.sm,
 })
-const $coverInitial: ThemedStyle<TextStyle> = () => ({
-  position: "absolute",
-  top: -18,
-  right: 44,
-  fontSize: 112,
-  lineHeight: 132,
-  fontWeight: "700",
-  opacity: 0.12,
+const $systemMarker: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: 6,
+  height: 34,
+  borderRadius: spacing.xxxs,
+  marginRight: spacing.sm,
 })
 const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
-const $deckSubtitle: ThemedStyle<TextStyle> = () => ({ color: "rgba(255, 255, 255, 0.78)" })
-const $cardIcon: ThemedStyle<ImageStyle> = () => ({ opacity: 0.72 })
-const $favoriteButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  top: spacing.sm,
-  right: spacing.sm,
+const $rowContext: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minWidth: 72,
+  alignItems: "flex-end",
+  gap: spacing.xxxs,
+})
+const $favoriteButton: ThemedStyle<ViewStyle> = () => ({
   width: 44,
   height: 44,
   alignItems: "center",
   justifyContent: "center",
 })
-const $skeletonCover: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  ...ABSOLUTE_FILL,
+const $skeletonMarker: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  width: 6,
+  height: 34,
+  borderRadius: spacing.xxxs,
+  marginRight: spacing.sm,
   backgroundColor: colors.separator,
 })
 const $skeletonContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
-  justifyContent: "flex-end",
-  padding: spacing.md,
+  justifyContent: "center",
+  paddingVertical: spacing.sm,
 })
 const $skeletonName: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: "58%",

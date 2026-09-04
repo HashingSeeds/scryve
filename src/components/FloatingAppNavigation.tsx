@@ -71,6 +71,6 @@ const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderWidth: 1,
   borderColor: colors.separator,
   borderRadius: 22,
-  backgroundColor: colors.background,
+  backgroundColor: colors.surface,
   paddingHorizontal: spacing.md,
 })

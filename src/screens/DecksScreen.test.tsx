@@ -124,7 +124,7 @@ describe("DecksScreen", () => {
     expect(onPlay).toHaveBeenCalledTimes(1)
   })
 
-  it("uses the deck as the colored surface without cropping card artwork", () => {
+  it("renders decks as quiet ledger rows instead of card artwork", () => {
     const onSelect = jest.fn()
     mockListMine.value = {
       decks: [
@@ -137,13 +137,22 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     const view = renderShelf({ onSelect })
-    expect(view.getByText("Magic · Commander · 100 cards · 3 versions · 75% of 4")).toBeTruthy()
-    expect(view.getByTestId("deck-initial-existing-deck").props.children).toBe("E")
+    expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
+    expect(view.getByText("3 versions")).toBeTruthy()
+    expect(view.getByText("75% of 4")).toBeTruthy()
     expect(
       StyleSheet.flatten(view.getByTestId("deck-card-existing-deck").props.style),
     ).toMatchObject({
-      minHeight: 124,
-      backgroundColor: "#B85636",
+      minHeight: 72,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.separator,
+    })
+    expect(
+      StyleSheet.flatten(view.getByTestId("deck-system-marker-existing-deck").props.style),
+    ).toMatchObject({
+      width: 6,
+      height: 34,
+      backgroundColor: colors.gameMenu.actions.history,
     })
     expect(view.getAllByText("Recent")).toHaveLength(1)
     fireEvent.press(view.getByLabelText("Existing Deck"))
@@ -181,9 +190,10 @@ describe("DecksScreen", () => {
     expect(view.getByLabelText("Loading decks")).toBeTruthy()
     expect(view.getAllByTestId("deck-skeleton-row")).toHaveLength(4)
     expect(
-      StyleSheet.flatten(view.getAllByTestId("deck-skeleton-cover")[0].props.style),
+      StyleSheet.flatten(view.getAllByTestId("deck-skeleton-marker")[0].props.style),
     ).toMatchObject({
-      position: "absolute",
+      width: 6,
+      height: 34,
       backgroundColor: colors.separator,
     })
     expect(view.queryByText("No decks yet")).toBeNull()
@@ -260,7 +270,9 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     const view = renderShelf()
-    expect(view.getByText("Magic · Commander · 100 cards · 3 versions · 75% of 4")).toBeTruthy()
+    expect(view.getByText("Magic · Commander · 100 cards")).toBeTruthy()
+    expect(view.getByText("3 versions")).toBeTruthy()
+    expect(view.getByText("75% of 4")).toBeTruthy()
     expect(view.getByText("Pokémon · Standard · 60 cards")).toBeTruthy()
   })
 
