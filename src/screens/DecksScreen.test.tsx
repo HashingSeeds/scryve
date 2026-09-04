@@ -259,7 +259,7 @@ describe("DecksScreen", () => {
   it("does not put upgrade copy on the deck shelf", () => {
     mockListMine.value = {
       decks: [commanderDeck, standardDeck],
-      capacity: { used: 1, limit: 1, premium: false, canCreate: false },
+      capacity: { used: 2, limit: 2, premium: false, canCreate: false },
       analyticsLocked: false,
     }
     const view = renderShelf()

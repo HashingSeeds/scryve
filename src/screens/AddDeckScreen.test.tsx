@@ -178,7 +178,7 @@ jest.mock("../../convex/_generated/api", () => ({
 function atCapacity() {
   mockListMine.value = {
     ...readyShelf,
-    capacity: { used: 1, limit: 1, premium: false, canCreate: false },
+    capacity: { used: 2, limit: 2, premium: false, canCreate: false },
   }
 }
 

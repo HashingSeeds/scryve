@@ -223,17 +223,20 @@ describe("premium deck tracking", () => {
     ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
   })
 
-  it("keeps one deck free and unlocks additional decks through server entitlements", async () => {
+  it("keeps two decks free and unlocks additional decks through server entitlements", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "deck-owner", "Deck Owner")
     await expect(
       actor.mutation(api.decks.create, { name: "First", format: "commander" }),
     ).resolves.toBeDefined()
-    await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
-      capacity: { used: 1, limit: 1, premium: false, canCreate: false },
-    })
     await expect(
       actor.mutation(api.decks.create, { name: "Second", format: "commander" }),
+    ).resolves.toBeDefined()
+    await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
+      capacity: { used: 2, limit: 2, premium: false, canCreate: false },
+    })
+    await expect(
+      actor.mutation(api.decks.create, { name: "Third", format: "commander" }),
     ).rejects.toMatchObject({
       data: { code: "deck_limit_reached", message: "Premium is required for additional decks" },
     })
@@ -244,11 +247,11 @@ describe("premium deck tracking", () => {
       source: "test",
     })
     await expect(
-      actor.mutation(api.decks.create, { name: "Second", format: "commander" }),
+      actor.mutation(api.decks.create, { name: "Third", format: "commander" }),
     ).resolves.toBeDefined()
     await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
-      decks: [{ game: "mtg" }, { game: "mtg" }],
-      capacity: { used: 2, premium: true, canCreate: true },
+      decks: [{ game: "mtg" }, { game: "mtg" }, { game: "mtg" }],
+      capacity: { used: 3, premium: true, canCreate: true },
     })
   })
 
