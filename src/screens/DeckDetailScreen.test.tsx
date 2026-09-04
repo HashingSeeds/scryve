@@ -225,7 +225,15 @@ describe("DeckDetailScreen", () => {
   it("edits the list behind an explicit edit mode and saves into the same version", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
+    expect(view.getByText("Edit deck")).toBeTruthy()
+    expect(view.getByText("Cancel")).toBeTruthy()
     expect(view.getByTestId("card-search-input")).toBeTruthy()
+    expect(StyleSheet.flatten(view.getByTestId("save-version-button").props.style)).toMatchObject({
+      backgroundColor: colors.tint,
+    })
+    expect(StyleSheet.flatten(view.getByText("Save changes").props.style)).toMatchObject({
+      color: colors.textInverse,
+    })
     fireEvent.press(view.getAllByText("+")[0])
     fireEvent.press(view.getByTestId("save-version-button"))
     await waitFor(() => expect(mockSaveVersion).toHaveBeenCalledTimes(1))

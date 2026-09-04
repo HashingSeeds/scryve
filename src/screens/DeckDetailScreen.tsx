@@ -545,20 +545,23 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
       contentContainerStyle={themed($screen)}
     >
       <Header
-        title={titleVisible ? detail.deck.name : ""}
+        title={editing ? "Edit deck" : titleVisible ? detail.deck.name : ""}
         backgroundColor={theme.colors.surface}
-        leftTx="common:back"
-        onLeftPress={onBack}
+        leftText={editing ? "Cancel" : undefined}
+        leftTx={editing ? undefined : "common:back"}
+        onLeftPress={editing ? discardEdits : onBack}
         RightActionComponent={
-          <TouchableOpacity
-            testID="deck-settings-button"
-            accessibilityRole="button"
-            accessibilityLabel="Deck settings"
-            style={themed($headerAction)}
-            onPress={() => setDialog("settings")}
-          >
-            <Text size="lg" text="•••" />
-          </TouchableOpacity>
+          editing ? undefined : (
+            <TouchableOpacity
+              testID="deck-settings-button"
+              accessibilityRole="button"
+              accessibilityLabel="Deck settings"
+              style={themed($headerAction)}
+              onPress={() => setDialog("settings")}
+            >
+              <Text size="lg" text="•••" />
+            </TouchableOpacity>
+          )
         }
       />
       <SectionList
@@ -798,8 +801,8 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                 <Button
                   testID="save-version-button"
                   text={busy ? "Saving…" : "Save changes"}
-                  preset="reversed"
-                  style={$actionButton}
+                  style={[themed($primaryActionButton), $actionButton]}
+                  textStyle={themed($primaryActionText)}
                   disabled={busy}
                   onPress={save}
                 />
