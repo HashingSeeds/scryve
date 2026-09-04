@@ -25,7 +25,11 @@ export function FloatingAppNavigation({
   const safeArea = useSafeAreaInsetsStyle(["bottom"], "margin")
 
   return (
-    <View pointerEvents="box-none" style={[themed($navigation), safeArea]}>
+    <View
+      testID="floating-app-navigation"
+      pointerEvents="box-none"
+      style={[themed($navigation), safeArea]}
+    >
       <View style={$utility}>
         <AppUtilityMenu
           compact
@@ -53,7 +57,7 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   zIndex: 50,
   left: spacing.md,
   right: spacing.md,
-  bottom: spacing.md,
+  bottom: 0,
   height: 48,
   alignItems: "center",
   justifyContent: "center",

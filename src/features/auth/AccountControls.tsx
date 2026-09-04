@@ -1,38 +1,65 @@
-import { Pressable, type TextStyle, View, type ViewStyle } from "react-native"
+import { useState } from "react"
+import { Modal, View } from "react-native"
+import { useClerk, useUser } from "@clerk/expo"
 import { UserProfileView } from "@clerk/expo/native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-import { Text } from "@/components/Text"
-import { useAppTheme } from "@/theme/context"
-import type { ThemedStyle } from "@/theme/types"
+import { AccountScreen } from "@/screens/AccountScreen"
 
 import type { AccountProfileProps } from "./accountProfileProps"
 
-export function AccountProfile({ onBack, accountControls }: AccountProfileProps) {
-  const { themed } = useAppTheme()
-  const insets = useSafeAreaInsets()
+export function AccountProfile({
+  onBack,
+  onSignedOut,
+  onOpenTerms,
+  onOpenPrivacy,
+  onOpenGameContentNotices,
+  accountControls,
+}: AccountProfileProps) {
+  const clerk = useClerk()
+  const { user } = useUser()
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const [error, setError] = useState<string>()
+
+  async function signOut() {
+    try {
+      setError(undefined)
+      setIsSigningOut(true)
+      await clerk.signOut()
+      onSignedOut?.()
+    } catch {
+      setError("Could not sign out. Try again.")
+    } finally {
+      setIsSigningOut(false)
+    }
+  }
 
   return (
-    <View style={$profile}>
-      <UserProfileView isDismissible={false} style={$profile} />
-      {accountControls ? (
-        <View style={{ paddingBottom: Math.max(insets.bottom, 8) }}>{accountControls}</View>
-      ) : null}
-      {onBack ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={12}
-          style={[$backButton, { top: insets.top + 14 }]}
-          onPress={onBack}
-        >
-          <Text text="Back" style={themed($backText)} />
-        </Pressable>
-      ) : null}
+    <View style={$fill}>
+      <AccountScreen
+        name={user?.fullName || user?.username || undefined}
+        email={user?.primaryEmailAddress?.emailAddress}
+        avatarUrl={user?.imageUrl}
+        isSigningOut={isSigningOut}
+        error={error}
+        accountControls={accountControls}
+        onBack={onBack}
+        onManageProfile={() => setProfileOpen(true)}
+        onOpenTerms={onOpenTerms}
+        onOpenPrivacy={onOpenPrivacy}
+        onOpenGameContentNotices={onOpenGameContentNotices}
+        onSignOut={() => void signOut()}
+      />
+      <Modal
+        visible={profileOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setProfileOpen(false)}
+      >
+        <UserProfileView style={$fill} onDismiss={() => setProfileOpen(false)} />
+      </Modal>
     </View>
   )
 }
 
-const $profile = { flex: 1 } as const
-const $backButton: ViewStyle = { position: "absolute", left: 20, zIndex: 1 }
-const $backText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
+const $fill = { flex: 1 } as const

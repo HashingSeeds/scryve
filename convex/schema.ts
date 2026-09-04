@@ -73,6 +73,7 @@ export default defineSchema({
     ),
     playerCount: v.number(),
     startingLife: v.number(),
+    lifeStep: v.optional(v.number()),
     ruleset: v.string(),
     game: v.optional(v.string()),
     system: v.optional(v.string()),

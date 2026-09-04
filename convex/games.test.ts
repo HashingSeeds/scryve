@@ -336,6 +336,31 @@ describe("Convex connected-game authorization", () => {
       format: "legacy-custom-format",
     })
   })
+
+  it("creates a no-system lobby with its board change amount", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "no-system-host", "Host")
+
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "no-system-public-game-id",
+      playerCount: 6,
+      startingLife: 20,
+      lifeStep: 5,
+      ruleset: "none",
+      system: "none",
+      inviteToken: "n".repeat(43),
+      manualCodeCandidates: ["NON234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+    })
+    const projection = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+    })
+
+    expect(projection).toMatchObject({ system: "none", lifeStep: 5 })
+    const games = await t.run((ctx) => ctx.db.query("games").collect())
+    expect(games[0].format).toBeUndefined()
+  })
 })
 
 async function activeGame(t: ReturnType<typeof convexTest>) {

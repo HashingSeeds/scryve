@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const gameContentNotices = {
   id: "gameContentNotices",
   title: "THIRD-PARTY GAME CONTENT",
-  version: "2026-08-29",
-  effectiveDate: "August 29, 2026",
+  version: "2026-09-04",
+  effectiveDate: "September 4, 2026",
   sections: [
     {
       blocks: [
@@ -27,7 +27,11 @@ export const gameContentNotices = {
       blocks: [
         {
           type: "paragraph",
-          text: "Magic: The Gathering, card names, card artwork, and related marks are property of Wizards of the Coast. Card data and images used by Scryve are provided through Scryfall. Scryve is not affiliated with Wizards of the Coast or Scryfall.",
+          text: "Scryve is unofficial Fan Content permitted under the Fan Content Policy. Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.",
+        },
+        {
+          type: "paragraph",
+          text: "Magic: The Gathering card data and images are provided through Scryfall. Scryve is not affiliated with Wizards of the Coast or Scryfall.",
         },
       ],
     },
@@ -36,7 +40,7 @@ export const gameContentNotices = {
       blocks: [
         {
           type: "paragraph",
-          text: "Yu-Gi-Oh!, card names, card artwork, and related marks remain property of their respective owners. Card data used by Scryve is provided through YGOPRODeck. Scryve is not affiliated with or endorsed by Konami or YGOPRODeck.",
+          text: "Yu-Gi-Oh!, card names, card artwork, and related marks remain property of their respective owners. Scryve's limited use of these materials is intended as fair use for card identification, deck management, play tracking, and reference. Card data is provided through YGOPRODeck. Scryve is not affiliated with or endorsed by Konami or YGOPRODeck.",
         },
       ],
     },
@@ -45,7 +49,7 @@ export const gameContentNotices = {
       blocks: [
         {
           type: "paragraph",
-          text: "Pokémon, card names, card artwork, characters, and related marks remain property of Nintendo, Creatures, GAME FREAK, The Pokémon Company, and their respective owners. Card data used by Scryve is provided through TCGdex. Tournament deck data is provided through Limitless. Scryve is not affiliated with or endorsed by those organizations.",
+          text: "Pokémon, card names, card artwork, characters, and related marks remain property of Nintendo, Creatures, GAME FREAK, The Pokémon Company, and their respective owners. Scryve's limited use of these materials is intended as fair use for card identification, deck management, play tracking, and reference. Card data is provided through TCGdex, and tournament deck data is provided through Limitless. Scryve is not affiliated with or endorsed by those organizations.",
         },
       ],
     },

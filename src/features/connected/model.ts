@@ -1,4 +1,4 @@
-import { playSystemId, type PlaySystemId } from "@/features/game/playSystems"
+import { NO_PLAY_SYSTEM, playSystemId, type PlaySystemId } from "@/features/game/playSystems"
 import type {
   ActorId,
   DeviceId,
@@ -88,6 +88,7 @@ export interface ConnectedProjection {
   system?: PlaySystemId
   format?: string
   startingLife: number
+  lifeStep?: number
   ruleset: string
   isHost: boolean
   eventSequence: number
@@ -242,14 +243,22 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       eliminatedPlayerIds: commanderDamageValue.eliminatedPlayerIds,
     }
   }
+  const system = value.system === NO_PLAY_SYSTEM ? undefined : playSystemId(value.system)
   return {
     schemaVersion: 1,
     publicId: value.publicId,
     status: value.status as ConnectedGameStatus,
     playerCount: value.playerCount,
-    system: playSystemId(value.system),
-    format: typeof value.format === "string" && value.format ? value.format : value.ruleset,
+    ...(system
+      ? {
+          system,
+          format: typeof value.format === "string" && value.format ? value.format : value.ruleset,
+        }
+      : {}),
     startingLife: value.startingLife,
+    ...(typeof value.lifeStep === "number" && Number.isInteger(value.lifeStep) && value.lifeStep > 0
+      ? { lifeStep: value.lifeStep }
+      : {}),
     ruleset: value.ruleset,
     isHost: value.isHost,
     eventSequence: value.eventSequence,

@@ -7,6 +7,7 @@ import {
 
 export const PLAY_SYSTEM_IDS = ["mtg", "ygo", "pokemon"] as const
 export type PlaySystemId = (typeof PLAY_SYSTEM_IDS)[number]
+export const NO_PLAY_SYSTEM = "none"
 
 export type CounterRules = {
   label: string
@@ -46,7 +47,7 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
       plural: "life",
       defaultValue: 20,
       presets: [20, 30, 40],
-      tapStep: 1,
+      tapStep: 10,
       direction: "open",
       maxStartingValue: 999,
     },
@@ -88,6 +89,25 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
   },
 }
 
+const GENERIC_PLAY_RULES = {
+  id: NO_PLAY_SYSTEM,
+  label: "No system",
+  shortLabel: "No system",
+  defaultFormat: "",
+  counter: {
+    label: "life",
+    heading: "Life",
+    singular: "life",
+    plural: "life",
+    defaultValue: 20,
+    presets: [],
+    tapStep: 1,
+    longPressStep: undefined,
+    direction: "open",
+    maxStartingValue: 999,
+  },
+} as const
+
 export const PLAY_SYSTEM_LIST = PLAY_SYSTEM_IDS.map((id) => PLAY_SYSTEMS[id])
 
 export function isPlaySystemId(value: unknown): value is PlaySystemId {
@@ -98,8 +118,8 @@ export function playSystemId(value: unknown): PlaySystemId {
   return isPlaySystemId(value) ? value : "mtg"
 }
 
-export function playSystemRules(value?: unknown): PlaySystemRules {
-  return PLAY_SYSTEMS[playSystemId(value)]
+export function playSystemRules(value?: unknown) {
+  return isPlaySystemId(value) ? PLAY_SYSTEMS[value] : GENERIC_PLAY_RULES
 }
 
 export function playSystemFormats(value?: unknown) {

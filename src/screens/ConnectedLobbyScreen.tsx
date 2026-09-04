@@ -276,7 +276,7 @@ function ConnectedLobbyContent({
           <Text
             size="sm"
             style={themed($dimmed)}
-            text={lobbyDetail(lobby.startingLife, lobby.ruleset)}
+            text={lobbyDetail(lobby.startingLife, lobby.ruleset, lobby.system, lobby.format)}
           />
         </View>
         <InviteCard

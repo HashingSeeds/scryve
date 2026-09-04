@@ -117,14 +117,34 @@ describe("DecksScreen", () => {
 
     expect(view.getByText("Return to game")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+    expect(StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style).bottom).toBe(
+      0,
+    )
     fireEvent.press(view.getByLabelText("Return to game"))
     expect(onPlay).toHaveBeenCalledTimes(1)
   })
 
-  it("shows dense rows with format, size, versions, and record", () => {
+  it("uses the deck as the colored surface without cropping card artwork", () => {
     const onSelect = jest.fn()
+    mockListMine.value = {
+      decks: [
+        {
+          ...commanderDeck,
+          coverImageUrl: "https://cards.scryfall.io/small/example.jpg",
+        },
+      ],
+      capacity: { used: 1, limit: 100, premium: true, canCreate: true },
+      analyticsLocked: false,
+    }
     const view = renderShelf({ onSelect })
     expect(view.getByText("Magic · Commander · 100 cards · 3 versions · 75% of 4")).toBeTruthy()
+    expect(view.getByTestId("deck-initial-existing-deck").props.children).toBe("E")
+    expect(
+      StyleSheet.flatten(view.getByTestId("deck-card-existing-deck").props.style),
+    ).toMatchObject({
+      minHeight: 124,
+      backgroundColor: "#B85636",
+    })
     expect(view.getAllByText("Recent")).toHaveLength(1)
     fireEvent.press(view.getByLabelText("Existing Deck"))
     expect(onSelect).toHaveBeenCalledWith({
@@ -136,6 +156,24 @@ describe("DecksScreen", () => {
     })
   })
 
+  it("matches the compact source filters used by History", () => {
+    const view = renderShelf()
+
+    expect(StyleSheet.flatten(view.getByTestId("collection-filter-all").props.style)).toMatchObject(
+      {
+        borderRadius: 24,
+        backgroundColor: colors.tint,
+      },
+    )
+    expect(
+      StyleSheet.flatten(view.getByTestId("collection-filter-favorites").props.style),
+    ).toMatchObject({ borderWidth: 1 })
+    expect(
+      StyleSheet.flatten(view.getByTestId("collection-filter-favorites").props.style)
+        .backgroundColor,
+    ).toBeUndefined()
+  })
+
   it("shows the deck shelf structure while decks load", () => {
     mockListMine.value = undefined
     const view = renderShelf()
@@ -145,8 +183,7 @@ describe("DecksScreen", () => {
     expect(
       StyleSheet.flatten(view.getAllByTestId("deck-skeleton-cover")[0].props.style),
     ).toMatchObject({
-      width: 46,
-      height: 64,
+      position: "absolute",
       backgroundColor: colors.separator,
     })
     expect(view.queryByText("No decks yet")).toBeNull()
@@ -155,7 +192,7 @@ describe("DecksScreen", () => {
   it("opens the add-deck route", () => {
     const onAddDeck = jest.fn()
     const view = renderShelf({ onAddDeck })
-    fireEvent.press(view.getByTestId("add-deck-tile"))
+    fireEvent.press(view.getByText("Add deck"))
     expect(onAddDeck).toHaveBeenCalledTimes(1)
   })
 
@@ -212,7 +249,7 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     const view = renderShelf()
-    expect(view.getByTestId("add-deck-tile")).toBeTruthy()
+    expect(view.getByText("Add deck")).toBeTruthy()
     expect(view.getByText("No decks yet")).toBeTruthy()
   })
 
@@ -264,7 +301,7 @@ describe("DecksScreen", () => {
     }
     const view = renderShelf()
     expect(view.queryByText(/Premium/)).toBeNull()
-    expect(view.getByTestId("add-deck-tile")).toBeEnabled()
+    expect(view.getByText("Add deck")).toBeEnabled()
   })
 
   it("keeps shelf controls mounted and retries a failed deck query", () => {

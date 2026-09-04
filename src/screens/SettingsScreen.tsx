@@ -3,15 +3,29 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
+import { ChoiceButton } from "@/components/ChoiceButton"
 import { MENU_BUTTON_STYLE_LABELS, MENU_BUTTON_STYLES } from "@/components/GameMenuButtonShape"
 import { ListItem } from "@/components/ListItem"
 import { Screen } from "@/components/Screen"
+import { SegmentedControl } from "@/components/SegmentedControl"
+import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
-import { STARTING_LIFE_PRESETS } from "@/features/game/domain"
+import { ValueField } from "@/components/ValueField"
+import { MAX_PLAYERS, MIN_PLAYERS } from "@/features/game/domain"
 import type { LocalSettings, ThemePreference } from "@/features/game/localPersistence"
+import {
+  isPlaySystemId,
+  NO_PLAY_SYSTEM,
+  PLAY_SYSTEM_LIST,
+  playSystemFormats,
+  playSystemRules,
+  type PlaySystemId,
+} from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+
+const MIN_STARTING_LIFE = 1
 
 export interface SettingsScreenProps {
   initialSettings: LocalSettings
@@ -47,7 +61,30 @@ export function SettingsScreen({
     setSettings(next)
     onSettingsChange(next)
   }
+  const selectSystem = (system?: PlaySystemId) => {
+    const { defaultSystem: _system, defaultFormat: _format, ...rest } = settings
+    const next: LocalSettings = {
+      ...rest,
+      defaultStartingLife: playSystemRules(system).counter.defaultValue,
+      ...(system
+        ? {
+            defaultSystem: system,
+          }
+        : {}),
+    }
+    setSettings(next)
+    onSettingsChange(next)
+  }
+  const selectFormat = (format?: string) => {
+    if (!settings.defaultSystem) return
+    const { defaultFormat: _format, ...rest } = settings
+    const next: LocalSettings = { ...rest, ...(format ? { defaultFormat: format } : {}) }
+    setSettings(next)
+    onSettingsChange(next)
+  }
   const themes: ThemePreference[] = ["system", "light", "dark"]
+  const formats = settings.defaultSystem ? playSystemFormats(settings.defaultSystem) : []
+  const counter = playSystemRules(settings.defaultSystem).counter
   return (
     <Screen
       preset="scroll"
@@ -59,15 +96,39 @@ export function SettingsScreen({
       <View style={themed($content)}>
         <Text text="Settings" preset="heading" accessibilityRole="header" />
         <Text text="Local game defaults" preset="subheading" accessibilityRole="header" />
+        <View style={themed($valueGrid)}>
+          <View style={themed($playerValue)}>
+            <ValueField
+              testID="default-player-count"
+              label="players"
+              value={settings.defaultPlayerCount}
+              min={MIN_PLAYERS}
+              max={MAX_PLAYERS}
+              onChange={(defaultPlayerCount) => update({ defaultPlayerCount })}
+            />
+          </View>
+          <View style={themed($counterValue)}>
+            <ValueField
+              testID="default-starting-life"
+              label={counter.label}
+              value={settings.defaultStartingLife}
+              min={MIN_STARTING_LIFE}
+              max={counter.maxStartingValue}
+              step={counter.tapStep}
+              longStep={counter.longPressStep ?? 10}
+              onChange={(defaultStartingLife) => update({ defaultStartingLife })}
+            />
+          </View>
+        </View>
         <Text text="Open Scryve to" style={themed($label)} />
         <View style={themed($row)}>
           {(["play", "decks"] as const).map((destination) => (
-            <Button
+            <ChoiceButton
               key={destination}
+              compact
               testID={`launch-destination-${destination}`}
               text={destination === "play" ? "Play" : "Decks"}
-              accessibilityState={{ selected: settings.launchDestination === destination }}
-              preset={settings.launchDestination === destination ? "reversed" : "default"}
+              selected={settings.launchDestination === destination}
               style={themed($choice)}
               onPress={() => update({ launchDestination: destination })}
             />
@@ -78,34 +139,37 @@ export function SettingsScreen({
           size="xs"
           style={themed($muted)}
         />
-        <Text text="Player count" style={themed($label)} />
-        <View style={themed($row)}>
-          {[2, 3, 4, 5, 6].map((count) => (
-            <Button
-              key={count}
-              text={String(count)}
-              accessibilityLabel={`Default ${count} players`}
-              accessibilityState={{ selected: settings.defaultPlayerCount === count }}
-              preset={settings.defaultPlayerCount === count ? "reversed" : "default"}
-              style={themed($choice)}
-              onPress={() => update({ defaultPlayerCount: count })}
-            />
-          ))}
-        </View>
-        <Text text="Starting life" style={themed($label)} />
-        <View style={themed($row)}>
-          {STARTING_LIFE_PRESETS.map((life) => (
-            <Button
-              key={life}
-              text={String(life)}
-              accessibilityLabel={`Default ${life} life`}
-              accessibilityState={{ selected: settings.defaultStartingLife === life }}
-              preset={settings.defaultStartingLife === life ? "reversed" : "default"}
-              style={themed($choice)}
-              onPress={() => update({ defaultStartingLife: life })}
-            />
-          ))}
-        </View>
+        <Text text="Game system" style={themed($label)} />
+        <SegmentedControl
+          testID="default-system"
+          accessibilityLabel="Default game system"
+          selectedId={settings.defaultSystem ?? NO_PLAY_SYSTEM}
+          segments={[
+            { id: NO_PLAY_SYSTEM, label: "No system" },
+            ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
+          ]}
+          onSelect={(id) => selectSystem(isPlaySystemId(id) ? id : undefined)}
+        />
+        {formats.length > 0 ? (
+          <SelectField
+            testID="default-format"
+            label="Format"
+            placeholder="No default"
+            clearLabel="No default"
+            value={settings.defaultFormat}
+            options={formats.map(({ id, label, blurb }) => ({
+              id,
+              label,
+              ...(blurb ? { detail: blurb } : {}),
+            }))}
+            onSelect={selectFormat}
+          />
+        ) : null}
+        <Text
+          text="Set these only when you want new games to start with the same system and format."
+          size="xs"
+          style={themed($muted)}
+        />
         <Switch
           testID="haptics-switch"
           label="Haptic feedback"
@@ -116,11 +180,11 @@ export function SettingsScreen({
         <Text text="Theme" preset="subheading" accessibilityRole="header" />
         <View style={themed($row)}>
           {themes.map((theme) => (
-            <Button
+            <ChoiceButton
               key={theme}
+              compact
               text={theme[0].toUpperCase() + theme.slice(1)}
-              accessibilityState={{ selected: settings.themePreference === theme }}
-              preset={settings.themePreference === theme ? "reversed" : "default"}
+              selected={settings.themePreference === theme}
               style={themed($choice)}
               onPress={() => update({ themePreference: theme })}
             />
@@ -134,12 +198,12 @@ export function SettingsScreen({
         <Text text="Game menu button" preset="subheading" accessibilityRole="header" />
         <View style={themed($row)}>
           {MENU_BUTTON_STYLES.map((style) => (
-            <Button
+            <ChoiceButton
               key={style}
+              compact
               testID={`menu-button-style-${style}`}
               text={MENU_BUTTON_STYLE_LABELS[style]}
-              accessibilityState={{ selected: settings.menuButtonStyle === style }}
-              preset={settings.menuButtonStyle === style ? "reversed" : "default"}
+              selected={settings.menuButtonStyle === style}
               style={themed($choice)}
               onPress={() => update({ menuButtonStyle: style })}
             />
@@ -228,12 +292,18 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   gap: spacing.md,
 })
+const $valueGrid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.xs,
+})
+const $playerValue: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $counterValue: ThemedStyle<ViewStyle> = () => ({ flex: 1.45 })
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
   gap: spacing.xs,
 })
-const $choice: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, minWidth: 56, minHeight: 48 })
+const $choice: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, minWidth: 56 })
 const $label: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $accountSection: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({

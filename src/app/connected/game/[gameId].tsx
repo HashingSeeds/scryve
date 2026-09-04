@@ -11,11 +11,11 @@ export default function ConnectedGameRoute() {
     <ConnectedGate
       allowOfflineBootstrap
       offlineGameId={gameId}
-      onBack={() => router.replace("/connected")}
+      onBack={() => router.replace("/game/new?mode=connected")}
     >
       <ConnectedBoardScreen
         publicId={gameId}
-        onBack={() => router.replace("/connected")}
+        onBack={() => router.replace("/game/new?mode=connected")}
         onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
         onDecks={() => router.push("/connected/decks")}
         onSettings={() => router.push("/settings")}

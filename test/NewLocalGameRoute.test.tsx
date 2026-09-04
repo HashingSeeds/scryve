@@ -7,13 +7,25 @@ import { ThemeProvider } from "@/theme/context"
 
 import NewLocalGameRoute from "../src/app/game/new"
 
+let mockSearchParams: { mode?: string; setup?: string } = {}
+
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), replace: jest.fn() },
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockSearchParams,
+}))
+jest.mock("@/features/connected/ConnectedGate", () => ({
+  ConnectedGate: ({ children }: { children: React.ReactNode }) => children,
+}))
+jest.mock("@/features/connected/ConnectedHostSource", () => ({
+  ConnectedHostSource: ({ children }: { children: (feed: object) => React.ReactNode }) =>
+    children({ ready: true, busy: false, host: jest.fn() }),
 }))
 
 describe("new local game route", () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockSearchParams = {}
+  })
   afterEach(() => localGameRepository.clearActiveGame())
 
   it("connects setup to persisted current-game navigation", () => {
@@ -50,5 +62,18 @@ describe("new local game route", () => {
     expect(view.queryByTestId("start-game-button")).toBeNull()
     fireEvent.press(view.getByTestId("guard-resume-game-button"))
     expect(router.replace).toHaveBeenCalledWith("/game/current")
+  })
+
+  it("uses the shared setup route for connected games", () => {
+    mockSearchParams = { mode: "connected" }
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("host-connected-button")).toBeTruthy()
+    fireEvent.press(view.getByTestId("mode-local"))
+    expect(router.replace).toHaveBeenCalledWith("/game/new")
   })
 })

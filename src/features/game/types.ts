@@ -1,3 +1,4 @@
+import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { PlaySystemId } from "./playSystems"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 
@@ -67,6 +68,8 @@ export interface LocalGame {
   status: GameStatus
   system?: PlaySystemId
   format?: string
+  layout?: PlayerGridLayoutVariant
+  lifeStep?: number
   startingLife: number
   players: GamePlayer[]
   events: GameEvent[]

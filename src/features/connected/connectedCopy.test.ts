@@ -75,6 +75,25 @@ describe("connected copy", () => {
     expect(lobbyDetail(20, "commander", "mtg", "")).toBe("20 life · Commander")
   })
 
+  it("omits format language for a no-system game", () => {
+    expect(lobbyDetail(20, "none", "none")).toBe("20 life")
+    expect(
+      resumeDetail(
+        {
+          publicId: "game",
+          status: "lobby",
+          isHost: true,
+          playerCount: 6,
+          system: "none",
+          ruleset: "none",
+          startingLife: 20,
+          updatedAt: 1,
+        },
+        1,
+      ),
+    ).toBe("6 seats · 20 life · just now")
+  })
+
   it("says how many players a lobby is still waiting on", () => {
     expect(seatSummary(1, 2)).toBe("Waiting for 1 more player")
     expect(seatSummary(1, 4)).toBe("Waiting for 3 more players")

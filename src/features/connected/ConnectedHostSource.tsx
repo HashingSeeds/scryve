@@ -9,6 +9,7 @@ import {
   type ConnectedProfileState,
 } from "@/features/connected/useConnectedProfile"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 
 import { api } from "../../../convex/_generated/api"
@@ -58,7 +59,8 @@ function ConnectedHostQuerySource({
   children: (feed: ConnectedHostFeed) => ReactNode
 }) {
   const createLobby = useMutation(api.games.createLobby)
-  const deviceId = useMemo(() => new LocalGameRepository().getDeviceId(), [])
+  const localRepository = useMemo(() => new LocalGameRepository(), [])
+  const deviceId = useMemo(() => localRepository.getDeviceId(), [localRepository])
   const [hostError, setHostError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const ready = connectedProfile.status === "ready"
@@ -93,13 +95,16 @@ function ConnectedHostQuerySource({
       setBusy(true)
       setHostError(undefined)
       const ids = await createLobbyIdentifiers()
+      const { layout, system, ...lobbySetup } = setup
       const lobby = await createLobby({
         ...ids,
-        ...setup,
+        ...lobbySetup,
+        system: system ?? NO_PLAY_SYSTEM,
         hostDisplayName: connectedProfile.profile.displayName,
         hostColor: PLAYER_COLOR_CHOICES[0],
         deviceId,
       })
+      localRepository.saveLayoutPreference(setup.playerCount, layout)
       onLobbyCreated(lobby)
     } catch (cause) {
       setHostError(cause instanceof Error ? cause.message : "Could not create lobby")

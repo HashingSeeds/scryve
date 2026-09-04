@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
-import { Image, type ImageStyle } from "expo-image"
+import type { ImageStyle } from "expo-image"
 import { useMutation, useQuery } from "convex/react"
+import Svg, { Path } from "react-native-svg"
 
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
@@ -10,6 +11,7 @@ import type { FilterChip } from "@/components/FilterChips"
 import { FilterChips } from "@/components/FilterChips"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { Header } from "@/components/Header"
+import { Icon } from "@/components/Icon"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -18,6 +20,7 @@ import type { DeckRecord } from "@/features/decks/deckCopy"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { useRecentDecks } from "@/features/decks/recentDecks"
+import { PLAYER_COLORS } from "@/features/game/domain"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -54,11 +57,17 @@ export type DeckSelection = {
 type DeckCollection = "all" | "favorites" | "recent"
 
 const ALL_SYSTEMS = "all"
+const DECK_SURFACES: Record<string, string> = {
+  mtg: PLAYER_COLORS[0],
+  ygo: PLAYER_COLORS[4],
+  pokemon: PLAYER_COLORS[3],
+}
 const COLLECTIONS = [
   { id: "all", label: "All" },
   { id: "favorites", label: "Favorites" },
   { id: "recent", label: "Recent" },
 ] as const
+const ABSOLUTE_FILL = { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 } as const
 
 function coverInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?"
@@ -99,8 +108,18 @@ function DeckRow({
   const { themed } = useAppTheme()
   const game = deck.game ?? DEFAULT_DECK_GAME
   const favorite = deck.favoritedAt !== undefined
+  const foreground = "#FFFFFF"
   return (
-    <View style={themed($row)}>
+    <View
+      testID={`deck-card-${deck._id}`}
+      style={[themed($row), { backgroundColor: DECK_SURFACES[game] ?? PLAYER_COLORS[1] }]}
+    >
+      <Text
+        testID={`deck-initial-${deck._id}`}
+        pointerEvents="none"
+        text={coverInitial(deck.name)}
+        style={[themed($coverInitial), { color: foreground }]}
+      />
       <TouchableOpacity
         style={themed($openButton)}
         accessibilityRole="button"
@@ -108,22 +127,22 @@ function DeckRow({
         activeOpacity={0.75}
         onPress={onPress}
       >
-        {deck.coverImageUrl ? (
-          <Image source={deck.coverImageUrl} style={themed($cover)} cachePolicy="memory-disk" />
-        ) : (
-          <View style={themed($coverPlaceholder)}>
-            <Text weight="bold" size="md" text={coverInitial(deck.name)} />
-          </View>
-        )}
         <View style={themed($rowCopy)}>
-          <Text weight="medium" numberOfLines={1} text={deck.name} />
           <Text
-            size="xxs"
+            weight="bold"
+            size="md"
+            numberOfLines={1}
+            text={deck.name}
+            style={{ color: foreground }}
+          />
+          <Text
+            size="xs"
             numberOfLines={2}
-            style={themed($dimmedText)}
+            style={themed($deckSubtitle)}
             text={deckSubtitle(deck, game, showGame)}
           />
         </View>
+        <Icon icon="caretRight" color={foreground} size={20} style={themed($cardIcon)} />
       </TouchableOpacity>
       <TouchableOpacity
         testID={`favorite-deck-${deck._id}`}
@@ -133,14 +152,55 @@ function DeckRow({
         style={themed($favoriteButton)}
         onPress={onToggleFavorite}
       >
-        <Text
-          size="lg"
-          style={favorite ? themed($favoriteText) : themed($dimmedText)}
-          text={favorite ? "★" : "☆"}
-        />
+        <StarIcon selected={favorite} color={foreground} />
       </TouchableOpacity>
-      <Text size="lg" style={themed($dimmedText)} text="›" />
     </View>
+  )
+}
+
+function CollectionChip({
+  id,
+  label,
+  selected,
+  onPress,
+}: {
+  id: DeckCollection
+  label: string
+  selected: boolean
+  onPress: () => void
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <TouchableOpacity
+      testID={`collection-filter-${id}`}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+      activeOpacity={0.8}
+      style={[themed($collectionChip), selected ? themed($collectionChipSelected) : undefined]}
+      onPress={onPress}
+    >
+      <Text
+        text={label}
+        size="xxs"
+        weight={selected ? "medium" : "normal"}
+        style={selected ? themed($collectionChipSelectedText) : themed($dimmedText)}
+      />
+    </TouchableOpacity>
+  )
+}
+
+function StarIcon({ selected, color }: { selected: boolean; color: string }) {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path
+        d="m12 2.6 2.86 5.8 6.4.93-4.63 4.51 1.09 6.38L12 17.2l-5.72 3.02 1.09-6.38-4.63-4.51 6.4-.93L12 2.6Z"
+        fill={selected ? color : "none"}
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+      />
+    </Svg>
   )
 }
 
@@ -154,7 +214,8 @@ function ActiveFilterChip({ label, onPress }: { label: string; onPress: () => vo
       style={themed($activeFilter)}
       onPress={onPress}
     >
-      <Text size="xxs" weight="medium" style={themed($activeFilterText)} text={`${label}  ✕`} />
+      <Text size="xxs" weight="medium" style={themed($activeFilterText)} text={label} />
+      <Icon icon="x" color="#FFFFFF" size={12} />
     </TouchableOpacity>
   )
 }
@@ -165,13 +226,12 @@ function DeckShelfSkeleton() {
     <View accessibilityRole="progressbar" accessibilityLabel="Loading decks">
       {Array.from({ length: 4 }).map((_, index) => (
         <View key={index} testID="deck-skeleton-row" style={themed($row)}>
-          <View
-            testID="deck-skeleton-cover"
-            style={[themed($coverPlaceholder), themed($skeletonCover)]}
-          />
-          <View style={themed($rowCopy)}>
-            <View style={themed($skeletonName)} />
-            <View style={themed($skeletonSubtitle)} />
+          <View testID="deck-skeleton-cover" style={themed($skeletonCover)} />
+          <View style={themed($skeletonContent)}>
+            <View style={themed($rowCopy)}>
+              <View style={themed($skeletonName)} />
+              <View style={themed($skeletonSubtitle)} />
+            </View>
           </View>
         </View>
       ))}
@@ -366,31 +426,28 @@ export function DecksScreen({
   }
 
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header title="Decks" />
+    <Screen preset="fixed" safeAreaEdges={[]} contentContainerStyle={themed($screen)}>
+      <Header
+        title="Decks"
+        rightText={unavailableMessage ? undefined : "Add deck"}
+        onRightPress={unavailableMessage ? undefined : onAddDeck}
+      />
       <View style={themed($content)}>
-        {!unavailableMessage ? (
-          <View style={themed($shelfActions)}>
-            <TouchableOpacity
-              testID="add-deck-tile"
-              accessibilityRole="button"
-              accessibilityLabel="Add deck"
-              style={themed($headerAction)}
-              onPress={onAddDeck}
-            >
-              <Text size="md" weight="medium" style={themed($link)} text="+ Add deck" />
-            </TouchableOpacity>
-          </View>
-        ) : null}
         <View style={themed($filterRow)}>
-          <View style={$collectionFilter}>
-            <FilterChips
-              testID="collection-filter"
-              accessibilityLabel="Deck collection"
-              chips={COLLECTIONS}
-              selectedId={collection}
-              onSelect={(next) => setCollection(next as DeckCollection)}
-            />
+          <View
+            testID="collection-filter"
+            accessibilityLabel="Deck collection"
+            style={themed($collectionFilter)}
+          >
+            {COLLECTIONS.map(({ id, label }) => (
+              <CollectionChip
+                key={id}
+                id={id}
+                label={label}
+                selected={collection === id}
+                onPress={() => setCollection(id)}
+              />
+            ))}
           </View>
           <Button
             testID="deck-filters-button"
@@ -516,11 +573,6 @@ export function DecksScreen({
 }
 
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
-const $shelfActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  justifyContent: "flex-end",
-  paddingBottom: spacing.xxs,
-})
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   width: "100%",
@@ -534,9 +586,28 @@ const $filterRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingVertical: spacing.xs,
 })
-const $collectionFilter: ViewStyle = { flex: 1 }
+const $collectionFilter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  flexDirection: "row",
+  gap: spacing.xs,
+})
+const $collectionChip: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  paddingVertical: spacing.xxs,
+  paddingHorizontal: spacing.sm,
+  borderRadius: spacing.lg,
+  borderWidth: 1,
+  borderColor: colors.separator,
+})
+const $collectionChipSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  borderColor: colors.tint,
+  backgroundColor: colors.tint,
+})
+const $collectionChipSelectedText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.palette.neutral100,
+})
 const $filtersButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 36,
+  borderRadius: 12,
   paddingHorizontal: spacing.sm,
   paddingVertical: 0,
 })
@@ -548,6 +619,9 @@ const $activeFilters: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $searchField: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.xs })
 const $activeFilter: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.sm,
   borderRadius: spacing.lg,
@@ -564,40 +638,53 @@ const $groupHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
   letterSpacing: 1,
 })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.sm,
+  paddingTop: spacing.xs,
   paddingBottom: spacing.xxxl + spacing.lg,
 })
-const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minHeight: 88,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
+const $row: ThemedStyle<ViewStyle> = () => ({
+  minHeight: 124,
+  overflow: "hidden",
+  borderRadius: 16,
 })
 const $openButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   flexDirection: "row",
-  alignItems: "center",
+  alignItems: "flex-end",
   gap: spacing.sm,
+  paddingHorizontal: spacing.md,
+  paddingTop: spacing.xl,
+  paddingBottom: spacing.md,
 })
-const $cover: ThemedStyle<ImageStyle> = ({ spacing }) => ({
-  width: 46,
-  height: 64,
-  borderRadius: spacing.xxxs,
-})
-const $coverPlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: 46,
-  height: 64,
-  borderRadius: spacing.xxxs,
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: colors.palette.neutral200,
+const $coverInitial: ThemedStyle<TextStyle> = () => ({
+  position: "absolute",
+  top: -18,
+  right: 44,
+  fontSize: 112,
+  lineHeight: 132,
+  fontWeight: "700",
+  opacity: 0.12,
 })
 const $rowCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
-const $favoriteButton: ThemedStyle<ViewStyle> = () => ({ minWidth: 32, alignItems: "center" })
-const $favoriteText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
+const $deckSubtitle: ThemedStyle<TextStyle> = () => ({ color: "rgba(255, 255, 255, 0.78)" })
+const $cardIcon: ThemedStyle<ImageStyle> = () => ({ opacity: 0.72 })
+const $favoriteButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  top: spacing.sm,
+  right: spacing.sm,
+  width: 44,
+  height: 44,
+  alignItems: "center",
+  justifyContent: "center",
+})
 const $skeletonCover: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  ...ABSOLUTE_FILL,
   backgroundColor: colors.separator,
+})
+const $skeletonContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  justifyContent: "flex-end",
+  padding: spacing.md,
 })
 const $skeletonName: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: "58%",
@@ -613,12 +700,6 @@ const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tex
 const $errorText: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.error,
   paddingVertical: spacing.xs,
-})
-const $link: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
-const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  height: 56,
-  justifyContent: "center",
-  paddingHorizontal: spacing.md,
 })
 const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,

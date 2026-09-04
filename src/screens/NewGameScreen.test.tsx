@@ -1,3 +1,4 @@
+import { Dimensions, StyleSheet } from "react-native"
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
 import { Screen } from "@/components/Screen"
@@ -82,22 +83,60 @@ describe("NewGameScreen", () => {
     resetConnectedProfileBootstrapForTests()
   })
 
-  it("starts defaults and supports six players plus custom life", () => {
+  it("starts no-system defaults and supports six players", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
 
-    fireEvent.press(view.getByLabelText("6 players"))
-    fireEvent.press(view.getByLabelText("Use custom starting life"))
-    fireEvent.changeText(view.getByTestId("custom-starting-life"), "37")
+    for (let count = 2; count < 6; count += 1)
+      fireEvent.press(view.getByTestId("player-count-increment"))
     fireEvent.changeText(view.getByTestId("player-name-6"), "Six")
     fireEvent.press(view.getByTestId("start-game-button"))
 
     expect(onStartLocal).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ name: "Six" })]),
-      37,
-      { format: "standard", system: "mtg" },
+      20,
+      { layout: "auto", lifeStep: 1 },
     )
     expect(onStartLocal.mock.calls[0][0]).toHaveLength(6)
+  })
+
+  it("offers only valid layouts for the player count and submits the selection", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
+
+    expect(view.getByTestId("player-layout-auto")).toBeTruthy()
+    const { width, height } = Dimensions.get("window")
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("player-layout-auto-preview", {
+          includeHiddenElements: true,
+        }).props.style,
+      ),
+    ).toMatchObject({
+      aspectRatio: width / height,
+    })
+    expect(view.queryByTestId("player-layout-tabletop")).toBeNull()
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
+
+    expect(view.getByTestId("player-layout-tabletop")).toBeTruthy()
+    expect(view.queryByTestId("player-layout-featured-first")).toBeNull()
+    fireEvent.press(view.getByTestId("player-layout-tabletop"))
+    fireEvent.press(view.getByTestId("start-game-button"))
+
+    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 20, {
+      layout: "tabletop",
+      lifeStep: 1,
+    })
+  })
+
+  it("offers the Table layout to six players", () => {
+    const view = setup()
+
+    for (let count = 2; count < 6; count += 1)
+      fireEvent.press(view.getByTestId("player-count-increment"))
+
+    expect(view.getByTestId("player-layout-tabletop")).toBeTruthy()
   })
 
   it("starts Yu-Gi-Oh! at 8000 Life Points with the Advanced format", () => {
@@ -105,11 +144,38 @@ describe("NewGameScreen", () => {
     const view = setup({ onStartLocal })
 
     fireEvent.press(view.getByTestId("play-system-ygo"))
-    expect(view.getByLabelText("Start at 8000 Life Points")).toBeTruthy()
+    expect(view.getByLabelText("Life Points, 8000")).toBeTruthy()
+    expect(view.getByLabelText("Change by, 100")).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
 
     expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 8000, {
       format: "advanced",
+      layout: "auto",
+      lifeStep: 100,
+      system: "ygo",
+    })
+  })
+
+  it("preselects the saved system and format defaults", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({
+      onStartLocal,
+      defaults: {
+        ...DEFAULT_LOCAL_SETTINGS,
+        defaultSystem: "ygo",
+        defaultFormat: "advanced",
+        defaultStartingLife: 8000,
+      },
+    })
+
+    expect(view.getByTestId("play-system-ygo").props.accessibilityState.selected).toBe(true)
+    expect(view.getByLabelText("Life Points, 8000")).toBeTruthy()
+    fireEvent.press(view.getByTestId("start-game-button"))
+
+    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 8000, {
+      format: "advanced",
+      layout: "auto",
+      lifeStep: 100,
       system: "ygo",
     })
   })
@@ -119,11 +185,13 @@ describe("NewGameScreen", () => {
     const view = setup({ onStartLocal })
 
     fireEvent.press(view.getByTestId("play-system-pokemon"))
-    expect(view.getByLabelText("Start at 6 Prize cards")).toBeTruthy()
+    expect(view.getByLabelText("Prize cards, 6")).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
 
     expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 6, {
       format: "standard",
+      layout: "auto",
+      lifeStep: 1,
       system: "pokemon",
     })
   })
@@ -159,7 +227,7 @@ describe("NewGameScreen", () => {
         expect.objectContaining({ name: "Player 1", color: "#39755C", shape: "hexagon" }),
       ]),
       20,
-      { format: "standard", system: "mtg" },
+      { layout: "auto", lifeStep: 1 },
     )
   })
 
@@ -171,29 +239,31 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("appearance-shape-circle")).toBeDisabled()
   })
 
-  it("disables start for invalid custom life", () => {
-    const view = setup()
+  it("uses the Life box as the starting value and saves a per-game change amount", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
 
-    fireEvent.press(view.getByLabelText("Use custom starting life"))
-    fireEvent.changeText(view.getByTestId("custom-starting-life"), "0")
+    fireEvent.press(view.getByTestId("play-system-mtg"))
+    expect(view.getByLabelText("Increase Life by 10")).toBeTruthy()
+    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("life-step"))
+    fireEvent.press(view.getByTestId("life-step-option-5"))
+    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("start-game-button"))
 
-    expect(view.getByTestId("start-game-button").props.accessibilityState.disabled).toBe(true)
-  })
-
-  it("hides the custom starting life field until it is requested", () => {
-    const view = setup()
-
-    expect(view.queryByTestId("custom-starting-life")).toBeNull()
-    fireEvent.press(view.getByLabelText("Use custom starting life"))
-    expect(view.getByTestId("custom-starting-life")).toBeTruthy()
-    fireEvent.press(view.getByLabelText("Start at 30 life"))
-    expect(view.queryByTestId("custom-starting-life")).toBeNull()
+    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 35, {
+      format: "standard",
+      layout: "auto",
+      lifeStep: 5,
+      system: "mtg",
+    })
   })
 
   it("keeps the start button pinned outside the scrollable form", () => {
     const view = setup()
 
-    fireEvent.press(view.getByLabelText("6 players"))
+    for (let count = 2; count < 6; count += 1)
+      fireEvent.press(view.getByTestId("player-count-increment"))
     const scrollableForm = view.UNSAFE_getByType(Screen)
     expect(within(scrollableForm).queryByTestId("start-game-button")).toBeNull()
     expect(within(scrollableForm).getByTestId("player-name-6")).toBeTruthy()
@@ -215,9 +285,11 @@ describe("NewGameScreen", () => {
     const view = setup({ mode: "connected", connected: { ...readyHost, host } })
 
     expect(view.queryByTestId("player-name-1")).toBeNull()
-    expect(view.getByLabelText("4 seats")).toBeTruthy()
-    fireEvent.press(view.getByLabelText("4 seats"))
-    fireEvent.press(view.getByTestId("play-format-commander"))
+    fireEvent.press(view.getByTestId("play-system-mtg"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("play-format"))
+    fireEvent.press(view.getByTestId("play-format-option-commander"))
     fireEvent.press(view.getByTestId("host-connected-button"))
 
     expect(host).toHaveBeenCalledWith({
@@ -226,6 +298,8 @@ describe("NewGameScreen", () => {
       ruleset: "commander",
       system: "mtg",
       format: "commander",
+      layout: "auto",
+      lifeStep: 10,
     })
   })
 
@@ -271,18 +345,22 @@ describe("NewGameScreen", () => {
     render(hostSetup(onLobbyCreated))
     await waitFor(() => expect(screen.getByTestId("host-connected-button")).toBeEnabled())
     expect(mockSyncUser).toHaveBeenCalledTimes(1)
-    fireEvent.press(screen.getByLabelText("4 seats"))
-    fireEvent.press(screen.getByLabelText("Start at 40 life"))
+    fireEvent.press(screen.getByTestId("play-system-mtg"))
+    fireEvent.press(screen.getByTestId("player-count-increment"))
+    fireEvent.press(screen.getByTestId("player-count-increment"))
+    fireEvent.press(screen.getByTestId("starting-counter-increment"))
+    fireEvent.press(screen.getByTestId("starting-counter-increment"))
     fireEvent.press(screen.getByTestId("host-connected-button"))
     await waitFor(() => expect(onLobbyCreated).toHaveBeenCalled())
     expect(mockCreateLobby).toHaveBeenCalledWith(
-      expect.objectContaining({ playerCount: 4, startingLife: 40, ruleset: "standard" }),
+      expect.objectContaining({
+        playerCount: 4,
+        startingLife: 40,
+        lifeStep: 10,
+        ruleset: "standard",
+      }),
     )
     expect(mockSyncUser).toHaveBeenCalledTimes(1)
-
-    fireEvent.press(screen.getByLabelText("Use custom starting life"))
-    fireEvent.changeText(screen.getByTestId("connected-starting-life"), "0")
-    expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
   })
 
   it("blocks hosting a second lobby from the setup screen", async () => {

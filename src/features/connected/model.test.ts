@@ -24,6 +24,20 @@ const legacyProjection = {
 }
 
 describe("connected projection parsing", () => {
+  it("preserves a no-system game and its board change amount", () => {
+    const projection = toConnectedProjection({
+      ...legacyProjection,
+      system: "none",
+      format: undefined,
+      ruleset: "none",
+      lifeStep: 5,
+    })
+
+    expect(projection).toMatchObject({ lifeStep: 5 })
+    expect(projection?.system).toBeUndefined()
+    expect(projection?.format).toBeUndefined()
+  })
+
   it("keeps legacy projections valid and normalizes missing commander fields", () => {
     const projection = toConnectedProjection(legacyProjection)
     expect(projection?.publicId).toBe("game-public")

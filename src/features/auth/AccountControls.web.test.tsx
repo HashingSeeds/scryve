@@ -34,7 +34,13 @@ describe("web AccountControls", () => {
   const renderProfile = (props: Partial<{ onBack: () => void; onSignedOut: () => void }> = {}) =>
     render(
       <ThemeProvider initialContext="light">
-        <AccountProfile onBack={jest.fn()} {...props} />
+        <AccountProfile
+          onBack={jest.fn()}
+          onOpenTerms={jest.fn()}
+          onOpenPrivacy={jest.fn()}
+          onOpenGameContentNotices={jest.fn()}
+          {...props}
+        />
       </ThemeProvider>,
     )
 

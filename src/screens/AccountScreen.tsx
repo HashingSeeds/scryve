@@ -19,6 +19,9 @@ export interface AccountScreenProps {
   accountControls?: ReactNode
   onBack?: () => void
   onManageProfile: () => void
+  onOpenTerms: () => void
+  onOpenPrivacy: () => void
+  onOpenGameContentNotices: () => void
   onSignOut: () => void
 }
 
@@ -31,6 +34,9 @@ export function AccountScreen({
   accountControls,
   onBack,
   onManageProfile,
+  onOpenTerms,
+  onOpenPrivacy,
+  onOpenGameContentNotices,
   onSignOut,
 }: AccountScreenProps) {
   const { themed } = useAppTheme()
@@ -70,6 +76,30 @@ export function AccountScreen({
             />
           </ListItem>
           {accountControls}
+        </View>
+
+        <View style={themed($section)}>
+          <Text text="Legal" preset="subheading" accessibilityRole="header" />
+          <View>
+            <ListItem text="Terms of Use" rightIcon="caretRight" onPress={onOpenTerms} />
+            <ListItem
+              text="Privacy Policy"
+              rightIcon="caretRight"
+              topSeparator
+              onPress={onOpenPrivacy}
+            />
+            <ListItem
+              text="Third-party game content"
+              rightIcon="caretRight"
+              topSeparator
+              onPress={onOpenGameContentNotices}
+            />
+          </View>
+          <Text
+            text="Scryve is independent and is not affiliated with or endorsed by the game publishers, rights holders, or data providers named in our game-content notice."
+            size="xxs"
+            style={themed($muted)}
+          />
         </View>
 
         <View style={themed($signOut)}>

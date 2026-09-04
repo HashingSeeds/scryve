@@ -7,7 +7,14 @@ import { AccountScreen } from "./AccountScreen"
 const renderScreen = (props: Partial<React.ComponentProps<typeof AccountScreen>> = {}) =>
   render(
     <ThemeProvider initialContext="light">
-      <AccountScreen onManageProfile={jest.fn()} onSignOut={jest.fn()} {...props} />
+      <AccountScreen
+        onManageProfile={jest.fn()}
+        onOpenTerms={jest.fn()}
+        onOpenPrivacy={jest.fn()}
+        onOpenGameContentNotices={jest.fn()}
+        onSignOut={jest.fn()}
+        {...props}
+      />
     </ThemeProvider>,
   )
 
@@ -34,5 +41,20 @@ describe("AccountScreen", () => {
 
     expect(view.getByText("Signing out…")).toBeTruthy()
     expect(onSignOut).not.toHaveBeenCalled()
+  })
+
+  it("opens each legal document", () => {
+    const onOpenTerms = jest.fn()
+    const onOpenPrivacy = jest.fn()
+    const onOpenGameContentNotices = jest.fn()
+    const view = renderScreen({ onOpenTerms, onOpenPrivacy, onOpenGameContentNotices })
+
+    fireEvent.press(view.getByText("Terms of Use"))
+    fireEvent.press(view.getByText("Privacy Policy"))
+    fireEvent.press(view.getByText("Third-party game content"))
+
+    expect(onOpenTerms).toHaveBeenCalledTimes(1)
+    expect(onOpenPrivacy).toHaveBeenCalledTimes(1)
+    expect(onOpenGameContentNotices).toHaveBeenCalledTimes(1)
   })
 })

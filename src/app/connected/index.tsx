@@ -1,25 +1,5 @@
-import { router } from "expo-router"
-
-import { ConnectedGate } from "@/features/connected/ConnectedGate"
-import { ConnectedHomeScreen } from "@/screens/ConnectedHomeScreen"
+import { Redirect } from "expo-router"
 
 export default function ConnectedIndex() {
-  return (
-    <ConnectedGate onBack={() => router.replace("/")}>
-      <ConnectedHomeScreen
-        onBack={() => router.replace("/")}
-        onHostNew={() => router.push("/connected/new")}
-        onJoin={() => router.push("/connected/join")}
-        onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
-        onDecks={() => router.push("/connected/decks")}
-        onResume={(game) =>
-          router.replace({
-            pathname:
-              game.status === "lobby" ? "/connected/lobby/[gameId]" : "/connected/game/[gameId]",
-            params: { gameId: game.publicId },
-          })
-        }
-      />
-    </ConnectedGate>
-  )
+  return <Redirect href="/game/new?mode=connected" />
 }

@@ -3,19 +3,21 @@ import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
 
 import { Button } from "@/components/Button"
-import { ChoiceButton } from "@/components/ChoiceButton"
 import {
   $dialogActions,
   $dialogButton,
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
-import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
+import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
+import { SegmentedControl } from "@/components/SegmentedControl"
+import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { ValueField } from "@/components/ValueField"
 import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import {
   MAX_PLAYER_NAME_LENGTH,
@@ -25,6 +27,12 @@ import {
 } from "@/features/game/domain"
 import type { LocalSettings } from "@/features/game/localPersistence"
 import {
+  playerGridLayoutForCount,
+  type PlayerGridLayoutVariant,
+} from "@/features/game/playerLayouts"
+import {
+  isPlaySystemId,
+  NO_PLAY_SYSTEM,
   PLAY_SYSTEM_LIST,
   playSystemFormat,
   playSystemFormats,
@@ -52,8 +60,10 @@ export interface ConnectedHostFeed {
     playerCount: number
     startingLife: number
     ruleset: string
-    system: PlaySystemId
-    format: string
+    system?: PlaySystemId
+    format?: string
+    layout: PlayerGridLayoutVariant
+    lifeStep: number
   }) => void
 }
 
@@ -65,7 +75,12 @@ export interface NewGameScreenProps {
   onStartLocal: (
     players: NewPlayerInput[],
     startingLife: number,
-    setup: { system: PlaySystemId; format: string },
+    setup: {
+      system?: PlaySystemId
+      format?: string
+      layout: PlayerGridLayoutVariant
+      lifeStep: number
+    },
   ) => void
   connected?: ConnectedHostFeed
   localSubmitText?: string
@@ -75,6 +90,7 @@ export interface NewGameScreenProps {
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
 const MAX_SEATS = 6
+const LIFE_STEP_OPTIONS = [1, 5, 10, 50, 100, 500, 1000] as const
 
 export function NewGameScreen({
   defaults,
@@ -87,11 +103,15 @@ export function NewGameScreen({
   initialGame,
   confirmLocalSubmit = false,
 }: NewGameScreenProps) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const $footerSafeArea = useSafeAreaInsetsStyle(["bottom"])
   const [playerCount, setPlayerCount] = useState(
     initialGame?.players.length ?? defaults.defaultPlayerCount,
   )
+  const [layout, setLayout] = useState<PlayerGridLayoutVariant>(initialGame?.layout ?? "auto")
   const [names, setNames] = useState<string[]>(() =>
     Array.from({ length: MAX_SEATS }, (_, index) => initialGame?.players[index]?.name ?? ""),
   )
@@ -104,21 +124,22 @@ export function NewGameScreen({
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
-  const initialSystem = initialGame?.system ?? "mtg"
-  const [system, setSystem] = useState<PlaySystemId>(initialSystem)
-  const [format, setFormat] = useState(() => initialGame?.format ?? playSystemFormat(initialSystem))
-  const [lifeText, setLifeText] = useState(
-    String(initialGame?.startingLife ?? defaults.defaultStartingLife),
+  const initialSystem = initialGame?.system ?? defaults.defaultSystem
+  const [system, setSystem] = useState<PlaySystemId | undefined>(initialSystem)
+  const [format, setFormat] = useState<string | undefined>(
+    () =>
+      initialGame?.format ??
+      (initialSystem ? playSystemFormat(initialSystem, defaults.defaultFormat) : undefined),
+  )
+  const [startingLife, setStartingLife] = useState(
+    initialGame?.startingLife ?? defaults.defaultStartingLife,
+  )
+  const [lifeStep, setLifeStep] = useState(
+    initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
   const counter = playSystemRules(system).counter
-  const [showCustomStartingLife, setShowCustomStartingLife] = useState(() =>
-    playSystemRules(initialSystem).counter.presets.every(
-      (life) => life !== (initialGame?.startingLife ?? defaults.defaultStartingLife),
-    ),
-  )
   const [confirmingLocalSubmit, setConfirmingLocalSubmit] = useState(false)
   const connectedMode = mode === "connected"
-  const startingLife = Number(lifeText)
   const validLife = validateStartingLife(startingLife, system)
   const seatNames = useMemo(
     () => names.slice(0, playerCount).map((name, index) => name.trim() || defaultName(index)),
@@ -141,19 +162,29 @@ export function NewGameScreen({
 
   function submit() {
     if (!valid || busy) return
+    const setup = {
+      layout,
+      lifeStep,
+      ...(system && format ? { system, format } : {}),
+    }
     if (connectedMode)
-      connected?.host({ playerCount, startingLife, ruleset: format, system, format })
+      connected?.host({ playerCount, startingLife, ruleset: format ?? NO_PLAY_SYSTEM, ...setup })
     else if (confirmLocalSubmit) setConfirmingLocalSubmit(true)
-    else onStartLocal(players, startingLife, { system, format })
+    else onStartLocal(players, startingLife, setup)
   }
 
   function chooseSystem(value: string) {
-    const next = PLAY_SYSTEM_LIST.find((candidate) => candidate.id === value)
-    if (!next) return
-    setSystem(next.id)
-    setFormat(playSystemFormat(next.id))
-    setLifeText(String(next.counter.defaultValue))
-    setShowCustomStartingLife(false)
+    const next = isPlaySystemId(value) ? value : undefined
+    const nextCounter = playSystemRules(next).counter
+    setSystem(next)
+    setFormat(next ? playSystemFormat(next) : undefined)
+    setStartingLife(nextCounter.defaultValue)
+    setLifeStep(nextCounter.tapStep)
+  }
+
+  function choosePlayerCount(value: number) {
+    setPlayerCount(value)
+    setLayout((current) => playerGridLayoutForCount(value, current))
   }
 
   function openAppearancePicker(index: number, event?: GestureResponderEvent) {
@@ -178,118 +209,93 @@ export function NewGameScreen({
   }
 
   return (
-    <View style={$styles.flex1}>
+    <View style={[themed($root), $styles.flex1]}>
       <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
         <Header
-          title={connectedMode ? "New connected game" : undefined}
-          titleTx={connectedMode ? undefined : "game:newGame"}
+          title="New game"
           leftTx="common:back"
+          backgroundColor={colors.surface}
           onLeftPress={onBack}
         />
-        <View style={themed($choiceRow)}>
-          <ChoiceButton
-            compact
-            testID="mode-local"
-            text="On this device"
-            accessibilityHint="Everything stays on this device"
-            selected={!connectedMode}
-            style={themed($modeChoice)}
-            onPress={() => onModeChange("local")}
-          />
-          <ChoiceButton
-            compact
-            testID="mode-connected"
-            text="Connected"
-            accessibilityHint="Play live with people on their own devices"
-            selected={connectedMode}
-            style={themed($modeChoice)}
-            onPress={() => onModeChange("connected")}
-          />
-        </View>
+        <SegmentedControl
+          testID="mode"
+          accessibilityLabel="Game connection"
+          segments={[
+            { id: "local", label: "On this device" },
+            { id: "connected", label: "Connected" },
+          ]}
+          selectedId={mode}
+          onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
+        />
 
         <View style={themed($section)}>
           <Text text="System" preset="subheading" accessibilityRole="header" />
-          <FilterChips
+          <SegmentedControl
             testID="play-system"
             accessibilityLabel="Game system"
-            chips={PLAY_SYSTEM_LIST.map((candidate) => ({
-              id: candidate.id,
-              label: candidate.shortLabel,
-            }))}
-            selectedId={system}
+            segments={[
+              { id: NO_PLAY_SYSTEM, label: "No system" },
+              ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
+            ]}
+            selectedId={system ?? NO_PLAY_SYSTEM}
             onSelect={chooseSystem}
           />
-          <Text text="Format" preset="subheading" accessibilityRole="header" />
-          <FilterChips
-            testID="play-format"
-            accessibilityLabel={`${playSystemRules(system).shortLabel} format`}
-            chips={playSystemFormats(system).map((candidate) => ({
-              id: candidate.id,
-              label: candidate.label,
-            }))}
-            selectedId={format}
-            onSelect={setFormat}
-          />
-        </View>
-
-        <View style={themed($section)}>
-          <Text
-            text={connectedMode ? "Seats" : "Players"}
-            preset="subheading"
-            accessibilityRole="header"
-          />
-          <View style={themed($choiceRow)}>
-            {PLAYER_COUNTS.map((count) => (
-              <ChoiceButton
-                compact
-                key={count}
-                text={String(count)}
-                accessibilityLabel={connectedMode ? `${count} seats` : `${count} players`}
-                selected={playerCount === count}
-                style={themed($choice)}
-                onPress={() => setPlayerCount(count)}
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={themed($section)}>
-          <Text text={`Starting ${counter.label}`} preset="subheading" accessibilityRole="header" />
-          <View style={themed($choiceRow)}>
-            {counter.presets.map((life) => (
-              <ChoiceButton
-                compact
-                key={life}
-                text={String(life)}
-                accessibilityLabel={`Start at ${life} ${counter.label}`}
-                selected={startingLife === life}
-                style={themed($choice)}
-                onPress={() => {
-                  setShowCustomStartingLife(false)
-                  setLifeText(String(life))
-                }}
-              />
-            ))}
-            <ChoiceButton
-              compact
-              text="Custom"
-              accessibilityLabel="Use custom starting life"
-              selected={showCustomStartingLife}
-              style={themed($choice)}
-              onPress={() => setShowCustomStartingLife(true)}
-            />
-          </View>
-          {showCustomStartingLife ? (
-            <TextField
-              testID={connectedMode ? "connected-starting-life" : "custom-starting-life"}
-              label={`Custom starting ${counter.label}`}
-              value={lifeText}
-              keyboardType="number-pad"
-              status={validLife ? undefined : "error"}
-              helper={`Whole number from 1 to ${counter.maxStartingValue}.`}
-              onChangeText={setLifeText}
+          {system ? (
+            <SelectField
+              testID="play-format"
+              label="Format"
+              value={format}
+              options={playSystemFormats(system).map(({ id, label, blurb }) => ({
+                id,
+                label,
+                ...(blurb ? { detail: blurb } : {}),
+              }))}
+              onSelect={setFormat}
             />
           ) : null}
+        </View>
+
+        <View style={themed($valueGrid)}>
+          <View style={themed($playerValue)}>
+            <ValueField
+              testID="player-count"
+              label={connectedMode ? "Seats" : "Players"}
+              value={playerCount}
+              min={PLAYER_COUNTS[0]}
+              max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
+              onChange={choosePlayerCount}
+            />
+          </View>
+          <View style={themed($counterValue)}>
+            <ValueField
+              testID="starting-counter"
+              label={counter.heading}
+              value={startingLife}
+              min={1}
+              max={counter.maxStartingValue}
+              longStep={counter.longPressStep}
+              step={lifeStep}
+              onChange={setStartingLife}
+            />
+          </View>
+        </View>
+
+        <View style={themed($section)}>
+          <SelectField
+            testID="life-step"
+            label="Change by"
+            value={String(lifeStep)}
+            options={LIFE_STEP_OPTIONS.map((step) => ({ id: String(step), label: String(step) }))}
+            onSelect={(value) => {
+              const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
+              if (next) setLifeStep(next)
+            }}
+          />
+        </View>
+
+        <View style={themed($section)}>
+          <Text text="Layout" preset="subheading" accessibilityRole="header" />
+          <PlayerLayoutPicker playerCount={playerCount} value={layout} onChange={setLayout} />
         </View>
 
         {!connectedMode ? (
@@ -435,7 +441,11 @@ export function NewGameScreen({
               style={themed($dialogButton)}
               onPress={() => {
                 setConfirmingLocalSubmit(false)
-                onStartLocal(players, startingLife, { system, format })
+                onStartLocal(players, startingLife, {
+                  layout,
+                  lifeStep,
+                  ...(system && format ? { system, format } : {}),
+                })
               }}
             />
           </View>
@@ -452,15 +462,18 @@ function defaultName(index: number) {
 const CONTENT_MAX_WIDTH = 720
 const MIN_NAME_ROW_WIDTH = 280
 
-const $form: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.lg })
+const $root: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
+const $form: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.lg,
+  backgroundColor: colors.surface,
+})
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $choiceRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $valueGrid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
-  flexWrap: "wrap",
   gap: spacing.xs,
 })
-const $choice: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, flexBasis: 56 })
-const $modeChoice: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, flexBasis: 140 })
+const $playerValue: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $counterValue: ThemedStyle<ViewStyle> = () => ({ flex: 1.45 })
 const $nameList: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
@@ -487,7 +500,7 @@ const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
 const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderTopWidth: 1,
   borderTopColor: colors.separator,
-  backgroundColor: colors.background,
+  backgroundColor: colors.surface,
   paddingTop: spacing.sm,
 })
 const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({

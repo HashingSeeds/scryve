@@ -18,6 +18,7 @@ export interface LifeControlsProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   system?: PlaySystemId
+  lifeStep?: number
   recentDelta?: number
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1, amount?: number) => void
@@ -48,7 +49,8 @@ export function LifeControls({
   contrastCheckedForeground: foreground = "#FFFFFF",
   compact,
   contentRotation = 0,
-  system = "mtg",
+  system,
+  lifeStep,
   recentDelta = 0,
   onChange,
   onLongChange,
@@ -63,6 +65,7 @@ export function LifeControls({
   const identity = `Seat ${seatNumber}, ${displayName}`
   const sideways = Math.abs(contentRotation) === 90
   const counter = playSystemRules(system).counter
+  const tapStep = lifeStep ?? counter.tapStep
 
   function labelFor(delta: LifeDelta) {
     return `${identity}, ${delta > 0 ? "add" : "subtract"} ${counterValueLabel(system, Math.abs(delta))}`
@@ -82,7 +85,7 @@ export function LifeControls({
         )}
       >
         {HALF_CARD_ZONES.map(({ direction, glyph, edge }) => {
-          const delta = direction * counter.tapStep
+          const delta = direction * tapStep
           const feedback =
             direction * recentDelta > 0
               ? recentDelta > 0

@@ -171,6 +171,75 @@ describe("LocalGameRepository", () => {
     })
   })
 
+  it("stores a default system and format only when both are known", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    expect(repository.loadSettings().defaultSystem).toBeUndefined()
+    expect(repository.loadSettings().defaultFormat).toBeUndefined()
+
+    repository.saveSettings({
+      ...DEFAULT_LOCAL_SETTINGS,
+      defaultSystem: "mtg",
+      defaultFormat: "commander",
+    })
+    expect(repository.loadSettings()).toMatchObject({
+      defaultSystem: "mtg",
+      defaultFormat: "commander",
+    })
+
+    storage.set(
+      LOCAL_KEYS.settings,
+      JSON.stringify({
+        ...DEFAULT_LOCAL_SETTINGS,
+        defaultSystem: "mtg",
+        defaultFormat: "advanced",
+      }),
+    )
+    expect(repository.loadSettings().defaultFormat).toBeUndefined()
+
+    storage.set(
+      LOCAL_KEYS.settings,
+      JSON.stringify({
+        ...DEFAULT_LOCAL_SETTINGS,
+        defaultSystem: "netrunner",
+        defaultFormat: "commander",
+      }),
+    )
+    expect(repository.loadSettings().defaultSystem).toBeUndefined()
+    expect(repository.loadSettings().defaultFormat).toBeUndefined()
+  })
+
+  it("stores Yu-Gi-Oh! starting Life Points", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+
+    repository.saveSettings({
+      ...DEFAULT_LOCAL_SETTINGS,
+      defaultSystem: "ygo",
+      defaultFormat: "advanced",
+      defaultStartingLife: 8000,
+    })
+
+    expect(repository.loadSettings()).toMatchObject({
+      defaultSystem: "ygo",
+      defaultFormat: "advanced",
+      defaultStartingLife: 8000,
+    })
+  })
+
+  it("rejects a starting value above the no-system limit", () => {
+    const storage = new MemoryStorage()
+    storage.set(
+      LOCAL_KEYS.settings,
+      JSON.stringify({
+        ...DEFAULT_LOCAL_SETTINGS,
+        defaultStartingLife: 8000,
+      }),
+    )
+
+    expect(new LocalGameRepository(storage).loadSettings()).toEqual(DEFAULT_LOCAL_SETTINGS)
+  })
+
   it("round-trips a chosen menu button style and ignores an unknown one", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)
