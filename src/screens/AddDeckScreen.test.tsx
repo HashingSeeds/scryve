@@ -178,6 +178,17 @@ jest.mock("../../convex/_generated/api", () => ({
 function atCapacity() {
   mockListMine.value = {
     ...readyShelf,
+    decks: [
+      ...readyShelf.decks,
+      {
+        _id: "second-deck",
+        name: "Second Deck",
+        format: "standard",
+        game: "mtg",
+        versionCount: 1,
+        cardQuantity: 60,
+      },
+    ],
     capacity: { used: 2, limit: 2, premium: false, canCreate: false },
   }
 }
