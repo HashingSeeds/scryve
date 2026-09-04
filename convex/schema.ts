@@ -186,8 +186,8 @@ export default defineSchema({
     .index("by_game_operation", ["gameId", "operationId"])
     .index("by_game_and_status", ["gameId", "status"])
     .index("by_game_and_to_and_status", ["gameId", "toPlayerId", "status"])
-    .index("by_actor_user", { fields: ["actorUserId"], staged: true })
-    .index("by_resolved_by_user", { fields: ["resolvedByUserId"], staged: true }),
+    .index("by_actor_user", ["actorUserId"])
+    .index("by_resolved_by_user", ["resolvedByUserId"]),
 
   gameSummaries: defineTable({
     gameId: v.id("games"),
@@ -539,7 +539,7 @@ export default defineSchema({
     .index("by_status_and_created_at", ["status", "createdAt"])
     .index("by_reported_user", ["reportedUserId"])
     .index("by_reporter_and_reported", ["reporterUserId", "reportedUserId"])
-    .index("by_retention_expires_at", { fields: ["retentionExpiresAt"], staged: true }),
+    .index("by_retention_expires_at", ["retentionExpiresAt"]),
 
   userBlocks: defineTable({
     blockerUserId: v.id("users"),

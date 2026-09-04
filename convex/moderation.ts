@@ -17,6 +17,7 @@ import {
   publicUsernameFor,
   releaseUsernameHold as releaseUsernameHoldFor,
 } from "./lib/moderation"
+import { moderationRetentionExpiresAt } from "./lib/moderationRetention"
 import {
   describeUsernameMatches,
   usernameFailsGate,
@@ -27,6 +28,8 @@ export const AUTO_HOLD_REPORT_THRESHOLD = 2
 const HISTORY_RENAME_BATCH_SIZE = 25
 const MAX_NOTE_LENGTH = 500
 const OPEN_REPORT_PAGE_SIZE = 50
+const RETENTION_BACKFILL_PAGE_SIZE = 50
+const RETENTION_PURGE_PAGE_SIZE = 50
 const DELETED_ACCOUNT_LABEL = "(deleted account)"
 
 export const reportReasonValidator = v.union(
@@ -265,9 +268,11 @@ export const upholdReport = internalMutation({
     if (!report) throw new Error("Report not found")
     const reported = report.reportedUserId ? await ctx.db.get(report.reportedUserId) : null
     if (reported) await placeUsernameOnHold(ctx, reported, "operator")
+    const now = Date.now()
     await ctx.db.patch(report._id, {
       status: "upheld",
-      resolvedAt: Date.now(),
+      resolvedAt: now,
+      retentionExpiresAt: moderationRetentionExpiresAt("upheld", now, report.createdAt),
       ...(args.note ? { resolutionNote: args.note } : {}),
     })
     return { held: Boolean(reported) }
@@ -279,9 +284,11 @@ export const dismissReport = internalMutation({
   handler: async (ctx, args) => {
     const report = await ctx.db.get(args.reportId)
     if (!report) throw new Error("Report not found")
+    const now = Date.now()
     await ctx.db.patch(report._id, {
       status: "dismissed",
-      resolvedAt: Date.now(),
+      resolvedAt: now,
+      retentionExpiresAt: moderationRetentionExpiresAt("dismissed", now, report.createdAt),
       ...(args.note ? { resolutionNote: args.note } : {}),
     })
     if (!report.reportedUserId) return { released: false }
@@ -306,6 +313,60 @@ export const dismissReport = internalMutation({
     )
     if (reported && release) await releaseUsernameHoldFor(ctx, reported)
     return { released: release }
+  },
+})
+
+export const backfillRetention = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("moderationReports")
+      .order("asc")
+      .paginate({ numItems: RETENTION_BACKFILL_PAGE_SIZE, cursor: args.cursor ?? null })
+    let updated = 0
+    for (const report of page.page) {
+      if (report.status === "open" || report.retentionExpiresAt !== undefined) continue
+      const retentionExpiresAt = moderationRetentionExpiresAt(
+        report.status,
+        report.resolvedAt,
+        report.createdAt,
+      )
+      if (retentionExpiresAt === undefined) continue
+      await ctx.db.patch(report._id, { retentionExpiresAt })
+      updated += 1
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.moderation.backfillRetention, {
+        cursor: page.continueCursor,
+      })
+    }
+    return { updated, hasMore: !page.isDone }
+  },
+})
+
+export const purgeExpiredReports = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const now = Date.now()
+    const page = await ctx.db
+      .query("moderationReports")
+      .withIndex("by_retention_expires_at", (q) =>
+        q.gt("retentionExpiresAt", 0).lte("retentionExpiresAt", now),
+      )
+      .paginate({ numItems: RETENTION_PURGE_PAGE_SIZE, cursor: args.cursor ?? null })
+    let deleted = 0
+    for (const report of page.page) {
+      if (report.status === "open") continue
+      if (report.legalHoldUntil !== undefined && report.legalHoldUntil > now) continue
+      await ctx.db.delete(report._id)
+      deleted += 1
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.moderation.purgeExpiredReports, {
+        cursor: page.continueCursor,
+      })
+    }
+    return { deleted, hasMore: !page.isDone }
   },
 })
 
