@@ -9,6 +9,7 @@ import NewLocalGameRoute from "../src/app/game/new"
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), replace: jest.fn() },
+  useLocalSearchParams: () => ({}),
 }))
 
 describe("new local game route", () => {
@@ -22,8 +23,13 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("start-game-button"))
-    expect(localGameRepository.loadActiveGame()?.players).toHaveLength(2)
-    expect(router.replace).toHaveBeenCalledWith("/game/current")
+    expect(localGameRepository.loadActiveGame()).toBeNull()
+    expect(router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: "/",
+        params: expect.objectContaining({ destination: "play" }),
+      }),
+    )
   })
 
   it("does not replace an existing active game", () => {

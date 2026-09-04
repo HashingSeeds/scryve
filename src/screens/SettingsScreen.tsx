@@ -59,6 +59,25 @@ export function SettingsScreen({
       <View style={themed($content)}>
         <Text text="Settings" preset="heading" accessibilityRole="header" />
         <Text text="Local game defaults" preset="subheading" accessibilityRole="header" />
+        <Text text="Open Scryve to" style={themed($label)} />
+        <View style={themed($row)}>
+          {(["play", "decks"] as const).map((destination) => (
+            <Button
+              key={destination}
+              testID={`launch-destination-${destination}`}
+              text={destination === "play" ? "Play" : "Decks"}
+              accessibilityState={{ selected: settings.launchDestination === destination }}
+              preset={settings.launchDestination === destination ? "reversed" : "default"}
+              style={themed($choice)}
+              onPress={() => update({ launchDestination: destination })}
+            />
+          ))}
+        </View>
+        <Text
+          text="Play resumes a current game or opens a fresh board."
+          size="xs"
+          style={themed($muted)}
+        />
         <Text text="Player count" style={themed($label)} />
         <View style={themed($row)}>
           {[2, 3, 4, 5, 6].map((count) => (

@@ -26,7 +26,10 @@ export default function AccountRoute() {
         {auth.configured && !auth.isSignedIn ? (
           <Button text="Re-authenticate" preset="reversed" onPress={auth.openAuth} />
         ) : null}
-        <Button text="Return home" onPress={() => router.replace("/")} />
+        <Button
+          text="Open Play"
+          onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+        />
       </Screen>
     )
   return (

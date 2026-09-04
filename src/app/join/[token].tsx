@@ -20,7 +20,10 @@ export default function InviteRoute() {
           text="This Scryve invitation is malformed or incomplete. Ask the host for a new link or enter the 6-character code."
         />
         <Button text="Enter a manual code" onPress={() => router.replace("/connected/join")} />
-        <Button text="Return home" onPress={() => router.replace("/")} />
+        <Button
+          text="Open Play"
+          onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+        />
       </Screen>
     )
   }
