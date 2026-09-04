@@ -57,7 +57,7 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   zIndex: 50,
   left: spacing.md,
   right: spacing.md,
-  bottom: 0,
+  bottom: spacing.md,
   height: 48,
   alignItems: "center",
   justifyContent: "center",
