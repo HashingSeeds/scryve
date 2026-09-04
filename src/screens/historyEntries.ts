@@ -1,5 +1,6 @@
 import {
   counterValueLabel,
+  NO_PLAY_SYSTEM,
   playFormatLabel,
   playSystemId,
   type PlaySystemId,
@@ -26,12 +27,13 @@ export interface HistoryEntry {
   winnerNames?: string[]
   eventCount: number
   players: HistoryPlayerSummary[]
-  system: PlaySystemId
+  system?: PlaySystemId
   format: string
 }
 
 export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
-  const system = playSystemId(game.system)
+  const rawSystem: unknown = game.system
+  const system = rawSystem === NO_PLAY_SYSTEM ? undefined : playSystemId(rawSystem)
   const result = game.result
   const winnerNames =
     result?.kind === "win"
@@ -54,9 +56,10 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
       name: player.name,
       color: player.color,
     })),
-    format: game.format
-      ? playFormatLabel(system, game.format)
-      : counterValueLabel(system, game.startingLife),
+    format:
+      system && game.format
+        ? playFormatLabel(system, game.format)
+        : counterValueLabel(system, game.startingLife),
   }
 }
 
@@ -77,7 +80,7 @@ export function connectedHistoryEntry(game: {
     deckNameAtFinish?: string
   }[]
 }): HistoryEntry {
-  const system = playSystemId(game.system)
+  const system = game.system === NO_PLAY_SYSTEM ? undefined : playSystemId(game.system)
   return {
     key: `connected:${game.publicId}`,
     source: "connected",
@@ -97,9 +100,9 @@ export function connectedHistoryEntry(game: {
       deckName: player.deckNameAtFinish,
     })),
     format:
-      game.format || game.ruleset
+      system && (game.format || game.ruleset)
         ? playFormatLabel(system, game.format || game.ruleset)
-        : game.startingLife
+        : game.startingLife !== undefined
           ? counterValueLabel(system, game.startingLife)
           : "Connected",
   }

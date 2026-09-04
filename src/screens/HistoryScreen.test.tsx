@@ -111,6 +111,15 @@ describe("unified history screen", () => {
     )
   })
 
+  it("does not turn a no-system connected game into a Magic format", () => {
+    const entry = connectedHistoryEntry(
+      connectedGame({ system: "none", format: "none", ruleset: "none", startingLife: 20 }),
+    )
+
+    expect(entry.system).toBeUndefined()
+    expect(entry.format).toBe("20 life")
+  })
+
   it("routes each row to the detail screen matching its source", () => {
     const { onSelectLocal, onSelectConnected } = renderHistory({
       connected: connectedFeed([connectedGame()]),

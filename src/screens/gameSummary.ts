@@ -2,6 +2,7 @@ import type { NextPageState, RemoteValue } from "@/features/async/remoteState"
 import {
   counterChangeLabel,
   counterValueLabel,
+  NO_PLAY_SYSTEM,
   playFormatLabel,
   playSystemId,
   type PlaySystemId,
@@ -37,7 +38,7 @@ export interface GameSummaryModel {
   finishedAt?: number
   startedAt?: number
   startingLife?: number
-  system: PlaySystemId
+  system?: PlaySystemId
   format: string
   changeCount: number
   players: SummaryPlayer[]
@@ -70,7 +71,8 @@ export function localOutcome(result: LocalGame["result"], playerId: string): Sum
 }
 
 export function localSummaryModel(game: LocalGame): GameSummaryModel {
-  const system = playSystemId(game.system)
+  const rawSystem: unknown = game.system
+  const system = rawSystem === NO_PLAY_SYSTEM ? undefined : playSystemId(rawSystem)
   return {
     source: "local",
     status: game.status === "abandoned" ? "abandoned" : "finished",
@@ -78,9 +80,10 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
     startedAt: game.createdAt,
     startingLife: game.startingLife,
     system,
-    format: game.format
-      ? playFormatLabel(system, game.format)
-      : counterValueLabel(system, game.startingLife),
+    format:
+      system && game.format
+        ? playFormatLabel(system, game.format)
+        : counterValueLabel(system, game.startingLife),
     changeCount: localChanges(game).length,
     players: game.players.map((player) => ({
       id: player.id,
@@ -128,14 +131,16 @@ export interface ConnectedSummaryDocument {
 }
 
 export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSummaryModel {
-  const system = playSystemId(summary.system)
+  const system = summary.system === NO_PLAY_SYSTEM ? undefined : playSystemId(summary.system)
   return {
     source: "connected",
     status: summary.terminalStatus === "abandoned" ? "abandoned" : "finished",
     finishedAt: summary.finishedAt,
     startingLife: summary.startingLife,
     system,
-    format: playFormatLabel(system, summary.format || summary.ruleset),
+    format: system
+      ? playFormatLabel(system, summary.format || summary.ruleset)
+      : counterValueLabel(system, summary.startingLife),
     changeCount: summary.eventCount,
     terminalReason: summary.terminalReason,
     players: summary.players.map((player) => ({
