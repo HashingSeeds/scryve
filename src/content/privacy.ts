@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-08-27",
-  effectiveDate: "August 27, 2026",
+  version: "2026-09-04",
+  effectiveDate: "September 4, 2026",
   sections: [
     {
       blocks: [
@@ -168,7 +168,7 @@ export const privacyContent = {
             "profile image, if provided",
             "account identifier",
             "games, players, decks, counters, game history, and other content and settings associated with your account",
-            "reports you submit about another player, including the reason you select and any note you write",
+            "reports and moderation records, including report reasons, notes, decisions, and timestamps",
             "the list of players you have blocked",
             "messages and information you provide when contacting support",
           ],
@@ -424,7 +424,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "We retain wait-list submissions while we review and fulfill access requests. You may ask us to remove your submission at any time. We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. We may retain limited records longer when reasonably necessary for security, fraud prevention, legal compliance, dispute resolution, backups, or enforcement of our agreements. We keep player reports and the record of our decision for as long as needed to enforce our Terms and to recognize repeat behavior.",
+          text: "We retain wait-list submissions while we review and fulfill access requests. You may ask us to remove your submission at any time. We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. Open player reports remain until we resolve them. We schedule dismissed reports for deletion 90 days after resolution and upheld reports for deletion 365 days after resolution. Account deletion removes direct links between a retained report and the deleted account. We minimize and restrict access to retained moderation records, then delete or anonymize them through routine cleanup. A specific appeal, investigation, legal hold, or legal obligation may require us to keep a record longer, subject to review.",
         },
         {
           type: "paragraph",
@@ -544,7 +544,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Upon your request to terminate your account, we will deactivate or delete your account and information from our active databases. However, we may retain some information in our files to prevent fraud, troubleshoot problems, assist with any investigations, enforce our legal terms and/or comply with applicable legal requirements.",
+          text: "Upon your request to terminate your account, we deactivate or delete your account and delete or de-identify account-linked information from our active databases. Open moderation reports remain until resolution. We schedule dismissed reports for deletion 90 days after resolution and upheld reports for deletion 365 days after resolution, without a direct link to the deleted account. A specific appeal, investigation, legal hold, or legal obligation may require longer retention, subject to review.",
         },
         {
           type: "paragraph",

@@ -4,11 +4,13 @@ import { View } from "react-native"
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import type { ConsentDocumentId } from "@/content/legal"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 export interface LegalConsentScreenProps {
-  effectiveDate: string
+  documents: readonly ConsentDocumentId[]
+  effectiveDate?: string
   isReturningUser: boolean
   isSubmitting?: boolean
   error?: string
@@ -18,6 +20,7 @@ export interface LegalConsentScreenProps {
 }
 
 export function LegalConsentScreen({
+  documents,
   effectiveDate,
   isReturningUser,
   isSubmitting,
@@ -27,20 +30,40 @@ export function LegalConsentScreen({
   onOpenPrivacy,
 }: LegalConsentScreenProps) {
   const { themed } = useAppTheme()
+  const includesTerms = documents.includes("terms")
+  const includesPrivacy = documents.includes("privacy")
+  const documentLabel =
+    includesTerms && includesPrivacy
+      ? "Terms of Use and Privacy Policy"
+      : includesTerms
+        ? "Terms of Use"
+        : "Privacy Policy"
+  const returningDescription = effectiveDate
+    ? `Our ${documentLabel} changed on ${effectiveDate}. Please review the update to keep using Scryve.`
+    : `Our ${documentLabel} have changed. Please review the updates to keep using Scryve.`
+  const acceptanceDescription = effectiveDate
+    ? `By tapping "I agree" you accept the ${documentLabel} dated ${effectiveDate}.`
+    : `By tapping "I agree" you accept the current ${documentLabel}.`
 
   return (
     <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentContainerStyle={themed($screen)}>
       <View style={themed($body)}>
         <Text text="SCRYVE" preset="formLabel" style={themed($eyebrow)} />
         <Text
-          text={isReturningUser ? "We have updated our terms" : "Before you start"}
+          text={
+            isReturningUser
+              ? includesPrivacy && !includesTerms
+                ? "We have updated our privacy policy"
+                : "We have updated our terms"
+              : "Before you start"
+          }
           preset="heading"
           accessibilityRole="header"
         />
         <Text
           text={
             isReturningUser
-              ? `Our Terms of Use and Privacy Policy changed on ${effectiveDate}. Please review them to keep using Scryve.`
+              ? returningDescription
               : "Please review our Terms of Use and Privacy Policy. You need to accept them to use Scryve."
           }
           style={themed($muted)}
@@ -48,8 +71,8 @@ export function LegalConsentScreen({
       </View>
 
       <View style={themed($links)}>
-        <Button text="Read the Terms of Use" onPress={onOpenTerms} />
-        <Button text="Read the Privacy Policy" onPress={onOpenPrivacy} />
+        {includesTerms ? <Button text="Read the Terms of Use" onPress={onOpenTerms} /> : null}
+        {includesPrivacy ? <Button text="Read the Privacy Policy" onPress={onOpenPrivacy} /> : null}
       </View>
 
       <View style={themed($actions)}>
@@ -63,11 +86,7 @@ export function LegalConsentScreen({
           disabled={isSubmitting}
           onPress={onAccept}
         />
-        <Text
-          text={`By tapping "I agree" you accept the Terms of Use and Privacy Policy dated ${effectiveDate}.`}
-          size="xxs"
-          style={themed($muted)}
-        />
+        <Text text={acceptanceDescription} size="xxs" style={themed($muted)} />
       </View>
     </Screen>
   )
