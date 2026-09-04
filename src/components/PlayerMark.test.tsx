@@ -4,6 +4,9 @@ import { Circle } from "react-native-svg"
 
 import { PlayerMark } from "./PlayerMark"
 
+const MARK_CENTER = 22
+const SWORD_GLYPH_BOUNDS = { left: 6.8, right: 17.2, top: 2.5, bottom: 21.5 }
+
 describe("PlayerMark", () => {
   it.each([
     [1, "circle"],
@@ -42,5 +45,63 @@ describe("PlayerMark", () => {
     expect(
       view.getByTestId("player-mark-spinner-seat-1", { includeHiddenElements: true }),
     ).toBeTruthy()
+  })
+
+  it("shows a close X instead of a sword when the mark becomes the close button", () => {
+    const view = render(
+      <PlayerMark seatNumber={1} color="#FFFFFF" insetSwordColor="#2F7D5F" closeIcon />,
+    )
+
+    expect(view.getByTestId("player-mark-close", { includeHiddenElements: true })).toBeTruthy()
+    expect(view.queryByTestId("player-mark-sword", { includeHiddenElements: true })).toBeNull()
+  })
+
+  it("keeps a single sword while the mark opens its board", () => {
+    const view = render(<PlayerMark seatNumber={1} color="#FFFFFF" insetSwordColor="#2F7D5F" />)
+
+    expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
+    expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
+  })
+
+  it("needs an inset color before a close X can render", () => {
+    const view = render(<PlayerMark seatNumber={1} color="#FFFFFF" closeIcon />)
+
+    expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
+  })
+
+  it("cuts the sword out of the mark instead of stacking it on the direction line", () => {
+    const view = render(
+      <PlayerMark seatNumber={1} color="#FFFFFF" insetSwordColor="#2F7D5F" spinning />,
+    )
+
+    expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
+    expect(view.queryByTestId("player-mark-spin-line", { includeHiddenElements: true })).toBeNull()
+  })
+
+  it.each([
+    [1, "circle"],
+    [2, "triangle"],
+    [3, "square"],
+    [4, "diamond"],
+    [5, "star"],
+    [6, "hexagon"],
+  ])("keeps seat %i's sword inside the %s it is cut from", (seatNumber) => {
+    const view = render(
+      <PlayerMark seatNumber={seatNumber} color="#FFFFFF" insetSwordColor="#2F7D5F" />,
+    )
+
+    const [scale, , , , offsetX, offsetY] = view.getByTestId("player-mark-sword", {
+      includeHiddenElements: true,
+    }).props.matrix as number[]
+    const left = offsetX + scale * SWORD_GLYPH_BOUNDS.left
+    const right = offsetX + scale * SWORD_GLYPH_BOUNDS.right
+    const top = offsetY + scale * SWORD_GLYPH_BOUNDS.top
+    const bottom = offsetY + scale * SWORD_GLYPH_BOUNDS.bottom
+
+    expect((left + right) / 2).toBeCloseTo(MARK_CENTER, 1)
+    expect(left).toBeGreaterThan(17)
+    expect(right).toBeLessThan(27)
+    expect(top).toBeGreaterThan(15)
+    expect(bottom).toBeLessThan(31)
   })
 })

@@ -1,4 +1,10 @@
-import { applyGameCommand, asDeviceId, createLocalGame, defaultCommandContext } from "./domain"
+import {
+  applyGameCommand,
+  asDeviceId,
+  commanderDamageKey,
+  createLocalGame,
+  defaultCommandContext,
+} from "./domain"
 import {
   DEFAULT_LOCAL_SETTINGS,
   LOCAL_KEYS,
@@ -73,6 +79,43 @@ describe("LocalGameRepository", () => {
     repository.saveActiveGame(game)
     expect(repository.loadActiveGame()).toEqual(game)
     expect(repository.loadActiveGame()?.players[0].life).toBe(-5)
+  })
+
+  it("recovers commander damage counters alongside the life they moved", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const context = defaultCommandContext(asDeviceId("device"))
+    let game = createLocalGame({
+      now: 1,
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      players: [
+        { name: "Ada", color: "#000", shape: "hexagon" },
+        { name: "Grace", color: "#111", shape: "circle" },
+      ],
+    })
+    const [ada, grace] = game.players
+    game = applyGameCommand(
+      game,
+      { type: "commanderDamage.assign", fromPlayerId: ada.id, toPlayerId: grace.id, delta: 7 },
+      context,
+    )
+    game = applyGameCommand(
+      game,
+      { type: "commanderDamage.assign", fromPlayerId: grace.id, toPlayerId: ada.id, delta: 3 },
+      context,
+    )
+
+    repository.saveActiveGame(game)
+    const loaded = repository.loadActiveGame()
+
+    expect(loaded).toEqual(game)
+    expect(loaded?.commanderDamage).toEqual({
+      [commanderDamageKey(ada.id, grace.id)]: 7,
+      [commanderDamageKey(grace.id, ada.id)]: 3,
+    })
+    expect(loaded?.players.map((player) => player.life)).toEqual([37, 33])
   })
 
   it("falls back safely when active/settings schemas are corrupt", () => {

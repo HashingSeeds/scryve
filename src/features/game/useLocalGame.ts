@@ -38,6 +38,18 @@ export function useLocalGame(
     [context, repository],
   )
 
+  const assignCommanderDamage = useCallback(
+    (fromPlayerId: PlayerId, toPlayerId: PlayerId, delta: number) => {
+      const previous = gameRef.current
+      const next = dispatch({ type: "commanderDamage.assign", fromPlayerId, toPlayerId, delta })
+      if (next === previous) return
+      if (settings.hapticsEnabled && reduceMotion === false) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined)
+      }
+    },
+    [dispatch, reduceMotion, settings.hapticsEnabled],
+  )
+
   const changeLife = useCallback(
     (playerId: PlayerId, delta: LifeDelta) => {
       dispatch({ type: "life.change", playerId, delta })
@@ -52,6 +64,7 @@ export function useLocalGame(
     game,
     canUndo: canUndo(game, context.actorId),
     changeLife,
+    assignCommanderDamage,
     undo: () => dispatch({ type: "life.undo" }),
     finish: (result?: LocalGameResult) => dispatch({ type: "game.finish", result }),
     abandon: () => dispatch({ type: "game.abandon" }),

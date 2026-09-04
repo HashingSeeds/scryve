@@ -1,16 +1,20 @@
 export type LifeCardContentRotation = -90 | 0 | 90 | 180
 
-export const LIFE_TARGET_SIZE = 116
-export const COMPACT_LIFE_TARGET_SIZE = 84
+export const LIFE_TARGET_SIZE = 200
+export const COMPACT_LIFE_TARGET_SIZE = 140
 export const LIFE_TARGET_TEXT_INSET = 8
 export const LIFE_MAX_FONT_SCALE = 1.3
 
 export const LIFE_DIGIT_ASPECT = 0.62
 export const LIFE_LINE_HEIGHT_RATIO = 1.1
 export const LIFE_FONT_MIN = 12
-export const LIFE_FONT_MAX = 80
-export const LIFE_FONT_SIZE = 60
-export const COMPACT_LIFE_FONT_SIZE = 42
+export const LIFE_FONT_MAX = 160
+export const LIFE_FONT_SIZE = 120
+export const COMPACT_LIFE_FONT_SIZE = 84
+
+export const PLAYER_MARK_SIZE = 80
+export const COMPACT_PLAYER_MARK_SIZE = 60
+export const PLAYER_MARK_MUTED_OPACITY = 0.72
 
 export function getLifeLineHeight(fontSize: number) {
   return Math.ceil(fontSize * LIFE_LINE_HEIGHT_RATIO)

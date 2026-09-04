@@ -34,6 +34,9 @@ export function overlayPendingDeltas(
   for (const action of pending) {
     if (action.event.gameId !== confirmed.publicId) continue
     if (confirmedOperations.has(action.event.operationId)) continue
+    // Commander damage only moves life once the defender confirms it, so queued
+    // claims and resolutions contribute no optimistic delta.
+    if (action.event.type !== "life.changed") continue
     deltas.set(action.event.playerId, (deltas.get(action.event.playerId) ?? 0) + action.event.delta)
   }
   return {

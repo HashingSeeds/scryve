@@ -18,9 +18,14 @@ import {
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { incomingCommanderDamage, isEliminatedByCommanderDamage } from "@/features/game/domain"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
-import { counterValueLabel, playSystemId } from "@/features/game/playSystems"
-import type { LocalGame, PlayerId } from "@/features/game/types"
+import {
+  counterValueLabel,
+  playSystemId,
+  supportsCommanderDamage,
+} from "@/features/game/playSystems"
+import type { GamePlayer, LocalGame, PlayerId } from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
@@ -73,6 +78,18 @@ export function CurrentGameScreen({
   const [drawSelected, setDrawSelected] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
+  const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
+  const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
+
+  function toggleSword(player: GamePlayer) {
+    setArmedPlayerId((current) => (current === player.id ? null : player.id))
+  }
+
+  function assignCommanderDamage(target: GamePlayer, step: number) {
+    if (!armedPlayerId || armedPlayerId === target.id) return
+    runtime.assignCommanderDamage(armedPlayerId, target.id, step)
+    setIsFresh(false)
+  }
 
   function captureMenuDialogOrigin(event?: GestureResponderEvent) {
     setMenuDialogOrigin(
@@ -207,6 +224,21 @@ export function CurrentGameScreen({
           system={system}
           layoutVariant={layoutVariant}
           disabled={menuOpen}
+          isPlayerEliminated={
+            commanderDamageEnabled
+              ? (player) => isEliminatedByCommanderDamage(runtime.game, player.id)
+              : undefined
+          }
+          commanderDamage={
+            commanderDamageEnabled
+              ? {
+                  incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
+                  armedPlayerId,
+                  onPressSword: toggleSword,
+                  onStage: assignCommanderDamage,
+                }
+              : undefined
+          }
           onChange={(playerId, delta) => {
             runtime.changeLife(playerId, delta)
             setIsFresh(false)
@@ -219,7 +251,10 @@ export function CurrentGameScreen({
           actions={radialActions}
           variant={menuButtonStyle}
           seatColors={runtime.game.players.map((player) => player.color)}
-          onToggle={() => setMenuOpen((current) => !current)}
+          onToggle={() => {
+            setArmedPlayerId(null)
+            setMenuOpen((current) => !current)
+          }}
           onClose={closeMenu}
         />
         {menuOpen && onDecks && onSettings && onAccount ? (

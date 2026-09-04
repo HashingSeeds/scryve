@@ -116,3 +116,6 @@ build-*.tar.gz
 
 # Android app bundles from local release builds
 *.aab
+
+# Local wrangler state and temp output
+.wrangler/

@@ -212,6 +212,38 @@ describe("useConnectedGame connection readiness", () => {
     jest.useRealTimers()
   })
 
+  it("acknowledges a queued claim resolution under its own operation id", async () => {
+    jest.useFakeTimers()
+    mockSocketConnected = true
+    mockPending = [{ attempts: 0, event: { operationId: "resolution-1" } }]
+    mockDrain.mockResolvedValue({ acknowledged: [], failed: [], stoppedForRetry: true })
+    const view = renderHook(() => useConnectedGame("game-public", "user-1"))
+    await waitFor(() => expect(mockDrain).toHaveBeenCalled())
+    const { send } = mockDrain.mock.calls[0][0]
+
+    const acknowledgement = await send({
+      attempts: 0,
+      event: {
+        type: "commanderDamage.resolved",
+        operationId: "resolution-1",
+        claimOperationId: "claim-1",
+        gameId: "game-public",
+        toPlayerId: "player-1",
+        accepted: true,
+        actorId: "user-1",
+        deviceId: "device-test-0001",
+        clientCreatedAt: 1,
+      },
+    })
+
+    expect(acknowledgement.operationId).toBe("resolution-1")
+    expect(mockChangeMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ operationId: "claim-1" }),
+    )
+    view.unmount()
+    jest.useRealTimers()
+  })
+
   it("does not overwrite a tap queued while an in-flight drain settles", () => {
     const draining = {
       schemaVersion: 1,

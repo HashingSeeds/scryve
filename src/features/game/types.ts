@@ -37,6 +37,14 @@ export interface LifeChangedEvent extends BaseGameEvent {
   compensatesOperationId?: OperationId
 }
 
+export interface CommanderDamageAssignedEvent extends BaseGameEvent {
+  type: "commanderDamage.assigned"
+  fromPlayerId: PlayerId
+  toPlayerId: PlayerId
+  delta: number
+  compensatesOperationId?: OperationId
+}
+
 export type LocalGameResult = { kind: "win"; winnerPlayerIds: PlayerId[] } | { kind: "draw" }
 
 export interface GameFinishedEvent extends BaseGameEvent {
@@ -48,7 +56,10 @@ export interface GameAbandonedEvent extends BaseGameEvent {
   type: "game.abandoned"
 }
 
-export type GameEvent = LifeChangedEvent | GameFinishedEvent | GameAbandonedEvent
+export type GameEvent =
+  LifeChangedEvent | CommanderDamageAssignedEvent | GameFinishedEvent | GameAbandonedEvent
+
+export type CommanderDamageTotals = Record<string, number>
 
 export interface LocalGame {
   schemaVersion: 1
@@ -59,6 +70,7 @@ export interface LocalGame {
   startingLife: number
   players: GamePlayer[]
   events: GameEvent[]
+  commanderDamage?: CommanderDamageTotals
   createdAt: number
   updatedAt: number
   finishedAt?: number
@@ -73,6 +85,12 @@ export interface NewPlayerInput {
 
 export type GameCommand =
   | { type: "life.change"; playerId: PlayerId; delta: LifeDelta }
+  | {
+      type: "commanderDamage.assign"
+      fromPlayerId: PlayerId
+      toPlayerId: PlayerId
+      delta: number
+    }
   | { type: "life.undo" }
   | { type: "game.finish"; result?: LocalGameResult }
   | { type: "game.abandon" }

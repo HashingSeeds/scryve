@@ -1,5 +1,12 @@
 import { playSystemId, type PlaySystemId } from "@/features/game/playSystems"
-import type { LifeChangedEvent } from "@/features/game/types"
+import type {
+  ActorId,
+  DeviceId,
+  GameId,
+  LifeChangedEvent,
+  OperationId,
+  PlayerId,
+} from "@/features/game/types"
 
 export type ConnectedGameStatus = "lobby" | "active" | "finished" | "abandoned"
 export const CONNECTED_RECENT_OPERATION_LIMIT = 100
@@ -10,10 +17,67 @@ export interface ConnectedPlayerProjection {
   displayName: string
   username?: string
   deckVersionId?: string
+  eliminatedByCommanderDamage?: boolean
   color: string
   shape?: string
   currentLife: number
   controlledByMe: boolean
+}
+
+export interface ConnectedCommanderDamageTotal {
+  fromPlayerId: string
+  toPlayerId: string
+  total: number
+}
+
+export interface ConnectedCommanderDamageClaim {
+  claimId: string
+  operationId: string
+  fromPlayerId: string
+  toPlayerId: string
+  delta: number
+  clientCreatedAt: number
+  createdAt: number
+}
+
+export interface ConnectedCommanderDamageProjection {
+  totals: ConnectedCommanderDamageTotal[]
+  pendingClaims: ConnectedCommanderDamageClaim[]
+  eliminatedPlayerIds: string[]
+}
+
+/** A single assignment submitted by the attacker's device. */
+export interface ConnectedCommanderDamageChange {
+  toPlayerId: string
+  delta: number
+}
+
+export interface CommanderDamageSubmittedEvent {
+  type: "commanderDamage.submitted"
+  operationId: OperationId
+  gameId: GameId
+  fromPlayerId: PlayerId
+  toPlayerId: PlayerId
+  delta: number
+  actorId: ActorId
+  deviceId: DeviceId
+  clientCreatedAt: number
+}
+
+/**
+ * The defender's decision on a claim. It travels through the same durable outbox
+ * as every other write, so a confirmation made offline replays on reconnect.
+ */
+export interface CommanderDamageResolvedEvent {
+  type: "commanderDamage.resolved"
+  operationId: OperationId
+  claimOperationId: OperationId
+  gameId: GameId
+  toPlayerId: PlayerId
+  accepted: boolean
+  actorId: ActorId
+  deviceId: DeviceId
+  clientCreatedAt: number
 }
 
 export interface ConnectedProjection {
@@ -29,23 +93,31 @@ export interface ConnectedProjection {
   eventSequence: number
   serverUpdatedAt: number
   recentOperationIds: string[]
+  /** Optional so projections from before commander damage remain readable. */
+  commanderDamage?: ConnectedCommanderDamageProjection
   players: ConnectedPlayerProjection[]
 }
 
-export interface PendingLifeAction {
+export type ConnectedActionEvent =
+  LifeChangedEvent | CommanderDamageSubmittedEvent | CommanderDamageResolvedEvent
+
+export interface PendingConnectedAction {
   schemaVersion: 1
-  event: LifeChangedEvent
+  event: ConnectedActionEvent
   queuedAt: number
   attempts: number
   lastAttemptAt?: number
 }
 
-export interface FailedLifeAction {
+export interface FailedConnectedAction {
   schemaVersion: 1
-  action: PendingLifeAction
+  action: PendingConnectedAction
   reason: string
   failedAt: number
 }
+
+export type PendingLifeAction = PendingConnectedAction
+export type FailedLifeAction = FailedConnectedAction
 
 export interface ConnectedDisplayProjection extends ConnectedProjection {
   players: Array<ConnectedPlayerProjection & { pendingDelta: number }>
@@ -97,11 +169,78 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       displayName: player.displayName,
       ...(typeof player.username === "string" ? { username: player.username } : {}),
       ...(typeof player.deckVersionId === "string" ? { deckVersionId: player.deckVersionId } : {}),
+      ...(typeof player.eliminatedByCommanderDamage === "boolean"
+        ? { eliminatedByCommanderDamage: player.eliminatedByCommanderDamage }
+        : {}),
       color: player.color,
       ...(typeof player.shape === "string" ? { shape: player.shape } : {}),
       currentLife: player.currentLife,
       controlledByMe: player.controlledByMe,
     })
+  }
+  const commanderDamageValue = value.commanderDamage
+  let commanderDamage: ConnectedCommanderDamageProjection | undefined
+  if (commanderDamageValue !== undefined) {
+    if (!isRecord(commanderDamageValue)) return null
+    const totals: ConnectedCommanderDamageTotal[] = []
+    for (const total of Array.isArray(commanderDamageValue.totals)
+      ? commanderDamageValue.totals
+      : []) {
+      const totalValue = isRecord(total) ? total.total : undefined
+      if (
+        !isRecord(total) ||
+        typeof total.fromPlayerId !== "string" ||
+        typeof total.toPlayerId !== "string" ||
+        typeof totalValue !== "number" ||
+        !Number.isInteger(totalValue) ||
+        totalValue < 0
+      )
+        return null
+      totals.push({
+        fromPlayerId: total.fromPlayerId,
+        toPlayerId: total.toPlayerId,
+        total: totalValue,
+      })
+    }
+    const pendingClaims: ConnectedCommanderDamageClaim[] = []
+    for (const claim of Array.isArray(commanderDamageValue.pendingClaims)
+      ? commanderDamageValue.pendingClaims
+      : []) {
+      const delta = isRecord(claim) ? claim.delta : undefined
+      if (
+        !isRecord(claim) ||
+        typeof claim.claimId !== "string" ||
+        typeof claim.operationId !== "string" ||
+        typeof claim.fromPlayerId !== "string" ||
+        typeof claim.toPlayerId !== "string" ||
+        typeof delta !== "number" ||
+        !Number.isInteger(delta) ||
+        typeof claim.clientCreatedAt !== "number" ||
+        !Number.isFinite(claim.clientCreatedAt) ||
+        typeof claim.createdAt !== "number" ||
+        !Number.isFinite(claim.createdAt)
+      )
+        return null
+      pendingClaims.push({
+        claimId: claim.claimId,
+        operationId: claim.operationId,
+        fromPlayerId: claim.fromPlayerId,
+        toPlayerId: claim.toPlayerId,
+        delta,
+        clientCreatedAt: claim.clientCreatedAt,
+        createdAt: claim.createdAt,
+      })
+    }
+    if (
+      !Array.isArray(commanderDamageValue.eliminatedPlayerIds) ||
+      commanderDamageValue.eliminatedPlayerIds.some((id) => typeof id !== "string")
+    )
+      return null
+    commanderDamage = {
+      totals,
+      pendingClaims,
+      eliminatedPlayerIds: commanderDamageValue.eliminatedPlayerIds,
+    }
   }
   return {
     schemaVersion: 1,
@@ -118,6 +257,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     recentOperationIds: value.recentOperationIds
       .filter((operationId: unknown): operationId is string => typeof operationId === "string")
       .slice(0, CONNECTED_RECENT_OPERATION_LIMIT),
+    ...(commanderDamage ? { commanderDamage } : {}),
     players,
   }
 }

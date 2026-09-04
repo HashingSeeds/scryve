@@ -10,7 +10,14 @@ import {
 } from "@/features/sync/durableOutbox"
 import { storage as mmkvStorage } from "@/utils/storage"
 
-import type { ConnectedProjection, FailedLifeAction, PendingLifeAction } from "./model"
+import type {
+  CommanderDamageResolvedEvent,
+  CommanderDamageSubmittedEvent,
+  ConnectedActionEvent,
+  ConnectedProjection,
+  FailedLifeAction,
+  PendingLifeAction,
+} from "./model"
 import { toConnectedProjection } from "./model"
 import {
   asActorId,
@@ -18,6 +25,7 @@ import {
   asGameId,
   asOperationId,
   asPlayerId,
+  isCommanderDamageDelta,
   isLifeDelta,
 } from "../game/domain"
 import type { LifeChangedEvent } from "../game/types"
@@ -74,7 +82,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function parseEvent(value: unknown): LifeChangedEvent | null {
+function parseLifeEvent(value: Record<string, unknown>): LifeChangedEvent | null {
   if (
     !isRecord(value) ||
     value.type !== "life.changed" ||
@@ -107,6 +115,78 @@ function parseEvent(value: unknown): LifeChangedEvent | null {
       ? { compensatesOperationId: asOperationId(value.compensatesOperationId) }
       : {}),
   }
+}
+
+function parseCommanderDamageEvent(
+  value: Record<string, unknown>,
+): CommanderDamageSubmittedEvent | null {
+  if (
+    value.type !== "commanderDamage.submitted" ||
+    typeof value.operationId !== "string" ||
+    typeof value.gameId !== "string" ||
+    typeof value.fromPlayerId !== "string" ||
+    typeof value.toPlayerId !== "string" ||
+    !isCommanderDamageDelta(value.delta) ||
+    typeof value.actorId !== "string" ||
+    typeof value.deviceId !== "string" ||
+    !/^[A-Za-z0-9_-]{16,128}$/.test(value.operationId) ||
+    !/^[A-Za-z0-9_-]{8,128}$/.test(value.deviceId) ||
+    typeof value.clientCreatedAt !== "number" ||
+    !Number.isSafeInteger(value.clientCreatedAt) ||
+    value.clientCreatedAt < 0
+  )
+    return null
+  return {
+    type: "commanderDamage.submitted",
+    operationId: asOperationId(value.operationId),
+    gameId: asGameId(value.gameId),
+    fromPlayerId: asPlayerId(value.fromPlayerId),
+    toPlayerId: asPlayerId(value.toPlayerId),
+    delta: value.delta,
+    actorId: asActorId(value.actorId),
+    deviceId: asDeviceId(value.deviceId),
+    clientCreatedAt: value.clientCreatedAt,
+  }
+}
+
+function parseCommanderResolutionEvent(
+  value: Record<string, unknown>,
+): CommanderDamageResolvedEvent | null {
+  if (
+    value.type !== "commanderDamage.resolved" ||
+    typeof value.operationId !== "string" ||
+    typeof value.claimOperationId !== "string" ||
+    typeof value.gameId !== "string" ||
+    typeof value.toPlayerId !== "string" ||
+    typeof value.accepted !== "boolean" ||
+    typeof value.actorId !== "string" ||
+    typeof value.deviceId !== "string" ||
+    !/^[A-Za-z0-9_-]{16,128}$/.test(value.operationId) ||
+    !/^[A-Za-z0-9_-]{16,128}$/.test(value.claimOperationId) ||
+    !/^[A-Za-z0-9_-]{8,128}$/.test(value.deviceId) ||
+    typeof value.clientCreatedAt !== "number" ||
+    !Number.isSafeInteger(value.clientCreatedAt) ||
+    value.clientCreatedAt < 0
+  )
+    return null
+  return {
+    type: "commanderDamage.resolved",
+    operationId: asOperationId(value.operationId),
+    claimOperationId: asOperationId(value.claimOperationId),
+    gameId: asGameId(value.gameId),
+    toPlayerId: asPlayerId(value.toPlayerId),
+    accepted: value.accepted,
+    actorId: asActorId(value.actorId),
+    deviceId: asDeviceId(value.deviceId),
+    clientCreatedAt: value.clientCreatedAt,
+  }
+}
+
+function parseEvent(value: unknown): ConnectedActionEvent | null {
+  if (!isRecord(value)) return null
+  if (value.type === "life.changed") return parseLifeEvent(value)
+  if (value.type === "commanderDamage.resolved") return parseCommanderResolutionEvent(value)
+  return parseCommanderDamageEvent(value)
 }
 
 function parsePending(value: unknown): PendingLifeAction | null {

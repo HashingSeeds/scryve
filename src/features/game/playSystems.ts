@@ -112,6 +112,14 @@ export function playSystemFormat(value?: unknown, format?: string): string {
   return PLAY_SYSTEMS[system].defaultFormat ?? defaultDeckFormat(system)
 }
 
+export const COMMANDER_DAMAGE_FORMAT = "commander"
+
+export function supportsCommanderDamage(value: unknown, format?: string): boolean {
+  return (
+    playSystemId(value) === "mtg" && playSystemFormat(value, format) === COMMANDER_DAMAGE_FORMAT
+  )
+}
+
 export function playFormatLabel(value: unknown, format?: string): string {
   const system = playSystemId(value)
   return deckFormatLabel(system, playSystemFormat(system, format))
