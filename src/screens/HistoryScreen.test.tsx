@@ -5,7 +5,7 @@ import type { ConnectedHistoryFeed } from "@/features/connected/ConnectedHistory
 import type { LocalGameSummary } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
 
-import { connectedHistoryEntry } from "./historyEntries"
+import { connectedHistoryEntry, localHistoryEntry } from "./historyEntries"
 import { HistoryScreen } from "./HistoryScreen"
 
 const NOW = new Date("2026-08-11T20:00:00Z").getTime()
@@ -115,6 +115,13 @@ describe("unified history screen", () => {
     const entry = connectedHistoryEntry(
       connectedGame({ system: "none", format: "none", ruleset: "none", startingLife: 20 }),
     )
+
+    expect(entry.system).toBeUndefined()
+    expect(entry.format).toBe("20 life")
+  })
+
+  it("keeps a no-system local game on generic starting-life copy", () => {
+    const entry = localHistoryEntry(localGame({ format: "standard" }))
 
     expect(entry.system).toBeUndefined()
     expect(entry.format).toBe("20 life")

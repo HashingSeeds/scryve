@@ -2,6 +2,7 @@ import {
   counterValueLabel,
   NO_PLAY_SYSTEM,
   playFormatLabel,
+  isPlaySystemId,
   playSystemId,
   type PlaySystemId,
 } from "@/features/game/playSystems"
@@ -32,8 +33,7 @@ export interface HistoryEntry {
 }
 
 export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
-  const rawSystem: unknown = game.system
-  const system = rawSystem === NO_PLAY_SYSTEM ? undefined : playSystemId(rawSystem)
+  const system = isPlaySystemId(game.system) ? game.system : undefined
   const result = game.result
   const winnerNames =
     result?.kind === "win"

@@ -123,7 +123,7 @@ describe("game summary", () => {
   })
 
   it("keeps a no-system local summary on generic starting-life copy", () => {
-    const model = localSummaryModel(localGame({ system: "none" as never, format: "standard" }))
+    const model = localSummaryModel(localGame({ format: "standard" }))
 
     expect(model.system).toBeUndefined()
     expect(model.format).toBe("20 life")

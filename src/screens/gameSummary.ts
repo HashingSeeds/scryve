@@ -3,6 +3,7 @@ import {
   counterChangeLabel,
   counterValueLabel,
   NO_PLAY_SYSTEM,
+  isPlaySystemId,
   playFormatLabel,
   playSystemId,
   type PlaySystemId,
@@ -71,8 +72,7 @@ export function localOutcome(result: LocalGame["result"], playerId: string): Sum
 }
 
 export function localSummaryModel(game: LocalGame): GameSummaryModel {
-  const rawSystem: unknown = game.system
-  const system = rawSystem === NO_PLAY_SYSTEM ? undefined : playSystemId(rawSystem)
+  const system = isPlaySystemId(game.system) ? game.system : undefined
   return {
     source: "local",
     status: game.status === "abandoned" ? "abandoned" : "finished",
