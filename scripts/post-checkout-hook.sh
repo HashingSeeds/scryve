@@ -23,7 +23,9 @@ null_sha="0000000000000000000000000000000000000000"
 
 # Link the shared development env file. Cheap, so it runs for every checkout
 # that is missing one, not just for new worktrees.
-target="${SCRYVE_DEV_ENV:-${XDG_CONFIG_HOME:-$HOME/.config}/scryve/env.development}"
+# Metro follows this symlink in development. Keep the shared target's basename
+# dotenv-shaped so Metro does not try to transform it as application source.
+target="${SCRYVE_DEV_ENV:-${XDG_CONFIG_HOME:-$HOME/.config}/scryve/.env.local}"
 if [ ! -e .env.local ] && [ -f "$target" ]; then
   ln -s "$target" .env.local 2>/dev/null &&
     echo "post-checkout: linked .env.local -> $target"
