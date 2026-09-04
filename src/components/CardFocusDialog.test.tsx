@@ -31,14 +31,14 @@ function renderDialog(props: Partial<Parameters<typeof CardFocusDialog>[0]> = {}
 }
 
 describe("CardFocusDialog", () => {
-  it("shows the focused card image once, with printing and deck context", () => {
+  it("shows the focused card image with rules, printing, and deck context", () => {
     const view = renderDialog()
     expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
     expect(view.getByTestId("card-focus-image")).toBeTruthy()
     expect(view.getByText("Llanowar Elves")).toBeTruthy()
-    expect(view.queryByText("{G}")).toBeNull()
-    expect(view.queryByText("Creature — Elf Druid")).toBeNull()
-    expect(view.queryByText("{T}: Add {G}.")).toBeNull()
+    expect(view.getByText("{G}")).toBeTruthy()
+    expect(view.getByText("Creature — Elf Druid")).toBeTruthy()
+    expect(view.getByText("{T}: Add {G}.")).toBeTruthy()
     expect(view.getByTestId("card-focus-image").props.accessibilityLabel).toBe(
       "Llanowar Elves. Creature — Elf Druid. {T}: Add {G}.",
     )

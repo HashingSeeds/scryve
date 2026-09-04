@@ -114,16 +114,14 @@ export function CardFocusDialog({
           </View>
         )}
         <View style={themed($details)}>
-          {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
-          {!displayImageUrl && details?.manaCost ? (
+          {details?.manaCost ? (
             <Text size="sm" style={themed($dimText)} text={details.manaCost} />
           ) : null}
-          {!displayImageUrl && details?.typeLine ? (
+          {details?.typeLine ? (
             <Text size="sm" style={themed($dimText)} text={details.typeLine} />
           ) : null}
-          {!displayImageUrl && details?.oracleText ? (
-            <Text selectable text={details.oracleText} />
-          ) : null}
+          {details?.oracleText ? <Text selectable text={details.oracleText} /> : null}
+          {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
           {!details && !detailsError ? (
             <Text size="sm" style={themed($dimText)} text="Loading details…" />
           ) : null}
@@ -169,15 +167,15 @@ const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 const $cardImage: ThemedStyle<ImageStyle> = ({ spacing }) => ({
-  width: "68%",
-  maxWidth: 240,
+  width: "52%",
+  maxWidth: 180,
   alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
   borderRadius: spacing.xs,
 })
 const $imagePlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: "68%",
-  maxWidth: 240,
+  width: "52%",
+  maxWidth: 180,
   alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
   alignItems: "center",
