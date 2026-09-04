@@ -1,13 +1,19 @@
 import type { ReactNode } from "react"
-import type { ViewStyle } from "react-native"
+import type { StyleProp, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-export function BottomActionBar({ children }: { children: ReactNode }) {
+export function BottomActionBar({
+  children,
+  style,
+}: {
+  children: ReactNode
+  style?: StyleProp<ViewStyle>
+}) {
   const { themed } = useAppTheme()
-  return <View style={themed($bar)}>{children}</View>
+  return <View style={[themed($bar), style]}>{children}</View>
 }
 
 const $bar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({

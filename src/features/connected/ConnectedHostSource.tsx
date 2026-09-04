@@ -63,12 +63,10 @@ function ConnectedHostQuerySource({
   const createLobby = useMutation(api.games.createLobby)
   const localRepository = useMemo(() => new LocalGameRepository(), [])
   const deviceId = useMemo(() => localRepository.getDeviceId(), [localRepository])
+  const connectedUserId = connectedProfile.profile?.userId
   const migrationRepository = useMemo(
-    () =>
-      connectedProfile.profile
-        ? new ConnectedGameRepository(undefined, connectedProfile.profile.userId)
-        : null,
-    [connectedProfile.profile],
+    () => (connectedUserId ? new ConnectedGameRepository(undefined, connectedUserId) : null),
+    [connectedUserId],
   )
   const migrateMemberships = useMutation(api.games.migrateMyGameMemberships)
   const [hostError, setHostError] = useState<string>()

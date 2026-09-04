@@ -26,6 +26,16 @@ export default function NewLocalGameRoute() {
               onModeChange={(nextMode) => nextMode === "local" && router.replace("/game/new")}
               onBack={() => router.back()}
               onStartLocal={() => undefined}
+              onJoinConnected={() => router.push("/connected/join")}
+              onResumeConnected={(game) =>
+                router.replace({
+                  pathname:
+                    game.status === "lobby"
+                      ? "/connected/lobby/[gameId]"
+                      : "/connected/game/[gameId]",
+                  params: { gameId: game.publicId },
+                })
+              }
               connected={connected}
             />
           )}

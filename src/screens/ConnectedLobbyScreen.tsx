@@ -109,7 +109,10 @@ function ConnectedLobbyContent({
   onBack?: () => void
   onLeft?: () => void
 }) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const deviceId = useRef(new LocalGameRepository().getDeviceId()).current
   const lobby = useQuery(api.games.lobbyProjection, { publicId, deviceId })
@@ -261,10 +264,16 @@ function ConnectedLobbyContent({
     }))
 
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
+    <Screen
+      preset="fixed"
+      safeAreaEdges={["bottom"]}
+      backgroundColor={colors.surface}
+      contentContainerStyle={themed($screen)}
+    >
       <Header
         title={titleVisible ? LOBBY_TITLE : ""}
         leftTx={onBack ? "common:back" : undefined}
+        backgroundColor={colors.surface}
         onLeftPress={onBack}
       />
       <ScrollView
@@ -331,7 +340,7 @@ function ConnectedLobbyContent({
           </LobbyDeckSource>
         </View>
       </ScrollView>
-      <BottomActionBar>
+      <BottomActionBar style={themed($surface)}>
         {actionError && !openExitCopy ? (
           <AlertNote testID="connected-action-error" text={actionError} />
         ) : null}
@@ -472,10 +481,20 @@ function LobbyStatusScreen({
   retry?: () => void
   onBack?: () => void
 }) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header title="" leftTx={onBack ? "common:back" : undefined} onLeftPress={onBack} />
+    <Screen
+      preset="fixed"
+      safeAreaEdges={["bottom"]}
+      backgroundColor={theme.colors.surface}
+      contentContainerStyle={themed($screen)}
+    >
+      <Header
+        title=""
+        leftTx={onBack ? "common:back" : undefined}
+        backgroundColor={theme.colors.surface}
+        onLeftPress={onBack}
+      />
       <ScrollView
         style={$styles.flex1}
         contentContainerStyle={themed($content)}
@@ -500,14 +519,18 @@ function LobbyStatusScreen({
           <Button testID="retry-lobby-button" text="Try again" onPress={retry} />
         ) : null}
       </ScrollView>
-      <BottomActionBar>
+      <BottomActionBar style={themed($surface)}>
         <Button text="Start game" preset="reversed" style={themed($primaryAction)} disabled />
       </BottomActionBar>
     </Screen>
   )
 }
 
-const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  flex: 1,
+  backgroundColor: colors.surface,
+})
+const $surface: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexGrow: 1,
   gap: spacing.md,

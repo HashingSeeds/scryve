@@ -331,11 +331,12 @@ describe("NewGameScreen", () => {
     }
     const view = setup({
       mode: "connected",
-      connected: { ...readyHost, activeGames: [game] },
+      connected: { ...readyHost, ready: false, activeGames: [game] },
       onJoinConnected,
       onResumeConnected,
     })
 
+    expect(view.getByTestId("join-connected-button")).toBeEnabled()
     fireEvent.press(view.getByTestId("join-connected-button"))
     fireEvent.press(view.getByTestId("resume-connected-resume-game"))
 

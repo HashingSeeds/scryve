@@ -8,9 +8,10 @@ import { ThemeProvider } from "@/theme/context"
 import NewLocalGameRoute from "../src/app/game/new"
 
 let mockSearchParams: { mode?: string; setup?: string } = {}
+let mockConnectedFeed: Record<string, unknown> = {}
 
 jest.mock("expo-router", () => ({
-  router: { back: jest.fn(), replace: jest.fn() },
+  router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => mockSearchParams,
 }))
 jest.mock("@/features/connected/ConnectedGate", () => ({
@@ -18,13 +19,14 @@ jest.mock("@/features/connected/ConnectedGate", () => ({
 }))
 jest.mock("@/features/connected/ConnectedHostSource", () => ({
   ConnectedHostSource: ({ children }: { children: (feed: object) => React.ReactNode }) =>
-    children({ ready: true, busy: false, host: jest.fn() }),
+    children({ ready: true, busy: false, host: jest.fn(), ...mockConnectedFeed }),
 }))
 
 describe("new local game route", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockSearchParams = {}
+    mockConnectedFeed = {}
   })
   afterEach(() => localGameRepository.clearActiveGame())
 
@@ -66,6 +68,18 @@ describe("new local game route", () => {
 
   it("uses the shared setup route for connected games", () => {
     mockSearchParams = { mode: "connected" }
+    mockConnectedFeed = {
+      activeGames: [
+        {
+          publicId: "active-game",
+          status: "active",
+          isHost: false,
+          playerCount: 2,
+          ruleset: "commander",
+          updatedAt: Date.now(),
+        },
+      ],
+    }
     const view = render(
       <ThemeProvider initialContext="light">
         <NewLocalGameRoute />
@@ -73,6 +87,13 @@ describe("new local game route", () => {
     )
 
     expect(view.getByTestId("host-connected-button")).toBeTruthy()
+    fireEvent.press(view.getByTestId("join-connected-button"))
+    expect(router.push).toHaveBeenCalledWith("/connected/join")
+    fireEvent.press(view.getByTestId("resume-connected-active-game"))
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/connected/game/[gameId]",
+      params: { gameId: "active-game" },
+    })
     fireEvent.press(view.getByTestId("mode-local"))
     expect(router.replace).toHaveBeenCalledWith("/game/new")
   })

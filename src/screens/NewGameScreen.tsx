@@ -389,12 +389,7 @@ export function NewGameScreen({
           </View>
         ) : null}
         {connectedMode && onJoinConnected ? (
-          <Button
-            testID="join-connected-button"
-            text="Join with code"
-            disabled={!connected?.ready}
-            onPress={onJoinConnected}
-          />
+          <Button testID="join-connected-button" text="Join with code" onPress={onJoinConnected} />
         ) : null}
       </Screen>
       <View style={[themed($footer), $footerSafeArea]}>
