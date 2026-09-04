@@ -828,6 +828,7 @@ export const connectedOperationStatus = query({
         return conflict(
           "Operation identifier was reused with different data: Commander damage claim was resolved differently",
         )
+      if (!claim.resolutionOperationId) return notFound()
       if (claim.resolutionOperationId !== operation.operationId)
         return conflict("Operation identifier was reused with different data")
       const decision = operation.accepted ? "confirmed" : "declined"

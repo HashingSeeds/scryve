@@ -1289,6 +1289,27 @@ describe("connected commander damage claims", () => {
       deviceId: "device-joiner-001",
       clientCreatedAt: 1_700_000_000_004,
     }
+    await game.joiner.mutation(api.games.confirmCommanderDamage, {
+      publicId: resolution.publicId,
+      operationId: resolution.operationId,
+      deviceId: resolution.deviceId,
+      clientCreatedAt: resolution.clientCreatedAt,
+    })
+    const operation = {
+      kind: "commanderDamage.resolved" as const,
+      operationId: resolution.resolutionOperationId,
+      claimOperationId: resolution.operationId,
+      toPlayerId: game.joinerPlayerId,
+      accepted: true,
+      deviceId: resolution.deviceId,
+      clientCreatedAt: resolution.clientCreatedAt,
+    }
+    await expect(
+      game.joiner.query(api.games.connectedOperationStatus, {
+        publicId: game.publicId,
+        operation,
+      }),
+    ).resolves.toMatchObject({ status: "not_found" })
     await expect(
       game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
     ).resolves.toMatchObject({
@@ -1298,15 +1319,7 @@ describe("connected commander damage claims", () => {
     await expect(
       game.joiner.query(api.games.connectedOperationStatus, {
         publicId: game.publicId,
-        operation: {
-          kind: "commanderDamage.resolved",
-          operationId: resolution.resolutionOperationId,
-          claimOperationId: resolution.operationId,
-          toPlayerId: game.joinerPlayerId,
-          accepted: true,
-          deviceId: resolution.deviceId,
-          clientCreatedAt: resolution.clientCreatedAt,
-        },
+        operation,
       }),
     ).resolves.toMatchObject({ status: "acknowledged" })
     await expect(
