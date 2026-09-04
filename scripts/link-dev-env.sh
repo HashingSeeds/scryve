@@ -13,7 +13,11 @@ set -euo pipefail
 
 # Metro follows this symlink in development. Keep the shared target's basename
 # dotenv-shaped so Metro does not try to transform it as application source.
-target="${SCRYVE_DEV_ENV:-${XDG_CONFIG_HOME:-$HOME/.config}/scryve/.env.local}"
+shared_dir="${XDG_CONFIG_HOME:-$HOME/.config}/scryve"
+target="${SCRYVE_DEV_ENV:-$shared_dir/.env.local}"
+if [[ -z "${SCRYVE_DEV_ENV:-}" && ! -f "$target" && -f "$shared_dir/env.development" ]]; then
+  target="$shared_dir/env.development"
+fi
 worktree=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 link="$worktree/.env.local"
 
