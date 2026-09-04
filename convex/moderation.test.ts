@@ -465,6 +465,77 @@ describe("moderation", () => {
       async (ctx) => await Promise.all([ctx.db.get(upheldReportId), ctx.db.get(dismissedReportId)]),
     )
     expect(statuses.map((report) => report?.status)).toEqual(["upheld", "dismissed"])
+
+    const dangling = convexTest(schema, modules)
+    await seatedGame(dangling, ["host-handle", "guest-handle"])
+    const danglingReports = await dangling.run(async (ctx) => {
+      const game = await ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", PUBLIC_ID))
+        .unique()
+      const reporter = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "host-subject"))
+        .unique()
+      const reported = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "guest-subject"))
+        .unique()
+      const report = await ctx.db.insert("moderationReports", {
+        gameId: game!._id,
+        reporterUserId: reporter!._id,
+        reportedUserId: reported!._id,
+        reportedUsername: "former-handle",
+        reason: "harassment",
+        status: "open",
+        createdAt: Date.now(),
+      })
+      const dismissed = await ctx.db.insert("moderationReports", {
+        gameId: game!._id,
+        reporterUserId: reporter!._id,
+        reportedUserId: reported!._id,
+        reportedUsername: "former-handle",
+        reason: "harassment",
+        status: "open",
+        createdAt: Date.now(),
+      })
+      await ctx.db.delete(reporter!._id)
+      await ctx.db.delete(reported!._id)
+      return { report, dismissed, reportedUserId: reported!._id }
+    })
+
+    const danglingOpen = await dangling.query(internal.moderation.openReports, {})
+    expect(danglingOpen).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reportId: danglingReports.dismissed,
+          reportedUserId: danglingReports.reportedUserId,
+          currentUsername: "(deleted account)",
+        }),
+        expect.objectContaining({
+          reportId: danglingReports.report,
+          reportedUserId: danglingReports.reportedUserId,
+          currentUsername: "(deleted account)",
+        }),
+      ]),
+    )
+    await expect(
+      dangling.query(internal.moderation.reportForAlert, { reportId: danglingReports.report }),
+    ).resolves.toMatchObject({
+      reporterUsername: "(deleted account)",
+      reportedUsername: "former-handle",
+      gamePublicId: PUBLIC_ID,
+    })
+    await expect(
+      dangling.mutation(internal.moderation.upholdReport, { reportId: danglingReports.report }),
+    ).resolves.toEqual({ held: false })
+    await expect(
+      dangling.mutation(internal.moderation.dismissReport, { reportId: danglingReports.dismissed }),
+    ).resolves.toEqual({ released: false })
+    const danglingStatuses = await dangling.run(async (ctx) =>
+      Promise.all([ctx.db.get(danglingReports.report), ctx.db.get(danglingReports.dismissed)]),
+    )
+    expect(danglingStatuses.map((report) => report?.status)).toEqual(["upheld", "dismissed"])
   })
 
   it("rejects reporting yourself or a player from another game", async () => {
