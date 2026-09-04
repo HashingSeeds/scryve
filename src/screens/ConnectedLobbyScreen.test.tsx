@@ -133,6 +133,10 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByTestId("seat-1-deck-deck-1")).toBeDisabled()
 
     await act(async () => resolveSelection(undefined))
+    fireEvent.press(screen.getByTestId("seat-1-deck-no-deck"))
+    await waitFor(() =>
+      expect(mockSelectDeck).toHaveBeenLastCalledWith({ publicId: "game-public", seat: 1 }),
+    )
   })
 
   it("reserves deck selector space while decks load independently", () => {
@@ -173,6 +177,13 @@ describe("ConnectedLobbyScreen", () => {
   })
 
   it("shows the deck rule and blocks a required lobby with a missing deck", () => {
+    connectedHarness.decks = [
+      {
+        _id: "deck-1",
+        name: "Krenko",
+        versions: [{ _id: "deck-version-1", versionNumber: 1 }],
+      },
+    ]
     const requiredProjection = {
       ...connectedHarness.projection,
       status: "lobby",
@@ -192,6 +203,7 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByText("0 of 2 ready")).toBeTruthy()
     expect(screen.getAllByText("40 life · Commander")).toHaveLength(1)
     expect(screen.getByText("Every seat needs a deck to start.")).toBeTruthy()
+    expect(screen.queryByTestId("seat-1-deck-no-deck")).toBeNull()
     expect(screen.getByTestId("start-connected-game-button")).toBeDisabled()
   })
 

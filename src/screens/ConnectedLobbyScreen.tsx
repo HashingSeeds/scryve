@@ -155,7 +155,7 @@ function ConnectedLobbyContent({
     : null
   const manualCode = lobby?.invitation?.manualCode
 
-  async function chooseVersion(seat: number, deckVersionId: string) {
+  async function chooseVersion(seat: number, deckVersionId?: string) {
     if (selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) {
       setActionError(onlineOnlyNotice("deck"))
@@ -165,7 +165,11 @@ function ConnectedLobbyContent({
     setSelectingDeckSeats(new Set(selectingDeckSeatsInFlight.current))
     try {
       setActionError(undefined)
-      await selectDeck({ publicId, seat, deckVersionId: deckVersionId as Id<"deckVersions"> })
+      await selectDeck({
+        publicId,
+        seat,
+        ...(deckVersionId ? { deckVersionId: deckVersionId as Id<"deckVersions"> } : {}),
+      })
     } catch (cause) {
       setActionError(convexErrorMessage(cause, "Could not select deck"))
     } finally {

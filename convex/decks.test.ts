@@ -24,6 +24,65 @@ async function synced(t: ReturnType<typeof convexTest>, subject: string, name: s
 }
 
 describe("premium deck tracking", () => {
+  it("lets a player clear a deck only when the lobby makes decks optional", async () => {
+    const t = convexTest(schema, modules)
+    const optionalHost = await synced(t, "optional-host", "Optional Host")
+    const deckId = await optionalHost.mutation(api.decks.create, {
+      name: "Optional Deck",
+      format: "commander",
+    })
+    const deckVersionId = await optionalHost.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [],
+    })
+    const optionalLobby = await optionalHost.mutation(api.games.createLobby, {
+      publicId: "optional-deck-public-1234",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      deckRequired: false,
+      inviteToken,
+      manualCodeCandidates: ["OPT234"],
+      hostDisplayName: "Optional Host",
+      hostColor: "#7C3AED",
+      deviceId: hostDeviceId,
+    })
+    await optionalHost.mutation(api.decks.selectForSeat, {
+      publicId: optionalLobby.publicId,
+      seat: 1,
+      deckVersionId,
+    })
+    await optionalHost.mutation(api.decks.selectForSeat, {
+      publicId: optionalLobby.publicId,
+      seat: 1,
+    })
+    const projection = await optionalHost.query(api.games.lobbyProjection, {
+      publicId: optionalLobby.publicId,
+      deviceId: hostDeviceId,
+    })
+    expect(projection.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
+
+    const requiredHost = await synced(t, "required-host", "Required Host")
+    const requiredLobby = await requiredHost.mutation(api.games.createLobby, {
+      publicId: "required-deck-public-1234",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      deckRequired: true,
+      inviteToken: "r".repeat(43),
+      manualCodeCandidates: ["REQ234"],
+      hostDisplayName: "Required Host",
+      hostColor: "#2563EB",
+      deviceId: "device-required-0001",
+    })
+    await expect(
+      requiredHost.mutation(api.decks.selectForSeat, {
+        publicId: requiredLobby.publicId,
+        seat: 1,
+      }),
+    ).rejects.toMatchObject({ data: { code: "deck_required" } })
+  })
+
   it("creates an imported deck and its first version atomically", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "import-owner", "Import Owner")

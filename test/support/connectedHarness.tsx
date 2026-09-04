@@ -30,6 +30,7 @@ type LobbyProjection = {
   startingLife: number
   ruleset: string
   isHost: boolean
+  deckRequired?: boolean
   invitation?: { token: string; manualCode: string } | null
   players: LobbyPlayer[]
   commanderDamage?: {

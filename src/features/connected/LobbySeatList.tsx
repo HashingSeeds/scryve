@@ -31,6 +31,8 @@ export type SeatDeck = {
 
 export type LobbyDeckState = RemoteValue<SeatDeck[]> | { status: "error"; retry: () => void }
 
+const NO_DECK_ID = "no-deck"
+
 export function LobbySeatList({
   seats,
   openSeats,
@@ -50,7 +52,7 @@ export function LobbySeatList({
   versionLabel: (version: { versionNumber: number; name?: string }) => string
   selectingDeckSeats?: ReadonlySet<number>
   deckRequired?: boolean
-  onSelectVersion: (seat: number, deckVersionId: string) => void
+  onSelectVersion: (seat: number, deckVersionId?: string) => void
   onReport: (seat: LobbySeat) => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
@@ -205,13 +207,22 @@ export function LobbySeatList({
                     <FilterChips
                       testID={`seat-${seat.seat}-deck`}
                       accessibilityLabel="Deck"
-                      chips={usableDecks.map((deck) => ({
-                        id: deck._id,
-                        label: deck.name,
-                        disabled: selectingDeck,
-                      }))}
-                      selectedId={chosenDeck?._id ?? ""}
+                      chips={[
+                        ...(deckRequired
+                          ? []
+                          : [{ id: NO_DECK_ID, label: "No deck", disabled: selectingDeck }]),
+                        ...usableDecks.map((deck) => ({
+                          id: deck._id,
+                          label: deck.name,
+                          disabled: selectingDeck,
+                        })),
+                      ]}
+                      selectedId={chosenDeck?._id ?? NO_DECK_ID}
                       onSelect={(deckId) => {
+                        if (deckId === NO_DECK_ID) {
+                          onSelectVersion(seat.seat)
+                          return
+                        }
                         const deck = usableDecks.find((candidate) => candidate._id === deckId)
                         const version = deck?.versions[deck.versions.length - 1]
                         if (version) onSelectVersion(seat.seat, version._id)
