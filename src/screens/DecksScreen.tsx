@@ -8,6 +8,7 @@ import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import type { FilterChip } from "@/components/FilterChips"
 import { FilterChips } from "@/components/FilterChips"
+import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -308,13 +309,23 @@ function DeckShelf({
 }
 
 export function DecksScreen({
-  onBack,
+  onPlay,
+  hasCurrentGame = false,
   onSelect,
   onAddDeck,
+  onSettings,
+  onAccount,
+  accountLabel = "Account",
+  unavailableMessage,
 }: {
-  onBack: () => void
+  onPlay: () => void
+  hasCurrentGame?: boolean
   onSelect: (deck: DeckSelection) => void
   onAddDeck: () => void
+  onSettings: () => void
+  onAccount: () => void
+  accountLabel?: "Account" | "Sign in"
+  unavailableMessage?: string
 }) {
   const { themed } = useAppTheme()
   const { format, setGame, setFormat } = useDeckFilters()
@@ -356,23 +367,21 @@ export function DecksScreen({
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header
-        title="Decks"
-        leftTx="common:back"
-        onLeftPress={onBack}
-        RightActionComponent={
-          <TouchableOpacity
-            testID="add-deck-tile"
-            accessibilityRole="button"
-            accessibilityLabel="Add deck"
-            style={themed($headerAction)}
-            onPress={onAddDeck}
-          >
-            <Text size="md" weight="medium" style={themed($link)} text="+ Add" />
-          </TouchableOpacity>
-        }
-      />
+      <Header title="Decks" />
       <View style={themed($content)}>
+        {!unavailableMessage ? (
+          <View style={themed($shelfActions)}>
+            <TouchableOpacity
+              testID="add-deck-tile"
+              accessibilityRole="button"
+              accessibilityLabel="Add deck"
+              style={themed($headerAction)}
+              onPress={onAddDeck}
+            >
+              <Text size="md" weight="medium" style={themed($link)} text="+ Add deck" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
         <View style={themed($filterRow)}>
           <View style={$collectionFilter}>
             <FilterChips
@@ -419,21 +428,35 @@ export function DecksScreen({
             ) : null}
           </View>
         ) : null}
-        <ConvexQueryBoundary
-          resetKey={`${collection}:${system}:${activeFormat}`}
-          fallback={({ retry }) => <DeckShelfUnavailable retry={retry} />}
-        >
-          <DeckShelf
-            system={system}
-            format={activeFormat}
-            search={search}
-            collection={collection}
-            recentDeckIds={recentDeckIds}
-            clearVisibleFilters={clearVisibleFilters}
-            onSelect={onSelect}
-          />
-        </ConvexQueryBoundary>
+        {unavailableMessage ? (
+          <View testID="decks-offline-state" style={themed($empty)}>
+            <Text preset="subheading" text="Decks unavailable" />
+            <Text size="sm" style={themed($dimmedText)} text={unavailableMessage} />
+          </View>
+        ) : (
+          <ConvexQueryBoundary
+            resetKey={`${collection}:${system}:${activeFormat}`}
+            fallback={({ retry }) => <DeckShelfUnavailable retry={retry} />}
+          >
+            <DeckShelf
+              system={system}
+              format={activeFormat}
+              search={search}
+              collection={collection}
+              recentDeckIds={recentDeckIds}
+              clearVisibleFilters={clearVisibleFilters}
+              onSelect={onSelect}
+            />
+          </ConvexQueryBoundary>
+        )}
       </View>
+      <FloatingAppNavigation
+        destinationLabel={hasCurrentGame ? "Return to game" : "Play"}
+        accountLabel={accountLabel}
+        onDestination={onPlay}
+        onSettings={onSettings}
+        onAccount={onAccount}
+      />
       <DialogCard
         visible={filtersOpen}
         onClose={() => setFiltersOpen(false)}
@@ -493,6 +516,11 @@ export function DecksScreen({
 }
 
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
+const $shelfActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "flex-end",
+  paddingBottom: spacing.xxs,
+})
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   width: "100%",
@@ -535,7 +563,9 @@ const $groupHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
   textTransform: "uppercase",
   letterSpacing: 1,
 })
-const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.lg })
+const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingBottom: spacing.xxxl + spacing.lg,
+})
 const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 88,
   flexDirection: "row",

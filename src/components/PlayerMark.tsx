@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import type { StyleProp, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import Animated, {
   cancelAnimation,
   Easing,
@@ -8,12 +8,14 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withTiming,
+  ZoomIn,
 } from "react-native-reanimated"
-import Svg, { Circle, Line, Path, Polygon, Rect } from "react-native-svg"
+import Svg, { Circle, G, Line, Path, Polygon, Rect } from "react-native-svg"
 
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import type { LifeCardContentRotation } from "./playerCardTypes"
+import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const SPIN_DURATION_MS = 7000
@@ -23,16 +25,22 @@ export interface PlayerMarkProps {
   color: string
   shape?: PlayerMarkShape
   rotation?: LifeCardContentRotation
+  insetSwordColor?: string
+  closeIcon?: boolean
   spinning?: boolean
   size?: number
   style?: StyleProp<ViewStyle>
 }
+
+const CLOSE_POP_MS = 200
 
 export function PlayerMark({
   seatNumber,
   color,
   shape: chosenShape,
   rotation = 0,
+  insetSwordColor,
+  closeIcon = false,
   spinning = false,
   size = 44,
   style,
@@ -47,6 +55,7 @@ export function PlayerMark({
   const spinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${spin.value}deg` }],
   }))
+  const closeEntering = reducedMotion === false ? ZoomIn.duration(CLOSE_POP_MS) : undefined
 
   useEffect(() => {
     cancelAnimation(spin)
@@ -76,7 +85,9 @@ export function PlayerMark({
       >
         <Svg width="100%" height="100%" viewBox="0 0 44 44">
           <MarkShape shape={shape} color={color} />
-          {spinning ? (
+          {insetSwordColor && !closeIcon ? (
+            <SwordInset shape={shape} color={insetSwordColor} />
+          ) : insetSwordColor ? null : spinning ? (
             <Line
               testID="player-mark-spin-line"
               x1="22"
@@ -90,6 +101,9 @@ export function PlayerMark({
           ) : null}
         </Svg>
       </Animated.View>
+      {insetSwordColor && closeIcon ? (
+        <CloseIconOverlay shape={shape} color={insetSwordColor} entering={closeEntering} />
+      ) : null}
     </View>
   )
 }
@@ -108,6 +122,69 @@ export function DrawMark({ color, size = 44 }: { color: string; size?: number })
         <Rect fill={color} x="10" y="20" width="24" height="4" rx="2" />
       </Svg>
     </View>
+  )
+}
+
+const SWORD_INSET_THAT_FITS_SHAPE: Record<
+  PlayerMarkShape,
+  { centerX: number; centerY: number; size: number }
+> = {
+  circle: { centerX: 22, centerY: 22, size: 14 },
+  square: { centerX: 22, centerY: 22, size: 15 },
+  diamond: { centerX: 22, centerY: 22, size: 14 },
+  hexagon: { centerX: 22, centerY: 22, size: 16 },
+  triangle: { centerX: 22, centerY: 25, size: 13 },
+  star: { centerX: 22, centerY: 22, size: 12 },
+}
+
+function CloseIconOverlay({
+  shape,
+  color,
+  entering,
+}: {
+  shape: PlayerMarkShape
+  color: string
+  entering: ReturnType<typeof ZoomIn.duration> | undefined
+}) {
+  const inset = SWORD_INSET_THAT_FITS_SHAPE[shape]
+  return (
+    <Animated.View
+      testID="player-mark-close"
+      entering={entering}
+      pointerEvents="none"
+      style={[
+        styles.closeIcon,
+        {
+          left: `${((inset.centerX - inset.size / 2) / 44) * 100}%`,
+          top: `${((inset.centerY - inset.size / 2) / 44) * 100}%`,
+          width: `${(inset.size / 44) * 100}%`,
+          height: `${(inset.size / 44) * 100}%`,
+        },
+      ]}
+    >
+      <View style={styles.closeIconPop}>
+        <View
+          style={[styles.closeBar, { backgroundColor: color, transform: [{ rotate: "45deg" }] }]}
+        />
+        <View
+          style={[styles.closeBar, { backgroundColor: color, transform: [{ rotate: "-45deg" }] }]}
+        />
+      </View>
+    </Animated.View>
+  )
+}
+
+function SwordInset({ shape, color }: { shape: PlayerMarkShape; color: string }) {
+  const { centerX, centerY, size } = SWORD_INSET_THAT_FITS_SHAPE[shape]
+  return (
+    <G
+      testID="player-mark-sword"
+      transform={`translate(${centerX - size / 2} ${centerY - size / 2}) scale(${
+        size / SWORD_VIEW_BOX
+      })`}
+    >
+      <SwordShapes color={color} />
+    </G>
   )
 }
 
@@ -133,3 +210,21 @@ function MarkShape({ shape, color }: { shape: PlayerMarkShape; color: string }) 
       return <Polygon {...common} points="22,8 34,15 34,29 22,36 10,29 10,15" />
   }
 }
+
+const styles = StyleSheet.create({
+  closeBar: {
+    borderRadius: 999,
+    height: "20%",
+    left: "6%",
+    position: "absolute",
+    top: "40%",
+    width: "88%",
+  },
+  closeIcon: {
+    position: "absolute",
+  },
+  closeIconPop: {
+    height: "100%",
+    width: "100%",
+  },
+})

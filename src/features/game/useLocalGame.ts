@@ -7,10 +7,6 @@ import { applyGameCommand, canUndo, defaultCommandContext } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { GameCommand, LifeDelta, LocalGame, LocalGameResult, PlayerId } from "./types"
 
-function defer(work: () => void) {
-  setTimeout(work, 0)
-}
-
 export function useLocalGame(
   initialGame: LocalGame,
   repository: LocalGameRepository = localGameRepository,
@@ -27,15 +23,25 @@ export function useLocalGame(
     (command: GameCommand): LocalGame => {
       const next = applyGameCommand(gameRef.current, command, context)
       if (next === gameRef.current) return next
+      if (next.status === "active") repository.saveActiveGame(next)
+      else repository.archiveGame(next)
       gameRef.current = next
       setGame(next)
-      defer(() => {
-        if (next.status === "active") repository.saveActiveGame(next)
-        else repository.archiveGame(next)
-      })
       return next
     },
     [context, repository],
+  )
+
+  const assignCommanderDamage = useCallback(
+    (fromPlayerId: PlayerId, toPlayerId: PlayerId, delta: number) => {
+      const previous = gameRef.current
+      const next = dispatch({ type: "commanderDamage.assign", fromPlayerId, toPlayerId, delta })
+      if (next === previous) return
+      if (settings.hapticsEnabled && reduceMotion === false) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined)
+      }
+    },
+    [dispatch, reduceMotion, settings.hapticsEnabled],
   )
 
   const changeLife = useCallback(
@@ -52,8 +58,13 @@ export function useLocalGame(
     game,
     canUndo: canUndo(game, context.actorId),
     changeLife,
+    assignCommanderDamage,
     undo: () => dispatch({ type: "life.undo" }),
     finish: (result?: LocalGameResult) => dispatch({ type: "game.finish", result }),
     abandon: () => dispatch({ type: "game.abandon" }),
+    discard: () => {
+      repository.clearActiveGame()
+      return gameRef.current
+    },
   }
 }

@@ -132,6 +132,70 @@ describe("outbox sync controller", () => {
     expect(repository.loadOutbox("game-public")).toEqual([])
   })
 
+  it("queues a defender confirmation made while offline and replays it on reconnect", async () => {
+    const { clock, controller, repository, sent } = harness()
+    const claim = {
+      claimId: "claim-1",
+      operationId: "commander-claim-000001",
+      fromPlayerId: "player-2",
+      toPlayerId: "player-1",
+      delta: 4,
+      clientCreatedAt: clock.now(),
+      createdAt: clock.now(),
+    }
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+    controller.resolveCommanderDamage(claim, true)
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+    expect(controller.getSnapshot().changeError).toBeUndefined()
+    expect(repository.loadOutbox("game-public")).toHaveLength(1)
+
+    controller.setEnvironment(ONLINE)
+    await settle()
+
+    expect(sent).toHaveLength(1)
+    expect(controller.getSnapshot().pending).toEqual([])
+    expect(repository.loadOutbox("game-public")).toEqual([])
+  })
+
+  it("queues nothing when any staged commander damage sits outside the supported range", () => {
+    const { controller, repository } = harness()
+    controller.setEnvironment(ONLINE)
+
+    controller.submitCommanderDamage("player-1", [
+      { toPlayerId: "player-2", delta: 4 },
+      { toPlayerId: "player-3", delta: 120 },
+    ])
+
+    expect(controller.getSnapshot().pending).toEqual([])
+    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(controller.getSnapshot().changeError).toMatch(/between 1 and 99/i)
+  })
+
+  it("keeps a declined claim distinct from a confirmed one", () => {
+    const { clock, controller } = harness()
+    const claim = {
+      claimId: "claim-1",
+      operationId: "commander-claim-000001",
+      fromPlayerId: "player-2",
+      toPlayerId: "player-1",
+      delta: 4,
+      clientCreatedAt: clock.now(),
+      createdAt: clock.now(),
+    }
+    controller.setEnvironment({ ...ONLINE, isWebSocketConnected: false })
+
+    controller.resolveCommanderDamage(claim, false)
+
+    const [queued] = controller.getSnapshot().pending
+    expect(queued.event).toMatchObject({
+      type: "commanderDamage.resolved",
+      claimOperationId: claim.operationId,
+      toPlayerId: claim.toPlayerId,
+      accepted: false,
+    })
+  })
+
   it("schedules a backoff retry after a transient send failure", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")

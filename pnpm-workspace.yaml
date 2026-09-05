@@ -1,13 +1,14 @@
 packages: []
 
+ignoredBuiltDependencies:
+  - dtrace-provider
+
 nodeLinker: hoisted
 
 onlyBuiltDependencies:
+  - '@sentry/cli'
   - esbuild
   - unrs-resolver
-
-ignoredBuiltDependencies:
-  - dtrace-provider
 
 # convex-test 0.0.54 leaves its event-loop MessagePorts open after scheduled functions finish.
 patchedDependencies:

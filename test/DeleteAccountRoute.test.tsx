@@ -81,8 +81,8 @@ describe("delete account route", () => {
     expect(view.queryByTestId("confirm-account-deletion-button")).toBeNull()
     fireEvent.press(view.getByText("Try again"))
     expect(retry).toHaveBeenCalledTimes(1)
-    fireEvent.press(view.getByText("Return home"))
-    expect(router.replace).toHaveBeenCalledWith("/")
+    fireEvent.press(view.getByText("Open Play"))
+    expect(router.replace).toHaveBeenCalledWith({ pathname: "/", params: { destination: "play" } })
   })
 
   it("restores a completed receipt after the identity is gone and the app restarts", () => {

@@ -13,9 +13,17 @@ import {
   asPlayerId,
   createClientId,
   isLifeDelta,
+  MAX_COMMANDER_DAMAGE,
 } from "./domain"
 import { playSystemId } from "./playSystems"
-import type { GameEvent, GamePlayer, LocalGame, LocalGameResult, LocalGameSummary } from "./types"
+import type {
+  CommanderDamageTotals,
+  GameEvent,
+  GamePlayer,
+  LocalGame,
+  LocalGameResult,
+  LocalGameSummary,
+} from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 
 export const MAX_HISTORY_GAMES = 30
@@ -35,6 +43,7 @@ export const LOCAL_KEYS = {
 } as const
 
 export type ThemePreference = "system" | "light" | "dark"
+export type LaunchDestination = "play" | "decks"
 
 export interface LocalSettings {
   schemaVersion: 1
@@ -43,6 +52,7 @@ export interface LocalSettings {
   hapticsEnabled: boolean
   themePreference: ThemePreference
   menuButtonStyle: MenuButtonStyle
+  launchDestination: LaunchDestination
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
@@ -52,6 +62,7 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   hapticsEnabled: true,
   themePreference: "system",
   menuButtonStyle: DEFAULT_MENU_BUTTON_STYLE,
+  launchDestination: "play",
 }
 
 export interface StringStorage {
@@ -152,6 +163,30 @@ function parseEvent(value: unknown): GameEvent | null {
   if (value.type === "game.abandoned") {
     return { ...base, type: "game.abandoned" }
   }
+  if (value.type === "commanderDamage.assigned") {
+    if (
+      typeof value.fromPlayerId !== "string" ||
+      typeof value.toPlayerId !== "string" ||
+      typeof value.delta !== "number" ||
+      !Number.isInteger(value.delta) ||
+      value.delta === 0 ||
+      Math.abs(value.delta) > MAX_COMMANDER_DAMAGE ||
+      (value.compensatesOperationId !== undefined &&
+        typeof value.compensatesOperationId !== "string")
+    ) {
+      return null
+    }
+    return {
+      ...base,
+      type: "commanderDamage.assigned",
+      fromPlayerId: asPlayerId(value.fromPlayerId),
+      toPlayerId: asPlayerId(value.toPlayerId),
+      delta: value.delta,
+      ...(typeof value.compensatesOperationId === "string"
+        ? { compensatesOperationId: asOperationId(value.compensatesOperationId) }
+        : {}),
+    }
+  }
   if (
     value.type !== "life.changed" ||
     typeof value.playerId !== "string" ||
@@ -171,6 +206,22 @@ function parseEvent(value: unknown): GameEvent | null {
   }
 }
 
+function parseCommanderDamage(value: unknown): CommanderDamageTotals | undefined {
+  if (!isRecord(value)) return undefined
+  const totals: CommanderDamageTotals = {}
+  for (const [key, total] of Object.entries(value)) {
+    if (
+      typeof total !== "number" ||
+      !Number.isInteger(total) ||
+      total < 0 ||
+      total > MAX_COMMANDER_DAMAGE
+    )
+      continue
+    totals[key] = total
+  }
+  return Object.keys(totals).length > 0 ? totals : undefined
+}
+
 function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   if (
     !isRecord(value) ||
@@ -186,6 +237,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const players = parsePlayers(value.players)
   if (!players || events.some((event) => event.gameId !== value.id)) return null
   const result = parseResult(value.result)
+  const commanderDamage = parseCommanderDamage(value.commanderDamage)
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -195,6 +247,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     startingLife: value.startingLife,
     players,
     events,
+    ...(commanderDamage ? { commanderDamage } : {}),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     ...(typeof value.finishedAt === "number" ? { finishedAt: value.finishedAt } : {}),
@@ -229,6 +282,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     menuButtonStyle: isMenuButtonStyle(migrated.menuButtonStyle)
       ? migrated.menuButtonStyle
       : DEFAULT_MENU_BUTTON_STYLE,
+    launchDestination: migrated.launchDestination === "decks" ? "decks" : "play",
   }
 }
 

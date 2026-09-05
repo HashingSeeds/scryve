@@ -140,6 +140,9 @@ export default defineSchema({
     operationId: v.string(),
     kind: v.string(),
     delta: v.optional(v.number()),
+    fromPlayerId: v.optional(v.id("gamePlayers")),
+    toPlayerId: v.optional(v.id("gamePlayers")),
+    claimOperationId: v.optional(v.string()),
     actorUserId: v.optional(v.id("users")),
     deviceId: v.optional(v.string()),
     clientCreatedAt: v.number(),
@@ -152,6 +155,37 @@ export default defineSchema({
     .index("by_game_operation", ["gameId", "operationId"])
     .index("by_operation_id", ["operationId"])
     .index("by_actor_user", ["actorUserId"]),
+
+  // One row per commander/defender pair keeps totals bounded and avoids replaying the event log.
+  gameCommanderDamage: defineTable({
+    gameId: v.id("games"),
+    fromPlayerId: v.id("gamePlayers"),
+    toPlayerId: v.id("gamePlayers"),
+    total: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_game", ["gameId"])
+    .index("by_game_and_pair", ["gameId", "fromPlayerId", "toPlayerId"]),
+
+  // Pending rows are short-lived operational state; resolved rows remain as a bounded audit trail
+  // only for the lifetime of the game and are never used to calculate totals.
+  gameCommanderClaims: defineTable({
+    gameId: v.id("games"),
+    operationId: v.string(),
+    fromPlayerId: v.id("gamePlayers"),
+    toPlayerId: v.id("gamePlayers"),
+    delta: v.number(),
+    status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("declined")),
+    actorUserId: v.id("users"),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+    resolvedByUserId: v.optional(v.id("users")),
+  })
+    .index("by_game_operation", ["gameId", "operationId"])
+    .index("by_game_and_status", ["gameId", "status"])
+    .index("by_game_and_to_and_status", ["gameId", "toPlayerId", "status"]),
 
   gameSummaries: defineTable({
     gameId: v.id("games"),

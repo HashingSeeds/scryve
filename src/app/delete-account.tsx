@@ -28,7 +28,10 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
         text="Scryve couldn't check your deletion status. Account deletion stays unavailable until the check succeeds."
       />
       <Button text="Try again" preset="reversed" onPress={() => void retry()} />
-      <Button text="Return home" onPress={() => router.replace("/")} />
+      <Button
+        text="Open Play"
+        onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+      />
     </Screen>
   )
 }
@@ -71,7 +74,10 @@ export default function DeleteAccountRoute() {
           {auth.configured ? (
             <Button text="Sign in" preset="reversed" onPress={auth.openAuth} />
           ) : null}
-          <Button text="Return home" onPress={() => router.replace("/")} />
+          <Button
+            text="Open Play"
+            onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+          />
         </Screen>
       )
   return <AuthenticatedDeleteAccountRoute onReceipt={rememberReceipt} />
@@ -97,7 +103,10 @@ function SignedOutDeletionReceipt({
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
         <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
         <Text text="Checking your deletion receipt…" accessibilityLiveRegion="polite" />
-        <Button text="Return home" onPress={() => router.replace("/")} />
+        <Button
+          text="Open Play"
+          onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+        />
       </Screen>
     )
 
@@ -107,7 +116,7 @@ function SignedOutDeletionReceipt({
       updatedAt={receipt.updatedAt}
       onBack={() => router.back()}
       onSignIn={receipt.canRetry ? onSignIn : undefined}
-      onReturnHome={() => router.replace("/")}
+      onReturnHome={() => router.replace({ pathname: "/", params: { destination: "play" } })}
     />
   )
 }
@@ -136,7 +145,10 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
       <Screen preset="auto" safeAreaEdges={["bottom"]}>
         <Header title="Delete account" leftTx="common:back" onLeftPress={() => router.back()} />
         <Text accessibilityRole="alert" text="Reconnect to Scryve before deleting your account." />
-        <Button text="Return home" onPress={() => router.replace("/")} />
+        <Button
+          text="Open Play"
+          onPress={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+        />
       </Screen>
     )
 

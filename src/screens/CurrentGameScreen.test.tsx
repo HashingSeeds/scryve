@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { createLocalGame } from "@/features/game/domain"
+import { commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -40,12 +40,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game()}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
@@ -65,12 +60,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game()}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("life-seat-1-1"))
@@ -81,25 +71,22 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game()}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("life-seat-1-1"))
     expect(Haptics.impactAsync).not.toHaveBeenCalled()
   })
 
-  it("uses a centered board menu and keeps navigation out of the play surface", () => {
+  it("keeps the radial geometry and reveals the new actions and corner navigation", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <CurrentGameScreen
           initialGame={game()}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onHome={jest.fn()}
+          onDecks={jest.fn()}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
           onGameEnded={jest.fn()}
         />
       </ThemeProvider>,
@@ -114,12 +101,36 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("game-menu-button"))
 
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
-    expect(view.getByTestId("home-button")).toBeTruthy()
+    expect(view.queryByTestId("home-button")).toBeNull()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
-    expect(view.getByTestId("status-button")).toBeTruthy()
+    expect(view.getByTestId("setup-button")).toBeTruthy()
+    expect(view.getByTestId("history-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
-    expect(view.queryByTestId("finish-button")).toBeNull()
-    expect(view.queryByTestId("abandon-button")).toBeNull()
+    expect(view.getByTestId("open-decks-button")).toBeTruthy()
+    expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+  })
+
+  it("offers Connect instead of End on a fresh board", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          fresh
+          initialGame={game()}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.getByTestId("connect-button")).toBeTruthy()
+    expect(view.queryByTestId("end-game-button")).toBeNull()
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.getByTestId("end-game-button")).toBeTruthy()
+    expect(view.queryByTestId("connect-button")).toBeNull()
   })
 
   it("moves the menu to a shared four-card junction", () => {
@@ -128,7 +139,6 @@ describe("CurrentGameScreen", () => {
         <CurrentGameScreen
           initialGame={game(6)}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onHome={jest.fn()}
           onGameEnded={jest.fn()}
         />
       </ThemeProvider>,
@@ -149,7 +159,6 @@ describe("CurrentGameScreen", () => {
         <CurrentGameScreen
           initialGame={game(5)}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onHome={jest.fn()}
           onGameEnded={jest.fn()}
         />
       </ThemeProvider>,
@@ -171,18 +180,18 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("layout-featured-first")).toBeTruthy()
   })
 
-  it("archives the game as abandoned when ended from the pop-up with no result", async () => {
+  it("discards an abandoned game without adding it to history", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()
     repository.saveActiveGame(initial)
-    const onGameEnded = jest.fn()
+    const onGameAbandoned = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
         <CurrentGameScreen
           initialGame={initial}
           repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={onGameEnded}
+          onGameEnded={jest.fn()}
+          onGameAbandoned={onGameAbandoned}
         />
       </ThemeProvider>,
     )
@@ -199,44 +208,42 @@ describe("CurrentGameScreen", () => {
       left: 0,
       right: 0,
     })
-    expect(view.getByTestId("confirm-end-game-button")).toBeTruthy()
-    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    fireEvent.press(view.getByTestId("abandon-game-button"))
     await waitFor(() => {
-      expect(onGameEnded).toHaveBeenCalledWith(initial.id)
+      expect(onGameAbandoned).toHaveBeenCalledTimes(1)
       expect(repository.loadActiveGame()).toBeNull()
-      expect(repository.loadHistory()[0].status).toBe("abandoned")
+      expect(repository.loadHistory()).toEqual([])
     })
   })
 
-  it("offers to abandon until a result is chosen, then to finish", () => {
+  it("keeps Abandon separate and enables End only after choosing a result", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
 
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("end-game-button"))
 
-    expect(view.getByText(/game:abandon/)).toBeTruthy()
+    expect(view.getByTestId("abandon-game-button")).toBeTruthy()
+    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(true)
 
     fireEvent.press(view.getByTestId("end-game-winner-1"))
-    expect(view.getByText(/game:finish/)).toBeTruthy()
-    expect(view.queryByText(/game:abandon/)).toBeNull()
+    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(
+      false,
+    )
 
     fireEvent.press(view.getByTestId("end-game-result-draw"))
-    expect(view.getByText(/game:finish/)).toBeTruthy()
+    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(
+      false,
+    )
 
     fireEvent.press(view.getByTestId("end-game-result-draw"))
-    expect(view.getByText(/game:abandon/)).toBeTruthy()
+    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(true)
   })
 
   it("records the winner the host picks before ending the game", async () => {
@@ -245,12 +252,7 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
 
@@ -271,18 +273,13 @@ describe("CurrentGameScreen", () => {
     })
   })
 
-  it("records no result once the last picked winner is unpicked", async () => {
+  it("does not end once the last picked winner is unpicked", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
 
@@ -290,14 +287,9 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("end-game-button"))
     fireEvent.press(view.getByTestId("end-game-winner-0"))
     fireEvent.press(view.getByTestId("end-game-winner-0"))
-    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(
-      false,
-    )
+    expect(view.getByTestId("confirm-end-game-button").props.accessibilityState.disabled).toBe(true)
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
-
-    await waitFor(() => {
-      expect(repository.loadHistory()[0].result).toBeUndefined()
-    })
+    expect(repository.loadHistory()).toEqual([])
   })
 
   it("records a draw and drops any picked winner", async () => {
@@ -306,12 +298,7 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
+        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
       </ThemeProvider>,
     )
 
@@ -326,28 +313,173 @@ describe("CurrentGameScreen", () => {
       expect(repository.loadHistory()[0].result).toEqual({ kind: "draw" })
     })
   })
+  describe("commander damage", () => {
+    function commanderGame(playerCount = 4) {
+      return createLocalGame({
+        players: Array.from({ length: playerCount }, (_, index) => ({
+          name: ["Ada", "Grace", "Katherine", "Dorothy"][index],
+          color: ["#41476E", "#39755C", "#7B5A91", "#A06A2B"][index],
+        })),
+        startingLife: 40,
+        system: "mtg",
+        format: "commander",
+        now: 1,
+      })
+    }
 
-  it("ends without a result when the host declines to record one", async () => {
-    const repository = new LocalGameRepository(new MemoryStorage())
-    const initial = game()
-    repository.saveActiveGame(initial)
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={initial}
-          repository={repository}
-          onHome={jest.fn()}
-          onGameEnded={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
+    const renderGame = (initialGame = commanderGame()) =>
+      render(
+        <ThemeProvider initialContext="light">
+          <CurrentGameScreen
+            initialGame={initialGame}
+            repository={new LocalGameRepository(new MemoryStorage())}
+            onGameEnded={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
 
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("end-game-button"))
-    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    const life = (view: ReturnType<typeof renderGame>, seat: number) =>
+      view.getByTestId(`life-total-seat-${seat}`).props.children
 
-    await waitFor(() => {
-      expect(repository.loadHistory()[0].result).toBeUndefined()
+    const armCommander = (view: ReturnType<typeof renderGame>, seat: number) => {
+      fireEvent.press(view.getByTestId(`commander-mark-seat-${seat}`))
+      fireEvent.press(view.getByTestId(`commander-sword-seat-${seat}`))
+    }
+
+    it("stays out of the way outside Commander", () => {
+      const view = renderGame(
+        createLocalGame({
+          players: [
+            { name: "Ada", color: "#41476E" },
+            { name: "Grace", color: "#39755C" },
+          ],
+          startingLife: 20,
+          system: "mtg",
+          format: "standard",
+          now: 1,
+        }),
+      )
+      expect(view.queryByTestId("commander-board-seat-1")).toBeNull()
+    })
+
+    it("shows a commander badge on every card and keeps each board hidden", () => {
+      const view = renderGame()
+      for (const seat of [1, 2, 3, 4]) {
+        expect(view.getByTestId(`commander-mark-seat-${seat}`)).toBeTruthy()
+        expect(view.queryByTestId(`commander-board-seat-${seat}`)).toBeNull()
+      }
+      expect(view.queryByTestId("commander-stage-seat-2-1")).toBeNull()
+    })
+
+    it("arms one commander at a time and reveals controls only on opponents", () => {
+      const view = renderGame()
+      armCommander(view, 1)
+      for (const seat of [2, 3, 4])
+        expect(view.getByTestId(`commander-stage-seat-${seat}-1`)).toBeTruthy()
+      expect(view.queryByTestId("commander-stage-seat-1-1")).toBeNull()
+
+      fireEvent.press(view.getByTestId("commander-done-seat-1"))
+      armCommander(view, 3)
+      expect(view.queryByTestId("commander-stage-seat-3-1")).toBeNull()
+      expect(view.getByTestId("commander-stage-seat-1-1")).toBeTruthy()
+    })
+
+    it("applies each press straight to the counter and the life total", () => {
+      const view = renderGame()
+      armCommander(view, 1)
+      for (let press = 0; press < 7; press += 1)
+        fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+      for (let press = 0; press < 3; press += 1)
+        fireEvent.press(view.getByTestId("commander-stage-seat-3-1"))
+
+      expect(life(view, 2)).toBe("33")
+      expect(life(view, 3)).toBe("37")
+      expect(life(view, 4)).toBe("40")
+      expect(life(view, 1)).toBe("40")
+    })
+
+    it("offers no send or cancel bar with nobody to confirm to", () => {
+      const view = renderGame()
+      armCommander(view, 1)
+      fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+      expect(view.queryByTestId("commander-send-seat-1")).toBeNull()
+      expect(view.queryByTestId("commander-cancel-seat-1")).toBeNull()
+    })
+
+    it("disarms from the attacking card", () => {
+      const view = renderGame()
+      armCommander(view, 2)
+      for (let press = 0; press < 4; press += 1)
+        fireEvent.press(view.getByTestId("commander-stage-seat-1-1"))
+      fireEvent.press(view.getByTestId("commander-done-seat-2"))
+      expect(life(view, 1)).toBe("36")
+      expect(view.queryByTestId("commander-stage-seat-1-1")).toBeNull()
+    })
+
+    it("gives life back on the way down and stops at the recorded total", () => {
+      const initial = commanderGame()
+      initial.commanderDamage = {
+        [commanderDamageKey(initial.players[0].id, initial.players[1].id)]: 7,
+      }
+      initial.players[1].life = 33
+      const view = renderGame(initial)
+
+      armCommander(view, 1)
+      for (let press = 0; press < 8; press += 1)
+        fireEvent.press(view.getByTestId("commander-stage-seat-2--1"))
+
+      expect(life(view, 2)).toBe("40")
+    })
+
+    it("marks 21 from one commander as eliminated and leaves the game running", () => {
+      const view = renderGame()
+      armCommander(view, 1)
+      for (let press = 0; press < 21; press += 1)
+        fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+
+      expect(view.getByTestId("life-eliminated-seat-2")).toBeTruthy()
+      expect(view.queryByTestId("life-eliminated-seat-3")).toBeNull()
+      expect(view.getByTestId("game-board")).toBeTruthy()
+      fireEvent.press(view.getByTestId("commander-done-seat-1"))
+      fireEvent.press(view.getByTestId("life-seat-2--1"))
+      expect(life(view, 2)).toBe("19")
+    })
+
+    it("switches a fresh board from Connect to End after a commander assignment", () => {
+      const view = render(
+        <ThemeProvider initialContext="light">
+          <CurrentGameScreen
+            fresh
+            initialGame={commanderGame()}
+            repository={new LocalGameRepository(new MemoryStorage())}
+            onGameEnded={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      expect(view.getByTestId("connect-button")).toBeTruthy()
+      expect(view.queryByTestId("end-game-button")).toBeNull()
+      fireEvent.press(view.getByTestId("game-menu-button"))
+
+      armCommander(view, 1)
+      fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      expect(view.getByTestId("end-game-button")).toBeTruthy()
+      expect(view.queryByTestId("connect-button")).toBeNull()
+    })
+
+    it("undoes one assignment press as a single action", () => {
+      const view = renderGame()
+      armCommander(view, 1)
+      for (let press = 0; press < 5; press += 1)
+        fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+      expect(life(view, 2)).toBe("35")
+
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      fireEvent.press(view.getByTestId("undo-button"))
+      expect(life(view, 2)).toBe("36")
     })
   })
 })

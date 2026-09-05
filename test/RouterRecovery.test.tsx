@@ -56,18 +56,24 @@ describe("Router recovery fallbacks", () => {
   it("offers re-authentication and home recovery from a rejected account route", () => {
     const view = render(themed(<AccountRoute />))
     fireEvent.press(view.getByText("Re-authenticate"))
-    fireEvent.press(view.getByText("Return home"))
+    fireEvent.press(view.getByText("Open Play"))
     expect(mockOpenAuth).toHaveBeenCalledTimes(1)
-    expect(jest.requireMock("expo-router").router.replace).toHaveBeenCalledWith("/")
+    expect(jest.requireMock("expo-router").router.replace).toHaveBeenCalledWith({
+      pathname: "/",
+      params: { destination: "play" },
+    })
   })
 
   it("offers manual-code and home recovery for an invalid deep link", () => {
     const view = render(themed(<InviteRoute />))
     fireEvent.press(view.getByText("Enter a manual code"))
-    fireEvent.press(view.getByText("Return home"))
+    fireEvent.press(view.getByText("Open Play"))
     const replace = jest.requireMock("expo-router").router.replace
     expect(replace).toHaveBeenNthCalledWith(1, "/connected/join")
-    expect(replace).toHaveBeenNthCalledWith(2, "/")
+    expect(replace).toHaveBeenNthCalledWith(2, {
+      pathname: "/",
+      params: { destination: "play" },
+    })
   })
 
   it("gives the signed-in account profile the remaining route height", () => {
