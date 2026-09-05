@@ -6,10 +6,10 @@ Flows are argent YAML in the app repo's `.argent/flows`, replayed with
 run that same flow by hand from the app repo while authoring it.
 
 Flows run with no LLM, so every step must be deterministic. goldie handles the
-surrounding machinery for you: before any flow it pins the status bar and
-reinstalls the app with cleared data, so every run starts from the same empty
-state. A simulator that is already booted keeps running; it is only shut down
-and rebooted when its keyboard and locale preferences still need pinning.
+capture setup. Screenshot scenes start independently. Preview segments form
+one continuous session: reset only before the first segment and preserve app
+data and navigation between later segments. Check the installed version's
+capture behavior before relying on a reset; launching alone does not clear data.
 
 ## Step vocabulary
 
@@ -23,9 +23,6 @@ preview's first segment starts with `launch:` and therefore must NOT have
 `executionPrerequisite`.
 
 ```yaml
-executionPrerequisite: >-        # top-level, preview segments mostly: the state
-  App on the composer with a title typed.   # this flow assumes when it starts
-
 steps:
   - echo: Why the next step looks the way it does   # comment, printed on replay
   - launch: com.example.app                          # launch by bundle id
@@ -62,10 +59,9 @@ steps:
 - **Never hardcode a simulator udid.** `argent flow run --device` injects it.
 - **`await visible` before acting on anything that appears.** Then
   `await idle` before the capture moment, so animations finish.
-- **The app starts with cleared data.** If a scene needs content on screen
-  (a populated list, a created item), the flow must create it, or the app must
-  seed demo data on first launch. Check how the app behaves on a fresh install
-  before assuming content exists.
+- Establish screenshot state explicitly. Create fixture content through the
+  app's normal flows. For later preview segments, reuse the previous segment's
+  state instead of resetting or reseeding.
 - **Mine the flows already in `.argent/flows`.** Selectors and coordinates that
   already replay there are proven; copy them instead of rediscovering, or point
   a scene straight at an existing flow when one reaches the screen.

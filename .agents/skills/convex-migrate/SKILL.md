@@ -1,23 +1,17 @@
 ---
 name: convex-migrate
-description: "Migrate schema + backfill data on a deployed Convex app using @convex-dev/migrations."
+description: Prepare or execute an authorized expand-and-contract Convex schema migration for installed Scryve clients.
 ---
 
-<!-- GENERATED from convex-agents content/capabilities/migrate.json — do not edit by hand. -->
+Read `convex/_generated/ai/guidelines.md`, `AGENTS.md`, and `RELEASING.md`. Identify the old client reads and writes before choosing the transition.
 
-# Migrate the schema / data on a live app
+- New field: add it as optional, backfill, then require it only after all writers support it.
+- Type change: accept old and new representations, migrate records, then narrow after old writers have aged out.
+- Rename: support old and new fields with compatible reads and writes, backfill, then remove the old representation after the client adoption window.
+- Removal: stop new dependencies first and retain the old function or field while installed clients still use it.
 
-Change a deployed schema without breaking existing data: stage the schema change, install @convex-dev/migrations, write a backfill that makes old rows valid, run it, and verify before tightening the validator.
+Declare staged indexes before using them; deploy that expansion and confirm backfill readiness before the code that queries them. Backend compatibility ships before the dependent client.
 
-## Workflow
+Use the repository's bounded scheduled mutations for small backfills. Each batch must be retry-safe and resumable through a persisted cursor or a predicate that excludes completed rows. Use an installed migration component if it already solves the task; do not add one automatically. Verify restart and retry behavior, remaining eligible records, and the resulting data before any tightening.
 
-1. Make the new field optional first (so deploy doesn't reject existing rows).
-2. Install @convex-dev/migrations; write a migration that backfills/transforms existing rows.
-3. Run the migration; verify all rows are valid.
-4. Tighten the validator (make the field required) once the backfill is complete.
-
-## Rules
-
-- Never tighten a validator before the backfill completes — it rejects existing rows and breaks the live app.
-- Add new fields as optional first, migrate, then require.
-- Verify row counts before and after.
+Prepare and test the migration before requesting any missing production authorization. Name the target immediately before an authorized deployment or migration. Record the exact commit and invocation in the release record. Roll forward with compatible code; do not restore an old snapshot over newer writes.

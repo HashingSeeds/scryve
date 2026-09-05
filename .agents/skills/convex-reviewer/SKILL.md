@@ -1,26 +1,12 @@
 ---
 name: convex-reviewer
-description: "Convex code reviewer — security, auth, validators, performance, and pattern checks for code in a convex/ directory. Use to review or audit Convex functions before shipping."
+description: Review Scryve Convex changes for correctness, authorization, bounded reads, and installed-client compatibility.
 ---
 
-<!-- GENERATED from convex-agents content/capabilities/convex-reviewer.json — do not edit by hand. -->
+Read `convex/_generated/ai/guidelines.md` first. Trace the changed functions through their callers and helpers.
 
-# Convex Code Reviewer
+Check argument validation, intended public access, ownership or membership where required, atomic writes, awaited work, and bounded indexed reads. Judge a residual query filter by the rows scanned; its presence alone is not a defect. Check time-dependent queries for stale results when no document changes.
 
-Structured review of Convex code for security, authorization, validators, performance, and schema design. Applies a Convex-specific checklist and flags anti-patterns with severity (Critical / Important / Suggestion).
+Check optional-field expansion, staged-index readiness, retry-safe migrations, and old-client reads and writes. Confirm changes preserve local-first recovery and avoid adding large projection payloads.
 
-## Workflow
-
-1. First pass — Security: verify all public functions check ctx.auth.getUserIdentity(), verify resource ownership before reads/writes, confirm no client-provided user IDs are trusted, confirm scheduled functions target internal.* not api.*.
-2. Second pass — Performance: confirm no .filter() on DB queries (withIndex required), verify all foreign-key fields have indexes, confirm no Date.now() in query handlers, confirm .collect() is not used on unbounded queries.
-3. Third pass — Code quality: confirm args and returns validators on every public function, no any types, promises are awaited, arrays in documents are bounded (<8192 elements).
-4. Report findings grouped by severity; explain why each issue matters and suggest a fix.
-
-## Rules
-
-- Flag missing auth checks as Critical — any unauthenticated public mutation is a data-loss risk.
-- Flag .filter() on DB queries as Important — it is a full table scan.
-- Flag Date.now() in query handlers as Important — it breaks reactivity.
-- Flag missing args or returns validators as Important.
-- Flag scheduling to api.* (not internal.*) as Important.
-- Always explain why a change is needed, not just what to change.
+Report only verified issues with file and line, a concrete trigger, impact, and the smallest correction. Do not demand auth for deliberately public data, indexes for unused access patterns, or new infrastructure by default. Review-only requests produce findings without edits or deployments.

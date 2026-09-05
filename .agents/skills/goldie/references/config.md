@@ -1,7 +1,7 @@
 # goldie.config.ts
 
-One file holds everything app-specific. It exports a `GoldieConfig` (type from
-`$GOLDIE/src/config.ts`). Every relative path in it resolves against the config
+One file holds everything app-specific. It exports a configuration object. When Goldie is installed locally,
+its package exports the optional `GoldieConfig` type. Every relative path in it resolves against the config
 file itself, and `out/` is created next to it. Scene flows are the exception:
 they are argent flow names resolved against `flowsDir`, which defaults to
 `.argent/flows` inside `appRoot`.
@@ -9,11 +9,9 @@ they are argent flow names resolved against `flowsDir`, which defaults to
 ## Annotated example
 
 ```ts
-import type { GoldieConfig } from "/Users/<you>/Dev/goldie/src/config.ts";
-
 const APP_ROOT = "/absolute/path/to/the/app/repo";
 
-const config: GoldieConfig = {
+const config = {
   appRoot: APP_ROOT,
   // The Release simulator build found in Step 1. Absolute path.
   appPath: `${process.env.HOME}/Library/Developer/Xcode/DerivedData/<App>-<hash>/Build/Products/Release-iphonesimulator/<App>.app`,
@@ -21,7 +19,7 @@ const config: GoldieConfig = {
 
   devices: ["iphone-6.9"],       // keys from $GOLDIE/src/specs.ts
   locales: ["en-US"],
-  appearance: "light",           // simulator appearance for every capture
+  appearance: "dark",           // simulator appearance for every capture
 
   // Bundled bezels: "17-pro-silver" | "17-pro-blue" | "17-pro-orange".
   // Pick the finish that contrasts with the background.
@@ -30,9 +28,9 @@ const config: GoldieConfig = {
   theme: {
     // Any CSS background. Soft brand-tinted gradients read best at store size.
     // "transparent" exports PNGs with alpha (for compositing; not uploadable as-is).
-    background: "linear-gradient(160deg, #E8F1FF 0%, #F7FAFF 55%, #FFFFFF 100%)",
-    headlineColor: "#0E1B2A",    // must contrast with the background;
-    subheadColor: "#5A6A7D",     // light text on a dark background and vice versa
+    background: "#000",
+    headlineColor: "#FFFFFF",    // must contrast with the background;
+    subheadColor: "#FFFFFF",     // light text on a dark background and vice versa
     // The system stack, or a bundled typeface named first: "Merriweather",
     // "DM Mono", "Lato", "DM Sans", "Montserrat" (files in $GOLDIE/assets/fonts).
     fontFamily: '-apple-system, "SF Pro Display", system-ui, sans-serif',
@@ -93,8 +91,10 @@ const config: GoldieConfig = {
 export default config;
 ```
 
-Import the type with an absolute path to the goldie checkout, since the config
-lives in the app repo.
+For a local installation, use `import type { GoldieConfig } from "goldie"`
+and annotate the configuration. For an `npx` invocation, the unannotated
+object above avoids requiring a source checkout. Run `goldie doctor` against
+the selected package version to check the configuration.
 
 ## Templates and layouts
 

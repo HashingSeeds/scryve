@@ -18,8 +18,8 @@ description: >-
 goldie replays argent YAML flows on an iOS simulator, captures raw screenshots
 and recordings, and turns them into upload-ready assets: screenshots get a
 device bezel, a background, and marketing copy; the preview video is the raw
-recordings joined as-is, since Apple requires app previews to be a plain
-screen recording with no framing or captions. A React studio shows the
+recordings joined as-is, this workflow uses plain screen recordings
+with no framing or captions. A React studio shows the
 result as the real store page. Your job is everything goldie cannot do alone:
 pick the screens worth marketing, author the flows that reach them, write the
 copy, and drive the pipeline.
@@ -27,6 +27,11 @@ copy, and drive the pipeline.
 The end state: 4 or 5 framed screenshots and the raw clips for a preview video,
 visible in the studio at http://localhost:4321, with the video rendering in
 the background.
+
+Use a dedicated simulator and development identity. Follow the repository's
+rules for browser and simulator authorization. Asset creation does not authorize
+production access, App Store publication, or changing a daily-driver build.
+Keep captures outside the worktree unless they are actual product assets.
 
 ## Before anything: check for an existing goldie setup
 
@@ -51,11 +56,11 @@ goldie is an npm package that bundles the CLI, the studio and a pinned argent
 driver. Nothing needs cloning; `npx` fetches it on first use:
 
 ```bash
-npx -y goldie@0 help
+npx -y goldie@0.3.1 help
 ```
 
-Every command below is `npx -y goldie@0 <cmd>`, referred to as `goldie`.
-It needs Node 20+ and `ffmpeg` on the PATH (`brew install ffmpeg`). If
+Every command below is `npx -y goldie@0.3.1 <cmd>`, referred to as `goldie`.
+It needs Node 20.12+ and `ffmpeg` on the PATH (`brew install ffmpeg`). If
 `$GOLDIE_ROOT` is set, the user is working from a source checkout; run
 `bun $GOLDIE_ROOT/src/cli.ts <cmd>` instead. All app-specific files live in
 the app repo.
@@ -135,7 +140,7 @@ Shell state does not persist between your Bash calls, so prefix every goldie
 command with it:
 
 ```bash
-GOLDIE_CONFIG=<app-repo>/goldie/goldie.config.ts npx -y goldie@0 doctor
+GOLDIE_CONFIG=<app-repo>/goldie/goldie.config.ts npx -y goldie@0.3.1 doctor
 ```
 
 Fix everything doctor flags before capturing. The usual findings and their
@@ -145,9 +150,9 @@ argent video watermark flag, a screenshot scale override, and a Debug build.
 Then capture and render the stills (skip the video for now, it takes minutes):
 
 ```bash
-GOLDIE_CONFIG=... npx -y goldie@0 capture
-GOLDIE_CONFIG=... npx -y goldie@0 frame
-GOLDIE_CONFIG=... npx -y goldie@0 manifest
+GOLDIE_CONFIG=... npx -y goldie@0.3.1 capture
+GOLDIE_CONFIG=... npx -y goldie@0.3.1 frame
+GOLDIE_CONFIG=... npx -y goldie@0.3.1 manifest
 ```
 
 `capture` replays every flow, including the preview segments, so the raw clips
@@ -168,21 +173,21 @@ Start the studio in the background. It needs `GOLDIE_CONFIG` too, so it
 serves the app repo's `out/`:
 
 ```bash
-GOLDIE_CONFIG=... npx -y goldie@0 studio --no-open   # background task; serves http://localhost:4321
+GOLDIE_CONFIG=... npx -y goldie@0.3.1 studio --no-open   # background task; serves http://localhost:4321
 ```
 
 Tell the user it is up at http://localhost:4321. Then, also in the background,
 render the preview video so it appears on reload once done:
 
 ```bash
-GOLDIE_CONFIG=... npx -y goldie@0 preview && GOLDIE_CONFIG=... npx -y goldie@0 manifest
+GOLDIE_CONFIG=... npx -y goldie@0.3.1 preview && GOLDIE_CONFIG=... npx -y goldie@0.3.1 manifest
 ```
 
 If `preview` refuses because the total is outside 15 to 30 seconds, adjust
 segment pacing (`wait:` steps and `holdSeconds`) and re-capture only what
 changed.
 
-Finish with `GOLDIE_CONFIG=... npx -y goldie@0 verify` and report the result: which
+Finish with `GOLDIE_CONFIG=... npx -y goldie@0.3.1 verify` and report the result: which
 assets exist, where they are, and whether they pass Apple's rules. The
 studio's sidebar shows the same checks; a red row is a rule violation. The
 Design panel lets the user restyle backgrounds, layouts, bezels and fonts

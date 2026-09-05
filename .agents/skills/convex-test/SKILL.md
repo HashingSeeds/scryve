@@ -1,23 +1,12 @@
 ---
 name: convex-test
-description: "Generate convex-test tests for the app's Convex functions."
+description: Add focused tests for a Scryve Convex behavior using the existing in-memory Jest setup.
 ---
 
-<!-- GENERATED from convex-agents content/capabilities/test.json — do not edit by hand. -->
+Read `convex/_generated/ai/guidelines.md` and a nearby `convex/*.test.ts` file before writing tests.
 
-# Generate Convex tests
+Scryve runs Convex tests with Jest and `convex-test`. Reuse its explicit module-loader map and call `convexTest(schema, modules)`. Include the modules reached by the behavior and scheduled functions. Do not use the default `import.meta.glob` loader or install a parallel Vitest framework.
 
-Use convex-test + vitest to test functions against an in-memory backend: args/returns, auth paths, indexes, and scheduled functions.
+Seed through public functions where useful, or use `t.run` for records the API cannot create. Use `t.withIdentity` with the identity shape consumed by the existing auth helper. Test the behavior that changes, including a rejected caller when authorization is involved. For scheduled work, use the existing fake-timer and scheduler-drain pattern.
 
-## Workflow
-
-1. Install convex-test + vitest.
-2. Write tests using convexTest(schema): seed via t.run, call t.query/t.mutation, assert.
-3. Cover auth (withIdentity), error paths, and scheduled functions (t.finishInProgressScheduledFunctions).
-4. Run vitest; keep tests deterministic.
-
-## Rules
-
-- Use convex-test (in-memory), not a live deployment.
-- Cover auth + error paths, not just the happy path.
-- Keep tests deterministic (no real time/network).
+Run `pnpm test <files> --runInBand`, targeted `pnpm exec eslint <files>`, and `pnpm compile`. Keep tests in memory and avoid real network calls or deployment setup.
