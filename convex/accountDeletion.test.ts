@@ -204,6 +204,16 @@ describe("account deletion", () => {
         currentLife: 40,
         joinedAt: now,
       })
+      for (let index = 0; index < 50; index += 1) {
+        await ctx.db.insert("moderationReports", {
+          reporterUserId: deletingUserId,
+          reportedUserId: remainingUserId,
+          reportedUsername: "remaining-player",
+          reason: "other",
+          status: "open",
+          createdAt: now,
+        })
+      }
       const reporterReportId = await ctx.db.insert("moderationReports", {
         reporterUserId: deletingUserId,
         reportedUserId: remainingUserId,
@@ -287,13 +297,25 @@ describe("account deletion", () => {
     const request = await host.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
       confirmation: "DELETE",
     })
+    await t.mutation(internal.accountDeletion.processModerationData, {
+      requestId: request.requestId,
+    })
+    const remainingReporterLinks = await t.run(async (ctx) =>
+      ctx.db
+        .query("moderationReports")
+        .withIndex("by_reporter_and_reported", (q) =>
+          q.eq("reporterUserId", fixture.deletingUserId),
+        )
+        .take(51),
+    )
+    expect(remainingReporterLinks).toHaveLength(1)
     for (let phase = 0; phase < 7; phase += 1)
       await t.mutation(internal.accountDeletion.processModerationData, {
         requestId: request.requestId,
       })
 
     const beforeRetry = await t.run(async (ctx) => ({
-      reports: await ctx.db.query("moderationReports").take(10),
+      reports: await ctx.db.query("moderationReports").take(60),
       blocks: await ctx.db.query("userBlocks").take(10),
       claims: await ctx.db.query("gameCommanderClaims").take(10),
     }))
@@ -301,7 +323,7 @@ describe("account deletion", () => {
       requestId: request.requestId,
     })
     const afterRetry = await t.run(async (ctx) => ({
-      reports: await ctx.db.query("moderationReports").take(10),
+      reports: await ctx.db.query("moderationReports").take(60),
       blocks: await ctx.db.query("userBlocks").take(10),
       claims: await ctx.db.query("gameCommanderClaims").take(10),
     }))
