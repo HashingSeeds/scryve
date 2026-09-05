@@ -1262,7 +1262,7 @@ async function resolveCommanderClaim(
   decision: "confirmed" | "declined",
 ) {
   assertOperationId(args.operationId)
-  if (args.resolutionOperationId) assertOperationId(args.resolutionOperationId)
+  if (args.resolutionOperationId !== undefined) assertOperationId(args.resolutionOperationId)
   assertDeviceId(args.deviceId)
   if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
     throw new Error("Invalid client timestamp")

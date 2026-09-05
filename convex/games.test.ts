@@ -1305,6 +1305,12 @@ describe("connected commander damage claims", () => {
       deviceId: "device-joiner-001",
       clientCreatedAt: 1_700_000_000_004,
     }
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        ...resolution,
+        resolutionOperationId: "",
+      }),
+    ).rejects.toThrow("Invalid operation identifier")
     await game.joiner.mutation(api.games.confirmCommanderDamage, resolution)
     for (const claimId of claimIds.slice(1)) {
       await game.host.mutation(
