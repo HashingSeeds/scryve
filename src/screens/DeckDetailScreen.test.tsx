@@ -373,6 +373,9 @@ describe("DeckDetailScreen", () => {
   it("archives the deck from deck settings behind a confirmation", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("deck-settings-button"))
+    expect(view.getByText("Save changes")).toBeTruthy()
+    expect(view.getByTestId("deck-format-picker")).toBeTruthy()
+    expect(view.queryByText("Cancel")).toBeNull()
     fireEvent.press(view.getByTestId("delete-deck-button"))
     fireEvent.press(view.getByTestId("delete-deck-confirm"))
     await waitFor(() => expect(mockArchiveDeck).toHaveBeenCalledWith({ deckId: "deck-1" }))

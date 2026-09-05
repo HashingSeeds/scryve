@@ -191,7 +191,13 @@ function renderAddDeck(onCreated = jest.fn()) {
 }
 
 function chooseFormat(view: ReturnType<typeof renderAddDeck>, format: string) {
-  fireEvent.press(view.getByTestId(`format-picker-options-${format}`))
+  fireEvent.press(view.getByTestId("format-picker-options"))
+  fireEvent.press(view.getByTestId(`format-picker-options-option-${format}`))
+}
+
+function chooseGame(view: ReturnType<typeof renderAddDeck>, game: string) {
+  fireEvent.press(view.getByTestId("game-picker-options"))
+  fireEvent.press(view.getByTestId(`game-picker-options-option-${game}`))
 }
 
 function chooseMode(view: ReturnType<typeof renderAddDeck>, mode: string) {
@@ -242,7 +248,7 @@ describe("AddDeckScreen", () => {
 
   it("offers official, pasted, and scratch-built creation paths", () => {
     const view = renderAddDeck()
-    expect(view.getByText("Official precon")).toBeTruthy()
+    expect(view.getByText("Official deck")).toBeTruthy()
     chooseMode(view, "paste")
     expect(view.getByText("Deck list")).toBeTruthy()
     chooseMode(view, "blank")
@@ -381,11 +387,11 @@ describe("AddDeckScreen", () => {
   it("loads each system with a valid default format and filters Top Decks by format", async () => {
     const view = renderAddDeck()
 
-    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    chooseGame(view, "ygo")
     await act(async () => jest.advanceTimersByTime(400))
-    expect(
-      view.getByTestId("format-picker-options-advanced").props.accessibilityState.selected,
-    ).toBe(true)
+    expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
+      "Format, Advanced",
+    )
     expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
       game: "ygo",
       format: "advanced",
@@ -400,11 +406,11 @@ describe("AddDeckScreen", () => {
       query: "",
     })
 
-    fireEvent.press(view.getByTestId("game-picker-options-mtg"))
+    chooseGame(view, "mtg")
     await act(async () => jest.advanceTimersByTime(400))
-    expect(
-      view.getByTestId("format-picker-options-commander").props.accessibilityState.selected,
-    ).toBe(true)
+    expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
+      "Format, Commander",
+    )
     expect(mockSearch).toHaveBeenLastCalledWith({ query: "", format: "commander" })
   })
 
@@ -428,7 +434,7 @@ describe("AddDeckScreen", () => {
       ])
     const view = renderAddDeck()
 
-    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    chooseGame(view, "ygo")
     await act(async () => jest.advanceTimersByTime(400))
     expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
       game: "ygo",
@@ -458,11 +464,11 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
 
     chooseFormat(view, "modern")
-    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    chooseGame(view, "ygo")
 
-    expect(
-      view.getByTestId("format-picker-options-advanced").props.accessibilityState.selected,
-    ).toBe(true)
+    expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
+      "Format, Advanced",
+    )
   })
 
   it("opens the shared card dialog from a Top Deck preview", async () => {
@@ -497,7 +503,7 @@ describe("AddDeckScreen", () => {
     }
     const view = renderAddDeck()
 
-    fireEvent.press(view.getByTestId("game-picker-options-ygo"))
+    chooseGame(view, "ygo")
     await act(async () => jest.advanceTimersByTime(400))
     await waitFor(() => expect(view.getByText("Sample Yu-Gi-Oh deck")).toBeTruthy())
     fireEvent.press(view.getByText("Sample Yu-Gi-Oh deck"))
@@ -540,7 +546,7 @@ describe("AddDeckScreen", () => {
     }
     const view = renderAddDeck()
 
-    fireEvent.press(view.getByTestId("game-picker-options-pokemon"))
+    chooseGame(view, "pokemon")
     await act(async () => jest.advanceTimersByTime(400))
     await waitFor(() => expect(view.getByText("Lucario Hariyama")).toBeTruthy())
     fireEvent.press(view.getByText("Lucario Hariyama"))

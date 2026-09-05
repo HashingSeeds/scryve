@@ -1,14 +1,13 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { AlertNote } from "./AlertNote"
 import { Button } from "./Button"
-import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "./DialogCard"
-import { FilterChips } from "./FilterChips"
+import { DialogCard } from "./DialogCard"
+import { SelectField } from "./SelectField"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 import { deckFormats } from "../../convex/lib/deckGames"
@@ -48,8 +47,10 @@ export function DeckSettingsDialog({
       backdropAccessibilityLabel="Close deck settings"
       dialogTestID="deck-settings-dialog"
       accessibilityViewIsModal
+      placement="bottom"
+      wide
     >
-      <Text preset="subheading" text="Deck settings" style={themed($dialogText)} />
+      <Text preset="subheading" text="Deck settings" />
       <TextField
         testID="deck-name-input"
         label="Deck name"
@@ -57,19 +58,18 @@ export function DeckSettingsDialog({
         maxLength={80}
         onChangeText={setName}
       />
-      <View style={themed($field)}>
-        <Text size="xs" weight="medium" style={themed($label)} text="Format" />
-        <FilterChips
-          testID="deck-format-picker"
-          accessibilityLabel="Format"
-          chips={deckFormats(game).map((candidate) => ({
-            id: candidate.id,
-            label: candidate.label,
-          }))}
-          selectedId={format}
-          onSelect={setFormat}
-        />
-      </View>
+      <SelectField
+        testID="deck-format-picker"
+        label="Format"
+        value={format}
+        options={deckFormats(game).map((candidate) => ({
+          id: candidate.id,
+          label: candidate.label,
+        }))}
+        onSelect={(next) => {
+          if (next) setFormat(next)
+        }}
+      />
       <TextField
         testID="deck-note-input"
         label="Notes"
@@ -82,17 +82,13 @@ export function DeckSettingsDialog({
         onChangeText={setNote}
       />
       {error ? <AlertNote text={error} /> : null}
-      <View style={themed($dialogActions)}>
-        <Button text="Cancel" style={themed($dialogButton)} disabled={busy} onPress={onClose} />
-        <Button
-          testID="deck-settings-save"
-          text={busy ? "Saving…" : "Save"}
-          preset="reversed"
-          style={themed($dialogButton)}
-          disabled={busy || !name.trim()}
-          onPress={() => onSubmit({ name, format, note })}
-        />
-      </View>
+      <Button
+        testID="deck-settings-save"
+        text={busy ? "Saving…" : "Save changes"}
+        preset="reversed"
+        disabled={busy || !name.trim()}
+        onPress={() => onSubmit({ name, format, note })}
+      />
       <Button
         testID="delete-deck-button"
         text="Delete deck"
@@ -105,8 +101,6 @@ export function DeckSettingsDialog({
   )
 }
 
-const $field: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.errorBackground,
   borderColor: colors.error,
