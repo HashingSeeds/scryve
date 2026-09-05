@@ -621,6 +621,54 @@ describe("deck versions", () => {
     expect(detail.cards).toHaveLength(2)
   })
 
+  it("persists metadata-only card changes", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "metadata-owner", "Metadata Owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Metadata", format: "commander" })
+    const card = testCard("Original Name", "aaaaaaa3")
+    await actor.mutation(api.decks.saveVersion, { deckId, cards: [card] })
+
+    await actor.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [
+        {
+          ...card,
+          name: "Updated Name",
+          category: "Creature",
+          originalReference: "original-reference",
+          imageUrl: "https://cards.scryfall.io/updated.jpg",
+          smallImageUrl: "https://cards.scryfall.io/small/updated.jpg",
+        },
+      ],
+    })
+
+    await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      cards: [
+        {
+          name: "Updated Name",
+          category: "Creature",
+          originalReference: "original-reference",
+          imageUrl: "https://cards.scryfall.io/updated.jpg",
+          smallImageUrl: "https://cards.scryfall.io/small/updated.jpg",
+        },
+      ],
+    })
+  })
+
+  it("treats reorder-only saves as no-ops", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "reorder-owner", "Reorder Owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Reorder", format: "commander" })
+    const cards = [testCard("First Card", "aaaaaaa4"), testCard("Second Card", "aaaaaaa5")]
+    await actor.mutation(api.decks.saveVersion, { deckId, cards })
+    const before = await actor.query(api.decks.detail, { deckId })
+
+    await actor.mutation(api.decks.saveVersion, { deckId, cards: [...cards].reverse() })
+    const after = await actor.query(api.decks.detail, { deckId })
+
+    expect(after.cards.map((card) => card._id)).toEqual(before.cards.map((card) => card._id))
+  })
+
   it("keeps extra version slots premium and caps them at five", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "version-owner", "Version Owner")
