@@ -1,4 +1,4 @@
-import type { PendingLifeAction } from "./model"
+import type { ConnectedProjection, PendingLifeAction } from "./model"
 import { OutboxSyncController, type OutboxSyncEnvironment } from "./OutboxSyncController"
 import { ConnectedGameRepository } from "./persistence"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
@@ -80,6 +80,39 @@ function action(operationId: string, delta: -5 | -1 | 1 | 5, queuedAt: number): 
   }
 }
 
+function projection(eventSequence: number, currentLife: number): ConnectedProjection {
+  return {
+    schemaVersion: 1,
+    publicId: "game-public",
+    status: "active",
+    playerCount: 2,
+    startingLife: 20,
+    ruleset: "standard",
+    isHost: true,
+    eventSequence,
+    serverUpdatedAt: eventSequence + 1,
+    recentOperationIds: [],
+    players: [
+      {
+        playerId: "player-1",
+        seat: 1,
+        displayName: "Ada",
+        color: "#111111",
+        currentLife,
+        controlledByMe: true,
+      },
+      {
+        playerId: "player-2",
+        seat: 2,
+        displayName: "Grace",
+        color: "#222222",
+        currentLife: 20,
+        controlledByMe: false,
+      },
+    ],
+  }
+}
+
 async function settle() {
   for (let tick = 0; tick < 20; tick += 1) await Promise.resolve()
 }
@@ -89,6 +122,8 @@ function harness(
     repository?: ConnectedGameRepository
     storage?: MemoryStorage
     send?: (queued: PendingLifeAction) => Promise<{ operationId: string }>
+    awaitProjectionBarrier?: boolean
+    projectionBarrierTimeoutMs?: number
     finishGame?: () => Promise<unknown>
     abandonGame?: () => Promise<unknown>
   } = {},
@@ -110,6 +145,8 @@ function harness(
       }),
     finishGame: options.finishGame ?? (async () => undefined),
     abandonGame: options.abandonGame ?? (async () => undefined),
+    awaitProjectionBarrier: options.awaitProjectionBarrier,
+    projectionBarrierTimeoutMs: options.projectionBarrierTimeoutMs,
     now: clock.now,
     setTimeoutFn: clock.setTimeoutFn,
     clearTimeoutFn: clock.clearTimeoutFn,
@@ -130,6 +167,171 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().pending).toEqual([])
     expect(controller.getSnapshot().connectionStatus).toBe("connected")
     expect(repository.loadOutbox("game-public")).toEqual([])
+  })
+
+  it.each(["projection-first", "acknowledgement-first"] as const)(
+    "applies one life delta and persists its confirmation: %s",
+    async (ordering) => {
+      const storage = new MemoryStorage()
+      const repository = new ConnectedGameRepository(storage, "user-1")
+      const queued = action("operation-atomic-projection", 5, 1)
+      repository.enqueue(queued, [])
+      let acknowledge!: (value: { operationId: string }) => void
+      const sent = new Promise<{ operationId: string }>((resolve) => {
+        acknowledge = resolve
+      })
+      const { controller } = harness({
+        storage,
+        repository,
+        awaitProjectionBarrier: true,
+        send: () => sent,
+      })
+      controller.onRemoteProjection(projection(0, 20))
+      controller.setEnvironment(ONLINE)
+      await settle()
+      if (ordering === "acknowledgement-first") {
+        acknowledge({ operationId: queued.event.operationId })
+        await settle()
+      }
+      expect(controller.getSnapshot().projection?.players[0].currentLife).toBe(25)
+      controller.onRemoteProjection(projection(1, 25), {
+        status: "acknowledged",
+        operationId: queued.event.operationId,
+        projectionEventSequence: 1,
+      })
+      expect(controller.getSnapshot().projection?.players[0].currentLife).toBe(25)
+      expect(harness({ storage }).controller.getSnapshot().projection?.players[0].currentLife).toBe(
+        25,
+      )
+      acknowledge({ operationId: queued.event.operationId })
+      await settle()
+      expect(controller.getSnapshot().pending).toEqual([])
+      expect(controller.getSnapshot().projection?.players[0].currentLife).toBe(25)
+    },
+  )
+
+  it("waits for the modern projection barrier after a mutation succeeds", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    const queued = action("operation-barrier-0001", 5, 1)
+    repository.enqueue(queued, [])
+    const { controller, sent } = harness({
+      storage,
+      repository,
+      awaitProjectionBarrier: true,
+    })
+
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment(ONLINE)
+    await settle()
+    expect(sent).toEqual([queued.event.operationId])
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+
+    controller.onOperationStatus({
+      status: "acknowledged",
+      operationId: queued.event.operationId,
+      projectionEventSequence: 1,
+    })
+    controller.onRemoteProjection(projection(1, 25))
+    await settle()
+    expect(controller.getSnapshot().pending).toEqual([])
+  })
+
+  it("keeps an acknowledged change across restart until the projection catches up", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    const queued = action("operation-restart-barrier", 5, 1)
+    repository.saveProjection(projection(0, 20))
+    repository.enqueue(queued, [])
+    const first = harness({ storage, repository, awaitProjectionBarrier: true })
+
+    first.controller.onRemoteProjection(projection(0, 20))
+    first.controller.setEnvironment(ONLINE)
+    await settle()
+    first.controller.onOperationStatus({
+      status: "acknowledged",
+      operationId: queued.event.operationId,
+      projectionEventSequence: 1,
+    })
+    await settle()
+
+    expect(first.repository.loadOutbox("game-public")).toHaveLength(1)
+    const restarted = harness({ storage, awaitProjectionBarrier: true })
+    expect(restarted.controller.getSnapshot()).toMatchObject({
+      pending: [{ event: { operationId: queued.event.operationId } }],
+      projection: { players: [{ currentLife: 25 }, { currentLife: 20 }] },
+    })
+
+    restarted.controller.onRemoteProjection(projection(0, 20))
+    restarted.controller.setEnvironment(ONLINE)
+    await settle()
+    restarted.controller.onOperationStatus({
+      status: "acknowledged",
+      operationId: queued.event.operationId,
+      projectionEventSequence: 1,
+    })
+    restarted.controller.onRemoteProjection(projection(1, 25))
+    await settle()
+
+    expect(restarted.repository.loadOutbox("game-public")).toEqual([])
+    const restored = harness({ storage, awaitProjectionBarrier: true })
+    expect(restored.controller.getSnapshot()).toMatchObject({
+      pending: [],
+      projection: { players: [{ currentLife: 25 }, { currentLife: 20 }] },
+    })
+  })
+
+  it("retains a conflicting status as a loud durable failure", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    const queued = action("operation-barrier-0002", 5, 1)
+    repository.enqueue(queued, [])
+    const { controller } = harness({
+      storage,
+      repository,
+      awaitProjectionBarrier: true,
+    })
+
+    controller.onRemoteProjection(projection(0, 20))
+    controller.onOperationStatus({
+      status: "conflict",
+      operationId: queued.event.operationId,
+      reason: "Operation identifier was reused with different data",
+    })
+    controller.setEnvironment(ONLINE)
+    await settle()
+
+    expect(controller.getSnapshot().pending).toEqual([])
+    expect(controller.getSnapshot().failed).toMatchObject([
+      { action: { event: { operationId: queued.event.operationId } } },
+    ])
+  })
+
+  it("retries when the projection barrier times out", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    repository.enqueue(action("operation-barrier-timeout", 5, 1), [])
+    const { clock, controller, sent } = harness({
+      storage,
+      repository,
+      awaitProjectionBarrier: true,
+      projectionBarrierTimeoutMs: 100,
+    })
+
+    controller.onRemoteProjection(projection(0, 20))
+    controller.setEnvironment(ONLINE)
+    await settle()
+    expect(sent).toHaveLength(1)
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+
+    clock.advance(100)
+    await settle()
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+    expect(controller.getSnapshot().connectionStatus).toBe("offline")
+
+    clock.advance(500)
+    await settle()
+    expect(sent).toHaveLength(2)
   })
 
   it("queues a defender confirmation made while offline and replays it on reconnect", async () => {
@@ -170,6 +372,14 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().pending).toEqual([])
     expect(repository.loadOutbox("game-public")).toEqual([])
     expect(controller.getSnapshot().changeError).toMatch(/between 1 and 99/i)
+  })
+
+  it("rejects commander damage against the attacking player before enqueueing", () => {
+    const { controller, repository } = harness()
+    controller.submitCommanderDamage("player-1", [{ toPlayerId: "player-1", delta: 4 }])
+    expect(controller.getSnapshot().pending).toEqual([])
+    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(controller.getSnapshot().changeError).toBe("A commander cannot damage itself")
   })
 
   it("keeps a declined claim distinct from a confirmed one", () => {

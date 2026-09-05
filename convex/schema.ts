@@ -172,6 +172,7 @@ export default defineSchema({
   gameCommanderClaims: defineTable({
     gameId: v.id("games"),
     operationId: v.string(),
+    resolutionOperationId: v.optional(v.string()),
     fromPlayerId: v.id("gamePlayers"),
     toPlayerId: v.id("gamePlayers"),
     delta: v.number(),

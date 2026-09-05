@@ -563,6 +563,85 @@ describe("Convex realtime life writes", () => {
     ).rejects.toThrow("reused with different data")
   })
 
+  it("recovers the head operation without reading recent IDs in the modern projection", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const args = lifeArgs(game.publicId, game.hostPlayerId, "operation-status-0001", 5)
+    await game.host.mutation(api.games.changeLife, args)
+
+    await expect(
+      game.host.query(api.games.lobbyProjection, {
+        publicId: game.publicId,
+        includeRecentOperationIds: false,
+        operation: {
+          kind: "life.changed",
+          operationId: args.operationId,
+          playerId: game.hostPlayerId,
+          delta: args.delta,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        },
+      }),
+    ).resolves.toMatchObject({
+      recentOperationIds: [],
+      eventSequence: 1,
+      operationStatus: {
+        status: "acknowledged",
+        operationId: args.operationId,
+        projectionEventSequence: 1,
+      },
+      players: expect.arrayContaining([
+        expect.objectContaining({ playerId: game.hostPlayerId, currentLife: 45 }),
+      ]),
+    })
+    await expect(
+      game.host.query(api.games.connectedOperationStatus, {
+        publicId: game.publicId,
+        operation: {
+          kind: "life.changed",
+          operationId: args.operationId,
+          playerId: game.hostPlayerId,
+          delta: args.delta,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        },
+      }),
+    ).resolves.toEqual({
+      status: "acknowledged",
+      operationId: args.operationId,
+      projectionEventSequence: 1,
+    })
+    await expect(
+      game.host.query(api.games.connectedOperationStatus, {
+        publicId: game.publicId,
+        operation: {
+          kind: "life.changed",
+          operationId: args.operationId,
+          playerId: game.hostPlayerId,
+          delta: -args.delta,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "conflict",
+      reason: expect.stringContaining("reused with different data"),
+    })
+    await expect(
+      game.host.query(api.games.connectedOperationStatus, {
+        publicId: game.publicId,
+        operation: {
+          kind: "life.changed",
+          operationId: "operation-status-missing",
+          playerId: game.hostPlayerId,
+          delta: 1,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        },
+      }),
+    ).resolves.toEqual({ status: "not_found", operationId: "operation-status-missing" })
+  })
+
   it("finishes only online through the host transition, preserves summary/history, and rejects new writes", async () => {
     const t = convexTest(schema, modules)
     const game = await activeGame(t)
@@ -1168,5 +1247,191 @@ describe("connected commander damage claims", () => {
         ),
       ),
     ).rejects.toThrow("only available in Commander games")
+  })
+
+  it("does not acknowledge a resolution whose stored outcome conflicts with the queue", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(
+        game.publicId,
+        game.hostPlayerId,
+        game.joinerPlayerId,
+        "commander-claim-status",
+        3,
+      ),
+    )
+    await game.joiner.mutation(api.games.declineCommanderDamage, {
+      publicId: game.publicId,
+      operationId: "commander-claim-status",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_001,
+    })
+
+    await expect(
+      game.joiner.query(api.games.connectedOperationStatus, {
+        publicId: game.publicId,
+        operation: {
+          kind: "commanderDamage.resolved",
+          operationId: "commander-resolution-status",
+          claimOperationId: "commander-claim-status",
+          toPlayerId: game.joinerPlayerId,
+          accepted: true,
+          deviceId: "device-joiner-001",
+          clientCreatedAt: 1_700_000_000_001,
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "conflict",
+      reason: expect.stringContaining("resolved differently"),
+    })
+  })
+
+  it("rejects resolution operation IDs reused across claims", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const claimIds = ["commander-unique-claim-one", "commander-unique-claim-two"]
+    for (const claimId of claimIds.slice(0, 1)) {
+      await game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, claimId, 3),
+      )
+    }
+    const resolution = {
+      publicId: game.publicId,
+      operationId: claimIds[0],
+      resolutionOperationId: "commander-unique-resolution",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_004,
+    }
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        ...resolution,
+        resolutionOperationId: "",
+      }),
+    ).rejects.toThrow("Invalid operation identifier")
+    await game.joiner.mutation(api.games.confirmCommanderDamage, resolution)
+    for (const claimId of claimIds.slice(1)) {
+      await game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, claimId, 3),
+      )
+    }
+
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        ...resolution,
+        operationId: claimIds[1],
+      }),
+    ).rejects.toThrow("reused with different data")
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
+    ).resolves.toMatchObject({ deduplicated: true })
+    const projection = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(
+      projection.players.find((player) => player.playerId === game.joinerPlayerId)?.currentLife,
+    ).toBe(37)
+  })
+
+  it("binds new resolution retries while preserving old resolution calls", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(
+        game.publicId,
+        game.hostPlayerId,
+        game.joinerPlayerId,
+        "commander-claim-binding",
+        3,
+      ),
+    )
+    const resolution = {
+      publicId: game.publicId,
+      operationId: "commander-claim-binding",
+      resolutionOperationId: "commander-resolution-binding",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_004,
+    }
+    await game.joiner.mutation(api.games.confirmCommanderDamage, {
+      publicId: resolution.publicId,
+      operationId: resolution.operationId,
+      deviceId: resolution.deviceId,
+      clientCreatedAt: resolution.clientCreatedAt,
+    })
+    const operation = {
+      kind: "commanderDamage.resolved" as const,
+      operationId: resolution.resolutionOperationId,
+      claimOperationId: resolution.operationId,
+      toPlayerId: game.joinerPlayerId,
+      accepted: true,
+      deviceId: resolution.deviceId,
+      clientCreatedAt: resolution.clientCreatedAt,
+    }
+    await expect(
+      game.joiner.query(api.games.connectedOperationStatus, {
+        publicId: game.publicId,
+        operation,
+      }),
+    ).resolves.toMatchObject({ status: "not_found" })
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
+    ).resolves.toMatchObject({
+      status: "confirmed",
+      operationId: resolution.resolutionOperationId,
+    })
+    await expect(
+      game.joiner.query(api.games.connectedOperationStatus, {
+        publicId: game.publicId,
+        operation,
+      }),
+    ).resolves.toMatchObject({ status: "acknowledged" })
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        ...resolution,
+        resolutionOperationId: "commander-resolution-other",
+      }),
+    ).rejects.toThrow("reused with different data")
+
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        publicId: game.publicId,
+        operationId: resolution.operationId,
+        deviceId: resolution.deviceId,
+        clientCreatedAt: resolution.clientCreatedAt + 1,
+      }),
+    ).resolves.toMatchObject({ status: "confirmed", deduplicated: true })
+  })
+
+  it("does not bind a new operation ID to the opposite legacy decision", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await game.host.mutation(
+      api.games.submitCommanderDamage,
+      commanderArgs(
+        game.publicId,
+        game.hostPlayerId,
+        game.joinerPlayerId,
+        "commander-claim-legacy-binding",
+        3,
+      ),
+    )
+    const legacyResolution = {
+      publicId: game.publicId,
+      operationId: "commander-claim-legacy-binding",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_005,
+    }
+    await game.joiner.mutation(api.games.declineCommanderDamage, legacyResolution)
+
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        ...legacyResolution,
+        resolutionOperationId: "commander-resolution-legacy-binding",
+      }),
+    ).rejects.toThrow("reused with different data")
   })
 })
