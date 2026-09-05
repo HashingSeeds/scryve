@@ -8,11 +8,11 @@ import type {
 } from "react-native"
 import { Modal, Pressable, StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
-import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 export interface DialogOrigin {
   x: number
@@ -55,8 +55,15 @@ export function DialogCard({
   style,
   children,
 }: DialogCardProps) {
-  const { themed } = useAppTheme()
-  const safeAreaInsets = useSafeAreaInsetsStyle(["top", "bottom"], "margin")
+  const { theme, themed } = useAppTheme()
+  const safeAreaInsets = useSafeAreaInsets()
+  const safeAreaMarginStyle = {
+    marginTop: safeAreaInsets.top,
+    marginBottom: placement === "bottom" ? 0 : safeAreaInsets.bottom,
+  }
+  const bottomSafeAreaStyle = {
+    paddingBottom: theme.spacing.lg + safeAreaInsets.bottom,
+  }
   const reducedMotion = useReducedMotion()
   const animateFromOrigin = Boolean(origin) && reducedMotion === false
   const entrance = useSharedValue(animateFromOrigin ? 0 : 1)
@@ -105,11 +112,12 @@ export function DialogCard({
           onPress={requestClose}
         />
         <View
+          testID={dialogTestID ? `${dialogTestID}-layout` : undefined}
           pointerEvents="box-none"
           style={[
             themed($dialogLayout),
             placement === "bottom" ? themed($bottomDialogLayout) : undefined,
-            safeAreaInsets,
+            safeAreaMarginStyle,
           ]}
         >
           <Animated.View
@@ -120,6 +128,7 @@ export function DialogCard({
               themed($dialog),
               wide ? themed($wideDialog) : undefined,
               placement === "bottom" ? themed($bottomDialog) : undefined,
+              placement === "bottom" ? bottomSafeAreaStyle : undefined,
               style,
               entranceStyle,
             ]}
