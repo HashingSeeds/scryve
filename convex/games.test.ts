@@ -573,8 +573,27 @@ describe("Convex realtime life writes", () => {
       game.host.query(api.games.lobbyProjection, {
         publicId: game.publicId,
         includeRecentOperationIds: false,
+        operation: {
+          kind: "life.changed",
+          operationId: args.operationId,
+          playerId: game.hostPlayerId,
+          delta: args.delta,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        },
       }),
-    ).resolves.toMatchObject({ recentOperationIds: [], eventSequence: 1 })
+    ).resolves.toMatchObject({
+      recentOperationIds: [],
+      eventSequence: 1,
+      operationStatus: {
+        status: "acknowledged",
+        operationId: args.operationId,
+        projectionEventSequence: 1,
+      },
+      players: expect.arrayContaining([
+        expect.objectContaining({ playerId: game.hostPlayerId, currentLife: 45 }),
+      ]),
+    })
     await expect(
       game.host.query(api.games.connectedOperationStatus, {
         publicId: game.publicId,

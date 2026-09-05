@@ -169,6 +169,47 @@ describe("outbox sync controller", () => {
     expect(repository.loadOutbox("game-public")).toEqual([])
   })
 
+  it.each(["projection-first", "acknowledgement-first"] as const)(
+    "applies one life delta and persists its confirmation: %s",
+    async (ordering) => {
+      const storage = new MemoryStorage()
+      const repository = new ConnectedGameRepository(storage, "user-1")
+      const queued = action("operation-atomic-projection", 5, 1)
+      repository.enqueue(queued, [])
+      let acknowledge!: (value: { operationId: string }) => void
+      const sent = new Promise<{ operationId: string }>((resolve) => {
+        acknowledge = resolve
+      })
+      const { controller } = harness({
+        storage,
+        repository,
+        awaitProjectionBarrier: true,
+        send: () => sent,
+      })
+      controller.onRemoteProjection(projection(0, 20))
+      controller.setEnvironment(ONLINE)
+      await settle()
+      if (ordering === "acknowledgement-first") {
+        acknowledge({ operationId: queued.event.operationId })
+        await settle()
+      }
+      expect(controller.getSnapshot().projection?.players[0].currentLife).toBe(25)
+      controller.onRemoteProjection(projection(1, 25), {
+        status: "acknowledged",
+        operationId: queued.event.operationId,
+        projectionEventSequence: 1,
+      })
+      expect(controller.getSnapshot().projection?.players[0].currentLife).toBe(25)
+      expect(harness({ storage }).controller.getSnapshot().projection?.players[0].currentLife).toBe(
+        25,
+      )
+      acknowledge({ operationId: queued.event.operationId })
+      await settle()
+      expect(controller.getSnapshot().pending).toEqual([])
+      expect(controller.getSnapshot().projection?.players[0].currentLife).toBe(25)
+    },
+  )
+
   it("waits for the modern projection barrier after a mutation succeeds", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")

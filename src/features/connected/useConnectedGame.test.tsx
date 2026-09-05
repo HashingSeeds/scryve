@@ -39,7 +39,6 @@ const mockRemoteProjection = {
   ],
 } as const
 let mockRemote: unknown = mockRemoteProjection
-let mockOperationStatus: unknown
 const mockChangeMutation = Object.assign(
   jest.fn(async (args: any) => args),
   {
@@ -75,7 +74,6 @@ jest.mock("../../../convex/_generated/api", () => ({
   api: {
     games: {
       lobbyProjection: "lobbyProjection",
-      connectedOperationStatus: "connectedOperationStatus",
       changeLife: "changeLife",
       finishGame: "finishGame",
     },
@@ -88,8 +86,7 @@ jest.mock("convex/react", () => ({
     isRefreshing: mockConvexRefreshing,
   }),
   useConvexConnectionState: () => ({ isWebSocketConnected: mockSocketConnected }),
-  useQuery: (reference: string) =>
-    reference === "connectedOperationStatus" ? mockOperationStatus : mockRemote,
+  useQuery: () => mockRemote,
   useMutation: (reference: string) => {
     if (reference === "finishGame") return mockFinishMutation
     mockChangeMutation.withOptimisticUpdate.mockReturnValue(mockChangeMutation)
@@ -103,7 +100,6 @@ describe("useConnectedGame connection readiness", () => {
     mockSocketConnected = false
     mockConvexRefreshing = false
     mockRemote = mockRemoteProjection
-    mockOperationStatus = undefined
     mockPending = []
     mockRepository.loadProjection.mockReturnValue(null)
     mockRepository.enqueue.mockImplementation((_action, current) => ({
@@ -179,6 +175,32 @@ describe("useConnectedGame connection readiness", () => {
     expect(mockDrain).not.toHaveBeenCalled()
   })
 
+  it("keeps one optimistic delta until the projection includes its operation status", () => {
+    const view = renderHook(() => useConnectedGame("game-public", "user-1"))
+    act(() => view.result.current.changeLife("player-1", 5))
+    const operationId = view.result.current.pending[0].event.operationId
+    const committed = {
+      ...mockRemoteProjection,
+      eventSequence: 1,
+      serverUpdatedAt: 2,
+      players: mockRemoteProjection.players.map((player) => ({
+        ...player,
+        currentLife: player.seat === 1 ? 25 : 20,
+      })),
+    }
+    mockRemote = committed
+    view.rerender({})
+    expect(view.result.current.projection?.players[0].currentLife).toBe(25)
+    expect(view.result.current.pending).toHaveLength(1)
+    mockRemote = {
+      ...committed,
+      operationStatus: { status: "acknowledged", operationId, projectionEventSequence: 1 },
+    }
+    view.rerender({})
+    expect(view.result.current.projection?.players[0].currentLife).toBe(25)
+    expect(view.result.current.pending).toEqual([])
+  })
+
   it("surfaces outbox backpressure without mutating the displayed projection", () => {
     mockRepository.enqueue.mockReturnValueOnce({
       accepted: false,
@@ -198,6 +220,10 @@ describe("useConnectedGame connection readiness", () => {
     jest.useFakeTimers()
     mockSocketConnected = true
     mockPending = [{ attempts: 0, event: { operationId: "operation-retry" } }]
+    mockRemote = {
+      ...mockRemoteProjection,
+      operationStatus: { status: "not_found", operationId: "operation-retry" },
+    }
     mockDrain
       .mockResolvedValueOnce({ acknowledged: [], failed: [], stoppedForRetry: true })
       .mockResolvedValueOnce({
@@ -220,15 +246,26 @@ describe("useConnectedGame connection readiness", () => {
     jest.useFakeTimers()
     mockSocketConnected = true
     mockPending = [{ attempts: 0, event: { operationId: "resolution-1" } }]
-    mockOperationStatus = {
-      status: "acknowledged",
-      operationId: "resolution-1",
-      projectionEventSequence: 0,
+    mockRemote = {
+      ...mockRemoteProjection,
+      operationStatus: {
+        status: "not_found",
+        operationId: "resolution-1",
+      },
     }
     mockDrain.mockResolvedValue({ acknowledged: [], failed: [], stoppedForRetry: true })
     const view = renderHook(() => useConnectedGame("game-public", "user-1"))
     await waitFor(() => expect(mockDrain).toHaveBeenCalled())
     const { send } = mockDrain.mock.calls[0][0]
+    mockRemote = {
+      ...mockRemoteProjection,
+      operationStatus: {
+        status: "acknowledged",
+        operationId: "resolution-1",
+        projectionEventSequence: 0,
+      },
+    }
+    view.rerender({})
 
     const acknowledgement = await send({
       attempts: 0,

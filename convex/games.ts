@@ -1,5 +1,5 @@
 import { paginationOptsValidator } from "convex/server"
-import { v } from "convex/values"
+import { v, type Infer } from "convex/values"
 
 import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
@@ -667,11 +667,41 @@ export const claimSeat = mutation({
   },
 })
 
+const connectedOperation = v.union(
+  v.object({
+    kind: v.literal("life.changed"),
+    operationId: v.string(),
+    playerId: v.id("gamePlayers"),
+    delta: v.number(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  }),
+  v.object({
+    kind: v.literal("commanderDamage.submitted"),
+    operationId: v.string(),
+    fromPlayerId: v.id("gamePlayers"),
+    toPlayerId: v.id("gamePlayers"),
+    delta: v.number(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  }),
+  v.object({
+    kind: v.literal("commanderDamage.resolved"),
+    operationId: v.string(),
+    claimOperationId: v.string(),
+    toPlayerId: v.id("gamePlayers"),
+    accepted: v.boolean(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  }),
+)
+
 export const lobbyProjection = query({
   args: {
     publicId: v.string(),
     deviceId: v.optional(v.string()),
     includeRecentOperationIds: v.optional(v.boolean()),
+    operation: v.optional(connectedOperation),
   },
   handler: async (ctx, args) => {
     assertPublicId(args.publicId)
@@ -714,6 +744,9 @@ export const lobbyProjection = query({
       format: game.format ?? game.ruleset,
       isHost,
       eventSequence: eventCount,
+      ...(args.operation
+        ? { operationStatus: await statusForOperation(ctx, game, user, eventCount, args.operation) }
+        : {}),
       serverUpdatedAt,
       recentOperationIds: recentEvents.map((event) => event.operationId),
       invitation:
@@ -746,136 +779,112 @@ export const lobbyProjection = query({
   },
 })
 
-const connectedOperation = v.union(
-  v.object({
-    kind: v.literal("life.changed"),
-    operationId: v.string(),
-    playerId: v.id("gamePlayers"),
-    delta: v.number(),
-    deviceId: v.string(),
-    clientCreatedAt: v.number(),
-  }),
-  v.object({
-    kind: v.literal("commanderDamage.submitted"),
-    operationId: v.string(),
-    fromPlayerId: v.id("gamePlayers"),
-    toPlayerId: v.id("gamePlayers"),
-    delta: v.number(),
-    deviceId: v.string(),
-    clientCreatedAt: v.number(),
-  }),
-  v.object({
-    kind: v.literal("commanderDamage.resolved"),
-    operationId: v.string(),
-    claimOperationId: v.string(),
-    toPlayerId: v.id("gamePlayers"),
-    accepted: v.boolean(),
-    deviceId: v.string(),
-    clientCreatedAt: v.number(),
-  }),
-)
-
 export const connectedOperationStatus = query({
   args: { publicId: v.string(), operation: connectedOperation },
   handler: async (ctx, args) => {
     assertPublicId(args.publicId)
-    assertOperationId(args.operation.operationId)
-    if (args.operation.kind === "commanderDamage.resolved")
-      assertOperationId(args.operation.claimOperationId)
-    assertDeviceId(args.operation.deviceId)
-    if (!Number.isSafeInteger(args.operation.clientCreatedAt) || args.operation.clientCreatedAt < 0)
-      throw new Error("Invalid client timestamp")
-    if (args.operation.kind === "life.changed") assertLifeDelta(args.operation.delta)
-    if (args.operation.kind === "commanderDamage.submitted") {
-      assertCommanderDelta(args.operation.delta)
-      if (args.operation.fromPlayerId === args.operation.toPlayerId)
-        throw new Error("A commander cannot damage itself")
-    }
 
     const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireUser(ctx)
     const players = await playersForGame(ctx, game._id)
     if (!players.some((player) => player.userId === user._id)) throw new Error("Game unavailable")
     const projectionEventSequence = totalEventCount(game, players)
-    const operation = args.operation
+    return await statusForOperation(ctx, game, user, projectionEventSequence, args.operation)
+  },
+})
 
-    const conflict = (reason: string) => ({
-      status: "conflict" as const,
-      operationId: operation.operationId,
-      reason,
-    })
-    const notFound = () => ({
-      status: "not_found" as const,
-      operationId: operation.operationId,
-    })
-    const acknowledged = () => ({
-      status: "acknowledged" as const,
-      operationId: operation.operationId,
-      projectionEventSequence,
-    })
+async function statusForOperation(
+  ctx: QueryCtx,
+  game: Doc<"games">,
+  user: Doc<"users">,
+  projectionEventSequence: number,
+  operation: Infer<typeof connectedOperation>,
+) {
+  assertOperationId(operation.operationId)
+  if (operation.kind === "commanderDamage.resolved") assertOperationId(operation.claimOperationId)
+  assertDeviceId(operation.deviceId)
+  if (!Number.isSafeInteger(operation.clientCreatedAt) || operation.clientCreatedAt < 0)
+    throw new Error("Invalid client timestamp")
+  if (operation.kind === "life.changed") assertLifeDelta(operation.delta)
+  if (operation.kind === "commanderDamage.submitted") {
+    assertCommanderDelta(operation.delta)
+    if (operation.fromPlayerId === operation.toPlayerId)
+      throw new Error("A commander cannot damage itself")
+  }
+  const conflict = (reason: string) => ({
+    status: "conflict" as const,
+    operationId: operation.operationId,
+    reason,
+  })
+  const notFound = () => ({
+    status: "not_found" as const,
+    operationId: operation.operationId,
+  })
+  const acknowledged = () => ({
+    status: "acknowledged" as const,
+    operationId: operation.operationId,
+    projectionEventSequence,
+  })
 
-    if (operation.kind === "commanderDamage.resolved") {
-      const claim = await ctx.db
-        .query("gameCommanderClaims")
-        .withIndex("by_game_operation", (q) =>
-          q.eq("gameId", game._id).eq("operationId", operation.claimOperationId),
-        )
-        .unique()
-      if (!claim) return notFound()
-      const expectedStatus = operation.accepted ? "confirmed" : "declined"
-      if (claim.status === "pending") return notFound()
-      if (claim.status !== expectedStatus)
-        return conflict(
-          "Operation identifier was reused with different data: Commander damage claim was resolved differently",
-        )
-      if (!claim.resolutionOperationId) return notFound()
-      if (claim.resolutionOperationId !== operation.operationId)
-        return conflict("Operation identifier was reused with different data")
-      const decision = operation.accepted ? "confirmed" : "declined"
-      const event = await ctx.db
-        .query("gameEvents")
-        .withIndex("by_game_operation", (q) =>
-          q.eq("gameId", game._id).eq("operationId", `${claim.operationId}_${decision}`),
-        )
-        .unique()
-      if (!event) return notFound()
-      if (
-        event.kind !== `commanderDamage.${decision}` ||
-        event.claimOperationId !== operation.claimOperationId ||
-        event.playerId !== operation.toPlayerId ||
-        event.toPlayerId !== operation.toPlayerId ||
-        event.actorUserId !== user._id ||
-        event.deviceId !== operation.deviceId ||
-        event.clientCreatedAt !== operation.clientCreatedAt
+  if (operation.kind === "commanderDamage.resolved") {
+    const claim = await ctx.db
+      .query("gameCommanderClaims")
+      .withIndex("by_game_operation", (q) =>
+        q.eq("gameId", game._id).eq("operationId", operation.claimOperationId),
       )
-        return conflict("Operation identifier was reused with different data")
-      return acknowledged()
-    }
-
+      .unique()
+    if (!claim) return notFound()
+    const expectedStatus = operation.accepted ? "confirmed" : "declined"
+    if (claim.status === "pending") return notFound()
+    if (claim.status !== expectedStatus)
+      return conflict(
+        "Operation identifier was reused with different data: Commander damage claim was resolved differently",
+      )
+    if (!claim.resolutionOperationId) return notFound()
+    if (claim.resolutionOperationId !== operation.operationId)
+      return conflict("Operation identifier was reused with different data")
+    const decision = operation.accepted ? "confirmed" : "declined"
     const event = await ctx.db
       .query("gameEvents")
       .withIndex("by_game_operation", (q) =>
-        q.eq("gameId", game._id).eq("operationId", operation.operationId),
+        q.eq("gameId", game._id).eq("operationId", `${claim.operationId}_${decision}`),
       )
       .unique()
     if (!event) return notFound()
-    const matches =
-      event.actorUserId === user._id &&
-      event.deviceId === operation.deviceId &&
-      event.clientCreatedAt === operation.clientCreatedAt &&
-      (operation.kind === "life.changed"
-        ? event.kind === "life.changed" &&
-          event.playerId === operation.playerId &&
-          event.delta === operation.delta
-        : event.kind === "commanderDamage.claimed" &&
-          event.fromPlayerId === operation.fromPlayerId &&
-          event.toPlayerId === operation.toPlayerId &&
-          event.delta === operation.delta)
-    return matches
-      ? acknowledged()
-      : conflict("Operation identifier was reused with different data")
-  },
-})
+    if (
+      event.kind !== `commanderDamage.${decision}` ||
+      event.claimOperationId !== operation.claimOperationId ||
+      event.playerId !== operation.toPlayerId ||
+      event.toPlayerId !== operation.toPlayerId ||
+      event.actorUserId !== user._id ||
+      event.deviceId !== operation.deviceId ||
+      event.clientCreatedAt !== operation.clientCreatedAt
+    )
+      return conflict("Operation identifier was reused with different data")
+    return acknowledged()
+  }
+
+  const event = await ctx.db
+    .query("gameEvents")
+    .withIndex("by_game_operation", (q) =>
+      q.eq("gameId", game._id).eq("operationId", operation.operationId),
+    )
+    .unique()
+  if (!event) return notFound()
+  const matches =
+    event.actorUserId === user._id &&
+    event.deviceId === operation.deviceId &&
+    event.clientCreatedAt === operation.clientCreatedAt &&
+    (operation.kind === "life.changed"
+      ? event.kind === "life.changed" &&
+        event.playerId === operation.playerId &&
+        event.delta === operation.delta
+      : event.kind === "commanderDamage.claimed" &&
+        event.fromPlayerId === operation.fromPlayerId &&
+        event.toPlayerId === operation.toPlayerId &&
+        event.delta === operation.delta)
+  return matches ? acknowledged() : conflict("Operation identifier was reused with different data")
+}
 
 export const setMyAppearance = mutation({
   args: {

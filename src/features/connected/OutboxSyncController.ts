@@ -174,12 +174,21 @@ export class OutboxSyncController {
     this.publish()
   }
 
-  onRemoteProjection(remote: unknown): void {
-    const incoming = toConnectedProjection(remote)
+  onRemoteProjection(remote: unknown, status?: ConnectedOperationStatus): void {
+    let incoming = toConnectedProjection(remote)
     if (!incoming) return
     const optimistic = Array.isArray(
       (remote as { __optimisticOperationIds?: unknown } | null)?.__optimisticOperationIds,
     )
+    if (!optimistic && status?.operationId === this.pending[0]?.event.operationId) {
+      this.operationStatus = status ?? null
+      if (status?.status === "acknowledged") {
+        incoming = {
+          ...incoming,
+          recentOperationIds: [...incoming.recentOperationIds, status.operationId],
+        }
+      }
+    }
     const merged = mergeConfirmedProjection(this.confirmed, incoming)
     if (!optimistic) this.options.repository.saveProjection(merged)
     this.confirmed = merged
@@ -499,7 +508,9 @@ export class OutboxSyncController {
     if (!this.options.awaitProjectionBarrier) return acknowledgement
 
     const operationId = action.event.operationId
-    this.inFlight.delete(operationId)
+    if (this.stopped) throw new Error("Connected game sync stopped")
+    if (acknowledgement.operationId !== operationId)
+      throw new Error("Mutation acknowledgement did not match the queued operation")
     if (this.projectionBarrierReached(operationId)) return acknowledgement
     return await new Promise<OutboxAcknowledgement>((resolve, reject) => {
       const waiter: {
