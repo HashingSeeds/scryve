@@ -844,12 +844,7 @@ async function statusForOperation(
     if (claim.resolutionOperationId !== operation.operationId)
       return conflict("Operation identifier was reused with different data")
     const decision = operation.accepted ? "confirmed" : "declined"
-    const event = await ctx.db
-      .query("gameEvents")
-      .withIndex("by_game_operation", (q) =>
-        q.eq("gameId", game._id).eq("operationId", `${claim.operationId}_${decision}`),
-      )
-      .unique()
+    const event = await commanderResolutionEvent(ctx, claim)
     if (!event) return notFound()
     if (
       event.kind !== `commanderDamage.${decision}` ||
@@ -1236,6 +1231,25 @@ export const submitCommanderDamage = mutation({
   },
 })
 
+async function commanderResolutionEvent(ctx: QueryCtx, claim: Doc<"gameCommanderClaims">) {
+  const operationId = claim.resolutionOperationId
+  if (operationId) {
+    const event = await ctx.db
+      .query("gameEvents")
+      .withIndex("by_game_operation", (q) =>
+        q.eq("gameId", claim.gameId).eq("operationId", operationId),
+      )
+      .unique()
+    if (event) return event
+  }
+  return await ctx.db
+    .query("gameEvents")
+    .withIndex("by_game_operation", (q) =>
+      q.eq("gameId", claim.gameId).eq("operationId", `${claim.operationId}_${claim.status}`),
+    )
+    .unique()
+}
+
 async function resolveCommanderClaim(
   ctx: MutationCtx,
   args: {
@@ -1276,16 +1290,26 @@ async function resolveCommanderClaim(
     args.deviceId,
     "target",
   )
+  if (args.resolutionOperationId) {
+    const operationId = args.resolutionOperationId
+    const existing = await ctx.db
+      .query("gameEvents")
+      .withIndex("by_game_operation", (q) =>
+        q.eq("gameId", game._id).eq("operationId", operationId),
+      )
+      .unique()
+    if (
+      existing &&
+      (existing.claimOperationId !== claim.operationId ||
+        existing.kind !== `commanderDamage.${decision}`)
+    )
+      throw new Error("Operation identifier was reused with different data")
+  }
   if (claim.status !== "pending") {
     if (args.resolutionOperationId) {
       if (claim.status !== decision)
         throw new Error("Operation identifier was reused with different data")
-      const event = await ctx.db
-        .query("gameEvents")
-        .withIndex("by_game_operation", (q) =>
-          q.eq("gameId", game._id).eq("operationId", `${claim.operationId}_${claim.status}`),
-        )
-        .unique()
+      const event = await commanderResolutionEvent(ctx, claim)
       if (
         !event ||
         event.kind !== `commanderDamage.${claim.status}` ||
@@ -1299,6 +1323,8 @@ async function resolveCommanderClaim(
         throw new Error("Operation identifier was reused with different data")
       if (!claim.resolutionOperationId)
         await ctx.db.patch(claim._id, { resolutionOperationId: args.resolutionOperationId })
+      if (event.operationId !== args.resolutionOperationId)
+        await ctx.db.patch(event._id, { operationId: args.resolutionOperationId })
     }
     return {
       operationId: args.resolutionOperationId ?? claim.operationId,
@@ -1327,7 +1353,7 @@ async function resolveCommanderClaim(
   if (game.status !== "active") throw new Error("Game is not active")
 
   const now = Date.now()
-  const eventOperationId = `${claim.operationId}_${decision}`
+  const eventOperationId = args.resolutionOperationId ?? `${claim.operationId}_${decision}`
   if (decision === "confirmed") {
     const pair = await ctx.db
       .query("gameCommanderDamage")

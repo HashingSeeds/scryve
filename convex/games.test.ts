@@ -1288,6 +1288,48 @@ describe("connected commander damage claims", () => {
     })
   })
 
+  it("rejects resolution operation IDs reused across claims", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const claimIds = ["commander-unique-claim-one", "commander-unique-claim-two"]
+    for (const claimId of claimIds.slice(0, 1)) {
+      await game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, claimId, 3),
+      )
+    }
+    const resolution = {
+      publicId: game.publicId,
+      operationId: claimIds[0],
+      resolutionOperationId: "commander-unique-resolution",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_004,
+    }
+    await game.joiner.mutation(api.games.confirmCommanderDamage, resolution)
+    for (const claimId of claimIds.slice(1)) {
+      await game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, claimId, 3),
+      )
+    }
+
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        ...resolution,
+        operationId: claimIds[1],
+      }),
+    ).rejects.toThrow("reused with different data")
+    await expect(
+      game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
+    ).resolves.toMatchObject({ deduplicated: true })
+    const projection = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(
+      projection.players.find((player) => player.playerId === game.joinerPlayerId)?.currentLife,
+    ).toBe(37)
+  })
+
   it("binds new resolution retries while preserving old resolution calls", async () => {
     const t = convexTest(schema, modules)
     const game = await activeGame(t)
