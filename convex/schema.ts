@@ -176,8 +176,8 @@ export default defineSchema({
     toPlayerId: v.id("gamePlayers"),
     delta: v.number(),
     status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("declined")),
-    actorUserId: v.id("users"),
-    deviceId: v.string(),
+    actorUserId: v.optional(v.id("users")),
+    deviceId: v.optional(v.string()),
     clientCreatedAt: v.number(),
     createdAt: v.number(),
     resolvedAt: v.optional(v.number()),
@@ -185,7 +185,9 @@ export default defineSchema({
   })
     .index("by_game_operation", ["gameId", "operationId"])
     .index("by_game_and_status", ["gameId", "status"])
-    .index("by_game_and_to_and_status", ["gameId", "toPlayerId", "status"]),
+    .index("by_game_and_to_and_status", ["gameId", "toPlayerId", "status"])
+    .index("by_actor_user", { fields: ["actorUserId"], staged: true })
+    .index("by_resolved_by_user", { fields: ["resolvedByUserId"], staged: true }),
 
   gameSummaries: defineTable({
     gameId: v.id("games"),
@@ -514,8 +516,8 @@ export default defineSchema({
     .index("by_clerk_user_and_document", ["clerkUserId", "document"]),
 
   moderationReports: defineTable({
-    reporterUserId: v.id("users"),
-    reportedUserId: v.id("users"),
+    reporterUserId: v.optional(v.id("users")),
+    reportedUserId: v.optional(v.id("users")),
     gameId: v.optional(v.id("games")),
     reportedUsername: v.string(),
     reason: v.union(
@@ -531,10 +533,13 @@ export default defineSchema({
     createdAt: v.number(),
     resolvedAt: v.optional(v.number()),
     resolutionNote: v.optional(v.string()),
+    retentionExpiresAt: v.optional(v.number()),
+    legalHoldUntil: v.optional(v.number()),
   })
     .index("by_status_and_created_at", ["status", "createdAt"])
     .index("by_reported_user", ["reportedUserId"])
-    .index("by_reporter_and_reported", ["reporterUserId", "reportedUserId"]),
+    .index("by_reporter_and_reported", ["reporterUserId", "reportedUserId"])
+    .index("by_retention_expires_at", { fields: ["retentionExpiresAt"], staged: true }),
 
   userBlocks: defineTable({
     blockerUserId: v.id("users"),
