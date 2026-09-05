@@ -374,6 +374,14 @@ describe("outbox sync controller", () => {
     expect(controller.getSnapshot().changeError).toMatch(/between 1 and 99/i)
   })
 
+  it("rejects commander damage against the attacking player before enqueueing", () => {
+    const { controller, repository } = harness()
+    controller.submitCommanderDamage("player-1", [{ toPlayerId: "player-1", delta: 4 }])
+    expect(controller.getSnapshot().pending).toEqual([])
+    expect(repository.loadOutbox("game-public")).toEqual([])
+    expect(controller.getSnapshot().changeError).toBe("A commander cannot damage itself")
+  })
+
   it("keeps a declined claim distinct from a confirmed one", () => {
     const { clock, controller } = harness()
     const claim = {

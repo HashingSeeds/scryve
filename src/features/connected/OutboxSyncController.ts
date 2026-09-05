@@ -261,6 +261,11 @@ export class OutboxSyncController {
       this.publish()
       return
     }
+    if (changes.some(({ toPlayerId }) => toPlayerId === fromPlayerId)) {
+      this.changeError = "A commander cannot damage itself"
+      this.publish()
+      return
+    }
     for (const { toPlayerId, delta } of changes) {
       const now = this.now()
       const action: PendingLifeAction = {
