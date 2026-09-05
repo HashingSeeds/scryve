@@ -25,7 +25,7 @@ Development configuration is split three ways:
 
 - `.env.development` is tracked and holds only public client values, so it reaches
   every checkout and worktree through git.
-- `~/.config/scryve/env.development` holds this machine's per-developer values and
+- `~/.config/scryve/.env.local` holds this machine's per-developer values and
   local secrets, such as your own Convex deployment and `SENTRY_AUTH_TOKEN`. It
   lives outside the repo so worktrees can share one copy. Link it with:
 
