@@ -233,6 +233,15 @@ describe("account deletion", () => {
         resolvedAt: now + 1,
         createdAt: now,
       })
+      const openTargetReportId = await ctx.db.insert("moderationReports", {
+        reporterUserId: remainingUserId,
+        reportedUserId: deletingUserId,
+        reportedUsername: "deleting-player",
+        reason: "harassment",
+        note: "open evidence",
+        status: "open",
+        createdAt: now,
+      })
       const upheldReportId = await ctx.db.insert("moderationReports", {
         reporterUserId: remainingUserId,
         reportedUserId: deletingUserId,
@@ -289,6 +298,7 @@ describe("account deletion", () => {
         reporterReportId,
         dismissedReportId,
         upheldReportId,
+        openTargetReportId,
         actorClaimId,
         resolverClaimId,
       }
@@ -350,8 +360,17 @@ describe("account deletion", () => {
     expect(dismissedReport.resolutionNote).toBeUndefined()
     expect(dismissedReport.gameId).toBeUndefined()
     expect(dismissedReport.autoAction).toBeUndefined()
+    const openTargetReport = reports.find((report) => report._id === fixture.openTargetReportId)!
+    expect(openTargetReport).toMatchObject({
+      reportedUsername: "(deleted account)",
+      status: "open",
+      note: "open evidence",
+    })
+    expect(openTargetReport.reportedUserId).toBeUndefined()
+    expect(openTargetReport.retentionExpiresAt).toBeUndefined()
     expect(upheldReport).toMatchObject({
       reporterUserId: fixture.remainingUserId,
+      reportedUsername: "(deleted account)",
       status: "upheld",
       retentionExpiresAt: now + 2 + 365 * 24 * 60 * 60 * 1000,
       note: "bounded upheld evidence",

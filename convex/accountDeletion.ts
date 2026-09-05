@@ -356,6 +356,7 @@ export const processModerationData = internalMutation({
         for (const report of reportsAsTarget) {
           await ctx.db.patch(report._id, {
             reportedUserId: undefined,
+            reportedUsername: DELETED_ACCOUNT_LABEL,
             ...(report.status !== "open" && report.retentionExpiresAt === undefined
               ? {
                   retentionExpiresAt: moderationRetentionExpiresAt(
@@ -372,7 +373,6 @@ export const processModerationData = internalMutation({
                   resolutionNote: undefined,
                   gameId: undefined,
                   autoAction: undefined,
-                  reportedUsername: DELETED_ACCOUNT_LABEL,
                 }
               : {}),
           })
