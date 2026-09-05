@@ -13,6 +13,7 @@ import { router, usePathname } from "expo-router"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 
 import { CONSENT_DOCUMENT_IDS, type ConsentDocumentId } from "@/content/legal"
+import { privacyContent } from "@/content/privacy"
 import { termsContent } from "@/content/terms"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { LaunchFallback } from "@/features/launch/LaunchFallback"
@@ -99,7 +100,13 @@ function DeviceConsentGate({ children, onResolved }: GateProps) {
   }, [])
 
   if (outstanding.length === 0) return <>{children}</>
-  return <ConsentPrompt hasPriorAcceptance={hasPriorAcceptance(accepted)} onAccept={accept} />
+  return (
+    <ConsentPrompt
+      documents={outstanding}
+      hasPriorAcceptance={hasPriorAcceptance(accepted)}
+      onAccept={accept}
+    />
+  )
 }
 
 function useCachedAcceptancesForUser(
@@ -354,6 +361,7 @@ function SignedInConsentGate({
     )
   return (
     <ConsentPrompt
+      documents={outstanding}
       hasPriorAcceptance={hasPriorAcceptance(accepted)}
       isSubmitting={isSubmitting}
       onAccept={() => void accept()}
@@ -362,17 +370,22 @@ function SignedInConsentGate({
 }
 
 function ConsentPrompt({
+  documents,
   hasPriorAcceptance,
   isSubmitting,
   onAccept,
 }: {
+  documents: ConsentDocumentId[]
   hasPriorAcceptance: boolean
   isSubmitting?: boolean
   onAccept: () => void
 }) {
+  const changedContent =
+    documents.length === 1 ? (documents[0] === "terms" ? termsContent : privacyContent) : undefined
   return (
     <LegalConsentScreen
-      effectiveDate={termsContent.effectiveDate}
+      documents={documents}
+      effectiveDate={changedContent?.effectiveDate}
       isReturningUser={hasPriorAcceptance}
       isSubmitting={isSubmitting}
       onAccept={onAccept}

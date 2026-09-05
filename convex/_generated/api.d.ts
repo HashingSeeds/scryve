@@ -37,6 +37,7 @@ import type * as lib_games_yugioh from "../lib/games/yugioh.js";
 import type * as lib_games_yugiohDecks from "../lib/games/yugiohDecks.js";
 import type * as lib_integrations from "../lib/integrations.js";
 import type * as lib_moderation from "../lib/moderation.js";
+import type * as lib_moderationRetention from "../lib/moderationRetention.js";
 import type * as lib_nameFilter from "../lib/nameFilter.js";
 import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_policy from "../lib/policy.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   "lib/games/yugiohDecks": typeof lib_games_yugiohDecks;
   "lib/integrations": typeof lib_integrations;
   "lib/moderation": typeof lib_moderation;
+  "lib/moderationRetention": typeof lib_moderationRetention;
   "lib/nameFilter": typeof lib_nameFilter;
   "lib/pagination": typeof lib_pagination;
   "lib/policy": typeof lib_policy;

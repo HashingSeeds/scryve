@@ -2,6 +2,11 @@ import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
+import {
+  DISMISSED_RETENTION_MS,
+  UPHELD_RETENTION_MS,
+  moderationRetentionExpiresAt,
+} from "./lib/moderationRetention"
 import schema from "./schema"
 
 const modules = {
@@ -563,5 +568,157 @@ describe("moderation", () => {
         reason: "other",
       }),
     ).rejects.toThrow()
+  })
+
+  it("calculates exact retention deadlines by resolution status", () => {
+    const createdAt = 1_000
+    const resolvedAt = 2_000
+    expect(moderationRetentionExpiresAt("upheld", resolvedAt, createdAt)).toBe(
+      resolvedAt + UPHELD_RETENTION_MS,
+    )
+    expect(moderationRetentionExpiresAt("dismissed", resolvedAt, createdAt)).toBe(
+      resolvedAt + DISMISSED_RETENTION_MS,
+    )
+    expect(moderationRetentionExpiresAt("open", undefined, createdAt)).toBeUndefined()
+  })
+
+  it("backfills resolved retention deadlines idempotently", async () => {
+    const t = convexTest(schema, modules)
+    const createdAt = 1_000_000
+    const resolvedAt = createdAt + 100
+    const existingDeadline = resolvedAt + 123
+    const ids = await t.run(async (ctx) => {
+      const upheld = await ctx.db.insert("moderationReports", {
+        reportedUsername: "upheld",
+        reason: "harassment",
+        status: "upheld",
+        createdAt,
+        resolvedAt,
+      })
+      const dismissed = await ctx.db.insert("moderationReports", {
+        reportedUsername: "dismissed",
+        reason: "other",
+        status: "dismissed",
+        createdAt,
+        resolvedAt,
+      })
+      const open = await ctx.db.insert("moderationReports", {
+        reportedUsername: "open",
+        reason: "other",
+        status: "open",
+        createdAt,
+      })
+      const existing = await ctx.db.insert("moderationReports", {
+        reportedUsername: "existing",
+        reason: "other",
+        status: "upheld",
+        createdAt,
+        resolvedAt,
+        retentionExpiresAt: existingDeadline,
+      })
+      return { upheld, dismissed, open, existing }
+    })
+
+    await expect(t.mutation(internal.moderation.backfillRetention, {})).resolves.toMatchObject({
+      updated: 2,
+      hasMore: false,
+    })
+    const afterFirstRun = await t.run(async (ctx) =>
+      Promise.all([
+        ctx.db.get(ids.upheld),
+        ctx.db.get(ids.dismissed),
+        ctx.db.get(ids.open),
+        ctx.db.get(ids.existing),
+      ]),
+    )
+    expect(afterFirstRun.map((report) => report?.retentionExpiresAt)).toEqual([
+      resolvedAt + UPHELD_RETENTION_MS,
+      resolvedAt + DISMISSED_RETENTION_MS,
+      undefined,
+      existingDeadline,
+    ])
+
+    await expect(t.mutation(internal.moderation.backfillRetention, {})).resolves.toMatchObject({
+      updated: 0,
+      hasMore: false,
+    })
+    const afterSecondRun = await t.run(async (ctx) => ctx.db.get(ids.existing))
+    expect(afterSecondRun?.retentionExpiresAt).toBe(existingDeadline)
+  })
+
+  it("purges expired reports but preserves future and legally held reports", async () => {
+    const t = convexTest(schema, modules)
+    const now = 2_000_000
+    jest.setSystemTime(now)
+    const ids = await t.run(async (ctx) => {
+      const expired = await ctx.db.insert("moderationReports", {
+        reportedUsername: "expired",
+        reason: "other",
+        status: "upheld",
+        createdAt: now - 10,
+        retentionExpiresAt: now,
+      })
+      const future = await ctx.db.insert("moderationReports", {
+        reportedUsername: "future",
+        reason: "other",
+        status: "dismissed",
+        createdAt: now - 10,
+        retentionExpiresAt: now + 1,
+      })
+      const held = await ctx.db.insert("moderationReports", {
+        reportedUsername: "held",
+        reason: "other",
+        status: "upheld",
+        createdAt: now - 10,
+        retentionExpiresAt: now - 1,
+        legalHoldUntil: now + 1,
+      })
+      const open = await ctx.db.insert("moderationReports", {
+        reportedUsername: "open",
+        reason: "other",
+        status: "open",
+        createdAt: now - 10,
+        retentionExpiresAt: now - 1,
+      })
+      return { expired, future, held, open }
+    })
+
+    await expect(t.mutation(internal.moderation.purgeExpiredReports, {})).resolves.toMatchObject({
+      deleted: 1,
+      hasMore: false,
+    })
+    await expect(t.run(async (ctx) => ctx.db.get(ids.expired))).resolves.toBeNull()
+    await expect(t.run(async (ctx) => ctx.db.get(ids.future))).resolves.not.toBeNull()
+    await expect(t.run(async (ctx) => ctx.db.get(ids.held))).resolves.not.toBeNull()
+    await expect(t.run(async (ctx) => ctx.db.get(ids.open))).resolves.not.toBeNull()
+  })
+
+  it("continues past a full page of legally held reports", async () => {
+    const t = convexTest(schema, modules)
+    const now = 3_000_000
+    jest.setSystemTime(now)
+    const target = await t.run(async (ctx) => {
+      for (let index = 0; index < 50; index += 1) {
+        await ctx.db.insert("moderationReports", {
+          reportedUsername: `held-${index}`,
+          reason: "other",
+          status: "upheld",
+          createdAt: now - 10,
+          retentionExpiresAt: now - 2,
+          legalHoldUntil: now + 1,
+        })
+      }
+      return await ctx.db.insert("moderationReports", {
+        reportedUsername: "eligible",
+        reason: "other",
+        status: "upheld",
+        createdAt: now - 10,
+        retentionExpiresAt: now - 1,
+      })
+    })
+
+    await t.mutation(internal.moderation.purgeExpiredReports, {})
+    await settle(t)
+    await expect(t.run(async (ctx) => ctx.db.get(target))).resolves.toBeNull()
   })
 })
