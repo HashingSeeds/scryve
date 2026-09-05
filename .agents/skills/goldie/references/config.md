@@ -55,8 +55,8 @@ const config = {
     description: { "en-US": "Two or three short paragraphs, store voice." },
   },
 
-  // flowsDir: "../.argent/flows" by default, resolved from appRoot. Every
-  // scene names a flow there, the way `argent flow run <name>` does.
+  // flowsDir defaults to <appRoot>/.argent/flows. An explicit relative path
+  // resolves from this config file; "../.argent/flows" works when it is in goldie/.
 
   scenes: [
     // One entry per screenshot, in store-page order. The first two tiles are

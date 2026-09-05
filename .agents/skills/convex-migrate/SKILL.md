@@ -10,7 +10,7 @@ Read `convex/_generated/ai/guidelines.md`, `AGENTS.md`, and `RELEASING.md`. Iden
 - Rename: support old and new fields with compatible reads and writes, backfill, then remove the old representation after the client adoption window.
 - Removal: stop new dependencies first and retain the old function or field while installed clients still use it.
 
-Declare staged indexes before using them; deploy that expansion and confirm backfill readiness before the code that queries them. Backend compatibility ships before the dependent client.
+Declare indexes with `staged: true`, deploy that expansion, and confirm backfill readiness. Then remove `staged: true` and deploy the activation before running queries against the index. Backend compatibility ships before the dependent client.
 
 Use the repository's bounded scheduled mutations for small backfills. Each batch must be retry-safe and resumable through a persisted cursor or a predicate that excludes completed rows. Use an installed migration component if it already solves the task; do not add one automatically. Verify restart and retry behavior, remaining eligible records, and the resulting data before any tightening.
 

@@ -169,15 +169,17 @@ what to re-resolve.
 
 ## Step 5: Open the studio, render the video lazily
 
-Start the studio in the background. It needs `GOLDIE_CONFIG` too, so it
-serves the app repo's `out/`:
+Run the following studio command using the agent harness's managed background
+process tool, retaining its session handle. In an interactive shell, use a
+separate terminal for it. It needs `GOLDIE_CONFIG` too, so it
+serves `<app-repo>/goldie/out/`, next to the configuration file:
 
 ```bash
-GOLDIE_CONFIG=... npx -y goldie@0.3.1 studio --no-open   # background task; serves http://localhost:4321
+GOLDIE_CONFIG=... npx -y goldie@0.3.1 studio --no-open   # run as a managed background process
 ```
 
-Tell the user it is up at http://localhost:4321. Then, also in the background,
-render the preview video so it appears on reload once done:
+Tell the user it is up at http://localhost:4321. Then render the preview video in the foreground in a separate tool call
+and wait for completion before verification:
 
 ```bash
 GOLDIE_CONFIG=... npx -y goldie@0.3.1 preview && GOLDIE_CONFIG=... npx -y goldie@0.3.1 manifest
