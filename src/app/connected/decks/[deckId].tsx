@@ -1,9 +1,10 @@
 import { useEffect } from "react"
 import { Redirect, router, useLocalSearchParams } from "expo-router"
 
-import { ConnectedGate } from "@/features/connected/ConnectedGate"
+import { CloudScreen } from "@/features/auth/CloudScreen"
 import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { DeckDetailScreen, type DeckDetailSummary } from "@/screens/DeckDetailScreen"
+import { GuestDeckDetailScreen } from "@/screens/GuestDeckDetailScreen"
 
 export default function DeckDetailRoute() {
   const { deckId, deckName, deckGame, deckFormat, deckCardQuantity } = useLocalSearchParams<{
@@ -17,6 +18,7 @@ export default function DeckDetailRoute() {
     if (deckId) recordRecentDeck(deckId)
   }, [deckId])
   if (!deckId) return <Redirect href="/connected/decks" />
+  if (deckId === "guest") return <GuestDeckDetailScreen onBack={() => router.back()} />
   const cardQuantity = deckCardQuantity === undefined ? undefined : Number(deckCardQuantity)
   const summary: DeckDetailSummary | undefined =
     deckName && deckGame && deckFormat
@@ -28,8 +30,15 @@ export default function DeckDetailRoute() {
         }
       : undefined
   return (
-    <ConnectedGate onBack={() => router.back()}>
-      <DeckDetailScreen deckId={deckId} summary={summary} onBack={() => router.back()} />
-    </ConnectedGate>
+    <CloudScreen onBack={() => router.back()}>
+      {(access) => (
+        <DeckDetailScreen
+          access={access}
+          deckId={deckId}
+          summary={summary}
+          onBack={() => router.back()}
+        />
+      )}
+    </CloudScreen>
   )
 }

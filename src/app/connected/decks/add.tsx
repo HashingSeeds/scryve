@@ -1,17 +1,20 @@
 import { router } from "expo-router"
 
-import { ConnectedGate } from "@/features/connected/ConnectedGate"
+import { CloudScreen } from "@/features/auth/CloudScreen"
 import { AddDeckScreen } from "@/screens/AddDeckScreen"
 
 export default function AddDeckRoute() {
   return (
-    <ConnectedGate onBack={() => router.back()}>
-      <AddDeckScreen
-        onBack={() => router.back()}
-        onCreated={(deckId) =>
-          router.replace({ pathname: "/connected/decks/[deckId]", params: { deckId } })
-        }
-      />
-    </ConnectedGate>
+    <CloudScreen onBack={() => router.back()}>
+      {(access) => (
+        <AddDeckScreen
+          access={access}
+          onBack={() => router.back()}
+          onCreated={(deckId) =>
+            router.replace({ pathname: "/connected/decks/[deckId]", params: { deckId } })
+          }
+        />
+      )}
+    </CloudScreen>
   )
 }

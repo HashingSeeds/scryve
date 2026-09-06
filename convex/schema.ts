@@ -243,6 +243,8 @@ export default defineSchema({
 
   decks: defineTable({
     ownerUserId: v.id("users"),
+    guestLocalId: v.optional(v.string()),
+    guestUpdatedAt: v.optional(v.number()),
     name: v.string(),
     format: v.string(),
     game: v.optional(v.string()),
@@ -253,7 +255,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner_and_updated_at", ["ownerUserId", "updatedAt"])
-    .index("by_owner_and_archived_at", ["ownerUserId", "archivedAt"]),
+    .index("by_owner_and_archived_at", ["ownerUserId", "archivedAt"])
+    .index("by_owner_and_guest_local_id", ["ownerUserId", "guestLocalId"]),
 
   deckVersions: defineTable({
     deckId: v.id("decks"),

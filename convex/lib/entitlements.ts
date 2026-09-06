@@ -6,6 +6,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server"
 
 export const PREMIUM_FEATURES = {
   fullHistory: "full_history",
+  proDecksLimit: "pro_decks_limit",
   unlimitedDecks: "unlimited_decks",
   deckAnalytics: "deck_analytics",
   deckVersions: "deck_versions",
@@ -14,11 +15,23 @@ export const PREMIUM_FEATURES = {
 type Ctx = QueryCtx | MutationCtx
 
 export async function hasFeature(ctx: Ctx, user: Doc<"users">, feature: string) {
+  const canonicalFeature =
+    feature === PREMIUM_FEATURES.unlimitedDecks ? PREMIUM_FEATURES.proDecksLimit : feature
   const entitlement = await ctx.db
     .query("userEntitlements")
-    .withIndex("by_user_and_feature", (q) => q.eq("userId", user._id).eq("feature", feature))
+    .withIndex("by_user_and_feature", (q) =>
+      q.eq("userId", user._id).eq("feature", canonicalFeature),
+    )
     .unique()
-  return entitlement?.enabled === true
+  if (entitlement) return entitlement.enabled
+  if (canonicalFeature !== PREMIUM_FEATURES.proDecksLimit) return false
+  const legacy = await ctx.db
+    .query("userEntitlements")
+    .withIndex("by_user_and_feature", (q) =>
+      q.eq("userId", user._id).eq("feature", PREMIUM_FEATURES.unlimitedDecks),
+    )
+    .unique()
+  return legacy?.enabled === true
 }
 
 export async function requireFeature(ctx: Ctx, user: Doc<"users">, feature: string) {
@@ -26,7 +39,7 @@ export async function requireFeature(ctx: Ctx, user: Doc<"users">, feature: stri
 }
 
 export async function deckCapacity(ctx: Ctx, user: Doc<"users">) {
-  const premium = await hasFeature(ctx, user, PREMIUM_FEATURES.unlimitedDecks)
+  const premium = await hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit)
   const limit = premium ? MAX_PREMIUM_DECKS : FREE_DECK_LIMIT
   const active = await ctx.db
     .query("decks")

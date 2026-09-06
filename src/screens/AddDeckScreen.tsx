@@ -10,6 +10,7 @@ import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
@@ -19,9 +20,14 @@ import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { AccountDeckCapacity } from "@/features/decks/AccountDeckCapacity"
 import { catalogCardDetails } from "@/features/decks/cardFocus"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
+import { replaceGuestDeck, saveGuestDeck, type GuestDeckPayload } from "@/features/decks/guestDeck"
+import { GuestDeckImportNotice } from "@/features/decks/GuestDeckImportNotice"
+import { useGuestDeckImport } from "@/features/decks/useGuestDeckImport"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -210,15 +216,23 @@ function previewSections(
 export function AddDeckScreen({
   onBack,
   onCreated,
+  access,
 }: {
   onBack: () => void
   onCreated: (deckId: string) => void
+  access?: CloudAccess
 }) {
   const { themed } = useAppTheme()
   const [capacityState, setCapacityState] = useState<CapacityState>({ status: "checking" })
   const capacity = capacityState.status === "ready" ? capacityState.capacity : undefined
-  const capacityReady = capacityState.status === "ready"
-  const atCapacity = capacity?.canCreate === false
+  const signedIn = access?.signedIn ?? Boolean(access?.ownerId)
+  const guestMode = Boolean(access && !signedIn)
+  const capacityReady = guestMode || ((access?.ready ?? true) && capacityState.status === "ready")
+  const atCapacity = !guestMode && capacityReady && capacity?.canCreate === false
+  const canRequestAccess = Boolean(access && !access.ready && !access.loading)
+  useEffect(() => {
+    if (access && !access.ready) setCapacityState({ status: "checking" })
+  }, [access])
   const createDeck = useMutation(api.decks.create)
   const createImportedDeck = useMutation(api.decks.importResolved)
   const searchPreconstructed = useAction(api.deckImports.searchPreconstructed)
@@ -251,6 +265,25 @@ export function AddDeckScreen({
   const [previewDetailsError, setPreviewDetailsError] = useState<string>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
+  const [saveAttempted, setSaveAttempted] = useState(false)
+  const [guestConflict, setGuestConflict] = useState(false)
+  const [pendingGuestPayload, setPendingGuestPayload] = useState<GuestDeckPayload>()
+  const [confirmGuestReplace, setConfirmGuestReplace] = useState(false)
+  const [guestReplacementLocalId, setGuestReplacementLocalId] = useState<string>()
+  const transfer = useGuestDeckImport(access)
+  const guestDeck = transfer.guestDeck
+  const waitingForGuest = Boolean(
+    access?.ready &&
+    guestDeck &&
+    (transfer.importing || !transfer.result || transfer.result.status === "limit_reached"),
+  )
+  const guestBlocked = guestMode && guestConflict && Boolean(guestDeck)
+  useEffect(() => {
+    if (!guestDeck || !guestMode) {
+      setGuestConflict(false)
+      setConfirmGuestReplace(false)
+    }
+  }, [guestDeck, guestMode])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string>()
   const [previewError, setPreviewError] = useState<string>()
@@ -265,6 +298,11 @@ export function AddDeckScreen({
     (next: DeckCapacity) => setCapacityState({ status: "ready", capacity: next }),
     [],
   )
+  useEffect(() => {
+    setSaveAttempted(false)
+    setGuestConflict(false)
+    setPendingGuestPayload(undefined)
+  }, [mode, game, format, selectedPrecon?.fileName, selectedCatalogDeck?._id])
 
   function begin() {
     setBusy(true)
@@ -273,6 +311,36 @@ export function AddDeckScreen({
 
   function fail(cause: unknown, fallback: string) {
     setError(convexErrorMessage(cause, fallback))
+  }
+
+  function saveGuest(payload: GuestDeckPayload) {
+    setSaveAttempted(true)
+    setPendingGuestPayload(payload)
+    try {
+      saveGuestDeck(payload)
+      onCreated("guest")
+    } catch (cause) {
+      if (guestDeck) {
+        setGuestConflict(true)
+        setError(undefined)
+        return
+      }
+      fail(cause, "Could not save deck locally")
+    }
+  }
+
+  function replaceLocalGuest() {
+    if (!pendingGuestPayload || !guestReplacementLocalId) return
+    try {
+      const payload =
+        mode === "blank" && !selectedPrecon && !selectedCatalogDeck
+          ? { ...pendingGuestPayload, name, format, game, note }
+          : pendingGuestPayload
+      replaceGuestDeck(payload, guestReplacementLocalId)
+      onCreated("guest")
+    } catch (cause) {
+      fail(cause, "Could not replace local deck")
+    }
   }
 
   function chooseGame(next: string) {
@@ -359,7 +427,16 @@ export function AddDeckScreen({
   }, [game, mode, preconQuery, runCatalogSearch])
 
   async function createBlank() {
-    if (!capacityReady || atCapacity) return
+    setSaveAttempted(true)
+    if (guestMode) {
+      saveGuest({ name, format, game, ...(note.trim() ? { note } : {}), cards: [] })
+      return
+    }
+    if (access && !access.ready) {
+      access.request()
+      return
+    }
+    if (!capacityReady || atCapacity || waitingForGuest) return
     try {
       begin()
       const deckId = await createDeck({ name, format, game, ...(note.trim() ? { note } : {}) })
@@ -408,6 +485,10 @@ export function AddDeckScreen({
   }
 
   async function loadPreviewCardDetails(card: FocusedPreviewCard) {
+    if (access && !access.ready) {
+      setPreviewDetailsError("Sign in to load additional card details.")
+      return
+    }
     if (previewDetailsByKey[card.detailKey]) return
     try {
       const details = card.scryfallId
@@ -471,9 +552,24 @@ export function AddDeckScreen({
   }
 
   async function importPrecon() {
+    setSaveAttempted(true)
+    if (guestMode && selectedPrecon && resolvedPrecon && !resolvedPrecon.unresolved.length) {
+      saveGuest({
+        name: resolvedPrecon.name || selectedPrecon.name,
+        format: preconSearchFormat(format) ? format : preconstructedFormat(selectedPrecon.type),
+        game,
+        cards: importCards(resolvedPrecon.cards),
+      })
+      return
+    }
+    if (access && !access.ready) {
+      access.request()
+      return
+    }
     if (
       !capacityReady ||
       atCapacity ||
+      waitingForGuest ||
       !selectedPrecon ||
       !resolvedPrecon ||
       resolvedPrecon.unresolved.length
@@ -496,7 +592,23 @@ export function AddDeckScreen({
   }
 
   async function importTopDeck() {
-    if (!capacityReady || atCapacity || !selectedCatalogDeck) return
+    setSaveAttempted(true)
+    if (guestMode && selectedCatalogDeck && catalogDetail) {
+      saveGuest({
+        name: selectedCatalogDeck.name,
+        format: selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game),
+        game: selectedCatalogDeck.game,
+        cards: catalogDetail.entries.map(
+          ({ _id, _creationTime, catalogDeckId: _catalogDeckId, ...entry }) => entry,
+        ),
+      })
+      return
+    }
+    if (access && !access.ready) {
+      access.request()
+      return
+    }
+    if (!capacityReady || atCapacity || waitingForGuest || !selectedCatalogDeck) return
     try {
       begin()
       const deckId = await importCatalog({ catalogDeckId: selectedCatalogDeck._id })
@@ -509,7 +621,16 @@ export function AddDeckScreen({
   }
 
   async function importPasted() {
-    if (!capacityReady || atCapacity) return
+    setSaveAttempted(true)
+    if (access && !access.ready) {
+      access.request()
+      return
+    }
+    if (guestMode) {
+      access?.request()
+      return
+    }
+    if (!capacityReady || atCapacity || waitingForGuest) return
     try {
       begin()
       const resolved = await resolvePasted({ list: deckList, game })
@@ -525,13 +646,14 @@ export function AddDeckScreen({
         setError(problems.join(". "))
         return
       }
-      const deckId = await createImportedDeck({
+      const payload = {
         name,
         format,
         game,
         ...(note.trim() ? { note } : {}),
         cards: importCards(resolved.cards),
-      })
+      }
+      const deckId = await createImportedDeck(payload)
       setName("")
       setNote("")
       setDeckList("")
@@ -570,6 +692,46 @@ export function AddDeckScreen({
       onClose={() => setFocusedPreviewCard(undefined)}
     />
   ) : null
+  const guestRecovery = guestBlocked ? (
+    <>
+      <View style={themed($inlineStatus)}>
+        <Text weight="bold" text="Keep another deck" />
+        <Text size="sm" text="Sign in free for 2 decks and sync. Your saved deck comes with you." />
+        {access?.request ? <Button text="Sign in free" onPress={access.request} /> : null}
+        <Button
+          text="Replace local deck"
+          onPress={() => {
+            setGuestReplacementLocalId(guestDeck?.localId)
+            setConfirmGuestReplace(true)
+          }}
+        />
+      </View>
+      <ConfirmDialog
+        visible={confirmGuestReplace}
+        title="Replace local deck?"
+        message="Your existing local deck will be replaced."
+        confirmText="Replace"
+        dialogTestID="confirm-guest-replace"
+        confirmTestID="confirm-guest-replace-action"
+        cancelTestID="cancel-guest-replace"
+        onClose={() => setConfirmGuestReplace(false)}
+        onConfirm={() => {
+          setConfirmGuestReplace(false)
+          replaceLocalGuest()
+        }}
+      />
+    </>
+  ) : null
+
+  const saveRecovery = (
+    <>
+      <GuestDeckImportNotice access={access} transfer={transfer} />
+      {atCapacity && saveAttempted && transfer.result?.status !== "limit_reached" ? (
+        <AccountDeckCapacity access={access} />
+      ) : null}
+      {guestRecovery}
+    </>
+  )
 
   if (selectedCatalogDeck) {
     const entries = catalogDetail?.entries ?? []
@@ -652,13 +814,26 @@ export function AddDeckScreen({
           })}
         </ScrollView>
         <BottomActionBar>
-          <DeckCapacityStatus onReady={handleCapacity} />
+          {!guestMode && (access?.ready ?? true) ? (
+            <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
+          ) : null}
+          {!guestMode && access?.message ? (
+            <Button text={access.actionLabel ?? access.message} onPress={access.request} />
+          ) : null}
           {error ? <AlertNote text={error} /> : null}
+          {saveRecovery}
           <Button
             testID="import-catalog-deck"
             text={busy ? "Importing…" : "Import deck"}
             preset="reversed"
-            disabled={busy || !capacityReady || atCapacity || !catalogDetail}
+            disabled={
+              busy ||
+              (!capacityReady && !canRequestAccess) ||
+              (atCapacity && saveAttempted) ||
+              guestBlocked ||
+              waitingForGuest ||
+              !catalogDetail
+            }
             onPress={importTopDeck}
           />
         </BottomActionBar>
@@ -677,7 +852,14 @@ export function AddDeckScreen({
     const sections = previewSections(cards, configuredSections)
     const unresolved = resolvedPrecon?.unresolved.length ?? 0
     const cannotImport =
-      busy || !capacityReady || atCapacity || previewLoading || !resolvedPrecon || unresolved > 0
+      busy ||
+      (!capacityReady && !canRequestAccess) ||
+      (atCapacity && saveAttempted) ||
+      guestBlocked ||
+      waitingForGuest ||
+      previewLoading ||
+      !resolvedPrecon ||
+      unresolved > 0
 
     return (
       <Screen
@@ -735,6 +917,9 @@ export function AddDeckScreen({
               />
             </View>
           ) : null}
+          {!guestMode && access?.message ? (
+            <Button text={access.actionLabel ?? access.message} onPress={access.request} />
+          ) : null}
           {error ? <AlertNote text={error} /> : null}
           {unresolved > 0 ? (
             <AlertNote
@@ -780,10 +965,10 @@ export function AddDeckScreen({
           )}
         </ScrollView>
         <BottomActionBar>
-          <DeckCapacityStatus onReady={handleCapacity} />
-          {atCapacity ? (
-            <AlertNote text="You've reached your deck limit. Archive a deck to import this one." />
+          {!guestMode && (access?.ready ?? true) ? (
+            <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
           ) : null}
+          {saveRecovery}
           <TouchableOpacity
             testID="import-preview-button"
             accessibilityRole="button"
@@ -883,7 +1068,7 @@ export function AddDeckScreen({
                   onPress={() => void runSearch(preconQuery)}
                 />
               </View>
-            ) : precons.length === 0 && preconQuery.trim() ? (
+            ) : (access?.ready ?? true) && precons.length === 0 && preconQuery.trim() ? (
               <Text size="xs" style={themed($label)} text="No official decks found." />
             ) : null}
             {precons.map((deck) => (
@@ -964,6 +1149,7 @@ export function AddDeckScreen({
             />
             <TextField
               label="Deck list"
+              accessibilityLabel="Deck list"
               helper={
                 game === "ygo"
                   ? "Paste YDK card IDs or lines like 3 Ash Blossom. Main, Extra, and Side headings are supported."
@@ -979,10 +1165,19 @@ export function AddDeckScreen({
               onChangeText={setDeckList}
             />
             {noteField}
+            {saveRecovery}
             <Button
               text={busy ? "Resolving cards…" : "Import deck list"}
               preset="reversed"
-              disabled={busy || !capacityReady || atCapacity || !name.trim() || !deckList.trim()}
+              disabled={
+                busy ||
+                (!capacityReady && !canRequestAccess) ||
+                (atCapacity && saveAttempted) ||
+                guestBlocked ||
+                waitingForGuest ||
+                !name.trim() ||
+                !deckList.trim()
+              }
               onPress={importPasted}
             />
           </View>
@@ -998,25 +1193,29 @@ export function AddDeckScreen({
               onChangeText={setName}
             />
             {noteField}
+            {saveRecovery}
             <Button
               text={busy ? "Creating…" : "Create deck"}
               preset="reversed"
-              disabled={busy || !capacityReady || atCapacity || !name.trim()}
+              disabled={
+                busy ||
+                (!capacityReady && !canRequestAccess) ||
+                (atCapacity && saveAttempted) ||
+                guestBlocked ||
+                waitingForGuest ||
+                !name.trim()
+              }
               onPress={createBlank}
             />
           </View>
         ) : null}
 
+        {!guestMode && access?.message ? (
+          <Button text={access.actionLabel ?? access.message} onPress={access.request} />
+        ) : null}
         {error ? <AlertNote text={error} /> : null}
-        <DeckCapacityStatus onReady={handleCapacity} />
-        {atCapacity ? (
-          <AlertNote
-            text={
-              capacity?.premium
-                ? "You've reached the deck limit. Archive a deck to add another."
-                : "You've reached your deck limit. Archive a deck to add another."
-            }
-          />
+        {!guestMode && (access?.ready ?? true) ? (
+          <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
         ) : null}
       </View>
     </Screen>
@@ -1033,7 +1232,6 @@ const $configRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 const $capacityStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 40,
   justifyContent: "center",
   paddingVertical: spacing.xxxs,
 })

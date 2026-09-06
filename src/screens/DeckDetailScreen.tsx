@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
+import { useNavigation } from "expo-router"
 import { useAction, useMutation, useQuery } from "convex/react"
+import { usePreventRemove } from "expo-router/react-navigation"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -21,6 +23,7 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { catalogCardDetails } from "@/features/decks/cardFocus"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { useAppTheme } from "@/theme/context"
@@ -53,6 +56,8 @@ type DeckCard = {
 }
 
 type DeckDetailTab = "cards" | "versions" | "notes"
+type DeckDialog =
+  "none" | "newVersion" | "renameVersion" | "deleteVersion" | "settings" | "deleteDeck" | "discard"
 
 function cardSection(card: DeckCard) {
   return card.section ?? card.board ?? "main"
@@ -126,6 +131,17 @@ function totalQuantity(cards: DeckCard[]) {
   return cards.reduce((total, card) => total + card.quantity, 0)
 }
 
+function cardsChanged(draft: DeckCard[], stored: DeckCard[]) {
+  return (
+    draft.length !== stored.length ||
+    draft.some(
+      (card, index) =>
+        printingKey(card) !== printingKey(stored[index]) ||
+        card.quantity !== stored[index].quantity,
+    )
+  )
+}
+
 export type DeckDetailSummary = {
   name: string
   game: string
@@ -134,6 +150,7 @@ export type DeckDetailSummary = {
 }
 
 type DeckDetailScreenProps = {
+  access?: CloudAccess
   deckId: string
   summary?: DeckDetailSummary
   onBack: () => void
@@ -143,9 +160,11 @@ function DeckDetailPlaceholder({
   summary,
   onBack,
   failure,
+  access,
 }: {
   summary?: DeckDetailSummary
   onBack: () => void
+  access?: CloudAccess
   failure?: { kind: "missing" | "unavailable"; retry: () => void }
 }) {
   const { themed, theme } = useAppTheme()
@@ -193,7 +212,7 @@ function DeckDetailPlaceholder({
             ) : null}
             <LoadingProgress
               testID="deck-loading-progress"
-              state={failure ? "unavailable" : "loading"}
+              state={failure || access?.message ? "unavailable" : "loading"}
               accessibilityText={failure ? statusText : "Loading deck"}
             />
           </View>
@@ -223,6 +242,9 @@ function DeckDetailPlaceholder({
             <Text size="xs" style={themed($dimmedText)} text="Current version" />
             <Text weight="medium" text="Current ›" />
           </TouchableOpacity>
+          {access?.message ? (
+            <Button text={access.actionLabel ?? access.message} onPress={access.request} />
+          ) : null}
           {failure ? (
             <View style={themed($queryFailure)}>
               <Text preset="subheading" text={statusText} />
@@ -276,18 +298,25 @@ export function DeckDetailScreen(props: DeckDetailScreenProps) {
         />
       )}
     >
-      <DeckDetailContent {...props} />
+      <DeckDetailContent key={props.access?.ownerId} {...props} />
     </ConvexQueryBoundary>
   )
 }
 
-function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
+function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
+  const navigation = useNavigation()
+  const listRef = useRef<SectionList<DeckCard>>(null)
   const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
-  const detail = useQuery(api.decks.detail, {
-    deckId: deckId as Id<"decks">,
-    ...(selectedVersionId ? { versionId: selectedVersionId } : {}),
-  })
+  const detail = useQuery(
+    api.decks.detail,
+    (access?.ready ?? true)
+      ? {
+          deckId: deckId as Id<"decks">,
+          ...(selectedVersionId ? { versionId: selectedVersionId } : {}),
+        }
+      : "skip",
+  )
   const searchCards = useAction(api.cards.search)
   const fetchCardById = useAction(api.cards.byId)
   const fetchCatalogCardById = useAction(api.cards.byCatalogId)
@@ -302,9 +331,9 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   const [editing, setEditing] = useState(false)
   const [activeTab, setActiveTab] = useState<DeckDetailTab>("cards")
   const [draft, setDraft] = useState<DeckCard[]>([])
-  const [dialog, setDialog] = useState<
-    "none" | "newVersion" | "renameVersion" | "deleteVersion" | "settings" | "deleteDeck"
-  >("none")
+  const [dialog, setDialog] = useState<DeckDialog>("none")
+  const [pendingNavigation, setPendingNavigation] =
+    useState<Parameters<typeof navigation.dispatch>[0]>()
   const [search, setSearch] = useState("")
   const [results, setResults] = useState<DeckCard[]>([])
   const [error, setError] = useState<string>()
@@ -323,6 +352,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
     [detail?.cards],
   )
   const cards = editing ? draft : storedCards
+  const draftChanged = editing && cardsChanged(draft, storedCards)
   const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
   const version = detail?.version
   const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)
@@ -330,11 +360,27 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
   const canDeleteVersion = (detail?.versions.length ?? 0) > 1
   const premium = detail?.capacity.premium === true
 
+  usePreventRemove(draftChanged, ({ data }) => {
+    setPendingNavigation(data.action)
+    setDialog("discard")
+  })
+
+  useEffect(() => {
+    if (editing || !pendingNavigation) return
+    const action = pendingNavigation
+    setPendingNavigation(undefined)
+    navigation.dispatch(action)
+  }, [editing, navigation, pendingNavigation])
+
   function fail(cause: unknown, fallback: string) {
     setError(convexErrorMessage(cause, fallback))
   }
 
   async function run(work: () => Promise<void>, fallback: string) {
+    if (access && !access.ready) {
+      access.request()
+      return
+    }
     try {
       setBusy(true)
       setError(undefined)
@@ -352,12 +398,29 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
     setEditing(true)
   }
 
+  useEffect(() => {
+    const list = listRef.current
+    const responder =
+      list && typeof list.getScrollResponder === "function" ? list.getScrollResponder() : undefined
+    if (editing && responder) {
+      responder.scrollTo({ y: 0, animated: false })
+    }
+  }, [editing])
+
   function discardEdits() {
     setDraft([])
     setResults([])
     setSearch("")
     setError(undefined)
     setEditing(false)
+  }
+
+  function requestDiscard() {
+    if (draftChanged) {
+      setDialog("discard")
+      return
+    }
+    discardEdits()
   }
 
   async function runSearch() {
@@ -524,7 +587,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
     }, "Could not delete deck")
   }
 
-  if (!detail) return <DeckDetailPlaceholder summary={summary} onBack={onBack} />
+  if (!detail) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
 
   const deckRecord = detail.record
   const deckScore = deckRecord
@@ -532,10 +595,41 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
     : "0–0"
   const deckWinRate = deckRecord?.games
     ? `${Math.round((deckRecord.wins / deckRecord.games) * 100)}%`
-    : "0%"
+    : "Unplayed"
   const gameLabel = deckGame(detail.deck.game)?.shortLabel ?? detail.deck.game
   const configuredSections = deckSections(detail.deck.game, detail.deck.format)
   const cardSections = groupedCards(cards, configuredSections)
+  const cardSearch =
+    editing && activeTab === "cards" ? (
+      <View style={themed($block)}>
+        <Text preset="subheading" text="Add cards" />
+        <TextField
+          testID="card-search-input"
+          label="Card search"
+          placeholder="Name, type, or Scryfall query"
+          value={search}
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          onChangeText={setSearch}
+          onSubmitEditing={runSearch}
+        />
+        <Button
+          text={busy ? "Searching…" : "Search"}
+          disabled={busy || search.trim().length < 2}
+          onPress={runSearch}
+        />
+        {results.map((card) => (
+          <ListItem
+            key={printingKey(card)}
+            bottomSeparator
+            height={64}
+            style={$centeredRow}
+            text={card.name}
+            onPress={() => addCard(card)}
+          />
+        ))}
+      </View>
+    ) : null
 
   return (
     <Screen
@@ -549,7 +643,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
         backgroundColor={theme.colors.surface}
         leftText={editing ? "Cancel" : undefined}
         leftTx={editing ? undefined : "common:back"}
-        onLeftPress={editing ? discardEdits : onBack}
+        onLeftPress={editing ? requestDiscard : onBack}
         RightActionComponent={
           editing ? undefined : (
             <TouchableOpacity
@@ -566,6 +660,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
       />
       <SectionList
         testID="deck-cards-list"
+        ref={listRef}
         style={$styles.flex1}
         contentContainerStyle={themed($listContent)}
         sections={activeTab === "cards" ? cardSections : []}
@@ -577,60 +672,63 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
         ListHeaderComponent={
           <View style={themed($headerBlock)}>
             <View style={themed($titleBlock)}>
-              <Text preset="heading" text={detail.deck.name} />
+              {editing ? (
+                <Text size="lg" weight="bold" text={detail.deck.name} />
+              ) : (
+                <Text preset="heading" text={detail.deck.name} />
+              )}
               <Text
                 size="sm"
                 style={themed($dimmedText)}
                 text={`${gameLabel} · ${deckFormatLabel(detail.deck.game, detail.deck.format)} · ${cardCountLabel(totalQuantity(cards))}`}
               />
-              <View style={themed($stats)}>
-                <View style={themed($stat)}>
-                  <Text size="lg" weight="bold" style={$tabularNumbers} text={deckScore} />
-                  <Text size="xxs" style={themed($dimmedText)} text="Record" />
+              {!editing ? (
+                <View style={themed($stats)}>
+                  <View style={themed($stat)}>
+                    <Text size="lg" weight="bold" style={$tabularNumbers} text={deckScore} />
+                    <Text size="xxs" style={themed($dimmedText)} text="Record" />
+                  </View>
+                  <View style={themed($stat)}>
+                    <Text size="lg" weight="bold" style={$tabularNumbers} text={deckWinRate} />
+                    <Text size="xxs" style={themed($dimmedText)} text="Win rate" />
+                  </View>
+                  <View style={themed($stat)}>
+                    <Text
+                      size="lg"
+                      weight="bold"
+                      style={$tabularNumbers}
+                      text={String(detail.versions.length)}
+                    />
+                    <Text size="xxs" style={themed($dimmedText)} text="Versions" />
+                  </View>
                 </View>
-                <View style={themed($stat)}>
-                  <Text size="lg" weight="bold" style={$tabularNumbers} text={deckWinRate} />
-                  <Text size="xxs" style={themed($dimmedText)} text="Win rate" />
-                </View>
-                <View style={themed($stat)}>
-                  <Text
-                    size="lg"
-                    weight="bold"
-                    style={$tabularNumbers}
-                    text={String(detail.versions.length)}
-                  />
-                  <Text size="xxs" style={themed($dimmedText)} text="Versions" />
-                </View>
-              </View>
-              <LoadingProgress
-                testID="deck-loading-progress"
-                state="complete"
-                accessibilityText="Deck loaded"
-              />
+              ) : null}
             </View>
 
-            <View style={themed($tabs)} accessibilityRole="tablist">
-              {(["cards", "versions", "notes"] as const).map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  testID={`deck-tab-${tab}`}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: activeTab === tab }}
-                  style={[themed($tab), activeTab === tab && themed($selectedTab)]}
-                  onPress={() => setActiveTab(tab)}
-                >
-                  <Text
-                    size="sm"
-                    weight={activeTab === tab ? "bold" : "normal"}
-                    text={tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
+            {!editing ? (
+              <View style={themed($tabs)} accessibilityRole="tablist">
+                {(["cards", "versions", "notes"] as const).map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    testID={`deck-tab-${tab}`}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: activeTab === tab }}
+                    style={[themed($tab), activeTab === tab && themed($selectedTab)]}
+                    onPress={() => setActiveTab(tab)}
+                  >
+                    <Text
+                      size="sm"
+                      weight={activeTab === tab ? "bold" : "normal"}
+                      text={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
 
             {activeTab !== "cards" && error ? <AlertNote text={error} /> : null}
 
-            {activeTab === "cards" ? (
+            {!editing && activeTab === "cards" ? (
               <TouchableOpacity
                 testID="current-version-button"
                 style={themed($currentVersion)}
@@ -720,13 +818,15 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
               </View>
             ) : null}
 
+            {cardSearch}
+
             {activeTab === "cards" && cards.length === 0 ? (
               <Text
                 size="sm"
                 style={themed($dimmedText)}
                 text={
                   editing
-                    ? "Search below to add your first card."
+                    ? "Search above to add your first card."
                     : "This version has no cards yet. Tap Edit list to build it."
                 }
               />
@@ -759,38 +859,6 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
             ) : null}
           </TouchableOpacity>
         )}
-        ListFooterComponent={
-          editing && activeTab === "cards" ? (
-            <View style={themed($block)}>
-              <Text preset="subheading" text="Add cards" />
-              <TextField
-                testID="card-search-input"
-                label="Card search"
-                placeholder="Name, type, or Scryfall query"
-                value={search}
-                autoCorrect={false}
-                clearButtonMode="while-editing"
-                onChangeText={setSearch}
-                onSubmitEditing={runSearch}
-              />
-              <Button
-                text={busy ? "Searching…" : "Search"}
-                disabled={busy || search.trim().length < 2}
-                onPress={runSearch}
-              />
-              {results.map((card) => (
-                <ListItem
-                  key={printingKey(card)}
-                  bottomSeparator
-                  height={64}
-                  style={$centeredRow}
-                  text={card.name}
-                  onPress={() => addCard(card)}
-                />
-              ))}
-            </View>
-          ) : null
-        }
       />
       {activeTab === "cards" ? (
         <BottomActionBar style={themed($actionBar)}>
@@ -811,7 +879,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                   text="Discard"
                   style={$actionButton}
                   disabled={busy}
-                  onPress={discardEdits}
+                  onPress={requestDiscard}
                 />
               </>
             ) : (
@@ -962,6 +1030,41 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
               textStyle={themed($destructiveText)}
               disabled={busy}
               onPress={deleteDeck}
+            />
+          </View>
+        </DialogCard>
+      ) : null}
+
+      {dialog === "discard" ? (
+        <DialogCard
+          visible
+          onClose={() => setDialog("none")}
+          closeDisabled={busy}
+          backdropTestID="discard-edits-backdrop"
+          backdropAccessibilityLabel="Keep editing"
+          dialogTestID="discard-edits-dialog"
+          dialogAccessibilityRole="alert"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text="Discard changes?" style={themed($dialogText)} />
+          <Text size="sm" text="Your edits will be lost." style={themed($dialogText)} />
+          <View style={themed($dialogActions)}>
+            <Button
+              text="Keep editing"
+              style={themed($dialogButton)}
+              disabled={busy}
+              onPress={() => setDialog("none")}
+            />
+            <Button
+              text="Discard"
+              testID="discard-edits-confirm"
+              style={[themed($dialogButton), themed($destructiveButton)]}
+              textStyle={themed($destructiveText)}
+              disabled={busy}
+              onPress={() => {
+                setDialog("none")
+                discardEdits()
+              }}
             />
           </View>
         </DialogCard>

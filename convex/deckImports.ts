@@ -861,6 +861,15 @@ async function preconCatalog(ctx: ActionCtx) {
   }
 }
 
+async function assertGuestPreconstructedInCatalog(ctx: ActionCtx, fileName: string) {
+  const decks = await preconCatalog(ctx)
+  if (!decks.some((deck) => normalizedPreconstructedFileName(deck.fileName) === fileName))
+    throw new ConvexError({
+      code: "catalog_deck_not_found",
+      message: "Preconstructed deck not found",
+    })
+}
+
 function normalizedPreconstructedFileName(fileName: string) {
   if (!/^[A-Za-z0-9_.-]{1,200}$/.test(fileName))
     throw new ConvexError({ code: "invalid_deck_identifier", message: "Invalid deck identifier" })
@@ -1014,7 +1023,6 @@ export const refreshResolvedPreconstructed = internalAction({
 export const searchPreconstructed = action({
   args: { query: v.string(), format: v.optional(v.string()) },
   handler: async (ctx, args): Promise<PreconstructedDeck[]> => {
-    await requireActionIdentity(ctx)
     const query = args.query.trim().toLocaleLowerCase()
     const format = args.format?.trim().toLocaleLowerCase()
     if (query.length > 120) return []
@@ -1037,17 +1045,17 @@ export const searchPreconstructed = action({
 export const previewPreconstructed = action({
   args: { fileName: v.string() },
   handler: async (ctx, args): Promise<PreconstructedDeckOutline> => {
-    await requireActionIdentity(ctx)
     const fileName = normalizedPreconstructedFileName(args.fileName)
     const cached = await cachedPreconstructedOutline(ctx, fileName)
-    return cached ?? (await previewColdPreconstructed(ctx, fileName))
+    if (cached) return cached
+    if (!(await ctx.auth.getUserIdentity())) await assertGuestPreconstructedInCatalog(ctx, fileName)
+    return await previewColdPreconstructed(ctx, fileName)
   },
 })
 
 export const resolvePreconstructed = action({
   args: { fileName: v.string() },
   handler: async (ctx, args): Promise<ResolvedPreconstructedDeck> => {
-    await requireActionIdentity(ctx)
     const fileName = normalizedPreconstructedFileName(args.fileName)
     const cached: Doc<"resolvedPreconstructedDecks"> | null = await ctx.runQuery(
       internal.deckImports.resolvedPreconstructedCache,
@@ -1055,6 +1063,7 @@ export const resolvePreconstructed = action({
     )
     if (cached && Date.now() - cached.fetchedAt < RESOLVED_PRECON_TTL_MS)
       return cachedPreconstructedDeck(cached)
+    if (!(await ctx.auth.getUserIdentity())) await assertGuestPreconstructedInCatalog(ctx, fileName)
     if (cached) {
       const claimId = crypto.randomUUID()
       const claimed: boolean = await ctx.runMutation(

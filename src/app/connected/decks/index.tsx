@@ -2,15 +2,16 @@ import { useMemo } from "react"
 import { router } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { ConnectedGate } from "@/features/connected/ConnectedGate"
+import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { DecksScreen } from "@/screens/DecksScreen"
 
 export default function DecksRoute() {
   const auth = useAuthAccess()
   const hasCurrentGame = useMemo(() => localGameRepository.loadActiveGame() !== null, [])
-  const screen = (
+  const screen = (access?: CloudAccess) => (
     <DecksScreen
+      access={access}
       onPlay={() => router.replace({ pathname: "/", params: { destination: "play" } })}
       hasCurrentGame={hasCurrentGame}
       onSettings={() => router.push("/settings")}
@@ -34,12 +35,10 @@ export default function DecksRoute() {
       unavailableMessage={
         !auth.configured
           ? auth.configurationMessage || "Deck sync is unavailable in this build."
-          : auth.isLoaded && !auth.isSignedIn
-            ? "Sign in to load your deck shelf. Offline decks are coming later."
-            : undefined
+          : undefined
       }
     />
   )
-  if (!auth.configured || (auth.isLoaded && !auth.isSignedIn)) return screen
-  return <ConnectedGate onBack={() => router.back()}>{screen}</ConnectedGate>
+  if (!auth.configured) return screen()
+  return <CloudScreen onBack={() => router.back()}>{screen}</CloudScreen>
 }

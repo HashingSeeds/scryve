@@ -8,13 +8,19 @@ export const current = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx)
-    const [fullHistory, unlimitedDecks, deckAnalytics, deckVersions] = await Promise.all([
+    const [fullHistory, proDecksLimit, deckAnalytics, deckVersions] = await Promise.all([
       hasFeature(ctx, user, PREMIUM_FEATURES.fullHistory),
-      hasFeature(ctx, user, PREMIUM_FEATURES.unlimitedDecks),
+      hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit),
       hasFeature(ctx, user, PREMIUM_FEATURES.deckAnalytics),
       hasFeature(ctx, user, PREMIUM_FEATURES.deckVersions),
     ])
-    return { fullHistory, unlimitedDecks, deckAnalytics, deckVersions }
+    return {
+      fullHistory,
+      proDecksLimit,
+      unlimitedDecks: proDecksLimit,
+      deckAnalytics,
+      deckVersions,
+    }
   },
 })
 
@@ -31,12 +37,16 @@ export const setUserFeature = internalMutation({
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
       .unique()
     if (!user) return null
+    const feature =
+      args.feature === PREMIUM_FEATURES.unlimitedDecks
+        ? PREMIUM_FEATURES.proDecksLimit
+        : args.feature
     const existing = await ctx.db
       .query("userEntitlements")
-      .withIndex("by_user_and_feature", (q) => q.eq("userId", user._id).eq("feature", args.feature))
+      .withIndex("by_user_and_feature", (q) => q.eq("userId", user._id).eq("feature", feature))
       .unique()
     const value = {
-      feature: args.feature,
+      feature,
       enabled: args.enabled,
       source: args.source,
       updatedAt: Date.now(),

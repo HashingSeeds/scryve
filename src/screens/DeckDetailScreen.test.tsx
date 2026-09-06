@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native"
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
@@ -29,6 +29,8 @@ const mockPokemonCardByReference = jest.fn(async () => ({
   rarity: "common",
 }))
 const queryArgs: Array<Record<string, unknown>> = []
+let mockPreventRemoveCallback: ((options: { data: { action: object } }) => void) | undefined
+const mockNavigationDispatch = jest.fn()
 
 const solRing = {
   _id: "card-1",
@@ -88,7 +90,8 @@ const mockDetail = {
 }
 
 jest.mock("convex/react", () => ({
-  useQuery: (_reference: string, args: Record<string, unknown>) => {
+  useQuery: (_reference: string, args: Record<string, unknown> | "skip") => {
+    if (args === "skip") return undefined
     queryArgs.push(args)
     if (mockDetail.error) throw mockDetail.error
     return mockDetail.value
@@ -106,6 +109,21 @@ jest.mock("convex/react", () => ({
     if (reference === "cards.byCatalogId") return mockCatalogCardById
     if (reference === "cards.byPokemonReference") return mockPokemonCardByReference
     return mockCardById
+  },
+}))
+
+jest.mock("expo-router", () => ({
+  useNavigation: () => ({
+    dispatch: mockNavigationDispatch,
+  }),
+}))
+
+jest.mock("expo-router/react-navigation", () => ({
+  usePreventRemove: (
+    _preventRemove: boolean,
+    callback: (options: { data: { action: object } }) => void,
+  ) => {
+    mockPreventRemoveCallback = callback
   },
 }))
 
@@ -141,12 +159,42 @@ describe("DeckDetailScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     queryArgs.length = 0
+    mockPreventRemoveCallback = undefined
+    mockNavigationDispatch.mockClear()
     mockDetail.value = {
       ...loadedDetail,
       version: mainVersion,
       capacity: { used: 2, limit: 5, premium: true, canCreate: true },
     }
     mockDetail.error = undefined
+  })
+
+  it("keeps the deck shell and selected tab through auth refresh without querying private data", () => {
+    const request = jest.fn()
+    const detail = (ready: boolean) => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          summary={{ name: "Existing Deck", game: "mtg", format: "commander" }}
+          access={{ ready, loading: !ready, ownerId: "owner-a", request }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(detail(false))
+    expect(view.getByText("Existing Deck")).toBeTruthy()
+    expect(queryArgs).toHaveLength(0)
+    expect(view.queryByText("Sol Ring")).toBeNull()
+    view.rerender(detail(true))
+    fireEvent.press(view.getByTestId("deck-tab-notes"))
+    expect(view.getByText("Ramp into big spells")).toBeTruthy()
+    queryArgs.length = 0
+    view.rerender(detail(false))
+    expect(queryArgs).toHaveLength(0)
+    expect(view.queryByText("Ramp into big spells")).toBeNull()
+    view.rerender(detail(true))
+    expect(view.getByText("Ramp into big spells")).toBeTruthy()
+    expect(request).not.toHaveBeenCalled()
   })
 
   it("keeps same-name Pokemon reprints distinct when only original references identify them", () => {
@@ -176,9 +224,7 @@ describe("DeckDetailScreen", () => {
         view.getByTestId("deck-card-row-main:22222222-2222-2222-2222-222222222222").props.style,
       ).minHeight,
     ).toBe(64)
-    expect(view.getByTestId("deck-loading-progress").props.accessibilityValue).toEqual({
-      text: "Deck loaded",
-    })
+    expect(view.queryByTestId("deck-loading-progress")).toBeNull()
     expect(view.getByText("3–3")).toBeTruthy()
     expect(view.getByText("50%")).toBeTruthy()
     expect(view.getByText("Current ›")).toBeTruthy()
@@ -228,6 +274,8 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Edit deck")).toBeTruthy()
     expect(view.getByText("Cancel")).toBeTruthy()
     expect(view.getByTestId("card-search-input")).toBeTruthy()
+    expect(view.queryByText("Record")).toBeNull()
+    expect(view.queryByTestId("deck-tab-versions")).toBeNull()
     expect(StyleSheet.flatten(view.getByTestId("save-version-button").props.style)).toMatchObject({
       backgroundColor: colors.tint,
     })
@@ -244,14 +292,30 @@ describe("DeckDetailScreen", () => {
     })
   })
 
-  it("throws away edits on discard", () => {
+  it("protects changed edits behind confirmation", () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     fireEvent.press(view.getAllByText("+")[0])
     expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
     fireEvent.press(view.getByTestId("discard-edits-button"))
+    expect(view.getByTestId("discard-edits-dialog")).toBeTruthy()
+    fireEvent.press(view.getByTestId("discard-edits-confirm"))
     expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
     expect(mockSaveVersion).not.toHaveBeenCalled()
+  })
+
+  it("replays native navigation only after changed edits are discarded", () => {
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getAllByText("+")[0])
+    const action = { type: "GO_BACK" }
+
+    act(() => mockPreventRemoveCallback?.({ data: { action } }))
+    expect(view.getByTestId("discard-edits-dialog")).toBeTruthy()
+    expect(mockNavigationDispatch).not.toHaveBeenCalled()
+
+    fireEvent.press(view.getByTestId("discard-edits-confirm"))
+    expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
   })
 
   it("opens the shared card dialog with provider details for a Yu-Gi-Oh card", async () => {

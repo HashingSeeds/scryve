@@ -1,6 +1,7 @@
-import { StyleSheet } from "react-native"
+import { Platform, StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { deleteGuestDeck, saveGuestDeck } from "@/features/decks/guestDeck"
 import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
@@ -101,9 +102,31 @@ function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
 }
 
 describe("DecksScreen", () => {
+  it("opens the local deck while auth is loading without querying the private shelf", () => {
+    saveGuestDeck({ name: "Guest Commander", format: "commander", game: "mtg", cards: [] })
+    mockListMine.error = new Error("Private query must not run")
+    const onSelect = jest.fn()
+    const view = renderShelf({
+      onSelect,
+      access: {
+        ready: false,
+        loading: true,
+        signedIn: false,
+        request: jest.fn(),
+      },
+    })
+    expect(view.getByText("Guest Commander")).toBeTruthy()
+    expect(view.queryByText("Existing Deck")).toBeNull()
+    fireEvent.press(view.getByLabelText("Guest Commander"))
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ deckId: "guest" }))
+    fireEvent.changeText(view.getByTestId("deck-search-input"), "no match")
+    expect(view.queryByText("Guest Commander")).toBeNull()
+    expect(view.getByText("Nothing matches")).toBeTruthy()
+  })
   beforeEach(() => {
     jest.clearAllMocks()
     clear()
+    deleteGuestDeck()
     mockListMine.value = {
       decks: [commanderDeck, standardDeck],
       capacity: { used: 2, limit: 100, premium: true, canCreate: true },
@@ -119,7 +142,7 @@ describe("DecksScreen", () => {
     expect(view.getByText("Return to game")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
     expect(StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style).bottom).toBe(
-      spacing.md,
+      Platform.OS === "ios" ? 0 : spacing.md,
     )
     fireEvent.press(view.getByLabelText("Return to game"))
     expect(onPlay).toHaveBeenCalledTimes(1)
