@@ -74,7 +74,11 @@ export default function HistoryRoute() {
       {signedIn ? <HistoryConnection ownerId={auth.userId} onChange={setConnected} /> : null}
       <HistoryScreen
         {...shared}
-        connected={signedIn && connected?.ownerId === auth.userId ? connected?.feed : undefined}
+        connected={
+          signedIn && auth.userId !== undefined && connected?.ownerId === auth.userId
+            ? connected?.feed
+            : undefined
+        }
       />
     </>
   )

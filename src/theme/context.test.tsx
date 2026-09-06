@@ -30,7 +30,7 @@ describe("ThemeProvider", () => {
     expect(view.getByTestId("themed-view").props.style).toMatchObject({
       flex: 1,
       opacity: 1,
-      backgroundColor: "#191015",
+      backgroundColor: "#000000",
     })
   })
 })

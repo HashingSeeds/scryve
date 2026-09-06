@@ -22,7 +22,7 @@ describe("web auth experience", () => {
 
   it.each([
     ["light", "#F4F2F1", "#C76542"],
-    ["dark", "#191015", "#E8C1B4"],
+    ["dark", "#000000", "#E8C1B4"],
   ] as const)("opens Clerk with the %s theme and popup OAuth", (theme, background, primary) => {
     const onDismiss = jest.fn()
     const { rerender } = render(modal(theme, false, onDismiss))
