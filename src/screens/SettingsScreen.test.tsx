@@ -135,6 +135,32 @@ describe("SettingsScreen", () => {
     )
   })
 
+  it("updates the life default for a format while preserving custom life", () => {
+    const onSettingsChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={{ ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg" }}
+          onBack={jest.fn()}
+          onSettingsChange={onSettingsChange}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("default-format"))
+    fireEvent.press(view.getByTestId("default-format-option-commander"))
+    expect(onSettingsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ defaultFormat: "commander", defaultStartingLife: 40 }),
+    )
+
+    fireEvent.press(view.getByTestId("default-starting-life-decrement"))
+    fireEvent.press(view.getByTestId("default-format"))
+    fireEvent.press(view.getByTestId("default-format-option-standard"))
+    expect(onSettingsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ defaultFormat: "standard", defaultStartingLife: 39 }),
+    )
+  })
+
   it("keeps Back reachable and reveals the title after scrolling", () => {
     const onBack = jest.fn()
     const view = render(

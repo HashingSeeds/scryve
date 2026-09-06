@@ -6,7 +6,7 @@ import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { createLocalGame, PLAYER_COLORS } from "@/features/game/domain"
+import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 import { useAppTheme } from "@/theme/context"
@@ -70,7 +70,8 @@ export default function Index() {
     settings.defaultFormat,
   ])
 
-  const stale = activeGame ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
+  const started = activeGame !== null && hasLocalGameStarted(activeGame)
+  const stale = activeGame && started ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
 
   if (destination !== "play" && (!activeGame || stale) && settings.launchDestination === "decks") {
     return <Redirect href="/connected/decks" />
@@ -101,7 +102,7 @@ export default function Index() {
   return (
     <CurrentGameScreen
       initialGame={activeGame ?? freshGame}
-      fresh={!activeGame}
+      fresh={!started}
       initialEndOpen={oldGameChoice === "end"}
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}

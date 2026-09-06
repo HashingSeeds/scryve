@@ -101,7 +101,7 @@ export function AppUtilityMenu({
           <Pressable
             testID="utility-menu-button"
             accessibilityRole="button"
-            accessibilityLabel="Utility"
+            accessibilityLabel="More"
             accessibilityState={{ expanded: open }}
             style={themed($trigger)}
             onPress={() => {
@@ -116,7 +116,7 @@ export function AppUtilityMenu({
                 <View style={themed($dot)} />
               </View>
             ) : (
-              <Text text="Utility" weight="bold" size="xs" />
+              <Text text="More" weight="bold" size="xs" />
             )}
           </Pressable>
         </Animated.View>

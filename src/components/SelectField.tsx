@@ -219,7 +219,7 @@ const $trigger: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.sm,
   paddingHorizontal: spacing.sm,
   borderRadius: CHOICE_RADIUS,
-  borderWidth: 2,
+  borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.palette.neutral100,
 })
@@ -239,7 +239,7 @@ const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $menu: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderRadius: CHOICE_RADIUS,
-  borderWidth: 2,
+  borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.background,
   shadowColor: colors.palette.neutral900,

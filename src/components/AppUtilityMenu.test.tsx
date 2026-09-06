@@ -14,6 +14,7 @@ describe("AppUtilityMenu", () => {
       </ThemeProvider>,
     )
 
+    expect(view.getByLabelText("More")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button").props.accessibilityState.expanded).toBe(false)
     fireEvent.press(view.getByTestId("utility-menu-button"))
     expect(view.queryByTestId("utility-menu-button")).toBeNull()

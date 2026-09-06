@@ -25,7 +25,7 @@ export interface SegmentedControlProps {
 }
 
 const TRACK_INSET = 3
-const TRACK_BORDER_WIDTH = 2
+const TRACK_BORDER_WIDTH = 1
 const SLIDE_SPRING = { damping: 18, stiffness: 240, mass: 0.6 } as const
 
 export function SegmentedControl({

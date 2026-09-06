@@ -1,5 +1,5 @@
 import { Dimensions, StyleSheet } from "react-native"
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
 
 import { Screen } from "@/components/Screen"
 import { ConnectedHostSource } from "@/features/connected/ConnectedHostSource"
@@ -13,7 +13,9 @@ import { ThemeProvider } from "@/theme/context"
 import { NewGameScreen, type ConnectedHostFeed, type NewGameScreenProps } from "./NewGameScreen"
 import {
   connectedHarness,
+  mockAbandon,
   mockCreateLobby,
+  mockLeave,
   mockSyncUser,
   resetConnectedHarness,
   themed,
@@ -56,7 +58,12 @@ function setup(overrides: Partial<NewGameScreenProps> = {}) {
   )
 }
 
-const readyHost: ConnectedHostFeed = { ready: true, busy: false, host: jest.fn() }
+const readyHost: ConnectedHostFeed = {
+  ready: true,
+  busy: false,
+  host: jest.fn(),
+  exitGame: jest.fn(async () => true),
+}
 
 function hostSetup(onLobbyCreated: (lobby: { publicId: string }) => void) {
   return themed(
@@ -244,19 +251,34 @@ describe("NewGameScreen", () => {
     const view = setup({ onStartLocal })
 
     fireEvent.press(view.getByTestId("play-system-mtg"))
-    expect(view.getByLabelText("Increase Life by 10")).toBeTruthy()
+    expect(view.getByLabelText("Increase Life by 1")).toBeTruthy()
     fireEvent.press(view.getByTestId("starting-counter-increment"))
     fireEvent.press(view.getByTestId("life-step"))
     fireEvent.press(view.getByTestId("life-step-option-5"))
     fireEvent.press(view.getByTestId("starting-counter-increment"))
     fireEvent.press(view.getByTestId("start-game-button"))
 
-    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 35, {
+    expect(onStartLocal).toHaveBeenCalledWith(expect.any(Array), 26, {
       format: "standard",
       layout: "auto",
       lifeStep: 5,
       system: "mtg",
     })
+  })
+
+  it("preserves custom life when changing formats", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
+    fireEvent.press(view.getByTestId("play-system-mtg"))
+    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("play-format"))
+    fireEvent.press(view.getByTestId("play-format-option-commander"))
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      21,
+      expect.objectContaining({ format: "commander", lifeStep: 1 }),
+    )
   })
 
   it("keeps the start button pinned outside the scrollable form", () => {
@@ -294,13 +316,13 @@ describe("NewGameScreen", () => {
 
     expect(host).toHaveBeenCalledWith({
       playerCount: 4,
-      startingLife: 20,
+      startingLife: 40,
       ruleset: "commander",
       system: "mtg",
       format: "commander",
       deckRequired: false,
       layout: "auto",
-      lifeStep: 10,
+      lifeStep: 1,
     })
   })
 
@@ -336,15 +358,127 @@ describe("NewGameScreen", () => {
       onResumeConnected,
     })
 
-    expect(view.getByTestId("join-connected-button")).toBeEnabled()
-    fireEvent.press(view.getByTestId("join-connected-button"))
+    expect(view.getByTestId("connected-action-join")).toBeEnabled()
+    fireEvent.press(view.getByTestId("connected-action-join"))
     fireEvent.press(view.getByTestId("resume-connected-resume-game"))
 
     expect(onJoinConnected).toHaveBeenCalledTimes(1)
     expect(onResumeConnected).toHaveBeenCalledWith(game)
   })
 
-  it("keeps hosting unavailable until the connected session is ready", () => {
+  it("confirms host end and participant leave actions without changing setup", async () => {
+    const exitGame = jest.fn(async () => true)
+    const hosted = {
+      publicId: "hosted-game",
+      status: "active" as const,
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: 1,
+    }
+    const joined = { ...hosted, publicId: "joined-game", isHost: false }
+    const view = setup({
+      mode: "connected",
+      connected: { ...readyHost, activeGames: [hosted, joined], exitGame },
+    })
+
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("end-connected-hosted-game"))
+    expect(view.getByText("End this game?")).toBeTruthy()
+    fireEvent.press(view.getByTestId("cancel-connected-game-exit"))
+    expect(view.getByTestId("player-count-increment")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("leave-connected-joined-game"))
+    expect(view.getByText("Leave this game?")).toBeTruthy()
+    fireEvent.press(view.getByTestId("confirm-connected-game-exit"))
+    await waitFor(() => expect(exitGame).toHaveBeenCalledWith(joined))
+    expect(view.queryByTestId("connected-game-exit-confirmation")).toBeNull()
+  })
+
+  it("keeps the exit confirmation open and shows an exit failure", async () => {
+    const exitGame = jest.fn(async () => false)
+    const game = {
+      publicId: "failed-exit",
+      status: "lobby" as const,
+      isHost: false,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: 1,
+    }
+    const view = setup({
+      mode: "connected",
+      connected: {
+        ...readyHost,
+        activeGames: [game],
+        exitGame,
+        exitError: "Could not leave this game.",
+      },
+    })
+
+    fireEvent.press(view.getByTestId("leave-connected-failed-exit"))
+    fireEvent.press(view.getByTestId("confirm-connected-game-exit"))
+    await waitFor(() => expect(exitGame).toHaveBeenCalledWith(game))
+    expect(view.getAllByText("Could not leave this game.")).toHaveLength(2)
+    expect(view.getByTestId("connected-game-exit-confirmation")).toBeTruthy()
+  })
+
+  it("hides brief preparation and retry flashes, but explains a slow connection", () => {
+    jest.useFakeTimers()
+    try {
+      const view = setup({
+        mode: "connected",
+        connected: {
+          ...readyHost,
+          ready: false,
+          status: "Checking your games…",
+          retry: jest.fn(),
+        },
+      })
+      expect(view.queryByTestId("connected-host-preparation")).toBeNull()
+      expect(view.queryByText("Retry connection")).toBeNull()
+      expect(view.getByTestId("host-connected-button")).toBeDisabled()
+      act(() => jest.advanceTimersByTime(200))
+      expect(view.getByTestId("connected-host-preparation")).toBeTruthy()
+      expect(view.queryByText("Retry connection")).toBeNull()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("never reveals preparation when the connection finishes within the delay", () => {
+    jest.useFakeTimers()
+    try {
+      const renderSetup = (connected: ConnectedHostFeed) =>
+        themed(
+          <NewGameScreen
+            defaults={DEFAULT_LOCAL_SETTINGS}
+            mode="connected"
+            connected={connected}
+            onModeChange={jest.fn()}
+            onBack={jest.fn()}
+            onStartLocal={jest.fn()}
+          />,
+        )
+      const view = render(
+        renderSetup({
+          ...readyHost,
+          ready: false,
+          status: "Checking your games…",
+          retry: jest.fn(),
+        }),
+      )
+      act(() => jest.advanceTimersByTime(100))
+      view.rerender(renderSetup(readyHost))
+      act(() => jest.advanceTimersByTime(200))
+      expect(view.queryByTestId("connected-host-preparation")).toBeNull()
+      expect(view.queryByText("Retry connection")).toBeNull()
+      expect(view.getByTestId("host-connected-button")).toBeEnabled()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("keeps hosting unavailable until the connected session is ready", async () => {
     const view = setup({
       mode: "connected",
       connected: {
@@ -355,8 +489,10 @@ describe("NewGameScreen", () => {
     })
 
     expect(view.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
-    expect(view.getByTestId("connected-host-preparation")).toHaveTextContent(
-      "Preparing your connected profile…",
+    await waitFor(() =>
+      expect(view.getByTestId("connected-host-preparation")).toHaveTextContent(
+        "Preparing your connected profile…",
+      ),
     )
   })
 
@@ -396,12 +532,47 @@ describe("NewGameScreen", () => {
     expect(mockCreateLobby).toHaveBeenCalledWith(
       expect.objectContaining({
         playerCount: 4,
-        startingLife: 40,
-        lifeStep: 10,
+        startingLife: 22,
+        lifeStep: 1,
         ruleset: "standard",
       }),
     )
     expect(mockSyncUser).toHaveBeenCalledTimes(1)
+  })
+
+  it("dispatches connected game exit mutations by player role", async () => {
+    connectedHarness.activeGames = [
+      { publicId: "hosted-game", status: "active", ruleset: "standard", isHost: true },
+      { publicId: "joined-game", status: "active", ruleset: "standard", isHost: false },
+    ]
+    render(hostSetup(jest.fn()))
+    await waitFor(() => expect(screen.getByTestId("end-connected-hosted-game")).toBeEnabled())
+
+    fireEvent.press(screen.getByTestId("end-connected-hosted-game"))
+    fireEvent.press(screen.getByTestId("confirm-connected-game-exit"))
+    await waitFor(() => expect(mockAbandon).toHaveBeenCalledWith({ publicId: "hosted-game" }))
+
+    fireEvent.press(screen.getByTestId("leave-connected-joined-game"))
+    fireEvent.press(screen.getByTestId("confirm-connected-game-exit"))
+    await waitFor(() =>
+      expect(mockLeave).toHaveBeenCalledWith(
+        expect.objectContaining({ publicId: "joined-game", deviceId: expect.any(String) }),
+      ),
+    )
+  })
+
+  it("keeps the recovery action available when its mutation fails", async () => {
+    connectedHarness.activeGames = [
+      { publicId: "joined-game", status: "active", ruleset: "standard", isHost: false },
+    ]
+    mockLeave.mockRejectedValueOnce(new Error("Could not leave this game."))
+    render(hostSetup(jest.fn()))
+    await waitFor(() => expect(screen.getByTestId("leave-connected-joined-game")).toBeEnabled())
+
+    fireEvent.press(screen.getByTestId("leave-connected-joined-game"))
+    fireEvent.press(screen.getByTestId("confirm-connected-game-exit"))
+    await waitFor(() => expect(screen.getAllByText("Could not leave this game.")).toHaveLength(2))
+    expect(screen.getByTestId("connected-game-exit-confirmation")).toBeTruthy()
   })
 
   it("blocks hosting a second lobby from the setup screen", async () => {
@@ -410,7 +581,7 @@ describe("NewGameScreen", () => {
     ]
     render(hostSetup(jest.fn()))
 
-    await waitFor(() => expect(screen.getByText(/Resume or finish your hosted game/i)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/End your hosted game/i)).toBeTruthy())
     expect(screen.getByTestId("host-connected-button").props.accessibilityState.disabled).toBe(true)
   })
 
@@ -418,9 +589,7 @@ describe("NewGameScreen", () => {
     connectedHarness.activeGamesStatus = "LoadingFirstPage"
     render(hostSetup(jest.fn()))
 
-    await waitFor(() =>
-      expect(screen.getByText("Checking for an existing hosted game…")).toBeTruthy(),
-    )
+    await waitFor(() => expect(screen.getByText("Checking your games…")).toBeTruthy())
     expect(screen.getByTestId("host-connected-button")).toBeDisabled()
   })
 })

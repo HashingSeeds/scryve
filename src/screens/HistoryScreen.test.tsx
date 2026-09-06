@@ -265,6 +265,28 @@ describe("unified history screen", () => {
     expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
   })
 
+  it("offers one older-page load when a connected filter has no loaded matches", () => {
+    const load = jest.fn()
+    renderHistory({
+      connected: connectedFeed([connectedGame()], {
+        page: {
+          status: "ready",
+          items: [connectedHistoryEntry(connectedGame())],
+          nextPage: { status: "available", load },
+        },
+      }),
+    })
+
+    fireEvent.press(screen.getByTestId("history-source-connected"))
+    openFilters()
+    fireEvent.press(screen.getByTestId("history-outcome-draw"))
+    fireEvent.press(screen.getByTestId("history-filters-button"))
+
+    expect(screen.getByText("No matches in loaded games")).toBeTruthy()
+    fireEvent.press(screen.getByRole("button", { name: "Load older games" }))
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
   it("warns that filters only cover loaded connected pages", () => {
     renderHistory({
       connected: connectedFeed([connectedGame()], {
@@ -295,14 +317,14 @@ describe("unified history screen", () => {
       games: [localGame({ result: { kind: "win", winnerPlayerIds: ["p2"] } } as never)],
     })
 
-    expect(screen.getByLabelText("Win · Ada · Grace")).toBeTruthy()
+    expect(screen.getByLabelText(/Win · Ada · Grace · Local · .* · Won by Grace/)).toBeTruthy()
     expect(screen.getByText(/Won by Grace/)).toBeTruthy()
   })
 
   it("labels an abandoned local game instead of implying a result", () => {
     renderHistory({ games: [localGame({ status: "abandoned" })] })
 
-    expect(screen.getByLabelText("Abandoned · Ada · Grace")).toBeTruthy()
+    expect(screen.getByLabelText(/Abandoned · Ada · Grace/)).toBeTruthy()
   })
 
   it("uses stable rows instead of settled zero counts while connected history loads", () => {
@@ -328,6 +350,19 @@ describe("unified history screen", () => {
 
     expect(screen.getByText("game:noGames")).toBeTruthy()
     expect(screen.queryByTestId("history-skeleton-row")).toBeNull()
+  })
+
+  it("keeps the older-page action reachable on an unfiltered empty connected page", () => {
+    const load = jest.fn()
+    renderHistory({
+      games: [],
+      connected: connectedFeed([], {
+        page: { status: "ready", items: [], nextPage: { status: "available", load } },
+      }),
+    })
+
+    fireEvent.press(screen.getByTestId("history-load-more"))
+    expect(load).toHaveBeenCalledTimes(1)
   })
 
   it("keeps local history usable when connected history is unavailable", () => {

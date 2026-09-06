@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { ActivityIndicator } from "react-native"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
@@ -99,6 +99,33 @@ describe("connected cold-offline and authentication gate", () => {
     mockUsernameCheck.mockResolvedValue({ acceptable: true })
   })
 
+  it("keeps editable setup mounted through connection checks and disconnects", async () => {
+    function Draft() {
+      const [life, setLife] = useState(20)
+      return <Button text={`Life ${life}`} onPress={() => setLife(life + 1)} />
+    }
+    const setup = () =>
+      themed(
+        <ConnectedGate allowPendingProfile>
+          <Draft />
+        </ConnectedGate>,
+      )
+    const view = render(setup())
+    await waitFor(() => expect(screen.getByText("Life 20")).toBeTruthy())
+    fireEvent.press(screen.getByText("Life 20"))
+    mockSocketConnected = false
+    view.rerender(setup())
+    expect(screen.getByText("Life 21")).toBeTruthy()
+    mockSocketConnected = true
+    mockConvexLoading = true
+    view.rerender(setup())
+    expect(screen.getByText("Life 21")).toBeTruthy()
+    mockClerkSignedIn = false
+    view.rerender(setup())
+    expect(screen.queryByText("Life 21")).toBeNull()
+    expect(screen.getByText("Sign in")).toBeTruthy()
+  })
+
   it("keeps an established board and taps mounted through a socket drop", async () => {
     const onTap = jest.fn()
     const child = <Button testID="offline-life-tap" text="+1" onPress={onTap} />
@@ -158,19 +185,22 @@ describe("connected cold-offline and authentication gate", () => {
     const onBack = jest.fn()
     render(gate(<Button testID="private-cached-board" text="+1" />, onBack))
     expect(screen.queryByTestId("private-cached-board")).toBeNull()
-    expect(screen.getByText(/session expired|signed out/i)).toBeTruthy()
+    expect(
+      screen.getByText("Sign in to play across devices. Local games remain available."),
+    ).toBeTruthy()
     expect(screen.queryByText(/issuer|deployment/i)).toBeNull()
-    fireEvent.press(screen.getByText("Re-authenticate"))
+    fireEvent.press(screen.getByText("Sign in"))
     fireEvent.press(screen.getByText("Back to local play"))
     expect(mockOpenAuth).toHaveBeenCalledTimes(1)
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 
-  it("reserves issuer/deployment guidance for an online Convex rejection", () => {
+  it("explains an online account connection failure without implementation details", () => {
     mockConvexAuthenticated = false
     const view = render(gate(<Button testID="private-cached-board" text="+1" />))
     expect(screen.queryByTestId("private-cached-board")).toBeNull()
-    expect(screen.getByText(/issuer or deployment configuration/i)).toBeTruthy()
+    expect(screen.getByText("We couldn’t connect your account. Try signing in again.")).toBeTruthy()
+    expect(screen.queryByText(/issuer|deployment|Convex/i)).toBeNull()
     expect(view.UNSAFE_getByType(Screen).props.safeAreaEdges).toEqual(["top", "bottom"])
   })
 
@@ -184,7 +214,7 @@ describe("connected cold-offline and authentication gate", () => {
     render(gate(child))
 
     expect(screen.getByTestId("warm-connected-board")).toBeTruthy()
-    expect(screen.queryByText("Preparing your connected-play profile…")).toBeNull()
+    expect(screen.queryByText("Preparing your game profile…")).toBeNull()
   })
 
   it("withholds the loading interstitial until the reveal delay elapses", () => {
@@ -250,8 +280,8 @@ describe("connected cold-offline and authentication gate", () => {
     render(gate(<Button testID="connected-board" text="Board" />, onBack))
 
     await waitFor(() => expect(screen.getByText("Could not sync profile")).toBeTruthy())
-    expect(screen.queryByText("Preparing your connected-play profile…")).toBeNull()
-    fireEvent.press(screen.getByText("Re-authenticate"))
+    expect(screen.queryByText("Preparing your game profile…")).toBeNull()
+    fireEvent.press(screen.getByText("Sign in again"))
     fireEvent.press(screen.getByText("Back to local play"))
     expect(mockOpenAuth).toHaveBeenCalledTimes(1)
     expect(onBack).toHaveBeenCalledTimes(1)

@@ -4,7 +4,6 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
-import { spacing } from "@/theme/spacing"
 import { clear } from "@/utils/storage"
 
 import { DecksScreen } from "./DecksScreen"
@@ -119,7 +118,7 @@ describe("DecksScreen", () => {
     expect(view.getByText("Return to game")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
     expect(StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style).bottom).toBe(
-      spacing.md,
+      0,
     )
     fireEvent.press(view.getByLabelText("Return to game"))
     expect(onPlay).toHaveBeenCalledTimes(1)

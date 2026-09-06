@@ -2,6 +2,7 @@ import {
   applyGameCommand,
   asActorId,
   canUndo,
+  hasLocalGameStarted,
   commanderDamageBetween,
   commandToEvent,
   COMMANDER_LETHAL_DAMAGE,
@@ -41,6 +42,26 @@ function makeGame(count = 2, startingLife = 20) {
 }
 
 describe("local game domain", () => {
+  it("starts on game activity, stays started after undo, and ignores setup edits", () => {
+    const game = { ...makeGame(), layout: "tabletop" as const }
+    game.players[0].name = "Alex"
+    expect(hasLocalGameStarted(game)).toBe(false)
+    const context = makeContext()
+    const changed = applyGameCommand(
+      game,
+      {
+        type: "life.change",
+        playerId: game.players[0].id,
+        delta: -1,
+      },
+      context,
+    )
+    expect(hasLocalGameStarted(changed)).toBe(true)
+    const undone = applyGameCommand(changed, { type: "life.undo" }, context)
+    expect(undone.players[0].life).toBe(game.startingLife)
+    expect(hasLocalGameStarted(undone)).toBe(true)
+  })
+
   it("uses independent secure UUID entropy even at the same timestamp", () => {
     const first = createClientId("operation", 123, () => "00000000-0000-4000-8000-000000000001")
     const second = createClientId("operation", 123, () => "00000000-0000-4000-8000-000000000002")
@@ -75,7 +96,7 @@ describe("local game domain", () => {
       ],
     })
 
-    expect(magic.lifeStep).toBe(10)
+    expect(magic.lifeStep).toBe(1)
     expect(custom.lifeStep).toBe(5)
   })
 

@@ -47,7 +47,7 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
       plural: "life",
       defaultValue: 20,
       presets: [20, 30, 40],
-      tapStep: 10,
+      tapStep: 1,
       direction: "open",
       maxStartingValue: 999,
     },
@@ -133,6 +133,15 @@ export function playSystemFormat(value?: unknown, format?: string): string {
 }
 
 export const COMMANDER_DAMAGE_FORMAT = "commander"
+
+export function defaultStartingLife(system?: unknown, format?: string): number {
+  if (
+    playSystemId(system) === "mtg" &&
+    playSystemFormat(system, format) === COMMANDER_DAMAGE_FORMAT
+  )
+    return 40
+  return playSystemRules(system).counter.defaultValue
+}
 
 export function supportsCommanderDamage(value: unknown, format?: string): boolean {
   return (
