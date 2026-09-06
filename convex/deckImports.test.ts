@@ -457,7 +457,7 @@ describe("preconstructed catalog caching", () => {
   })
 
   it("does not cold-fetch an unknown guest preconstructed filename", async () => {
-    const fetchSpy = jest.spyOn(global, "fetch")
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network unavailable"))
     try {
       const t = convexTest(schema, modules)
       await t.mutation(internal.deckImports.storeCatalog, {
