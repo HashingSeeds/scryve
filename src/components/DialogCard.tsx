@@ -8,11 +8,11 @@ import type {
 } from "react-native"
 import { Modal, Pressable, StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
-import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 export interface DialogOrigin {
   x: number
@@ -29,6 +29,7 @@ export interface DialogCardProps {
   dialogAccessibilityRole?: AccessibilityRole
   accessibilityViewIsModal?: boolean
   wide?: boolean
+  placement?: "center" | "bottom"
   origin?: DialogOrigin
   style?: StyleProp<ViewStyle>
   children: ReactNode
@@ -49,12 +50,20 @@ export function DialogCard({
   dialogAccessibilityRole,
   accessibilityViewIsModal,
   wide,
+  placement = "center",
   origin,
   style,
   children,
 }: DialogCardProps) {
-  const { themed } = useAppTheme()
-  const safeAreaInsets = useSafeAreaInsetsStyle(["top", "bottom"], "margin")
+  const { theme, themed } = useAppTheme()
+  const safeAreaInsets = useSafeAreaInsets()
+  const safeAreaMarginStyle = {
+    marginTop: safeAreaInsets.top,
+    marginBottom: placement === "bottom" ? 0 : safeAreaInsets.bottom,
+  }
+  const bottomSafeAreaStyle = {
+    paddingBottom: theme.spacing.lg + safeAreaInsets.bottom,
+  }
   const reducedMotion = useReducedMotion()
   const animateFromOrigin = Boolean(origin) && reducedMotion === false
   const entrance = useSharedValue(animateFromOrigin ? 0 : 1)
@@ -102,12 +111,27 @@ export function DialogCard({
           style={[StyleSheet.absoluteFill, themed($dialogBackdrop)]}
           onPress={requestClose}
         />
-        <View pointerEvents="box-none" style={[themed($dialogLayout), safeAreaInsets]}>
+        <View
+          testID={dialogTestID ? `${dialogTestID}-layout` : undefined}
+          pointerEvents="box-none"
+          style={[
+            themed($dialogLayout),
+            placement === "bottom" ? themed($bottomDialogLayout) : undefined,
+            safeAreaMarginStyle,
+          ]}
+        >
           <Animated.View
             testID={dialogTestID}
             accessibilityRole={dialogAccessibilityRole}
             accessibilityViewIsModal={accessibilityViewIsModal}
-            style={[themed($dialog), wide ? themed($wideDialog) : undefined, style, entranceStyle]}
+            style={[
+              themed($dialog),
+              wide ? themed($wideDialog) : undefined,
+              placement === "bottom" ? themed($bottomDialog) : undefined,
+              placement === "bottom" ? bottomSafeAreaStyle : undefined,
+              style,
+              entranceStyle,
+            ]}
             onLayout={launchFromOrigin}
             onStartShouldSetResponder={claimTouchesSoTheBackdropNeverSeesThem}
           >
@@ -129,6 +153,11 @@ const $dialogLayout: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "center",
   padding: spacing.lg,
 })
+const $bottomDialogLayout: ThemedStyle<ViewStyle> = () => ({
+  justifyContent: "flex-end",
+  paddingHorizontal: 0,
+  paddingBottom: 0,
+})
 const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   width: "100%",
   maxWidth: 420,
@@ -146,6 +175,15 @@ const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   elevation: 16,
 })
 const $wideDialog: ThemedStyle<ViewStyle> = () => ({ maxWidth: 520 })
+const $bottomDialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  maxHeight: "88%",
+  borderBottomWidth: 0,
+  borderBottomLeftRadius: 0,
+  borderBottomRightRadius: 0,
+  borderTopLeftRadius: spacing.lg,
+  borderTopRightRadius: spacing.lg,
+  backgroundColor: colors.surface,
+})
 
 export const $dialogText: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
 export const $dialogActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({

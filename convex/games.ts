@@ -46,6 +46,7 @@ const MAX_INVITES_PER_GAME_READ = 20
 const MAX_HOSTED_GAMES_RECOVERY_READ = 25
 const MAX_COMMANDER_DAMAGE = 99
 const MAX_PENDING_COMMANDER_CLAIMS = 100
+const NO_GAME_SYSTEM = "none"
 
 async function gameByPublicId(ctx: QueryCtx, publicId: string) {
   assertPublicId(publicId)
@@ -484,7 +485,9 @@ export const createLobby = mutation({
     publicId: v.string(),
     playerCount: v.number(),
     startingLife: v.number(),
+    lifeStep: v.optional(v.number()),
     ruleset: v.string(),
+    deckRequired: v.optional(v.boolean()),
     game: v.optional(v.string()),
     system: v.optional(v.string()),
     format: v.optional(v.string()),
@@ -499,21 +502,31 @@ export const createLobby = mutation({
     const user = await requireUser(ctx)
     if (args.game !== undefined && args.system !== undefined && args.game !== args.system)
       throw new Error("Game system fields must match")
-    const gameSystem = assertGameSystem(args.system ?? args.game ?? DEFAULT_DECK_GAME)
-    await requireReleasedCapability(ctx, gameSystem, "playTracking")
+    const noSystem = (args.system ?? args.game) === NO_GAME_SYSTEM
+    const gameSystem = noSystem
+      ? NO_GAME_SYSTEM
+      : assertGameSystem(args.system ?? args.game ?? DEFAULT_DECK_GAME)
+    if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
     assertPlayerCount(args.playerCount)
     assertStartingLife(
       args.startingLife,
-      gameSystem === "ygo" ? 999_999 : gameSystem === "pokemon" ? 99 : 999,
+      gameSystem === "pokemon" ? 99 : gameSystem === "ygo" ? 999_999 : 999,
     )
+    if (args.lifeStep !== undefined) {
+      assertLifeDelta(args.lifeStep)
+      if (args.lifeStep < 1) throw new Error("Life step must be positive")
+    }
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
     assertAllowedColor(args.hostColor)
     if (args.hostShape !== undefined) assertAllowedShape(args.hostShape)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const ruleset = assertRuleset(args.ruleset)
-    const format =
-      args.format === undefined ? ruleset : assertDeckGameFormat(gameSystem, args.format)
+    const format = noSystem
+      ? undefined
+      : args.format === undefined
+        ? ruleset
+        : assertDeckGameFormat(gameSystem, args.format)
     const hostDisplayName = assertDisplayName(args.hostDisplayName)
     assertPublicId(args.publicId)
     for (const status of ["lobby", "active"] as const) {
@@ -540,10 +553,12 @@ export const createLobby = mutation({
       status: "lobby",
       playerCount: args.playerCount,
       startingLife: args.startingLife,
+      ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
       ruleset,
+      ...(args.deckRequired === undefined ? {} : { deckRequired: args.deckRequired }),
       game: gameSystem,
       system: gameSystem,
-      format,
+      ...(format ? { format } : {}),
       createdAt: now,
       updatedAt: now,
       eventSequence: 0,
@@ -738,7 +753,9 @@ export const lobbyProjection = query({
       status: game.status,
       playerCount: game.playerCount,
       startingLife: game.startingLife,
+      ...(game.lifeStep === undefined ? {} : { lifeStep: game.lifeStep }),
       ruleset: game.ruleset,
+      deckRequired: game.deckRequired ?? false,
       game: game.game ?? DEFAULT_DECK_GAME,
       system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
       format: game.format ?? game.ruleset,
@@ -913,6 +930,15 @@ export const startGame = mutation({
     const players = await playersForGame(ctx, game._id)
     if (players.length < 2 || players.length > 6 || players.length !== game.playerCount)
       throw new Error("All configured seats (2–6) must be claimed before starting")
+    if (game.deckRequired === true) {
+      for (const player of players) {
+        if (
+          player.deckVersionId === undefined ||
+          !(await deckSelectionIsPlayable(ctx, player.deckVersionId))
+        )
+          throw new Error("Every occupied seat must choose a deck before starting")
+      }
+    }
     const now = Date.now()
     await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
     for (const player of players) {
@@ -1722,6 +1748,7 @@ export const activeConnectedGames = query({
             isHost: true,
             playerCount: game.playerCount,
             ruleset: game.ruleset,
+            deckRequired: game.deckRequired ?? false,
             game: game.game ?? DEFAULT_DECK_GAME,
             system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
             format: game.format ?? game.ruleset,
@@ -1742,6 +1769,7 @@ export const activeConnectedGames = query({
           isHost: game.hostUserId === user._id,
           playerCount: game.playerCount,
           ruleset: game.ruleset,
+          deckRequired: game.deckRequired ?? false,
           game: game.game ?? DEFAULT_DECK_GAME,
           system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
           format: game.format ?? game.ruleset,

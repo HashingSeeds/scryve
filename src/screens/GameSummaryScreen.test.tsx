@@ -122,6 +122,13 @@ describe("game summary", () => {
     expect(screen.getByText("Final Life")).toBeTruthy()
   })
 
+  it("keeps a no-system local summary on generic starting-life copy", () => {
+    const model = localSummaryModel(localGame({ format: "standard" }))
+
+    expect(model.system).toBeUndefined()
+    expect(model.format).toBe("20 life")
+  })
+
   it("numbers local seats for humans, starting at one like the board does", () => {
     renderLocal()
 
@@ -205,6 +212,15 @@ describe("game summary", () => {
     expect(screen.getByLabelText("Winner, Player, 7 life")).toBeTruthy()
     expect(screen.getByLabelText("Loss, Player, -1 life")).toBeTruthy()
     expect(screen.getByText("2 players · Commander · 48 life changes")).toBeTruthy()
+  })
+
+  it("keeps a no-system connected summary on generic starting-life copy", () => {
+    const model = connectedSummaryModel(
+      connectedSummary({ system: "none", format: "none", ruleset: "none" }),
+    )
+
+    expect(model.system).toBeUndefined()
+    expect(model.format).toBe("40 life")
   })
 
   it("says when a connected game finished without a recorded winner", () => {

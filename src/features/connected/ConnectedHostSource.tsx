@@ -1,14 +1,17 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useMutation, usePaginatedQuery } from "convex/react"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remotePage } from "@/features/async/remoteState"
+import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
+import { ConnectedGameRepository } from "@/features/connected/persistence"
 import {
   useConnectedProfile,
   type ConnectedProfileState,
 } from "@/features/connected/useConnectedProfile"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 
 import { api } from "../../../convex/_generated/api"
@@ -58,7 +61,14 @@ function ConnectedHostQuerySource({
   children: (feed: ConnectedHostFeed) => ReactNode
 }) {
   const createLobby = useMutation(api.games.createLobby)
-  const deviceId = useMemo(() => new LocalGameRepository().getDeviceId(), [])
+  const localRepository = useMemo(() => new LocalGameRepository(), [])
+  const deviceId = useMemo(() => localRepository.getDeviceId(), [localRepository])
+  const connectedUserId = connectedProfile.profile?.userId
+  const migrationRepository = useMemo(
+    () => (connectedUserId ? new ConnectedGameRepository(undefined, connectedUserId) : null),
+    [connectedUserId],
+  )
+  const migrateMemberships = useMutation(api.games.migrateMyGameMemberships)
   const [hostError, setHostError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const ready = connectedProfile.status === "ready"
@@ -75,6 +85,27 @@ function ConnectedHostQuerySource({
         ? "Checking for an existing hosted game…"
         : undefined
   const hostReady = ready && activeGamesState.status === "ready"
+
+  useEffect(() => {
+    if (!ready || !migrationRepository || migrationRepository.isMembershipMigrationComplete())
+      return
+    let cancelled = false
+    void (async () => {
+      let cursor: string | null = null
+      let isDone = false
+      while (!isDone && !cancelled) {
+        const result: { continueCursor: string; isDone: boolean } = await migrateMemberships({
+          cursor,
+        })
+        cursor = result.continueCursor
+        isDone = result.isDone
+      }
+      if (!cancelled) migrationRepository.markMembershipMigrationComplete()
+    })().catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [migrateMemberships, migrationRepository, ready])
 
   async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
     if (connectedProfile.status === "offline") {
@@ -93,13 +124,16 @@ function ConnectedHostQuerySource({
       setBusy(true)
       setHostError(undefined)
       const ids = await createLobbyIdentifiers()
+      const { layout, system, ...lobbySetup } = setup
       const lobby = await createLobby({
         ...ids,
-        ...setup,
+        ...lobbySetup,
+        system: system ?? NO_PLAY_SYSTEM,
         hostDisplayName: connectedProfile.profile.displayName,
         hostColor: PLAYER_COLOR_CHOICES[0],
         deviceId,
       })
+      localRepository.saveLayoutPreference(setup.playerCount, layout)
       onLobbyCreated(lobby)
     } catch (cause) {
       setHostError(cause instanceof Error ? cause.message : "Could not create lobby")
@@ -120,6 +154,12 @@ function ConnectedHostQuerySource({
           : undefined,
     error:
       hostError ?? (connectedProfile.status === "error" ? connectedProfile.message : undefined),
+    ...(activeGamesState.status === "ready"
+      ? {
+          activeGames: activeGamesState.items as readonly ResumableGame[],
+          activeGamesNextPage: activeGamesState.nextPage,
+        }
+      : {}),
     host: (setup) => void host(setup),
   })
 }

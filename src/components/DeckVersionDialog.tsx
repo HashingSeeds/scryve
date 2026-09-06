@@ -8,7 +8,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { AlertNote } from "./AlertNote"
 import { Button } from "./Button"
 import { ChoiceButton } from "./ChoiceButton"
-import { $dialogActions, $dialogButton, $dialogText, DialogCard } from "./DialogCard"
+import { DialogCard } from "./DialogCard"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 
@@ -55,8 +55,10 @@ export function DeckVersionDialog({
       backdropAccessibilityLabel="Close version editor"
       dialogTestID="deck-version-dialog"
       accessibilityViewIsModal
+      placement="bottom"
+      wide
     >
-      <Text preset="subheading" text={title} style={themed($dialogText)} />
+      <Text preset="subheading" text={title} />
       <TextField
         testID="version-name-input"
         label="Version name"
@@ -97,17 +99,13 @@ export function DeckVersionDialog({
         </View>
       ) : null}
       {error ? <AlertNote text={error} /> : null}
-      <View style={themed($dialogActions)}>
-        <Button text="Cancel" style={themed($dialogButton)} disabled={busy} onPress={onClose} />
-        <Button
-          testID="version-submit"
-          text={busy ? "Saving…" : submitLabel}
-          preset="reversed"
-          style={themed($dialogButton)}
-          disabled={busy || !name.trim()}
-          onPress={() => onSubmit({ name, note, copyCards })}
-        />
-      </View>
+      <Button
+        testID="version-submit"
+        text={busy ? "Saving…" : submitLabel}
+        preset="reversed"
+        disabled={busy || !name.trim()}
+        onPress={() => onSubmit({ name, note, copyCards })}
+      />
       {onDelete ? (
         <Button
           testID="delete-version-button"

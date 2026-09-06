@@ -150,7 +150,9 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("player-grid-row-2")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
+    expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(false)
+    fireEvent.press(view.getByTestId("layout-button"))
+    expect(view.getByTestId("layout-tabletop")).toBeTruthy()
   })
 
   it("keeps the useful odd-player layout choices without offering wide", () => {
@@ -178,6 +180,23 @@ describe("CurrentGameScreen", () => {
     })
     expect(view.queryByTestId("layout-wide-grid")).toBeNull()
     expect(view.getByTestId("layout-featured-first")).toBeTruthy()
+  })
+
+  it("changes and persists the four-player layout from the radial menu", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen initialGame={game(4)} repository={repository} onGameEnded={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.getByTestId("layout-button")).toBeEnabled()
+    fireEvent.press(view.getByTestId("layout-button"))
+    fireEvent.press(view.getByTestId("layout-tabletop"))
+
+    expect(view.getByTestId("player-grid-row-2")).toBeTruthy()
+    await waitFor(() => expect(repository.loadActiveGame()?.layout).toBe("tabletop"))
   })
 
   it("discards an abandoned game without adding it to history", async () => {
@@ -441,7 +460,7 @@ describe("CurrentGameScreen", () => {
       expect(view.queryByTestId("life-eliminated-seat-3")).toBeNull()
       expect(view.getByTestId("game-board")).toBeTruthy()
       fireEvent.press(view.getByTestId("commander-done-seat-1"))
-      fireEvent.press(view.getByTestId("life-seat-2--1"))
+      fireEvent.press(view.getByTestId("life-seat-2--10"))
       expect(life(view, 2)).toBe("19")
     })
 

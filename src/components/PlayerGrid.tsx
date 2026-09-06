@@ -2,6 +2,10 @@ import { useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
 
+import {
+  playerGridLayoutForCount,
+  type PlayerGridLayoutVariant,
+} from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
@@ -39,6 +43,7 @@ export interface CommanderDamageGridBinding {
 export interface PlayerGridProps {
   players: GamePlayer[]
   system?: PlaySystemId
+  lifeStep?: number
   layoutVariant?: PlayerGridLayoutVariant
   disabled?: boolean
   isPlayerDisabled?: (player: GamePlayer) => boolean
@@ -51,10 +56,12 @@ export interface PlayerGridProps {
 }
 
 const SINGLE_PLAYER_ROW_FLEX = 0.8
+const TABLETOP_SINGLE_PLAYER_ROW_FLEX = 0.58
 
 export function PlayerGrid({
   players,
-  system = "mtg",
+  system,
+  lifeStep,
   layoutVariant = "auto",
   disabled,
   isPlayerDisabled,
@@ -114,10 +121,7 @@ export function PlayerGrid({
         <View
           key={rowIndex}
           testID={`player-grid-row-${rowIndex}`}
-          style={[
-            themed($row),
-            getPlayerGridRowFlex(row, layout.columnCount) < 1 && $singlePlayerRow,
-          ]}
+          style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}
         >
           {row.map((index, columnIndex) => {
             if (index === null) {
@@ -164,6 +168,7 @@ export function PlayerGrid({
                   contentRotation={contentRotation}
                   lifeFontSize={lifeFontSize}
                   system={system}
+                  lifeStep={lifeStep}
                   disabled={disabled || playerDisabled}
                   ownership={ownership}
                   pendingCount={getPendingCount?.(player)}
@@ -208,28 +213,8 @@ export function PlayerGrid({
   )
 }
 
-export type PlayerGridLayoutVariant = "auto" | "featured-first" | "featured-last" | "even-grid"
-
-export interface PlayerGridLayoutOption {
-  variant: PlayerGridLayoutVariant
-  label: string
-}
-
-export function getPlayerGridLayoutOptions(playerCount: number): PlayerGridLayoutOption[] {
-  if (playerCount === 2) return [{ variant: "auto", label: "Responsive" }]
-  if (playerCount % 2 === 0) return [{ variant: "auto", label: "Balanced" }]
-  return playerCount === 3
-    ? [
-        { variant: "auto", label: "Top focus" },
-        { variant: "featured-last", label: "Bottom focus" },
-        { variant: "even-grid", label: "Even grid" },
-      ]
-    : [
-        { variant: "auto", label: "Bottom focus" },
-        { variant: "featured-first", label: "Top focus" },
-        { variant: "even-grid", label: "Even grid" },
-      ]
-}
+export { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
+export type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 
 const LIFE_CONTROL_GUTTER = 32
 const LIFE_HEIGHT_RATIO = 0.5
@@ -270,6 +255,8 @@ export function getPlayerGridRows(
   layout: ReturnType<typeof getPlayerGridLayout>,
 ): (number | null)[][] {
   const seats = Array.from({ length: playerCount }, (_, index) => index)
+  if (layout.variant === "tabletop")
+    return [[0], ...chunkSeats(seats.slice(1, -1), 2), [playerCount - 1]]
   if (layout.variant === "featured-first") return [[0], ...chunkSeats(seats.slice(1), 2)]
   if (layout.variant === "featured-last")
     return [...chunkSeats(seats.slice(0, -1), 2), [playerCount - 1]]
@@ -283,7 +270,7 @@ export function getPlayerGridMenuAnchor(
   layout: ReturnType<typeof getPlayerGridLayout>,
 ): { x: number; y: number } {
   const rows = getPlayerGridRows(playerCount, layout)
-  const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout.columnCount))
+  const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
   const totalRowFlex = rowFlexes.reduce((total, flex) => total + flex, 0)
   let cumulativeFlex = 0
   const boundaryPositions = rowFlexes.slice(0, -1).map((flex) => {
@@ -314,8 +301,12 @@ export function getPlayerGridMenuAnchor(
   return { x: 0.5, y: nearestCentralBoundary ?? 0.5 }
 }
 
-function getPlayerGridRowFlex(row: (number | null)[], columnCount: number): number {
-  return row.length === 1 && columnCount > 1 ? SINGLE_PLAYER_ROW_FLEX : 1
+export function getPlayerGridRowFlex(
+  row: (number | null)[],
+  layout: ReturnType<typeof getPlayerGridLayout>,
+): number {
+  if (row.length !== 1 || layout.columnCount === 1) return 1
+  return layout.variant === "tabletop" ? TABLETOP_SINGLE_PLAYER_ROW_FLEX : SINGLE_PLAYER_ROW_FLEX
 }
 
 export function getScreenCornerSquaringStyle(input: {
@@ -384,8 +375,6 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
 })
 
-const $singlePlayerRow: ViewStyle = { flex: SINGLE_PLAYER_ROW_FLEX }
-
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 
 export function getPlayerGridLayout(input: {
@@ -408,19 +397,24 @@ export function getPlayerGridLayout(input: {
         : input.playerCount >= 5 && landscape
           ? 3
           : 2
-  const variant = input.layoutVariant ?? "auto"
+  const variant = playerGridLayoutForCount(input.playerCount, input.layoutVariant)
   const columnCount =
-    variant === "featured-first" || variant === "featured-last" || variant === "even-grid"
+    variant === "featured-first" ||
+    variant === "featured-last" ||
+    variant === "even-grid" ||
+    variant === "tabletop"
       ? 2
       : automaticColumnCount
   const rowCount =
-    variant === "featured-first" || variant === "featured-last"
-      ? 1 + Math.ceil((input.playerCount - 1) / 2)
-      : variant === "even-grid"
-        ? Math.ceil(input.playerCount / 2)
-        : input.playerCount === 3 && !landscape
-          ? 2
-          : Math.ceil(input.playerCount / columnCount)
+    variant === "tabletop"
+      ? 2 + Math.ceil((input.playerCount - 2) / 2)
+      : variant === "featured-first" || variant === "featured-last"
+        ? 1 + Math.ceil((input.playerCount - 1) / 2)
+        : variant === "even-grid"
+          ? Math.ceil(input.playerCount / 2)
+          : input.playerCount === 3 && !landscape
+            ? 2
+            : Math.ceil(input.playerCount / columnCount)
   const layout =
     input.playerCount === 2
       ? landscape

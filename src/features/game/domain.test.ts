@@ -52,6 +52,31 @@ describe("local game domain", () => {
     const game = makeGame(count, 40)
     expect(game.players).toHaveLength(count)
     expect(game.players.every(({ life }) => life === 40)).toBe(true)
+    expect(game.system).toBeUndefined()
+    expect(game.lifeStep).toBe(1)
+  })
+
+  it("uses the system change amount unless the game overrides it", () => {
+    const magic = createLocalGame({
+      startingLife: 20,
+      system: "mtg",
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+    })
+    const custom = createLocalGame({
+      startingLife: 20,
+      system: "mtg",
+      lifeStep: 5,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+    })
+
+    expect(magic.lifeStep).toBe(10)
+    expect(custom.lifeStep).toBe(5)
   })
 
   it("keeps a chosen player mark", () => {

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -16,8 +16,8 @@ import {
   getPlayerGridLayoutOptions,
   getPlayerGridMenuAnchor,
   PlayerGrid,
-  type PlayerGridLayoutVariant,
 } from "@/components/PlayerGrid"
+import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -29,11 +29,12 @@ import {
 } from "@/features/connected/PlayerActionsDialog"
 import { useConnectedGame } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
+import { LocalGameRepository } from "@/features/game/localPersistence"
+import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
   counterValueLabel,
   playFormatLabel,
-  playSystemId,
   playSystemRules,
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
@@ -198,7 +199,11 @@ function ConnectedBoardRuntime({
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
-  const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
+  const localRepository = useMemo(() => new LocalGameRepository(), [])
+  const [layoutSelection, setLayoutSelection] = useState<{
+    playerCount: number
+    layout: PlayerGridLayoutVariant
+  }>()
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedCommander, setArmedCommander] = useState<{
     playerId: PlayerId
@@ -232,7 +237,7 @@ function ConnectedBoardRuntime({
     )
 
   const game = runtime.projection
-  const system = playSystemId(game.system)
+  const system = game.system
   const counter = playSystemRules(system).counter
   const active = game.status === "active"
   const finished = game.status === "finished"
@@ -245,6 +250,10 @@ function ConnectedBoardRuntime({
     life: player.currentLife,
     seat: player.seat,
   }))
+  const layoutVariant =
+    layoutSelection?.playerCount === players.length
+      ? layoutSelection.layout
+      : localRepository.loadLayoutPreference(players.length)
   const commanderDamageEnabled =
     supportsCommanderDamage(system, game.format || game.ruleset) &&
     game.commanderDamage !== undefined
@@ -394,6 +403,7 @@ function ConnectedBoardRuntime({
         <PlayerGrid
           players={players}
           system={system}
+          lifeStep={game.lifeStep}
           layoutVariant={layoutVariant}
           disabled={!active || overlayOpen}
           isPlayerDisabled={(player) => !controlled.has(player.id)}
@@ -490,22 +500,16 @@ function ConnectedBoardRuntime({
           style={themed($boardDialog)}
         >
           <Text text="Layout" preset="subheading" style={themed($dialogText)} />
-          <View style={themed($layoutOptions)}>
-            {layoutOptions.map((option) => (
-              <Button
-                key={option.variant}
-                testID={`connected-layout-${option.variant}`}
-                text={option.label}
-                accessibilityState={{ selected: layoutVariant === option.variant }}
-                preset={layoutVariant === option.variant ? "reversed" : "default"}
-                style={themed($layoutOption)}
-                onPress={() => {
-                  setLayoutVariant(option.variant)
-                  setLayoutPickerOpen(false)
-                }}
-              />
-            ))}
-          </View>
+          <PlayerLayoutPicker
+            playerCount={players.length}
+            value={layoutVariant}
+            testID="connected-layout"
+            onChange={(layout) => {
+              localRepository.saveLayoutPreference(players.length, layout)
+              setLayoutSelection({ playerCount: players.length, layout })
+              setLayoutPickerOpen(false)
+            }}
+          />
           <Button text="Cancel" onPress={() => setLayoutPickerOpen(false)} />
         </DialogCard>
       ) : null}
@@ -748,16 +752,6 @@ const $statusActionText: ThemedStyle<TextStyle> = ({ colors }) => ({
 const $boardDialog: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxHeight: "82%",
   gap: spacing.md,
-})
-const $layoutOptions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: spacing.xs,
-})
-const $layoutOption: ThemedStyle<ViewStyle> = () => ({
-  minWidth: 96,
-  minHeight: 44,
-  flexGrow: 1,
 })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,

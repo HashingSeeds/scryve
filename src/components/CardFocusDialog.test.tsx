@@ -31,7 +31,7 @@ function renderDialog(props: Partial<Parameters<typeof CardFocusDialog>[0]> = {}
 }
 
 describe("CardFocusDialog", () => {
-  it("shows the focused card image, rich details and deck context", () => {
+  it("shows the focused card image with rules, printing, and deck context", () => {
     const view = renderDialog()
     expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
     expect(view.getByTestId("card-focus-image")).toBeTruthy()
@@ -39,8 +39,13 @@ describe("CardFocusDialog", () => {
     expect(view.getByText("{G}")).toBeTruthy()
     expect(view.getByText("Creature — Elf Druid")).toBeTruthy()
     expect(view.getByText("{T}: Add {G}.")).toBeTruthy()
+    expect(view.getByTestId("card-focus-image").props.accessibilityLabel).toBe(
+      "Llanowar Elves. Creature — Elf Druid. {T}: Add {G}.",
+    )
     expect(view.getByText("Dominaria · #168 · Common")).toBeTruthy()
     expect(view.getByText("2× in Main")).toBeTruthy()
+    expect(view.getByTestId("card-focus-image").props.contentFit).toBe("contain")
+    expect(view.getByTestId("card-focus-quantity")).toBeTruthy()
   })
 
   it("reports quantity changes to the screen", () => {

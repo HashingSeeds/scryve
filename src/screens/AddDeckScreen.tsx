@@ -8,14 +8,14 @@ import type { FunctionReturnType } from "convex/server"
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
-import { Card } from "@/components/Card"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
-import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
+import { SegmentedControl } from "@/components/SegmentedControl"
+import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
@@ -809,37 +809,53 @@ export function AddDeckScreen({
 
   return (
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
-      <Header title="Add a deck" leftTx="common:back" onLeftPress={onBack} />
+      <Header title="Add deck" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($stack)}>
-        <Text preset="subheading" text="System" />
-        <FilterChips
-          testID="game-picker-options"
-          accessibilityLabel="Game"
-          chips={DECK_GAME_LIST.map((candidate) => ({
-            id: candidate.id,
-            label: candidate.shortLabel,
-          }))}
-          selectedId={game}
-          onSelect={chooseGame}
-        />
-        <Text preset="subheading" text="Format" />
-        <FilterChips
-          testID="format-picker-options"
-          accessibilityLabel="Format"
-          chips={deckFormats(game).map((candidate) => ({
-            id: candidate.id,
-            label: candidate.label,
-          }))}
-          selectedId={format}
-          onSelect={chooseFormat}
-        />
+        <Text preset="subheading" text="Deck details" accessibilityRole="header" />
+        <View style={themed($configRow)}>
+          <View style={$flex1}>
+            <SelectField
+              testID="game-picker-options"
+              label="System"
+              value={game}
+              options={DECK_GAME_LIST.map((candidate) => ({
+                id: candidate.id,
+                label: candidate.shortLabel,
+              }))}
+              onSelect={(next) => {
+                if (next) chooseGame(next)
+              }}
+            />
+          </View>
+          <View style={$flex1}>
+            <SelectField
+              testID="format-picker-options"
+              label="Format"
+              value={format}
+              options={deckFormats(game).map((candidate) => ({
+                id: candidate.id,
+                label: candidate.label,
+              }))}
+              onSelect={(next) => {
+                if (next) chooseFormat(next)
+              }}
+            />
+          </View>
+        </View>
         <Text preset="subheading" text="Start from" />
-        <FilterChips
+        <SegmentedControl
           testID="mode-picker-options"
           accessibilityLabel="Starting point"
-          chips={MODES.map((candidate) => ({
+          segments={MODES.map((candidate) => ({
             id: candidate.id,
-            label: candidate.id === "precon" && game !== "mtg" ? "Top Decks" : candidate.label,
+            label:
+              candidate.id === "precon"
+                ? game === "mtg"
+                  ? "Official deck"
+                  : "Top Decks"
+                : candidate.id === "blank"
+                  ? "Empty"
+                  : candidate.label,
           }))}
           selectedId={mode}
           onSelect={(next) => setMode(next as CreationMode)}
@@ -871,14 +887,25 @@ export function AddDeckScreen({
               <Text size="xs" style={themed($label)} text="No official decks found." />
             ) : null}
             {precons.map((deck) => (
-              <Card
+              <TouchableOpacity
                 key={deck.fileName}
-                heading={deck.name}
-                content={preconDetail(deck)}
-                footer="Preview deck"
+                testID={`precon-result-${deck.fileName}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Preview ${deck.name}`}
+                activeOpacity={0.75}
+                style={themed($resultRow)}
                 disabled={previewLoading}
                 onPress={() => previewPrecon(deck)}
-              />
+              >
+                <View style={themed($resultMark)} />
+                <View style={$flex1}>
+                  <Text weight="medium" text={deck.name} numberOfLines={2} />
+                  {preconDetail(deck) ? (
+                    <Text size="xs" style={themed($label)} text={preconDetail(deck)} />
+                  ) : null}
+                </View>
+                <Text weight="medium" style={themed($textAction)} text="Preview" />
+              </TouchableOpacity>
             ))}
           </View>
         ) : null}
@@ -903,13 +930,25 @@ export function AddDeckScreen({
               </View>
             ) : null}
             {catalogDecks.map((deck) => (
-              <Card
+              <TouchableOpacity
                 key={deck._id}
-                heading={deck.name}
-                content={deck.kind === "tournament" ? "Tournament deck" : "Community deck"}
-                footer="Preview deck"
+                accessibilityRole="button"
+                accessibilityLabel={`Preview ${deck.name}`}
+                activeOpacity={0.75}
+                style={themed($resultRow)}
                 onPress={() => setSelectedCatalogDeck(deck)}
-              />
+              >
+                <View style={themed($resultMark)} />
+                <View style={$flex1}>
+                  <Text weight="medium" text={deck.name} numberOfLines={2} />
+                  <Text
+                    size="xs"
+                    style={themed($label)}
+                    text={deck.kind === "tournament" ? "Tournament deck" : "Community deck"}
+                  />
+                </View>
+                <Text weight="medium" style={themed($textAction)} text="Preview" />
+              </TouchableOpacity>
             ))}
           </View>
         ) : null}
@@ -988,6 +1027,11 @@ const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   marginTop: spacing.sm,
 })
+const $flex1 = { flex: 1 } as const
+const $configRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.xs,
+})
 const $capacityStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 40,
   justifyContent: "center",
@@ -998,6 +1042,22 @@ const $inlineStatus: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "flex-start",
 })
 const $label: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $textAction: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
+const $resultRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 68,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  paddingVertical: spacing.xs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $resultMark: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 5,
+  height: 36,
+  borderRadius: 3,
+  backgroundColor: colors.gameMenu.actions.history,
+})
 const $previewScreen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 const $previewContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",

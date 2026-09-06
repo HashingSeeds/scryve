@@ -1,6 +1,7 @@
 import { randomUUID as secureRandomUUID } from "expo-crypto"
 
-import { playSystemFormat, playSystemId, playSystemRules, type PlaySystemId } from "./playSystems"
+import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
+import { isPlaySystemId, playSystemFormat, playSystemRules, type PlaySystemId } from "./playSystems"
 import type {
   ActorId,
   CommanderDamageAssignedEvent,
@@ -72,7 +73,7 @@ export function validatePlayerCount(count: number): boolean {
   return Number.isInteger(count) && count >= MIN_PLAYERS && count <= MAX_PLAYERS
 }
 
-export function validateStartingLife(life: number, system: PlaySystemId = "mtg"): boolean {
+export function validateStartingLife(life: number, system?: PlaySystemId): boolean {
   return (
     Number.isInteger(life) && life > 0 && life <= playSystemRules(system).counter.maxStartingValue
   )
@@ -101,19 +102,25 @@ export function createLocalGame(input: {
   startingLife: number
   system?: PlaySystemId
   format?: string
+  layout?: PlayerGridLayoutVariant
+  lifeStep?: number
   now?: number
   gameId?: GameId
 }): LocalGame {
-  const system = playSystemId(input.system)
-  const format = playSystemFormat(system, input.format)
+  const system = isPlaySystemId(input.system) ? input.system : undefined
+  const format = system ? playSystemFormat(system, input.format) : undefined
+  const counter = playSystemRules(system).counter
+  const lifeStep = input.lifeStep ?? counter.tapStep
   if (!validatePlayerCount(input.players.length)) {
     throw new Error("A local game requires 2–6 players.")
   }
   if (!validateStartingLife(input.startingLife, system)) {
     throw new Error(
-      `Starting ${playSystemRules(system).counter.label} must be a whole number from 1 to ${playSystemRules(system).counter.maxStartingValue}.`,
+      `Starting ${counter.label} must be a whole number from 1 to ${counter.maxStartingValue}.`,
     )
   }
+  if (!isLifeDelta(lifeStep) || lifeStep < 1)
+    throw new Error("Life step must be a positive whole number.")
   const validatedNames = validatePlayerNames(input.players.map(({ name }) => name))
   if (!validatedNames.valid) {
     throw new Error(validatedNames.errors.find(Boolean) ?? "Enter valid player names.")
@@ -134,8 +141,9 @@ export function createLocalGame(input: {
     schemaVersion: 1,
     id,
     status: "active",
-    system,
-    format,
+    ...(system ? { system, format } : {}),
+    layout: playerGridLayoutForCount(input.players.length, input.layout),
+    lifeStep,
     startingLife: input.startingLife,
     players,
     events: [],

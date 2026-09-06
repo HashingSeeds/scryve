@@ -44,6 +44,19 @@ describe("useLocalGame persistence", () => {
     expect(new LocalGameRepository(storage).loadActiveGame()?.players[0].life).toBe(21)
   })
 
+  it("persists layout before a following life change", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const initial = game()
+    const { result } = renderHook(() => useLocalGame(initial, repository))
+    const save = jest.spyOn(repository, "saveActiveGame")
+    act(() => result.current.changeLayout("even-grid"))
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ layout: "even-grid" }))
+    act(() => result.current.changeLife(initial.players[0].id, 1))
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ layout: "even-grid" }))
+    expect(new LocalGameRepository(storage).loadActiveGame()?.players[0].life).toBe(21)
+  })
+
   it("does not publish a change when persistence fails", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()

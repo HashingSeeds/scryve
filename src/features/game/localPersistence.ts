@@ -15,7 +15,14 @@ import {
   isLifeDelta,
   MAX_COMMANDER_DAMAGE,
 } from "./domain"
-import { playSystemId } from "./playSystems"
+import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
+import {
+  isPlaySystemId,
+  playSystemFormats,
+  playSystemId,
+  playSystemRules,
+  type PlaySystemId,
+} from "./playSystems"
 import type {
   CommanderDamageTotals,
   GameEvent,
@@ -37,6 +44,7 @@ export const LOCAL_KEYS = {
   settings: "count.local.settings.v1",
   legacySettings: "count.local.settings",
   active: "count.local.active.v1",
+  layouts: "count.local.layouts.v1",
   historyIndex: "count.local.history.index.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
@@ -53,6 +61,8 @@ export interface LocalSettings {
   themePreference: ThemePreference
   menuButtonStyle: MenuButtonStyle
   launchDestination: LaunchDestination
+  defaultSystem?: PlaySystemId
+  defaultFormat?: string
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
@@ -242,8 +252,13 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     schemaVersion: 1,
     id: asGameId(value.id),
     status: value.status,
-    system: playSystemId(value.system),
+    ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
     ...(typeof value.format === "string" ? { format: value.format } : {}),
+    layout: playerGridLayoutForCount(players.length, value.layout),
+    lifeStep:
+      isLifeDelta(value.lifeStep) && value.lifeStep > 0
+        ? value.lifeStep
+        : playSystemRules(value.system).counter.tapStep,
     startingLife: value.startingLife,
     players,
     events,
@@ -258,6 +273,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
 function parseSettings(value: unknown): LocalSettings | null {
   if (!isRecord(value)) return null
   const migrated = value.schemaVersion === undefined ? { ...value, schemaVersion: 1 } : value
+  const maximumStartingValue = playSystemRules(migrated.defaultSystem).counter.maxStartingValue
   if (
     migrated.schemaVersion !== 1 ||
     typeof migrated.defaultPlayerCount !== "number" ||
@@ -265,7 +281,7 @@ function parseSettings(value: unknown): LocalSettings | null {
     migrated.defaultPlayerCount > 6 ||
     typeof migrated.defaultStartingLife !== "number" ||
     migrated.defaultStartingLife < 1 ||
-    migrated.defaultStartingLife > 999 ||
+    migrated.defaultStartingLife > maximumStartingValue ||
     typeof migrated.hapticsEnabled !== "boolean" ||
     (migrated.themePreference !== "system" &&
       migrated.themePreference !== "light" &&
@@ -283,7 +299,19 @@ function parseSettings(value: unknown): LocalSettings | null {
       ? migrated.menuButtonStyle
       : DEFAULT_MENU_BUTTON_STYLE,
     launchDestination: migrated.launchDestination === "decks" ? "decks" : "play",
+    ...parseSystemPreference(migrated.defaultSystem, migrated.defaultFormat),
   }
+}
+
+function parseSystemPreference(
+  system: unknown,
+  format: unknown,
+): { defaultSystem?: PlaySystemId; defaultFormat?: string } {
+  if (!isPlaySystemId(system)) return {}
+  if (typeof format !== "string" || !playSystemFormats(system).some(({ id }) => id === format)) {
+    return { defaultSystem: system }
+  }
+  return { defaultSystem: system, defaultFormat: format }
 }
 
 function parseSummary(value: unknown): LocalGameSummary | null {
@@ -305,7 +333,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         schemaVersion: 1,
         id: asGameId(value.id),
         status: value.status,
-        system: playSystemId(value.system),
+        ...(isPlaySystemId(value.system) ? { system: value.system } : {}),
         ...(typeof value.format === "string" ? { format: value.format } : {}),
         startingLife: value.startingLife,
         players,
@@ -355,6 +383,21 @@ export class LocalGameRepository {
   saveSettings(settings: LocalSettings): void {
     const valid = parseSettings(settings)
     this.storage.set(LOCAL_KEYS.settings, JSON.stringify(valid ?? DEFAULT_LOCAL_SETTINGS))
+  }
+
+  loadLayoutPreference(playerCount: number): PlayerGridLayoutVariant {
+    const layouts = parseJson(this.storage.getString(LOCAL_KEYS.layouts))
+    if (!isRecord(layouts)) return "auto"
+    return playerGridLayoutForCount(playerCount, layouts[String(playerCount)])
+  }
+
+  saveLayoutPreference(playerCount: number, layout: PlayerGridLayoutVariant): void {
+    const current = parseJson(this.storage.getString(LOCAL_KEYS.layouts))
+    const layouts = isRecord(current) ? current : {}
+    this.storage.set(
+      LOCAL_KEYS.layouts,
+      JSON.stringify({ ...layouts, [playerCount]: playerGridLayoutForCount(playerCount, layout) }),
+    )
   }
 
   saveActiveGame(game: LocalGame): void {

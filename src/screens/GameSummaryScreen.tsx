@@ -60,7 +60,7 @@ function StandingRow({
   player: SummaryPlayer
   rank: number
   startingLife?: number
-  system: PlaySystemId
+  system?: PlaySystemId
   showOutcome: boolean
 }) {
   const { theme, themed } = useAppTheme()

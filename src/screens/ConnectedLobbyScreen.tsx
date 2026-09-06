@@ -25,6 +25,7 @@ import {
   lobbyDetail,
   lobbyExitCopy,
   onlineOnlyNotice,
+  deckRequirementLabel,
   seatSummary,
   type LobbyExitAction,
 } from "@/features/connected/connectedCopy"
@@ -108,7 +109,10 @@ function ConnectedLobbyContent({
   onBack?: () => void
   onLeft?: () => void
 }) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const deviceId = useRef(new LocalGameRepository().getDeviceId()).current
   const lobby = useQuery(api.games.lobbyProjection, {
@@ -123,6 +127,8 @@ function ConnectedLobbyContent({
   const selectDeck = useMutation(api.decks.selectForSeat)
   const setAppearance = useMutation(api.games.setMyAppearance)
   const [actionError, setActionError] = useState<string>()
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteOrigin, setInviteOrigin] = useState<DialogOrigin>()
   const [leaveAction, setLeaveAction] = useState<LobbyExitAction>()
   const [leaving, setLeaving] = useState(false)
   const [exitOrigin, setExitOrigin] = useState<DialogOrigin>()
@@ -153,7 +159,7 @@ function ConnectedLobbyContent({
     : null
   const manualCode = lobby?.invitation?.manualCode
 
-  async function chooseVersion(seat: number, deckVersionId: string) {
+  async function chooseVersion(seat: number, deckVersionId?: string) {
     if (selectingDeckSeatsInFlight.current.has(seat)) return
     if (!isWebSocketConnected) {
       setActionError(onlineOnlyNotice("deck"))
@@ -163,7 +169,11 @@ function ConnectedLobbyContent({
     setSelectingDeckSeats(new Set(selectingDeckSeatsInFlight.current))
     try {
       setActionError(undefined)
-      await selectDeck({ publicId, seat, deckVersionId: deckVersionId as Id<"deckVersions"> })
+      await selectDeck({
+        publicId,
+        seat,
+        ...(deckVersionId ? { deckVersionId: deckVersionId as Id<"deckVersions"> } : {}),
+      })
     } catch (cause) {
       setActionError(convexErrorMessage(cause, "Could not select deck"))
     } finally {
@@ -251,9 +261,13 @@ function ConnectedLobbyContent({
   const claimedSeats = lobby.players.length
   const openSeats = Math.max(0, lobby.playerCount - claimedSeats)
   const everySeatClaimed = claimedSeats === lobby.playerCount
+  const missingDeck = lobby.deckRequired && lobby.players.some((player) => !player.deckVersionId)
+  const readyPlayers = lobby.players.filter(
+    (player) => !lobby.deckRequired || Boolean(player.deckVersionId),
+  ).length
   const exitAction: LobbyExitAction = lobby.isHost ? "abandon" : "leave"
   const exitCopy = lobbyExitCopy(exitAction)
-  const startBlocked = !everySeatClaimed || !isWebSocketConnected || starting
+  const startBlocked = !everySeatClaimed || missingDeck || !isWebSocketConnected || starting
   const openExitCopy = leaveAction ? lobbyExitCopy(leaveAction) : undefined
   const takenAppearances = lobby.players
     .filter((player) => player.seat !== appearanceSeat)
@@ -263,10 +277,16 @@ function ConnectedLobbyContent({
     }))
 
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
+    <Screen
+      preset="fixed"
+      safeAreaEdges={["bottom"]}
+      backgroundColor={colors.surface}
+      contentContainerStyle={themed($screen)}
+    >
       <Header
         title={titleVisible ? LOBBY_TITLE : ""}
         leftTx={onBack ? "common:back" : undefined}
+        backgroundColor={colors.surface}
         onLeftPress={onBack}
       />
       <ScrollView
@@ -276,32 +296,78 @@ function ConnectedLobbyContent({
         scrollEventThrottle={16}
       >
         <View style={themed($hero)}>
-          <Text preset="heading" text={LOBBY_TITLE} />
-          <Text
-            size="sm"
-            style={themed($dimmed)}
-            text={lobbyDetail(lobby.startingLife, lobby.ruleset)}
-          />
+          <View style={themed($inviteSummary)}>
+            <View style={$styles.flex1}>
+              <Text preset="heading" text={manualCode ?? LOBBY_TITLE} />
+              <Text
+                size="sm"
+                style={themed($dimmed)}
+                text={
+                  manualCode
+                    ? "Share this code to invite players"
+                    : lobbyDetail(lobby.startingLife, lobby.ruleset, lobby.system, lobby.format)
+                }
+              />
+            </View>
+            {inviteQrPayload || manualCode ? (
+              <Button
+                testID="open-invite-button"
+                text="Invite"
+                style={themed($inviteButton)}
+                onPress={(event) => {
+                  setInviteOrigin(
+                    event?.nativeEvent
+                      ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }
+                      : undefined,
+                  )
+                  setInviteOpen(true)
+                }}
+              />
+            ) : null}
+          </View>
+          {manualCode ? (
+            <Text
+              size="xs"
+              style={themed($dimmed)}
+              text={lobbyDetail(lobby.startingLife, lobby.ruleset, lobby.system, lobby.format)}
+            />
+          ) : null}
         </View>
-        <InviteCard
-          qrPayload={inviteQrPayload}
-          manualCode={manualCode}
-          onShare={inviteUrl || manualCode ? shareInvite : undefined}
-        />
         <View style={themed($section)}>
+          <View style={themed($readinessHeading)}>
+            <Text preset="subheading" accessibilityRole="header" text="Ready check" />
+            <Text
+              size="xs"
+              style={themed($dimmed)}
+              text={`${readyPlayers} of ${lobby.playerCount} ready`}
+            />
+          </View>
+          <View style={themed($progressTrack)}>
+            <View
+              testID="lobby-readiness-progress"
+              accessibilityRole="progressbar"
+              accessibilityValue={{ min: 0, max: lobby.playerCount, now: readyPlayers }}
+              style={[
+                themed($progressFill),
+                { width: `${(readyPlayers / lobby.playerCount) * 100}%` },
+              ]}
+            />
+          </View>
           <Text
-            preset="subheading"
-            accessibilityRole="header"
-            text={`Seats · ${claimedSeats} of ${lobby.playerCount}`}
+            size="xxs"
+            style={themed($dimmed)}
+            text={deckRequirementLabel(Boolean(lobby.deckRequired))}
           />
           <LobbyDeckSource>
             {(deckState) => (
               <LobbySeatList
                 seats={lobby.players}
                 openSeats={openSeats}
+                totalSeats={lobby.playerCount}
                 deckState={deckState}
                 versionLabel={versionLabel}
                 selectingDeckSeats={selectingDeckSeats}
+                deckRequired={Boolean(lobby.deckRequired)}
                 onSelectVersion={(seat, deckVersionId) => void chooseVersion(seat, deckVersionId)}
                 onEditAppearance={(seat, event) => {
                   setAppearanceOrigin(
@@ -332,7 +398,7 @@ function ConnectedLobbyContent({
           </LobbyDeckSource>
         </View>
       </ScrollView>
-      <BottomActionBar>
+      <BottomActionBar style={themed($surface)}>
         {actionError && !openExitCopy ? (
           <AlertNote testID="connected-action-error" text={actionError} />
         ) : null}
@@ -356,6 +422,13 @@ function ConnectedLobbyContent({
                 text={seatSummary(claimedSeats, lobby.playerCount)}
               />
             ) : null}
+            {missingDeck && isWebSocketConnected ? (
+              <Text
+                size="xxs"
+                style={themed($actionHint)}
+                text="Every seat needs a deck to start."
+              />
+            ) : null}
           </>
         ) : (
           <Text size="sm" style={themed($actionHint)} text="Waiting for the host to start." />
@@ -368,6 +441,27 @@ function ConnectedLobbyContent({
           onPress={(event) => openExitDialog(exitAction, event)}
         />
       </BottomActionBar>
+      {inviteOpen ? (
+        <DialogCard
+          visible
+          wide
+          placement="bottom"
+          origin={inviteOrigin}
+          onClose={() => setInviteOpen(false)}
+          backdropTestID="invite-backdrop"
+          backdropAccessibilityLabel="Close invite"
+          dialogTestID="invite-dialog"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text="Invite players" />
+          <InviteCard
+            qrPayload={inviteQrPayload}
+            manualCode={manualCode}
+            onShare={inviteUrl || manualCode ? shareInvite : undefined}
+          />
+          <Button text="Close" onPress={() => setInviteOpen(false)} />
+        </DialogCard>
+      ) : null}
       {leaveAction && openExitCopy ? (
         <ConfirmDialog
           visible
@@ -466,10 +560,20 @@ function LobbyStatusScreen({
   retry?: () => void
   onBack?: () => void
 }) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header title="" leftTx={onBack ? "common:back" : undefined} onLeftPress={onBack} />
+    <Screen
+      preset="fixed"
+      safeAreaEdges={["bottom"]}
+      backgroundColor={theme.colors.surface}
+      contentContainerStyle={themed($screen)}
+    >
+      <Header
+        title=""
+        leftTx={onBack ? "common:back" : undefined}
+        backgroundColor={theme.colors.surface}
+        onLeftPress={onBack}
+      />
       <ScrollView
         style={$styles.flex1}
         contentContainerStyle={themed($content)}
@@ -494,14 +598,18 @@ function LobbyStatusScreen({
           <Button testID="retry-lobby-button" text="Try again" onPress={retry} />
         ) : null}
       </ScrollView>
-      <BottomActionBar>
+      <BottomActionBar style={themed($surface)}>
         <Button text="Start game" preset="reversed" style={themed($primaryAction)} disabled />
       </BottomActionBar>
     </Screen>
   )
 }
 
-const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  flex: 1,
+  backgroundColor: colors.surface,
+})
+const $surface: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexGrow: 1,
   gap: spacing.md,
@@ -510,6 +618,30 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $hero: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $inviteSummary: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+})
+const $inviteButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  paddingVertical: spacing.xxs,
+  paddingHorizontal: spacing.md,
+})
+const $readinessHeading: ThemedStyle<ViewStyle> = () => ({
+  flexDirection: "row",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+})
+const $progressTrack: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  height: 4,
+  overflow: "hidden",
+  backgroundColor: colors.separator,
+})
+const $progressFill: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  height: "100%",
+  backgroundColor: colors.tint,
+})
 const $dimmed: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({ minHeight: 52 })
 const $secondaryAction: ThemedStyle<ViewStyle> = ({ colors }) => ({

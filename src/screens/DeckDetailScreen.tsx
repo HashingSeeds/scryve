@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
-import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -23,7 +22,7 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { catalogCardDetails } from "@/features/decks/cardFocus"
-import { cardCountLabel, recordLine } from "@/features/decks/deckCopy"
+import { cardCountLabel } from "@/features/decks/deckCopy"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -149,7 +148,7 @@ function DeckDetailPlaceholder({
   onBack: () => void
   failure?: { kind: "missing" | "unavailable"; retry: () => void }
 }) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   const loadingGameLabel = summary ? (deckGame(summary.game)?.shortLabel ?? summary.game) : null
   const loadingMetadata = summary
     ? [
@@ -164,9 +163,15 @@ function DeckDetailPlaceholder({
   const statusText = failure?.kind === "missing" ? "Deck not found" : "Deck unavailable"
 
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
+    <Screen
+      preset="fixed"
+      safeAreaEdges={["bottom"]}
+      backgroundColor={theme.colors.surface}
+      contentContainerStyle={themed($screen)}
+    >
       <Header
         title=""
+        backgroundColor={theme.colors.surface}
         leftTx="common:back"
         onLeftPress={onBack}
         RightActionComponent={
@@ -215,8 +220,8 @@ function DeckDetailPlaceholder({
             style={themed($currentVersion)}
             disabled
           >
-            <Text size="xs" style={themed($dimmedText)} text="Version" />
-            <Text weight="medium" text="Current  ›" />
+            <Text size="xs" style={themed($dimmedText)} text="Current version" />
+            <Text weight="medium" text="Current ›" />
           </TouchableOpacity>
           {failure ? (
             <View style={themed($queryFailure)}>
@@ -238,13 +243,13 @@ function DeckDetailPlaceholder({
         </View>
         <DeckListSkeleton sections={loadingSections} density="comfortable" />
       </ScrollView>
-      <BottomActionBar>
+      <BottomActionBar style={themed($actionBar)}>
         <View style={themed($actionRow)}>
           <Button
             testID="edit-deck-button"
             text="Edit list"
-            preset="reversed"
-            style={$actionButton}
+            style={themed($primaryActionButton)}
+            textStyle={themed($primaryActionText)}
             disabled
           />
         </View>
@@ -277,7 +282,7 @@ export function DeckDetailScreen(props: DeckDetailScreenProps) {
 }
 
 function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
   const detail = useQuery(api.decks.detail, {
     deckId: deckId as Id<"decks">,
@@ -519,40 +524,44 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
     }, "Could not delete deck")
   }
 
-  function cardThumbnail(card: DeckCard) {
-    const thumbnailUrl = card.smallImageUrl ?? card.imageUrl
-    return (
-      <View style={themed($thumbnailSlot)}>
-        {thumbnailUrl ? (
-          <Image source={thumbnailUrl} style={themed($thumbnail)} cachePolicy="memory-disk" />
-        ) : null}
-      </View>
-    )
-  }
-
   if (!detail) return <DeckDetailPlaceholder summary={summary} onBack={onBack} />
 
-  const deckRecord = recordLine(detail.record)
+  const deckRecord = detail.record
+  const deckScore = deckRecord
+    ? `${deckRecord.wins}–${deckRecord.losses}${deckRecord.draws ? `–${deckRecord.draws}` : ""}`
+    : "0–0"
+  const deckWinRate = deckRecord?.games
+    ? `${Math.round((deckRecord.wins / deckRecord.games) * 100)}%`
+    : "0%"
   const gameLabel = deckGame(detail.deck.game)?.shortLabel ?? detail.deck.game
   const configuredSections = deckSections(detail.deck.game, detail.deck.format)
   const cardSections = groupedCards(cards, configuredSections)
 
   return (
-    <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
+    <Screen
+      preset="fixed"
+      safeAreaEdges={["bottom"]}
+      backgroundColor={theme.colors.surface}
+      contentContainerStyle={themed($screen)}
+    >
       <Header
-        title={titleVisible ? detail.deck.name : ""}
-        leftTx="common:back"
-        onLeftPress={onBack}
+        title={editing ? "Edit deck" : titleVisible ? detail.deck.name : ""}
+        backgroundColor={theme.colors.surface}
+        leftText={editing ? "Cancel" : undefined}
+        leftTx={editing ? undefined : "common:back"}
+        onLeftPress={editing ? discardEdits : onBack}
         RightActionComponent={
-          <TouchableOpacity
-            testID="deck-settings-button"
-            accessibilityRole="button"
-            accessibilityLabel="Deck settings"
-            style={themed($headerAction)}
-            onPress={() => setDialog("settings")}
-          >
-            <Text size="lg" text="•••" />
-          </TouchableOpacity>
+          editing ? undefined : (
+            <TouchableOpacity
+              testID="deck-settings-button"
+              accessibilityRole="button"
+              accessibilityLabel="Deck settings"
+              style={themed($headerAction)}
+              onPress={() => setDialog("settings")}
+            >
+              <Text size="lg" text="•••" />
+            </TouchableOpacity>
+          )
         }
       />
       <SectionList
@@ -574,7 +583,25 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                 style={themed($dimmedText)}
                 text={`${gameLabel} · ${deckFormatLabel(detail.deck.game, detail.deck.format)} · ${cardCountLabel(totalQuantity(cards))}`}
               />
-              {deckRecord ? <Text size="sm" text={deckRecord} /> : null}
+              <View style={themed($stats)}>
+                <View style={themed($stat)}>
+                  <Text size="lg" weight="bold" style={$tabularNumbers} text={deckScore} />
+                  <Text size="xxs" style={themed($dimmedText)} text="Record" />
+                </View>
+                <View style={themed($stat)}>
+                  <Text size="lg" weight="bold" style={$tabularNumbers} text={deckWinRate} />
+                  <Text size="xxs" style={themed($dimmedText)} text="Win rate" />
+                </View>
+                <View style={themed($stat)}>
+                  <Text
+                    size="lg"
+                    weight="bold"
+                    style={$tabularNumbers}
+                    text={String(detail.versions.length)}
+                  />
+                  <Text size="xxs" style={themed($dimmedText)} text="Versions" />
+                </View>
+              </View>
               <LoadingProgress
                 testID="deck-loading-progress"
                 state="complete"
@@ -609,16 +636,31 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                 style={themed($currentVersion)}
                 onPress={() => setActiveTab("versions")}
               >
-                <Text size="xs" style={themed($dimmedText)} text="Version" />
-                <Text weight="medium" text={`${version ? versionLabel(version) : "Current"}  ›`} />
+                <Text size="xs" style={themed($dimmedText)} text="Current version" />
+                <Text weight="medium" text={`${version ? versionLabel(version) : "Current"} ›`} />
               </TouchableOpacity>
             ) : null}
 
             {activeTab === "versions" ? (
               <View style={themed($versions)}>
+                <View style={themed($versionHeading)}>
+                  <Text weight="bold" size="sm" text="Versions" />
+                  <TouchableOpacity
+                    testID="version-picker-__new__"
+                    accessibilityRole="button"
+                    accessibilityLabel="New version"
+                    disabled={editing}
+                    onPress={startNewVersion}
+                  >
+                    <Text weight="bold" size="sm" style={themed($textAction)} text="New version" />
+                  </TouchableOpacity>
+                </View>
                 {detail.versions.map((candidate) => {
                   const selected = candidate._id === version?._id
-                  const candidateRecord = recordLine(candidate.record)
+                  const record = candidate.record
+                  const candidateRecord = record?.games
+                    ? `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ""}`
+                    : "Unplayed"
                   return (
                     <TouchableOpacity
                       key={candidate._id}
@@ -630,20 +672,27 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                       onPress={() => chooseVersion(candidate._id)}
                     >
                       <View
-                        style={[themed($versionDot), selected && themed($versionDotSelected)]}
+                        testID={`version-marker-${candidate._id}`}
+                        style={[themed($versionMark), selected && themed($versionMarkSelected)]}
                       />
                       <View style={themed($versionCopy)}>
                         <Text weight="medium" text={versionLabel(candidate)} />
+                        {candidate.note ? (
+                          <Text
+                            size="xxs"
+                            style={themed($dimmedText)}
+                            text={candidate.note}
+                            numberOfLines={2}
+                          />
+                        ) : null}
+                      </View>
+                      <View style={themed($versionContext)}>
+                        <Text weight="medium" style={$tabularNumbers} text={candidateRecord} />
                         <Text
                           size="xxs"
                           style={themed($dimmedText)}
-                          text={[cardCountLabel(candidate.cardQuantity), candidateRecord]
-                            .filter(Boolean)
-                            .join(" · ")}
+                          text={cardCountLabel(candidate.cardQuantity)}
                         />
-                        {candidate.note ? (
-                          <Text size="xs" numberOfLines={2} text={candidate.note} />
-                        ) : null}
                       </View>
                       {selected ? (
                         <TouchableOpacity
@@ -657,13 +706,6 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                     </TouchableOpacity>
                   )
                 })}
-                <Button
-                  testID="version-picker-__new__"
-                  text="New version"
-                  preset="reversed"
-                  disabled={editing}
-                  onPress={startNewVersion}
-                />
               </View>
             ) : null}
 
@@ -700,22 +742,22 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
           />
         )}
         renderItem={({ item }) => (
-          <ListItem
-            bottomSeparator
-            height={84}
-            style={$centeredRow}
-            text={`${item.quantity}× ${item.name}`}
+          <TouchableOpacity
+            testID={`deck-card-row-${printingKey(item)}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.quantity}× ${item.name}`}
+            style={themed($cardRow)}
             onPress={() => focusCard(item)}
-            LeftComponent={cardThumbnail(item)}
-            RightComponent={
-              editing ? (
-                <View style={themed($quantityRow)}>
-                  <Button text="−" style={$stepperButton} onPress={() => removeCard(item)} />
-                  <Button text="+" style={$stepperButton} onPress={() => addCard(item)} />
-                </View>
-              ) : undefined
-            }
-          />
+          >
+            <Text style={[themed($dimmedText), $quantity]} text={`${item.quantity}×`} />
+            <Text weight="medium" style={$cardName} text={item.name} numberOfLines={1} />
+            {editing ? (
+              <View style={themed($quantityRow)}>
+                <Button text="−" style={$stepperButton} onPress={() => removeCard(item)} />
+                <Button text="+" style={$stepperButton} onPress={() => addCard(item)} />
+              </View>
+            ) : null}
+          </TouchableOpacity>
         )}
         ListFooterComponent={
           editing && activeTab === "cards" ? (
@@ -740,10 +782,9 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                 <ListItem
                   key={printingKey(card)}
                   bottomSeparator
-                  height={84}
+                  height={64}
                   style={$centeredRow}
                   text={card.name}
-                  LeftComponent={cardThumbnail(card)}
                   onPress={() => addCard(card)}
                 />
               ))}
@@ -752,7 +793,7 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
         }
       />
       {activeTab === "cards" ? (
-        <BottomActionBar>
+        <BottomActionBar style={themed($actionBar)}>
           {error ? <AlertNote text={error} /> : null}
           <View style={themed($actionRow)}>
             {editing ? (
@@ -760,8 +801,8 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                 <Button
                   testID="save-version-button"
                   text={busy ? "Saving…" : "Save changes"}
-                  preset="reversed"
-                  style={$actionButton}
+                  style={[themed($primaryActionButton), $actionButton]}
+                  textStyle={themed($primaryActionText)}
                   disabled={busy}
                   onPress={save}
                 />
@@ -778,8 +819,8 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
                 <Button
                   testID="edit-deck-button"
                   text="Edit list"
-                  preset="reversed"
-                  style={$actionButton}
+                  style={themed($primaryActionButton)}
+                  textStyle={themed($primaryActionText)}
                   disabled={busy}
                   onPress={startEditing}
                 />
@@ -931,8 +972,14 @@ function DeckDetailContent({ deckId, summary, onBack }: DeckDetailScreenProps) {
 
 const $actionButton = { flex: 1, minHeight: 48 } as const
 const $stepperButton = { minWidth: 44, minHeight: 44 } as const
+const $tabularNumbers: TextStyle = { fontVariant: ["tabular-nums"] }
+const $quantity: TextStyle = { width: 32 }
+const $cardName: TextStyle = { flex: 1 }
 
 const $screen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
+const $actionBar: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.surface,
+})
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 720,
@@ -956,6 +1003,12 @@ const $queryFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $headerBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $titleBlock: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $stats: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.lg,
+  paddingTop: spacing.xs,
+})
+const $stat: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxxs })
 const $tabs: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flexDirection: "row",
   borderBottomWidth: 1,
@@ -978,26 +1031,37 @@ const $currentVersion: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 const $versions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $versionHeading: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 36,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: spacing.sm,
+})
+const $textAction: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $versionRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minHeight: 64,
+  minHeight: 72,
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
+  paddingVertical: spacing.xxs,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $versionDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  width: 10,
-  height: 10,
-  borderRadius: 5,
-  borderWidth: 1,
-  borderColor: colors.textDim,
+const $versionMark: ThemedStyle<ViewStyle> = () => ({
+  width: 5,
+  height: 34,
+  borderRadius: 3,
 })
-const $versionDotSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  borderColor: colors.tint,
-  backgroundColor: colors.tint,
+const $versionMarkSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.gameMenu.actions.history,
 })
 const $versionCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({ flex: 1, gap: spacing.xxxs })
+const $versionContext: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minWidth: 64,
+  alignItems: "flex-end",
+  gap: spacing.xxxs,
+})
 const $headerAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   height: 56,
   minWidth: 56,
@@ -1012,18 +1076,29 @@ const $quantityRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $actionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
+  justifyContent: "center",
   gap: spacing.xs,
 })
-const $centeredRow = { alignItems: "center" } as const
-const $thumbnailSlot: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: 48,
-  height: 68,
-  borderRadius: spacing.xxs,
-  marginEnd: spacing.sm,
-  overflow: "hidden",
-  backgroundColor: colors.separator,
+const $primaryActionButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minWidth: 160,
+  minHeight: 44,
+  paddingVertical: spacing.xs,
+  borderRadius: 22,
+  borderColor: colors.tint,
+  backgroundColor: colors.tint,
 })
-const $thumbnail: ThemedStyle<ImageStyle> = () => ({ width: 48, height: 68 })
+const $primaryActionText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.textInverse,
+})
+const $centeredRow = { alignItems: "center" } as const
+const $cardRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 64,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
 const $boardHeading: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({

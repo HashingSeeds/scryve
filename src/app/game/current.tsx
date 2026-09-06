@@ -25,7 +25,7 @@ export default function CurrentLocalGameRoute() {
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
       onSetup={() => router.push("/game/new?setup=1")}
-      onConnect={() => router.push("/connected")}
+      onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
       onAccount={() => router.push("/account")}
       onGameEnded={(gameId) =>

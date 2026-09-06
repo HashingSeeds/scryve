@@ -5,6 +5,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { applyGameCommand, canUndo, defaultCommandContext } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
+import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { GameCommand, LifeDelta, LocalGame, LocalGameResult, PlayerId } from "./types"
 
 export function useLocalGame(
@@ -44,6 +45,18 @@ export function useLocalGame(
     [dispatch, reduceMotion, settings.hapticsEnabled],
   )
 
+  const changeLayout = useCallback(
+    (layout: PlayerGridLayoutVariant) => {
+      const current = gameRef.current
+      if (current.layout === layout) return
+      const next = { ...current, layout, updatedAt: Date.now() }
+      repository.saveActiveGame(next)
+      gameRef.current = next
+      setGame(next)
+    },
+    [repository],
+  )
+
   const changeLife = useCallback(
     (playerId: PlayerId, delta: LifeDelta) => {
       dispatch({ type: "life.change", playerId, delta })
@@ -59,6 +72,7 @@ export function useLocalGame(
     canUndo: canUndo(game, context.actorId),
     changeLife,
     assignCommanderDamage,
+    changeLayout,
     undo: () => dispatch({ type: "life.undo" }),
     finish: (result?: LocalGameResult) => dispatch({ type: "game.finish", result }),
     abandon: () => dispatch({ type: "game.abandon" }),

@@ -1,9 +1,15 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
 import { DialogCard } from "./DialogCard"
 import { Text } from "./Text"
+
+jest.mock("react-native-safe-area-context", () => ({
+  ...jest.requireActual("react-native-safe-area-context"),
+  useSafeAreaInsets: () => ({ top: 47, right: 0, bottom: 34, left: 0 }),
+}))
 
 function renderDialog(props: Partial<React.ComponentProps<typeof DialogCard>> = {}) {
   const onClose = jest.fn()
@@ -56,5 +62,21 @@ describe("DialogCard", () => {
 
     expect(view.queryByTestId("dialog-backdrop")).toBeNull()
     expect(view.queryByText("Dialog body")).toBeNull()
+  })
+
+  it("supports an edge-aligned bottom sheet", () => {
+    const { view } = renderDialog({ placement: "bottom" })
+    const dialog = view.getByTestId("dialog-card")
+
+    expect(StyleSheet.flatten(dialog.props.style)).toMatchObject({
+      maxHeight: "88%",
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      paddingBottom: 58,
+    })
+    expect(StyleSheet.flatten(view.getByTestId("dialog-card-layout").props.style)).toMatchObject({
+      marginTop: 47,
+      marginBottom: 0,
+    })
   })
 })

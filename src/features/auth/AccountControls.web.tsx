@@ -7,7 +7,14 @@ import { useAppTheme } from "@/theme/context"
 import type { AccountProfileProps } from "./accountProfileProps"
 import { getClerkAppearance } from "./clerkAppearance"
 
-export function AccountProfile({ onBack, onSignedOut, accountControls }: AccountProfileProps) {
+export function AccountProfile({
+  onBack,
+  onSignedOut,
+  onOpenTerms,
+  onOpenPrivacy,
+  onOpenGameContentNotices,
+  accountControls,
+}: AccountProfileProps) {
   const clerk = useClerk()
   const { user } = useUser()
   const { theme } = useAppTheme()
@@ -43,6 +50,9 @@ export function AccountProfile({ onBack, onSignedOut, accountControls }: Account
       accountControls={accountControls}
       onBack={onBack}
       onManageProfile={manageProfile}
+      onOpenTerms={onOpenTerms}
+      onOpenPrivacy={onOpenPrivacy}
+      onOpenGameContentNotices={onOpenGameContentNotices}
       onSignOut={() => void signOut()}
     />
   )

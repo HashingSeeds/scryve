@@ -1,10 +1,10 @@
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, View } from "react-native"
+import { ScrollView, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
-import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
+import { DialogCard } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -66,17 +66,32 @@ export function CardFocusDialog({
   const smallImageUrl = details?.smallImageUrl ?? card.smallImageUrl
   const displayImageUrl = details?.imageUrl ?? card.imageUrl ?? smallImageUrl
   const cachedThumbnailUrl = displayImageUrl === smallImageUrl ? undefined : smallImageUrl
+  const imageAccessibilityLabel = [card.name, details?.typeLine, details?.oracleText]
+    .filter(Boolean)
+    .join(". ")
 
   return (
     <DialogCard
       visible
       wide
+      placement="bottom"
       onClose={onClose}
       backdropTestID="card-focus-backdrop"
       backdropAccessibilityLabel="Close card details"
       dialogTestID="card-focus-dialog"
       accessibilityViewIsModal
     >
+      <View style={themed($header)}>
+        <Text preset="subheading" style={themed($name)} text={card.name} />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Close card details"
+          style={themed($closeButton)}
+          onPress={onClose}
+        >
+          <Text text="Close" weight="bold" style={themed($closeText)} />
+        </TouchableOpacity>
+      </View>
       <ScrollView
         style={$scrollBody}
         contentContainerStyle={themed($scrollContent)}
@@ -85,7 +100,7 @@ export function CardFocusDialog({
         {displayImageUrl ? (
           <Image
             testID="card-focus-image"
-            accessibilityLabel={card.name}
+            accessibilityLabel={imageAccessibilityLabel}
             source={displayImageUrl}
             placeholder={cachedThumbnailUrl}
             style={themed($cardImage)}
@@ -99,12 +114,9 @@ export function CardFocusDialog({
           </View>
         )}
         <View style={themed($details)}>
-          <View style={themed($nameRow)}>
-            <Text preset="subheading" style={themed($name)} text={card.name} />
-            {details?.manaCost ? (
-              <Text size="sm" style={themed($dimText)} text={details.manaCost} />
-            ) : null}
-          </View>
+          {details?.manaCost ? (
+            <Text size="sm" style={themed($dimText)} text={details.manaCost} />
+          ) : null}
           {details?.typeLine ? (
             <Text size="sm" style={themed($dimText)} text={details.typeLine} />
           ) : null}
@@ -116,7 +128,7 @@ export function CardFocusDialog({
           {detailsError ? <AlertNote text={detailsError} /> : null}
         </View>
       </ScrollView>
-      <View style={themed($quantityRow)}>
+      <View testID="card-focus-quantity" style={themed($quantityRow)}>
         <Text
           size="sm"
           style={themed($quantityLabel)}
@@ -139,43 +151,58 @@ export function CardFocusDialog({
           />
         ) : null}
       </View>
-      <View style={themed($dialogActions)}>
-        <Button text="Close" style={themed($dialogButton)} onPress={onClose} />
-      </View>
     </DialogCard>
   )
 }
 
 const $scrollBody = { flexGrow: 0, flexShrink: 1 } as const
-const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.lg })
+const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
+const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 44,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
 const $cardImage: ThemedStyle<ImageStyle> = ({ spacing }) => ({
-  alignSelf: "stretch",
+  width: "52%",
+  maxWidth: 180,
+  alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
-  borderRadius: spacing.sm,
+  borderRadius: spacing.xs,
 })
 const $imagePlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  alignSelf: "stretch",
+  width: "52%",
+  maxWidth: 180,
+  alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
   alignItems: "center",
   justifyContent: "center",
   padding: spacing.md,
-  borderRadius: spacing.sm,
+  borderRadius: spacing.xs,
   borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.separator,
 })
 const $details: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.xs,
-})
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
+const $closeButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  flexShrink: 0,
+  justifyContent: "center",
+  paddingStart: spacing.sm,
+})
+const $closeText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.brandText })
 const $dimText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $quantityRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $quantityRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
+  paddingTop: spacing.sm,
+  borderTopWidth: 1,
+  borderTopColor: colors.separator,
 })
 const $quantityLabel: ThemedStyle<TextStyle> = ({ colors }) => ({
   flexGrow: 1,

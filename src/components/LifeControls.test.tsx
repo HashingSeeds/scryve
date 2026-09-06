@@ -81,6 +81,28 @@ describe("LifeControls", () => {
     expect(onLongChange).toHaveBeenCalledWith(-1, 1000)
   })
 
+  it("uses the change amount saved on the game", () => {
+    const onChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeControls playerName="Ada" system="mtg" lifeStep={5} onChange={onChange} />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("life-seat-1-5"))
+    expect(onChange).toHaveBeenCalledWith(5)
+  })
+
+  it("uses ten as Magic's default change amount", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeControls playerName="Ada" system="mtg" onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("life-seat-1-10")).toBeTruthy()
+  })
+
   it("uses Prize card language for Pokémon", () => {
     const view = render(
       <ThemeProvider initialContext="dark">

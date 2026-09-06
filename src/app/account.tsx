@@ -42,6 +42,9 @@ export default function AccountRoute() {
           </>
         }
         onBack={leaveAccount}
+        onOpenTerms={() => router.push("/terms")}
+        onOpenPrivacy={() => router.push("/privacy")}
+        onOpenGameContentNotices={() => router.push("/game-content-notices")}
         onSignedOut={() => router.replace("/")}
       />
     </Screen>

@@ -11,6 +11,7 @@ import {
   getPlayerGridLayout,
   getPlayerGridLayoutOptions,
   getPlayerGridMenuAnchor,
+  getPlayerGridRowFlex,
   getPlayerGridRows,
   PlayerGrid,
 } from "./PlayerGrid"
@@ -130,6 +131,46 @@ describe("PlayerGrid", () => {
       })
       expect(getPlayerGridRows(5, layout)).toEqual(expectedRows)
     }
+  })
+
+  it("supports the four-player tabletop arrangement", () => {
+    const layout = getPlayerGridLayout({
+      playerCount: 4,
+      width: 390,
+      height: 844,
+      layoutVariant: "tabletop",
+    })
+
+    expect(getPlayerGridRows(4, layout)).toEqual([[0], [1, 2], [3]])
+    expect(layout).toMatchObject({ columnCount: 2, rowCount: 3, variant: "tabletop" })
+    expect(getPlayerGridRowFlex([0], layout)).toBe(0.58)
+    expect(getPlayerGridRowFlex([1, 2], layout)).toBe(1)
+    expect(getPlayerGridLayoutOptions(4)).toEqual([
+      { variant: "auto", label: "Balanced" },
+      { variant: "tabletop", label: "Table" },
+    ])
+
+    const invalidTabletop = getPlayerGridLayout({
+      playerCount: 5,
+      width: 390,
+      height: 844,
+      layoutVariant: "tabletop",
+    })
+    expect(invalidTabletop.variant).toBe("auto")
+    expect(getPlayerGridRows(5, invalidTabletop).flat()).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it("supports the six-player tabletop arrangement", () => {
+    const layout = getPlayerGridLayout({
+      playerCount: 6,
+      width: 390,
+      height: 844,
+      layoutVariant: "tabletop",
+    })
+
+    expect(getPlayerGridRows(6, layout)).toEqual([[0], [1, 2], [3, 4], [5]])
+    expect(layout).toMatchObject({ columnCount: 2, rowCount: 4, variant: "tabletop" })
+    expect(getPlayerGridLayoutOptions(6)).toContainEqual({ variant: "tabletop", label: "Table" })
   })
 
   it("gives a full-width odd player less height than paired player rows", () => {

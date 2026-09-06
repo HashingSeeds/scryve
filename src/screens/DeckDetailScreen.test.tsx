@@ -1,5 +1,7 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
+import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 
 import { cardDetailsKey, DeckDetailScreen } from "./DeckDetailScreen"
@@ -35,6 +37,7 @@ const solRing = {
   oracleId: "11111111-1111-1111-1111-111111111111",
   scryfallId: "22222222-2222-2222-2222-222222222222",
   name: "Sol Ring",
+  imageUrl: "https://cards.scryfall.io/normal/sol-ring.jpg",
   quantity: 1,
   board: "main" as const,
 }
@@ -163,16 +166,32 @@ describe("DeckDetailScreen", () => {
   it("opens read-only with the deck, its notes, and the selected version's record", () => {
     const view = renderDetail()
     expect(view.getByText("Magic · Commander · 1 card")).toBeTruthy()
+    expect(
+      view.queryByTestId("deck-card-thumbnail-main:22222222-2222-2222-2222-222222222222"),
+    ).toBeNull()
+    expect(view.getByText("1×")).toBeTruthy()
+    expect(view.getByText("Sol Ring")).toBeTruthy()
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("deck-card-row-main:22222222-2222-2222-2222-222222222222").props.style,
+      ).minHeight,
+    ).toBe(64)
     expect(view.getByTestId("deck-loading-progress").props.accessibilityValue).toEqual({
       text: "Deck loaded",
     })
-    expect(view.getByText("50% win rate · 3W 3L 0D over 6 games")).toBeTruthy()
-    expect(view.getByText("Current  ›")).toBeTruthy()
+    expect(view.getByText("3–3")).toBeTruthy()
+    expect(view.getByText("50%")).toBeTruthy()
+    expect(view.getByText("Current ›")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-tab-notes"))
     expect(view.getByText("Ramp into big spells")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-tab-versions"))
     expect(view.getByText("The list I actually sleeve")).toBeTruthy()
-    expect(view.getByText("1 card · 75% win rate · 3W 1L 0D over 4 games")).toBeTruthy()
+    expect(view.getByText("3–1")).toBeTruthy()
+    expect(view.getAllByText("1 card").length).toBeGreaterThan(0)
+    expect(
+      StyleSheet.flatten(view.getByTestId("version-marker-version-main").props.style)
+        .backgroundColor,
+    ).toBe(colors.gameMenu.actions.history)
     expect(view.queryByText(/Premium/)).toBeNull()
   })
 
@@ -206,7 +225,15 @@ describe("DeckDetailScreen", () => {
   it("edits the list behind an explicit edit mode and saves into the same version", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
+    expect(view.getByText("Edit deck")).toBeTruthy()
+    expect(view.getByText("Cancel")).toBeTruthy()
     expect(view.getByTestId("card-search-input")).toBeTruthy()
+    expect(StyleSheet.flatten(view.getByTestId("save-version-button").props.style)).toMatchObject({
+      backgroundColor: colors.tint,
+    })
+    expect(StyleSheet.flatten(view.getByText("Save changes").props.style)).toMatchObject({
+      color: colors.textInverse,
+    })
     fireEvent.press(view.getAllByText("+")[0])
     fireEvent.press(view.getByTestId("save-version-button"))
     await waitFor(() => expect(mockSaveVersion).toHaveBeenCalledTimes(1))
@@ -221,9 +248,9 @@ describe("DeckDetailScreen", () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     fireEvent.press(view.getAllByText("+")[0])
-    expect(view.getByText("2× Sol Ring")).toBeTruthy()
+    expect(view.getByLabelText("2× Sol Ring")).toBeTruthy()
     fireEvent.press(view.getByTestId("discard-edits-button"))
-    expect(view.getByText("1× Sol Ring")).toBeTruthy()
+    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
     expect(mockSaveVersion).not.toHaveBeenCalled()
   })
 
@@ -248,7 +275,7 @@ describe("DeckDetailScreen", () => {
     }
     const view = renderDetail()
 
-    fireEvent.press(view.getByText("3× Ash Blossom & Joyous Spring"))
+    fireEvent.press(view.getByLabelText("3× Ash Blossom & Joyous Spring"))
 
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
     expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
@@ -274,7 +301,7 @@ describe("DeckDetailScreen", () => {
     }
     const view = renderDetail()
 
-    fireEvent.press(view.getByText("3× Riolu"))
+    fireEvent.press(view.getByLabelText("3× Riolu"))
 
     await waitFor(() => expect(view.getByText("Pokemon · Basic · Fighting")).toBeTruthy())
     expect(mockPokemonCardByReference).toHaveBeenCalledWith({
@@ -346,6 +373,9 @@ describe("DeckDetailScreen", () => {
   it("archives the deck from deck settings behind a confirmation", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("deck-settings-button"))
+    expect(view.getByText("Save changes")).toBeTruthy()
+    expect(view.getByTestId("deck-format-picker")).toBeTruthy()
+    expect(view.queryByText("Cancel")).toBeNull()
     fireEvent.press(view.getByTestId("delete-deck-button"))
     fireEvent.press(view.getByTestId("delete-deck-confirm"))
     await waitFor(() => expect(mockArchiveDeck).toHaveBeenCalledWith({ deckId: "deck-1" }))
@@ -372,7 +402,7 @@ describe("DeckDetailScreen", () => {
 
     mockDetail.error = undefined
     fireEvent.press(view.getByTestId("retry-deck-detail"))
-    expect(view.getByText("1× Sol Ring")).toBeTruthy()
+    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
     consoleError.mockRestore()
   })
 

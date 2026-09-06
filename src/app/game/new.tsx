@@ -1,11 +1,48 @@
 import { router, useLocalSearchParams } from "expo-router"
 
+import { ConnectedGate } from "@/features/connected/ConnectedGate"
+import { ConnectedHostSource } from "@/features/connected/ConnectedHostSource"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { ActiveGameGuardScreen } from "@/screens/ActiveGameGuardScreen"
 import { NewGameScreen } from "@/screens/NewGameScreen"
 
 export default function NewLocalGameRoute() {
-  const { setup } = useLocalSearchParams<{ setup?: string }>()
+  const { mode, setup } = useLocalSearchParams<{ mode?: string; setup?: string }>()
+  if (mode === "connected") {
+    return (
+      <ConnectedGate onBack={() => router.back()}>
+        <ConnectedHostSource
+          onLobbyCreated={(lobby) =>
+            router.replace({
+              pathname: "/connected/lobby/[gameId]",
+              params: { gameId: lobby.publicId },
+            })
+          }
+        >
+          {(connected) => (
+            <NewGameScreen
+              defaults={localGameRepository.loadSettings()}
+              mode="connected"
+              onModeChange={(nextMode) => nextMode === "local" && router.replace("/game/new")}
+              onBack={() => router.back()}
+              onStartLocal={() => undefined}
+              onJoinConnected={() => router.push("/connected/join")}
+              onResumeConnected={(game) =>
+                router.replace({
+                  pathname:
+                    game.status === "lobby"
+                      ? "/connected/lobby/[gameId]"
+                      : "/connected/game/[gameId]",
+                  params: { gameId: game.publicId },
+                })
+              }
+              connected={connected}
+            />
+          )}
+        </ConnectedHostSource>
+      </ConnectedGate>
+    )
+  }
   const activeGame = localGameRepository.loadActiveGame()
   const changingCurrentSetup = setup === "1" && activeGame !== null
   if (activeGame && !changingCurrentSetup) {
@@ -31,7 +68,9 @@ export default function NewLocalGameRoute() {
       localSubmitText={changingCurrentSetup ? "Apply and reset" : undefined}
       initialGame={changingCurrentSetup ? activeGame : undefined}
       confirmLocalSubmit={changingCurrentSetup}
-      onModeChange={(mode) => mode === "connected" && router.replace("/connected/new")}
+      onModeChange={(nextMode) =>
+        nextMode === "connected" && router.replace("/game/new?mode=connected")
+      }
       onBack={() => router.back()}
       onStartLocal={(players, startingLife, setup) => {
         if (changingCurrentSetup) localGameRepository.clearActiveGame()

@@ -13,18 +13,14 @@ import {
   getPlayerGridLayout,
   getPlayerGridMenuAnchor,
   PlayerGrid,
-  type PlayerGridLayoutVariant,
 } from "@/components/PlayerGrid"
+import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { incomingCommanderDamage, isEliminatedByCommanderDamage } from "@/features/game/domain"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
-import {
-  counterValueLabel,
-  playSystemId,
-  supportsCommanderDamage,
-} from "@/features/game/playSystems"
+import { counterValueLabel, supportsCommanderDamage } from "@/features/game/playSystems"
 import type { GamePlayer, LocalGame, PlayerId } from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
@@ -69,7 +65,7 @@ export function CurrentGameScreen({
     theme: { colors },
   } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)
-  const system = playSystemId(runtime.game.system)
+  const system = runtime.game.system
   const { width, height, fontScale } = useWindowDimensions()
   const [menuOpen, setMenuOpen] = useState(false)
   const [isFresh, setIsFresh] = useState(fresh)
@@ -96,8 +92,8 @@ export function CurrentGameScreen({
       event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
     )
   }
-  const [layoutVariant, setLayoutVariant] = useState<PlayerGridLayoutVariant>("auto")
   const playerCount = runtime.game.players.length
+  const layoutVariant = runtime.game.layout ?? "auto"
   const layoutOptions = getPlayerGridLayoutOptions(playerCount)
   const gridLayout = getPlayerGridLayout({
     playerCount,
@@ -222,6 +218,7 @@ export function CurrentGameScreen({
         <PlayerGrid
           players={runtime.game.players}
           system={system}
+          lifeStep={runtime.game.lifeStep}
           layoutVariant={layoutVariant}
           disabled={menuOpen}
           isPlayerEliminated={
@@ -280,22 +277,15 @@ export function CurrentGameScreen({
           wide
         >
           <Text text="Layout" preset="subheading" style={themed($dialogText)} />
-          <View style={themed($layoutOptions)}>
-            {layoutOptions.map((option) => (
-              <Button
-                key={option.variant}
-                testID={`layout-${option.variant}`}
-                text={option.label}
-                accessibilityState={{ selected: layoutVariant === option.variant }}
-                preset={layoutVariant === option.variant ? "reversed" : "default"}
-                style={themed($layoutOption)}
-                onPress={() => {
-                  setLayoutVariant(option.variant)
-                  closePanel()
-                }}
-              />
-            ))}
-          </View>
+          <PlayerLayoutPicker
+            playerCount={playerCount}
+            value={layoutVariant}
+            testID="layout"
+            onChange={(layout) => {
+              runtime.changeLayout(layout)
+              closePanel()
+            }}
+          />
           <Button tx="game:cancel" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>
       ) : null}
@@ -375,16 +365,6 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
-const $layoutOptions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: spacing.xs,
-})
-const $layoutOption: ThemedStyle<ViewStyle> = () => ({
-  minWidth: 96,
-  minHeight: 44,
-  flexGrow: 1,
-})
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
 const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

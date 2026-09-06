@@ -75,6 +75,7 @@ export interface LifeCardProps {
   contentRotation?: LifeCardContentRotation
   lifeFontSize?: number
   system?: PlaySystemId
+  lifeStep?: number
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
   pendingCount?: number
@@ -93,7 +94,8 @@ export function LifeCard({
   compact,
   contentRotation = 0,
   lifeFontSize,
-  system = "mtg",
+  system,
+  lifeStep,
   disabled,
   ownership,
   pendingCount = 0,
@@ -457,6 +459,7 @@ export function LifeCard({
           compact={compact}
           contentRotation={contentRotation}
           system={system}
+          lifeStep={lifeStep}
           recentDelta={recentDelta}
           onChange={onChange}
           onLongChange={(direction, amount) => {

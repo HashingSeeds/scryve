@@ -755,10 +755,12 @@ export const archive = mutation({
 })
 
 export const selectForSeat = mutation({
-  args: { publicId: v.string(), seat: v.number(), deckVersionId: v.id("deckVersions") },
+  args: {
+    publicId: v.string(),
+    seat: v.number(),
+    deckVersionId: v.optional(v.id("deckVersions")),
+  },
   handler: async (ctx, args) => {
-    const { deck, version } = await ownedVersion(ctx, args.deckVersionId)
-    assertNotArchived(deck)
     const game = await ctx.db
       .query("games")
       .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
@@ -768,6 +770,19 @@ export const selectForSeat = mutation({
         code: "deck_selection_not_allowed",
         message: "Decks can only be selected in a lobby",
       })
+    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
+    if (args.deckVersionId === undefined) {
+      if (game.deckRequired === true)
+        throw new ConvexError({
+          code: "deck_required",
+          message: "This lobby requires every player to choose a deck",
+        })
+      await ctx.db.patch(player._id, { deckVersionId: undefined })
+      await ctx.db.patch(game._id, { updatedAt: Date.now() })
+      return { deckId: null, deckVersionId: null }
+    }
+    const { deck, version } = await ownedVersion(ctx, args.deckVersionId)
+    assertNotArchived(deck)
     const deckGame = deck.game ?? DEFAULT_DECK_GAME
     const lobbyGame = game.system ?? game.game ?? DEFAULT_DECK_GAME
     if (deckGame !== lobbyGame)
@@ -775,7 +790,6 @@ export const selectForSeat = mutation({
         code: "deck_system_mismatch",
         message: "This deck belongs to another game system",
       })
-    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
     await ctx.db.patch(player._id, { deckVersionId: version._id })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return { deckId: deck._id, deckVersionId: version._id }

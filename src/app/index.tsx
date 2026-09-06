@@ -59,8 +59,16 @@ export default function Index() {
         color: PLAYER_COLORS[index],
       })),
       startingLife: settings.defaultStartingLife,
+      ...(settings.defaultSystem ? { system: settings.defaultSystem } : {}),
+      ...(settings.defaultFormat ? { format: settings.defaultFormat } : {}),
     })
-  }, [prepared, settings.defaultPlayerCount, settings.defaultStartingLife])
+  }, [
+    prepared,
+    settings.defaultPlayerCount,
+    settings.defaultStartingLife,
+    settings.defaultSystem,
+    settings.defaultFormat,
+  ])
 
   const stale = activeGame ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
 
@@ -98,7 +106,7 @@ export default function Index() {
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
       onSetup={() => router.push(activeGame ? "/game/new?setup=1" : "/game/new")}
-      onConnect={() => router.push("/connected")}
+      onConnect={() => router.push("/game/new?mode=connected")}
       onSettings={() => router.push("/settings")}
       onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}
       accountLabel={auth.isSignedIn ? "Account" : "Sign in"}
