@@ -285,37 +285,41 @@ describe("premium deck tracking", () => {
     ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
   })
 
-  it("restores missing mirror URLs in cached and saved Yu-Gi-Oh decks", async () => {
-    const t = convexTest(schema, modules)
-    const actor = await synced(t, "mirror-owner", "Mirror Owner")
-    const catalogDeckId = await t.run(async (ctx) => {
-      const id = await ctx.db.insert("deckCatalogs", {
-        game: "ygo",
-        source: "ygoprodeck-decks",
-        externalId: "missing-images",
-        kind: "top",
-        name: "Dark Magician",
-        format: "advanced",
-        fetchedAt: Date.now(),
+  it.each([undefined, "46986414:0"])(
+    "restores missing mirror URLs with printing %s",
+    async (printingId) => {
+      const t = convexTest(schema, modules)
+      const actor = await synced(t, "mirror-owner", "Mirror Owner")
+      const catalogDeckId = await t.run(async (ctx) => {
+        const id = await ctx.db.insert("deckCatalogs", {
+          game: "ygo",
+          source: "ygoprodeck-decks",
+          externalId: "missing-images",
+          kind: "top",
+          name: "Dark Magician",
+          format: "advanced",
+          fetchedAt: Date.now(),
+        })
+        await ctx.db.insert("deckCatalogCards", {
+          catalogDeckId: id,
+          game: "ygo",
+          cardId: "46986414",
+          printingId,
+          name: "Dark Magician",
+          quantity: 3,
+          section: "main",
+          entryKind: "card",
+        })
+        return id
       })
-      await ctx.db.insert("deckCatalogCards", {
-        catalogDeckId: id,
-        game: "ygo",
-        cardId: "46986414",
-        name: "Dark Magician",
-        quantity: 3,
-        section: "main",
-        entryKind: "card",
-      })
-      return id
-    })
-    const imageUrl = "https://ygo-images.scryve.sow.care/images/yugioh/cards/46986414.jpg"
-    const catalog = await t.query(api.deckCatalogs.detail, { catalogDeckId })
-    expect(catalog.entries[0]).toMatchObject({ imageUrl, smallImageUrl: imageUrl })
-    const deckId = await actor.mutation(api.decks.importCatalog, { catalogDeckId })
-    const detail = await actor.query(api.decks.detail, { deckId })
-    expect(detail.cards[0]).toMatchObject({ imageUrl, smallImageUrl: imageUrl })
-  })
+      const imageUrl = "https://ygo-images.scryve.sow.care/images/yugioh/cards/46986414.jpg"
+      const catalog = await t.query(api.deckCatalogs.detail, { catalogDeckId })
+      expect(catalog.entries[0]).toMatchObject({ imageUrl, smallImageUrl: imageUrl })
+      const deckId = await actor.mutation(api.decks.importCatalog, { catalogDeckId })
+      const detail = await actor.query(api.decks.detail, { deckId })
+      expect(detail.cards[0]).toMatchObject({ imageUrl, smallImageUrl: imageUrl })
+    },
+  )
 
   it("keeps card text available while an image release gate is disabled", async () => {
     const t = convexTest(schema, modules)

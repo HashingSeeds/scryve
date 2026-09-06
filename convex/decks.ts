@@ -657,7 +657,7 @@ export const detail = query({
         if (includeImages) {
           const imageUrl =
             deck.game === "ygo"
-              ? ygoImageUrl(card.printingId ?? card.providerCardId ?? card.cardId)
+              ? ygoImageUrl(card.printingId, card.providerCardId, card.cardId)
               : undefined
           return imageUrl
             ? {

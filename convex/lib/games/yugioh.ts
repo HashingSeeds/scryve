@@ -32,8 +32,9 @@ function mirroredImageUrl(baseUrl: string | undefined, printingId: string) {
   }
 }
 
-export function ygoImageUrl(printingId: string | undefined) {
-  if (!printingId || !/^\d+$/.test(printingId)) return undefined
+export function ygoImageUrl(...ids: (string | undefined)[]) {
+  const printingId = ids.find((id) => id !== undefined && /^\d+$/.test(id))
+  if (!printingId) return undefined
   return mirroredImageUrl(configuredYgoImageBaseUrl(), printingId)
 }
 
