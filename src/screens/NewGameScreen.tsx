@@ -51,6 +51,7 @@ import type { LocalGame, LocalGameResult, NewPlayerInput } from "@/features/game
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { accessibleForeground } from "@/utils/colorContrast"
 
 import { shapeForSeat, type PlayerAppearance } from "../../convex/lib/appearance"
 
@@ -348,21 +349,29 @@ export function NewGameScreen({
         ) : null}
 
         {!connectedMode && localGame ? (
-          <View style={themed($section)}>
-            <Text text="Your local game" preset="subheading" accessibilityRole="header" />
+          <View style={themed($activeLocalGame)}>
+            <Text text="Game in progress" preset="subheading" accessibilityRole="header" />
             <Text
-              text={localGame.players
-                .map((player) => `${player.name} · ${player.life}`)
-                .join(" / ")}
+              size="sm"
+              style={themed($footerStatus)}
+              text={`${playSystemFormats(localGame.system ?? "mtg").find((candidate) => candidate.id === localGame.format)?.label ?? "Local game"} · ${localGame.players.length} players`}
             />
-            <View style={themed($connectedGameActions)}>
-              <Button testID="resume-local-game" text="Resume" onPress={onResumeLocal} />
-              <Button
-                testID="end-local-game"
-                text="End game…"
-                onPress={() => setEndingLocal(true)}
-              />
-            </View>
+            <Button
+              testID="resume-local-game"
+              text="Resume game"
+              preset="reversed"
+              style={themed($resumeButton)}
+              textStyle={themed($resumeButtonText)}
+              onPress={onResumeLocal}
+            />
+            <TouchableOpacity
+              testID="end-local-game"
+              accessibilityRole="button"
+              style={themed($localEndAction)}
+              onPress={() => setEndingLocal(true)}
+            >
+              <Text text="End game…" style={themed($footerNote)} />
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -721,3 +730,20 @@ const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $footerStatus: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+
+const $activeLocalGame: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  borderLeftWidth: 2,
+  borderLeftColor: colors.tint,
+  paddingLeft: spacing.md,
+  gap: spacing.xs,
+})
+const $localEndAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  justifyContent: "center",
+  paddingVertical: spacing.xs,
+})
+
+const $resumeButton: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.tint })
+const $resumeButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: accessibleForeground(colors.tint),
+})

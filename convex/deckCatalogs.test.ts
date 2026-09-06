@@ -1,12 +1,22 @@
+import { v } from "convex/values"
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
+import { internalMutation } from "./_generated/server"
 import schema from "./schema"
 
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
   "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
+  "./externalApiRateLimits.ts": async () => ({
+    reserve: internalMutation({
+      args: { bucket: v.string(), intervalMs: v.number() },
+      handler: async () => 0,
+    }),
+  }),
+  "./providerHealth.ts": async () => jest.requireActual("./providerHealth"),
+  "./cardCatalog.ts": async () => jest.requireActual("./cardCatalog"),
   "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
 }
 
@@ -96,4 +106,85 @@ describe("deck catalog search", () => {
       ).resolves.toMatchObject([{ externalId: "traditional-match", format: "traditional" }])
     },
   )
+})
+
+it.each(["expanded", undefined])(
+  "refreshes Pokémon format %s independently and reuses its cache",
+  async (requestedFormat) => {
+    const expectedFormat = requestedFormat ?? "standard"
+    const otherFormat = expectedFormat === "standard" ? "expanded" : "standard"
+    const t = convexTest(schema, modules)
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deckCatalogs", {
+        game: "pokemon",
+        source: "fixture",
+        externalId: otherFormat,
+        kind: "tournament",
+        name: "Other format deck",
+        format: otherFormat,
+        fetchedAt: Date.now(),
+      })
+    })
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+      const url = String(input)
+      const body = url.includes("/tournaments?")
+        ? [
+            { id: "expanded-one", name: "First event", format: expectedFormat.toUpperCase() },
+            { id: "expanded-two", name: "Second event", format: expectedFormat.toUpperCase() },
+          ]
+        : url.endsWith("/standings")
+          ? [
+              {
+                player: "winner",
+                placing: 1,
+                deck: { name: "Expanded deck" },
+                decklist: { pokemon: [{ name: "Pikachu", set: "BS", number: "58", count: 60 }] },
+              },
+            ]
+          : []
+      return new Response(JSON.stringify(body), { status: 200 })
+    })
+    try {
+      const actor = t.withIdentity({ subject: "catalog-reader" })
+      const decks = await actor.action(api.deckCatalogs.searchTopDecks, {
+        game: "pokemon",
+        format: requestedFormat,
+        query: "",
+      })
+      expect(decks).toHaveLength(2)
+      expect(decks.every((deck) => deck.format === expectedFormat)).toBe(true)
+      expect(
+        fetchSpy.mock.calls.some(([url]) =>
+          String(url).includes(`format=${expectedFormat.toUpperCase()}`),
+        ),
+      ).toBe(true)
+      const fetchCount = fetchSpy.mock.calls.length
+      await expect(
+        actor.action(api.deckCatalogs.searchTopDecks, {
+          game: "pokemon",
+          format: requestedFormat,
+          query: "",
+        }),
+      ).resolves.toHaveLength(2)
+      expect(fetchSpy).toHaveBeenCalledTimes(fetchCount)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  },
+)
+
+it.each(["standard", "expanded"])("caches a successful empty %s feed", async (format) => {
+  const t = convexTest(schema, modules)
+  const actor = t.withIdentity({ subject: "empty-catalog-reader" })
+  const fetchSpy = jest
+    .spyOn(global, "fetch")
+    .mockImplementation(async () => new Response("[]", { status: 200 }))
+  try {
+    const args = { game: "pokemon", format, query: "" }
+    await expect(actor.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual([])
+    await expect(actor.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual([])
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  } finally {
+    fetchSpy.mockRestore()
+  }
 })
