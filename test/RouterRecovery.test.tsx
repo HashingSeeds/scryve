@@ -38,8 +38,8 @@ jest.mock("@/features/auth/AccountControls", () => {
     ),
   }
 })
-jest.mock("@/features/connected/ConnectedGate", () => ({
-  ConnectedGate: ({ children }: { children: React.ReactNode }) => children,
+jest.mock("@/features/auth/CloudScreen", () => ({
+  CloudScreen: ({ children }: { children: () => React.ReactNode }) => children(),
 }))
 jest.mock("@/screens/JoinConnectedScreen", () => ({ JoinConnectedScreen: () => null }))
 

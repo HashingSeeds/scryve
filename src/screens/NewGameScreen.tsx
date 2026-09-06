@@ -26,7 +26,6 @@ import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import {
-  hasLocalGameStarted,
   MAX_PLAYER_NAME_LENGTH,
   PLAYER_COLORS,
   validatePlayerNames,
@@ -280,7 +279,7 @@ export function NewGameScreen({
     <View style={[themed($root), $styles.flex1]}>
       <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
         <Header
-          title={initialGame && !hasLocalGameStarted(initialGame) ? "Game setup" : "New game"}
+          title={onSavePlayers ? "Game setup" : "New game"}
           leftTx="common:back"
           backgroundColor={colors.surface}
           onLeftPress={onBack}
