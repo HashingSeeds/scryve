@@ -1,10 +1,23 @@
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { Header } from "@/components/Header"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
 
 import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
+
+let mockPreventRemove = false
+let mockPreventRemoveCallback:
+  ((options: { data: { action: { type: string } } }) => void) | undefined
+const mockNavigationDispatch = jest.fn()
+const mockNavigation = { dispatch: mockNavigationDispatch }
+jest.mock("expo-router", () => ({ useNavigation: () => mockNavigation }))
+jest.mock("expo-router/react-navigation", () => ({
+  usePreventRemove: (preventRemove: boolean, callback: typeof mockPreventRemoveCallback) => {
+    mockPreventRemove = preventRemove
+    mockPreventRemoveCallback = callback
+  },
+}))
 
 const mockStored = {
   schemaVersion: 1 as const,
@@ -50,6 +63,9 @@ function renderScreen(onBack = jest.fn()) {
 }
 
 beforeEach(() => {
+  mockPreventRemove = false
+  mockPreventRemoveCallback = undefined
+  mockNavigationDispatch.mockClear()
   mockCurrent = mockStored
   mockSaveFailure = false
   mockSaveGuestDeck.mockClear()
@@ -79,6 +95,7 @@ test("shows stored cards and saves edits across reload", async () => {
 test("cancel keeps a guest deck and confirm deletes it", async () => {
   const onBack = jest.fn()
   const view = renderScreen(onBack)
+  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved before deletion")
   fireEvent.press(view.getByTestId("guest-deck-delete"))
   await waitFor(() => expect(view.getByTestId("guest-deck-confirm-delete")).toBeTruthy())
   fireEvent.press(view.getByTestId("confirm-dialog-cancel"))
@@ -144,4 +161,36 @@ test("keeps unsaved edits until back navigation is confirmed", () => {
   fireEvent(view.UNSAFE_getByType(Header), "leftPress")
   fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
   expect(onBack).toHaveBeenCalledTimes(1)
+})
+
+test("blocks system back until discard is confirmed and replays the original action", () => {
+  const { onBack, ...view } = renderScreen()
+  expect(mockPreventRemove).toBe(false)
+  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved")
+  expect(mockPreventRemove).toBe(true)
+  const action = { type: "GO_BACK" }
+  act(() => mockPreventRemoveCallback?.({ data: { action } }))
+  expect(view.getByText("Discard changes?")).toBeTruthy()
+  expect(mockNavigationDispatch).not.toHaveBeenCalled()
+  fireEvent.press(view.getByText("Keep editing"))
+  expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
+  expect(mockPreventRemove).toBe(true)
+  act(() => mockPreventRemoveCallback?.({ data: { action } }))
+  fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
+  expect(mockPreventRemove).toBe(false)
+  expect(mockNavigationDispatch).toHaveBeenCalledTimes(1)
+  expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
+  expect(onBack).not.toHaveBeenCalled()
+})
+
+test("saving after cancelling system back keeps the editor open", () => {
+  const view = renderScreen()
+  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Saved")
+  expect(mockPreventRemove).toBe(true)
+  act(() => mockPreventRemoveCallback?.({ data: { action: { type: "GO_BACK" } } }))
+  fireEvent.press(view.getByText("Keep editing"))
+  fireEvent.press(view.getByTestId("guest-deck-save"))
+  expect(mockPreventRemove).toBe(false)
+  expect(mockNavigationDispatch).not.toHaveBeenCalled()
+  expect(view.getByDisplayValue("Saved")).toBeTruthy()
 })
