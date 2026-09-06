@@ -232,7 +232,7 @@ export function AddDeckScreen({
   const [capacityState, setCapacityState] = useState<CapacityState>({ status: "checking" })
   const capacity = capacityState.status === "ready" ? capacityState.capacity : undefined
   const signedIn = access?.signedIn ?? Boolean(access?.ownerId)
-  const guestMode = Boolean(access && !signedIn)
+  const guestMode = Boolean(access && !access.loading && !signedIn)
   const capacityReady = guestMode || ((access?.ready ?? true) && capacityState.status === "ready")
   const atCapacity = !guestMode && capacityReady && capacity?.canCreate === false
   const canRequestAccess = Boolean(access && !access.ready && !access.loading)

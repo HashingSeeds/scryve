@@ -386,6 +386,28 @@ describe("AddDeckScreen", () => {
     expect(onCreated).toHaveBeenCalledWith("guest")
   })
 
+  it("waits for auth resolution before enabling guest save", () => {
+    const onCreated = jest.fn()
+    const form = (loading: boolean) => (
+      <ThemeProvider initialContext="light">
+        <AddDeckScreen
+          onBack={jest.fn()}
+          onCreated={onCreated}
+          access={{ ready: false, loading, signedIn: false, request: jest.fn() }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(form(true))
+    chooseMode(view, "blank")
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Guest deck")
+    expect(view.getByText("Create deck")).toBeDisabled()
+
+    view.rerender(form(false))
+    expect(view.getByText("Create deck")).toBeEnabled()
+    fireEvent.press(view.getByText("Create deck"))
+    expect(onCreated).toHaveBeenCalledWith("guest")
+  })
+
   it("reveals guest replacement recovery after the second save and disables save", () => {
     const existing = saveGuestDeck({
       name: "Existing",
