@@ -15,9 +15,12 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import type { CloudAccess } from "@/features/auth/CloudScreen"
 import type { DeckRecord } from "@/features/decks/deckCopy"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
+import { useGuestDeck } from "@/features/decks/guestDeck"
+import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
@@ -94,7 +97,7 @@ function DeckRow({
   deck: ShelfDeck
   showGame: boolean
   onPress: () => void
-  onToggleFavorite: () => void
+  onToggleFavorite?: () => void
 }) {
   const { theme, themed } = useAppTheme()
   const game = deck.game ?? DEFAULT_DECK_GAME
@@ -133,16 +136,21 @@ function DeckRow({
           </View>
         ) : null}
       </TouchableOpacity>
-      <TouchableOpacity
-        testID={`favorite-deck-${deck._id}`}
-        accessibilityRole="button"
-        accessibilityLabel={`${favorite ? "Remove" : "Add"} ${deck.name} ${favorite ? "from" : "to"} favorites`}
-        hitSlop={8}
-        style={themed($favoriteButton)}
-        onPress={onToggleFavorite}
-      >
-        <StarIcon selected={favorite} color={favorite ? theme.colors.tint : theme.colors.textDim} />
-      </TouchableOpacity>
+      {onToggleFavorite ? (
+        <TouchableOpacity
+          testID={`favorite-deck-${deck._id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`${favorite ? "Remove" : "Add"} ${deck.name} ${favorite ? "from" : "to"} favorites`}
+          hitSlop={8}
+          style={themed($favoriteButton)}
+          onPress={onToggleFavorite}
+        >
+          <StarIcon
+            selected={favorite}
+            color={favorite ? theme.colors.tint : theme.colors.textDim}
+          />
+        </TouchableOpacity>
+      ) : null}
     </View>
   )
 }
@@ -366,6 +374,7 @@ export function DecksScreen({
   onAccount,
   accountLabel = "Account",
   unavailableMessage,
+  access,
 }: {
   onPlay: () => void
   hasCurrentGame?: boolean
@@ -375,10 +384,12 @@ export function DecksScreen({
   onAccount: () => void
   accountLabel?: "Account" | "Sign in"
   unavailableMessage?: string
+  access?: CloudAccess
 }) {
   const { theme, themed } = useAppTheme()
   const { format, setGame, setFormat } = useDeckFilters()
   const { deckIds: recentDeckIds } = useRecentDecks()
+  const guest = useGuestDeck()
   const [collection, setCollection] = useState<DeckCollection>("all")
   const [system, setSystem] = useState(ALL_SYSTEMS)
   const [search, setSearch] = useState("")
@@ -396,6 +407,26 @@ export function DecksScreen({
   const selectedSystem = DECK_GAME_LIST.find((candidate) => candidate.id === system)
   const activeFormat = system === ALL_SYSTEMS ? ALL_FORMATS : format
   const filterCount = Number(system !== ALL_SYSTEMS) + Number(activeFormat !== ALL_FORMATS)
+  const guestRow: ShelfDeck | undefined = guest
+    ? {
+        _id: "guest",
+        name: guest.deck.name,
+        game: guest.deck.game ?? DEFAULT_DECK_GAME,
+        format: guest.deck.format,
+        cardQuantity: guest.deck.cards.reduce((total, card) => total + card.quantity, 0),
+      }
+    : undefined
+  const guestVisible =
+    guestRow &&
+    collection !== "favorites" &&
+    (collection !== "recent" || recentDeckIds.includes("guest")) &&
+    (system === ALL_SYSTEMS || guestRow.game === system) &&
+    (activeFormat === ALL_FORMATS || guestRow.format === activeFormat) &&
+    matchesSearch(guestRow, search)
+  const guestOnly = Boolean(
+    unavailableMessage ||
+    (access && !access.loading && !access.ready && !access.signedIn && !access.ownerId),
+  )
 
   function chooseSystem(next: string) {
     setSystem(next)
@@ -424,8 +455,8 @@ export function DecksScreen({
       <Header
         title="Decks"
         backgroundColor={theme.colors.surface}
-        rightText={unavailableMessage ? undefined : "Add deck"}
-        onRightPress={unavailableMessage ? undefined : onAddDeck}
+        rightText="Add deck"
+        onRightPress={onAddDeck}
       />
       <View style={themed($content)}>
         <View style={themed($filterRow)}>
@@ -480,7 +511,58 @@ export function DecksScreen({
             ) : null}
           </View>
         ) : null}
-        {unavailableMessage ? (
+        {guestVisible && guestRow ? (
+          <View>
+            <Text size="xs" text="On this device" />
+            <DeckRow
+              deck={guestRow}
+              showGame={system === ALL_SYSTEMS}
+              onPress={() =>
+                onSelect({
+                  deckId: "guest",
+                  name: guestRow.name,
+                  game: guestRow.game ?? DEFAULT_DECK_GAME,
+                  format: guestRow.format,
+                  cardQuantity: guestRow.cardQuantity,
+                })
+              }
+            />
+          </View>
+        ) : null}
+        {access?.ready ? <GuestDeckTransfer access={access} /> : null}
+        {guestOnly ? (
+          !guestVisible ? (
+            <View style={themed($empty)}>
+              <Text preset="subheading" text={guest ? "Nothing matches" : "No decks yet"} />
+              <Text
+                size="sm"
+                text={
+                  guest
+                    ? "Try another search or clear the filters."
+                    : "Save a deck on this device. No account needed."
+                }
+              />
+              {guest ? (
+                <Button
+                  text="Clear search and filters"
+                  onPress={() => {
+                    clearVisibleFilters()
+                    setCollection("all")
+                  }}
+                />
+              ) : null}
+            </View>
+          ) : null
+        ) : access && !access.ready ? (
+          access.loading ? (
+            <DeckShelfSkeleton />
+          ) : (
+            <View style={themed($empty)}>
+              <Text text={access.message ?? "Decks unavailable"} />
+              <Button text={access.actionLabel ?? "Try again"} onPress={access.request} />
+            </View>
+          )
+        ) : unavailableMessage ? (
           <View testID="decks-offline-state" style={themed($empty)}>
             <Text preset="subheading" text="Decks unavailable" />
             <Text size="sm" style={themed($dimmedText)} text={unavailableMessage} />

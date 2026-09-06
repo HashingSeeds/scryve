@@ -349,6 +349,18 @@ describe("preconstructed catalog caching", () => {
     }
   })
 
+  it("serves cached catalog search to guests", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(deckListResponse)
+    try {
+      const t = convexTest(schema, modules)
+      const result = await t.action(api.deckImports.searchPreconstructed, { query: "atraxa" })
+      expect(result).toMatchObject([{ fileName: "AtraxaInfect", name: "Atraxa Infect" }])
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it("shares a resolved deck across users without repeating external requests", async () => {
     const fetchSpy = jest
       .spyOn(global, "fetch")
@@ -362,6 +374,14 @@ describe("preconstructed catalog caching", () => {
       const first = await firstUser.action(api.deckImports.resolvePreconstructed, {
         fileName: "AvengersAssemble",
       })
+      const reservation = await t.run(
+        async (ctx) =>
+          await ctx.db
+            .query("externalApiRateLimits")
+            .withIndex("by_bucket", (q) => q.eq("bucket", "mtgjson:decks"))
+            .unique(),
+      )
+      expect(reservation?.nextRequestAt).toBe(1_000_100)
       nowSpy.mockReturnValue(1_000_000 + 60 * 60 * 1000)
       const second = await secondUser.action(api.deckImports.resolvePreconstructed, {
         fileName: "AvengersAssemble.json",
@@ -400,6 +420,78 @@ describe("preconstructed catalog caching", () => {
         fileName: "AvengersAssemble",
       })
       expect(fetchSpy).toHaveBeenCalledTimes(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("resolves a known preconstructed deck for guests", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) =>
+        String(input).endsWith("DeckList.json")
+          ? deckListResponse()
+          : resolvedPreconResponse(String(input)),
+      )
+    try {
+      const t = convexTest(schema, modules)
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: [
+          {
+            fileName: "AvengersAssemble",
+            name: "Avengers Assemble",
+          },
+        ],
+      })
+      const result = await t.action(api.deckImports.resolvePreconstructed, {
+        fileName: "AvengersAssemble",
+      })
+      expect(result).toMatchObject({
+        name: "Avengers Assemble",
+        cards: [{ scryfallId: preconCardId, quantity: 1 }],
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("does not cold-fetch an unknown guest preconstructed filename", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network unavailable"))
+    try {
+      const t = convexTest(schema, modules)
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: [{ fileName: "AtraxaInfect", name: "Atraxa Infect" }],
+      })
+      await expect(
+        t.action(api.deckImports.resolvePreconstructed, { fileName: "UnknownDeck" }),
+      ).rejects.toMatchObject({ data: { code: "catalog_deck_not_found" } })
+      await expect(
+        t.action(api.deckImports.previewPreconstructed, { fileName: "UnknownDeck" }),
+      ).rejects.toMatchObject({ data: { code: "catalog_deck_not_found" } })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("serves a cold preview to guests through the bounded fetch lease", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) => resolvedPreconResponse(String(input)))
+    try {
+      const t = convexTest(schema, modules)
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: [{ fileName: "AvengersAssemble", name: "Avengers Assemble" }],
+      })
+      const outline = await t.action(api.deckImports.previewPreconstructed, {
+        fileName: "AvengersAssemble",
+      })
+      expect(outline).toMatchObject({
+        name: "Avengers Assemble",
+        cards: [{ name: "Captain America, Team Leader", quantity: 1 }],
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
     } finally {
       fetchSpy.mockRestore()
     }

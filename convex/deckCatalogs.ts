@@ -304,24 +304,19 @@ async function refreshPokemonTopDecks(
 export const searchTopDecks = action({
   args: { game: v.string(), query: v.string(), format: v.optional(v.string()) },
   handler: async (ctx, args): Promise<Doc<"deckCatalogs">[]> => {
-    if (!(await ctx.auth.getUserIdentity()))
-      throw new ConvexError({ code: "unauthenticated", message: "Authentication required" })
     const game = assertGameSystem(args.game)
     const format = args.format ? assertDeckGameFormat(game, args.format) : undefined
     await requireActionCapability(ctx, game, "exampleDecks")
-    const includeImages = await actionCapabilityEnabled(ctx, game, "images")
-    if (game === "mtg")
-      return await ctx.runQuery(internal.deckCatalogs.searchCached, {
-        game,
-        query: args.query,
-        ...(format ? { format } : {}),
-      })
-
     const cached: Doc<"deckCatalogs">[] = await ctx.runQuery(internal.deckCatalogs.searchCached, {
       game,
       query: args.query,
       ...(format ? { format } : {}),
     })
+    if (!(await ctx.auth.getUserIdentity())) return cached
+
+    const includeImages = await actionCapabilityEnabled(ctx, game, "images")
+    if (game === "mtg") return cached
+
     const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game })
     if (latest && Date.now() - latest.fetchedAt < FEED_TTL_MS) return cached
 

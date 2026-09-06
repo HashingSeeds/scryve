@@ -119,6 +119,72 @@ describe("premium deck tracking", () => {
     })
   })
 
+  it("imports guest decks once per owner and preserves archived receipts", async () => {
+    const t = convexTest(schema, modules)
+    const owner = await synced(t, "guest-owner", "Guest Owner")
+    const other = await synced(t, "guest-other", "Guest Other")
+    const localId = "11111111-1111-4111-8111-111111111111"
+    const args = { localId, localUpdatedAt: 123, name: "Scratch", format: "commander", cards: [] }
+    const imported = await owner.mutation(api.decks.importGuest, args)
+    expect(imported).toMatchObject({ status: "imported", localUpdatedAt: 123 })
+    if (imported.status === "limit_reached") throw new Error("unexpected capacity result")
+    await expect(
+      owner.mutation(api.decks.importGuest, { ...args, name: "Changed", localUpdatedAt: 456 }),
+    ).resolves.toMatchObject({
+      status: "already_imported",
+      deckId: imported.deckId,
+      localUpdatedAt: 123,
+    })
+    await owner.mutation(api.decks.archive, { deckId: imported.deckId })
+    await expect(owner.mutation(api.decks.importGuest, args)).resolves.toMatchObject({
+      status: "already_imported",
+      deckId: imported.deckId,
+    })
+    await expect(
+      owner.mutation(api.decks.importGuest, {
+        ...args,
+        localId: "33333333-3333-4333-8333-333333333333",
+        cards: [{ name: "Invalid", quantity: 1 }],
+      }),
+    ).rejects.toMatchObject({ data: { code: "invalid_card" } })
+    await owner.mutation(api.decks.create, { name: "Another", format: "commander" })
+    await owner.mutation(api.decks.create, { name: "Full", format: "commander" })
+    await expect(owner.mutation(api.decks.importGuest, args)).resolves.toMatchObject({
+      status: "already_imported",
+      deckId: imported.deckId,
+      localUpdatedAt: 123,
+    })
+    await expect(other.mutation(api.decks.importGuest, args)).resolves.toMatchObject({
+      status: "imported",
+    })
+    const otherDecks = await other.query(api.decks.listMine)
+    await expect(
+      owner.query(api.decks.detail, { deckId: otherDecks.decks[0]._id }),
+    ).rejects.toMatchObject({ data: { code: "deck_not_found" } })
+    await expect(owner.query(api.decks.listMine)).resolves.toMatchObject({
+      capacity: { used: 2, limit: 2 },
+    })
+  })
+
+  it("returns guest capacity without writing when a free account is full", async () => {
+    const t = convexTest(schema, modules)
+    const owner = await synced(t, "guest-full", "Guest Full")
+    await owner.mutation(api.decks.create, { name: "First", format: "commander" })
+    await owner.mutation(api.decks.create, { name: "Second", format: "commander" })
+    await expect(
+      owner.mutation(api.decks.importGuest, {
+        localId: "22222222-2222-4222-8222-222222222222",
+        localUpdatedAt: 1,
+        name: "Third",
+        format: "commander",
+        cards: [],
+      }),
+    ).resolves.toMatchObject({
+      status: "limit_reached",
+      capacity: { used: 2, limit: 2, premium: false },
+    })
+  })
+
   it("imports a Yu-Gi-Oh! catalog deck without crossing system identities", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "catalog-owner", "Catalog Owner")
@@ -310,7 +376,84 @@ describe("premium deck tracking", () => {
     ).resolves.toBeDefined()
     await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
       decks: [{ game: "mtg" }, { game: "mtg" }, { game: "mtg" }],
-      capacity: { used: 3, premium: true, canCreate: true },
+      capacity: { used: 3, limit: 100, premium: true, canCreate: true },
+    })
+  })
+
+  it("uses canonical entitlement precedence while accepting legacy stored records", async () => {
+    const t = convexTest(schema, modules)
+    const legacy = await synced(t, "legacy-entitlement", "Legacy Entitlement")
+    const userId = await t.run(async (ctx) => {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "legacy-entitlement"))
+        .unique()
+      return user!._id
+    })
+    await t.run(async (ctx) => {
+      await ctx.db.insert("userEntitlements", {
+        userId,
+        feature: "unlimited_decks",
+        enabled: true,
+        source: "legacy",
+        updatedAt: Date.now(),
+      })
+    })
+    await expect(legacy.query(api.decks.listMine)).resolves.toMatchObject({
+      capacity: { premium: true, limit: 100 },
+    })
+    await t.run(async (ctx) => {
+      await ctx.db.insert("userEntitlements", {
+        userId,
+        feature: "pro_decks_limit",
+        enabled: false,
+        source: "revoked",
+        updatedAt: Date.now(),
+      })
+    })
+    await expect(legacy.query(api.decks.listMine)).resolves.toMatchObject({
+      capacity: { premium: false, limit: 2 },
+    })
+    await t.mutation(internal.entitlements.setUserFeature, {
+      clerkUserId: "legacy-entitlement",
+      feature: "unlimited_decks",
+      enabled: true,
+      source: "new-writer",
+    })
+    await t.mutation(internal.entitlements.setUserFeature, {
+      clerkUserId: "legacy-entitlement",
+      feature: "pro_decks_limit",
+      enabled: false,
+      source: "new-writer-revocation",
+    })
+    await expect(legacy.query(api.decks.listMine)).resolves.toMatchObject({
+      capacity: { premium: false, limit: 2 },
+    })
+    await t.mutation(internal.entitlements.setUserFeature, {
+      clerkUserId: "legacy-entitlement",
+      feature: "unlimited_decks",
+      enabled: true,
+      source: "legacy-writer-reenable",
+    })
+    await expect(legacy.query(api.decks.listMine)).resolves.toMatchObject({
+      capacity: { premium: true, limit: 100 },
+    })
+    const deckEntitlements = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("userEntitlements")
+          .withIndex("by_user_and_feature", (q) => q.eq("userId", userId))
+          .take(10),
+    )
+    expect(deckEntitlements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ feature: "unlimited_decks", enabled: true }),
+        expect.objectContaining({ feature: "pro_decks_limit", enabled: true }),
+      ]),
+    )
+    await expect(legacy.query(api.entitlements.current)).resolves.toMatchObject({
+      proDecksLimit: true,
+      unlimitedDecks: true,
     })
   })
 

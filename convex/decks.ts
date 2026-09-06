@@ -1,4 +1,4 @@
-import { ConvexError, v } from "convex/values"
+import { ConvexError, type Infer, v } from "convex/values"
 
 import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
@@ -50,24 +50,7 @@ const cardValidator = v.object({
   board: v.optional(boardValidator),
 })
 
-type DeckCardInput = {
-  game?: string
-  identityNamespace?: string
-  cardId?: string
-  providerCardId?: string
-  printingId?: string
-  section?: string
-  entryKind?: string
-  originalReference?: string
-  category?: string
-  oracleId?: string
-  scryfallId?: string
-  name: string
-  imageUrl?: string
-  smallImageUrl?: string
-  quantity: number
-  board?: "main" | "sideboard" | "commander"
-}
+type DeckCardInput = Infer<typeof cardValidator>
 
 const VERSION_SCAN = MAX_DECK_VERSIONS * 4
 
@@ -463,6 +446,72 @@ export const importResolved = mutation({
       now,
     )
     return deckId
+  },
+})
+
+export const importGuest = mutation({
+  args: {
+    localId: v.string(),
+    localUpdatedAt: v.number(),
+    name: v.string(),
+    format: v.string(),
+    game: v.optional(v.string()),
+    note: v.optional(v.string()),
+    cards: v.array(cardValidator),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(args.localId)
+    )
+      throw new ConvexError({ code: "invalid_local_id", message: "Guest local ID must be a UUID" })
+    if (!Number.isSafeInteger(args.localUpdatedAt) || args.localUpdatedAt < 0)
+      throw new ConvexError({
+        code: "invalid_local_updated_at",
+        message: "Guest timestamp is invalid",
+      })
+    const existing = await ctx.db
+      .query("decks")
+      .withIndex("by_owner_and_guest_local_id", (q) =>
+        q.eq("ownerUserId", user._id).eq("guestLocalId", args.localId),
+      )
+      .unique()
+    if (existing) {
+      const receiptUpdatedAt = existing.guestUpdatedAt ?? null
+      return {
+        status: "already_imported" as const,
+        deckId: existing._id,
+        localUpdatedAt: receiptUpdatedAt,
+      }
+    }
+    const capacity = await deckCapacity(ctx, user)
+    if (!capacity.canCreate) return { status: "limit_reached" as const, capacity }
+    const game = assertPlayableDeckGame(args.game ?? DEFAULT_DECK_GAME)
+    await requireReleasedCapability(ctx, game, "deckImport")
+    assertDeckSize(args.cards, game)
+    const format = assertDeckGameFormat(game, assertDeckFormat(args.format))
+    const note = args.note ? assertDeckNote(args.note) : ""
+    const now = Date.now()
+    const deckId = await ctx.db.insert("decks", {
+      ownerUserId: user._id,
+      guestLocalId: args.localId,
+      guestUpdatedAt: args.localUpdatedAt,
+      name: assertDeckName(args.name),
+      format,
+      game,
+      ...(note ? { note } : {}),
+      createdAt: now,
+      updatedAt: now,
+    })
+    await insertDeckVersion(
+      ctx,
+      deckId,
+      game,
+      { versionNumber: 1, name: DEFAULT_VERSION_NAME },
+      args.cards,
+      now,
+    )
+    return { status: "imported" as const, deckId, localUpdatedAt: args.localUpdatedAt }
   },
 })
 
