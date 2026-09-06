@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
+import { Header } from "@/components/Header"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
 
@@ -131,4 +132,16 @@ test.each([
   expect(view.queryByText("Loading details…")).toBeNull()
   fireEvent.press(view.getByTestId("card-focus-increment"))
   expect(view.getByText("2× in main")).toBeTruthy()
+})
+
+test("keeps unsaved edits until back navigation is confirmed", () => {
+  const { onBack, ...view } = renderScreen()
+  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved")
+  fireEvent(view.UNSAFE_getByType(Header), "leftPress")
+  expect(onBack).not.toHaveBeenCalled()
+  fireEvent.press(view.getByText("Keep editing"))
+  expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
+  fireEvent(view.UNSAFE_getByType(Header), "leftPress")
+  fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
+  expect(onBack).toHaveBeenCalledTimes(1)
 })

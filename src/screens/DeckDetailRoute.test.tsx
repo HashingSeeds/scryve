@@ -12,8 +12,8 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
 }))
 
-jest.mock("@/features/connected/ConnectedGate", () => ({
-  ConnectedGate: ({ children }: { children: React.ReactNode }) => children,
+jest.mock("@/features/auth/CloudScreen", () => ({
+  CloudScreen: ({ children }: { children: () => React.ReactNode }) => children(),
 }))
 
 jest.mock("@/screens/DeckDetailScreen", () => ({

@@ -269,6 +269,30 @@ describe("AddDeckScreen", () => {
     expect(view.getByTestId("deck-capacity-status")).toBeTruthy()
   })
 
+  it("allows a new deck after a guest transfer fails without deleting the guest", async () => {
+    const saved = saveGuestDeck({ name: "Keep me", game: "mtg", format: "commander", cards: [] })
+    mockGuestImport.mockRejectedValueOnce(new Error("Sync unavailable"))
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <AddDeckScreen
+          onBack={jest.fn()}
+          onCreated={jest.fn()}
+          access={{
+            ready: true,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+    chooseMode(view, "blank")
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "New draft")
+    await waitFor(() => expect(view.getByText("Create deck")).toBeEnabled())
+    expect(loadGuestDeck()?.localId).toBe(saved.localId)
+  })
+
   it("imports the saved guest after sign-in without losing the second deck draft", async () => {
     const saved = saveGuestDeck({ name: "First deck", game: "mtg", format: "commander", cards: [] })
     mockGuestImport.mockResolvedValue({

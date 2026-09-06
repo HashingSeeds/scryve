@@ -1038,7 +1038,10 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
       {dialog === "discard" ? (
         <DialogCard
           visible
-          onClose={() => setDialog("none")}
+          onClose={() => {
+            setPendingNavigation(undefined)
+            setDialog("none")
+          }}
           closeDisabled={busy}
           backdropTestID="discard-edits-backdrop"
           backdropAccessibilityLabel="Keep editing"
@@ -1053,7 +1056,10 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
               text="Keep editing"
               style={themed($dialogButton)}
               disabled={busy}
-              onPress={() => setDialog("none")}
+              onPress={() => {
+                setPendingNavigation(undefined)
+                setDialog("none")
+              }}
             />
             <Button
               text="Discard"

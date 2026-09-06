@@ -121,7 +121,7 @@ describe("DecksScreen", () => {
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ deckId: "guest" }))
     fireEvent.changeText(view.getByTestId("deck-search-input"), "no match")
     expect(view.queryByText("Guest Commander")).toBeNull()
-    expect(view.getByText("Nothing matches")).toBeTruthy()
+    expect(view.queryByText("Nothing matches")).toBeNull()
   })
   beforeEach(() => {
     jest.clearAllMocks()

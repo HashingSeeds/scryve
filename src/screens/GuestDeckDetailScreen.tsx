@@ -46,10 +46,13 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const [error, setError] = useState<string>()
   const [conflict, setConflict] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState<number>()
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   const draftRef = useRef(draft)
-  draftRef.current = draft
+  useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
 
   useEffect(() => {
     if (stored && sameDraft(draftRef.current, baseRef.current)) {
@@ -70,7 +73,11 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         backgroundColor={theme.colors.surface}
         contentContainerStyle={themed($screen)}
       >
-        <Header title="Guest deck" leftTx="common:back" onLeftPress={onBack} />
+        <Header
+          title="Guest deck"
+          leftTx="common:back"
+          onLeftPress={() => (sameDraft(draft, baseRef.current) ? onBack() : setDiscarding(true))}
+        />
         <View style={themed($empty)}>
           <Text preset="subheading" text="Guest deck unavailable" />
           <Text text="This deck was deleted or has not been saved yet." />
@@ -136,7 +143,11 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
       backgroundColor={theme.colors.surface}
       contentContainerStyle={themed($screen)}
     >
-      <Header title="Guest deck" leftTx="common:back" onLeftPress={onBack} />
+      <Header
+        title="Guest deck"
+        leftTx="common:back"
+        onLeftPress={() => (sameDraft(draft, baseRef.current) ? onBack() : setDiscarding(true))}
+      />
       <ScrollView contentContainerStyle={themed($content)}>
         <TextField
           testID="guest-deck-name"
@@ -268,6 +279,17 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
           }}
         />
       ) : null}
+      <ConfirmDialog
+        visible={discarding}
+        title="Discard changes?"
+        message="Your edits will be lost."
+        confirmText="Discard"
+        cancelText="Keep editing"
+        destructive
+        confirmTestID="guest-deck-discard-confirm"
+        onClose={() => setDiscarding(false)}
+        onConfirm={onBack}
+      />
       <ConfirmDialog
         visible={deleting}
         title="Delete guest deck?"

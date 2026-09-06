@@ -438,6 +438,19 @@ describe("premium deck tracking", () => {
     await expect(legacy.query(api.decks.listMine)).resolves.toMatchObject({
       capacity: { premium: true, limit: 100 },
     })
+    const deckEntitlements = await t.run(
+      async (ctx) =>
+        await ctx.db
+          .query("userEntitlements")
+          .withIndex("by_user_and_feature", (q) => q.eq("userId", userId))
+          .take(10),
+    )
+    expect(deckEntitlements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ feature: "unlimited_decks", enabled: true }),
+        expect.objectContaining({ feature: "pro_decks_limit", enabled: true }),
+      ]),
+    )
     await expect(legacy.query(api.entitlements.current)).resolves.toMatchObject({
       proDecksLimit: true,
       unlimitedDecks: true,
