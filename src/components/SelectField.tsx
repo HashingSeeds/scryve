@@ -78,17 +78,20 @@ export function SelectField({
   function show() {
     entrance.value = reducedMotion === false ? 0 : 1
     setAnchor(undefined)
-    setOpen(true)
     const currentTrigger = trigger.current
     if (!currentTrigger) {
+      setOpen(true)
       if (reducedMotion === false) entrance.value = withSpring(1, OPEN_SPRING)
       return
     }
+    let measured = false
     currentTrigger.measureInWindow((x, y, width, height) => {
+      measured = true
       setAnchor({ x, y, width, height })
       setOpen(true)
       if (reducedMotion === false) entrance.value = withSpring(1, OPEN_SPRING)
     })
+    if (!measured) setOpen(true)
   }
 
   function choose(id?: string) {
