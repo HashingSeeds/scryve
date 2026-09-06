@@ -314,7 +314,11 @@ export const searchTopDecks = action({
   args: { game: v.string(), query: v.string(), format: v.optional(v.string()) },
   handler: async (ctx, args): Promise<Doc<"deckCatalogs">[]> => {
     const game = assertGameSystem(args.game)
-    const format = args.format ? assertDeckGameFormat(game, args.format) : undefined
+    const format = args.format
+      ? assertDeckGameFormat(game, args.format)
+      : game === "pokemon"
+        ? "standard"
+        : undefined
     await requireActionCapability(ctx, game, "exampleDecks")
     const cached: Doc<"deckCatalogs">[] = await ctx.runQuery(internal.deckCatalogs.searchCached, {
       game,

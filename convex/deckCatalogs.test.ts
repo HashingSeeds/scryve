@@ -108,56 +108,67 @@ describe("deck catalog search", () => {
   )
 })
 
-it("fetches Expanded independently of Standard and gathers lists across tournaments", async () => {
-  const t = convexTest(schema, modules)
-  await t.run(async (ctx) => {
-    await ctx.db.insert("deckCatalogs", {
-      game: "pokemon",
-      source: "fixture",
-      externalId: "standard",
-      kind: "tournament",
-      name: "Standard deck",
-      format: "standard",
-      fetchedAt: Date.now(),
-    })
-  })
-  const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (input) => {
-    const url = String(input)
-    const body = url.includes("/tournaments?")
-      ? [
-          { id: "expanded-one", name: "First event", format: "EXPANDED" },
-          { id: "expanded-two", name: "Second event", format: "EXPANDED" },
-        ]
-      : url.endsWith("/standings")
-        ? [
-            {
-              player: "winner",
-              placing: 1,
-              deck: { name: "Expanded deck" },
-              decklist: { pokemon: [{ name: "Pikachu", set: "BS", number: "58", count: 60 }] },
-            },
-          ]
-        : []
-    return new Response(JSON.stringify(body), { status: 200 })
-  })
-  try {
-    const actor = t.withIdentity({ subject: "catalog-reader" })
-    const decks = await actor.action(api.deckCatalogs.searchTopDecks, {
-      game: "pokemon",
-      format: "expanded",
-      query: "",
-    })
-    expect(decks).toHaveLength(2)
-    expect(decks.every((deck) => deck.format === "expanded")).toBe(true)
-    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("format=EXPANDED"))).toBe(true)
-    await expect(
-      t.action(api.deckCatalogs.searchTopDecks, {
+it.each(["expanded", undefined])(
+  "refreshes Pokémon format %s independently and reuses its cache",
+  async (requestedFormat) => {
+    const expectedFormat = requestedFormat ?? "standard"
+    const otherFormat = expectedFormat === "standard" ? "expanded" : "standard"
+    const t = convexTest(schema, modules)
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deckCatalogs", {
         game: "pokemon",
-        format: "expanded",
+        source: "fixture",
+        externalId: otherFormat,
+        kind: "tournament",
+        name: "Other format deck",
+        format: otherFormat,
+        fetchedAt: Date.now(),
+      })
+    })
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+      const url = String(input)
+      const body = url.includes("/tournaments?")
+        ? [
+            { id: "expanded-one", name: "First event", format: expectedFormat.toUpperCase() },
+            { id: "expanded-two", name: "Second event", format: expectedFormat.toUpperCase() },
+          ]
+        : url.endsWith("/standings")
+          ? [
+              {
+                player: "winner",
+                placing: 1,
+                deck: { name: "Expanded deck" },
+                decklist: { pokemon: [{ name: "Pikachu", set: "BS", number: "58", count: 60 }] },
+              },
+            ]
+          : []
+      return new Response(JSON.stringify(body), { status: 200 })
+    })
+    try {
+      const actor = t.withIdentity({ subject: "catalog-reader" })
+      const decks = await actor.action(api.deckCatalogs.searchTopDecks, {
+        game: "pokemon",
+        format: requestedFormat,
         query: "",
-      }),
-    ).resolves.toHaveLength(2)
-  } finally {
-    fetchSpy.mockRestore()
-  }
-})
+      })
+      expect(decks).toHaveLength(2)
+      expect(decks.every((deck) => deck.format === expectedFormat)).toBe(true)
+      expect(
+        fetchSpy.mock.calls.some(([url]) =>
+          String(url).includes(`format=${expectedFormat.toUpperCase()}`),
+        ),
+      ).toBe(true)
+      const fetchCount = fetchSpy.mock.calls.length
+      await expect(
+        actor.action(api.deckCatalogs.searchTopDecks, {
+          game: "pokemon",
+          format: requestedFormat,
+          query: "",
+        }),
+      ).resolves.toHaveLength(2)
+      expect(fetchSpy).toHaveBeenCalledTimes(fetchCount)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  },
+)
