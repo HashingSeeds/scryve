@@ -53,6 +53,7 @@ describe("useLocalGame persistence", () => {
     act(() => result.current.changeLayout("even-grid"))
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ layout: "even-grid" }))
     act(() => result.current.changeLife(initial.players[0].id, 1))
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ layout: "even-grid" }))
     expect(new LocalGameRepository(storage).loadActiveGame()?.players[0].life).toBe(21)
   })
 
