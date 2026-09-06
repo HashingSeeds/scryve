@@ -716,7 +716,6 @@ describe("AddDeckScreen", () => {
       name: "Riolu",
       originalReference: "MEG 76",
     })
-
   })
 
   it("carries the chosen game, format, and note into a new deck", async () => {
