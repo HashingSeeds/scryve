@@ -84,14 +84,11 @@ export function SelectField({
       if (reducedMotion === false) entrance.value = withSpring(1, OPEN_SPRING)
       return
     }
-    let measured = false
     currentTrigger.measureInWindow((x, y, width, height) => {
-      measured = true
       setAnchor({ x, y, width, height })
       setOpen(true)
       if (reducedMotion === false) entrance.value = withSpring(1, OPEN_SPRING)
     })
-    if (!measured) setOpen(true)
   }
 
   function choose(id?: string) {
