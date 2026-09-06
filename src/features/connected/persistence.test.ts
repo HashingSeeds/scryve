@@ -417,6 +417,7 @@ describe("connected MMKV repository", () => {
     storage.set(CONNECTED_KEYS.projection("game-public"), JSON.stringify(validProjection))
     expect(new ConnectedGameRepository(storage).loadProjection("game-public")).toEqual({
       ...validProjection,
+      deckRequired: false,
       system: "mtg",
       format: "standard",
     })
