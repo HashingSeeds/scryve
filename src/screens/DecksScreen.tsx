@@ -424,7 +424,8 @@ export function DecksScreen({
     (activeFormat === ALL_FORMATS || guestRow.format === activeFormat) &&
     matchesSearch(guestRow, search)
   const guestOnly = Boolean(
-    unavailableMessage || (access && !access.ready && !access.signedIn && !access.ownerId),
+    unavailableMessage ||
+    (access && !access.loading && !access.ready && !access.signedIn && !access.ownerId),
   )
 
   function chooseSystem(next: string) {

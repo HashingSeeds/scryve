@@ -374,6 +374,14 @@ describe("preconstructed catalog caching", () => {
       const first = await firstUser.action(api.deckImports.resolvePreconstructed, {
         fileName: "AvengersAssemble",
       })
+      const reservation = await t.run(
+        async (ctx) =>
+          await ctx.db
+            .query("externalApiRateLimits")
+            .withIndex("by_bucket", (q) => q.eq("bucket", "mtgjson:decks"))
+            .unique(),
+      )
+      expect(reservation?.nextRequestAt).toBe(1_000_100)
       nowSpy.mockReturnValue(1_000_000 + 60 * 60 * 1000)
       const second = await secondUser.action(api.deckImports.resolvePreconstructed, {
         fileName: "AvengersAssemble.json",

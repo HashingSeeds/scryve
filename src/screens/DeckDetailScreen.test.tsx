@@ -318,6 +318,17 @@ describe("DeckDetailScreen", () => {
     expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
   })
 
+  it("does not replay cancelled navigation after saving", async () => {
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getAllByText("+")[0])
+    act(() => mockPreventRemoveCallback?.({ data: { action: { type: "GO_BACK" } } }))
+    fireEvent.press(view.getByText("Keep editing"))
+    fireEvent.press(view.getByText("Save changes"))
+    await waitFor(() => expect(mockSaveVersion).toHaveBeenCalled())
+    expect(mockNavigationDispatch).not.toHaveBeenCalled()
+  })
+
   it("opens the shared card dialog with provider details for a Yu-Gi-Oh card", async () => {
     mockDetail.value = {
       ...loadedDetail,

@@ -6,7 +6,7 @@ import { ConnectedLobbyScreen } from "@/screens/ConnectedLobbyScreen"
 export default function LobbyRoute() {
   const params = useLocalSearchParams<{ gameId: string }>()
   return (
-    <ConnectedGate onBack={() => router.replace("/game/new?mode=connected")}>
+    <ConnectedGate onBack={() => router.replace("/game/new")}>
       <ConnectedLobbyScreen
         publicId={params.gameId}
         onBack={() => router.replace("/game/new?mode=connected")}

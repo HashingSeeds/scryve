@@ -281,7 +281,9 @@ export function AddDeckScreen({
   const waitingForGuest = Boolean(
     access?.ready &&
     guestDeck &&
-    (transfer.importing || !transfer.result || transfer.result.status === "limit_reached"),
+    (transfer.importing ||
+      (!transfer.result && !transfer.error) ||
+      transfer.result?.status === "limit_reached"),
   )
   const guestBlocked = guestMode && guestConflict && Boolean(guestDeck)
   useEffect(() => {
@@ -1089,7 +1091,9 @@ export function AddDeckScreen({
                   onPress={() => void runSearch(preconQuery)}
                 />
               </View>
-            ) : (access?.ready ?? true) && precons.length === 0 && preconQuery.trim() ? (
+            ) : (guestMode || (access?.ready ?? true)) &&
+              precons.length === 0 &&
+              preconQuery.trim() ? (
               <Text size="xs" style={themed($label)} text="No official decks found." />
             ) : null}
             {precons.map((deck) => (

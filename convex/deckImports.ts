@@ -901,6 +901,11 @@ async function fetchAndCachePreconstructedOutline(
     const cached = await cachedPreconstructedOutline(ctx, fileName)
     if (cached) return cached
   }
+  const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
+    bucket: "mtgjson:decks",
+    intervalMs: 100,
+  })
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
   const response = await fetch(`${MTGJSON_BASE_URL}/decks/${encodeURIComponent(fileName)}`)
   if (!response.ok)
     throw new ConvexError({

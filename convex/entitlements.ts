@@ -41,20 +41,29 @@ export const setUserFeature = internalMutation({
       args.feature === PREMIUM_FEATURES.unlimitedDecks
         ? PREMIUM_FEATURES.proDecksLimit
         : args.feature
-    const existing = await ctx.db
-      .query("userEntitlements")
-      .withIndex("by_user_and_feature", (q) => q.eq("userId", user._id).eq("feature", feature))
-      .unique()
-    const value = {
-      feature,
-      enabled: args.enabled,
-      source: args.source,
-      updatedAt: Date.now(),
-    }
-    if (existing) {
-      await ctx.db.patch(existing._id, value)
-      return existing._id
-    }
-    return await ctx.db.insert("userEntitlements", { userId: user._id, ...value })
+    const features =
+      feature === PREMIUM_FEATURES.proDecksLimit
+        ? [PREMIUM_FEATURES.proDecksLimit, PREMIUM_FEATURES.unlimitedDecks]
+        : [feature]
+    const ids = await Promise.all(
+      features.map(async (feature) => {
+        const existing = await ctx.db
+          .query("userEntitlements")
+          .withIndex("by_user_and_feature", (q) => q.eq("userId", user._id).eq("feature", feature))
+          .unique()
+        const value = {
+          feature,
+          enabled: args.enabled,
+          source: args.source,
+          updatedAt: Date.now(),
+        }
+        if (existing) {
+          await ctx.db.patch(existing._id, value)
+          return existing._id
+        }
+        return await ctx.db.insert("userEntitlements", { userId: user._id, ...value })
+      }),
+    )
+    return ids[0]
   },
 })
