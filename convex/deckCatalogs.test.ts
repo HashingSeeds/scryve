@@ -12,7 +12,7 @@ const modules = {
 
 describe("deck catalog search", () => {
   it("serves cached top decks to guests without refreshing providers", async () => {
-    const fetchSpy = jest.spyOn(global, "fetch")
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network unavailable"))
     const t = convexTest(schema, modules)
     try {
       await t.run(async (ctx) => {

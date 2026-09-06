@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useMutation } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
@@ -15,7 +15,9 @@ export function useGuestDeckImport(access?: CloudAccess) {
   const [error, setError] = useState<string>()
   const [result, setResult] = useState<FunctionReturnType<typeof api.decks.importGuest>>()
   const latestAccess = useRef(access)
-  latestAccess.current = access
+  useLayoutEffect(() => {
+    latestAccess.current = access
+  }, [access])
   const attempted = useRef<string | undefined>(undefined)
   const running = useRef(false)
   const ownerId = access?.ownerId
