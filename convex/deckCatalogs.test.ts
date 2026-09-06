@@ -1,12 +1,22 @@
+import { v } from "convex/values"
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
+import { internalMutation } from "./_generated/server"
 import schema from "./schema"
 
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
   "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
+  "./externalApiRateLimits.ts": async () => ({
+    reserve: internalMutation({
+      args: { bucket: v.string(), intervalMs: v.number() },
+      handler: async () => 0,
+    }),
+  }),
+  "./providerHealth.ts": async () => jest.requireActual("./providerHealth"),
+  "./cardCatalog.ts": async () => jest.requireActual("./cardCatalog"),
   "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
 }
 
@@ -96,4 +106,58 @@ describe("deck catalog search", () => {
       ).resolves.toMatchObject([{ externalId: "traditional-match", format: "traditional" }])
     },
   )
+})
+
+it("fetches Expanded independently of Standard and gathers lists across tournaments", async () => {
+  const t = convexTest(schema, modules)
+  await t.run(async (ctx) => {
+    await ctx.db.insert("deckCatalogs", {
+      game: "pokemon",
+      source: "fixture",
+      externalId: "standard",
+      kind: "tournament",
+      name: "Standard deck",
+      format: "standard",
+      fetchedAt: Date.now(),
+    })
+  })
+  const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+    const url = String(input)
+    const body = url.includes("/tournaments?")
+      ? [
+          { id: "expanded-one", name: "First event", format: "EXPANDED" },
+          { id: "expanded-two", name: "Second event", format: "EXPANDED" },
+        ]
+      : url.endsWith("/standings")
+        ? [
+            {
+              player: "winner",
+              placing: 1,
+              deck: { name: "Expanded deck" },
+              decklist: { pokemon: [{ name: "Pikachu", set: "BS", number: "58", count: 60 }] },
+            },
+          ]
+        : []
+    return new Response(JSON.stringify(body), { status: 200 })
+  })
+  try {
+    const actor = t.withIdentity({ subject: "catalog-reader" })
+    const decks = await actor.action(api.deckCatalogs.searchTopDecks, {
+      game: "pokemon",
+      format: "expanded",
+      query: "",
+    })
+    expect(decks).toHaveLength(2)
+    expect(decks.every((deck) => deck.format === "expanded")).toBe(true)
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("format=EXPANDED"))).toBe(true)
+    await expect(
+      t.action(api.deckCatalogs.searchTopDecks, {
+        game: "pokemon",
+        format: "expanded",
+        query: "",
+      }),
+    ).resolves.toHaveLength(2)
+  } finally {
+    fetchSpy.mockRestore()
+  }
 })

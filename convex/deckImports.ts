@@ -834,7 +834,9 @@ export const storeCatalog = internalMutation({
 })
 
 async function fetchPreconCatalog() {
-  const response = await fetch(`${MTGJSON_BASE_URL}/DeckList.json`)
+  const response = await fetch(`${MTGJSON_BASE_URL}/DeckList.json`, {
+    signal: AbortSignal.timeout(10_000),
+  })
   if (!response.ok)
     throw new ConvexError({
       code: "precon_search_unavailable",
@@ -848,17 +850,40 @@ async function fetchPreconCatalog() {
     .slice(0, MAX_PRECON_CATALOG)
 }
 
-async function preconCatalog(ctx: ActionCtx) {
-  const cached: Doc<"preconCatalogs"> | null = await ctx.runQuery(internal.deckImports.catalog, {})
-  if (cached && Date.now() - cached.fetchedAt < PRECON_CATALOG_TTL_MS) return cached.decks
-  try {
+export const requestCatalogRefresh = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cached = await ctx.db.query("preconCatalogs").first()
+    const now = Date.now()
+    if (
+      !cached ||
+      now - cached.fetchedAt < PRECON_CATALOG_TTL_MS ||
+      now - (cached.refreshRequestedAt ?? 0) < 5 * 60 * 1000
+    )
+      return
+    await ctx.db.patch(cached._id, { refreshRequestedAt: now })
+    await ctx.scheduler.runAfter(0, internal.deckImports.refreshCatalog, {})
+  },
+})
+
+export const refreshCatalog = internalAction({
+  args: {},
+  handler: async (ctx) => {
     const decks = await fetchPreconCatalog()
     await ctx.runMutation(internal.deckImports.storeCatalog, { decks })
-    return decks
-  } catch (cause) {
-    if (cached) return cached.decks
-    throw cause
+  },
+})
+
+async function preconCatalog(ctx: ActionCtx) {
+  const cached: Doc<"preconCatalogs"> | null = await ctx.runQuery(internal.deckImports.catalog, {})
+  if (cached) {
+    if (Date.now() - cached.fetchedAt >= PRECON_CATALOG_TTL_MS)
+      await ctx.runMutation(internal.deckImports.requestCatalogRefresh, {})
+    return cached.decks
   }
+  const decks = await fetchPreconCatalog()
+  await ctx.runMutation(internal.deckImports.storeCatalog, { decks })
+  return decks
 }
 
 async function assertGuestPreconstructedInCatalog(ctx: ActionCtx, fileName: string) {

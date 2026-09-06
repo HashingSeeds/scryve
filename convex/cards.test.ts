@@ -34,6 +34,26 @@ const pokemonCard = {
 describe("card provider caching and health", () => {
   afterEach(() => jest.restoreAllMocks())
 
+  it("loads card descriptions without signing in", async () => {
+    const id = "11111111-1111-1111-1111-111111111111"
+    jest.spyOn(global, "fetch").mockImplementation(() =>
+      response({
+        id,
+        oracle_id: id,
+        name: "Avenge",
+        type_line: "Sorcery",
+        oracle_text: "Destroy all creatures.",
+        mana_cost: "{4}{W}{W}",
+        image_uris: { normal: "https://cards.scryfall.io/normal/test.jpg" },
+      }),
+    )
+    const t = convexTest(schema, modules)
+    await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject({
+      name: "Avenge",
+      oracleText: "Destroy all creatures.",
+    })
+  })
+
   it("upgrades a text-only cache after image access is enabled", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response([pokemonCard]))
     const t = convexTest(schema, modules)

@@ -441,6 +441,7 @@ export default defineSchema({
 
   preconCatalogs: defineTable({
     fetchedAt: v.number(),
+    refreshRequestedAt: v.optional(v.number()),
     decks: v.array(
       v.object({
         fileName: v.string(),

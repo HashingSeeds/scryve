@@ -493,10 +493,6 @@ export function AddDeckScreen({
   }
 
   async function loadPreviewCardDetails(card: FocusedPreviewCard) {
-    if (access && !access.ready) {
-      setPreviewDetailsError("Sign in to load additional card details.")
-      return
-    }
     if (previewDetailsByKey[card.detailKey]) return
     try {
       const details = card.scryfallId
@@ -702,17 +698,28 @@ export function AddDeckScreen({
   ) : null
   const guestRecovery = guestBlocked ? (
     <>
-      <View style={themed($inlineStatus)}>
-        <Text weight="bold" text="Keep another deck" />
-        <Text size="sm" text="Sign in free for 2 decks and sync. Your saved deck comes with you." />
-        {access?.request ? <Button text="Sign in free" onPress={access.request} /> : null}
+      <View style={themed($stack)}>
+        <Text weight="bold" text="One deck saved on this device" />
         <Button
-          text="Replace local deck"
+          preset="reversed"
+          text="Replace saved deck…"
+          style={themed($previewImportButton)}
+          textStyle={themed($previewImportButtonText)}
           onPress={() => {
             setGuestReplacementLocalId(guestDeck?.localId)
             setConfirmGuestReplace(true)
           }}
         />
+        {access?.request ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={themed($plainAction)}
+            onPress={access.request}
+          >
+            <Text text="Sign in to keep both" style={themed($textAction)} />
+          </TouchableOpacity>
+        ) : null}
+        <Text size="xs" style={themed($label)} text="Free account · 2 decks + sync" />
       </View>
       <ConfirmDialog
         visible={confirmGuestReplace}
@@ -739,6 +746,34 @@ export function AddDeckScreen({
       ) : null}
       {guestRecovery}
     </>
+  )
+
+  const emptyCatalog = (
+    <View style={themed($stack)}>
+      <Text weight="bold" text={preconQuery.trim() ? "No matching decks" : "No decks here yet"} />
+      <Text
+        size="sm"
+        text={
+          preconQuery.trim()
+            ? "Try another search, paste a list, or start an empty deck."
+            : `We don’t have ${deckFormatLabel(game, format)} lists yet. Paste a list or start an empty deck.`
+        }
+      />
+      <Button
+        text="Paste a list"
+        preset="reversed"
+        style={themed($previewImportButton)}
+        textStyle={themed($previewImportButtonText)}
+        onPress={() => setMode("paste")}
+      />
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={themed($plainAction)}
+        onPress={() => setMode("blank")}
+      >
+        <Text text="Start empty" style={themed($textAction)} />
+      </TouchableOpacity>
+    </View>
   )
 
   if (selectedCatalogDeck) {
@@ -838,20 +873,22 @@ export function AddDeckScreen({
           ) : null}
           {error ? <AlertNote text={error} /> : null}
           {saveRecovery}
-          <Button
-            testID="import-catalog-deck"
-            text={busy ? "Importing…" : "Import deck"}
-            preset="reversed"
-            disabled={
-              busy ||
-              (!capacityReady && !canRequestAccess) ||
-              (atCapacity && saveAttempted) ||
-              guestBlocked ||
-              waitingForGuest ||
-              !catalogDetail
-            }
-            onPress={importTopDeck}
-          />
+          {!guestBlocked ? (
+            <Button
+              testID="import-catalog-deck"
+              text={busy ? "Importing…" : "Import deck"}
+              preset="reversed"
+              disabled={
+                busy ||
+                (!capacityReady && !canRequestAccess) ||
+                (atCapacity && saveAttempted) ||
+                guestBlocked ||
+                waitingForGuest ||
+                !catalogDetail
+              }
+              onPress={importTopDeck}
+            />
+          ) : null}
         </BottomActionBar>
         {previewCardDialog}
       </Screen>
@@ -992,23 +1029,25 @@ export function AddDeckScreen({
             <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
           ) : null}
           {saveRecovery}
-          <TouchableOpacity
-            testID="import-preview-button"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: cannotImport }}
-            style={[
-              themed($previewImportButton),
-              cannotImport && themed($previewImportButtonDisabled),
-            ]}
-            disabled={cannotImport}
-            onPress={() => void importPrecon()}
-          >
-            <Text
-              weight="bold"
-              style={themed($previewImportButtonText)}
-              text={busy ? "Importing…" : "Import deck"}
-            />
-          </TouchableOpacity>
+          {!guestBlocked ? (
+            <TouchableOpacity
+              testID="import-preview-button"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: cannotImport }}
+              style={[
+                themed($previewImportButton),
+                cannotImport && themed($previewImportButtonDisabled),
+              ]}
+              disabled={cannotImport}
+              onPress={() => void importPrecon()}
+            >
+              <Text
+                weight="bold"
+                style={themed($previewImportButtonText)}
+                text={busy ? "Importing…" : "Import deck"}
+              />
+            </TouchableOpacity>
+          ) : null}
         </BottomActionBar>
         {previewCardDialog}
       </Screen>
@@ -1091,10 +1130,15 @@ export function AddDeckScreen({
                   onPress={() => void runSearch(preconQuery)}
                 />
               </View>
-            ) : (guestMode || (access?.ready ?? true)) &&
-              precons.length === 0 &&
-              preconQuery.trim() ? (
-              <Text size="xs" style={themed($label)} text="No official decks found." />
+            ) : (guestMode || (access?.ready ?? true)) && precons.length === 0 ? (
+              emptyCatalog
+            ) : null}
+            {precons.length > 0 && ["standard", "pioneer", "modern"].includes(format) ? (
+              <Text
+                size="xs"
+                style={themed($label)}
+                text="Original precon lists. Cards may no longer be legal in this format."
+              />
             ) : null}
             {precons.map((deck) => (
               <TouchableOpacity
@@ -1138,6 +1182,8 @@ export function AddDeckScreen({
                 <AlertNote text={searchError} />
                 <Button text="Retry" onPress={() => void runCatalogSearch(preconQuery)} />
               </View>
+            ) : catalogDecks.length === 0 ? (
+              emptyCatalog
             ) : null}
             {catalogDecks.map((deck) => (
               <TouchableOpacity
@@ -1330,4 +1376,9 @@ const $previewImportButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $previewImportButtonDisabled: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 const $previewImportButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: accessibleForeground(colors.tint),
+})
+
+const $plainAction: ThemedStyle<ViewStyle> = () => ({
+  minHeight: 44,
+  justifyContent: "center",
 })

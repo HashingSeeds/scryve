@@ -179,13 +179,16 @@ export const searchCached = internalQuery({
 })
 
 export const latestFetch = internalQuery({
-  args: { game: v.string() },
-  handler: async (ctx, args) =>
-    await ctx.db
+  args: { game: v.string(), format: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const rows = ctx.db
       .query("deckCatalogs")
       .withIndex("by_game_and_fetched_at", (query) => query.eq("game", assertGameSystem(args.game)))
       .order("desc")
-      .first(),
+    return await (
+      args.format ? rows.filter((q) => q.eq(q.field("format"), args.format!)) : rows
+    ).first()
+  },
 })
 
 async function limitlessJson(ctx: ActionCtx, path: string) {
@@ -218,10 +221,11 @@ async function pokemonSummariesWhenAvailable(
 async function refreshPokemonTopDecks(
   ctx: ActionCtx,
   includeImages: boolean,
+  format: string,
 ): Promise<{ count: number; status: number }> {
   const tournamentsResponse = await limitlessJson(
     ctx,
-    "/tournaments?game=PTCG&format=STANDARD&limit=5",
+    `/tournaments?game=PTCG&format=${encodeURIComponent(format.toUpperCase())}&limit=5`,
   )
   const tournaments = Array.isArray(tournamentsResponse.value) ? tournamentsResponse.value : []
   let decks: LimitlessDeck[] = []
@@ -230,10 +234,15 @@ async function refreshPokemonTopDecks(
     const id = tournament.id
     if (typeof id !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(id)) continue
     const standings = await limitlessJson(ctx, `/tournaments/${encodeURIComponent(id)}/standings`)
-    decks = normalizeLimitlessStandings(tournament, standings.value).slice(0, 12)
-    if (decks.length > 0) break
+    decks.push(
+      ...normalizeLimitlessStandings(tournament, standings.value).filter(
+        (deck) => deck.format === format,
+      ),
+    )
+    if (decks.length >= MAX_FEED_DECKS) break
   }
-  if (decks.length === 0) throw new Error("Limitless returned no usable public deck lists")
+  decks = decks.slice(0, MAX_FEED_DECKS)
+  if (decks.length === 0) return { count: 0, status: tournamentsResponse.status }
 
   const summaries = await pokemonSummariesWhenAvailable(
     ctx,
@@ -315,15 +324,20 @@ export const searchTopDecks = action({
     if (!(await ctx.auth.getUserIdentity())) return cached
 
     const includeImages = await actionCapabilityEnabled(ctx, game, "images")
-    if (game === "mtg") return cached
+    if (
+      game === "mtg" ||
+      (game === "ygo" && format && format !== "advanced") ||
+      (game === "pokemon" && format && !["standard", "expanded"].includes(format))
+    )
+      return cached
 
-    const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game })
+    const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
     if (latest && Date.now() - latest.fetchedAt < FEED_TTL_MS) return cached
 
     const startedAt = Date.now()
     if (game === "pokemon") {
       try {
-        const result = await refreshPokemonTopDecks(ctx, includeImages)
+        const result = await refreshPokemonTopDecks(ctx, includeImages, format ?? "standard")
         const finishedAt = Date.now()
         await ctx.runMutation(internal.providerHealth.record, {
           game,
@@ -366,7 +380,7 @@ export const searchTopDecks = action({
         intervalMs: 1_000,
       })
       if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
-      const response = await fetch(YGO_DECK_FEED_URL, {
+      const response = await fetch(`${YGO_DECK_FEED_URL}?_sft_category=Tournament%20Meta%20Decks`, {
         headers: { "Accept": "application/json", "User-Agent": "Scryve/1.0" },
         signal: AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS),
       })

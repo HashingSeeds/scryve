@@ -179,7 +179,6 @@ export const search = action({
 export const byCatalogId = action({
   args: { game: v.string(), cardId: v.string() },
   handler: async (ctx, args): Promise<CatalogCard> => {
-    await requireActionIdentity(ctx)
     const game = assertGameSystem(args.game)
     await requireActionCapability(ctx, game, "cardCatalog")
     const includeImages = await actionCapabilityEnabled(ctx, game, "images")
@@ -249,7 +248,6 @@ export const byCatalogId = action({
 export const byPokemonReference = action({
   args: { name: v.string(), originalReference: v.string() },
   handler: async (ctx, args): Promise<CatalogCard> => {
-    await requireActionIdentity(ctx)
     await requireActionCapability(ctx, "pokemon", "cardCatalog")
     const includeImages = await actionCapabilityEnabled(ctx, "pokemon", "images")
     const name = args.name.trim()
@@ -305,7 +303,6 @@ function toCardReference(cached: Doc<"cardReferences">): CardReference {
 export const byId = action({
   args: { scryfallId: v.string() },
   handler: async (ctx, args): Promise<CardReference> => {
-    await requireActionIdentity(ctx)
     if (!/^[0-9a-f-]{36}$/i.test(args.scryfallId))
       throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
     const cached: Doc<"cardReferences"> | null = await ctx.runQuery(internal.cards.cachedById, args)

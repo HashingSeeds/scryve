@@ -334,6 +334,25 @@ describe("generic deck resolution", () => {
 })
 
 describe("preconstructed catalog caching", () => {
+  it("returns a warmed catalog without waiting for an expired provider refresh", async () => {
+    jest.useFakeTimers()
+    const t = convexTest(schema, modules)
+    await t.run(async (ctx) => {
+      await ctx.db.insert("preconCatalogs", { fetchedAt: 0, decks: deckListPayload.data })
+    })
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(deckListResponse)
+    try {
+      const result = await t.action(api.deckImports.searchPreconstructed, { query: "atraxa" })
+      expect(result).toMatchObject([{ name: "Atraxa Infect" }])
+      expect(fetchSpy).not.toHaveBeenCalled()
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      fetchSpy.mockRestore()
+      jest.useRealTimers()
+    }
+  })
+
   it("fetches the official deck list once and serves later searches from the cache", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(deckListResponse)
     try {

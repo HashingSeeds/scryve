@@ -192,15 +192,25 @@ export function deckSections(game: string, format: string): readonly DeckSection
   return deckFormats(game).find((candidate) => candidate.id === format)?.sections ?? []
 }
 
-export const PRECON_FORMATS = ["commander", "brawl", "constructed"] as const
+export const PRECON_FORMATS = [
+  "commander",
+  "brawl",
+  "standard",
+  "pioneer",
+  "modern",
+  "constructed",
+] as const
 
 export function preconSearchFormat(format: string): string | undefined {
-  return (PRECON_FORMATS as readonly string[]).includes(format) ? format : undefined
+  return format
 }
 
 export function preconstructedFormat(type: string | undefined) {
   const value = type?.toLocaleLowerCase() ?? ""
   if (value.includes("commander")) return "commander"
   if (value.includes("brawl")) return "brawl"
+  if (value.includes("pioneer challenger")) return "pioneer"
+  if (value.includes("modern event")) return "modern"
+  if (value === "challenger deck" || value === "event deck") return "standard"
   return "constructed"
 }

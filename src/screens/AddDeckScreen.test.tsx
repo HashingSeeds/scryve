@@ -319,7 +319,7 @@ describe("AddDeckScreen", () => {
     chooseMode(view, "blank")
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Second deck")
     fireEvent.press(view.getByText("Create deck"))
-    expect(view.getByText("Keep another deck")).toBeTruthy()
+    expect(view.getByText("One deck saved on this device")).toBeTruthy()
     view.rerender(form(true))
     await waitFor(() => expect(loadGuestDeck()).toBeUndefined())
     expect(mockGuestImport).toHaveBeenCalledWith(
@@ -428,15 +428,15 @@ describe("AddDeckScreen", () => {
     chooseMode(view, "blank")
     fireEvent.changeText(view.getByTestId("deck-name-input"), "New deck")
     fireEvent.press(view.getByText("Create deck"))
-    expect(view.getByText("Keep another deck")).toBeTruthy()
+    expect(view.getByText("One deck saved on this device")).toBeTruthy()
     expect(view.getByText("Create deck")).toBeDisabled()
 
-    fireEvent.press(view.getByText("Replace local deck"))
+    fireEvent.press(view.getByText("Replace saved deck…"))
     expect(view.getByTestId("confirm-guest-replace")).toBeTruthy()
     fireEvent.press(view.getByTestId("cancel-guest-replace"))
     expect(onCreated).not.toHaveBeenCalled()
 
-    fireEvent.press(view.getByText("Replace local deck"))
+    fireEvent.press(view.getByText("Replace saved deck…"))
     fireEvent.press(view.getByTestId("confirm-guest-replace-action"))
     expect(onCreated).toHaveBeenCalledWith("guest")
     expect(loadGuestDeck()?.localId).not.toBe(existing.localId)
@@ -457,6 +457,17 @@ describe("AddDeckScreen", () => {
     await act(async () => jest.advanceTimersByTime(400))
     await waitFor(() => expect(view.getByText("Explorers of the Deep")).toBeTruthy())
     expect(mockSearch).toHaveBeenCalledWith({ query: "Explorers", format: "commander" })
+  })
+
+  it("offers paste and empty deck actions for a format with no lists", async () => {
+    mockSearch.mockResolvedValueOnce([])
+    const view = renderAddDeck()
+    chooseFormat(view, "standard")
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(mockSearch).toHaveBeenCalledWith({ query: "", format: "standard" })
+    expect(view.getByText("No decks here yet")).toBeTruthy()
+    fireEvent.press(view.getByText("Start empty"))
+    expect(view.getByTestId("deck-name-input")).toBeTruthy()
   })
 
   it("previews an official deck before importing it", async () => {
@@ -523,8 +534,16 @@ describe("AddDeckScreen", () => {
     expect(view.getByTestId("import-preview-button").props.accessibilityState.disabled).toBe(true)
   })
 
-  it("opens a read-only card preview from the deck preview", async () => {
-    const view = renderAddDeck()
+  it("loads descriptions in a signed-out card preview", async () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AddDeckScreen
+          onBack={jest.fn()}
+          onCreated={jest.fn()}
+          access={{ ready: false, loading: false, signedIn: false, request: jest.fn() }}
+        />
+      </ThemeProvider>,
+    )
     continueSetup(view)
     fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
     await act(async () => {
