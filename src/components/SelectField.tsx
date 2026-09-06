@@ -76,12 +76,19 @@ export function SelectField({
   const selected = options.find((option) => option.id === value)
 
   function show() {
-    trigger.current?.measureInWindow((x, y, width, height) => {
-      setAnchor({ x, y, width, height })
-    })
     entrance.value = reducedMotion === false ? 0 : 1
+    setAnchor(undefined)
     setOpen(true)
-    if (reducedMotion === false) entrance.value = withSpring(1, OPEN_SPRING)
+    const currentTrigger = trigger.current
+    if (!currentTrigger) {
+      if (reducedMotion === false) entrance.value = withSpring(1, OPEN_SPRING)
+      return
+    }
+    currentTrigger.measureInWindow((x, y, width, height) => {
+      setAnchor({ x, y, width, height })
+      setOpen(true)
+      if (reducedMotion === false) entrance.value = withSpring(1, OPEN_SPRING)
+    })
   }
 
   function choose(id?: string) {

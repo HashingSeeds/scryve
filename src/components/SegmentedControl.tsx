@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { LayoutChangeEvent, TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
@@ -52,14 +52,15 @@ export function SegmentedControl({
   function measureTrack(event: LayoutChangeEvent) {
     const width = event.nativeEvent.layout.width - (TRACK_INSET + TRACK_BORDER_WIDTH) * 2
     setTrackWidth(width)
-    offset.value = (width / segments.length) * selectedIndex
   }
 
-  function select(id: string, index: number) {
-    if (segmentWidth > 0) {
-      const target = segmentWidth * index
-      offset.value = reducedMotion === false ? withSpring(target, SLIDE_SPRING) : target
-    }
+  useEffect(() => {
+    if (segmentWidth <= 0) return
+    const target = segmentWidth * selectedIndex
+    offset.value = reducedMotion === false ? withSpring(target, SLIDE_SPRING) : target
+  }, [offset, reducedMotion, segmentWidth, selectedIndex])
+
+  function select(id: string) {
     if (id !== selectedId) onSelect(id)
   }
 
@@ -79,7 +80,7 @@ export function SegmentedControl({
           style={[themed($thumbShape), { width: segmentWidth, backgroundColor: accent }, $thumb]}
         />
       ) : null}
-      {segments.map((segment, index) => {
+      {segments.map((segment) => {
         const selected = segment.id === selectedId
         return (
           <Pressable
@@ -88,7 +89,7 @@ export function SegmentedControl({
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             style={themed($segment)}
-            onPress={() => select(segment.id, index)}
+            onPress={() => select(segment.id)}
           >
             <Text
               text={segment.label}
