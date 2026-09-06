@@ -22,6 +22,7 @@ export default function NewLocalGameRoute() {
   const [connectedEnabled, setConnectedEnabled] = useState(mode === "connected")
   const [connected, setConnected] = useState<ConnectedHostFeed>()
   const [activeGame, setActiveGame] = useState(() => localGameRepository.loadActiveGame())
+  const [defaults] = useState(() => localGameRepository.loadSettings())
   const [initialGame] = useState(activeGame ?? undefined)
   useFocusEffect(
     useCallback(() => {
@@ -53,7 +54,7 @@ export default function NewLocalGameRoute() {
         <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
       ) : null}
       <NewGameScreen
-        defaults={localGameRepository.loadSettings()}
+        defaults={defaults}
         mode={mode}
         initialGame={initialGame}
         localGame={started ? activeGame : undefined}
