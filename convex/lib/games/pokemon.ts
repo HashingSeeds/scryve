@@ -183,6 +183,7 @@ export async function pokemonCardByReference(
     ctx,
     `/cards?name=${encodeURIComponent(name)}&localId=${encodeURIComponent(reference.collectorNumber)}`,
   )
+  if (response.status === 404) return { cards: [], status: response.status }
   if (!response.ok) throw Object.assign(new Error("TCGdex reference lookup failed"), { response })
   const exact = normalizePokemonCards((await response.json()) as unknown, includeImages).filter(
     (card) =>

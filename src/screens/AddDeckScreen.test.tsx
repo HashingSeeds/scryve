@@ -716,7 +716,11 @@ describe("AddDeckScreen", () => {
       name: "Riolu",
       originalReference: "MEG 76",
     })
-
+    fireEvent.press(view.getByText("Close"))
+    expect(view.getByTestId("catalog-card-thumbnail-catalog-card-riolu").props.source).toEqual([
+      { uri: "https://assets.example/riolu/high.webp" },
+    ])
+    expect(mockPokemonCardByReference).toHaveBeenCalledTimes(1)
   })
 
   it("carries the chosen game, format, and note into a new deck", async () => {

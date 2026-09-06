@@ -112,6 +112,18 @@ describe("card provider caching and health", () => {
     ).resolves.toMatchObject({ status: "healthy", httpStatus: 404 })
   })
 
+  it("reports a Pokemon reference search 404 as card-not-found rather than provider failure", async () => {
+    jest.spyOn(global, "fetch").mockImplementation(() => response({}, 404))
+    const t = convexTest(schema, modules)
+    const actor = t.withIdentity({ subject: "pokemon-reference-404" })
+    await expect(
+      actor.action(api.cards.byPokemonReference, {
+        name: "Riolu",
+        originalReference: "MEG 76",
+      }),
+    ).rejects.toMatchObject({ data: { code: "card_not_found" } })
+  })
+
   it("records successful empty Yu-Gi-Oh lookups as healthy card-not-found responses", async () => {
     jest.spyOn(global, "fetch").mockImplementation(() => response({ data: [] }))
     const t = convexTest(schema, modules)

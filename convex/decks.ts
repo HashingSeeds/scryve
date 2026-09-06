@@ -19,6 +19,7 @@ import {
   requireDeckCapacity,
   requireVersionCapacity,
 } from "./lib/entitlements"
+import { ygoImageUrl } from "./lib/games/yugioh"
 import { capabilityReleased, requireReleasedCapability } from "./lib/integrations"
 import {
   assertDeckFormat,
@@ -653,7 +654,19 @@ export const detail = query({
       versions,
       version: selected ?? null,
       cards: cards.slice(0, MAX_DECK_CARDS).map((card) => {
-        if (includeImages) return card
+        if (includeImages) {
+          const imageUrl =
+            deck.game === "ygo"
+              ? ygoImageUrl(card.printingId ?? card.providerCardId ?? card.cardId)
+              : undefined
+          return imageUrl
+            ? {
+                ...card,
+                imageUrl: card.imageUrl ?? imageUrl,
+                smallImageUrl: card.smallImageUrl ?? card.imageUrl ?? imageUrl,
+              }
+            : card
+        }
         const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...textCard } = card
         return textCard
       }),
