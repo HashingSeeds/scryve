@@ -50,9 +50,9 @@ export function useLocalGame(
       const current = gameRef.current
       if (current.layout === layout) return
       const next = { ...current, layout, updatedAt: Date.now() }
+      repository.saveActiveGame(next)
       gameRef.current = next
       setGame(next)
-      setTimeout(() => repository.saveActiveGame(next), 0)
     },
     [repository],
   )
