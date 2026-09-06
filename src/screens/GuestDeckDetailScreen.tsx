@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { Image } from "expo-image"
+import { useNavigation } from "expo-router"
+import { usePreventRemove } from "expo-router/react-navigation"
 
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
@@ -37,6 +39,7 @@ function sameDraft(a: GuestDeckPayload | undefined, b: GuestDeckPayload | undefi
 
 export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
+  const navigation = useNavigation()
   const stored = useGuestDeck()
   const [draft, setDraft] = useState<GuestDeckPayload | undefined>(() => stored?.deck)
   const revisionRef = useRef(
@@ -47,6 +50,9 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const [conflict, setConflict] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [discarding, setDiscarding] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [pendingNavigation, setPendingNavigation] =
+    useState<Parameters<typeof navigation.dispatch>[0]>()
   const [focusedIndex, setFocusedIndex] = useState<number>()
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   const draftRef = useRef(draft)
@@ -65,6 +71,17 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
       revisionRef.current = undefined
     }
   }, [stored])
+
+  usePreventRemove(!leaving && !sameDraft(draft, baseRef.current), ({ data }) => {
+    setPendingNavigation(data.action)
+    setDiscarding(true)
+  })
+
+  useEffect(() => {
+    if (!leaving) return
+    if (pendingNavigation) navigation.dispatch(pendingNavigation)
+    else onBack()
+  }, [leaving, navigation, onBack, pendingNavigation])
 
   if (!stored && !draft) {
     return (
@@ -287,8 +304,11 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         cancelText="Keep editing"
         destructive
         confirmTestID="guest-deck-discard-confirm"
-        onClose={() => setDiscarding(false)}
-        onConfirm={onBack}
+        onClose={() => {
+          setPendingNavigation(undefined)
+          setDiscarding(false)
+        }}
+        onConfirm={() => setLeaving(true)}
       />
       <ConfirmDialog
         visible={deleting}
@@ -314,7 +334,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
               return
             }
             deleteGuestDeck()
-            onBack()
+            setLeaving(true)
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Unable to delete guest deck.")
             setDeleting(false)
