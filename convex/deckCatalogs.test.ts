@@ -172,3 +172,19 @@ it.each(["expanded", undefined])(
     }
   },
 )
+
+it.each(["standard", "expanded"])("caches a successful empty %s feed", async (format) => {
+  const t = convexTest(schema, modules)
+  const actor = t.withIdentity({ subject: "empty-catalog-reader" })
+  const fetchSpy = jest
+    .spyOn(global, "fetch")
+    .mockImplementation(async () => new Response("[]", { status: 200 }))
+  try {
+    const args = { game: "pokemon", format, query: "" }
+    await expect(actor.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual([])
+    await expect(actor.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual([])
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})

@@ -185,9 +185,23 @@ export const latestFetch = internalQuery({
       .query("deckCatalogs")
       .withIndex("by_game_and_fetched_at", (query) => query.eq("game", assertGameSystem(args.game)))
       .order("desc")
-    return await (
+    const latest = await (
       args.format ? rows.filter((q) => q.eq(q.field("format"), args.format!)) : rows
     ).first()
+    if (args.game === "pokemon") {
+      const refresh = await ctx.db
+        .query("providerHealth")
+        .withIndex("by_game_and_provider_and_operation", (q) =>
+          q
+            .eq("game", "pokemon")
+            .eq("provider", "limitless")
+            .eq("operation", `deck-feed-refresh:${args.format ?? "standard"}`),
+        )
+        .unique()
+      if (refresh?.lastSuccessAt !== undefined && refresh.lastSuccessAt > (latest?.fetchedAt ?? 0))
+        return { fetchedAt: refresh.lastSuccessAt }
+    }
+    return latest
   },
 })
 
@@ -346,7 +360,7 @@ export const searchTopDecks = action({
         await ctx.runMutation(internal.providerHealth.record, {
           game,
           provider: "limitless",
-          operation: "deck-feed-refresh",
+          operation: `deck-feed-refresh:${format}`,
           status: "healthy",
           lastAttemptAt: finishedAt,
           lastSuccessAt: finishedAt,
@@ -364,7 +378,7 @@ export const searchTopDecks = action({
         await ctx.runMutation(internal.providerHealth.record, {
           game,
           provider: "limitless",
-          operation: "deck-feed-refresh",
+          operation: `deck-feed-refresh:${format}`,
           status: "unavailable",
           lastAttemptAt: finishedAt,
           responseMs: finishedAt - startedAt,
