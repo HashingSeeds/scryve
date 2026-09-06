@@ -12,7 +12,7 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
-import { AppearancePicker } from "@/features/connected/AppearancePicker"
+import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
 import { connectedProfileName } from "@/features/connected/useConnectedProfile"
@@ -31,12 +31,14 @@ import {
 
 export function JoinConnectedScreen({
   inviteToken,
+  access,
   onJoined,
   onScan,
   initialCode = "",
   onBack,
 }: {
   inviteToken?: string
+  access?: CloudAccess
   onJoined: (publicId: string) => void
   onScan?: () => void
   initialCode?: string
@@ -50,7 +52,7 @@ export function JoinConnectedScreen({
   const claimSeat = useMutation(api.games.claimSeat)
   const deviceId = useState(() => new LocalGameRepository().getDeviceId())[0]
   const [code, setCode] = useState(initialCode)
-  const [appearance, setAppearance] = useState<PlayerAppearance>({
+  const [appearance] = useState<PlayerAppearance>({
     color: PLAYER_COLOR_CHOICES[0],
     shape: shapeForSeat(1),
   })
@@ -61,6 +63,10 @@ export function JoinConnectedScreen({
   const title = inviteToken ? "Join invited lobby" : "Join with code"
 
   async function join() {
+    if (access && !access.ready) {
+      access.request()
+      return
+    }
     const startedAt = Date.now()
     if (!isWebSocketConnected) {
       setError(onlineOnlyNotice("join"))
@@ -118,7 +124,7 @@ export function JoinConnectedScreen({
             style={themed($dimmed)}
             text={
               inviteToken
-                ? "Your invite is checked when you join. Lobby details stay hidden until your seat is claimed."
+                ? "Join your friends using this invitation."
                 : "Enter the 6-character code from the host, or scan their QR."
             }
           />
@@ -157,22 +163,17 @@ export function JoinConnectedScreen({
             />
           </View>
         ) : null}
-        <View style={themed($section)}>
-          <AppearancePicker value={appearance} onChange={setAppearance} />
-          <Text
-            size="xxs"
-            style={themed($dimmed)}
-            text="If someone already took this combination, you get the nearest free one and can change it in the lobby."
-          />
-        </View>
       </ScrollView>
       <BottomActionBar>
+        {access?.message ? <Text size="xs" text={access.message} /> : null}
         {error ? <AlertNote testID="join-error" text={error} /> : null}
         {!isWebSocketConnected ? <AlertNote text={onlineOnlyNotice("join")} /> : null}
         <Button
           testID="claim-seat-button"
-          text={busy ? "Joining…" : "Claim open seat"}
-          disabled={busy || !isWebSocketConnected || !validInput}
+          text={busy ? "Joining…" : "Join game"}
+          disabled={
+            busy || Boolean(access?.loading) || (!access && !isWebSocketConnected) || !validInput
+          }
           preset="reversed"
           style={themed($primaryAction)}
           onPress={join}

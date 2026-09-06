@@ -2,6 +2,7 @@ import { router } from "expo-router"
 
 import { EmptyState } from "@/components/EmptyState"
 import { Screen } from "@/components/Screen"
+import { hasLocalGameStarted } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 
@@ -22,6 +23,7 @@ export default function CurrentLocalGameRoute() {
   return (
     <CurrentGameScreen
       initialGame={game}
+      fresh={!hasLocalGameStarted(game)}
       onDecks={() => router.push("/connected/decks")}
       onHistory={() => router.push("/history")}
       onSetup={() => router.push("/game/new?setup=1")}

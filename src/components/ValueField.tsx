@@ -119,12 +119,12 @@ export function ValueField({
   )
 }
 
-const $field: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $field: ThemedStyle<ViewStyle> = ({ colors, isDark }) => ({
   minHeight: 132,
   borderRadius: 16,
   overflow: "hidden",
   justifyContent: "center",
-  backgroundColor: colors.surfaceRaised,
+  backgroundColor: isDark ? colors.surfaceRaised : colors.palette.neutral300,
 })
 const $readout: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFill,

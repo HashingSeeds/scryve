@@ -1,11 +1,10 @@
 import { useState } from "react"
-import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
+import type { GestureResponderEvent, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 
 import { Button } from "@/components/Button"
-import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
-import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
+import { DialogCard, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
 import {
@@ -15,13 +14,17 @@ import {
   PlayerGrid,
 } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
-import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { incomingCommanderDamage, isEliminatedByCommanderDamage } from "@/features/game/domain"
+import {
+  hasLocalGameStarted,
+  incomingCommanderDamage,
+  isEliminatedByCommanderDamage,
+} from "@/features/game/domain"
+import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
-import { counterValueLabel, supportsCommanderDamage } from "@/features/game/playSystems"
-import type { GamePlayer, LocalGame, PlayerId } from "@/features/game/types"
+import { supportsCommanderDamage } from "@/features/game/playSystems"
+import type { GamePlayer, LocalGame, LocalGameResult, PlayerId } from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
@@ -60,18 +63,13 @@ export function CurrentGameScreen({
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game")
   const menuButtonStyle = useMenuButtonStyle()
-  const {
-    themed,
-    theme: { colors },
-  } = useAppTheme()
+  const { themed } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)
   const system = runtime.game.system
   const { width, height, fontScale } = useWindowDimensions()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [isFresh, setIsFresh] = useState(fresh)
+  const isFresh = fresh && !hasLocalGameStarted(runtime.game)
   const [endConfirmationOpen, setEndConfirmationOpen] = useState(initialEndOpen)
-  const [winnerPlayerIds, setWinnerPlayerIds] = useState<PlayerId[]>([])
-  const [drawSelected, setDrawSelected] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
@@ -84,7 +82,6 @@ export function CurrentGameScreen({
   function assignCommanderDamage(target: GamePlayer, step: number) {
     if (!armedPlayerId || armedPlayerId === target.id) return
     runtime.assignCommanderDamage(armedPlayerId, target.id, step)
-    setIsFresh(false)
   }
 
   function captureMenuDialogOrigin(event?: GestureResponderEvent) {
@@ -104,11 +101,8 @@ export function CurrentGameScreen({
   })
   const menuAnchor = getPlayerGridMenuAnchor(playerCount, gridLayout)
 
-  function confirmEnd() {
-    if (!endResultSelected) return
-    const ended = winnerPlayerIds.length
-      ? runtime.finish({ kind: "win", winnerPlayerIds })
-      : runtime.finish({ kind: "draw" })
+  function confirmEnd(result: LocalGameResult) {
+    const ended = runtime.finish(result)
     setEndConfirmationOpen(false)
     if (ended.status !== "active") setTimeout(() => onGameEnded(ended.id), 0)
   }
@@ -120,24 +114,8 @@ export function CurrentGameScreen({
     setTimeout(onGameAbandoned, 0)
   }
 
-  function toggleWinner(playerId: PlayerId) {
-    setDrawSelected(false)
-    setWinnerPlayerIds((current) =>
-      current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId],
-    )
-  }
-
-  const endResultSelected = winnerPlayerIds.length > 0 || drawSelected
-
-  function selectDraw() {
-    setWinnerPlayerIds([])
-    setDrawSelected((current) => !current)
-  }
-
   function showEndConfirmation() {
     setMenuOpen(false)
-    setWinnerPlayerIds([])
-    setDrawSelected(false)
     setEndConfirmationOpen(true)
   }
 
@@ -171,7 +149,7 @@ export function CurrentGameScreen({
     },
     {
       kind: "setup",
-      label: "Setup",
+      label: isFresh ? "Setup" : "New",
       disabled: !onSetup,
       onPress: () => {
         closeMenu()
@@ -236,10 +214,7 @@ export function CurrentGameScreen({
                 }
               : undefined
           }
-          onChange={(playerId, delta) => {
-            runtime.changeLife(playerId, delta)
-            setIsFresh(false)
-          }}
+          onChange={runtime.changeLife}
         />
         <GameRadialMenu
           open={menuOpen}
@@ -291,69 +266,13 @@ export function CurrentGameScreen({
       ) : null}
 
       {endConfirmationOpen ? (
-        <DialogCard
-          visible
-          onClose={() => setEndConfirmationOpen(false)}
+        <LocalGameEndDialog
+          game={runtime.game}
           origin={menuDialogOrigin}
-          backdropTestID="end-game-backdrop"
-          backdropAccessibilityLabel="Cancel ending the game"
-          dialogTestID="end-game-dialog"
-          dialogAccessibilityRole="alert"
-        >
-          <View style={themed($dialogHeader)}>
-            <Text text="Who won?" preset="subheading" />
-            <Text
-              text="Choose a winner or record a draw."
-              size="xs"
-              style={themed($dialogSubtitle)}
-            />
-          </View>
-          <View style={themed($resultChoices)}>
-            {runtime.game.players.map((player) => {
-              const selected = winnerPlayerIds.includes(player.id)
-              return (
-                <ChoiceButton
-                  key={player.id}
-                  testID={`end-game-winner-${player.seat}`}
-                  text={player.name}
-                  detail={counterValueLabel(system, player.life)}
-                  accentColor={player.color}
-                  Leading={({ color }) => (
-                    <PlayerMark seatNumber={player.seat} color={color} size={28} />
-                  )}
-                  accessibilityLabel={`${player.name}, ${counterValueLabel(system, player.life)}${selected ? ", winner" : ""}`}
-                  selected={selected}
-                  onPress={() => toggleWinner(player.id)}
-                />
-              )
-            })}
-            <ChoiceButton
-              testID="end-game-result-draw"
-              text="Draw"
-              accentColor={colors.palette.neutral400}
-              Leading={({ color }) => <DrawMark color={color} />}
-              selected={drawSelected}
-              onPress={selectDraw}
-            />
-          </View>
-          <View style={themed($dialogActions)}>
-            <Button
-              testID="abandon-game-button"
-              text="Abandon"
-              disabled={!onGameAbandoned}
-              style={themed($dialogAction)}
-              onPress={abandonGame}
-            />
-            <Button
-              testID="confirm-end-game-button"
-              text="End game"
-              disabled={!endResultSelected}
-              preset="reversed"
-              style={themed($dialogAction)}
-              onPress={confirmEnd}
-            />
-          </View>
-        </DialogCard>
+          onClose={() => setEndConfirmationOpen(false)}
+          onEnd={confirmEnd}
+          onAbandon={onGameAbandoned ? abandonGame : undefined}
+        />
       ) : null}
     </Screen>
   )
@@ -366,11 +285,3 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
 })
 const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
-const $dialogHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-const $dialogSubtitle: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $resultChoices: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $dialogAction: ThemedStyle<ViewStyle> = () => ({
-  flex: 1,
-  minHeight: 48,
-  borderRadius: CHOICE_RADIUS,
-})

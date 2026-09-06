@@ -38,6 +38,46 @@ function makeGame(now = 1) {
 }
 
 describe("LocalGameRepository", () => {
+  it("updates players on the latest board and keeps events and commander damage", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const original = makeGame()
+    const current = applyGameCommand(
+      original,
+      {
+        type: "commanderDamage.assign",
+        fromPlayerId: original.players[0].id,
+        toPlayerId: original.players[1].id,
+        delta: 3,
+      },
+      defaultCommandContext(asDeviceId("device")),
+    )
+    repository.saveActiveGame(current)
+    const players = original.players.map((player, index) => ({
+      name: index ? player.name : "Alex",
+      color: "#39755C",
+      shape: "star" as const,
+    }))
+    repository.updateActivePlayers(original.id, players)
+    expect(repository.loadActiveGame()).toMatchObject({
+      id: original.id,
+      events: current.events,
+      commanderDamage: current.commanderDamage,
+      players: current.players.map((player, index) => ({ ...player, ...players[index] })),
+    })
+    expect(() => repository.updateActivePlayers("another-game", players)).toThrow(
+      "This game changed",
+    )
+    expect(() => repository.updateActivePlayers(original.id, players.slice(1))).toThrow(
+      "This game changed",
+    )
+    expect(() =>
+      repository.updateActivePlayers(
+        original.id,
+        players.map((p) => ({ ...p, name: "same" })),
+      ),
+    ).toThrow("unique")
+  })
+
   it("keeps the analytics id stable and independent of gameplay identity", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)

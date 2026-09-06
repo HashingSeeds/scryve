@@ -82,7 +82,6 @@ function subtitleFor(entry: HistoryEntry) {
     entry.source === "connected" ? "Connected" : "Local",
     timeLabel(entry.finishedAt),
     entry.winnerNames?.length ? `Won by ${entry.winnerNames.join(" & ")}` : undefined,
-    `${entry.eventCount} life change${entry.eventCount === 1 ? "" : "s"}`,
     decks.length > 0 ? decks.join(", ") : undefined,
   ]
     .filter(Boolean)
@@ -152,7 +151,7 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
     <TouchableOpacity
       testID={`history-row-${entry.source}-${entry.routeId}`}
       accessibilityRole="button"
-      accessibilityLabel={`${badge.accessibilityLabel} · ${titleFor(entry)}`}
+      accessibilityLabel={`${badge.accessibilityLabel} · ${titleFor(entry)} · ${subtitleFor(entry)}`}
       activeOpacity={0.8}
       style={themed($row)}
       onPress={onPress}
@@ -161,7 +160,7 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
         <Text weight="bold" size="sm" text={badge.label} style={{ color: badgeTone }} />
       </View>
       <View style={$styles.flex1}>
-        <Text size="sm" weight="medium" numberOfLines={1} text={titleFor(entry)} />
+        <Text size="sm" weight="medium" numberOfLines={2} text={titleFor(entry)} />
         <Text size="xxs" numberOfLines={1} style={themed($dimmedText)} text={subtitleFor(entry)} />
       </View>
       <View style={themed($dots)}>
@@ -270,6 +269,17 @@ export function HistoryScreen({
   const connectedRelevant = filters.source !== "local"
   const loadingFirstPage = connectedRelevant && connectedPage?.status === "loading"
   const connectedUnavailable = connectedRelevant && connectedPage?.status === "unavailable"
+  const canLoadOlderMatches =
+    anyFilters &&
+    connectedRelevant &&
+    connectedPage?.status === "ready" &&
+    connectedPage.nextPage.status !== "exhausted"
+  const loadOlderMatches =
+    connectedPage?.status === "ready" && connectedPage.nextPage.status === "available"
+      ? connectedPage.nextPage.load
+      : undefined
+  const loadingOlderMatches =
+    connectedPage?.status === "ready" && connectedPage.nextPage.status === "loading"
   const loadingMore =
     connectedRelevant &&
     connectedPage?.status === "ready" &&
@@ -399,7 +409,15 @@ export function HistoryScreen({
         ListEmptyComponent={
           loadingFirstPage ? (
             <HistoryRowsSkeleton />
-          ) : connectedUnavailable ? null : anyFilters ? (
+          ) : connectedUnavailable ? null : canLoadOlderMatches ? (
+            <EmptyState
+              heading="No matches in loaded games"
+              content="Load older games to search further back."
+              button="Load older games"
+              buttonOnPress={loadOlderMatches}
+              ButtonProps={{ disabled: loadingOlderMatches }}
+            />
+          ) : anyFilters ? (
             <EmptyState
               heading="No games match these filters"
               content="Clear a filter to widen the search."
@@ -433,7 +451,9 @@ export function HistoryScreen({
                 />
               </View>
             ) : null}
-            {connectedPage?.status === "ready" && connectedPage.nextPage.status !== "exhausted" ? (
+            {connectedPage?.status === "ready" &&
+            connectedPage.nextPage.status !== "exhausted" &&
+            !(canLoadOlderMatches && visible.length === 0) ? (
               <>
                 <Button
                   testID="history-load-more"

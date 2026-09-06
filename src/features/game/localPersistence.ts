@@ -14,6 +14,7 @@ import {
   createClientId,
   isLifeDelta,
   MAX_COMMANDER_DAMAGE,
+  validatePlayerNames,
 } from "./domain"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import {
@@ -30,6 +31,7 @@ import type {
   LocalGame,
   LocalGameResult,
   LocalGameSummary,
+  NewPlayerInput,
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 
@@ -450,6 +452,24 @@ export class LocalGameRepository {
     }
     const game = parseGame(raw.game, events)
     return game?.status === "active" ? game : null
+  }
+
+  updateActivePlayers(gameId: string, players: NewPlayerInput[]): void {
+    const game = this.loadActiveGame()
+    if (!game || game.id !== gameId || game.players.length !== players.length)
+      throw new Error("This game changed. Reopen setup to edit its players.")
+    const names = validatePlayerNames(players.map((player) => player.name))
+    if (!names.valid) throw new Error(names.errors.find(Boolean) ?? "Enter valid player names.")
+    this.saveActiveGame({
+      ...game,
+      players: game.players.map((player, index) => ({
+        ...player,
+        name: names.names[index],
+        color: players[index].color,
+        shape: players[index].shape,
+      })),
+      updatedAt: Date.now(),
+    })
   }
 
   clearActiveGame(): void {

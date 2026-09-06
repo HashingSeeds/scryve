@@ -123,12 +123,14 @@ describe("CurrentGameScreen", () => {
     )
 
     fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.getByTestId("setup-button")).toHaveTextContent("Setup")
     expect(view.getByTestId("connect-button")).toBeTruthy()
     expect(view.queryByTestId("end-game-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("life-seat-1-1"))
     fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.getByTestId("setup-button")).toHaveTextContent("New")
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.queryByTestId("connect-button")).toBeNull()
   })
@@ -460,7 +462,7 @@ describe("CurrentGameScreen", () => {
       expect(view.queryByTestId("life-eliminated-seat-3")).toBeNull()
       expect(view.getByTestId("game-board")).toBeTruthy()
       fireEvent.press(view.getByTestId("commander-done-seat-1"))
-      fireEvent.press(view.getByTestId("life-seat-2--10"))
+      fireEvent.press(view.getByTestId("life-seat-2--1"))
       expect(life(view, 2)).toBe("19")
     })
 

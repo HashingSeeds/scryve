@@ -28,6 +28,32 @@ jest.mock("../../convex/_generated/api", () =>
 describe("JoinConnectedScreen", () => {
   beforeEach(resetConnectedHarness)
 
+  it("keeps code entry and scanning available before sign-in", async () => {
+    const request = jest.fn()
+    const onScan = jest.fn()
+    const onJoined = jest.fn()
+    const form = (ready: boolean) =>
+      themed(
+        <JoinConnectedScreen
+          onJoined={onJoined}
+          onScan={onScan}
+          access={{ ready, loading: false, request }}
+        />,
+      )
+    const view = render(form(false))
+    fireEvent.changeText(view.getByTestId("manual-code-input"), "AB12CD")
+    fireEvent.press(view.getByTestId("scan-invite-button"))
+    expect(onScan).toHaveBeenCalledTimes(1)
+    expect(request).not.toHaveBeenCalled()
+    fireEvent.press(view.getByTestId("claim-seat-button"))
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+    view.rerender(form(true))
+    expect(view.getByTestId("manual-code-input").props.value).toBe("AB12CD")
+    fireEvent.press(view.getByTestId("claim-seat-button"))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
+  })
+
   it("claims a seat from a manual code using the profile name, not a typed one", async () => {
     const onJoined = jest.fn()
     render(themed(<JoinConnectedScreen onJoined={onJoined} />))
@@ -45,18 +71,16 @@ describe("JoinConnectedScreen", () => {
     expect(screen.getByTestId("join-username")).toHaveTextContent("@ada_lovelace")
   })
 
-  it("submits the color and shape a joiner picked independently", async () => {
+  it("joins with a default appearance that can be changed in the lobby", async () => {
     render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
     fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
-    fireEvent.press(screen.getByTestId("appearance-color-39755c"))
-    fireEvent.press(screen.getByTestId("appearance-shape-hexagon"))
 
     await act(async () => {
       fireEvent.press(screen.getByTestId("claim-seat-button"))
     })
 
     expect(mockClaimSeat).toHaveBeenLastCalledWith(
-      expect.objectContaining({ color: "#39755C", shape: "hexagon" }),
+      expect.objectContaining({ color: "#B85636", shape: "circle" }),
     )
   })
 

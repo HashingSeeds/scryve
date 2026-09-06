@@ -264,7 +264,7 @@ const $pressedTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
 
 const $disabledViewStyle: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderColor: colors.textDim,
-  borderStyle: "dashed",
+  borderStyle: "solid",
   opacity: 0.55,
 })
 
@@ -280,7 +280,7 @@ const $disabledViewPresets: Record<Presets, ThemedStyle<ViewStyle>> = {
 }
 
 const $disabledTextStyle: ThemedStyle<TextStyle> = () => ({
-  textDecorationLine: "line-through",
+  textDecorationLine: "none",
 })
 
 const $disabledTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
