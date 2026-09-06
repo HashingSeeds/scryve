@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -59,47 +59,68 @@ describe("menuPlacement", () => {
 })
 
 describe("SelectField", () => {
-  it("keeps the menu closed until the trigger is pressed", () => {
+  it("keeps the menu closed until a delayed measurement completes", () => {
+    jest.useFakeTimers()
+    ;(globalThis as { __SELECT_FIELD_DELAY_MEASURE__?: boolean }).__SELECT_FIELD_DELAY_MEASURE__ =
+      true
+    try {
+      const { view } = renderField()
+      fireEvent.press(view.getByTestId("format"))
+      expect(view.queryByTestId("format-option-commander")).toBeNull()
+      act(() => jest.runAllTimers())
+      expect(view.getByTestId("format-option-commander")).toBeTruthy()
+    } finally {
+      ;(globalThis as { __SELECT_FIELD_DELAY_MEASURE__?: boolean }).__SELECT_FIELD_DELAY_MEASURE__ =
+        false
+      jest.useRealTimers()
+    }
+  })
+
+  it("opens after trigger measurement completes", async () => {
     const { view } = renderField()
     expect(view.queryByTestId("format-option-commander")).toBeNull()
 
     fireEvent.press(view.getByTestId("format"))
-    expect(view.getByTestId("format-option-commander")).toBeTruthy()
+    await waitFor(() => expect(view.getByTestId("format-option-commander")).toBeTruthy())
     expect(view.getByTestId("format-option-none")).toBeTruthy()
   })
 
-  it("reports a choice once and closes", () => {
+  it("reports a choice once and closes", async () => {
     const { view, onSelect } = renderField()
     fireEvent.press(view.getByTestId("format"))
+    await waitFor(() => expect(view.getByTestId("format-option-commander")).toBeTruthy())
     fireEvent.press(view.getByTestId("format-option-commander"))
 
     expect(onSelect).toHaveBeenCalledWith("commander")
     expect(view.queryByTestId("format-option-commander")).toBeNull()
   })
 
-  it("clears without reporting a change when the value is already empty", () => {
+  it("clears without reporting a change when the value is already empty", async () => {
     const { view, onSelect } = renderField()
     fireEvent.press(view.getByTestId("format"))
+    await waitFor(() => expect(view.getByTestId("format-option-none")).toBeTruthy())
     fireEvent.press(view.getByTestId("format-option-none"))
 
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it("dismisses on the scrim without changing the value", () => {
+  it("dismisses on the scrim without changing the value", async () => {
     const { view, onSelect } = renderField(jest.fn(), "standard")
     expect(view.getByLabelText("Format, Standard")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("format"))
+    await waitFor(() => expect(scrim(view)).toBeTruthy())
     fireEvent.press(scrim(view))
 
     expect(onSelect).not.toHaveBeenCalled()
     expect(view.queryByTestId("format-option-standard")).toBeNull()
   })
 
-  it("marks only the selected menu row", () => {
+  it("marks only the selected menu row", async () => {
     const { view } = renderField(jest.fn(), "standard")
 
     fireEvent.press(view.getByTestId("format"))
+    await waitFor(() => expect(view.getByText("✓")).toBeTruthy())
 
     expect(view.getAllByText("✓")).toHaveLength(1)
     expect(view.getByTestId("format-option-standard").props.accessibilityState.selected).toBe(true)

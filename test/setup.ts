@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from "react"
+import { createElement, forwardRef, useImperativeHandle, type ReactNode } from "react"
 import "react-native-url-polyfill/auto"
 // we always make sure 'react-native' gets included first
 // eslint-disable-next-line no-restricted-imports
@@ -32,6 +32,29 @@ jest.doMock("react-native", () => {
             ) => success(100, 100),
           ),
         },
+      ),
+      Pressable: Object.assign(
+        forwardRef<
+          {
+            measureInWindow: (
+              callback: (x: number, y: number, width: number, height: number) => void,
+            ) => void
+          },
+          ReactNative.PressableProps
+        >(function TestPressable(props, ref) {
+          useImperativeHandle(ref, () => ({
+            measureInWindow: (callback) => {
+              if (
+                (globalThis as { __SELECT_FIELD_DELAY_MEASURE__?: boolean })
+                  .__SELECT_FIELD_DELAY_MEASURE__
+              )
+                setTimeout(() => callback(24, 200, 300, 56), 0)
+              else callback(24, 200, 300, 56)
+            },
+          }))
+          return createElement(ReactNative.Pressable, props)
+        }),
+        { displayName: "Pressable" },
       ),
     },
     ReactNative,
