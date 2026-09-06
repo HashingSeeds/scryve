@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
+import { ConfirmDialog } from "@/components/ConfirmDialog"
 import {
   $dialogActions,
   $dialogButton,
@@ -23,17 +26,20 @@ import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import {
+  hasLocalGameStarted,
   MAX_PLAYER_NAME_LENGTH,
   PLAYER_COLORS,
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
+import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import type { LocalSettings } from "@/features/game/localPersistence"
 import {
   playerGridLayoutForCount,
   type PlayerGridLayoutVariant,
 } from "@/features/game/playerLayouts"
 import {
+  defaultStartingLife,
   isPlaySystemId,
   NO_PLAY_SYSTEM,
   PLAY_SYSTEM_LIST,
@@ -42,11 +48,10 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { LocalGame, NewPlayerInput } from "@/features/game/types"
+import type { LocalGame, LocalGameResult, NewPlayerInput } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
-import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { shapeForSeat, type PlayerAppearance } from "../../convex/lib/appearance"
 
@@ -54,10 +59,12 @@ export type NewGameMode = "local" | "connected"
 
 export interface ConnectedHostFeed {
   ready: boolean
+  access?: { label: string; request: () => void }
   busy: boolean
   status?: string
   blockedReason?: string
   error?: string
+  exitError?: string
   retry?: () => void
   activeGames?: readonly ResumableGame[]
   activeGamesNextPage?: NextPageState
@@ -71,6 +78,7 @@ export interface ConnectedHostFeed {
     layout: PlayerGridLayoutVariant
     lifeStep: number
   }) => void
+  exitGame: (game: ResumableGame) => Promise<boolean>
 }
 
 export interface NewGameScreenProps {
@@ -89,9 +97,12 @@ export interface NewGameScreenProps {
     },
   ) => void
   connected?: ConnectedHostFeed
-  localSubmitText?: string
   initialGame?: LocalGame
-  confirmLocalSubmit?: boolean
+  localGame?: LocalGame
+  onResumeLocal?: () => void
+  onEndLocal?: (result: LocalGameResult) => void
+  onAbandonLocal?: () => void
+  onSavePlayers?: (players: NewPlayerInput[]) => void
   onJoinConnected?: () => void
   onResumeConnected?: (game: ResumableGame) => void
 }
@@ -107,17 +118,20 @@ export function NewGameScreen({
   onBack,
   onStartLocal,
   connected,
-  localSubmitText,
   initialGame,
-  confirmLocalSubmit = false,
+  localGame,
+  onResumeLocal,
+  onEndLocal,
+  onAbandonLocal,
+  onSavePlayers,
   onJoinConnected,
   onResumeConnected,
 }: NewGameScreenProps) {
   const {
     themed,
-    theme: { colors },
+    theme: { colors, spacing },
   } = useAppTheme()
-  const $footerSafeArea = useSafeAreaInsetsStyle(["bottom"])
+  const { bottom } = useSafeAreaInsets()
   const [playerCount, setPlayerCount] = useState(
     initialGame?.players.length ?? defaults.defaultPlayerCount,
   )
@@ -149,8 +163,19 @@ export function NewGameScreen({
     initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
   const counter = playSystemRules(system).counter
-  const [confirmingLocalSubmit, setConfirmingLocalSubmit] = useState(false)
+  const [endingLocal, setEndingLocal] = useState(false)
+  const [playerSaveError, setPlayerSaveError] = useState<string>()
+  const [gameToExit, setGameToExit] = useState<ResumableGame>()
+  const [exitingGameId, setExitingGameId] = useState<string>()
   const connectedMode = mode === "connected"
+  const preparing = connectedMode && Boolean(connected?.status) && !connected?.ready
+  const [showPreparation, setShowPreparation] = useState(false)
+  useEffect(() => {
+    setShowPreparation(false)
+    if (!preparing) return
+    const timer = setTimeout(() => setShowPreparation(true), 200)
+    return () => clearTimeout(timer)
+  }, [preparing])
   const validLife = validateStartingLife(startingLife, system)
   const seatNames = useMemo(
     () => names.slice(0, playerCount).map((name, index) => name.trim() || defaultName(index)),
@@ -167,12 +192,16 @@ export function NewGameScreen({
     [appearances, nameValidation.names],
   )
   const valid = connectedMode
-    ? validLife && Boolean(connected?.ready) && !connected?.blockedReason
-    : validLife && nameValidation.valid
-  const busy = Boolean(connected?.busy)
+    ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
+    : validLife && nameValidation.valid && !localGame
+  const busy = connectedMode && Boolean(connected?.busy)
 
   function submit() {
     if (!valid || busy) return
+    if (connectedMode && connected?.access) {
+      connected.access.request()
+      return
+    }
     const setup = {
       layout,
       lifeStep,
@@ -186,7 +215,6 @@ export function NewGameScreen({
         deckRequired,
         ...setup,
       })
-    else if (confirmLocalSubmit) setConfirmingLocalSubmit(true)
     else onStartLocal(players, startingLife, setup)
   }
 
@@ -195,8 +223,31 @@ export function NewGameScreen({
     const nextCounter = playSystemRules(next).counter
     setSystem(next)
     setFormat(next ? playSystemFormat(next) : undefined)
-    setStartingLife(nextCounter.defaultValue)
+    setStartingLife(defaultStartingLife(next))
     setLifeStep(nextCounter.tapStep)
+  }
+
+  function chooseFormat(value: string | undefined) {
+    if (startingLife === defaultStartingLife(system, format))
+      setStartingLife(defaultStartingLife(system, value))
+    setFormat(value)
+  }
+
+  function savePlayers() {
+    setPlayerSaveError(undefined)
+    try {
+      onSavePlayers?.(players)
+    } catch (cause) {
+      setPlayerSaveError(cause instanceof Error ? cause.message : "Could not save players.")
+    }
+  }
+
+  async function confirmExit() {
+    if (!gameToExit || !connected?.exitGame) return
+    setExitingGameId(gameToExit.publicId)
+    const exited = await connected.exitGame(gameToExit)
+    setExitingGameId(undefined)
+    if (exited) setGameToExit(undefined)
   }
 
   function choosePlayerCount(value: number) {
@@ -229,7 +280,7 @@ export function NewGameScreen({
     <View style={[themed($root), $styles.flex1]}>
       <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
         <Header
-          title="New game"
+          title={initialGame && !hasLocalGameStarted(initialGame) ? "Game setup" : "New game"}
           leftTx="common:back"
           backgroundColor={colors.surface}
           onLeftPress={onBack}
@@ -244,6 +295,117 @@ export function NewGameScreen({
           selectedId={mode}
           onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
         />
+
+        {connectedMode && onJoinConnected ? (
+          <SegmentedControl
+            testID="connected-action"
+            accessibilityLabel="Host or join"
+            segments={[
+              { id: "host", label: "Host" },
+              { id: "join", label: "Join" },
+            ]}
+            selectedId="host"
+            onSelect={(action) => {
+              if (action !== "join") return
+              onJoinConnected()
+            }}
+          />
+        ) : null}
+
+        {connectedMode && connected?.blockedReason ? (
+          <Text
+            accessibilityRole="alert"
+            size="xs"
+            text={connected.blockedReason}
+            style={themed($footerNote)}
+          />
+        ) : null}
+        {connectedMode && connected?.error ? (
+          <View style={themed($connectedError)}>
+            <Text
+              accessibilityRole="alert"
+              size="xs"
+              text={connected.error}
+              style={themed($footerNote)}
+            />
+            {connected.retry ? (
+              <Button
+                testID="retry-connected-host-preparation"
+                text="Try again"
+                style={themed($retryConnected)}
+                onPress={connected.retry}
+              />
+            ) : null}
+          </View>
+        ) : null}
+        {connectedMode &&
+        connected &&
+        !connected.ready &&
+        !connected.error &&
+        connected.retry &&
+        connected.blockedReason &&
+        !connected.access ? (
+          <Button text="Retry connection" onPress={connected.retry} />
+        ) : null}
+
+        {!connectedMode && localGame ? (
+          <View style={themed($section)}>
+            <Text text="Your local game" preset="subheading" accessibilityRole="header" />
+            <Text
+              text={localGame.players
+                .map((player) => `${player.name} · ${player.life}`)
+                .join(" / ")}
+            />
+            <View style={themed($connectedGameActions)}>
+              <Button testID="resume-local-game" text="Resume" onPress={onResumeLocal} />
+              <Button
+                testID="end-local-game"
+                text="End game…"
+                onPress={() => setEndingLocal(true)}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {connectedMode && connected?.activeGames?.length ? (
+          <View style={themed($section)}>
+            <Text text="Your connected games" preset="subheading" accessibilityRole="header" />
+            {connected.activeGames.map((game) => (
+              <View key={game.publicId} style={themed($connectedGame)}>
+                <ConnectedGameRow
+                  game={game}
+                  now={Date.now()}
+                  onPress={() => onResumeConnected?.(game)}
+                />
+                <View style={themed($connectedGameActions)}>
+                  <Button
+                    testID={`resume-connected-action-${game.publicId}`}
+                    text="Resume"
+                    onPress={() => onResumeConnected?.(game)}
+                  />
+                  <Button
+                    testID={`${game.isHost ? "end" : "leave"}-connected-${game.publicId}`}
+                    text={game.isHost ? "End game…" : "Leave game…"}
+                    disabled={busy || !connected.ready}
+                    onPress={() => setGameToExit(game)}
+                  />
+                </View>
+              </View>
+            ))}
+            {connected.exitError ? (
+              <Text
+                accessibilityRole="alert"
+                style={themed($footerNote)}
+                text={connected.exitError}
+              />
+            ) : null}
+            {connected.activeGamesNextPage?.status === "available" ? (
+              <Button text="Load more" onPress={connected.activeGamesNextPage.load} />
+            ) : connected.activeGamesNextPage?.status === "loading" ? (
+              <Text size="xs" style={themed($footerStatus)} text="Loading more games…" />
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={themed($section)}>
           <Text text="System" preset="subheading" accessibilityRole="header" />
@@ -267,7 +429,7 @@ export function NewGameScreen({
                 label,
                 ...(blurb ? { detail: blurb } : {}),
               }))}
-              onSelect={setFormat}
+              onSelect={chooseFormat}
             />
           ) : null}
         </View>
@@ -368,72 +530,41 @@ export function NewGameScreen({
                 </View>
               ))}
             </View>
-          </View>
-        ) : null}
-        {connectedMode && connected?.activeGames?.length ? (
-          <View style={themed($section)}>
-            <Text text="Your connected games" preset="subheading" accessibilityRole="header" />
-            {connected.activeGames.map((game) => (
-              <ConnectedGameRow
-                key={game.publicId}
-                game={game}
-                now={Date.now()}
-                onPress={() => onResumeConnected?.(game)}
-              />
-            ))}
-            {connected.activeGamesNextPage?.status === "available" ? (
-              <Button text="Load more" onPress={connected.activeGamesNextPage.load} />
-            ) : connected.activeGamesNextPage?.status === "loading" ? (
-              <Text size="xs" style={themed($footerStatus)} text="Loading more games…" />
+            {onSavePlayers && initialGame ? (
+              <>
+                <Text
+                  size="xs"
+                  text="Save names, colors, and marks without resetting life totals."
+                />
+                <Button
+                  testID="save-players-button"
+                  text="Save players"
+                  preset="reversed"
+                  disabled={!nameValidation.valid || playerCount !== initialGame.players.length}
+                  onPress={savePlayers}
+                />
+                {playerCount !== initialGame.players.length ? (
+                  <Text
+                    size="xs"
+                    text="Restore the player count to save players without resetting."
+                  />
+                ) : null}
+                {playerSaveError ? <Text accessibilityRole="alert" text={playerSaveError} /> : null}
+              </>
             ) : null}
           </View>
         ) : null}
-        {connectedMode && onJoinConnected ? (
-          <Button testID="join-connected-button" text="Join with code" onPress={onJoinConnected} />
-        ) : null}
       </Screen>
-      <View style={[themed($footer), $footerSafeArea]}>
+      <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
         <View style={themed($footerContent)}>
-          {connectedMode && connected?.status ? (
-            <Text
-              testID="connected-host-preparation"
-              accessibilityRole="progressbar"
-              accessibilityLiveRegion="polite"
-              size="xs"
-              text={connected.status}
-              style={themed($footerStatus)}
-            />
-          ) : null}
-          {connectedMode && connected?.blockedReason ? (
-            <Text
-              accessibilityRole="alert"
-              size="xs"
-              text={connected.blockedReason}
-              style={themed($footerNote)}
-            />
-          ) : null}
-          {connectedMode && connected?.error ? (
-            <View style={themed($connectedError)}>
-              <Text
-                accessibilityRole="alert"
-                size="xs"
-                text={connected.error}
-                style={themed($footerNote)}
-              />
-              {connected.retry ? (
-                <Button
-                  testID="retry-connected-host-preparation"
-                  text="Try again"
-                  style={themed($retryConnected)}
-                  onPress={connected.retry}
-                />
-              ) : null}
-            </View>
-          ) : null}
           <Button
             testID={connectedMode ? "host-connected-button" : "start-game-button"}
-            text={connectedMode ? (busy ? "Creating…" : "Host lobby") : localSubmitText}
-            tx={connectedMode || localSubmitText ? undefined : "game:startGame"}
+            text={
+              connectedMode
+                ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
+                : undefined
+            }
+            tx={connectedMode ? undefined : "game:startGame"}
             preset="reversed"
             disabled={!valid || busy}
             accessibilityHint={
@@ -443,8 +574,42 @@ export function NewGameScreen({
             }
             onPress={submit}
           />
+          {preparing && showPreparation ? (
+            <Text
+              testID="connected-host-preparation"
+              accessibilityRole="text"
+              accessibilityLiveRegion="polite"
+              size="xs"
+              text={connected?.status}
+              style={themed($footerStatus)}
+            />
+          ) : null}
+          {!connectedMode && localGame ? (
+            <Text size="xs" text="End your current game to start another." />
+          ) : null}
         </View>
       </View>
+      {gameToExit ? (
+        <ConfirmDialog
+          visible
+          title={gameToExit.isHost ? "End this game?" : "Leave this game?"}
+          message={
+            gameToExit.isHost
+              ? "This ends the game for everyone and records it as abandoned. This cannot be undone."
+              : "You will leave this game. Other players and their history stay unchanged."
+          }
+          confirmText={gameToExit.isHost ? "End game" : "Leave game"}
+          destructive={gameToExit.isHost}
+          busy={exitingGameId === gameToExit.publicId}
+          confirmDisabled={!connected?.ready || busy}
+          notice={connected?.exitError ? <AlertNote text={connected.exitError} /> : undefined}
+          dialogTestID="connected-game-exit-confirmation"
+          confirmTestID="confirm-connected-game-exit"
+          cancelTestID="cancel-connected-game-exit"
+          onConfirm={() => void confirmExit()}
+          onClose={() => setGameToExit(undefined)}
+        />
+      ) : null}
       {appearanceSeat !== undefined && appearanceDraft ? (
         <DialogCard
           visible
@@ -473,37 +638,23 @@ export function NewGameScreen({
           </View>
         </DialogCard>
       ) : null}
-      {confirmingLocalSubmit ? (
-        <DialogCard
-          visible
-          onClose={() => setConfirmingLocalSubmit(false)}
-          dialogTestID="confirm-reset-game-dialog"
-          dialogAccessibilityRole="alert"
-        >
-          <Text preset="subheading" text="Reset this game?" />
-          <Text text="The current board will be replaced with these starting values." />
-          <View style={themed($dialogActions)}>
-            <Button
-              text="Cancel"
-              style={themed($dialogButton)}
-              onPress={() => setConfirmingLocalSubmit(false)}
-            />
-            <Button
-              testID="confirm-reset-game-button"
-              text="Reset game"
-              preset="reversed"
-              style={themed($dialogButton)}
-              onPress={() => {
-                setConfirmingLocalSubmit(false)
-                onStartLocal(players, startingLife, {
-                  layout,
-                  lifeStep,
-                  ...(system && format ? { system, format } : {}),
-                })
-              }}
-            />
-          </View>
-        </DialogCard>
+      {endingLocal && localGame && onEndLocal ? (
+        <LocalGameEndDialog
+          game={localGame}
+          onClose={() => setEndingLocal(false)}
+          onEnd={(result) => {
+            onEndLocal(result)
+            setEndingLocal(false)
+          }}
+          onAbandon={
+            onAbandonLocal
+              ? () => {
+                  onAbandonLocal()
+                  setEndingLocal(false)
+                }
+              : undefined
+          }
+        />
       ) : null}
     </View>
   )
@@ -543,6 +694,11 @@ const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexBasis: MIN_NAME_ROW_WIDTH,
 })
 const $connectedError: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $connectedGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $connectedGameActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.xs,
+})
 const $retryConnected: ThemedStyle<ViewStyle> = () => ({ minHeight: 40 })
 const $nameField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
@@ -563,7 +719,6 @@ const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   gap: spacing.xs,
   paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.sm,
 })
 const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $footerStatus: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })

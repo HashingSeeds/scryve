@@ -3,6 +3,7 @@ import { useMutation, usePaginatedQuery } from "convex/react"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remotePage } from "@/features/async/remoteState"
+import { useAuthAccess } from "@/features/auth/AuthContext"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
 import { ConnectedGameRepository } from "@/features/connected/persistence"
@@ -41,6 +42,7 @@ export function ConnectedHostSource({
           error: "Could not check for an existing hosted game.",
           retry,
           host: () => undefined,
+          exitGame: async () => false,
         })
       }
     >
@@ -60,6 +62,7 @@ function ConnectedHostQuerySource({
   onLobbyCreated: (lobby: CreatedLobby) => void
   children: (feed: ConnectedHostFeed) => ReactNode
 }) {
+  const auth = useAuthAccess()
   const createLobby = useMutation(api.games.createLobby)
   const localRepository = useMemo(() => new LocalGameRepository(), [])
   const deviceId = useMemo(() => localRepository.getDeviceId(), [localRepository])
@@ -69,7 +72,10 @@ function ConnectedHostQuerySource({
     [connectedUserId],
   )
   const migrateMemberships = useMutation(api.games.migrateMyGameMemberships)
+  const leaveGame = useMutation(api.games.leaveMyGame)
+  const abandonGame = useMutation(api.games.abandonGame)
   const [hostError, setHostError] = useState<string>()
+  const [exitError, setExitError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const ready = connectedProfile.status === "ready"
   const activeGames = usePaginatedQuery(api.games.activeConnectedGames, ready ? {} : "skip", {
@@ -80,9 +86,9 @@ function ConnectedHostQuerySource({
     activeGamesState.status === "ready" && activeGamesState.items.some((game) => game.isHost)
   const preparationStatus =
     connectedProfile.status === "loading"
-      ? "Preparing your connected profile…"
+      ? "Connecting… You can keep editing."
       : ready && activeGamesState.status === "loading"
-        ? "Checking for an existing hosted game…"
+        ? "Checking your games…"
         : undefined
   const hostReady = ready && activeGamesState.status === "ready"
 
@@ -142,18 +148,47 @@ function ConnectedHostQuerySource({
     }
   }
 
+  async function exitGame(game: ResumableGame) {
+    if (busy) return false
+    if (connectedProfile.status === "offline") {
+      setExitError("Reconnect before leaving or ending a game.")
+      return false
+    }
+    if (!hostReady) {
+      setExitError(preparationStatus ?? "Connected profile is not ready yet.")
+      return false
+    }
+    try {
+      setBusy(true)
+      setExitError(undefined)
+      if (game.isHost) await abandonGame({ publicId: game.publicId })
+      else await leaveGame({ publicId: game.publicId, deviceId })
+      return true
+    } catch (cause) {
+      setExitError(cause instanceof Error ? cause.message : "Could not update this game.")
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return children({
     ready: hostReady,
     busy,
     status: preparationStatus,
     blockedReason:
       connectedProfile.status === "offline"
-        ? "Connected games need a live connection."
+        ? "You’re offline. Your setup is kept."
         : hasHostedGame
-          ? "Resume or finish your hosted game before creating another."
+          ? "End your hosted game before hosting another."
           : undefined,
     error:
       hostError ?? (connectedProfile.status === "error" ? connectedProfile.message : undefined),
+    exitError,
+    retry:
+      connectedProfile.status === "error" && connectedProfile.reason !== "sync"
+        ? auth.openAuth
+        : connectedProfile.retry,
     ...(activeGamesState.status === "ready"
       ? {
           activeGames: activeGamesState.items as readonly ResumableGame[],
@@ -161,5 +196,6 @@ function ConnectedHostQuerySource({
         }
       : {}),
     host: (setup) => void host(setup),
+    exitGame,
   })
 }

@@ -6,7 +6,6 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withTiming,
   ZoomIn,
 } from "react-native-reanimated"
@@ -18,7 +17,7 @@ import type { LifeCardContentRotation } from "./playerCardTypes"
 import { SWORD_VIEW_BOX, SwordShapes } from "./Sword"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
-const SPIN_DURATION_MS = 7000
+const SPIN_DURATION_MS = 500
 
 export interface PlayerMarkProps {
   seatNumber: number
@@ -61,11 +60,7 @@ export function PlayerMark({
     cancelAnimation(spin)
     spin.value = 0
     if (spinning && reducedMotion === false) {
-      spin.value = withRepeat(
-        withTiming(360, { duration: SPIN_DURATION_MS, easing: Easing.linear }),
-        -1,
-        false,
-      )
+      spin.value = withTiming(360, { duration: SPIN_DURATION_MS, easing: Easing.out(Easing.quad) })
     }
     return () => cancelAnimation(spin)
   }, [reducedMotion, spin, spinning])

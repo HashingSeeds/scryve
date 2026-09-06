@@ -41,7 +41,7 @@ describe("Button", () => {
     expect(buttonStyle).toEqual(
       expect.objectContaining({
         borderRadius: 12,
-        borderStyle: "dashed",
+        borderStyle: "solid",
         marginTop: 7,
         opacity: expect.any(Number),
       }),

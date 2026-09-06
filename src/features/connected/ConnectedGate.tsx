@@ -69,6 +69,7 @@ function GateScreen({ busy = false, children }: { busy?: boolean; children: Reac
 export function BackendGate({
   children,
   allowOfflineBootstrap = false,
+  allowPendingProfile = false,
   offlineGameId,
   clerkLoaded,
   clerkSignedIn,
@@ -76,6 +77,7 @@ export function BackendGate({
   onReauthenticate,
 }: {
   children: ReactNode
+  allowPendingProfile?: boolean
   allowOfflineBootstrap?: boolean
   offlineGameId?: string
   clerkLoaded: boolean
@@ -111,9 +113,9 @@ export function BackendGate({
       <GateScreen>
         <Text
           accessibilityRole="alert"
-          text="You are signed out or your session expired. Re-authenticate to resume connected play; local games remain available."
+          text="Sign in to play across devices. Local games remain available."
         />
-        <Button text="Re-authenticate" preset="reversed" onPress={onReauthenticate} />
+        <Button text="Sign in" preset="reversed" onPress={onReauthenticate} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
@@ -170,6 +172,8 @@ export function BackendGate({
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
+  if (allowPendingProfile && clerkSignedIn && isUserLoaded && user?.id && user.username !== null)
+    return children
   if (
     isAuthenticated &&
     isUserLoaded &&
@@ -194,7 +198,7 @@ export function BackendGate({
   )
     return (
       <GateScreen busy>
-        <Text text="Connecting to Convex… Local play remains available." />
+        <Text text="Connecting… Local play remains available." />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
@@ -206,9 +210,9 @@ export function BackendGate({
       <GateScreen>
         <Text
           accessibilityRole="alert"
-          text="Convex rejected this signed-in session. Check the issuer or deployment configuration, then retry."
+          text="We couldn’t connect your account. Try signing in again."
         />
-        <Button text="Re-authenticate" preset="reversed" onPress={onReauthenticate} />
+        <Button text="Sign in again" preset="reversed" onPress={onReauthenticate} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
@@ -217,13 +221,13 @@ export function BackendGate({
       <GateScreen>
         <Text accessibilityRole="alert" text={connectedProfile.message} />
         <Button text="Retry connected setup" preset="reversed" onPress={connectedProfile.retry} />
-        <Button text="Re-authenticate" onPress={onReauthenticate} />
+        <Button text="Sign in again" onPress={onReauthenticate} />
         {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
       </GateScreen>
     )
   return (
     <GateScreen busy>
-      <Text text="Preparing your connected-play profile…" />
+      <Text text="Preparing your game profile…" />
       {onBack ? <Button text="Back to local play" onPress={onBack} /> : null}
     </GateScreen>
   )
@@ -233,10 +237,12 @@ export function ConnectedGate({
   children,
   onBack,
   allowOfflineBootstrap,
+  allowPendingProfile,
   offlineGameId,
 }: {
   children: ReactNode
   onBack?: () => void
+  allowPendingProfile?: boolean
   allowOfflineBootstrap?: boolean
   offlineGameId?: string
 }) {
@@ -252,6 +258,7 @@ export function ConnectedGate({
     <ConnectedErrorBoundary onBack={onBack}>
       <ConnectedProfileProvider>
         <BackendGate
+          allowPendingProfile={allowPendingProfile}
           allowOfflineBootstrap={allowOfflineBootstrap}
           offlineGameId={offlineGameId}
           clerkLoaded={auth.isLoaded}

@@ -18,6 +18,7 @@ import {
   isPlaySystemId,
   NO_PLAY_SYSTEM,
   PLAY_SYSTEM_LIST,
+  defaultStartingLife,
   playSystemFormats,
   playSystemRules,
   type PlaySystemId,
@@ -65,7 +66,7 @@ export function SettingsScreen({
     const { defaultSystem: _system, defaultFormat: _format, ...rest } = settings
     const next: LocalSettings = {
       ...rest,
-      defaultStartingLife: playSystemRules(system).counter.defaultValue,
+      defaultStartingLife: defaultStartingLife(system),
       ...(system
         ? {
             defaultSystem: system,
@@ -77,8 +78,15 @@ export function SettingsScreen({
   }
   const selectFormat = (format?: string) => {
     if (!settings.defaultSystem) return
+    const previousDefaultLife = defaultStartingLife(settings.defaultSystem, settings.defaultFormat)
     const { defaultFormat: _format, ...rest } = settings
-    const next: LocalSettings = { ...rest, ...(format ? { defaultFormat: format } : {}) }
+    const next: LocalSettings = {
+      ...rest,
+      ...(format ? { defaultFormat: format } : {}),
+      ...(settings.defaultStartingLife === previousDefaultLife
+        ? { defaultStartingLife: defaultStartingLife(settings.defaultSystem, format) }
+        : {}),
+    }
     setSettings(next)
     onSettingsChange(next)
   }

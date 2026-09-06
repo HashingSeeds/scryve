@@ -381,6 +381,14 @@ export function applyGameCommand(
   return event ? reduceGameEvent(game, event) : game
 }
 
+export function hasLocalGameStarted(game: LocalGame): boolean {
+  return (
+    game.events.length > 0 ||
+    game.players.some((player) => player.life !== game.startingLife) ||
+    Object.values(game.commanderDamage ?? {}).some((damage) => damage !== 0)
+  )
+}
+
 export function canUndo(game: LocalGame, actorId: ActorId): boolean {
   const compensated = compensatedOperationIds(game)
   return game.events.some(

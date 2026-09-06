@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { ViewStyle } from "react-native"
-import { Pressable, View } from "react-native"
+import { Platform, Pressable, View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -60,7 +60,7 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   zIndex: 50,
   left: spacing.md,
   right: spacing.md,
-  bottom: spacing.md,
+  bottom: Platform.OS === "ios" ? 0 : spacing.md,
   height: 48,
   alignItems: "center",
   justifyContent: "flex-end",
