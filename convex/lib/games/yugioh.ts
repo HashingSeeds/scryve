@@ -12,6 +12,7 @@ import type { ActionCtx } from "../../_generated/server"
 import { env } from "../../_generated/server"
 
 const BASE_URL = "https://db.ygoprodeck.com/api/v7"
+const DEFAULT_IMAGE_BASE_URL = "https://ygo-images.scryve.sow.care"
 const REQUEST_INTERVAL_MS = 100
 const REQUEST_TIMEOUT_MS = 10_000
 
@@ -29,6 +30,16 @@ function mirroredImageUrl(baseUrl: string | undefined, printingId: string) {
   } catch {
     return undefined
   }
+}
+
+export function ygoImageUrl(...ids: (string | undefined)[]) {
+  const printingId = ids.find((id) => id !== undefined && /^\d+$/.test(id))
+  if (!printingId) return undefined
+  return mirroredImageUrl(configuredYgoImageBaseUrl(), printingId)
+}
+
+function configuredYgoImageBaseUrl() {
+  return env.YGO_IMAGE_BASE_URL ?? DEFAULT_IMAGE_BASE_URL
 }
 
 export function normalizeYgoCards(value: unknown, imageBaseUrl?: string): NormalizedCard[] {
@@ -108,7 +119,7 @@ export async function searchYgo(ctx: ActionCtx, query: string, includeImages = t
   return {
     cards: normalizeYgoCards(
       (await response.json()) as unknown,
-      includeImages ? (env as { YGO_IMAGE_BASE_URL?: string }).YGO_IMAGE_BASE_URL : undefined,
+      includeImages ? configuredYgoImageBaseUrl() : undefined,
     ),
     status: response.status,
   }
@@ -121,7 +132,7 @@ export async function cardsByYgoIds(ctx: ActionCtx, ids: readonly string[], incl
   return {
     cards: normalizeYgoCards(
       (await response.json()) as unknown,
-      includeImages ? (env as { YGO_IMAGE_BASE_URL?: string }).YGO_IMAGE_BASE_URL : undefined,
+      includeImages ? configuredYgoImageBaseUrl() : undefined,
     ),
     status: response.status,
   }

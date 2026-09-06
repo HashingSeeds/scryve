@@ -13,7 +13,7 @@ import {
   type LimitlessDeck,
 } from "./lib/games/limitless"
 import { pokemonCardSummaries } from "./lib/games/pokemon"
-import { cardsByYgoIds } from "./lib/games/yugioh"
+import { cardsByYgoIds, ygoImageUrl } from "./lib/games/yugioh"
 import { normalizeYgoDeckFeed, YGO_DECK_FEED_URL } from "./lib/games/yugiohDecks"
 import { assertGameSystem, capabilityReleased, requireReleasedCapability } from "./lib/integrations"
 import { MAX_DECK_CARDS } from "./lib/policy"
@@ -485,7 +485,19 @@ export const detail = query({
     return {
       deck,
       entries: entries.slice(0, MAX_DECK_CARDS).map((entry) => {
-        if (includeImages) return entry
+        if (includeImages) {
+          const imageUrl =
+            deck.game === "ygo"
+              ? ygoImageUrl(entry.printingId, entry.providerCardId, entry.cardId)
+              : undefined
+          return imageUrl
+            ? {
+                ...entry,
+                imageUrl: entry.imageUrl ?? imageUrl,
+                smallImageUrl: entry.smallImageUrl ?? entry.imageUrl ?? imageUrl,
+              }
+            : entry
+        }
         const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...textEntry } = entry
         return { ...textEntry, imageUrl: undefined, smallImageUrl: undefined }
       }),

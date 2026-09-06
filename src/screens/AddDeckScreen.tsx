@@ -98,6 +98,12 @@ type GenericImportedCard = {
   quantity: number
 }
 
+function catalogCardDetailKey(
+  card: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+) {
+  return `${card.game}:${card.cardId ?? card.printingId ?? card.providerCardId ?? `${card.name}:${card.originalReference ?? ""}`}`
+}
+
 type FocusedPreviewCard = {
   detailKey: string
   name: string
@@ -538,7 +544,7 @@ export function AddDeckScreen({
   ) {
     const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
     const focused = {
-      detailKey: `${card.game}:${catalogCardId ?? card.name}`,
+      detailKey: catalogCardDetailKey(card),
       name: card.name,
       imageUrl: card.imageUrl,
       smallImageUrl: card.smallImageUrl,
@@ -736,7 +742,14 @@ export function AddDeckScreen({
   )
 
   if (selectedCatalogDeck) {
-    const entries = catalogDetail?.entries ?? []
+    const entries = (catalogDetail?.entries ?? []).map((entry) => {
+      const details = previewDetailsByKey[catalogCardDetailKey(entry)]
+      return {
+        ...entry,
+        imageUrl: entry.imageUrl ?? details?.imageUrl,
+        smallImageUrl: entry.smallImageUrl ?? details?.smallImageUrl ?? details?.imageUrl,
+      }
+    })
     const quantity = entries.reduce((total, entry) => total + entry.quantity, 0)
     return (
       <Screen
@@ -799,6 +812,7 @@ export function AddDeckScreen({
                     <View style={themed($previewThumbnailSlot)}>
                       {entry.smallImageUrl || entry.imageUrl ? (
                         <Image
+                          testID={`catalog-card-thumbnail-${entry._id}`}
                           source={entry.smallImageUrl ?? entry.imageUrl}
                           style={themed($previewThumbnail)}
                           cachePolicy="memory-disk"
@@ -848,7 +862,14 @@ export function AddDeckScreen({
     const previewFormat = preconSearchFormat(format)
       ? format
       : preconstructedFormat(selectedPrecon.type)
-    const cards = resolvedPrecon?.cards ?? preconOutline?.cards ?? []
+    const cards = (resolvedPrecon?.cards ?? preconOutline?.cards ?? []).map((card) => {
+      const details = previewDetailsByKey[card.scryfallId ?? `mtg:${card.name}`]
+      return {
+        ...card,
+        imageUrl: card.imageUrl ?? details?.imageUrl,
+        smallImageUrl: card.smallImageUrl ?? details?.smallImageUrl ?? details?.imageUrl,
+      }
+    })
     const gameLabel = DECK_GAME_LIST.find((candidate) => candidate.id === game)?.shortLabel ?? game
     const configuredSections = deckSections(game, previewFormat)
     const sections = previewSections(cards, configuredSections)
