@@ -52,7 +52,7 @@ export function useLocalGame(
       const next = { ...current, layout, updatedAt: Date.now() }
       gameRef.current = next
       setGame(next)
-      defer(() => repository.saveActiveGame(next))
+      setTimeout(() => repository.saveActiveGame(next), 0)
     },
     [repository],
   )
