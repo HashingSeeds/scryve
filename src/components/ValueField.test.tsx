@@ -48,6 +48,7 @@ describe("ValueField", () => {
   it("does not report a value outside its bounds", () => {
     const { view, onChange } = renderField(1)
 
+    expect(view.getByTestId("life-decrement")).toBeDisabled()
     fireEvent.press(view.getByTestId("life-decrement"))
 
     expect(onChange).not.toHaveBeenCalled()

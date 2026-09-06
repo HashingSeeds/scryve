@@ -85,6 +85,8 @@ export function ValueField({
             accessibilityRole="button"
             accessibilityLabel={`${word} ${label} by ${step}`}
             accessibilityHint={longStep ? `Long press to change it by ${longStep}.` : undefined}
+            disabled={direction < 0 ? value <= min : value >= max}
+            accessibilityState={{ disabled: direction < 0 ? value <= min : value >= max }}
             delayLongPress={450}
             onPressIn={() => {
               longPressDirection.current = null
