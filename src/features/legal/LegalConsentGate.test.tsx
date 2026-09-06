@@ -98,6 +98,36 @@ describe("LegalConsentGate", () => {
     expect(view.getByText("We have updated our terms")).toBeTruthy()
   })
 
+  it("names a privacy-only update and shows its effective date", () => {
+    deviceAcceptanceStore.write({ ...REQUIRED_CONSENT_VERSIONS, privacy: "1900-01-01" })
+    const view = renderGate()
+
+    expect(view.getByText("We have updated our privacy policy")).toBeTruthy()
+    expect(
+      view.getByText(
+        `Our Privacy Policy changed on September 4, 2026. Please review the update to keep using Scryve.`,
+      ),
+    ).toBeTruthy()
+    expect(view.queryByText("Read the Terms of Use")).toBeNull()
+    expect(view.getByText("Read the Privacy Policy")).toBeTruthy()
+  })
+
+  it("does not assign one date to two changed documents", () => {
+    deviceAcceptanceStore.write({ terms: "1900-01-01", privacy: "1900-01-01" })
+    const view = renderGate()
+
+    expect(
+      view.getByText(
+        "Our Terms of Use and Privacy Policy have changed. Please review the updates to keep using Scryve.",
+      ),
+    ).toBeTruthy()
+    expect(
+      view.getByText(
+        'By tapping "I agree" you accept the current Terms of Use and Privacy Policy.',
+      ),
+    ).toBeTruthy()
+  })
+
   it("lets the support page be read while gated", () => {
     mockPathname = "/support"
     expect(renderGate().getByText("APP CONTENT")).toBeTruthy()

@@ -37,6 +37,31 @@ function action(operationId: string, queuedAt = 1, actorId = "user-1"): PendingL
 }
 
 describe("connected MMKV repository", () => {
+  it("drops stored commander claims against their own player and keeps valid claims", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    for (const toPlayerId of ["player-1", "player-2"]) {
+      const pending = action(`commander-claim-${toPlayerId}`)
+      repository.enqueue(
+        {
+          ...pending,
+          event: {
+            ...pending.event,
+            type: "commanderDamage.submitted",
+            fromPlayerId: asPlayerId("player-1"),
+            toPlayerId: asPlayerId(toPlayerId),
+            delta: 5,
+            deviceId: asDeviceId("device-valid-001"),
+          },
+        },
+        [],
+      )
+    }
+    expect(
+      repository.loadOutbox("game-public").map((pending) => pending.event.operationId),
+    ).toEqual(["commander-claim-player-2"])
+  })
+
   it("rejects a saturated outbox before writing another pending record", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1", {

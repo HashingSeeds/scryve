@@ -20,6 +20,7 @@ export function AppUtilityMenu({
   placement = "topRight",
   onSettings,
   onAccount,
+  onOpenChange,
   accountLabel = "Account",
 }: {
   visible?: boolean
@@ -27,6 +28,7 @@ export function AppUtilityMenu({
   placement?: "topRight" | "bottomLeft"
   onSettings: () => void
   onAccount: () => void
+  onOpenChange?: (open: boolean) => void
   accountLabel?: "Account" | "Sign in"
 }) {
   const { themed } = useAppTheme()
@@ -35,8 +37,11 @@ export function AppUtilityMenu({
   const progress = useSharedValue(0)
 
   useEffect(() => {
-    if (!visible) setOpen(false)
-  }, [visible])
+    if (!visible && open) {
+      setOpen(false)
+      onOpenChange?.(false)
+    }
+  }, [onOpenChange, open, visible])
 
   useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, {
@@ -55,19 +60,28 @@ export function AppUtilityMenu({
   }))
 
   if (!visible) return null
-  const choose = (action: () => void) => {
+  const close = () => {
     setOpen(false)
+    onOpenChange?.(false)
+  }
+  const choose = (action: () => void) => {
+    close()
     action()
   }
+  const slotStyle = open ? (compact ? $expandedCompactSlot : $expandedSlot) : undefined
 
   return (
-    <View pointerEvents="box-none" style={compact ? $compactSlot : $slot}>
+    <Animated.View
+      testID="utility-menu-slot"
+      pointerEvents="box-none"
+      style={[compact ? $compactSlot : $slot, slotStyle]}
+    >
       {open ? (
         <Pressable
           testID="utility-menu-backdrop"
           accessibilityLabel="Close utility menu"
           style={$backdrop}
-          onPress={() => setOpen(false)}
+          onPress={close}
         />
       ) : null}
       <Animated.View
@@ -90,7 +104,10 @@ export function AppUtilityMenu({
             accessibilityLabel="Utility"
             accessibilityState={{ expanded: open }}
             style={themed($trigger)}
-            onPress={() => setOpen(true)}
+            onPress={() => {
+              setOpen(true)
+              onOpenChange?.(true)
+            }}
           >
             {compact ? (
               <View testID="utility-menu-dots" accessible={false} style={$dotsRow}>
@@ -127,12 +144,14 @@ export function AppUtilityMenu({
           </Pressable>
         </Animated.View>
       </Animated.View>
-    </View>
+    </Animated.View>
   )
 }
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
 const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }
+const $expandedSlot: ViewStyle = { width: 188, height: 108 }
+const $expandedCompactSlot: ViewStyle = { width: 148, height: 108 }
 const $backdrop: ViewStyle = {
   position: "absolute",
   top: -1000,

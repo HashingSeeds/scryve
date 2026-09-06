@@ -168,19 +168,9 @@ function fingerprint(cards: DeckCardInput[]) {
   return `${cards.length}-${(hash >>> 0).toString(16).padStart(8, "0")}`
 }
 
-function cardTotals(cards: DeckCardInput[]) {
-  return {
-    fingerprint: fingerprint(cards),
-    cardCount: cards.length,
-    cardQuantity: cards.reduce((total, card) => total + card.quantity, 0),
-  }
-}
-
-function cardRow(versionId: Id<"deckVersions">, game: string, card: DeckCardInput) {
+function cardFields(game: string, card: DeckCardInput) {
   const isMagic = game === DEFAULT_DECK_GAME
-  const section = card.section ?? card.board ?? "main"
   return {
-    deckVersionId: versionId,
     game,
     identityNamespace:
       card.identityNamespace ??
@@ -192,7 +182,7 @@ function cardRow(versionId: Id<"deckVersions">, game: string, card: DeckCardInpu
     ...((card.printingId ?? card.scryfallId)
       ? { printingId: card.printingId ?? card.scryfallId }
       : {}),
-    section,
+    section: card.section ?? card.board ?? "main",
     entryKind: card.entryKind ?? "card",
     ...(card.originalReference ? { originalReference: card.originalReference } : {}),
     ...(card.category ? { category: card.category } : {}),
@@ -203,6 +193,40 @@ function cardRow(versionId: Id<"deckVersions">, game: string, card: DeckCardInpu
     ...(card.smallImageUrl ? { smallImageUrl: card.smallImageUrl } : {}),
     quantity: card.quantity,
     ...(card.board ? { board: card.board } : {}),
+  }
+}
+
+function canonicalCardFieldsWithDefaults(game: string, card: Doc<"deckCards">) {
+  const { _id: _, _creationTime: __, deckVersionId: ___, ...fields } = card
+  return cardFields(card.game ?? game, fields)
+}
+
+function canonicalCards(cards: readonly Record<string, unknown>[]) {
+  return JSON.stringify(
+    cards
+      .map((card) =>
+        JSON.stringify(
+          Object.fromEntries(
+            Object.entries(card).sort(([left], [right]) => left.localeCompare(right)),
+          ),
+        ),
+      )
+      .sort(),
+  )
+}
+
+function cardTotals(cards: DeckCardInput[]) {
+  return {
+    fingerprint: fingerprint(cards),
+    cardCount: cards.length,
+    cardQuantity: cards.reduce((total, card) => total + card.quantity, 0),
+  }
+}
+
+function cardRow(versionId: Id<"deckVersions">, game: string, card: DeckCardInput) {
+  return {
+    deckVersionId: versionId,
+    ...cardFields(game, card),
   }
 }
 
@@ -621,7 +645,15 @@ export const saveVersion = mutation({
       return versionId
     }
     const totals = cardTotals(args.cards)
-    if (target.fingerprint === totals.fingerprint) return target._id
+    const existingCards = await ctx.db
+      .query("deckCards")
+      .withIndex("by_deck_version", (q) => q.eq("deckVersionId", target._id))
+      .take(MAX_DECK_CARDS + 1)
+    if (
+      canonicalCards(existingCards.map((card) => canonicalCardFieldsWithDefaults(game, card))) ===
+      canonicalCards(args.cards.map((card) => cardFields(game, card)))
+    )
+      return target._id
     await replaceVersionCards(ctx, target._id, game, args.cards)
     await ctx.db.patch(target._id, { ...totals, updatedAt: now })
     await ctx.db.patch(deck._id, { updatedAt: now })

@@ -8,10 +8,6 @@ import { localGameRepository, type LocalGameRepository } from "./localPersistenc
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { GameCommand, LifeDelta, LocalGame, LocalGameResult, PlayerId } from "./types"
 
-function defer(work: () => void) {
-  setTimeout(work, 0)
-}
-
 export function useLocalGame(
   initialGame: LocalGame,
   repository: LocalGameRepository = localGameRepository,
@@ -28,12 +24,10 @@ export function useLocalGame(
     (command: GameCommand): LocalGame => {
       const next = applyGameCommand(gameRef.current, command, context)
       if (next === gameRef.current) return next
+      if (next.status === "active") repository.saveActiveGame(next)
+      else repository.archiveGame(next)
       gameRef.current = next
       setGame(next)
-      defer(() => {
-        if (next.status === "active") repository.saveActiveGame(next)
-        else repository.archiveGame(next)
-      })
       return next
     },
     [context, repository],

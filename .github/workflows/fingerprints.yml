@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -43,6 +45,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare base revision
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base_dir="$RUNNER_TEMP/base"
+          mkdir -p "$base_dir"
+          git archive "$BASE_SHA" | tar -x -C "$base_dir"
+          pnpm --dir "$base_dir" install --frozen-lockfile
+
       - name: Check native fingerprints
         id: fingerprints
         shell: bash
@@ -51,7 +62,9 @@ jobs:
 
           marker='<!-- native-fingerprint-check -->'
           comment_file="$RUNNER_TEMP/native-fingerprints.md"
+          changed_inputs_file="$RUNNER_TEMP/native-fingerprint-inputs.txt"
           needs_build=false
+          : > "$changed_inputs_file"
 
           {
             echo "$marker"
@@ -70,6 +83,7 @@ jobs:
 
             for platform in ios android; do
               fingerprint_file="$RUNNER_TEMP/fingerprint-${profile//:/-}-$platform.json"
+              base_fingerprint_file="$RUNNER_TEMP/base-fingerprint-${profile//:/-}-$platform.json"
               matching_file="$RUNNER_TEMP/matching-${profile//:/-}-$platform.json"
               latest_file="$RUNNER_TEMP/latest-${profile//:/-}-$platform.json"
 
@@ -79,6 +93,20 @@ jobs:
                 --json \
                 --non-interactive > "$fingerprint_file"
               current_hash=$(jq -er '.hash' "$fingerprint_file")
+
+              (
+                cd "$RUNNER_TEMP/base"
+                eas fingerprint:generate \
+                  --build-profile "$profile" \
+                  --platform "$platform" \
+                  --json \
+                  --non-interactive
+              ) > "$base_fingerprint_file"
+              base_hash=$(jq -er '.hash' "$base_fingerprint_file")
+
+              if [ "$current_hash" = "$base_hash" ]; then
+                continue
+              fi
 
               eas build:list \
                 --build-profile "$profile" \
@@ -94,6 +122,21 @@ jobs:
               fi
 
               needs_build=true
+              jq -nr \
+                --slurpfile base "$base_fingerprint_file" \
+                --slurpfile current "$fingerprint_file" '
+                  def key:
+                    if .type == "contents" then "contents:\(.id)"
+                    else "\(.type):\(.filePath)"
+                    end;
+                  ($base[0].sources | map({ key: key, value: . }) | from_entries) as $base_sources |
+                  ($current[0].sources | map({ key: key, value: . }) | from_entries) as $current_sources |
+                  (($base_sources | keys) + ($current_sources | keys) | unique)[] as $key |
+                  select(($base_sources[$key].hash // null) != ($current_sources[$key].hash // null)) |
+                  ($current_sources[$key] // $base_sources[$key]) |
+                  (.filePath // .id)
+                ' >> "$changed_inputs_file"
+
               eas build:list \
                 --build-profile "$profile" \
                 --platform "$platform" \
@@ -122,6 +165,16 @@ jobs:
               echo "| $environment | $platform_name | $difference |" >> "$comment_file"
             done
           done
+
+          if [ "$needs_build" = true ]; then
+            {
+              echo
+              echo 'Changed fingerprint inputs:'
+              sort -u "$changed_inputs_file" | while IFS= read -r input; do
+                echo "- \`$input\`"
+              done
+            } >> "$comment_file"
+          fi
 
           echo "needs_build=$needs_build" >> "$GITHUB_OUTPUT"
           echo "comment_file=$comment_file" >> "$GITHUB_OUTPUT"

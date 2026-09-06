@@ -126,6 +126,7 @@ function parseCommanderDamageEvent(
     typeof value.gameId !== "string" ||
     typeof value.fromPlayerId !== "string" ||
     typeof value.toPlayerId !== "string" ||
+    value.fromPlayerId === value.toPlayerId ||
     !isCommanderDamageDelta(value.delta) ||
     typeof value.actorId !== "string" ||
     typeof value.deviceId !== "string" ||

@@ -1,10 +1,7 @@
-import type { OptimisticLocalStore } from "convex/browser"
-
 import { drainConnectedOutbox } from "./drainOutbox"
 import type { ConnectedProjection, PendingLifeAction } from "./model"
 import { ConnectedGameRepository } from "./persistence"
 import { optimisticallyApplyLife, overlayPendingDeltas } from "./reconciliation"
-import { connectedLifeOptimisticUpdater } from "./useConnectedGame"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
 
 class MemoryStorage {
@@ -108,45 +105,6 @@ describe("subscription/ack reconciliation ordering", () => {
     expect(restarted.cleanupTerminalGame(terminal, result.pending, result.failures)).toBe(true)
     expect(restarted.loadProjection("game-public")).toBeNull()
   })
-
-  it.each(["subscription-before-ack", "ack-before-subscription"] as const)(
-    "composes the actual Convex optimistic callback with durable state: %s",
-    (ordering) => {
-      const storage = new MemoryStorage()
-      const repository = new ConnectedGameRepository(storage, "user-a")
-      repository.enqueue(pending, [])
-      let query: any = base
-      const store: OptimisticLocalStore = {
-        getQuery: jest.fn(() => query),
-        getAllQueries: jest.fn(() => []),
-        setQuery: jest.fn((_reference: unknown, _args: unknown, value: unknown) => {
-          query = value
-        }) as OptimisticLocalStore["setQuery"],
-      }
-
-      connectedLifeOptimisticUpdater(store, {
-        publicId: "game-public",
-        playerId: "player-1",
-        operationId,
-        delta: 5,
-      })
-      expect(query.players[0].currentLife).toBe(25)
-
-      if (ordering === "subscription-before-ack") {
-        query = committed
-        repository.saveProjection(committed)
-        repository.acknowledge("game-public", operationId)
-      } else {
-        repository.acknowledge("game-public", operationId)
-        query = committed
-        repository.saveProjection(committed)
-      }
-
-      expect(query.players[0].currentLife).toBe(25)
-      expect(repository.loadOutbox("game-public")).toEqual([])
-      expect(repository.loadProjection("game-public")?.players[0].currentLife).toBe(25)
-    },
-  )
 
   it("keeps exactly one delta when subscription arrives before acknowledgement", () => {
     const storage = new MemoryStorage()

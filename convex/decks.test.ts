@@ -282,17 +282,20 @@ describe("premium deck tracking", () => {
     ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
   })
 
-  it("keeps one deck free and unlocks additional decks through server entitlements", async () => {
+  it("keeps two decks free and unlocks additional decks through server entitlements", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "deck-owner", "Deck Owner")
     await expect(
       actor.mutation(api.decks.create, { name: "First", format: "commander" }),
     ).resolves.toBeDefined()
-    await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
-      capacity: { used: 1, limit: 1, premium: false, canCreate: false },
-    })
     await expect(
       actor.mutation(api.decks.create, { name: "Second", format: "commander" }),
+    ).resolves.toBeDefined()
+    await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
+      capacity: { used: 2, limit: 2, premium: false, canCreate: false },
+    })
+    await expect(
+      actor.mutation(api.decks.create, { name: "Third", format: "commander" }),
     ).rejects.toMatchObject({
       data: { code: "deck_limit_reached", message: "Premium is required for additional decks" },
     })
@@ -303,11 +306,11 @@ describe("premium deck tracking", () => {
       source: "test",
     })
     await expect(
-      actor.mutation(api.decks.create, { name: "Second", format: "commander" }),
+      actor.mutation(api.decks.create, { name: "Third", format: "commander" }),
     ).resolves.toBeDefined()
     await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
-      decks: [{ game: "mtg" }, { game: "mtg" }],
-      capacity: { used: 2, premium: true, canCreate: true },
+      decks: [{ game: "mtg" }, { game: "mtg" }, { game: "mtg" }],
+      capacity: { used: 3, premium: true, canCreate: true },
     })
   })
 
@@ -675,6 +678,54 @@ describe("deck versions", () => {
     expect(detail.versions).toHaveLength(1)
     expect(detail.versions[0]).toMatchObject({ versionNumber: 1, cardCount: 2, cardQuantity: 2 })
     expect(detail.cards).toHaveLength(2)
+  })
+
+  it("persists metadata-only card changes", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "metadata-owner", "Metadata Owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Metadata", format: "commander" })
+    const card = testCard("Original Name", "aaaaaaa3")
+    await actor.mutation(api.decks.saveVersion, { deckId, cards: [card] })
+
+    await actor.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [
+        {
+          ...card,
+          name: "Updated Name",
+          category: "Creature",
+          originalReference: "original-reference",
+          imageUrl: "https://cards.scryfall.io/updated.jpg",
+          smallImageUrl: "https://cards.scryfall.io/small/updated.jpg",
+        },
+      ],
+    })
+
+    await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      cards: [
+        {
+          name: "Updated Name",
+          category: "Creature",
+          originalReference: "original-reference",
+          imageUrl: "https://cards.scryfall.io/updated.jpg",
+          smallImageUrl: "https://cards.scryfall.io/small/updated.jpg",
+        },
+      ],
+    })
+  })
+
+  it("treats reorder-only saves as no-ops", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "reorder-owner", "Reorder Owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Reorder", format: "commander" })
+    const cards = [testCard("First Card", "aaaaaaa4"), testCard("Second Card", "aaaaaaa5")]
+    await actor.mutation(api.decks.saveVersion, { deckId, cards })
+    const before = await actor.query(api.decks.detail, { deckId })
+
+    await actor.mutation(api.decks.saveVersion, { deckId, cards: [...cards].reverse() })
+    const after = await actor.query(api.decks.detail, { deckId })
+
+    expect(after.cards.map((card) => card._id)).toEqual(before.cards.map((card) => card._id))
   })
 
   it("keeps extra version slots premium and caps them at five", async () => {

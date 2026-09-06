@@ -115,7 +115,11 @@ function ConnectedLobbyContent({
   } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const deviceId = useRef(new LocalGameRepository().getDeviceId()).current
-  const lobby = useQuery(api.games.lobbyProjection, { publicId, deviceId })
+  const lobby = useQuery(api.games.lobbyProjection, {
+    publicId,
+    deviceId,
+    includeRecentOperationIds: false,
+  })
   const { isWebSocketConnected } = useConvexConnectionState()
   const start = useMutation(api.games.startGame)
   const leave = useMutation(api.games.leaveMyGame)

@@ -11,5 +11,11 @@ crons.interval(
   internal.deckImports.pruneResolvedPreconstructedCache,
   {},
 )
+crons.interval(
+  "purge expired moderation reports",
+  { hours: 24 },
+  internal.moderation.purgeExpiredReports,
+  {},
+)
 
 export default crons
