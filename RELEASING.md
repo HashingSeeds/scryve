@@ -100,3 +100,21 @@ The SDK stays unloaded without consent and build configuration. No PostHog repla
 plugin or provider is installed. Sentry diagnostics retain their existing behavior.
 For analytics deletion requests, locate events using the Analytics ID the player
 provides from Settings; these IDs are intentionally not linked to account IDs.
+
+## Native store review prompts
+
+`expo-store-review` requires a new native binary before shipping this change via OTA.
+The app counts the first five distinct completed local or connected games on the
+installation, independent of analytics consent and game outcome. Abandoned games
+and previously finished connected games loaded from history do not count.
+
+After the threshold, a finished summary must stay focused for two seconds with
+no app dialog open. Leaving the screen or backgrounding the app cancels the
+pending request. Web and development mode skip prompting. The app persists one
+request attempt per installation, even if the store declines to display it or the
+native call fails; it does not track whether a review was submitted.
+
+Verify the native prompt on iOS and Android using their supported store-review
+test distribution paths. TestFlight does not display the iOS review prompt, and
+the stores may suppress prompts based on their own quotas. Unit tests cover our
+eligibility and cancellation logic, not whether the OS displays its dialog.

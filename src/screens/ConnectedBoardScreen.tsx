@@ -42,6 +42,7 @@ import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useStoreReview } from "@/utils/useStoreReview"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -210,6 +211,15 @@ function ConnectedBoardRuntime({
     staged: Partial<Record<PlayerId, number>>
   } | null>(null)
   const finishSubmitInFlight = useRef(false)
+  useStoreReview(
+    runtime.status !== "loading" &&
+      runtime.projection.status === "finished" &&
+      !menuOpen &&
+      !statusOpen &&
+      !layoutPickerOpen &&
+      !confirmingFinish &&
+      !playerActionsOpen,
+  )
 
   function toggleWinner(playerId: string) {
     setDrawSelected(false)

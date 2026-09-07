@@ -1,12 +1,14 @@
 import { act, renderHook } from "@testing-library/react-native"
 
 import { captureGame } from "@/utils/analytics"
+import { recordReviewCompletion } from "@/utils/storeReview"
 
 import { createLocalGame } from "./domain"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
 import { useLocalGame } from "./useLocalGame"
 
 jest.mock("@/utils/analytics", () => ({ captureGame: jest.fn() }))
+jest.mock("@/utils/storeReview", () => ({ recordReviewCompletion: jest.fn() }))
 
 class MemoryStorage implements StringStorage {
   values = new Map<string, string>()
@@ -100,4 +102,16 @@ it("counts the first gameplay action once, then explicit completion", () => {
     "local",
     "game_menu",
   )
+})
+
+it("counts a finished local game for reviews but not an abandoned game", () => {
+  jest.mocked(recordReviewCompletion).mockClear()
+  const repository = new LocalGameRepository(new MemoryStorage())
+  const initial = game()
+  const finished = renderHook(() => useLocalGame(initial, repository))
+  act(() => finished.result.current.finish({ kind: "draw" }))
+  expect(recordReviewCompletion).toHaveBeenCalledWith(`local:${initial.id}`)
+  const abandoned = renderHook(() => useLocalGame(game(), repository))
+  act(() => abandoned.result.current.abandon())
+  expect(recordReviewCompletion).toHaveBeenCalledTimes(1)
 })

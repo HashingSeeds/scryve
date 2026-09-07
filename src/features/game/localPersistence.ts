@@ -5,6 +5,7 @@ import {
 } from "@/components/GameMenuButtonShape"
 import { captureGame, type GameEndSource } from "@/utils/analytics"
 import { storage as mmkvStorage } from "@/utils/storage"
+import { recordReviewCompletion } from "@/utils/storeReview"
 
 import {
   asActorId,
@@ -512,13 +513,15 @@ export class LocalGameRepository {
     removed.forEach(({ id }) => this.storage.delete(LOCAL_KEYS.historyDetail(id)))
     const active = this.loadActiveGame()
     if (active?.id === game.id) this.clearActiveGame()
-    if (game.status === "finished")
+    if (game.status === "finished") {
+      recordReviewCompletion(`local:${game.id}`)
       captureGame(
         "game_completed",
         { ...game, playerCount: game.players.length },
         "local",
         endSource,
       )
+    }
     return summary
   }
 
