@@ -271,6 +271,7 @@ export function SettingsScreen({
         <Text text="Privacy" preset="subheading" accessibilityRole="header" />
         <Switch
           testID="analytics-switch"
+          disabled={!analyticsConfigured() && !sharing}
           label="Share usage with Scryve"
           helper="Optional and off by default, including without an account. Allow PostHog to receive game starts and finishes, systems, formats, player counts, connection failures, and use of decks and stats. Offline events upload when you reconnect."
           value={sharing}

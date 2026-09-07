@@ -138,6 +138,7 @@ function ConnectedHostQuerySource({
       )
       return
     }
+    let requestSucceeded = false
     try {
       setBusy(true)
       setHostError(undefined)
@@ -151,15 +152,17 @@ function ConnectedHostQuerySource({
         hostColor: PLAYER_COLOR_CHOICES[0],
         deviceId,
       })
+      requestSucceeded = true
       captureAnalytics("connection_attempt", { action: "create", stage: "succeeded" })
       localRepository.saveLayoutPreference(setup.playerCount, layout)
       onLobbyCreated(lobby)
     } catch (cause) {
-      captureAnalytics("connection_attempt", {
-        action: "create",
-        stage: "failed",
-        reason: "request",
-      })
+      if (!requestSucceeded)
+        captureAnalytics("connection_attempt", {
+          action: "create",
+          stage: "failed",
+          reason: "request",
+        })
       setHostError(cause instanceof Error ? cause.message : "Could not create lobby")
     } finally {
       setBusy(false)

@@ -94,6 +94,8 @@ describe("LegalConsentGate", () => {
   })
 
   it("legal acceptance leaves optional analytics off", () => {
+    const previousKey = process.env.EXPO_PUBLIC_POSTHOG_KEY
+    const previousHost = process.env.EXPO_PUBLIC_POSTHOG_HOST
     process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-key"
     process.env.EXPO_PUBLIC_POSTHOG_HOST = "https://analytics.invalid"
     try {
@@ -101,13 +103,19 @@ describe("LegalConsentGate", () => {
       expect(view.getByTestId("first-use-analytics-switch").props.accessibilityState.checked).toBe(
         false,
       )
+      fireEvent.press(view.getByTestId("first-use-analytics-switch"))
+      expect(analyticsEnabled()).toBe(false)
+      expect(storage.getString("scryve.analytics.consent.v1")).toBeUndefined()
+      fireEvent.press(view.getByTestId("first-use-analytics-switch"))
       fireEvent.press(view.getByTestId("accept-legal-button"))
       expect(view.getByText("APP CONTENT")).toBeTruthy()
       expect(analyticsEnabled()).toBe(false)
       expect(storage.getString("scryve.analytics.consent.v1")).toBeUndefined()
     } finally {
-      delete process.env.EXPO_PUBLIC_POSTHOG_KEY
-      delete process.env.EXPO_PUBLIC_POSTHOG_HOST
+      if (previousKey === undefined) delete process.env.EXPO_PUBLIC_POSTHOG_KEY
+      else process.env.EXPO_PUBLIC_POSTHOG_KEY = previousKey
+      if (previousHost === undefined) delete process.env.EXPO_PUBLIC_POSTHOG_HOST
+      else process.env.EXPO_PUBLIC_POSTHOG_HOST = previousHost
     }
   })
 

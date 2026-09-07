@@ -6,6 +6,12 @@ import { ThemeProvider } from "@/theme/context"
 
 import { cardDetailsKey, DeckDetailScreen } from "./DeckDetailScreen"
 
+let mockFocused = true
+const mockCaptureAnalytics = jest.fn()
+jest.mock("@/utils/analytics", () => ({
+  captureAnalytics: (...args: unknown[]) => mockCaptureAnalytics(...args),
+}))
+
 const mockSaveVersion = jest.fn(async () => "version-main")
 const mockCreateVersion = jest.fn(async () => "version-new")
 const mockUpdateVersion = jest.fn(async () => null)
@@ -113,7 +119,10 @@ jest.mock("convex/react", () => ({
 }))
 
 jest.mock("expo-router", () => ({
-  useFocusEffect: (callback: () => void) => require("react").useEffect(callback, [callback]),
+  useFocusEffect: (callback: () => void) =>
+    require("react").useEffect(() => {
+      if (mockFocused) return callback()
+    }, [callback, mockFocused]),
   useNavigation: () => ({
     dispatch: mockNavigationDispatch,
   }),
@@ -158,6 +167,7 @@ function renderDetail() {
 
 describe("DeckDetailScreen", () => {
   beforeEach(() => {
+    mockFocused = true
     jest.clearAllMocks()
     queryArgs.length = 0
     mockPreventRemoveCallback = undefined
@@ -168,6 +178,26 @@ describe("DeckDetailScreen", () => {
       capacity: { used: 2, limit: 5, premium: true, canCreate: true },
     }
     mockDetail.error = undefined
+  })
+
+  it("records stats again when the screen regains focus", () => {
+    const view = renderDetail()
+    expect(mockCaptureAnalytics).toHaveBeenCalledTimes(1)
+    mockFocused = false
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(mockCaptureAnalytics).toHaveBeenCalledTimes(1)
+    mockFocused = true
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(mockCaptureAnalytics).toHaveBeenCalledTimes(2)
+    expect(mockCaptureAnalytics).toHaveBeenLastCalledWith("stats_viewed", { surface: "deck" })
   })
 
   it("keeps the deck shell and selected tab through auth refresh without querying private data", () => {

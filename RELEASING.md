@@ -74,7 +74,7 @@ Before setting `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` for a re
 - Configure the chosen PostHog region and a maximum 90-day event retention period. Confirm the privacy policy matches the project configuration and provider agreement.
 - Update App Store privacy details and Google Play Data safety for optional product interaction data and installation identifiers. Review the privacy and web storage policy changes before publishing.
 - Use a separate development PostHog project to check opt-in, offline capture followed by reconnect, and opt-out with queued events. Never use the live analytics project for development checks.
-- Measure cold start, first gameplay action, frame time, stored queue size, and upload batches with analytics off and on in the same development build. The SDK work is deferred, but that is not a measured performance guarantee.
+- Measure cold start, first gameplay action, frame time, stored queue size, and upload batches with analytics off and on in the same development build. SDK initialization and event processing are scheduled after the current task, but that is not a measured performance guarantee.
 
 The six explicit events are `app_opened`, `game_started`, `game_completed`,
 `connection_attempt`, `deck_used`, and `stats_viewed`. A local start means the first

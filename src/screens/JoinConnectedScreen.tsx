@@ -77,6 +77,7 @@ export function JoinConnectedScreen({
       setError(onlineOnlyNotice("join"))
       return
     }
+    let requestSucceeded = false
     try {
       setBusy(true)
       setError(undefined)
@@ -101,16 +102,19 @@ export function JoinConnectedScreen({
         shape: appearance.shape,
         deviceId,
       })
+      requestSucceeded = true
       emitTelemetry("join.completed", { durationMs: Date.now() - startedAt, outcome: "success" })
       captureAnalytics("connection_attempt", { action: "join", stage: "succeeded" })
       onJoined(result.publicId)
     } catch (cause) {
-      captureAnalytics("connection_attempt", {
-        action: "join",
-        stage: "failed",
-        reason: failureReason,
-      })
-      emitTelemetry("join.failed", { durationMs: Date.now() - startedAt, outcome: "rejected" })
+      if (!requestSucceeded) {
+        captureAnalytics("connection_attempt", {
+          action: "join",
+          stage: "failed",
+          reason: failureReason,
+        })
+        emitTelemetry("join.failed", { durationMs: Date.now() - startedAt, outcome: "rejected" })
+      }
       setError(cause instanceof Error ? cause.message : "Could not join lobby")
     } finally {
       setBusy(false)

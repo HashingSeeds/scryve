@@ -146,6 +146,11 @@ function ConnectedLobbyContent({
   const observedLobby = useRef(false)
 
   useEffect(() => {
+    observedLobby.current = false
+    didNavigateToGame.current = false
+  }, [publicId])
+
+  useEffect(() => {
     if (lobby?.status === "lobby") observedLobby.current = true
     if (lobby?.status === "active" && !didNavigateToGame.current) {
       if (observedLobby.current)

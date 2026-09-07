@@ -87,16 +87,13 @@ export function LegalConsentScreen({
             label="Share usage with Scryve, optional"
             value={sharing}
             helper="Off by default. Allow PostHog to receive game starts and finishes, system, format, player count, connection failures, and use of decks and stats with a random analytics ID. Offline events upload when you reconnect. No names, clipboard contents, or PostHog recordings. Change this in Settings any time."
-            onValueChange={(value) => {
-              setSharingError(!setAnalyticsEnabled(value, "first_use"))
-              setSharing(analyticsEnabled())
-            }}
+            onValueChange={setSharing}
           />
           {sharingError ? (
             <Text
               accessibilityRole="alert"
               size="xs"
-              text="Could not save your sharing choice. Please try again in Settings."
+              text="Could not save your sharing choice. Try again or turn sharing off to continue."
             />
           ) : null}
         </View>
@@ -110,7 +107,15 @@ export function LegalConsentScreen({
           text={isSubmitting ? "Saving…" : "I agree"}
           preset="reversed"
           disabled={isSubmitting}
-          onPress={onAccept}
+          onPress={() => {
+            if (!isReturningUser && sharing !== analyticsEnabled()) {
+              if (!setAnalyticsEnabled(sharing, "first_use")) {
+                setSharingError(true)
+                return
+              }
+            }
+            onAccept()
+          }}
         />
         <Text text={acceptanceDescription} size="xxs" style={themed($muted)} />
       </View>

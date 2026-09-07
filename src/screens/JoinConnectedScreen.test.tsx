@@ -25,8 +25,35 @@ jest.mock("../../convex/_generated/api", () =>
     .createGeneratedApiMock(),
 )
 
+const mockCaptureAnalytics = jest.fn()
+jest.mock("@/utils/analytics", () => ({
+  captureAnalytics: (...args: unknown[]) => mockCaptureAnalytics(...args),
+}))
+
 describe("JoinConnectedScreen", () => {
   beforeEach(resetConnectedHarness)
+
+  it("does not report a failed request when navigation throws after joining", async () => {
+    mockCaptureAnalytics.mockClear()
+    render(
+      themed(
+        <JoinConnectedScreen
+          initialCode="AB12CD"
+          onJoined={() => {
+            throw new Error("Navigation failed")
+          }}
+        />,
+      ),
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+    expect(mockCaptureAnalytics.mock.calls).toEqual([
+      ["connection_attempt", { action: "join", stage: "started" }],
+      ["connection_attempt", { action: "join", stage: "succeeded" }],
+    ])
+    expect(screen.getByText("Navigation failed")).toBeTruthy()
+  })
 
   it("keeps code entry and scanning available before sign-in", async () => {
     const request = jest.fn()
