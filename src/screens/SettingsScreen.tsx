@@ -79,7 +79,7 @@ export function SettingsScreen({
             : (Updates.updateId ?? "Unavailable")
           : __DEV__
             ? "Development"
-            : unavailable,
+            : "Bundled",
     Channel: Updates.channel || unavailable,
     Platform: Platform.OS,
   }

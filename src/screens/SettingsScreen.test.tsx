@@ -123,6 +123,33 @@ describe("SettingsScreen", () => {
     expect(view.getByText("Update: Development")).toBeTruthy()
   })
 
+  it("reports bundled code when updates are disabled in a native release", async () => {
+    const development = __DEV__
+    Reflect.set(globalThis, "__DEV__", false)
+    mockUpdates.isEnabled = false
+    mockUpdates.isEmbeddedLaunch = false
+    mockUpdates.updateId = null
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <SettingsScreen
+            initialSettings={DEFAULT_LOCAL_SETTINGS}
+            onBack={jest.fn()}
+            onSettingsChange={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+      expect(view.getByText("Update: Bundled")).toBeTruthy()
+      fireEvent.press(view.getByText("Copy debug info"))
+      await waitFor(() => expect(view.getByText("Copied")).toBeTruthy())
+      expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+        expect.stringContaining("Update: Bundled\n"),
+      )
+    } finally {
+      Reflect.set(globalThis, "__DEV__", development)
+    }
+  })
+
   it.each(["denied", "rejected"])("allows retry when clipboard access is %s", async (failure) => {
     if (failure === "denied") jest.mocked(Clipboard.setStringAsync).mockResolvedValueOnce(false)
     else
