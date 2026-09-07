@@ -1,11 +1,172 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { Platform } from "react-native"
+import * as Clipboard from "expo-clipboard"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
 import { SettingsScreen } from "./SettingsScreen"
 
+const mockApp = {
+  nativeApplicationVersion: "1.2.3" as string | null,
+  nativeBuildVersion: "42" as string | null,
+}
+const mockUpdates = {
+  isEnabled: true,
+  isEmbeddedLaunch: false,
+  runtimeVersion: "abcdef1234567890abcdef1234567890" as string | null,
+  updateId: "12345678-abcd-4321-abcd-123456789012" as string | null,
+  channel: "preview" as string | null,
+}
+jest.mock("expo-application", () => ({
+  __esModule: true,
+  get nativeApplicationVersion() {
+    return mockApp.nativeApplicationVersion
+  },
+  get nativeBuildVersion() {
+    return mockApp.nativeBuildVersion
+  },
+}))
+jest.mock("expo-updates", () => ({
+  __esModule: true,
+  get isEnabled() {
+    return mockUpdates.isEnabled
+  },
+  get isEmbeddedLaunch() {
+    return mockUpdates.isEmbeddedLaunch
+  },
+  get runtimeVersion() {
+    return mockUpdates.runtimeVersion
+  },
+  get updateId() {
+    return mockUpdates.updateId
+  },
+  get channel() {
+    return mockUpdates.channel
+  },
+}))
+jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn() }))
+
 describe("SettingsScreen", () => {
+  beforeEach(() => {
+    mockApp.nativeApplicationVersion = "1.2.3"
+    mockApp.nativeBuildVersion = "42"
+    Object.assign(mockUpdates, {
+      isEnabled: true,
+      isEmbeddedLaunch: false,
+      runtimeVersion: "abcdef1234567890abcdef1234567890",
+      updateId: "12345678-abcd-4321-abcd-123456789012",
+      channel: "preview",
+    })
+    jest.mocked(Clipboard.setStringAsync).mockReset().mockResolvedValue(true)
+  })
+
+  it("shows installed metadata and copies full identifiers", async () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          onBack={jest.fn()}
+          onSettingsChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("Version: 1.2.3")).toBeTruthy()
+    expect(view.getByText("Build: 42")).toBeTruthy()
+    expect(view.getByText("Runtime: abcdef123456…")).toBeTruthy()
+    expect(view.getByText("Update: 12345678-abc…")).toBeTruthy()
+    fireEvent.press(view.getByText("Copy debug info"))
+    await waitFor(() => expect(view.getByText("Copied")).toBeTruthy())
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      [
+        "Scryve",
+        "Version: 1.2.3",
+        "Build: 42",
+        `Runtime: ${mockUpdates.runtimeVersion}`,
+        `Update: ${mockUpdates.updateId}`,
+        "Channel: preview",
+        `Platform: ${Platform.OS}`,
+      ].join("\n"),
+    )
+  })
+
+  it("distinguishes bundled launches from development and missing metadata", () => {
+    mockUpdates.isEmbeddedLaunch = true
+    mockApp.nativeBuildVersion = null
+    mockApp.nativeApplicationVersion = null
+    mockUpdates.runtimeVersion = null
+    mockUpdates.channel = null
+    const screen = (
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          onBack={jest.fn()}
+          onSettingsChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen)
+    expect(view.getByText("Update: Bundled")).toBeTruthy()
+    expect(view.getByText("Version: Unavailable")).toBeTruthy()
+    expect(view.getByText("Build: Unavailable")).toBeTruthy()
+    expect(view.getByText("Runtime: Unavailable")).toBeTruthy()
+    mockUpdates.isEnabled = false
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          onBack={jest.fn()}
+          onSettingsChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("Update: Development")).toBeTruthy()
+  })
+
+  it.each(["denied", "rejected"])("allows retry when clipboard access is %s", async (failure) => {
+    if (failure === "denied") jest.mocked(Clipboard.setStringAsync).mockResolvedValueOnce(false)
+    else
+      jest
+        .mocked(Clipboard.setStringAsync)
+        .mockRejectedValueOnce(new Error("Clipboard unavailable"))
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          onBack={jest.fn()}
+          onSettingsChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByText("Copy debug info"))
+    await waitFor(() => expect(view.getByText("Could not copy. Try again.")).toBeTruthy())
+    fireEvent.press(view.getByText("Copy debug info"))
+    await waitFor(() => expect(view.getByText("Copied")).toBeTruthy())
+  })
+
+  it("marks native-only metadata as not applicable on web", () => {
+    const platform = jest.replaceProperty(Platform, "OS", "web")
+    mockApp.nativeApplicationVersion = null
+    mockApp.nativeBuildVersion = null
+    Object.assign(mockUpdates, { isEnabled: false, runtimeVersion: null, channel: null })
+    try {
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <SettingsScreen
+            initialSettings={DEFAULT_LOCAL_SETTINGS}
+            onBack={jest.fn()}
+            onSettingsChange={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+      expect(view.getByText("Build: Not applicable")).toBeTruthy()
+      expect(view.getByText("Runtime: Not applicable")).toBeTruthy()
+      expect(view.getByText("Channel: Not applicable")).toBeTruthy()
+    } finally {
+      platform.restore()
+    }
+  })
+
   it("exposes the two shipping menu button treatments", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
