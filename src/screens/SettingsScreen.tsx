@@ -1,6 +1,10 @@
 import { useState, type ReactNode } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { Platform, View } from "react-native"
+import * as Application from "expo-application"
+import * as Clipboard from "expo-clipboard"
+import Constants from "expo-constants"
+import * as Updates from "expo-updates"
 
 import { Button } from "@/components/Button"
 import { ChoiceButton } from "@/components/ChoiceButton"
@@ -57,6 +61,40 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const { themed } = useAppTheme()
   const [settings, setSettings] = useState(initialSettings)
+  const [copyStatus, setCopyStatus] = useState("")
+  const unavailable = Platform.OS === "web" ? "Not applicable" : "Unavailable"
+  const appInfo = {
+    Version:
+      Platform.OS === "web"
+        ? (Constants.expoConfig?.version ?? "Unavailable")
+        : (Application.nativeApplicationVersion ?? "Unavailable"),
+    Build: Application.nativeBuildVersion ?? unavailable,
+    Runtime: Updates.runtimeVersion || unavailable,
+    Update:
+      Platform.OS === "web"
+        ? unavailable
+        : Updates.isEnabled
+          ? Updates.isEmbeddedLaunch
+            ? "Bundled"
+            : (Updates.updateId ?? "Unavailable")
+          : __DEV__
+            ? "Development"
+            : "Bundled",
+    Channel: Updates.channel || unavailable,
+    Platform: Platform.OS,
+  }
+  const copyDebugInfo = async () => {
+    try {
+      const copied = await Clipboard.setStringAsync(
+        ["Scryve", ...Object.entries(appInfo).map(([label, value]) => `${label}: ${value}`)].join(
+          "\n",
+        ),
+      )
+      setCopyStatus(copied ? "Copied" : "Could not copy. Try again.")
+    } catch {
+      setCopyStatus("Could not copy. Try again.")
+    }
+  }
   const update = (changes: Partial<LocalSettings>) => {
     const next = { ...settings, ...changes }
     setSettings(next)
@@ -284,6 +322,25 @@ export function SettingsScreen({
             ) : null}
           </View>
         ) : null}
+        <View style={themed($legalSection)}>
+          <Text text="App information" preset="subheading" accessibilityRole="header" />
+          {Object.entries(appInfo).map(([label, value]) => {
+            const shorten = (label === "Runtime" || label === "Update") && value.length > 16
+            return (
+              <Text
+                key={label}
+                size="sm"
+                selectable
+                accessibilityLabel={`${label}: ${value}`}
+                text={`${label}: ${shorten ? `${value.slice(0, 12)}…` : value}`}
+              />
+            )
+          })}
+          <ListItem text="Copy debug info" onPress={copyDebugInfo} />
+          {copyStatus ? (
+            <Text text={copyStatus} size="sm" accessibilityLiveRegion="polite" />
+          ) : null}
+        </View>
       </View>
     </Screen>
   )
