@@ -1,6 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 
+import { recordReviewCompletion } from "@/utils/storeReview"
+
 import { mergeDrainSnapshot, useConnectedGame } from "./useConnectedGame"
+
+jest.mock("@/utils/storeReview", () => ({ recordReviewCompletion: jest.fn() }))
 
 const mockFinishMutation = jest.fn(async () => undefined)
 const mockDrain = jest.fn()
@@ -108,6 +112,19 @@ describe("useConnectedGame connection readiness", () => {
     }))
     mockDrain.mockResolvedValue({ acknowledged: [], failed: [], stoppedForRetry: false })
   })
+
+  it.each(["finished", "abandoned"])(
+    "counts only an observed finished transition, not %s reloads",
+    (status) => {
+      const hook = renderHook(() => useConnectedGame("game-public", "user-1"))
+      mockRemote = { ...mockRemoteProjection, status, eventSequence: 1, serverUpdatedAt: 2 }
+      hook.rerender({})
+      expect(recordReviewCompletion).toHaveBeenCalledTimes(status === "finished" ? 1 : 0)
+      hook.unmount()
+      renderHook(() => useConnectedGame("game-public", "user-1"))
+      expect(recordReviewCompletion).toHaveBeenCalledTimes(status === "finished" ? 1 : 0)
+    },
+  )
 
   it("keeps a remote projection read-only for online-only finish while disconnected", async () => {
     const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))

@@ -7,6 +7,7 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { LifeDelta } from "@/features/game/types"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { captureGame } from "@/utils/analytics"
+import { recordReviewCompletion } from "@/utils/storeReview"
 
 import type {
   ConnectedActionEvent,
@@ -198,7 +199,8 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
       previous?.id === projection.publicId &&
       previous.status === "active" &&
       projection.status === "finished"
-    )
+    ) {
+      recordReviewCompletion(`connected:${projection.publicId}`)
       captureGame(
         "game_completed",
         {
@@ -209,6 +211,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
         },
         "connected",
       )
+    }
     observedGame.current = { id: projection.publicId, status: projection.status }
   }, [snapshot.projection])
 

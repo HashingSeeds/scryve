@@ -23,6 +23,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { useStoreReview } from "@/utils/useStoreReview"
 
 import type {
   GameSummaryState,
@@ -185,6 +186,13 @@ export function GameSummaryScreen({
   const { titleVisible, onScroll } = useCollapsingTitle()
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
+
+  useStoreReview(
+    summary.status === "ready" &&
+      summary.value?.status === "finished" &&
+      !timelineOpen &&
+      !playerActionsOpen,
+  )
 
   if (summary.status === "loading") return <SummaryLoadingShell onBack={onBack} />
 

@@ -7,6 +7,8 @@ import { ConnectedSummarySource } from "./ConnectedSummarySource"
 import type { ConnectedSummaryDocument } from "../../screens/gameSummary"
 import { GameSummaryScreen } from "../../screens/GameSummaryScreen"
 
+jest.mock("@/utils/useStoreReview", () => ({ useStoreReview: jest.fn() }))
+
 const FINISHED_AT = new Date("2026-08-10T23:24:00Z").getTime()
 
 const summaryDocument: ConnectedSummaryDocument & { viewerPlayerIds: string[] } = {

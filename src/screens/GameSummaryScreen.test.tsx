@@ -15,6 +15,8 @@ import {
 } from "./gameSummary"
 import { GameSummaryScreen } from "./GameSummaryScreen"
 
+jest.mock("@/utils/useStoreReview", () => ({ useStoreReview: jest.fn() }))
+
 const CREATED_AT = new Date("2026-08-10T22:50:00Z").getTime()
 const FINISHED_AT = CREATED_AT + 34 * 60 * 1000
 
