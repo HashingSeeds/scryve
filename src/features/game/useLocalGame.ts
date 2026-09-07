@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import * as Haptics from "expo-haptics"
 
+import { captureGame, type GameEndSource } from "@/utils/analytics"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
-import { applyGameCommand, canUndo, defaultCommandContext } from "./domain"
+import { applyGameCommand, canUndo, defaultCommandContext, hasLocalGameStarted } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { GameCommand, LifeDelta, LocalGame, LocalGameResult, PlayerId } from "./types"
@@ -21,11 +22,14 @@ export function useLocalGame(
   gameRef.current = game
 
   const dispatch = useCallback(
-    (command: GameCommand): LocalGame => {
+    (command: GameCommand, endSource?: GameEndSource): LocalGame => {
       const next = applyGameCommand(gameRef.current, command, context)
       if (next === gameRef.current) return next
-      if (next.status === "active") repository.saveActiveGame(next)
-      else repository.archiveGame(next)
+      if (next.status === "active") {
+        repository.saveActiveGame(next)
+        if (!hasLocalGameStarted(gameRef.current) && hasLocalGameStarted(next))
+          captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
+      } else repository.archiveGame(next, endSource)
       gameRef.current = next
       setGame(next)
       return next
@@ -74,7 +78,8 @@ export function useLocalGame(
     assignCommanderDamage,
     changeLayout,
     undo: () => dispatch({ type: "life.undo" }),
-    finish: (result?: LocalGameResult) => dispatch({ type: "game.finish", result }),
+    finish: (result?: LocalGameResult, endSource?: GameEndSource) =>
+      dispatch({ type: "game.finish", result }, endSource),
     abandon: () => dispatch({ type: "game.abandon" }),
     discard: () => {
       repository.clearActiveGame()

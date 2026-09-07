@@ -12,6 +12,7 @@ import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
 import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
 import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
 import { ThemeProvider } from "@/theme/context"
+import { initAnalytics } from "@/utils/analytics"
 import { reportCrash } from "@/utils/crashReporting"
 import { initObservability } from "@/utils/observability"
 
@@ -43,7 +44,10 @@ function Root() {
   const ready = useLaunchReadiness(isConsentResolved)
 
   useEffect(() => {
-    if (ready && isConsentResolved) AppMetrics.markInteractive()
+    if (ready && isConsentResolved) {
+      AppMetrics.markInteractive()
+      initAnalytics()
+    }
   }, [isConsentResolved, ready])
 
   if (!ready) {

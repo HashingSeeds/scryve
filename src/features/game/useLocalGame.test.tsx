@@ -1,8 +1,12 @@
 import { act, renderHook } from "@testing-library/react-native"
 
+import { captureGame } from "@/utils/analytics"
+
 import { createLocalGame } from "./domain"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
 import { useLocalGame } from "./useLocalGame"
+
+jest.mock("@/utils/analytics", () => ({ captureGame: jest.fn() }))
 
 class MemoryStorage implements StringStorage {
   values = new Map<string, string>()
@@ -71,4 +75,29 @@ describe("useLocalGame persistence", () => {
     expect(result.current.game).toBe(initial)
     expect(result.current.game.players[0].life).toBe(20)
   })
+})
+
+it("counts the first gameplay action once, then explicit completion", () => {
+  jest.mocked(captureGame).mockClear()
+  const initial = game()
+  const repository = new LocalGameRepository(new MemoryStorage())
+  const { result } = renderHook(() => useLocalGame(initial, repository))
+  expect(captureGame).not.toHaveBeenCalled()
+  act(() => result.current.changeLayout("even-grid"))
+  expect(captureGame).not.toHaveBeenCalled()
+  act(() => result.current.changeLife(initial.players[0].id, 1))
+  act(() => result.current.changeLife(initial.players[0].id, -1))
+  expect(captureGame).toHaveBeenCalledTimes(1)
+  expect(captureGame).toHaveBeenLastCalledWith(
+    "game_started",
+    expect.objectContaining({ playerCount: 2 }),
+    "local",
+  )
+  act(() => result.current.finish({ kind: "draw" }))
+  expect(captureGame).toHaveBeenLastCalledWith(
+    "game_completed",
+    expect.objectContaining({ playerCount: 2 }),
+    "local",
+    "game_menu",
+  )
 })

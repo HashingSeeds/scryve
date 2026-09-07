@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, SectionList, TouchableOpacity, View } from "react-native"
-import { useNavigation } from "expo-router"
+import { useFocusEffect, useNavigation } from "expo-router"
 import { useAction, useMutation, useQuery } from "convex/react"
 import { usePreventRemove } from "expo-router/react-navigation"
 
@@ -29,6 +29,7 @@ import { cardCountLabel } from "@/features/decks/deckCopy"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics } from "@/utils/analytics"
 import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
@@ -317,6 +318,12 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         }
       : "skip",
   )
+  const statsAvailable = Boolean(detail)
+  useFocusEffect(
+    useCallback(() => {
+      if (statsAvailable) captureAnalytics("stats_viewed", { surface: "deck" })
+    }, [statsAvailable]),
+  )
   const searchCards = useAction(api.cards.search)
   const fetchCardById = useAction(api.cards.byId)
   const fetchCatalogCardById = useAction(api.cards.byCatalogId)
@@ -507,6 +514,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         ...(version ? { versionId: version._id } : {}),
         cards: draft,
       })
+      captureAnalytics("deck_used", { feature: "saved" })
       setEditing(false)
       setResults([])
       setSearch("")

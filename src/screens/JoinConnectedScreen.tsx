@@ -20,6 +20,7 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics } from "@/utils/analytics"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import { api } from "../../convex/_generated/api"
@@ -63,12 +64,16 @@ export function JoinConnectedScreen({
   const title = inviteToken ? "Join invited lobby" : "Join with code"
 
   async function join() {
+    captureAnalytics("connection_attempt", { action: "join", stage: "started" })
     if (access && !access.ready) {
+      captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "access" })
       access.request()
       return
     }
     const startedAt = Date.now()
+    let failureReason: "profile" | "request" = "profile"
     if (!isWebSocketConnected) {
+      captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "offline" })
       setError(onlineOnlyNotice("join"))
       return
     }
@@ -76,15 +81,18 @@ export function JoinConnectedScreen({
       setBusy(true)
       setError(undefined)
       if (!validInput) {
+        captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "input" })
         setError("Enter a valid invitation code.")
         return
       }
       await syncUser({ displayName: profileName, avatarUrl: user?.imageUrl })
       const manualCode = inviteToken ? undefined : normalizeManualCode(code)
       if (!inviteToken && !manualCode) {
+        captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "input" })
         setError("Enter a valid 6-character invitation code.")
         return
       }
+      failureReason = "request"
       const result = await claimSeat({
         token: inviteToken,
         manualCode: manualCode ?? undefined,
@@ -94,8 +102,14 @@ export function JoinConnectedScreen({
         deviceId,
       })
       emitTelemetry("join.completed", { durationMs: Date.now() - startedAt, outcome: "success" })
+      captureAnalytics("connection_attempt", { action: "join", stage: "succeeded" })
       onJoined(result.publicId)
     } catch (cause) {
+      captureAnalytics("connection_attempt", {
+        action: "join",
+        stage: "failed",
+        reason: failureReason,
+      })
       emitTelemetry("join.failed", { durationMs: Date.now() - startedAt, outcome: "rejected" })
       setError(cause instanceof Error ? cause.message : "Could not join lobby")
     } finally {

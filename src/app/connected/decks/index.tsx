@@ -1,12 +1,18 @@
-import { useMemo } from "react"
-import { router } from "expo-router"
+import { useCallback, useMemo } from "react"
+import { router, useFocusEffect } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { DecksScreen } from "@/screens/DecksScreen"
+import { captureAnalytics } from "@/utils/analytics"
 
 export default function DecksRoute() {
+  useFocusEffect(
+    useCallback(() => {
+      captureAnalytics("deck_used", { feature: "library" })
+    }, []),
+  )
   const auth = useAuthAccess()
   const hasCurrentGame = useMemo(() => localGameRepository.loadActiveGame() !== null, [])
   const screen = (access?: CloudAccess) => (

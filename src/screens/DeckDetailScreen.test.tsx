@@ -113,6 +113,7 @@ jest.mock("convex/react", () => ({
 }))
 
 jest.mock("expo-router", () => ({
+  useFocusEffect: (callback: () => void) => require("react").useEffect(callback, [callback]),
   useNavigation: () => ({
     dispatch: mockNavigationDispatch,
   }),

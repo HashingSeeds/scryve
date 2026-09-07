@@ -14,6 +14,7 @@ import {
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
+import { captureAnalytics } from "@/utils/analytics"
 
 import { api } from "../../../convex/_generated/api"
 import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
@@ -114,11 +115,22 @@ function ConnectedHostQuerySource({
   }, [migrateMemberships, migrationRepository, ready])
 
   async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
+    captureAnalytics("connection_attempt", { action: "create", stage: "started" })
     if (connectedProfile.status === "offline") {
+      captureAnalytics("connection_attempt", {
+        action: "create",
+        stage: "failed",
+        reason: "offline",
+      })
       setHostError("Reconnect before hosting; lobby creation is not queued.")
       return
     }
     if (connectedProfile.status !== "ready" || !hostReady) {
+      captureAnalytics("connection_attempt", {
+        action: "create",
+        stage: "failed",
+        reason: "profile",
+      })
       setHostError(
         connectedProfile.status === "error"
           ? connectedProfile.message
@@ -139,9 +151,15 @@ function ConnectedHostQuerySource({
         hostColor: PLAYER_COLOR_CHOICES[0],
         deviceId,
       })
+      captureAnalytics("connection_attempt", { action: "create", stage: "succeeded" })
       localRepository.saveLayoutPreference(setup.playerCount, layout)
       onLobbyCreated(lobby)
     } catch (cause) {
+      captureAnalytics("connection_attempt", {
+        action: "create",
+        stage: "failed",
+        reason: "request",
+      })
       setHostError(cause instanceof Error ? cause.message : "Could not create lobby")
     } finally {
       setBusy(false)

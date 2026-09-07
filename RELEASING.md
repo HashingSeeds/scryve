@@ -66,3 +66,37 @@ backfill or authorize an incidental production command.
 **Bad native binary:** Halt the staged store rollout and prepare a fixed binary. Disable affected cloud features if possible.
 
 **Bad Convex deploy or migration:** Roll FORWARD with backward-compatible server code. A client rollback does not repair server data.
+
+## Optional PostHog analytics
+
+Before setting `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` for a release:
+
+- Configure the chosen PostHog region and a maximum 90-day event retention period. Confirm the privacy policy matches the project configuration and provider agreement.
+- Update App Store privacy details and Google Play Data safety for optional product interaction data and installation identifiers. Review the privacy and web storage policy changes before publishing.
+- Use a separate development PostHog project to check opt-in, offline capture followed by reconnect, and opt-out with queued events. Never use the live analytics project for development checks.
+- Measure cold start, first gameplay action, frame time, stored queue size, and upload batches with analytics off and on in the same development build. The SDK work is deferred, but that is not a measured performance guarantee.
+
+The six explicit events are `app_opened`, `game_started`, `game_completed`,
+`connection_attempt`, `deck_used`, and `stats_viewed`. A local start means the first
+accepted gameplay action, not rendering the fresh board. Completed local games include
+`end_source`: `game_menu`, `new_game_prompt`, or `stale_game_prompt`. A cancelled
+prompt does not label a later manual finish. Connected completion observations
+use `unknown` because the observing client does not know the finishing player's
+entry point. This describes the UI path, not the player's motivation. Connected starts and
+completions count observations per consenting installation, not unique games or
+all players at the table. Historical views do not emit game events. Stats events
+mean a visit to history or a loaded deck page showing its record, not proof the
+player read the stats. A saved deck and an assigned deck are separate from browsing.
+
+Use `consent_source = first_use` for activation cohorts from the optional, unchecked
+choice on the first-use legal screen. `consent_source = settings` includes existing
+players and must not be labeled new players. Retention is per installation, not
+per person; reinstalling or clearing storage can create a new installation. Players who decline or never
+reconnect remain unmeasured. No activity before consent is backfilled. Use event
+timestamps rather than ingestion times for offline cohorts.
+
+Usage sharing is a device preference, separate from legal acceptance and sign-in.
+The SDK stays unloaded without consent and build configuration. No PostHog replay
+plugin or provider is installed. Sentry diagnostics retain their existing behavior.
+For analytics deletion requests, locate events using the Analytics ID the player
+provides from Settings; these IDs are intentionally not linked to account IDs.

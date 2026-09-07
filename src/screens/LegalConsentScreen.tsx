@@ -1,12 +1,15 @@
+import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { Switch } from "@/components/Toggle/Switch"
 import type { ConsentDocumentId } from "@/content/legal"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { analyticsConfigured, analyticsEnabled, setAnalyticsEnabled } from "@/utils/analytics"
 
 export interface LegalConsentScreenProps {
   documents: readonly ConsentDocumentId[]
@@ -30,6 +33,8 @@ export function LegalConsentScreen({
   onOpenPrivacy,
 }: LegalConsentScreenProps) {
   const { themed } = useAppTheme()
+  const [sharing, setSharing] = useState(analyticsEnabled)
+  const [sharingError, setSharingError] = useState(false)
   const includesTerms = documents.includes("terms")
   const includesPrivacy = documents.includes("privacy")
   const documentLabel =
@@ -75,6 +80,27 @@ export function LegalConsentScreen({
         {includesPrivacy ? <Button text="Read the Privacy Policy" onPress={onOpenPrivacy} /> : null}
       </View>
 
+      {!isReturningUser && analyticsConfigured() ? (
+        <View style={themed($links)}>
+          <Switch
+            testID="first-use-analytics-switch"
+            label="Share usage with Scryve, optional"
+            value={sharing}
+            helper="Off by default. Allow PostHog to receive game starts and finishes, system, format, player count, connection failures, and use of decks and stats with a random analytics ID. Offline events upload when you reconnect. No names, clipboard contents, or PostHog recordings. Change this in Settings any time."
+            onValueChange={(value) => {
+              setSharingError(!setAnalyticsEnabled(value, "first_use"))
+              setSharing(analyticsEnabled())
+            }}
+          />
+          {sharingError ? (
+            <Text
+              accessibilityRole="alert"
+              size="xs"
+              text="Could not save your sharing choice. Please try again in Settings."
+            />
+          ) : null}
+        </View>
+      ) : null}
       <View style={themed($actions)}>
         {error ? (
           <Text accessibilityRole="alert" text={error} size="xs" style={themed($error)} />

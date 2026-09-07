@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const cookiePolicyContent = {
   id: "cookiePolicy",
   title: "COOKIE POLICY",
-  version: "2026-08-18",
-  effectiveDate: "August 18, 2026",
+  version: "2026-09-07",
+  effectiveDate: "September 7, 2026",
   sections: [
     {
       blocks: [
@@ -23,7 +23,7 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "No. This Cookie Policy applies to our Website only. The Scryve mobile application does not use cookies. It stores your settings, your local game history, and your sign-in token on your device so that it can work.",
+          text: "No. This Cookie Policy applies to our Website only. The Scryve mobile application does not use cookies. It stores your settings, your local game history, and your sign-in token on your device so that it can work. If you enable optional usage sharing, it also stores a random analytics identifier and a bounded queue of PostHog events until they can be sent. See our Privacy Policy for details.",
         },
       ],
     },
@@ -49,7 +49,7 @@ export const cookiePolicyContent = {
         },
         {
           type: "paragraph",
-          text: "We do not use cookies or similar technologies for advertising, for measuring advertising, for analytics, or to build a profile of your interests. We do not allow third parties to serve advertising on our Website.",
+          text: "We do not use cookies or similar technologies for advertising, measuring advertising, or building a profile of your interests. If you enable Share usage with Scryve in Settings, we use local storage for a random analytics identifier and a bounded queue of PostHog usage events. This optional analytics storage is separate from essential sign-in cookies. We do not allow third parties to serve advertising on our Website.",
         },
       ],
     },
@@ -58,7 +58,7 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Because we use only strictly necessary cookies, we do not show a cookie consent banner and there are no optional cookie categories for you to accept or reject. Strictly necessary cookies do not require consent under applicable law, and they cannot be turned off through our Website without preventing it from working.",
+          text: "Optional usage sharing is off by default. You can enable or disable it in Scryve Settings without affecting your ability to play or sign in. We do not initialize PostHog before you choose to share. Turning sharing off discards unsent events and stops new collection. The analytics identifier remains available in Settings for deletion requests. Essential sign-in and security cookies are separate from this choice.",
         },
         {
           type: "paragraph",
@@ -66,7 +66,7 @@ export const cookiePolicyContent = {
         },
         {
           type: "paragraph",
-          text: "If we ever begin using cookies that are not strictly necessary, we will ask for your consent before doing so and update this policy.",
+          text: "Accepting legal documents or signing in does not enable optional analytics. The Privacy Policy explains the data shared with PostHog, retention, and how to request deletion.",
         },
       ],
     },

@@ -29,6 +29,7 @@ import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import type { GameEndSource } from "@/utils/analytics"
 
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
@@ -69,7 +70,9 @@ export function CurrentGameScreen({
   const { width, height, fontScale } = useWindowDimensions()
   const [menuOpen, setMenuOpen] = useState(false)
   const isFresh = fresh && !hasLocalGameStarted(runtime.game)
-  const [endConfirmationOpen, setEndConfirmationOpen] = useState(initialEndOpen)
+  const [endSource, setEndSource] = useState<GameEndSource | undefined>(
+    initialEndOpen ? "stale_game_prompt" : undefined,
+  )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
@@ -102,21 +105,21 @@ export function CurrentGameScreen({
   const menuAnchor = getPlayerGridMenuAnchor(playerCount, gridLayout)
 
   function confirmEnd(result: LocalGameResult) {
-    const ended = runtime.finish(result)
-    setEndConfirmationOpen(false)
+    const ended = runtime.finish(result, endSource)
+    setEndSource(undefined)
     if (ended.status !== "active") setTimeout(() => onGameEnded(ended.id), 0)
   }
 
   function abandonGame() {
     if (!onGameAbandoned) return
     runtime.discard()
-    setEndConfirmationOpen(false)
+    setEndSource(undefined)
     setTimeout(onGameAbandoned, 0)
   }
 
   function showEndConfirmation() {
     setMenuOpen(false)
-    setEndConfirmationOpen(true)
+    setEndSource("game_menu")
   }
 
   function closeMenu() {
@@ -265,11 +268,11 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
-      {endConfirmationOpen ? (
+      {endSource ? (
         <LocalGameEndDialog
           game={runtime.game}
           origin={menuDialogOrigin}
-          onClose={() => setEndConfirmationOpen(false)}
+          onClose={() => setEndSource(undefined)}
           onEnd={confirmEnd}
           onAbandon={onGameAbandoned ? abandonGame : undefined}
         />

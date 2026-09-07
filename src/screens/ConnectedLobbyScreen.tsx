@@ -40,6 +40,7 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { captureAnalytics, captureGame } from "@/utils/analytics"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
@@ -142,13 +143,26 @@ function ConnectedLobbyContent({
   const startInFlight = useRef(false)
   const selectingDeckSeatsInFlight = useRef(new Set<number>())
   const didNavigateToGame = useRef(false)
+  const observedLobby = useRef(false)
 
   useEffect(() => {
+    if (lobby?.status === "lobby") observedLobby.current = true
     if (lobby?.status === "active" && !didNavigateToGame.current) {
+      if (observedLobby.current)
+        captureGame(
+          "game_started",
+          {
+            id: publicId,
+            system: lobby.system,
+            format: lobby.format,
+            playerCount: lobby.playerCount,
+          },
+          "connected",
+        )
       didNavigateToGame.current = true
       onStarted()
     }
-  }, [lobby?.status, onStarted])
+  }, [lobby, onStarted, publicId])
   const origin = readPublicCloudConfig()
   const inviteUrl =
     lobby?.invitation?.token && origin.configured
@@ -174,6 +188,7 @@ function ConnectedLobbyContent({
         seat,
         ...(deckVersionId ? { deckVersionId: deckVersionId as Id<"deckVersions"> } : {}),
       })
+      if (deckVersionId) captureAnalytics("deck_used", { feature: "assigned" })
     } catch (cause) {
       setActionError(convexErrorMessage(cause, "Could not select deck"))
     } finally {

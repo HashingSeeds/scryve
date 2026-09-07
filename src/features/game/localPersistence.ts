@@ -3,6 +3,7 @@ import {
   isMenuButtonStyle,
   type MenuButtonStyle,
 } from "@/components/GameMenuButtonShape"
+import { captureGame, type GameEndSource } from "@/utils/analytics"
 import { storage as mmkvStorage } from "@/utils/storage"
 
 import {
@@ -482,7 +483,7 @@ export class LocalGameRepository {
     }
   }
 
-  archiveGame(game: LocalGame): LocalGameSummary | null {
+  archiveGame(game: LocalGame, endSource: GameEndSource = "game_menu"): LocalGameSummary | null {
     if (game.status === "active" || game.finishedAt === undefined) return null
     const summary: LocalGameSummary = {
       schemaVersion: 1,
@@ -511,6 +512,13 @@ export class LocalGameRepository {
     removed.forEach(({ id }) => this.storage.delete(LOCAL_KEYS.historyDetail(id)))
     const active = this.loadActiveGame()
     if (active?.id === game.id) this.clearActiveGame()
+    if (game.status === "finished")
+      captureGame(
+        "game_completed",
+        { ...game, playerCount: game.players.length },
+        "local",
+        endSource,
+      )
     return summary
   }
 
