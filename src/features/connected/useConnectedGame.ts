@@ -6,6 +6,7 @@ import { asDeviceId } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { LifeDelta } from "@/features/game/types"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
+import { captureGame } from "@/utils/analytics"
 
 import type {
   ConnectedActionEvent,
@@ -188,6 +189,28 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
     ...(head ? { operation: operationCheckFor(head) } : {}),
   })
   const remoteReady = toConnectedProjection(remote) !== null
+  const observedGame = useRef<{ id: string; status: string } | undefined>(undefined)
+  useEffect(() => {
+    const projection = snapshot.projection
+    if (!projection) return
+    const previous = observedGame.current
+    if (
+      previous?.id === projection.publicId &&
+      previous.status === "active" &&
+      projection.status === "finished"
+    )
+      captureGame(
+        "game_completed",
+        {
+          id: projection.publicId,
+          system: projection.system,
+          format: projection.format,
+          playerCount: projection.playerCount,
+        },
+        "connected",
+      )
+    observedGame.current = { id: projection.publicId, status: projection.status }
+  }, [snapshot.projection])
 
   useEffect(() => {
     controller.setEnvironment({

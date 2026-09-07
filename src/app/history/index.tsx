@@ -1,5 +1,5 @@
-import { memo, useEffect, useState } from "react"
-import { router, useLocalSearchParams } from "expo-router"
+import { memo, useCallback, useEffect, useState } from "react"
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -10,6 +10,7 @@ import {
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { HistorySource } from "@/screens/historyEntries"
 import { HistoryScreen } from "@/screens/HistoryScreen"
+import { captureAnalytics } from "@/utils/analytics"
 
 function ReportHistory({
   feed,
@@ -54,6 +55,11 @@ const HistoryConnection = memo(function HistoryConnection({
 })
 
 export default function HistoryRoute() {
+  useFocusEffect(
+    useCallback(() => {
+      captureAnalytics("stats_viewed", { surface: "history" })
+    }, []),
+  )
   const auth = useAuthAccess()
   const [connected, setConnected] = useState<{ ownerId?: string; feed: ConnectedHistoryFeed }>()
   const signedIn = auth.configured && auth.isSignedIn

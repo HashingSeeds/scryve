@@ -1,7 +1,9 @@
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { Text } from "@/components/Text"
+import { privacyContent } from "@/content/privacy"
 import { ThemeProvider } from "@/theme/context"
+import { analyticsEnabled } from "@/utils/analytics"
 import { storage } from "@/utils/storage"
 
 import {
@@ -91,6 +93,32 @@ describe("LegalConsentGate", () => {
     expect(renderGate().getByText("APP CONTENT")).toBeTruthy()
   })
 
+  it("legal acceptance leaves optional analytics off", () => {
+    const previousKey = process.env.EXPO_PUBLIC_POSTHOG_KEY
+    const previousHost = process.env.EXPO_PUBLIC_POSTHOG_HOST
+    process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-key"
+    process.env.EXPO_PUBLIC_POSTHOG_HOST = "https://analytics.invalid"
+    try {
+      const view = renderGate()
+      expect(view.getByTestId("first-use-analytics-switch").props.accessibilityState.checked).toBe(
+        false,
+      )
+      fireEvent.press(view.getByTestId("first-use-analytics-switch"))
+      expect(analyticsEnabled()).toBe(false)
+      expect(storage.getString("scryve.analytics.consent.v1")).toBeUndefined()
+      fireEvent.press(view.getByTestId("first-use-analytics-switch"))
+      fireEvent.press(view.getByTestId("accept-legal-button"))
+      expect(view.getByText("APP CONTENT")).toBeTruthy()
+      expect(analyticsEnabled()).toBe(false)
+      expect(storage.getString("scryve.analytics.consent.v1")).toBeUndefined()
+    } finally {
+      if (previousKey === undefined) delete process.env.EXPO_PUBLIC_POSTHOG_KEY
+      else process.env.EXPO_PUBLIC_POSTHOG_KEY = previousKey
+      if (previousHost === undefined) delete process.env.EXPO_PUBLIC_POSTHOG_HOST
+      else process.env.EXPO_PUBLIC_POSTHOG_HOST = previousHost
+    }
+  })
+
   it("prompts again when a document version changes", () => {
     deviceAcceptanceStore.write({ ...REQUIRED_CONSENT_VERSIONS, terms: "1900-01-01" })
     const view = renderGate()
@@ -105,7 +133,7 @@ describe("LegalConsentGate", () => {
     expect(view.getByText("We have updated our privacy policy")).toBeTruthy()
     expect(
       view.getByText(
-        `Our Privacy Policy changed on September 4, 2026. Please review the update to keep using Scryve.`,
+        `Our Privacy Policy changed on ${privacyContent.effectiveDate}. Please review the update to keep using Scryve.`,
       ),
     ).toBeTruthy()
     expect(view.queryByText("Read the Terms of Use")).toBeNull()

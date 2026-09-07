@@ -43,7 +43,7 @@ export default function NewLocalGameRoute() {
         { type: "game.finish", result },
         defaultCommandContext(localGameRepository.getDeviceId()),
       )
-      localGameRepository.archiveGame(ended)
+      localGameRepository.archiveGame(ended, "new_game_prompt")
     } else localGameRepository.clearActiveGame()
     setActiveGame(null)
   }

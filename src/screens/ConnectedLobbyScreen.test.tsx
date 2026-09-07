@@ -55,8 +55,25 @@ jest.mock("react-native-qrcode-svg", () =>
     .createQrCodeMock(),
 )
 
+const mockCaptureGame = jest.fn()
+jest.mock("@/utils/analytics", () => ({
+  captureGame: (...args: unknown[]) => mockCaptureGame(...args),
+  captureAnalytics: jest.fn(),
+}))
+
 describe("ConnectedLobbyScreen", () => {
   beforeEach(resetConnectedHarness)
+
+  it("does not carry lobby observation into another game on the same route", () => {
+    mockCaptureGame.mockClear()
+    connectedHarness.projection = { ...connectedHarness.projection, status: "lobby" }
+    const onStarted = jest.fn()
+    const view = render(themed(<ConnectedLobbyScreen publicId="first" onStarted={onStarted} />))
+    connectedHarness.projection = { ...connectedHarness.projection, status: "active" }
+    view.rerender(themed(<ConnectedLobbyScreen publicId="second" onStarted={onStarted} />))
+    expect(onStarted).toHaveBeenCalledTimes(1)
+    expect(mockCaptureGame).not.toHaveBeenCalled()
+  })
 
   it("renders a recoverable accessible error when a start race fails", async () => {
     connectedHarness.projection = {

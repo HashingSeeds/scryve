@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-09-04",
-  effectiveDate: "September 4, 2026",
+  version: "2026-09-07",
+  effectiveDate: "September 7, 2026",
   sections: [
     {
       blocks: [
@@ -207,6 +207,27 @@ export const privacyContent = {
       ],
     },
     {
+      heading: "Optional product analytics",
+      blocks: [
+        {
+          type: "paragraph",
+          text: "Usage sharing is optional and off by default, including when you use Scryve without an account. Accepting this Privacy Policy or signing in does not enable it. If you enable optional usage sharing during first use or in Settings, we use PostHog to understand game starts and completions, systems, formats, player counts, connected-game creation and joining attempts, and use of decks and stats. Events include their time, app version, platform, and a random analytics identifier for this installation. This identifier lets us measure return visits; it is not linked to your Scryve account. These events are pseudonymous, not anonymous.",
+        },
+        {
+          type: "paragraph",
+          text: "We do not include deck names, player names, deck contents, clipboard contents, invitation codes, or account identifiers in PostHog events. We disable PostHog automatic interaction capture, screen capture, error capture, and session replay. We disable geographic enrichment. Like any service receiving an internet request, PostHog receives the network IP address needed to deliver it. Sentry crash diagnostics and error-related replay are separate, as described below.",
+        },
+        {
+          type: "paragraph",
+          text: "With usage sharing enabled, events recorded offline wait in a bounded queue on your device and are sent in batches when the app can connect. Activity from before you enabled sharing is not collected retroactively. Turn sharing off in Settings to stop new collection, cancel pending uploads where possible, and discard unsent events. A request already delivered cannot be recalled. Turning sharing off does not delete events already received by PostHog.",
+        },
+        {
+          type: "paragraph",
+          text: "We process this optional analytics data with your consent to understand feature use and improve Scryve, not for advertising. PostHog processes it on our behalf in the United States or European Union, depending on the hosting region configured for the service. We retain uploaded analytics events for up to 90 days. The analytics identifier remains on your device so you can include the Analytics ID shown in Settings in a deletion request to privacy@sowinghope.how. Account deletion alone cannot locate these events because we do not link the identifier to your account. For information about PostHog, visit https://posthog.com/privacy.",
+        },
+      ],
+    },
+    {
       heading: "Information we receive from other sources",
       blocks: [
         {
@@ -362,6 +383,7 @@ export const privacyContent = {
             "RevenueCat, for verifying purchases and managing subscription entitlements.",
             "Apple and Google, when you purchase a subscription or use their platform services.",
             "Sentry, for crash reporting, diagnostic logging, user feedback, and privacy-protected session replay.",
+            "PostHog, for optional product analytics only when you enable usage sharing.",
             "Resend, to email us when a player is reported so we can review it within 24 hours. That email contains the reported username and any note the reporter wrote; it does not identify the person who filed the report.",
             "Legal and Safety Disclosures. We may disclose information when required by law or when reasonably necessary to protect users, the Services, or our legal rights.",
             "Business Transfers. We may share or transfer information in connection with a merger, financing, acquisition, reorganization, or sale of all or part of our business or assets.",
@@ -403,7 +425,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: 'Our servers are located in the United States. Regardless of your location, please be aware that your information may be transferred to, stored by, and processed by us in our facilities and in the facilities of the third parties with whom we may share your personal information (see " WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION? " above), including facilities in the United States, and other countries.',
+          text: 'Our core service servers are located in the United States. Optional PostHog analytics use the United States or European Union region configured for that service. Regardless of your location, please be aware that your information may be transferred to, stored by, and processed by us in our facilities and in the facilities of the third parties with whom we may share your personal information (see " WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION? " above), including facilities in the United States, and other countries.',
         },
         {
           type: "paragraph",
@@ -604,7 +626,7 @@ export const privacyContent = {
             "C. Protected classification characteristics under state or federal law Gender, age, date of birth, race and ethnicity, national origin, marital status, and other demographic data NO",
             "D. Commercial information Products purchased and subscription status YES",
             "E. Biometric information Fingerprints and voiceprints NO",
-            "F. Internet or other similar network activity Interactions with our website and application, diagnostic logs, crashes, and privacy-protected session replay YES",
+            "F. Internet or other similar network activity Interactions with our website and application, optional product analytics, diagnostic logs, crashes, and privacy-protected session replay YES",
             "G. Geolocation data Device location NO",
             "H. Audio, electronic, sensory, or similar information Images and audio, video or call recordings created in connection with our business activities NO",
             "I. Professional or employment-related information Business contact details in order to provide you our Services at a business level or job title, work history, and professional qualifications if you apply for a job with us NO",
@@ -642,7 +664,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "We collect personal information directly from you, automatically from your device and use of the Services, from Clerk for authentication, from Apple or Google through RevenueCat for purchases and subscription status, and from Sentry for diagnostics and error-related session replay.",
+          text: "We collect personal information directly from you, automatically from your device and use of the Services, from Clerk for authentication, from Apple or Google through RevenueCat for purchases and subscription status, from Sentry for diagnostics and error-related session replay, and from PostHog for optional product analytics when you enable usage sharing.",
         },
       ],
     },

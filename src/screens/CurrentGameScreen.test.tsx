@@ -504,3 +504,34 @@ describe("CurrentGameScreen", () => {
     })
   })
 })
+
+it.each([false, true])(
+  "attributes stale-prompt completion without retaining it after cancellation: %s",
+  (cancelPrompt) => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const archive = jest.spyOn(repository, "archiveGame")
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game()}
+          initialEndOpen
+          repository={repository}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(archive).not.toHaveBeenCalled()
+    if (cancelPrompt) {
+      fireEvent.press(view.getByTestId("end-game-backdrop"))
+      expect(archive).not.toHaveBeenCalled()
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      fireEvent.press(view.getByTestId("end-game-button"))
+    }
+    fireEvent.press(view.getByTestId("end-game-result-draw"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    expect(archive).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "finished" }),
+      cancelPrompt ? "game_menu" : "stale_game_prompt",
+    )
+  },
+)
