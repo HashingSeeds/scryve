@@ -148,7 +148,7 @@ describe("SettingsScreen", () => {
     const platform = jest.replaceProperty(Platform, "OS", "web")
     mockApp.nativeApplicationVersion = null
     mockApp.nativeBuildVersion = null
-    Object.assign(mockUpdates, { isEnabled: false, runtimeVersion: null, channel: null })
+    Object.assign(mockUpdates, { isEnabled: true, runtimeVersion: "", channel: "" })
     try {
       const view = render(
         <ThemeProvider initialContext="dark">
@@ -162,6 +162,7 @@ describe("SettingsScreen", () => {
       expect(view.getByText("Build: Not applicable")).toBeTruthy()
       expect(view.getByText("Runtime: Not applicable")).toBeTruthy()
       expect(view.getByText("Channel: Not applicable")).toBeTruthy()
+      expect(view.getByText("Update: Not applicable")).toBeTruthy()
     } finally {
       platform.restore()
     }

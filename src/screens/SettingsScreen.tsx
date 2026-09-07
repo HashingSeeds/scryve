@@ -69,14 +69,17 @@ export function SettingsScreen({
         ? (Constants.expoConfig?.version ?? "Unavailable")
         : (Application.nativeApplicationVersion ?? "Unavailable"),
     Build: Application.nativeBuildVersion ?? unavailable,
-    Runtime: Updates.runtimeVersion ?? unavailable,
-    Update: Updates.isEnabled
-      ? Updates.isEmbeddedLaunch
-        ? "Bundled"
-        : (Updates.updateId ?? "Unavailable")
-      : __DEV__
-        ? "Development"
-        : unavailable,
+    Runtime: Updates.runtimeVersion || unavailable,
+    Update:
+      Platform.OS === "web"
+        ? unavailable
+        : Updates.isEnabled
+          ? Updates.isEmbeddedLaunch
+            ? "Bundled"
+            : (Updates.updateId ?? "Unavailable")
+          : __DEV__
+            ? "Development"
+            : unavailable,
     Channel: Updates.channel || unavailable,
     Platform: Platform.OS,
   }
