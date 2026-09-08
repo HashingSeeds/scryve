@@ -136,6 +136,8 @@ export function CardImage({
     )
   return (
     <View
+      accessible
+      accessibilityRole="image"
       testID={testID ? `${testID}-placeholder` : undefined}
       accessibilityLabel={`${accessibilityLabel}: ${active?.loading ? "Loading image" : "No image found"}`}
       style={[style as StyleProp<ViewStyle>, $placeholder]}

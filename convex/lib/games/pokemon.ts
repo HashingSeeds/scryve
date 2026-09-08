@@ -290,12 +290,23 @@ export async function pokemonImageCandidates(ctx: ActionCtx, cardId: string) {
   if (!response.ok) throw new Error("TCGdex printing lookup failed")
   const rows: unknown = await response.json()
   // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code
-  // ponytail: at most 20 same-name candidates, expand pagination if matching reprints fall outside this page.
-  for (const value of (Array.isArray(rows) ? rows : []).slice(0, 20)) {
+  // ponytail: eight detail lookups from one name-search page; expand only if matching reprints are missed.
+  const setPrefix = `${cardId.slice(0, cardId.lastIndexOf("-"))}-`
+  const candidates = (Array.isArray(rows) ? rows : [])
+    .slice(0, 20)
+    .sort(
+      (a: unknown, b: unknown) =>
+        Number(stringValue(objectRecord(b)?.id)?.startsWith(setPrefix) ?? false) -
+        Number(stringValue(objectRecord(a)?.id)?.startsWith(setPrefix) ?? false),
+    )
+  let detailLookups = 0
+  for (const value of candidates) {
     const summary = objectRecord(value)
     const id = stringValue(summary?.id)
     const image = stringValue(summary?.image)
     if (!id || id === cardId || image?.includes("/tcgp/")) continue
+    if (detailLookups === 8) break
+    detailLookups += 1
     const detail = await request(ctx, `/cards/${encodeURIComponent(id)}`)
     if (!detail.ok) continue
     const candidate = objectRecord(await detail.json())

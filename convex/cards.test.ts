@@ -360,3 +360,42 @@ it.each([
     fetchSpy.mockRestore()
   }
 })
+
+it("caps Pokemon fallback detail requests and prioritizes the original set", async () => {
+  const original = {
+    id: "me05-039",
+    name: "Dhelmise",
+    category: "Pokemon",
+    hp: 140,
+    attacks: [{ name: "Vengeful Anchor" }],
+  }
+  const candidates = Array.from({ length: 19 }, (_, i) => ({
+    id: `older-${i}`,
+    name: original.name,
+  }))
+  candidates.push({ id: "me05-091", name: original.name })
+  const calls: string[] = []
+  const fetchSpy = jest.spyOn(global, "fetch").mockImplementation((input) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.includes("/cards?")) return response(candidates)
+    if (url.endsWith(original.id)) return response(original)
+    if (url.endsWith("me05-091"))
+      return response({
+        ...original,
+        id: "me05-091",
+        image: "https://assets.tcgdex.net/en/me/me05/091",
+      })
+    return response({ ...original, hp: 90 })
+  })
+  try {
+    const t = convexTest(schema, modules)
+    expect(
+      await t.action(api.cards.imageFallbacks, { game: "pokemon", cardId: original.id }),
+    ).toEqual(["https://assets.tcgdex.net/en/me/me05/091/high.webp"])
+    expect(calls).toHaveLength(10)
+    expect(calls[2]).toContain("me05-091")
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
