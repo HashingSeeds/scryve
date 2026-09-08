@@ -349,6 +349,12 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_game_and_capability", ["game", "capability"]),
 
+  deckCatalogRefreshes: defineTable({
+    game: v.string(),
+    format: v.string(),
+    scheduledId: v.id("_scheduled_functions"),
+  }).index("by_game_and_format", ["game", "format"]),
+
   deckCatalogs: defineTable({
     game: v.string(),
     source: v.string(),
