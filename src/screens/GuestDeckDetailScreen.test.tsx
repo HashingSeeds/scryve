@@ -192,3 +192,37 @@ test("searches new cards into Main deck by default and saves merged copies", asy
   )
   expect(mockSaveGuestDeck.mock.calls[0][0].cards[1]).not.toHaveProperty("manaCost")
 })
+
+test("loads rules text when opening a saved Magic card", async () => {
+  mockCurrent = {
+    ...mockStored,
+    deck: {
+      ...mockStored.deck,
+      name: "Doom Prevails",
+      cards: [{ name: "Molecule Man", quantity: 1, scryfallId: "molecule-man" }],
+    },
+  }
+  mockSearchCards.mockResolvedValue({ oracleText: "Molecule Man rules text", typeLine: "Creature" })
+  const view = renderScreen()
+  fireEvent.press(view.getByLabelText("1× Molecule Man"))
+  await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
+  expect(mockSearchCards).toHaveBeenCalledWith(expect.anything(), { scryfallId: "molecule-man" })
+})
+
+test("shows lookup errors and retries when the saved card is reopened", async () => {
+  mockCurrent = {
+    ...mockStored,
+    deck: {
+      ...mockStored.deck,
+      cards: [{ name: "Molecule Man", quantity: 1, scryfallId: "molecule-man" }],
+    },
+  }
+  mockSearchCards.mockRejectedValueOnce(new Error("Card lookup unavailable"))
+  const view = renderScreen()
+  fireEvent.press(view.getByLabelText("1× Molecule Man"))
+  await waitFor(() => expect(view.getByText("Could not load card details")).toBeTruthy())
+  fireEvent.press(view.getAllByLabelText("Close card details")[0])
+  mockSearchCards.mockResolvedValueOnce({ oracleText: "Molecule Man rules text" })
+  fireEvent.press(view.getByLabelText("1× Molecule Man"))
+  await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
+})
