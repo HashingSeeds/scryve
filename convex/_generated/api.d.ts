@@ -26,6 +26,7 @@ import type * as lib_actionCapabilities from "../lib/actionCapabilities.js";
 import type * as lib_appearance from "../lib/appearance.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
+import type * as lib_cardImageFallback from "../lib/cardImageFallback.js";
 import type * as lib_deckGames from "../lib/deckGames.js";
 import type * as lib_deckRateLimits from "../lib/deckRateLimits.js";
 import type * as lib_deckVersions from "../lib/deckVersions.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "lib/appearance": typeof lib_appearance;
   "lib/auth": typeof lib_auth;
   "lib/authConfig": typeof lib_authConfig;
+  "lib/cardImageFallback": typeof lib_cardImageFallback;
   "lib/deckGames": typeof lib_deckGames;
   "lib/deckRateLimits": typeof lib_deckRateLimits;
   "lib/deckVersions": typeof lib_deckVersions;

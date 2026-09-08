@@ -96,6 +96,7 @@ const mockDetail = {
 }
 
 jest.mock("convex/react", () => ({
+  useConvex: () => undefined,
   useQuery: (_reference: string, args: Record<string, unknown> | "skip") => {
     if (args === "skip") return undefined
     queryArgs.push(args)

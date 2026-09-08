@@ -4,6 +4,8 @@ import { ThemeProvider } from "@/theme/context"
 
 import { CardFocusDialog } from "./CardFocusDialog"
 
+jest.mock("convex/react", () => ({ useConvex: () => undefined }))
+
 const card = {
   name: "Llanowar Elves",
   imageUrl: "https://cards.scryfall.io/normal/elves.jpg",
@@ -69,9 +71,9 @@ describe("CardFocusDialog", () => {
     expect(failed.onIncrement).toHaveBeenCalledTimes(1)
   })
 
-  it("falls back to a named placeholder when the printing has no image", () => {
+  it("falls back to a no-image placeholder when the printing has no image", () => {
     const view = renderDialog({ card: { ...card, imageUrl: undefined } })
     expect(view.queryByTestId("card-focus-image")).toBeNull()
-    expect(view.getAllByText("Llanowar Elves").length).toBeGreaterThan(0)
+    expect(view.getByText("No image found")).toBeTruthy()
   })
 })

@@ -1,15 +1,16 @@
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
-import { Image, type ImageStyle } from "expo-image"
+import { type ImageStyle } from "expo-image"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
+import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { DialogCard } from "@/components/DialogCard"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-export type FocusedCard = {
+export type FocusedCard = CardImageIdentity & {
   name: string
   imageUrl?: string
   smallImageUrl?: string
@@ -97,22 +98,15 @@ export function CardFocusDialog({
         contentContainerStyle={themed($scrollContent)}
         showsVerticalScrollIndicator={false}
       >
-        {displayImageUrl ? (
-          <Image
-            testID="card-focus-image"
-            accessibilityLabel={imageAccessibilityLabel}
-            source={displayImageUrl}
-            placeholder={cachedThumbnailUrl}
-            style={themed($cardImage)}
-            contentFit="contain"
-            transition={150}
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={themed($imagePlaceholder)}>
-            <Text style={themed($dimText)} text={card.name} />
-          </View>
-        )}
+        <CardImage
+          game={card.game}
+          cardId={card.cardId}
+          testID="card-focus-image"
+          accessibilityLabel={imageAccessibilityLabel}
+          source={displayImageUrl}
+          placeholder={cachedThumbnailUrl}
+          style={themed($cardImage)}
+        />
         <View style={themed($details)}>
           {details?.manaCost ? (
             <Text size="sm" style={themed($dimText)} text={details.manaCost} />
@@ -172,19 +166,6 @@ const $cardImage: ThemedStyle<ImageStyle> = ({ spacing }) => ({
   alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
   borderRadius: spacing.xs,
-})
-const $imagePlaceholder: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  width: "52%",
-  maxWidth: 180,
-  alignSelf: "center",
-  aspectRatio: CARD_ASPECT_RATIO,
-  alignItems: "center",
-  justifyContent: "center",
-  padding: spacing.md,
-  borderRadius: spacing.xs,
-  borderWidth: 1,
-  borderColor: colors.border,
-  backgroundColor: colors.separator,
 })
 const $details: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })

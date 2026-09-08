@@ -242,3 +242,72 @@ export async function pokemonCardSummaries(
   }
   return { cards, status }
 }
+
+export function pokemonGameplayKey(value: unknown) {
+  const card = objectRecord(value)
+  if (!card || !card.name || !card.category) return undefined
+  if (card.category === "Pokemon" && (!card.hp || !Array.isArray(card.attacks))) return undefined
+  if (card.category !== "Pokemon" && !card.effect) return undefined
+  return JSON.stringify([
+    card.name,
+    card.category,
+    card.hp,
+    card.types,
+    card.stage,
+    card.evolveFrom,
+    card.suffix,
+    card.trainerType,
+    card.energyType,
+    card.attacks,
+    card.abilities,
+    card.effect,
+    card.weaknesses,
+    card.resistances,
+    card.retreat,
+    card.rules,
+  ])
+}
+
+export async function pokemonImageCandidates(ctx: ActionCtx, cardId: string) {
+  const originalResponse = await request(ctx, `/cards/${encodeURIComponent(cardId)}`)
+  if (!originalResponse.ok) throw new Error("TCGdex card lookup failed")
+  const original = objectRecord(await originalResponse.json())
+  const key = pokemonGameplayKey(original)
+  const name = stringValue(original?.name)
+  const originalImage = stringValue(original?.image)
+  const images: string[] = originalImage?.startsWith("https://assets.tcgdex.net/en/")
+    ? [`${originalImage}/high.webp`, `${originalImage}/low.webp`]
+    : []
+  if (!key || !name) return images
+  const response = await request(
+    ctx,
+    `/cards?${new URLSearchParams({
+      "name": `eq:${name}`,
+      "pagination:page": "1",
+      "pagination:itemsPerPage": "20",
+    })}`,
+  )
+  if (!response.ok) throw new Error("TCGdex printing lookup failed")
+  const rows: unknown = await response.json()
+  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code
+  // ponytail: at most 20 same-name candidates, expand pagination if matching reprints fall outside this page.
+  for (const value of (Array.isArray(rows) ? rows : []).slice(0, 20)) {
+    const summary = objectRecord(value)
+    const id = stringValue(summary?.id)
+    const image = stringValue(summary?.image)
+    if (!id || id === cardId || image?.includes("/tcgp/")) continue
+    const detail = await request(ctx, `/cards/${encodeURIComponent(id)}`)
+    if (!detail.ok) continue
+    const candidate = objectRecord(await detail.json())
+    const imageBase = stringValue(candidate?.image)
+    if (
+      pokemonGameplayKey(candidate) === key &&
+      imageBase?.startsWith("https://assets.tcgdex.net/en/") &&
+      !imageBase.includes("/tcgp/")
+    ) {
+      images.push(`${imageBase}/high.webp`)
+      if (images.length === 8) break
+    }
+  }
+  return images
+}

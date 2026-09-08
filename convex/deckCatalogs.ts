@@ -95,7 +95,7 @@ export const browseCached = internalQuery({
     game: v.string(),
     format: v.string(),
     query: v.string(),
-    source: v.optional(v.union(v.literal("examples"), v.literal("official"))),
+    source: v.optional(v.union(v.literal("examples"), v.literal("official"), v.literal("all"))),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
@@ -590,7 +590,7 @@ async function browseDecks(
     format?: string
     query: string
     cursor?: string
-    source?: "examples" | "official"
+    source?: "examples" | "official" | "all"
   },
 ): Promise<BrowseResult> {
   const game = assertGameSystem(args.game)
@@ -651,7 +651,7 @@ export const browse = action({
     format: v.optional(v.string()),
     query: v.string(),
     cursor: v.optional(v.string()),
-    source: v.optional(v.union(v.literal("examples"), v.literal("official"))),
+    source: v.optional(v.union(v.literal("examples"), v.literal("official"), v.literal("all"))),
   },
   handler: browseDecks,
 })

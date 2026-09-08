@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Linking, ScrollView, TouchableOpacity, View } from "react-native"
-import { Image, type ImageStyle } from "expo-image"
+import { type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
@@ -10,6 +10,7 @@ import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
+import { CardImage } from "@/components/CardImage"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { Header } from "@/components/Header"
@@ -172,7 +173,7 @@ function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
 }
 
 function preconDetail(deck: PreconstructedDeck) {
-  return [deck.type, deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
+  return ["Wizards", deck.type, deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
     .filter(Boolean)
     .join(" · ")
 }
@@ -287,10 +288,6 @@ export function AddDeckScreen({
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const [mode, setMode] = useState<CreationMode>("precon")
-  const [catalogSource, setCatalogSource] = useState<"examples" | "official">(() =>
-    ["commander", "brawl", "constructed"].includes(format) ? "official" : "examples",
-  )
-  const showMagicOfficial = game === "mtg" && catalogSource === "official"
   const [catalogStatus, setCatalogStatus] =
     useState<FunctionReturnType<typeof api.deckCatalogs.browse>["status"]>("ready")
   const [catalogCursor, setCatalogCursor] = useState<string | null>(null)
@@ -404,9 +401,6 @@ export function AddDeckScreen({
     setSelectedPrecon(undefined)
     setFocusedPreviewCard(undefined)
     setMode("precon")
-    setCatalogSource(
-      ["commander", "brawl", "constructed"].includes(nextFormat) ? "official" : "examples",
-    )
     setCatalogStatus("ready")
     setCatalogCursor(null)
   }
@@ -414,47 +408,11 @@ export function AddDeckScreen({
   function chooseFormat(next: string) {
     setDeckFormat(next)
     setFormat(next)
-    setCatalogSource(["commander", "brawl", "constructed"].includes(next) ? "official" : "examples")
     setCatalogStatus("ready")
     setCatalogCursor(null)
     setPrecons([])
     setCatalogDecks([])
   }
-
-  const runSearch = useCallback(
-    async (query: string) => {
-      const token = searchToken.current + 1
-      searchToken.current = token
-      if (query.trim().length < 2 && !preconFormat) {
-        setPrecons([])
-        return
-      }
-      try {
-        setSearching(true)
-        setSearchError(undefined)
-        const found = await searchPreconstructed({
-          query,
-          ...(preconFormat ? { format: preconFormat } : {}),
-        })
-        if (searchToken.current === token) setPrecons(found)
-      } catch (cause) {
-        if (searchToken.current === token)
-          setSearchError(convexErrorMessage(cause, "Could not search official decks"))
-      } finally {
-        if (searchToken.current === token) setSearching(false)
-      }
-    },
-    [preconFormat, searchPreconstructed],
-  )
-
-  useEffect(() => {
-    if (mode !== "precon" || !showMagicOfficial) return undefined
-    const timer = setTimeout(() => void runSearch(preconQuery), SEARCH_DEBOUNCE_MS)
-    return () => {
-      clearTimeout(timer)
-      searchToken.current += 1
-    }
-  }, [showMagicOfficial, mode, preconQuery, runSearch])
 
   const runCatalogSearch = useCallback(
     async (query: string, cursor?: string) => {
@@ -462,14 +420,32 @@ export function AddDeckScreen({
       try {
         setSearching(true)
         setSearchError(undefined)
-        const found = await searchTopDecks({
-          game,
-          format,
-          query,
-          source: catalogSource,
-          ...(cursor ? { cursor } : {}),
-        })
-        if (searchToken.current === token) {
+        const [catalogResult, preconResult] = await Promise.allSettled([
+          searchTopDecks({
+            game,
+            format,
+            query,
+            source: "all",
+            ...(cursor ? { cursor } : {}),
+          }),
+          game === "mtg" && !cursor
+            ? searchPreconstructed({ query, ...(preconFormat ? { format: preconFormat } : {}) })
+            : Promise.resolve(null),
+        ])
+        if (searchToken.current !== token) return
+        if (preconResult.status === "fulfilled" && preconResult.value)
+          setPrecons(preconResult.value)
+        const failures = [catalogResult, preconResult].filter(
+          (result) => result.status === "rejected",
+        )
+        if (failures.length)
+          setSearchError(
+            failures
+              .map((result) => convexErrorMessage(result.reason, "Could not load decks"))
+              .join("\n"),
+          )
+        if (catalogResult.status === "fulfilled") {
+          const found = catalogResult.value
           setCatalogDecks((current) =>
             cursor
               ? [
@@ -489,11 +465,12 @@ export function AddDeckScreen({
         if (searchToken.current === token) setSearching(false)
       }
     },
-    [format, game, catalogSource, searchTopDecks],
+    [format, game, preconFormat, searchPreconstructed, searchTopDecks],
   )
 
   useEffect(() => {
-    if (mode !== "precon" || showMagicOfficial) return undefined
+    if (mode !== "precon") return undefined
+    setPrecons([])
     setCatalogDecks([])
     setCatalogCursor(null)
     setCatalogStatus("ready")
@@ -502,7 +479,7 @@ export function AddDeckScreen({
       clearTimeout(timer)
       searchToken.current += 1
     }
-  }, [showMagicOfficial, mode, preconQuery, runCatalogSearch])
+  }, [mode, preconQuery, runCatalogSearch])
 
   async function createBlank() {
     setSaveAttempted(true)
@@ -756,6 +733,8 @@ export function AddDeckScreen({
   const previewCardDialog = focusedPreviewCard ? (
     <CardFocusDialog
       card={{
+        game: focusedPreviewCard.game ?? "mtg",
+        cardId: focusedPreviewCard.scryfallId ?? focusedPreviewCard.catalogCardId,
         name: focusedPreviewCard.name,
         imageUrl: focusedPreviewCard.imageUrl,
         smallImageUrl: focusedPreviewCard.smallImageUrl,
@@ -933,14 +912,20 @@ export function AddDeckScreen({
                     onPress={() => focusCatalogCard(entry, section.label)}
                   >
                     <View style={themed($previewThumbnailSlot)}>
-                      {entry.smallImageUrl || entry.imageUrl ? (
-                        <Image
-                          testID={`catalog-card-thumbnail-${entry._id}`}
-                          source={entry.smallImageUrl ?? entry.imageUrl}
-                          style={themed($previewThumbnail)}
-                          cachePolicy="memory-disk"
-                        />
-                      ) : null}
+                      <CardImage
+                        game={selectedCatalogDeck.game}
+                        cardId={
+                          entry.scryfallId ??
+                          entry.cardId ??
+                          entry.printingId ??
+                          entry.providerCardId
+                        }
+                        source={entry.smallImageUrl ?? entry.imageUrl}
+                        accessibilityLabel={entry.name}
+                        compact
+                        testID={`catalog-card-thumbnail-${entry._id}`}
+                        style={themed($previewThumbnail)}
+                      />
                     </View>
                     <Text
                       style={themed($previewCardName)}
@@ -1040,6 +1025,12 @@ export function AddDeckScreen({
             {preconDetail(selectedPrecon) ? (
               <Text size="xs" style={themed($label)} text={preconDetail(selectedPrecon)} />
             ) : null}
+            {["standard", "pioneer", "modern"].includes(previewFormat) ? (
+              <Text
+                size="xs"
+                text="Original precon list. Cards may no longer be legal in this format."
+              />
+            ) : null}
             <LoadingProgress
               testID="precon-loading-progress"
               state={previewLoading ? "loading" : resolvedPrecon ? "complete" : "unavailable"}
@@ -1094,13 +1085,14 @@ export function AddDeckScreen({
                     onPress={() => focusPreviewCard(card, section.label)}
                   >
                     <View style={themed($previewThumbnailSlot)}>
-                      {card.smallImageUrl || card.imageUrl ? (
-                        <Image
-                          source={card.smallImageUrl ?? card.imageUrl}
-                          style={themed($previewThumbnail)}
-                          cachePolicy="memory-disk"
-                        />
-                      ) : null}
+                      <CardImage
+                        game="mtg"
+                        cardId={card.scryfallId}
+                        source={card.smallImageUrl ?? card.imageUrl}
+                        accessibilityLabel={card.name}
+                        compact
+                        style={themed($previewThumbnail)}
+                      />
                     </View>
                     <Text
                       style={themed($previewCardName)}
@@ -1197,92 +1189,9 @@ export function AddDeckScreen({
           ))}
         </View>
         {mode === "precon" ? (
-          <View accessibilityRole="tablist" accessibilityLabel="Deck source" style={themed($tabs)}>
-            {(
-              [
-                { id: "examples", label: "Examples" },
-                { id: "official", label: "Official decks" },
-              ] as const
-            ).map((candidate) => (
-              <TouchableOpacity
-                key={candidate.id}
-                testID={`catalog-source-${candidate.id}`}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: catalogSource === candidate.id }}
-                style={[themed($tab), catalogSource === candidate.id && themed($selectedTab)]}
-                onPress={() => {
-                  setCatalogSource(candidate.id)
-                  setSearchError(undefined)
-                }}
-              >
-                <Text
-                  text={candidate.label}
-                  weight={catalogSource === candidate.id ? "bold" : "normal"}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : null}
-
-        {mode === "precon" && showMagicOfficial ? (
           <View style={themed($stack)}>
             <TextField
               testID="precon-search-input"
-              placeholder="Search official decks"
-              value={preconQuery}
-              maxLength={120}
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-              onChangeText={setPreconQuery}
-            />
-            {searching ? (
-              <Text size="xs" style={themed($label)} text="Searching…" />
-            ) : searchError ? (
-              <View style={themed($inlineStatus)}>
-                <AlertNote text={searchError} />
-                <Button
-                  testID="retry-precon-search"
-                  text="Retry"
-                  onPress={() => void runSearch(preconQuery)}
-                />
-              </View>
-            ) : (guestMode || (access?.ready ?? true)) && precons.length === 0 ? (
-              emptyCatalog
-            ) : null}
-            {precons.length > 0 && ["standard", "pioneer", "modern"].includes(format) ? (
-              <Text
-                size="xs"
-                style={themed($label)}
-                text="Original precon lists. Cards may no longer be legal in this format."
-              />
-            ) : null}
-            {precons.map((deck) => (
-              <TouchableOpacity
-                key={deck.fileName}
-                testID={`precon-result-${deck.fileName}`}
-                accessibilityRole="button"
-                accessibilityLabel={`Preview ${deck.name}`}
-                activeOpacity={0.75}
-                style={themed($resultRow)}
-                disabled={previewLoading}
-                onPress={() => previewPrecon(deck)}
-              >
-                <View style={$flex1}>
-                  <Text weight="medium" text={deck.name} numberOfLines={2} />
-                  {preconDetail(deck) ? (
-                    <Text size="xs" style={themed($label)} text={preconDetail(deck)} />
-                  ) : null}
-                </View>
-                <Text weight="medium" style={themed($textAction)} text="Preview" />
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : null}
-
-        {mode === "precon" && !showMagicOfficial ? (
-          <View style={themed($stack)}>
-            <TextField
-              testID="top-deck-search-input"
               placeholder="Search decks"
               value={preconQuery}
               maxLength={120}
@@ -1298,6 +1207,7 @@ export function AddDeckScreen({
                 <Button text="Retry" onPress={() => void runCatalogSearch(preconQuery)} />
               </View>
             ) : catalogDecks.length === 0 &&
+              precons.length === 0 &&
               !["rate_limited", "unavailable", "refreshing"].includes(catalogStatus) ? (
               emptyCatalog
             ) : null}
@@ -1322,6 +1232,26 @@ export function AddDeckScreen({
                 />
               </View>
             ) : null}
+            {precons.map((deck) => (
+              <TouchableOpacity
+                key={deck.fileName}
+                testID={`precon-result-${deck.fileName}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Preview ${deck.name}`}
+                activeOpacity={0.75}
+                style={themed($resultRow)}
+                disabled={previewLoading}
+                onPress={() => previewPrecon(deck)}
+              >
+                <View style={$flex1}>
+                  <Text weight="medium" text={deck.name} numberOfLines={2} />
+                  {preconDetail(deck) ? (
+                    <Text size="xs" style={themed($label)} text={preconDetail(deck)} />
+                  ) : null}
+                </View>
+                <Text weight="medium" style={themed($textAction)} text="Preview" />
+              </TouchableOpacity>
+            ))}
             {catalogDecks.map((deck) => (
               <TouchableOpacity
                 key={deck._id}

@@ -1,6 +1,7 @@
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
+import { normalizePokemonCards } from "./lib/games/pokemon"
 import rushCards from "./lib/games/rushCards.json"
 import schema from "./schema"
 
@@ -209,4 +210,153 @@ describe("card provider caching and health", () => {
       }),
     ).rejects.toMatchObject({ data: { code: "card_not_found" } })
   })
+})
+
+describe("image fallback candidates", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("finds Magic artwork by oracle identity without changing the stored printing", async () => {
+    const id = "11111111-1111-1111-1111-111111111111"
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(() => response({ oracle_id: id }))
+      .mockImplementationOnce(() =>
+        response({
+          data: [
+            {
+              id: "other",
+              oracle_id: "wrong",
+              name: "Wrong card",
+              image_uris: { normal: "wrong" },
+            },
+            {
+              id: "alternate",
+              oracle_id: id,
+              name: "Same card",
+              image_uris: { normal: "working" },
+            },
+          ],
+        }),
+      )
+    const t = convexTest(schema, modules)
+    expect(await t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id })).toEqual([
+      "working",
+    ])
+    expect(String(fetchSpy.mock.calls[1][0])).toContain("unique=prints")
+    await t.run(async (ctx) => expect(await ctx.db.query("cardPrintings").take(1)).toEqual([]))
+  })
+
+  it("uses Yu-Gi-Oh alternate artwork through the existing mirror", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockImplementation(() =>
+        response({ data: [{ id: 1, name: "Same card", card_images: [{ id: 1 }, { id: 2 }] }] }),
+      )
+    const t = convexTest(schema, modules)
+    expect(await t.action(api.cards.imageFallbacks, { game: "ygo", cardId: "1" })).toEqual([
+      "https://ygo-images.scryve.sow.care/images/yugioh/cards/1.jpg",
+      "https://ygo-images.scryve.sow.care/images/yugioh/cards/2.jpg",
+    ])
+  })
+
+  it("matches Pokemon gameplay, rejecting different HP, attack costs, and Pocket cards", async () => {
+    const original = {
+      id: "me05-039",
+      name: "Dhelmise",
+      category: "Pokemon",
+      hp: 140,
+      stage: "Basic",
+      types: ["Psychic"],
+      attacks: [
+        { name: "Vengeful Anchor", cost: ["Psychic"], damage: "30+", effect: "Same rules" },
+      ],
+    }
+    const base = "https://assets.tcgdex.net/en/me/me05/"
+    const candidates = [
+      { ...original, id: "hp", hp: 90, image: `${base}1` },
+      {
+        ...original,
+        id: "cost",
+        attacks: [{ ...original.attacks[0], cost: ["Colorless"] }],
+        image: `${base}2`,
+      },
+      { ...original, id: "pocket", image: "https://assets.tcgdex.net/en/tcgp/A1/1" },
+      { ...original, id: "match", image: `${base}091` },
+    ]
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation((input) => {
+      const url = String(input)
+      if (url.includes("/cards?")) return response(candidates)
+      return response(
+        url.endsWith(original.id) ? original : candidates.find((card) => url.endsWith(card.id)),
+      )
+    })
+    const t = convexTest(schema, modules)
+    expect(
+      await t.action(api.cards.imageFallbacks, { game: "pokemon", cardId: original.id }),
+    ).toEqual([`${base}091/high.webp`])
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).endsWith("/pocket"))).toBe(false)
+  })
+
+  it("returns no candidates for bundled Rush cards and rejects invalid identities", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch")
+    const t = convexTest(schema, modules)
+    expect(await t.action(api.cards.imageFallbacks, { game: "ygo", cardId: "rush:15150" })).toEqual(
+      [],
+    )
+    await expect(
+      t.action(api.cards.imageFallbacks, { game: "pokemon", cardId: " " }),
+    ).rejects.toMatchObject({ data: { code: "invalid_card_identifier" } })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+it("does not fetch fallback images when image access is disabled", async () => {
+  const t = convexTest(schema, modules)
+  const fetchSpy = jest.spyOn(global, "fetch")
+  try {
+    await t.mutation(internal.integrationManifest.setCapabilityOverride, {
+      game: "pokemon",
+      capability: "images",
+      release: "disabled",
+    })
+    await expect(
+      t.action(api.cards.imageFallbacks, { game: "pokemon", cardId: "me05-039" }),
+    ).rejects.toThrow()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
+
+it.each([
+  {
+    category: "Trainer",
+    trainerType: "Item",
+    effect: "Put a Pokémon or a Basic Energy card from your discard pile into your hand.",
+  },
+  { category: "Energy", energyType: "Normal" },
+])("upgrades cached Pokemon summaries and preserves full $category details", async (details) => {
+  const summary = {
+    id: "me02.5-196",
+    name: details.category === "Trainer" ? "Night Stretcher" : "Basic Psychic Energy",
+    image: "https://assets.tcgdex.net/en/me/me02.5/196",
+  }
+  const full = { ...summary, ...details }
+  const t = convexTest(schema, modules)
+  const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response(full))
+  try {
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: normalizePokemonCards(summary) })
+    const args = { game: "pokemon", cardId: summary.id }
+    const result = await t.action(api.cards.byCatalogId, args)
+    expect(result.typeLabel).toContain(details.category)
+    expect(result.text).toBe("effect" in details ? details.effect : undefined)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: normalizePokemonCards(summary) })
+    const cached = await t.action(api.cards.byCatalogId, args)
+    expect(cached.typeLabel).toBe(result.typeLabel)
+    expect(cached.text).toBe(result.text)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  } finally {
+    fetchSpy.mockRestore()
+  }
 })

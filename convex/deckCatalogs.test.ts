@@ -494,3 +494,21 @@ it.each(["ygo", "pokemon"])(
     )
   },
 )
+
+it.each(["ygo", "pokemon"])("browses %s examples and official decks in one list", async (game) => {
+  const t = convexTest(schema, modules)
+  const args = {
+    game,
+    format: game === "ygo" ? "rush" : "standard",
+    query: "",
+    source: "all" as const,
+  }
+  const result = await t.action(api.deckCatalogs.browse, args)
+  expect(result.decks.some((deck) => deck.kind === "official")).toBe(true)
+  expect(result.decks.some((deck) => deck.kind === "example")).toBe(true)
+  expect(
+    result.decks.every((deck) => deck.source && deck.sourceUrl && deck.format === args.format),
+  ).toBe(true)
+  const filtered = await t.action(api.deckCatalogs.browse, { ...args, query: result.decks[0].name })
+  expect(filtered.decks.some((deck) => deck._id === result.decks[0]._id)).toBe(true)
+})

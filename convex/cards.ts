@@ -5,6 +5,7 @@ import type { Doc } from "./_generated/dataModel"
 import type { ActionCtx, MutationCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
+import { cardImageCandidates } from "./lib/cardImageFallback"
 import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { pokemonCardById, pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
@@ -191,6 +192,7 @@ export const byCatalogId = action({
     })
     if (
       cached &&
+      (game !== "pokemon" || cached.typeLabel !== undefined) &&
       (!includeImages || game === "mtg" || cardId.startsWith("rush:") || hasCatalogImage(cached))
     )
       return includeImages ? cached : catalogWithoutImages(cached)
@@ -381,5 +383,17 @@ export const cacheMany = internalMutation({
   handler: async (ctx, args) => {
     for (const card of args.cards) await upsertCardReference(ctx, card)
     return null
+  },
+})
+
+export const imageFallbacks = action({
+  args: { game: v.string(), cardId: v.string() },
+  handler: async (ctx, { game: gameId, cardId }) => {
+    const game = assertGameSystem(gameId)
+    await requireActionCapability(ctx, game, "images")
+    await requireActionCapability(ctx, game, "cardCatalog")
+    if (!cardId.trim() || cardId.length > 200)
+      throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
+    return [...new Set(await cardImageCandidates(ctx, game, cardId.trim()))]
   },
 })
