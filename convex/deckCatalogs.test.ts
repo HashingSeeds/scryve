@@ -21,6 +21,72 @@ const modules = {
 }
 
 describe("deck catalog search", () => {
+  it.each([
+    ["pokemon", "standard"],
+    ["ygo", "advanced"],
+  ])(
+    "shares the %s cache for 24 hours, then refreshes behind stale results",
+    async (game, format) => {
+      jest.useFakeTimers()
+      const fetchedAt = Date.now()
+      const t = convexTest(schema, modules)
+      const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("provider offline"))
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {})
+      try {
+        await t.run(async (ctx) => {
+          await ctx.db.insert("deckCatalogs", {
+            game,
+            source: "fixture",
+            externalId: "shared-cache",
+            kind: "tournament",
+            name: "Shared deck",
+            format,
+            fetchedAt,
+          })
+        })
+        const firstUser = t.withIdentity({ subject: "first-reader" })
+        const secondUser = t.withIdentity({ subject: "second-reader" })
+        const args = { game, format, query: "" }
+        jest.setSystemTime(fetchedAt + 24 * 60 * 60 * 1000 - 1)
+        const cached = await firstUser.action(api.deckCatalogs.searchTopDecks, args)
+        await expect(secondUser.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual(
+          cached,
+        )
+        expect(fetchSpy).not.toHaveBeenCalled()
+        await t.run(async (ctx) => {
+          expect(await ctx.db.system.query("_scheduled_functions").collect()).toHaveLength(0)
+        })
+
+        jest.setSystemTime(fetchedAt + 24 * 60 * 60 * 1000)
+        await expect(firstUser.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual(
+          cached,
+        )
+        await expect(secondUser.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual(
+          cached,
+        )
+        await expect(
+          secondUser.action(api.deckCatalogs.searchTopDecks, { ...args, query: "missing" }),
+        ).resolves.toEqual([])
+        expect(fetchSpy).not.toHaveBeenCalled()
+        await t.run(async (ctx) => {
+          expect(await ctx.db.system.query("_scheduled_functions").collect()).toHaveLength(1)
+        })
+        await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        await expect(secondUser.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual(
+          cached,
+        )
+        await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+        expect(fetchSpy).toHaveBeenCalledTimes(2)
+        expect(errorSpy).toHaveBeenCalledTimes(2)
+      } finally {
+        errorSpy.mockRestore()
+        fetchSpy.mockRestore()
+        jest.useRealTimers()
+      }
+    },
+  )
+
   it("serves cached top decks to guests without refreshing providers", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network unavailable"))
     const t = convexTest(schema, modules)
@@ -111,6 +177,8 @@ describe("deck catalog search", () => {
 it.each(["expanded", undefined])(
   "refreshes Pokémon format %s independently and reuses its cache",
   async (requestedFormat) => {
+    jest.useFakeTimers()
+    const startedAt = Date.now()
     const expectedFormat = requestedFormat ?? "standard"
     const otherFormat = expectedFormat === "standard" ? "expanded" : "standard"
     const t = convexTest(schema, modules)
@@ -160,15 +228,40 @@ it.each(["expanded", undefined])(
       ).toBe(true)
       const fetchCount = fetchSpy.mock.calls.length
       await expect(
+        t
+          .withIdentity({ subject: "another-catalog-reader" })
+          .action(api.deckCatalogs.searchTopDecks, {
+            game: "pokemon",
+            format: requestedFormat,
+            query: "",
+          }),
+      ).resolves.toHaveLength(2)
+      expect(fetchSpy).toHaveBeenCalledTimes(fetchCount)
+
+      jest.setSystemTime(startedAt + 24 * 60 * 60 * 1000)
+      await expect(
         actor.action(api.deckCatalogs.searchTopDecks, {
           game: "pokemon",
           format: requestedFormat,
           query: "",
         }),
-      ).resolves.toHaveLength(2)
+      ).resolves.toEqual(decks)
       expect(fetchSpy).toHaveBeenCalledTimes(fetchCount)
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      expect(fetchSpy).toHaveBeenCalledTimes(fetchCount * 2)
+      const refreshed = await t
+        .withIdentity({ subject: "reader-after-refresh" })
+        .action(api.deckCatalogs.searchTopDecks, {
+          game: "pokemon",
+          format: requestedFormat,
+          query: "",
+        })
+      expect(refreshed).toHaveLength(2)
+      expect(refreshed.every((deck) => deck.fetchedAt > startedAt)).toBe(true)
+      expect(fetchSpy).toHaveBeenCalledTimes(fetchCount * 2)
     } finally {
       fetchSpy.mockRestore()
+      jest.useRealTimers()
     }
   },
 )

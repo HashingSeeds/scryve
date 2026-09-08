@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values"
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
 import type { ActionCtx, QueryCtx } from "./_generated/server"
-import { action, internalMutation, internalQuery, query } from "./_generated/server"
+import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { assertDeckGameFormat } from "./lib/deckGames"
 import type { NormalizedCard } from "./lib/games/cards"
@@ -18,7 +18,7 @@ import { normalizeYgoDeckFeed, YGO_DECK_FEED_URL } from "./lib/games/yugiohDecks
 import { assertGameSystem, capabilityReleased, requireReleasedCapability } from "./lib/integrations"
 import { MAX_DECK_CARDS } from "./lib/policy"
 
-const FEED_TTL_MS = 6 * 60 * 60 * 1000
+const FEED_TTL_MS = 24 * 60 * 60 * 1000
 const MAX_FEED_DECKS = 20
 const LIMITLESS_BASE_URL = "https://play.limitlesstcg.com/api"
 const PROVIDER_REQUEST_TIMEOUT_MS = 10_000
@@ -341,7 +341,6 @@ export const searchTopDecks = action({
     })
     if (!(await ctx.auth.getUserIdentity())) return cached
 
-    const includeImages = await actionCapabilityEnabled(ctx, game, "images")
     if (
       game === "mtg" ||
       (game === "ygo" && format && format !== "advanced") ||
@@ -352,10 +351,53 @@ export const searchTopDecks = action({
     const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
     if (latest && Date.now() - latest.fetchedAt < FEED_TTL_MS) return cached
 
+    const refreshArgs = { game, format: format ?? "advanced" }
+    if (latest) {
+      await ctx.runMutation(internal.deckCatalogs.scheduleRefresh, refreshArgs)
+      return cached
+    }
+
+    await ctx.runAction(internal.deckCatalogs.refreshTopDecks, refreshArgs)
+    return await ctx.runQuery(internal.deckCatalogs.searchCached, {
+      game,
+      query: args.query,
+      ...(format ? { format } : {}),
+    })
+  },
+})
+
+export const scheduleRefresh = internalMutation({
+  args: { game: v.string(), format: v.string() },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("deckCatalogRefreshes")
+      .withIndex("by_game_and_format", (q) => q.eq("game", args.game).eq("format", args.format))
+      .unique()
+    const scheduled = existing ? await ctx.db.system.get(existing.scheduledId) : null
+    if (scheduled?.state.kind === "pending" || scheduled?.state.kind === "inProgress") return
+    const scheduledId = await ctx.scheduler.runAfter(0, internal.deckCatalogs.refreshTopDecks, args)
+    if (existing) await ctx.db.patch(existing._id, { scheduledId })
+    else await ctx.db.insert("deckCatalogRefreshes", { ...args, scheduledId })
+  },
+})
+
+export const refreshTopDecks = internalAction({
+  args: { game: v.string(), format: v.string() },
+  handler: async (ctx, args): Promise<void> => {
+    const game = assertGameSystem(args.game)
+    const format = assertDeckGameFormat(game, args.format)
+    await requireActionCapability(ctx, game, "exampleDecks")
+    if (game !== "pokemon" && game !== "ygo") return
+    if (game === "pokemon" && !["standard", "expanded"].includes(format)) return
+    if (game === "ygo" && format !== "advanced") return
+    const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
+    if (latest && Date.now() - latest.fetchedAt < FEED_TTL_MS) return
+    const includeImages = await actionCapabilityEnabled(ctx, game, "images")
+
     const startedAt = Date.now()
     if (game === "pokemon") {
       try {
-        const result = await refreshPokemonTopDecks(ctx, includeImages, format ?? "standard")
+        const result = await refreshPokemonTopDecks(ctx, includeImages, format)
         const finishedAt = Date.now()
         await ctx.runMutation(internal.providerHealth.record, {
           game,
@@ -368,11 +410,7 @@ export const searchTopDecks = action({
           httpStatus: result.status,
           message: `${result.count} cleaned decks cached`,
         })
-        return await ctx.runQuery(internal.deckCatalogs.searchCached, {
-          game,
-          query: args.query,
-          ...(format ? { format } : {}),
-        })
+        return
       } catch (error) {
         const finishedAt = Date.now()
         await ctx.runMutation(internal.providerHealth.record, {
@@ -384,7 +422,6 @@ export const searchTopDecks = action({
           responseMs: finishedAt - startedAt,
           message: error instanceof Error ? error.message : "Deck feed refresh failed",
         })
-        if (cached.length > 0) return cached
         throw new ConvexError({
           code: "deck_provider_unavailable",
           message: "Top Decks are temporarily unavailable",
@@ -477,11 +514,6 @@ export const searchTopDecks = action({
         httpStatus: response.status,
         message: `${feed.length} cleaned decks cached`,
       })
-      return await ctx.runQuery(internal.deckCatalogs.searchCached, {
-        game,
-        query: args.query,
-        ...(format ? { format } : {}),
-      })
     } catch (error) {
       const finishedAt = Date.now()
       await ctx.runMutation(internal.providerHealth.record, {
@@ -493,7 +525,6 @@ export const searchTopDecks = action({
         responseMs: finishedAt - startedAt,
         message: error instanceof Error ? error.message : "Deck feed refresh failed",
       })
-      if (cached.length > 0) return cached
       throw new ConvexError({
         code: "deck_provider_unavailable",
         message: "Top Decks are temporarily unavailable",
