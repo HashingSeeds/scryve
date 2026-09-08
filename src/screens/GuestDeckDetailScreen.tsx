@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react"
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import type { TextStyle, ViewStyle } from "react-native"
+import { View } from "react-native"
 import { useNavigation } from "expo-router"
 import { usePreventRemove } from "expo-router/react-navigation"
 
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
-import { CardImage } from "@/components/CardImage"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
+import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { TextField } from "@/components/TextField"
-import { GuestCardSearchDialog } from "@/features/decks/GuestCardSearchDialog"
+import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
+import { printingKey } from "@/features/decks/deckCards"
+import { DeckView } from "@/features/decks/DeckView"
 import {
   deleteGuestDeck,
   loadGuestDeck,
@@ -23,13 +24,7 @@ import {
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import {
-  DEFAULT_DECK_GAME,
-  DECK_GAME_LIST,
-  deckFormatLabel,
-  deckGame,
-  deckSections,
-} from "../../convex/lib/deckGames"
+import { DEFAULT_DECK_GAME, deckSections } from "../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 
 type GuestDeckDetailScreenProps = { onBack: () => void }
@@ -50,6 +45,11 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const baseRef = useRef(stored?.deck)
   const [error, setError] = useState<string>()
   const [conflict, setConflict] = useState(false)
+  const [tab, setTab] = useState<"cards" | "notes">("cards")
+  const [editing, setEditing] = useState(false)
+  const [settings, setSettings] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [undo, setUndo] = useState<{ name: string; cards: GuestCard[] }>()
   const [adding, setAdding] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [discarding, setDiscarding] = useState(false)
@@ -149,6 +149,8 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         { ...current, name: current.name.trim() },
         { localId: revision.localId },
       )
+      setEditing(false)
+      setUndo(undefined)
       setDraft(saved.deck)
       baseRef.current = saved.deck
       revisionRef.current = { localId: saved.localId, updatedAt: saved.updatedAt }
@@ -164,159 +166,105 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
       backgroundColor={theme.colors.surface}
       contentContainerStyle={themed($screen)}
     >
-      <Header
-        title="Guest deck"
-        leftTx="common:back"
-        onLeftPress={() => (sameDraft(draft, baseRef.current) ? onBack() : setDiscarding(true))}
+      <DeckView
+        tab={tab}
+        onTabChange={setTab}
+        guest
+        name={current.name}
+        game={game}
+        format={current.format}
+        cards={current.cards}
+        note={current.note ?? ""}
+        editing={editing}
+        dirty={!sameDraft(current, baseRef.current)}
+        onBack={() => (sameDraft(current, baseRef.current) ? onBack() : setDiscarding(true))}
+        onEdit={() => setEditing(true)}
+        onSave={save}
+        onCancel={() => {
+          if (!sameDraft(current, baseRef.current)) {
+            setCancelling(true)
+            setDiscarding(true)
+          } else setEditing(false)
+        }}
+        onDetails={() => setSettings(true)}
+        onAdd={() => {
+          setEditing(true)
+          setAdding(true)
+        }}
+        onNoteChange={(note) => update({ note })}
+        onFocus={(card) => setFocusedIndex(current.cards.indexOf(card))}
+        onIncrement={(card) => {
+          setUndo(undefined)
+          updateCard(current.cards.indexOf(card), { ...card, quantity: card.quantity + 1 })
+        }}
+        onDecrement={(card) => {
+          if (card.quantity === 1) setUndo({ name: card.name, cards: current.cards })
+          else setUndo(undefined)
+          updateCard(
+            current.cards.indexOf(card),
+            card.quantity > 1 ? { ...card, quantity: card.quantity - 1 } : undefined,
+          )
+        }}
+        undo={
+          undo
+            ? {
+                name: undo.name,
+                restore: () => {
+                  update({ cards: undo.cards })
+                  setUndo(undefined)
+                },
+              }
+            : undefined
+        }
+        error={
+          <>
+            {error ? <Text testID="guest-deck-error" style={themed($error)} text={error} /> : null}
+            {conflict ? (
+              <Button
+                testID="guest-deck-reload"
+                text="Reload saved deck"
+                onPress={() => {
+                  const latest = loadGuestDeck()
+                  if (!latest) return
+                  setDraft(latest.deck)
+                  baseRef.current = latest.deck
+                  revisionRef.current = { localId: latest.localId, updatedAt: latest.updatedAt }
+                  setError(undefined)
+                  setConflict(false)
+                  setUndo(undefined)
+                  setEditing(false)
+                }}
+              />
+            ) : null}
+          </>
+        }
       />
-      <ScrollView
-        style={$scroll}
-        contentContainerStyle={themed($content)}
-        keyboardShouldPersistTaps="handled"
-      >
-        <TextField
-          testID="guest-deck-name"
-          label="Name"
-          value={current.name}
-          onChangeText={(name) => update({ name })}
+      {settings ? (
+        <DeckSettingsDialog
+          game={game}
+          initial={{ name: current.name, format: current.format }}
+          onClose={() => setSettings(false)}
+          onSubmit={(changes) => {
+            update(changes)
+            setSettings(false)
+            setEditing(true)
+          }}
+          onDelete={() => {
+            setSettings(false)
+            setDeleteRevision(revisionRef.current)
+            setDeleting(true)
+          }}
         />
-        <Text
-          size="sm"
-          style={themed($metadata)}
-          text={[
-            deckGame(game)?.shortLabel ??
-              DECK_GAME_LIST.find((item) => item.id === game)?.shortLabel ??
-              game,
-            deckFormatLabel(game, current.format),
-          ].join(" · ")}
-        />
-        <TextField
-          testID="guest-deck-notes"
-          label="Notes"
-          multiline
-          value={current.note ?? ""}
-          onChangeText={(note) => update({ note })}
-        />
-        <View style={themed($cards)}>
-          <Text
-            preset="subheading"
-            text={`Cards (${current.cards.reduce((total, card) => total + card.quantity, 0)})`}
-          />
-          <Text size="sm" text="Use + and − to change copies, or Remove to delete a card." />
-          {current.cards.map((card, index) => (
-            <View
-              key={`${card.name}-${index}`}
-              testID={`guest-card-${index}`}
-              style={themed($card)}
-            >
-              <TouchableOpacity
-                testID={`guest-card-${index}-image`}
-                accessibilityRole="button"
-                accessibilityLabel={`View ${card.name}`}
-                onPress={() => setFocusedIndex(index)}
-              >
-                <CardImage
-                  game={game}
-                  cardId={card.scryfallId ?? card.cardId ?? card.printingId ?? card.providerCardId}
-                  compact
-                  testID={`guest-card-${index}-thumbnail`}
-                  source={card.smallImageUrl ?? card.imageUrl}
-                  accessibilityLabel={card.name}
-                  style={$cardImage}
-                />
-              </TouchableOpacity>
-              <View style={themed($cardCopy)}>
-                <Text weight="medium" text={card.name} />
-                <Text size="sm" style={themed($metadata)} text={sectionLabel(card)} />
-              </View>
-              <View style={themed($cardControls)}>
-                <View style={themed($quantityControls)}>
-                  <Button
-                    testID={`guest-card-${index}-decrease`}
-                    text="−"
-                    accessibilityLabel={`Remove one ${card.name}`}
-                    onPress={() =>
-                      card.quantity > 1
-                        ? updateCard(index, { ...card, quantity: card.quantity - 1 })
-                        : updateCard(index, undefined)
-                    }
-                  />
-                  <Text accessibilityLabel={`${card.name} quantity`} text={`${card.quantity}×`} />
-                  <Button
-                    testID={`guest-card-${index}-increase`}
-                    text="+"
-                    accessibilityLabel={`Add one ${card.name}`}
-                    disabled={card.quantity >= 999}
-                    onPress={() => updateCard(index, { ...card, quantity: card.quantity + 1 })}
-                  />
-                </View>
-                <Button
-                  testID={`guest-card-${index}-remove`}
-                  text="Remove"
-                  accessibilityLabel={`Remove ${card.name} from deck`}
-                  onPress={() => updateCard(index, undefined)}
-                />
-              </View>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-      <View style={themed($footer)}>
-        {error ? <Text testID="guest-deck-error" style={themed($error)} text={error} /> : null}
-        {conflict ? (
-          <Button
-            testID="guest-deck-reload"
-            text="Reload saved deck"
-            onPress={() => {
-              const latest = loadGuestDeck()
-              if (!latest) return
-              setDraft(latest.deck)
-              baseRef.current = latest.deck
-              revisionRef.current = { localId: latest.localId, updatedAt: latest.updatedAt }
-              setError(undefined)
-              setConflict(false)
-            }}
-          />
-        ) : null}
-        <Button text="Add cards" testID="guest-deck-add-cards" onPress={() => setAdding(true)} />
-        <View style={themed($actions)}>
-          <Button
-            style={$action}
-            testID="guest-deck-save"
-            preset="reversed"
-            text="Save"
-            onPress={save}
-          />
-          <Button
-            style={$action}
-            testID="guest-deck-delete"
-            text="Delete deck"
-            onPress={() => {
-              setDeleteRevision(revisionRef.current)
-              setDeleting(true)
-            }}
-          />
-        </View>
-      </View>
+      ) : null}
       {adding ? (
-        <GuestCardSearchDialog
+        <CardSearchScreen
           game={game}
           format={current.format}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
+            setUndo(undefined)
             const index = current.cards.findIndex(
-              (entry) =>
-                (entry.section ?? entry.board ?? "main") === card.section &&
-                (entry.printingId ??
-                  entry.providerCardId ??
-                  entry.scryfallId ??
-                  entry.cardId ??
-                  entry.name) ===
-                  (card.printingId ??
-                    card.providerCardId ??
-                    card.scryfallId ??
-                    card.cardId ??
-                    card.name),
+              (entry) => printingKey(entry) === printingKey(card),
             )
             if (index >= 0) {
               const entry = current.cards[index]
@@ -352,18 +300,24 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
             typeLine: sectionLabel(focusedCard),
           }}
           onClose={() => setFocusedIndex(undefined)}
-          onIncrement={() =>
-            updateCard(focusedIndex, { ...focusedCard, quantity: focusedCard.quantity + 1 })
-          }
-          onDecrement={() => {
-            if (focusedCard.quantity <= 1) setFocusedIndex(undefined)
-            updateCard(
-              focusedIndex,
-              focusedCard.quantity > 1
-                ? { ...focusedCard, quantity: focusedCard.quantity - 1 }
-                : undefined,
-            )
-          }}
+          {...(editing
+            ? {
+                onIncrement: () =>
+                  updateCard(focusedIndex, {
+                    ...focusedCard,
+                    quantity: Math.min(999, focusedCard.quantity + 1),
+                  }),
+                onDecrement: () => {
+                  if (focusedCard.quantity <= 1) setFocusedIndex(undefined)
+                  updateCard(
+                    focusedIndex,
+                    focusedCard.quantity > 1
+                      ? { ...focusedCard, quantity: focusedCard.quantity - 1 }
+                      : undefined,
+                  )
+                },
+              }
+            : {})}
         />
       ) : null}
       <ConfirmDialog
@@ -376,9 +330,18 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         confirmTestID="guest-deck-discard-confirm"
         onClose={() => {
           setPendingNavigation(undefined)
+          setCancelling(false)
           setDiscarding(false)
         }}
-        onConfirm={() => setLeaving(true)}
+        onConfirm={() => {
+          if (cancelling) {
+            setDraft(baseRef.current)
+            setEditing(false)
+            setUndo(undefined)
+            setDiscarding(false)
+            setCancelling(false)
+          } else setLeaving(true)
+        }}
       />
       <ConfirmDialog
         visible={deleting}
@@ -419,41 +382,9 @@ const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flex: 1,
   backgroundColor: colors.surface,
 })
-const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm, padding: spacing.md })
 const $empty: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.sm,
   padding: spacing.lg,
 })
-const $cards: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs, marginTop: spacing.sm })
-const $card: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  alignItems: "center",
-  borderBottomColor: colors.border,
-  borderBottomWidth: 1,
-  flexDirection: "row",
-  gap: spacing.xs,
-  paddingVertical: spacing.xs,
-})
-const $cardCopy: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-const $cardImage: ImageStyle = { height: 56, width: 40 }
-const $metadata: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
-
-const $scroll: ViewStyle = { flex: 1 }
-const $action: ViewStyle = { flex: 1 }
-const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  borderTopColor: colors.border,
-  borderTopWidth: 1,
-  padding: spacing.md,
-  gap: spacing.sm,
-})
-const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.sm,
-})
-const $cardControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $quantityControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.xs,
-})

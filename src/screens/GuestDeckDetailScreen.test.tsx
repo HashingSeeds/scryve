@@ -77,189 +77,118 @@ beforeEach(() => {
   mockDeleteGuestDeck.mockClear()
 })
 
-test("shows stored cards and saves edits across reload", async () => {
+function editNote(view: ReturnType<typeof renderScreen>, value: string) {
+  fireEvent.press(view.getByTestId("deck-tab-notes"))
+  fireEvent.press(view.getByText("Edit notes"))
+  fireEvent.changeText(view.getByTestId("deck-note-input"), value)
+}
+
+test("opens read-only, edits notes in the deck view, and saves locally", () => {
   const view = renderScreen()
-  await waitFor(() => expect(view.getByDisplayValue("Offline Commander")).toBeTruthy())
-  expect(view.getByText("Sol Ring")).toBeTruthy()
-  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Renamed")
-  fireEvent.press(view.getByTestId("guest-card-0-increase"))
-  fireEvent.press(view.getByTestId("guest-deck-save"))
-
-  expect(mockSaveGuestDeck).toHaveBeenCalledWith(
-    expect.objectContaining({
-      name: "Renamed",
-      cards: [{ name: "Sol Ring", quantity: 3, board: "main" }],
-    }),
-    { localId: mockStored.localId },
-  )
-  view.unmount()
-  const reloaded = renderScreen()
-  await waitFor(() => expect(reloaded.getByDisplayValue("Renamed")).toBeTruthy())
-})
-
-test("cancel keeps a guest deck and confirm deletes it", async () => {
-  const onBack = jest.fn()
-  const view = renderScreen(onBack)
-  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved before deletion")
-  fireEvent.press(view.getByTestId("guest-deck-delete"))
-  await waitFor(() => expect(view.getByTestId("guest-deck-confirm-delete")).toBeTruthy())
-  fireEvent.press(view.getByTestId("confirm-dialog-cancel"))
-  expect(mockDeleteGuestDeck).not.toHaveBeenCalled()
-  expect(view.getByText("Sol Ring")).toBeTruthy()
-
-  fireEvent.press(view.getByTestId("guest-deck-delete"))
-  await waitFor(() => expect(view.getByTestId("guest-deck-confirm-delete")).toBeTruthy())
-  fireEvent.press(view.getByTestId("guest-deck-confirm-delete"))
-  expect(mockDeleteGuestDeck).toHaveBeenCalledTimes(1)
-  expect(onBack).toHaveBeenCalledTimes(1)
-})
-
-test("keeps a dirty draft when saving hits a revision conflict", () => {
-  const view = renderScreen()
-  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved")
-  mockCurrent = { ...mockStored, updatedAt: 3 }
-  fireEvent.press(view.getByTestId("guest-deck-save"))
-  expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
-  expect(view.getByTestId("guest-deck-error")).toHaveTextContent(/changed elsewhere/i)
-})
-
-test("keeps entered draft when saving fails", () => {
-  const view = renderScreen()
-  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Still here")
-  mockSaveFailure = true
-  fireEvent.press(view.getByTestId("guest-deck-save"))
-  expect(view.getByDisplayValue("Still here")).toBeTruthy()
-  expect(view.getByTestId("guest-deck-error")).toHaveTextContent(/Unable to save/i)
-})
-
-test.each([
-  ["ygo", "Dark Magician", "https://ygo-images.example/dark-magician.jpg"],
-  ["pokemon", "Riolu", "https://assets.example/riolu/high.webp"],
-] as const)("shows and focuses a local %s card image", (game, name, imageUrl) => {
-  mockCurrent = {
-    ...mockStored,
-    deck: {
-      ...mockStored.deck,
-      game,
-      cards: [{ name, quantity: 1, section: "main", imageUrl, smallImageUrl: imageUrl }],
-    },
-  }
-  const view = renderScreen()
-
-  expect(view.getByTestId("guest-card-0-image")).toBeTruthy()
-  expect(view.getByTestId("guest-card-0-thumbnail").props.source).toEqual([{ uri: imageUrl }])
-  fireEvent.press(view.getByTestId("guest-card-0-image"))
-
-  expect(view.getByTestId("card-focus-image").props.source).toEqual([{ uri: imageUrl }])
-  expect(view.queryByText("Loading details…")).toBeNull()
-  fireEvent.press(view.getByTestId("card-focus-increment"))
-  expect(view.getByText("2× in main")).toBeTruthy()
-})
-
-test("keeps unsaved edits until back navigation is confirmed", () => {
-  const { onBack, ...view } = renderScreen()
-  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved")
-  fireEvent(view.UNSAFE_getByType(Header), "leftPress")
-  expect(onBack).not.toHaveBeenCalled()
-  fireEvent.press(view.getByText("Keep editing"))
-  expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
-  fireEvent(view.UNSAFE_getByType(Header), "leftPress")
-  fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
-  expect(onBack).toHaveBeenCalledTimes(1)
-})
-
-test("blocks system back until discard is confirmed and replays the original action", () => {
-  const { onBack, ...view } = renderScreen()
-  expect(mockPreventRemove).toBe(false)
-  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved")
-  expect(mockPreventRemove).toBe(true)
-  const action = { type: "GO_BACK" }
-  act(() => mockPreventRemoveCallback?.({ data: { action } }))
-  expect(view.getByText("Discard changes?")).toBeTruthy()
-  expect(mockNavigationDispatch).not.toHaveBeenCalled()
-  fireEvent.press(view.getByText("Keep editing"))
-  expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
-  expect(mockPreventRemove).toBe(true)
-  act(() => mockPreventRemoveCallback?.({ data: { action } }))
-  fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
-  expect(mockPreventRemove).toBe(false)
-  expect(mockNavigationDispatch).toHaveBeenCalledTimes(1)
-  expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
-  expect(onBack).not.toHaveBeenCalled()
-})
-
-test("saving after cancelling system back keeps the editor open", () => {
-  const view = renderScreen()
-  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Saved")
-  expect(mockPreventRemove).toBe(true)
-  act(() => mockPreventRemoveCallback?.({ data: { action: { type: "GO_BACK" } } }))
-  fireEvent.press(view.getByText("Keep editing"))
-  fireEvent.press(view.getByTestId("guest-deck-save"))
-  expect(mockPreventRemove).toBe(false)
-  expect(mockNavigationDispatch).not.toHaveBeenCalled()
-  expect(view.getByDisplayValue("Saved")).toBeTruthy()
-})
-
-test("removes all copies of a card from the list and saves the draft", () => {
-  const view = renderScreen()
-  fireEvent.press(view.getByLabelText("Remove Sol Ring from deck"))
-  expect(view.queryByText("Sol Ring")).toBeNull()
-  expect(view.getByText("Cards (0)")).toBeTruthy()
-  fireEvent.press(view.getByTestId("guest-deck-save"))
-  expect(mockSaveGuestDeck).toHaveBeenCalledWith(expect.objectContaining({ cards: [] }), {
+  expect(view.getByText("Offline Commander")).toBeTruthy()
+  expect(view.queryByTestId("deck-note-input")).toBeNull()
+  expect(view.queryByLabelText("Increase Sol Ring")).toBeNull()
+  editNote(view, "New notes")
+  fireEvent.press(view.getByTestId("save-version-button"))
+  expect(mockSaveGuestDeck).toHaveBeenCalledWith(expect.objectContaining({ note: "New notes" }), {
     localId: mockStored.localId,
   })
+  view.unmount()
+  const reloaded = renderScreen()
+  fireEvent.press(reloaded.getByTestId("deck-tab-notes"))
+  expect(reloaded.getByText("New notes")).toBeTruthy()
 })
 
-test.each([
-  {
-    game: "mtg",
-    card: { name: "Island", scryfallId: "island-print", oracleId: "island", manaCost: "" },
-  },
-  {
-    game: "pokemon",
-    card: {
-      name: "Charizard",
-      cardId: "base1-4",
-      printingId: "base1-4",
-      game: "pokemon",
-      faces: [],
-      facets: {},
-    },
-  },
-])("adds new $game cards from search and saves only deck fields", async ({ game, card }) => {
-  mockCurrent = { ...mockStored, deck: { ...mockStored.deck, game, format: "standard", cards: [] } }
-  mockSearchCards.mockResolvedValue([{ ...card, imageUrl: "https://cards.example/card.jpg" }])
+test("deck details edits the name without a duplicate notes field", () => {
   const view = renderScreen()
-  fireEvent.press(view.getByTestId("guest-deck-add-cards"))
-  fireEvent.changeText(view.getByTestId("guest-card-search-input"), card.name)
-  fireEvent.press(view.getByTestId("guest-card-search"))
-  await waitFor(() => expect(view.getByLabelText(`Add ${card.name} to deck`)).toBeTruthy())
-  expect(mockSearchCards).toHaveBeenCalledWith(expect.anything(), { game, query: card.name })
-  fireEvent.press(view.getByLabelText(`Add ${card.name} to deck`))
-  fireEvent.press(view.getByLabelText(`Add ${card.name} to deck`))
-  fireEvent.press(view.getByText("Done"))
-  expect(view.getByText("Cards (2)")).toBeTruthy()
-  fireEvent.press(view.getByTestId("guest-deck-save"))
-  const savedCards = mockSaveGuestDeck.mock.calls[0][0].cards
-  expect(savedCards).toHaveLength(1)
-  expect(savedCards[0]).toMatchObject({ name: card.name, quantity: 2, section: "main" })
-  expect(savedCards[0]).not.toHaveProperty("manaCost")
-  expect(savedCards[0]).not.toHaveProperty("faces")
-  expect(savedCards[0]).not.toHaveProperty("facets")
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  expect(view.queryByTestId("deck-note-input")).toBeNull()
+  fireEvent.changeText(view.getByTestId("deck-name-input"), "Renamed")
+  fireEvent.press(view.getByTestId("deck-settings-save"))
+  fireEvent.press(view.getByTestId("save-version-button"))
+  expect(mockSaveGuestDeck).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Renamed", note: "Keep this local" }),
+    expect.anything(),
+  )
 })
 
-test("keeps edits after a failed search and lets guests retry", async () => {
-  mockSearchCards.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce([])
+test("cancel keeps a guest deck and confirm deletes it", () => {
   const view = renderScreen()
-  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved")
-  fireEvent.press(view.getByTestId("guest-deck-add-cards"))
-  fireEvent.changeText(view.getByTestId("guest-card-search-input"), "Island")
-  fireEvent.press(view.getByTestId("guest-card-search"))
-  await waitFor(() => expect(view.getByText(/Check your connection/)).toBeTruthy())
-  fireEvent.press(view.getByTestId("guest-card-search"))
-  await waitFor(() => expect(view.getByText("No cards found.")).toBeTruthy())
-  fireEvent.press(view.getByText("Done"))
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  fireEvent.press(view.getByTestId("delete-deck-button"))
+  fireEvent.press(view.getByTestId("confirm-dialog-cancel"))
+  expect(mockDeleteGuestDeck).not.toHaveBeenCalled()
+  fireEvent.press(view.getByTestId("deck-settings-button"))
+  fireEvent.press(view.getByTestId("delete-deck-button"))
+  fireEvent.press(view.getByTestId("guest-deck-confirm-delete"))
+  expect(mockDeleteGuestDeck).toHaveBeenCalledTimes(1)
+})
+
+test("retains a dirty draft on conflict and storage failure", () => {
+  const view = renderScreen()
+  editNote(view, "Unsaved")
+  mockCurrent = { ...mockStored, updatedAt: 3 }
+  fireEvent.press(view.getByTestId("save-version-button"))
+  expect(view.getByTestId("guest-deck-error")).toHaveTextContent(/changed elsewhere/)
   expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
+  mockCurrent = mockStored
+  mockSaveFailure = true
+  fireEvent.press(view.getByTestId("save-version-button"))
+  expect(view.getByTestId("guest-deck-error")).toHaveTextContent(/Unable to save/)
+  expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
+})
+
+test("supports removing the last copy, Undo, and cancelling an edit", () => {
+  const view = renderScreen()
+  fireEvent.press(view.getByTestId("edit-deck-button"))
+  fireEvent.press(view.getByLabelText("Decrease Sol Ring"))
+  fireEvent.press(view.getByLabelText("Remove Sol Ring"))
+  expect(view.queryByText("Sol Ring")).toBeNull()
+  fireEvent.press(view.getByText("Undo"))
   expect(view.getByText("Sol Ring")).toBeTruthy()
+  fireEvent(view.UNSAFE_getByType(Header), "leftPress")
+  fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
+  expect(view.getByText("2×")).toBeTruthy()
+  expect(view.onBack).not.toHaveBeenCalled()
+})
+
+test("blocks system back and replays navigation after discard", () => {
+  const view = renderScreen()
+  editNote(view, "Unsaved")
+  const action = { type: "GO_BACK" }
+  act(() => mockPreventRemoveCallback?.({ data: { action } }))
+  fireEvent.press(view.getByText("Keep editing"))
+  expect(mockPreventRemove).toBe(true)
+  act(() => mockPreventRemoveCallback?.({ data: { action } }))
+  fireEvent.press(view.getByTestId("guest-deck-discard-confirm"))
+  expect(mockNavigationDispatch).toHaveBeenCalledWith(action)
+})
+
+test("searches new cards into Main deck by default and saves merged copies", async () => {
+  mockSearchCards.mockResolvedValue([
+    {
+      name: "Island",
+      scryfallId: "island",
+      oracleId: "island-oracle",
+      imageUrl: "https://cards.example/island.jpg",
+      manaCost: "",
+    },
+  ])
+  const view = renderScreen()
+  fireEvent.press(view.getByTestId("deck-add-cards"))
+  fireEvent.changeText(view.getByTestId("card-search-input"), "Island")
+  await waitFor(() => expect(view.getByLabelText("Add Island to deck")).toBeTruthy())
+  fireEvent.press(view.getByLabelText("Add Island to deck"))
+  fireEvent.press(view.getByLabelText("Add Island to deck"))
+  fireEvent.press(view.getByText("Done"))
+  fireEvent.press(view.getByTestId("save-version-button"))
+  expect(mockSaveGuestDeck).toHaveBeenCalledWith(
+    expect.objectContaining({
+      cards: expect.arrayContaining([
+        expect.objectContaining({ name: "Island", quantity: 2, section: "main" }),
+      ]),
+    }),
+    expect.anything(),
+  )
+  expect(mockSaveGuestDeck.mock.calls[0][0].cards[1]).not.toHaveProperty("manaCost")
 })
