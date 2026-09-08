@@ -76,6 +76,7 @@ export function CardFocusDialog({
       visible
       wide
       placement="bottom"
+      style={$sheet}
       onClose={onClose}
       backdropTestID="card-focus-backdrop"
       backdropAccessibilityLabel="Close card details"
@@ -149,7 +150,8 @@ export function CardFocusDialog({
   )
 }
 
-const $scrollBody = { flexGrow: 0, flexShrink: 1 } as const
+const $sheet: ViewStyle = { height: "88%" }
+const $scrollBody: ViewStyle = { flex: 1 }
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $header: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 44,
