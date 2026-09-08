@@ -16,7 +16,8 @@ export async function cardImageCandidates(ctx: ActionCtx, game: string, cardId: 
       .slice(0, 8)
   }
   const original = await fetchScryfall(ctx, `/cards/${encodeURIComponent(cardId)}`)
-  if (!original.ok) throw new Error("Card lookup failed")
+  if (!original.ok)
+    throw new Error(`Card lookup failed (Scryfall HTTP ${original.status}, card ${cardId})`)
   const card = objectRecord(await original.json())
   const oracleId = stringValue(card?.oracle_id)
   if (!oracleId || !/^[\da-f-]{36}$/i.test(oracleId)) return []
@@ -24,7 +25,8 @@ export async function cardImageCandidates(ctx: ActionCtx, game: string, cardId: 
     ctx,
     `/cards/search?${new URLSearchParams({ q: `oracleid:${oracleId} lang:en`, unique: "prints", order: "released" })}`,
   )
-  if (!response.ok) throw new Error("Printing lookup failed")
+  if (!response.ok)
+    throw new Error(`Printing lookup failed (Scryfall HTTP ${response.status}, card ${cardId})`)
   const page = objectRecord(await response.json())
   // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code
   // ponytail: one provider page, expand pagination if this misses usable older artwork.

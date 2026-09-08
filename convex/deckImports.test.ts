@@ -882,6 +882,54 @@ describe("preconstructed catalog caching", () => {
 })
 
 describe("Scryfall request pacing", () => {
+  it("enforces endpoint and shared quotas, then stops queued work during a global cooldown", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const acquire = (path: string) =>
+        t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })
+      expect(await acquire("/cards/search?q=first")).toEqual({ waitMs: 0, blocked: false })
+      expect(await acquire("/cards/collection")).toEqual({ waitMs: 125, blocked: false })
+      now.mockReturnValue(1_000_125)
+      expect(await acquire("/cards/collection")).toEqual({ waitMs: 0, blocked: false })
+      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 375, blocked: false })
+      await t.mutation(internal.externalApiRateLimits.block, {
+        bucket: "scryfall:cooldown",
+        durationMs: 30_000,
+      })
+      now.mockReturnValue(1_000_500)
+      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 29_625, blocked: true })
+      expect(await acquire("/cards/example")).toEqual({ waitMs: 29_625, blocked: true })
+      now.mockReturnValue(1_030_125)
+      expect(await acquire("/cards/search?q=second")).toEqual({ waitMs: 0, blocked: false })
+    } finally {
+      now.mockRestore()
+    }
+  })
+
+  it.each([
+    ["/cards/named?exact=Forest", 500],
+    ["/cards/random", 500],
+    ["/cards/manifest", 6000],
+  ])("paces %s without a burst allowance", async (path, interval) => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      expect(await t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })).toEqual({
+        waitMs: 0,
+        blocked: false,
+      })
+      expect(await t.mutation(internal.externalApiRateLimits.acquireScryfall, { path })).toEqual({
+        waitMs: interval,
+        blocked: false,
+      })
+    } finally {
+      now.mockRestore()
+    }
+  })
+
   it("allocates a unique persistent slot to every concurrent reservation", async () => {
     const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
     try {
