@@ -909,6 +909,12 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
       {focusedCard ? (
         <CardFocusDialog
           card={{
+            game: detail.deck.game,
+            cardId:
+              focusedCard.scryfallId ??
+              focusedCard.cardId ??
+              focusedCard.printingId ??
+              focusedCard.providerCardId,
             name: focusedCard.name,
             imageUrl: focusedCard.imageUrl,
             smallImageUrl: focusedCard.smallImageUrl,

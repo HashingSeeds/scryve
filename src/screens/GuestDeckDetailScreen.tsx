@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
-import { Image } from "expo-image"
 import { useNavigation } from "expo-router"
 import { usePreventRemove } from "expo-router/react-navigation"
 
 import { Button } from "@/components/Button"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
+import { CardImage } from "@/components/CardImage"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
@@ -200,22 +200,22 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
               testID={`guest-card-${index}`}
               style={themed($card)}
             >
-              {card.smallImageUrl || card.imageUrl ? (
-                <TouchableOpacity
-                  testID={`guest-card-${index}-image`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View ${card.name}`}
-                  onPress={() => setFocusedIndex(index)}
-                >
-                  <Image
-                    testID={`guest-card-${index}-thumbnail`}
-                    source={card.smallImageUrl ?? card.imageUrl}
-                    accessibilityLabel={card.name}
-                    style={$cardImage}
-                    contentFit="contain"
-                  />
-                </TouchableOpacity>
-              ) : null}
+              <TouchableOpacity
+                testID={`guest-card-${index}-image`}
+                accessibilityRole="button"
+                accessibilityLabel={`View ${card.name}`}
+                onPress={() => setFocusedIndex(index)}
+              >
+                <CardImage
+                  game={game}
+                  cardId={card.scryfallId ?? card.cardId ?? card.printingId ?? card.providerCardId}
+                  compact
+                  testID={`guest-card-${index}-thumbnail`}
+                  source={card.smallImageUrl ?? card.imageUrl}
+                  accessibilityLabel={card.name}
+                  style={$cardImage}
+                />
+              </TouchableOpacity>
               <View style={themed($cardCopy)}>
                 <Text weight="medium" text={card.name} />
                 <Text size="sm" style={themed($metadata)} text={sectionLabel(card)} />
@@ -270,6 +270,12 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
       {focusedCard && focusedIndex !== undefined ? (
         <CardFocusDialog
           card={{
+            game,
+            cardId:
+              focusedCard.scryfallId ??
+              focusedCard.cardId ??
+              focusedCard.printingId ??
+              focusedCard.providerCardId,
             name: focusedCard.name,
             imageUrl: focusedCard.imageUrl,
             smallImageUrl: focusedCard.smallImageUrl,

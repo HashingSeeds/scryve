@@ -92,6 +92,7 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard) {
         query.eq("game", card.game).eq("printingId", printing.printingId),
       )
       .unique()
+    if (card.game === "pokemon" && stored?.typeLabel && !printing.typeLabel) continue
     const value = { gameCardId, game: card.game, ...printing, updatedAt: now }
     if (stored) await ctx.db.replace(stored._id, value)
     else await ctx.db.insert("cardPrintings", value)

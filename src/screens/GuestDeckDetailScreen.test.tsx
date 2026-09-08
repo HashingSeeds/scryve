@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/theme/context"
 
 import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
 
+jest.mock("convex/react", () => ({ useConvex: () => undefined }))
+
 let mockPreventRemove = false
 let mockPreventRemoveCallback:
   ((options: { data: { action: { type: string } } }) => void) | undefined
