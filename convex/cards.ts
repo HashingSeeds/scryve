@@ -189,7 +189,10 @@ export const byCatalogId = action({
       game,
       cardId,
     })
-    if (cached && (!includeImages || game === "mtg" || hasCatalogImage(cached)))
+    if (
+      cached &&
+      (!includeImages || game === "mtg" || cardId.startsWith("rush:") || hasCatalogImage(cached))
+    )
       return includeImages ? cached : catalogWithoutImages(cached)
     if (game === "mtg") {
       const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(cardId)}`)
@@ -206,6 +209,11 @@ export const byCatalogId = action({
       await ctx.runMutation(internal.cardCatalog.cacheMany, { cards: [card] })
       return catalogResult(card, includeImages)
     }
+    if (game === "ygo" && cardId.startsWith("rush:"))
+      throw new ConvexError({
+        code: "card_not_found",
+        message: "Rush Duel card is not in the catalog",
+      })
     const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
     const startedAt = Date.now()
     const result = await (async () => {

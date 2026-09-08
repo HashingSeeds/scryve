@@ -6,6 +6,7 @@ import type { ActionCtx } from "./_generated/server"
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { preconstructedFormat } from "./lib/deckGames"
+import { limitDeckImport } from "./lib/deckRateLimits"
 import {
   MAX_CATALOG_BATCH,
   normalizeCardName,
@@ -98,11 +99,6 @@ const preconstructedOutlineCardValidator = v.object({
   board: v.union(v.literal("main"), v.literal("sideboard"), v.literal("commander")),
   scryfallId: v.optional(v.string()),
 })
-
-async function requireActionIdentity(ctx: { auth: { getUserIdentity: () => Promise<unknown> } }) {
-  if (!(await ctx.auth.getUserIdentity()))
-    throw new ConvexError({ code: "unauthenticated", message: "Authentication required" })
-}
 
 type GenericParsedEntry = {
   name: string
@@ -881,6 +877,7 @@ async function preconCatalog(ctx: ActionCtx) {
       await ctx.runMutation(internal.deckImports.requestCatalogRefresh, {})
     return cached.decks
   }
+  await limitDeckImport(ctx)
   const decks = await fetchPreconCatalog()
   await ctx.runMutation(internal.deckImports.storeCatalog, { decks })
   return decks
@@ -1079,6 +1076,7 @@ export const previewPreconstructed = action({
     const cached = await cachedPreconstructedOutline(ctx, fileName)
     if (cached) return cached
     if (!(await ctx.auth.getUserIdentity())) await assertGuestPreconstructedInCatalog(ctx, fileName)
+    await limitDeckImport(ctx)
     return await previewColdPreconstructed(ctx, fileName)
   },
 })
@@ -1107,6 +1105,7 @@ export const resolvePreconstructed = action({
         })
       return cachedPreconstructedDeck(cached)
     }
+    await limitDeckImport(ctx)
     return await resolveColdPreconstructed(ctx, fileName)
   },
 })
@@ -1120,7 +1119,7 @@ export const resolvePasted = action({
     | { cards: ResolvedDeckCard[]; unresolved: string[]; invalidLines: string[] }
     | { cards: GenericDeckCard[]; unresolved: string[]; invalidLines: string[] }
   > => {
-    await requireActionIdentity(ctx)
+    await limitDeckImport(ctx)
     const game = assertGameSystem(args.game ?? "mtg")
     await requireActionCapability(ctx, game, "deckImport")
     if (game !== "mtg") {

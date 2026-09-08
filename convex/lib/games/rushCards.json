@@ -1,0 +1,1074 @@
+[
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15150",
+    "name": "セブンスロード・マジシャン",
+    "nameNormalized": "セブンスロード・マジシャン",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "7"
+      },
+      {
+        "key": "attack",
+        "value": "2100"
+      },
+      {
+        "key": "defense",
+        "value": "1500"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15150",
+        "printingId": "rush:15150",
+        "setCode": "RD/ST01",
+        "collectorNumber": "001",
+        "language": "ja",
+        "typeLabel": "闇属性 レベル 7 【 魔法使い族 ／効果 】 ATK 2100 DEF 1500",
+        "faces": [
+          {
+            "index": 0,
+            "name": "セブンスロード・マジシャン",
+            "text": "【条件】自分の墓地にモンスターがいる場合、デッキの一番上のカードを墓地へ送って発動できる。\n【効果】このカードの攻撃力はターン終了時まで、［自分の墓地のモンスターの属性の種類］×３００アップする。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp001_srp.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp001_srp.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15151",
+    "name": "風使いトルネ",
+    "nameNormalized": "風使いトルネ",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "6"
+      },
+      {
+        "key": "attack",
+        "value": "1600"
+      },
+      {
+        "key": "defense",
+        "value": "1000"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15151",
+        "printingId": "rush:15151",
+        "setCode": "RD/ST01",
+        "collectorNumber": "002",
+        "language": "ja",
+        "typeLabel": "風属性 レベル 6 【 魔法使い族 ／効果 】 ATK 1600 DEF 1000",
+        "faces": [
+          {
+            "index": 0,
+            "name": "風使いトルネ",
+            "text": "【条件】手札１枚を墓地へ送って発動できる。\n【効果】相手フィールドのモンスター１体を選んで表示形式を変更する（攻撃表示は表側守備表示に、守備表示は表側攻撃表示にする）。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp002_r.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp002_r.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15152",
+    "name": "魔剣士アンサラー",
+    "nameNormalized": "魔剣士アンサラー",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "6"
+      },
+      {
+        "key": "attack",
+        "value": "2000"
+      },
+      {
+        "key": "defense",
+        "value": "500"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15152",
+        "printingId": "rush:15152",
+        "setCode": "RD/ST01",
+        "collectorNumber": "003",
+        "language": "ja",
+        "typeLabel": "炎属性 レベル 6 【 魔法使い族 ／通常 】 ATK 2000 DEF 500",
+        "faces": [
+          {
+            "index": 0,
+            "name": "魔剣士アンサラー",
+            "text": "傀儡の炎魔に自身を振るわせる魔剣。炎魔との仕合に勝った者は、魔剣に真の使い手として認められるらしい。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp003.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp003.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15153",
+    "name": "ハイドロ・マジシャン",
+    "nameNormalized": "ハイドロ・マジシャン",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "5"
+      },
+      {
+        "key": "attack",
+        "value": "1700"
+      },
+      {
+        "key": "defense",
+        "value": "1500"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15153",
+        "printingId": "rush:15153",
+        "setCode": "RD/ST01",
+        "collectorNumber": "004",
+        "language": "ja",
+        "typeLabel": "水属性 レベル 5 【 魔法使い族 ／通常 】 ATK 1700 DEF 1500",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ハイドロ・マジシャン",
+            "text": "水と意識を通わせる魔法使いの青年。蒼く華麗に舞うその姿は敵をも魅了する。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp004.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp004.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15154",
+    "name": "ダーク・ソーサラー",
+    "nameNormalized": "ダーク・ソーサラー",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "4"
+      },
+      {
+        "key": "attack",
+        "value": "1500"
+      },
+      {
+        "key": "defense",
+        "value": "0"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15154",
+        "printingId": "rush:15154",
+        "setCode": "RD/ST01",
+        "collectorNumber": "005",
+        "language": "ja",
+        "typeLabel": "闇属性 レベル 4 【 魔法使い族 ／通常 】 ATK 1500 DEF 0",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ダーク・ソーサラー",
+            "text": "禁忌の術に手を染めた魔術師。望んだその力の代償を彼はまだ知らない。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp005.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp005.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15155",
+    "name": "ミスティック・ディーラー",
+    "nameNormalized": "ミスティック・ディーラー",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "3"
+      },
+      {
+        "key": "attack",
+        "value": "1000"
+      },
+      {
+        "key": "defense",
+        "value": "0"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15155",
+        "printingId": "rush:15155",
+        "setCode": "RD/ST01",
+        "collectorNumber": "006",
+        "language": "ja",
+        "typeLabel": "水属性 レベル 3 【 魔法使い族 ／効果 】 ATK 1000 DEF 0",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ミスティック・ディーラー",
+            "text": "【条件】手札のモンスター（魔法使い族）１体を墓地へ送って発動できる。\n【効果】自分は１枚ドローする。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp006_r.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp006_r.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15156",
+    "name": "魔獣ウォルフラム",
+    "nameNormalized": "魔獣ウォルフラム",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "3"
+      },
+      {
+        "key": "attack",
+        "value": "1100"
+      },
+      {
+        "key": "defense",
+        "value": "100"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15156",
+        "printingId": "rush:15156",
+        "setCode": "RD/ST01",
+        "collectorNumber": "007",
+        "language": "ja",
+        "typeLabel": "炎属性 レベル 3 【 魔法使い族 ／通常 】 ATK 1100 DEF 100",
+        "faces": [
+          {
+            "index": 0,
+            "name": "魔獣ウォルフラム",
+            "text": "高名な魔法使いの元使い魔。いつしか主を超えたその魔力で、炎を自在に操り敵を翻弄する。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp007.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp007.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15157",
+    "name": "スペル・アーチャー",
+    "nameNormalized": "スペル・アーチャー",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "3"
+      },
+      {
+        "key": "attack",
+        "value": "1000"
+      },
+      {
+        "key": "defense",
+        "value": "400"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15157",
+        "printingId": "rush:15157",
+        "setCode": "RD/ST01",
+        "collectorNumber": "008",
+        "language": "ja",
+        "typeLabel": "風属性 レベル 3 【 魔法使い族 ／通常 】 ATK 1000 DEF 400",
+        "faces": [
+          {
+            "index": 0,
+            "name": "スペル・アーチャー",
+            "text": "風に愛されし若き弓の名手。魔力によって創られた矢はどこまでも飛び続ける。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp008.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp008.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15158",
+    "name": "ルミナス・シャーマン",
+    "nameNormalized": "ルミナス・シャーマン",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "2"
+      },
+      {
+        "key": "attack",
+        "value": "500"
+      },
+      {
+        "key": "defense",
+        "value": "0"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15158",
+        "printingId": "rush:15158",
+        "setCode": "RD/ST01",
+        "collectorNumber": "009",
+        "language": "ja",
+        "typeLabel": "光属性 レベル 2 【 魔法使い族 ／効果 】 ATK 500 DEF 0",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ルミナス・シャーマン",
+            "text": "【条件】自分フィールドの表側表示のこのカードを墓地へ送って発動できる。\n【効果】自分フィールドの表側表示モンスター（レベル４以下／魔法使い族）１体を選ぶ。このターン、そのモンスターは直接攻撃できる。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp009.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp009.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15159",
+    "name": "はぐれ使い魔",
+    "nameNormalized": "はぐれ使い魔",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "1"
+      },
+      {
+        "key": "attack",
+        "value": "0"
+      },
+      {
+        "key": "defense",
+        "value": "1400"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15159",
+        "printingId": "rush:15159",
+        "setCode": "RD/ST01",
+        "collectorNumber": "010",
+        "language": "ja",
+        "typeLabel": "地属性 レベル 1 【 魔法使い族 ／通常 】 ATK 0 DEF 1400",
+        "faces": [
+          {
+            "index": 0,
+            "name": "はぐれ使い魔",
+            "text": "強大な力を秘めているとされる使い魔。元来寂しがりな子だが、仲間たちとはぐれてしまい最近は特に寂しい。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp010.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp010.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15160",
+    "name": "風精の加護",
+    "nameNormalized": "風精の加護",
+    "category": "Spell",
+    "facets": [],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15160",
+        "printingId": "rush:15160",
+        "setCode": "RD/ST01",
+        "collectorNumber": "011",
+        "language": "ja",
+        "typeLabel": "魔法",
+        "faces": [
+          {
+            "index": 0,
+            "name": "風精の加護",
+            "text": "【条件】手札１枚を墓地へ送って発動できる。\n【効果】自分フィールドの表側表示モンスター（魔法使い族）１体を選び、その攻撃力をターン終了時まで１０００アップする。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp011.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp011.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15161",
+    "name": "マジカル・ストリーム",
+    "nameNormalized": "マジカル・ストリーム",
+    "category": "Spell",
+    "facets": [],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15161",
+        "printingId": "rush:15161",
+        "setCode": "RD/ST01",
+        "collectorNumber": "012",
+        "language": "ja",
+        "typeLabel": "魔法",
+        "faces": [
+          {
+            "index": 0,
+            "name": "マジカル・ストリーム",
+            "text": "【条件】自分フィールドに表側表示モンスター（魔法使い族）がいる場合に発動できる。\n【効果】相手フィールドの魔法・罠カード１枚を選んで破壊する。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp012.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp012.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15162",
+    "name": "ダーク・リベレイション",
+    "nameNormalized": "ダーク・リベレイション",
+    "category": "Trap",
+    "facets": [],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15162",
+        "printingId": "rush:15162",
+        "setCode": "RD/ST01",
+        "collectorNumber": "013",
+        "language": "ja",
+        "typeLabel": "罠",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ダーク・リベレイション",
+            "text": "【条件】相手モンスターの攻撃宣言時、自分の墓地のモンスター（魔法使い族）４体をデッキに戻して発動できる。\n【効果】相手フィールドの攻撃表示モンスターを全て破壊する。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp013_r.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp013_r.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15163",
+    "name": "火の粉のカーテン",
+    "nameNormalized": "火の粉のカーテン",
+    "category": "Trap",
+    "facets": [],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15163",
+        "printingId": "rush:15163",
+        "setCode": "RD/ST01",
+        "collectorNumber": "014",
+        "language": "ja",
+        "typeLabel": "罠",
+        "faces": [
+          {
+            "index": 0,
+            "name": "火の粉のカーテン",
+            "text": "【条件】自分の墓地にモンスター（魔法使い族）がいる場合、相手モンスターの攻撃宣言時に発動できる。\n【効果】攻撃してきたモンスターの攻撃力はターン終了時まで５００ダウンする。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp014.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st01/cards/jp014.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15164",
+    "name": "連撃竜ドラギアス",
+    "nameNormalized": "連撃竜ドラギアス",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "7"
+      },
+      {
+        "key": "attack",
+        "value": "2500"
+      },
+      {
+        "key": "defense",
+        "value": "1500"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15164",
+        "printingId": "rush:15164",
+        "setCode": "RD/ST02",
+        "collectorNumber": "001",
+        "language": "ja",
+        "typeLabel": "光属性 レベル 7 【 ドラゴン族 ／効果 】 ATK 2500 DEF 1500",
+        "faces": [
+          {
+            "index": 0,
+            "name": "連撃竜ドラギアス",
+            "text": "【条件】デッキの一番上のカードを墓地へ送って発動できる。\n【効果】このターン、このカードが戦闘でモンスターを破壊したバトルフェイズ中、このカードはもう１度だけ攻撃できる。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp001_srp.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp001_srp.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15165",
+    "name": "グラビティ・プレス・ドラゴン",
+    "nameNormalized": "グラビティ・プレス・ドラゴン",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "6"
+      },
+      {
+        "key": "attack",
+        "value": "1500"
+      },
+      {
+        "key": "defense",
+        "value": "1000"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15165",
+        "printingId": "rush:15165",
+        "setCode": "RD/ST02",
+        "collectorNumber": "002",
+        "language": "ja",
+        "typeLabel": "地属性 レベル 6 【 ドラゴン族 ／効果 】 ATK 1500 DEF 1000",
+        "faces": [
+          {
+            "index": 0,
+            "name": "グラビティ・プレス・ドラゴン",
+            "text": "【条件】手札１枚を墓地へ送って発動できる。\n【効果】相手フィールドの表側表示モンスター１体を選び、その攻撃力・守備力をターン終了時まで７００ダウンする。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp002_r.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp002_r.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15166",
+    "name": "火口の番竜",
+    "nameNormalized": "火口の番竜",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "6"
+      },
+      {
+        "key": "attack",
+        "value": "2100"
+      },
+      {
+        "key": "defense",
+        "value": "400"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15166",
+        "printingId": "rush:15166",
+        "setCode": "RD/ST02",
+        "collectorNumber": "003",
+        "language": "ja",
+        "typeLabel": "炎属性 レベル 6 【 ドラゴン族 ／通常 】 ATK 2100 DEF 400",
+        "faces": [
+          {
+            "index": 0,
+            "name": "火口の番竜",
+            "text": "火竜の王国へとつながる道に立ちはだかる門番。そのブレスを耐え切れぬ者に、先へと進む資格はない。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp003.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp003.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15167",
+    "name": "暗黒の竜騎士",
+    "nameNormalized": "暗黒の竜騎士",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "5"
+      },
+      {
+        "key": "attack",
+        "value": "1600"
+      },
+      {
+        "key": "defense",
+        "value": "1100"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15167",
+        "printingId": "rush:15167",
+        "setCode": "RD/ST02",
+        "collectorNumber": "004",
+        "language": "ja",
+        "typeLabel": "闇属性 レベル 5 【 ドラゴン族 ／通常 】 ATK 1600 DEF 1100",
+        "faces": [
+          {
+            "index": 0,
+            "name": "暗黒の竜騎士",
+            "text": "黒き軍勢を率いる竜騎士。慈悲なき一撃は強力無比。手にする邪剣は敵の魂を喰らい成長を続けている。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp004.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp004.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15168",
+    "name": "輝岩竜",
+    "nameNormalized": "輝岩竜",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "4"
+      },
+      {
+        "key": "attack",
+        "value": "1500"
+      },
+      {
+        "key": "defense",
+        "value": "0"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15168",
+        "printingId": "rush:15168",
+        "setCode": "RD/ST02",
+        "collectorNumber": "005",
+        "language": "ja",
+        "typeLabel": "地属性 レベル 4 【 ドラゴン族 ／通常 】 ATK 1500 DEF 0",
+        "faces": [
+          {
+            "index": 0,
+            "name": "輝岩竜",
+            "text": "地下鉱脈を起源とする竜。未知の鉱石が発するエネルギーを動力源とし闘い続ける。超硬度の打撃は威力抜群だ！",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp005.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp005.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15169",
+    "name": "ツインエッジ・ドラゴン",
+    "nameNormalized": "ツインエッジ・ドラゴン",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "3"
+      },
+      {
+        "key": "attack",
+        "value": "1000"
+      },
+      {
+        "key": "defense",
+        "value": "0"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15169",
+        "printingId": "rush:15169",
+        "setCode": "RD/ST02",
+        "collectorNumber": "006",
+        "language": "ja",
+        "typeLabel": "光属性 レベル 3 【 ドラゴン族 ／効果 】 ATK 1000 DEF 0",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ツインエッジ・ドラゴン",
+            "text": "【条件】手札１枚を墓地へ送って発動できる。\n【効果】このターン、このカードは２回攻撃できる。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp006_r.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp006_r.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15170",
+    "name": "竜の祈り子",
+    "nameNormalized": "竜の祈り子",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "3"
+      },
+      {
+        "key": "attack",
+        "value": "1100"
+      },
+      {
+        "key": "defense",
+        "value": "100"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15170",
+        "printingId": "rush:15170",
+        "setCode": "RD/ST02",
+        "collectorNumber": "007",
+        "language": "ja",
+        "typeLabel": "水属性 レベル 3 【 ドラゴン族 ／通常 】 ATK 1100 DEF 100",
+        "faces": [
+          {
+            "index": 0,
+            "name": "竜の祈り子",
+            "text": "古のドラゴンの血脈を継ぐうら若き巫女。一族の安寧のため日々祈り続ける。その清き瞳には、映る者の未来を変える力があると言われている。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp007.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp007.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15171",
+    "name": "ドラゴン・バット",
+    "nameNormalized": "ドラゴン・バット",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "3"
+      },
+      {
+        "key": "attack",
+        "value": "1000"
+      },
+      {
+        "key": "defense",
+        "value": "400"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15171",
+        "printingId": "rush:15171",
+        "setCode": "RD/ST02",
+        "collectorNumber": "008",
+        "language": "ja",
+        "typeLabel": "闇属性 レベル 3 【 ドラゴン族 ／通常 】 ATK 1000 DEF 400",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ドラゴン・バット",
+            "text": "鳥か獣か、学者も意見の分かれる謎の生物。大群で飛ぶ姿が竜に見えなくもないので、もしかしたらドラゴンかもしれない。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp008.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp008.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15172",
+    "name": "フェニックス・ドラゴン",
+    "nameNormalized": "フェニックス・ドラゴン",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "2"
+      },
+      {
+        "key": "attack",
+        "value": "500"
+      },
+      {
+        "key": "defense",
+        "value": "500"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15172",
+        "printingId": "rush:15172",
+        "setCode": "RD/ST02",
+        "collectorNumber": "009",
+        "language": "ja",
+        "typeLabel": "炎属性 レベル 2 【 ドラゴン族 ／効果 】 ATK 500 DEF 500",
+        "faces": [
+          {
+            "index": 0,
+            "name": "フェニックス・ドラゴン",
+            "text": "【条件】自分の墓地にモンスター（レベル５以上／ドラゴン族）がいる場合、手札１枚を墓地へ送って発動できる。\n【効果】自分の墓地のモンスター（レベル５以上／ドラゴン族）１体を選んで手札に加える。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp009.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp009.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15173",
+    "name": "手乗りドラコ",
+    "nameNormalized": "手乗りドラコ",
+    "category": "Monster",
+    "facets": [
+      {
+        "key": "level",
+        "value": "1"
+      },
+      {
+        "key": "attack",
+        "value": "0"
+      },
+      {
+        "key": "defense",
+        "value": "1400"
+      }
+    ],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15173",
+        "printingId": "rush:15173",
+        "setCode": "RD/ST02",
+        "collectorNumber": "010",
+        "language": "ja",
+        "typeLabel": "風属性 レベル 1 【 ドラゴン族 ／通常 】 ATK 0 DEF 1400",
+        "faces": [
+          {
+            "index": 0,
+            "name": "手乗りドラコ",
+            "text": "平和を愛する小型のドラゴン。人懐っこく木の実を投げると寄ってくる。首に掛けたリングには何かすごい秘密が隠されているらしい。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp010.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp010.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15174",
+    "name": "ドラゴニック・プレッシャー",
+    "nameNormalized": "ドラゴニック・プレッシャー",
+    "category": "Spell",
+    "facets": [],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15174",
+        "printingId": "rush:15174",
+        "setCode": "RD/ST02",
+        "collectorNumber": "011",
+        "language": "ja",
+        "typeLabel": "魔法",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ドラゴニック・プレッシャー",
+            "text": "【条件】手札のモンスター（ドラゴン族）３体を墓地へ送って発動できる。\n【効果】お互いのフィールドのモンスターを全て破壊する。その後、自分の墓地のモンスター（レベル４以下／ドラゴン族）１体を選んで自分フィールドに表側守備表示で特殊召喚できる。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp011_r.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp011_r.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15175",
+    "name": "火竜の熱閃",
+    "nameNormalized": "火竜の熱閃",
+    "category": "Spell",
+    "facets": [],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15175",
+        "printingId": "rush:15175",
+        "setCode": "RD/ST02",
+        "collectorNumber": "012",
+        "language": "ja",
+        "typeLabel": "魔法",
+        "faces": [
+          {
+            "index": 0,
+            "name": "火竜の熱閃",
+            "text": "【条件】自分フィールドに表側表示モンスター（ドラゴン族）がいる場合に発動できる。\n【効果】相手フィールドの魔法・罠カード１枚を選んで破壊する。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp012.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp012.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15176",
+    "name": "ドラゴン・エンカウント",
+    "nameNormalized": "ドラゴン・エンカウント",
+    "category": "Trap",
+    "facets": [],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15176",
+        "printingId": "rush:15176",
+        "setCode": "RD/ST02",
+        "collectorNumber": "013",
+        "language": "ja",
+        "typeLabel": "罠",
+        "faces": [
+          {
+            "index": 0,
+            "name": "ドラゴン・エンカウント",
+            "text": "【条件】相手がモンスターを召喚・特殊召喚した時に発動できる。\n【効果】手札のモンスター（ドラゴン族）１体を自分フィールドに表側表示で特殊召喚する。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp013.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp013.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "game": "ygo",
+    "identityNamespace": "konami-rush",
+    "cardId": "rush:15177",
+    "name": "反攻の竜撃",
+    "nameNormalized": "反攻の竜撃",
+    "category": "Trap",
+    "facets": [],
+    "printings": [
+      {
+        "provider": "konami-rush",
+        "providerCardId": "rush:15177",
+        "printingId": "rush:15177",
+        "setCode": "RD/ST02",
+        "collectorNumber": "014",
+        "language": "ja",
+        "typeLabel": "罠",
+        "faces": [
+          {
+            "index": 0,
+            "name": "反攻の竜撃",
+            "text": "【条件】自分のモンスター（ドラゴン族）が相手の攻撃で破壊された時、手札１枚を墓地へ送って発動できる。\n【効果】相手フィールドのモンスター１体を選んで破壊する。",
+            "imageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp014.jpg",
+            "smallImageUrl": "https://www.konami.com/yugioh/rushduel/products/st02/cards/jp014.jpg"
+          }
+        ]
+      }
+    ]
+  }
+]

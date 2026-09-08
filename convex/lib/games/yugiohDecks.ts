@@ -71,7 +71,8 @@ export function normalizeYgoDeckFeed(value: unknown): YgoDeckFeedItem[] {
         externalId,
         name,
         kind: stringValue(deck?.tournamentName) ? "tournament" : "community",
-        sourceUrl: SOURCE_URL,
+        sourceUrl: `https://ygoprodeck.com/deck/${encodeURIComponent(stringValue(deck?.pretty_url) ?? externalId)}`,
+
         entries: [
           ...countedEntries(main, "main"),
           ...countedEntries(extra, "extra"),

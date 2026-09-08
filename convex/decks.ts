@@ -8,6 +8,7 @@ import {
   assertDeckGameFormat,
   assertPlayableDeckGame,
   DEFAULT_DECK_GAME,
+  magicCatalogCardFields,
   defaultDeckFormat,
 } from "./lib/deckGames"
 import { DEFAULT_VERSION_NAME } from "./lib/deckVersions"
@@ -546,10 +547,11 @@ export const importCatalog = mutation({
       return includeImages
         ? {
             ...entry,
+            ...magicCatalogCardFields(entry),
             ...(storedEntry.imageUrl ? { imageUrl: storedEntry.imageUrl } : {}),
             ...(storedEntry.smallImageUrl ? { smallImageUrl: storedEntry.smallImageUrl } : {}),
           }
-        : entry
+        : { ...entry, ...magicCatalogCardFields(entry) }
     })
     assertDeckSize(cards, game)
     const format = assertDeckGameFormat(

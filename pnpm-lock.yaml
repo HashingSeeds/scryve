@@ -19,6 +19,9 @@ importers:
       '@clerk/expo':
         specifier: 4.6.1
         version: 4.6.1(2ae2767b719753e93726b8cd59a7debf)
+      '@convex-dev/rate-limiter':
+        specifier: ^0.3.2
+        version: 0.3.2(convex@1.42.3(@clerk/react@6.14.8(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       '@expo-google-fonts/space-grotesk':
         specifier: ^0.4.0
         version: 0.4.1
@@ -292,6 +295,16 @@ importers:
         version: 4.127.1(@cloudflare/workers-types@5.20260830.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
 packages:
+
+  '@convex-dev/rate-limiter@0.3.2':
+    resolution: {integrity: sha512-+oBPsBfFbzdxiF/9XaaTQmVnvDlvEfg/c69/v8LxTbw4VLuiflIKlfnPQL8OS0azXQQ11hcPWHmU8ytFmHKDXA==}
+    peerDependencies:
+      convex: ^1.24.8
+      react: ^18.2.0 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
+
 
   '@adraffy/ens-normalize@1.11.1':
     resolution: {integrity: sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ==}
@@ -7871,6 +7884,13 @@ packages:
       '@types/emscripten': '>=1.39.6'
 
 snapshots:
+
+  '@convex-dev/rate-limiter@0.3.2(convex@1.42.3(@clerk/react@6.14.8(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)':
+    dependencies:
+      convex: 1.42.3(@clerk/react@6.14.8(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
+    optionalDependencies:
+      react: 19.2.3
+
 
   '@adraffy/ens-normalize@1.11.1': {}
 
