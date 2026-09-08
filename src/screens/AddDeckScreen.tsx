@@ -8,7 +8,6 @@ import type { FunctionReturnType } from "convex/server"
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
-import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { CardImage } from "@/components/CardImage"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
@@ -22,11 +21,11 @@ import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { AccountDeckCapacity } from "@/features/decks/AccountDeckCapacity"
-import { catalogCardDetails } from "@/features/decks/cardFocus"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { replaceGuestDeck, saveGuestDeck, type GuestDeckPayload } from "@/features/decks/guestDeck"
 import { GuestDeckImportNotice } from "@/features/decks/GuestDeckImportNotice"
+import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useGuestDeckImport } from "@/features/decks/useGuestDeckImport"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -282,9 +281,6 @@ export function AddDeckScreen({
   const resolvePasted = useAction(api.deckImports.resolvePasted)
   const searchTopDecks = useAction(api.deckCatalogs.browse)
   const importCatalog = useMutation(api.decks.importCatalog)
-  const fetchCardById = useAction(api.cards.byId)
-  const fetchCatalogCardById = useAction(api.cards.byCatalogId)
-  const fetchPokemonCardByReference = useAction(api.cards.byPokemonReference)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const [mode, setMode] = useState<CreationMode>("precon")
@@ -304,10 +300,8 @@ export function AddDeckScreen({
   const [resolvedPrecon, setResolvedPrecon] = useState<ResolvedPreconstructedDeck>()
   const [previewLoading, setPreviewLoading] = useState(false)
   const [focusedPreviewCard, setFocusedPreviewCard] = useState<FocusedPreviewCard>()
-  const [previewDetailsByKey, setPreviewDetailsByKey] = useState<
-    Record<string, FocusedCardDetails>
-  >({})
-  const [previewDetailsError, setPreviewDetailsError] = useState<string>()
+  const { detailsByKey: previewDetailsByKey, detailsError: previewDetailsError } =
+    useCardDetails(focusedPreviewCard)
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [saveAttempted, setSaveAttempted] = useState(false)
@@ -534,36 +528,8 @@ export function AddDeckScreen({
     setPreconOutline(undefined)
     setResolvedPrecon(undefined)
     setFocusedPreviewCard(undefined)
-    setPreviewDetailsError(undefined)
     setPreviewError(undefined)
     setError(undefined)
-  }
-
-  async function loadPreviewCardDetails(card: FocusedPreviewCard) {
-    if (previewDetailsByKey[card.detailKey]) return
-    try {
-      const details = card.scryfallId
-        ? await fetchCardById({ scryfallId: card.scryfallId })
-        : card.game && card.catalogCardId
-          ? catalogCardDetails(
-              await fetchCatalogCardById({ game: card.game, cardId: card.catalogCardId }),
-            )
-          : card.game === "pokemon" && card.originalReference
-            ? catalogCardDetails(
-                await fetchPokemonCardByReference({
-                  name: card.name,
-                  originalReference: card.originalReference,
-                }),
-              )
-            : undefined
-      if (!details) {
-        setPreviewDetailsError("No additional card details are available.")
-        return
-      }
-      setPreviewDetailsByKey((current) => ({ ...current, [card.detailKey]: details }))
-    } catch (cause) {
-      setPreviewDetailsError(convexErrorMessage(cause, "Could not load card details"))
-    }
   }
 
   function focusPreviewCard(card: PreviewCard, boardLabel: string) {
@@ -577,8 +543,6 @@ export function AddDeckScreen({
       scryfallId: card.scryfallId,
     }
     setFocusedPreviewCard(focused)
-    setPreviewDetailsError(undefined)
-    void loadPreviewCardDetails(focused)
   }
 
   function focusCatalogCard(
@@ -599,8 +563,6 @@ export function AddDeckScreen({
       originalReference: card.originalReference,
     }
     setFocusedPreviewCard(focused)
-    setPreviewDetailsError(undefined)
-    void loadPreviewCardDetails(focused)
   }
 
   async function importPrecon() {

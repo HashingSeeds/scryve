@@ -142,7 +142,7 @@ export function SelectField({
           accessibilityViewIsModal
           style={[themed($menu), placement?.style ?? themed($menuFallback), $entrance]}
         >
-          <ScrollView contentContainerStyle={themed($menuContent)}>
+          <ScrollView style={$menuClip} contentContainerStyle={themed($menuContent)}>
             {clearLabel ? (
               <MenuOption
                 testID={testID ? `${testID}-option-none` : undefined}
@@ -254,6 +254,7 @@ const $menuFallback: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "80%",
   maxHeight: MIN_MENU_HEIGHT * 2,
 })
+const $menuClip: ViewStyle = { borderRadius: CHOICE_RADIUS - 1, overflow: "hidden" }
 const $menuContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingVertical: spacing.xxs })
 const $optionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,

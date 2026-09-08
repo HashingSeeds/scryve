@@ -51,6 +51,7 @@ jobs:
         run: |
           base_dir="$RUNNER_TEMP/base"
           mkdir -p "$base_dir"
+          git fetch --depth=1 origin "$BASE_SHA"
           git archive "$BASE_SHA" | tar -x -C "$base_dir"
           pnpm --dir "$base_dir" install --frozen-lockfile
 
