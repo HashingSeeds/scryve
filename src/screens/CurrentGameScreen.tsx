@@ -76,9 +76,11 @@ export function CurrentGameScreen({
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
+  const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
 
   function toggleSword(player: GamePlayer) {
+    setInspectedPlayerId(null)
     setArmedPlayerId((current) => (current === player.id ? null : player.id))
   }
 
@@ -191,7 +193,8 @@ export function CurrentGameScreen({
   return (
     <Screen
       preset="fixed"
-      safeAreaEdges={[]}
+      backgroundColor={commanderDamageEnabled ? "#000000" : undefined}
+      safeAreaEdges={commanderDamageEnabled ? ["top", "bottom", "left", "right"] : []}
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
@@ -212,6 +215,7 @@ export function CurrentGameScreen({
               ? {
                   incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
                   armedPlayerId,
+                  inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
                   onPressSword: toggleSword,
                   onStage: assignCommanderDamage,
                 }
@@ -219,19 +223,21 @@ export function CurrentGameScreen({
           }
           onChange={runtime.changeLife}
         />
-        <GameRadialMenu
-          open={menuOpen}
-          anchor={menuAnchor}
-          compact={playerCount > 2}
-          actions={radialActions}
-          variant={menuButtonStyle}
-          seatColors={runtime.game.players.map((player) => player.color)}
-          onToggle={() => {
-            setArmedPlayerId(null)
-            setMenuOpen((current) => !current)
-          }}
-          onClose={closeMenu}
-        />
+        {!armedPlayerId && !inspectedPlayerId ? (
+          <GameRadialMenu
+            open={menuOpen}
+            anchor={menuAnchor}
+            compact={playerCount > 2}
+            actions={radialActions}
+            variant={menuButtonStyle}
+            seatColors={runtime.game.players.map((player) => player.color)}
+            onToggle={() => {
+              setArmedPlayerId(null)
+              setMenuOpen((current) => !current)
+            }}
+            onClose={closeMenu}
+          />
+        ) : null}
         {menuOpen && onDecks && onSettings && onAccount ? (
           <FloatingAppNavigation
             destinationLabel="Decks"

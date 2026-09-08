@@ -360,11 +360,10 @@ describe("CurrentGameScreen", () => {
       )
 
     const life = (view: ReturnType<typeof renderGame>, seat: number) =>
-      view.getByTestId(`life-total-seat-${seat}`).props.children
+      view.getByTestId(`life-total-seat-${seat}`, { includeHiddenElements: true }).props.children
 
     const armCommander = (view: ReturnType<typeof renderGame>, seat: number) => {
       fireEvent.press(view.getByTestId(`commander-mark-seat-${seat}`))
-      fireEvent.press(view.getByTestId(`commander-sword-seat-${seat}`))
     }
 
     it("stays out of the way outside Commander", () => {
@@ -390,6 +389,30 @@ describe("CurrentGameScreen", () => {
         expect(view.queryByTestId(`commander-board-seat-${seat}`)).toBeNull()
       }
       expect(view.queryByTestId("commander-stage-seat-2-1")).toBeNull()
+    })
+
+    it("keeps inspection separate from assignment and clears the menu out of both", () => {
+      const view = renderGame()
+      fireEvent.press(view.getByTestId("commander-inspect-seat-2"))
+      expect(view.getByTestId("commander-board-seat-2")).toBeTruthy()
+      expect(view.queryByTestId("game-menu-button")).toBeNull()
+      fireEvent.press(view.getByTestId("commander-inspect-seat-3"))
+      expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
+      expect(view.getByTestId("commander-board-seat-3")).toBeTruthy()
+      armCommander(view, 1)
+      expect(view.queryByTestId("commander-board-seat-3")).toBeNull()
+      expect(view.queryByTestId("game-menu-button")).toBeNull()
+      fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+      expect(view.getByTestId("commander-total-seat-2")).toHaveTextContent("1")
+      expect(view.getByTestId("commander-life-seat-2")).toHaveTextContent("39 life")
+      expect(view.getByLabelText("1 commander damage from Ada, 39 life")).toBeTruthy()
+      fireEvent.press(view.getByTestId("commander-done-seat-1"))
+      expect(view.queryByTestId("commander-board-seat-3")).toBeNull()
+      expect(view.getByTestId("game-menu-button")).toBeTruthy()
+      fireEvent.press(view.getByTestId("commander-inspect-seat-2"))
+      fireEvent.press(view.getByTestId("commander-inspect-seat-2"))
+      expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
+      expect(view.getByTestId("game-menu-button")).toBeTruthy()
     })
 
     it("arms one commander at a time and reveals controls only on opponents", () => {
@@ -458,7 +481,9 @@ describe("CurrentGameScreen", () => {
       for (let press = 0; press < 21; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
 
-      expect(view.getByTestId("life-eliminated-seat-2")).toBeTruthy()
+      expect(
+        view.getByTestId("life-eliminated-seat-2", { includeHiddenElements: true }),
+      ).toBeTruthy()
       expect(view.queryByTestId("life-eliminated-seat-3")).toBeNull()
       expect(view.getByTestId("game-board")).toBeTruthy()
       fireEvent.press(view.getByTestId("commander-done-seat-1"))
@@ -485,6 +510,7 @@ describe("CurrentGameScreen", () => {
 
       armCommander(view, 1)
       fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
+      fireEvent.press(view.getByTestId("commander-done-seat-1"))
 
       fireEvent.press(view.getByTestId("game-menu-button"))
       expect(view.getByTestId("end-game-button")).toBeTruthy()
@@ -497,6 +523,7 @@ describe("CurrentGameScreen", () => {
       for (let press = 0; press < 5; press += 1)
         fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
       expect(life(view, 2)).toBe("35")
+      fireEvent.press(view.getByTestId("commander-done-seat-1"))
 
       fireEvent.press(view.getByTestId("game-menu-button"))
       fireEvent.press(view.getByTestId("undo-button"))

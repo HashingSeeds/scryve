@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
+import Svg, { Path, Rect } from "react-native-svg"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
@@ -48,6 +49,7 @@ export type LifeCardCommanderDamage = Omit<
   CommanderDamageBoardProps,
   "contentRotation" | "compact" | "foreground" | "seatNumber"
 > & {
+  inspection?: { open: boolean; onToggle: () => void }
   attackerName?: string
   stagedAgainstOwner?: number
   onStage?: (step: number) => void
@@ -108,7 +110,9 @@ export function LifeCard({
     themed,
     theme: { spacing },
   } = useAppTheme()
-  const foreground = accessibleForeground(color)
+  const localCommander = !!commanderDamage?.inspection
+  const foreground = localCommander ? "#FFFFFF" : accessibleForeground(color)
+  const cardColor = localCommander ? "#000000" : color
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
   const frozen = disabled || eliminated
@@ -134,7 +138,14 @@ export function LifeCard({
     )
   const cardPadding = compact ? spacing.xxs : spacing.xs
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
-  const [commanderOverviewOpen, setCommanderOverviewOpen] = useState(false)
+  const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
+  const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
+  const inspectionInsets = {
+    top: contentRotation === 180 ? 60 : 12,
+    bottom: contentRotation === 0 ? 60 : 12,
+    left: contentRotation === 90 ? 60 : 12,
+    right: contentRotation === -90 ? 60 : 12,
+  }
   const markStyle = getPlayerMarkCorner(contentRotation, cardPadding)
   const commanderOverviewEntering =
     reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
@@ -272,11 +283,12 @@ export function LifeCard({
         themed($card),
         compact && themed($compactCard),
         ownership === "disabled" && themed($disabledCard),
-        { backgroundColor: color },
+        { backgroundColor: cardColor },
+        localCommander && themed($localCommanderCard),
         style,
       ]}
     >
-      {commanderDamage && !commanderCardMode ? (
+      {localCommander ? null : commanderDamage && !commanderCardMode ? (
         <View
           pointerEvents="none"
           style={[
@@ -308,8 +320,15 @@ export function LifeCard({
         />
       )}
       <View
-        pointerEvents="box-none"
-        style={[themed($content), commanderCardMode && themed($mutedContent)]}
+        pointerEvents={commanderOverviewOpen || commanderCardMode ? "none" : "box-none"}
+        accessibilityElementsHidden={commanderOverviewOpen || !!commanderCardMode}
+        importantForAccessibility={
+          commanderOverviewOpen || commanderCardMode ? "no-hide-descendants" : "auto"
+        }
+        style={[
+          themed($content),
+          (commanderCardMode || commanderOverviewOpen) && themed($mutedContent),
+        ]}
       >
         <View
           testID={`life-readout-seat-${seatNumber}`}
@@ -393,16 +412,17 @@ export function LifeCard({
           testID={`commander-overview-seat-${seatNumber}`}
           entering={commanderOverviewEntering}
           exiting={commanderOverviewExiting}
-          accessibilityViewIsModal
+          accessibilityViewIsModal={!localCommander}
           style={[
             themed($commanderOverview),
             compact && themed($compactCommanderOverview),
-            { backgroundColor: color },
+            { backgroundColor: cardColor },
           ]}
         >
-          <View style={themed($commanderOverviewContent)}>
+          <View style={[themed($commanderOverviewContent), localCommander && inspectionInsets]}>
             <CommanderDamageBoard
               ownerPlayerId={commanderDamage.ownerPlayerId}
+              players={commanderDamage.players}
               seats={commanderDamage.seats}
               rows={commanderDamage.rows}
               columns={commanderDamage.columns}
@@ -415,31 +435,45 @@ export function LifeCard({
               foreground={foreground}
               style={themed($expandedCommanderBoard)}
               maxSize={{
-                width: Math.max(cardSize.width - cardPadding * 2, 0),
-                height: Math.max(cardSize.height - cardPadding * 2, 0),
+                width: Math.max(
+                  cardSize.width -
+                    (localCommander
+                      ? inspectionInsets.left + inspectionInsets.right
+                      : cardPadding * 2),
+                  0,
+                ),
+                height: Math.max(
+                  cardSize.height -
+                    (localCommander
+                      ? inspectionInsets.top + inspectionInsets.bottom
+                      : cardPadding * 2),
+                  0,
+                ),
               }}
             />
           </View>
-          <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-            <Pressable
-              testID={`commander-overview-close-seat-${seatNumber}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Close commander damage for ${identity}`}
-              onPress={closeCommanderOverview}
-              hitSlop={12}
-              style={[themed($overviewClose), markStyle, { width: markSize, height: markSize }]}
-            >
-              <PlayerMark
-                seatNumber={seatNumber}
-                shape={shape}
-                color={foreground}
-                rotation={contentRotation}
-                insetSwordColor={color}
-                closeIcon
-                size={markSize}
-              />
-            </Pressable>
-          </View>
+          {!localCommander ? (
+            <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+              <Pressable
+                testID={`commander-overview-close-seat-${seatNumber}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Close commander damage for ${identity}`}
+                onPress={closeCommanderOverview}
+                hitSlop={12}
+                style={[themed($overviewClose), markStyle, { width: markSize, height: markSize }]}
+              >
+                <PlayerMark
+                  seatNumber={seatNumber}
+                  shape={shape}
+                  color={foreground}
+                  rotation={contentRotation}
+                  insetSwordColor={color}
+                  closeIcon
+                  size={markSize}
+                />
+              </Pressable>
+            </View>
+          ) : null}
         </Animated.View>
       ) : null}
       {commanderCardMode ? (
@@ -449,8 +483,9 @@ export function LifeCard({
           contentRotation={contentRotation}
           compact={compact}
           mode={commanderCardMode}
+          life={localCommander ? life : undefined}
         />
-      ) : (
+      ) : !commanderOverviewOpen ? (
         <LifeControls
           playerName={displayName}
           seatNumber={seatNumber}
@@ -467,8 +502,8 @@ export function LifeCard({
             else openEditor(direction > 0 ? "add" : "subtract")
           }}
         />
-      )}
-      {commanderDamage && !commanderCardMode && !commanderOverviewOpen ? (
+      ) : null}
+      {commanderDamage && !localCommander && !commanderCardMode && !commanderOverviewOpen ? (
         <Pressable
           testID={`commander-mark-seat-${seatNumber}`}
           accessibilityRole="button"
@@ -483,6 +518,49 @@ export function LifeCard({
             { width: markSize, height: markSize, opacity: pressed ? 0.72 : 1 },
           ]}
         />
+      ) : null}
+      {commanderDamage?.inspection && !commanderCardMode ? (
+        <View style={[themed($commanderToolbar), commanderToolbarEdge(contentRotation)]}>
+          <Pressable
+            testID={`commander-inspect-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${commanderOverviewOpen ? "Close" : "Show"} commander damage for ${identity}`}
+            accessibilityState={{ expanded: commanderOverviewOpen, disabled: !!disabled }}
+            disabled={disabled}
+            onPress={commanderDamage.inspection.onToggle}
+            style={themed($commanderToolbarButton)}
+          >
+            <Svg
+              width={24}
+              height={24}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={foreground}
+              strokeWidth={1.6}
+            >
+              <Rect x={3} y={3} width={18} height={18} rx={1} />
+              <Path d="M12 3v18M3 12h18" />
+            </Svg>
+          </Pressable>
+          <Pressable
+            testID={`commander-mark-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Assign commander damage from ${identity}`}
+            accessibilityState={{ disabled: !!disabled }}
+            disabled={disabled}
+            onPress={beginCommanderAssignment}
+            style={themed($commanderToolbarButton)}
+          >
+            <PlayerMark
+              seatNumber={seatNumber}
+              shape={shape}
+              color={foreground}
+              rotation={contentRotation}
+              insetSwordColor={cardColor}
+              size={36}
+            />
+          </Pressable>
+        </View>
       ) : null}
       {editMode ? (
         <DialogCard
@@ -661,3 +739,30 @@ const $eliminatedMark: ThemedStyle<TextStyle> = () => ({
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
 const $dialogTitle: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
+
+function commanderToolbarEdge(rotation: LifeCardContentRotation): ViewStyle {
+  if (rotation === 90) return { left: 8, top: 8, bottom: 8, width: 44, flexDirection: "column" }
+  if (rotation === -90)
+    return { right: 8, top: 8, bottom: 8, width: 44, flexDirection: "column-reverse" }
+  if (rotation === 180)
+    return { top: 8, left: 8, right: 8, height: 44, flexDirection: "row-reverse" }
+  return { bottom: 8, left: 8, right: 8, height: 44, flexDirection: "row" }
+}
+const $commanderToolbar: ThemedStyle<ViewStyle> = () => ({
+  position: "absolute",
+  zIndex: 10,
+  justifyContent: "space-between",
+  alignItems: "center",
+})
+const $commanderToolbarButton: ThemedStyle<ViewStyle> = () => ({
+  width: 44,
+  height: 44,
+  alignItems: "center",
+  justifyContent: "center",
+})
+
+const $localCommanderCard: ThemedStyle<ViewStyle> = () => ({
+  borderWidth: 1,
+  borderColor: "#333333",
+  borderRadius: 0,
+})
