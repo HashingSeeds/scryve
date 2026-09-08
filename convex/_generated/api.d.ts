@@ -27,6 +27,7 @@ import type * as lib_appearance from "../lib/appearance.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
 import type * as lib_deckGames from "../lib/deckGames.js";
+import type * as lib_deckRateLimits from "../lib/deckRateLimits.js";
 import type * as lib_deckVersions from "../lib/deckVersions.js";
 import type * as lib_entitlements from "../lib/entitlements.js";
 import type * as lib_games_cards from "../lib/games/cards.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/authConfig": typeof lib_authConfig;
   "lib/deckGames": typeof lib_deckGames;
+  "lib/deckRateLimits": typeof lib_deckRateLimits;
   "lib/deckVersions": typeof lib_deckVersions;
   "lib/entitlements": typeof lib_entitlements;
   "lib/games/cards": typeof lib_games_cards;
@@ -122,4 +124,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

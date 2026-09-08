@@ -1043,3 +1043,31 @@ describe("deck versions", () => {
     ).resolves.toBeDefined()
   })
 })
+
+it("imports Magic catalog examples into the existing deck and version model", async () => {
+  const t = convexTest(schema, modules)
+  await t.mutation(internal.deckCatalogs.seedMagicExamples, {})
+  const [catalogDeck] = await t.query(api.deckCatalogs.search, {
+    game: "mtg",
+    format: "pauper",
+    query: "",
+  })
+  await expect(
+    t.mutation(api.decks.importCatalog, { catalogDeckId: catalogDeck._id }),
+  ).rejects.toMatchObject({ data: { code: "unauthenticated" } })
+  const actor = await synced(t, "magic-catalog-owner", "Magic Catalog Owner")
+  const deckId = await actor.mutation(api.decks.importCatalog, { catalogDeckId: catalogDeck._id })
+  const detail = await actor.query(api.decks.detail, { deckId })
+  expect(detail.deck.format).toBe("pauper")
+  expect(
+    detail.cards
+      .filter((card) => card.board === "main")
+      .reduce((sum, card) => sum + card.quantity, 0),
+  ).toBe(60)
+  expect(
+    detail.cards
+      .filter((card) => card.board === "sideboard")
+      .reduce((sum, card) => sum + card.quantity, 0),
+  ).toBe(15)
+  expect(detail.cards.every((card) => card.oracleId && card.scryfallId)).toBe(true)
+})

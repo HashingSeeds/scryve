@@ -1,18 +1,23 @@
+import { paginationOptsValidator } from "convex/server"
 import { ConvexError, v } from "convex/values"
 
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
-import type { ActionCtx, QueryCtx } from "./_generated/server"
+import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server"
 import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
-import { assertDeckGameFormat } from "./lib/deckGames"
-import type { NormalizedCard } from "./lib/games/cards"
+import { assertDeckGameFormat, magicCatalogCardFields } from "./lib/deckGames"
+import { deckRateLimiter } from "./lib/deckRateLimits"
+import { MAX_CATALOG_BATCH, type NormalizedCard } from "./lib/games/cards"
+import curatedDecks from "./lib/games/curatedDecks.json"
 import {
   normalizeLimitlessStandings,
   pokemonSummaryLookupKey,
   type LimitlessDeck,
 } from "./lib/games/limitless"
+import magicExamples from "./lib/games/magicExamples.json"
 import { pokemonCardSummaries } from "./lib/games/pokemon"
+import rushCards from "./lib/games/rushCards.json"
 import { cardsByYgoIds, ygoImageUrl } from "./lib/games/yugioh"
 import { normalizeYgoDeckFeed, YGO_DECK_FEED_URL } from "./lib/games/yugiohDecks"
 import { assertGameSystem, capabilityReleased, requireReleasedCapability } from "./lib/integrations"
@@ -38,60 +43,71 @@ const entryValidator = v.object({
   smallImageUrl: v.optional(v.string()),
 })
 
+function catalogQuery(
+  ctx: QueryCtx,
+  args: { game: string; query: string; format?: string; kind?: string },
+) {
+  const term = args.query.trim()
+  if (term) {
+    return ctx.db.query("deckCatalogs").withSearchIndex("search_name_by_format", (search) => {
+      let filtered = search.search("name", term).eq("game", args.game)
+      if (args.format) filtered = filtered.eq("format", args.format)
+      if (args.kind) filtered = filtered.eq("kind", args.kind)
+      return filtered
+    })
+  }
+  const rows =
+    args.format && args.kind
+      ? ctx.db
+          .query("deckCatalogs")
+          .withIndex("by_game_and_format_and_kind_and_fetched_at", (q) =>
+            q.eq("game", args.game).eq("format", args.format).eq("kind", args.kind!),
+          )
+      : args.format
+        ? ctx.db
+            .query("deckCatalogs")
+            .withIndex("by_game_and_format_and_fetched_at", (q) =>
+              q.eq("game", args.game).eq("format", args.format),
+            )
+        : args.kind
+          ? ctx.db
+              .query("deckCatalogs")
+              .withIndex("by_game_and_kind_and_fetched_at", (q) =>
+                q.eq("game", args.game).eq("kind", args.kind!),
+              )
+          : ctx.db
+              .query("deckCatalogs")
+              .withIndex("by_game_and_fetched_at", (q) => q.eq("game", args.game))
+  return rows.order("desc")
+}
+
 async function searchRows(
   ctx: QueryCtx,
   args: { game: string; query: string; format?: string; kind?: string },
 ) {
   const term = args.query.trim()
   if (term.length === 1 || term.length > 120) return []
-  let rows: Doc<"deckCatalogs">[]
-  if (!term) {
-    if (args.kind) {
-      const query = ctx.db
-        .query("deckCatalogs")
-        .withIndex("by_game_and_kind_and_fetched_at", (query) =>
-          query.eq("game", args.game).eq("kind", args.kind!),
-        )
-        .order("desc")
-      rows = await (
-        args.format
-          ? query.filter((filter) => filter.eq(filter.field("format"), args.format!))
-          : query
-      ).take(30)
-    } else {
-      const query = ctx.db
-        .query("deckCatalogs")
-        .withIndex("by_game_and_fetched_at", (query) => query.eq("game", args.game))
-        .order("desc")
-      rows = await (
-        args.format
-          ? query.filter((filter) => filter.eq(filter.field("format"), args.format!))
-          : query
-      ).take(30)
-    }
-  } else if (args.kind) {
-    const query = ctx.db
-      .query("deckCatalogs")
-      .withSearchIndex("search_name", (search) =>
-        search.search("name", term).eq("game", args.game).eq("kind", args.kind!),
-      )
-    rows = await (
-      args.format
-        ? query.filter((filter) => filter.eq(filter.field("format"), args.format!))
-        : query
-    ).take(30)
-  } else {
-    const query = ctx.db
-      .query("deckCatalogs")
-      .withSearchIndex("search_name", (search) => search.search("name", term).eq("game", args.game))
-    rows = await (
-      args.format
-        ? query.filter((filter) => filter.eq(filter.field("format"), args.format!))
-        : query
-    ).take(30)
-  }
-  return rows
+  return await catalogQuery(ctx, args).take(30)
 }
+
+export const browseCached = internalQuery({
+  args: {
+    game: v.string(),
+    format: v.string(),
+    query: v.string(),
+    source: v.optional(v.union(v.literal("examples"), v.literal("official"))),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const rows = catalogQuery(ctx, {
+      ...args,
+      ...(args.source === "official" ? { kind: "official" } : {}),
+    })
+    return await (
+      args.source === "examples" ? rows.filter((q) => q.neq(q.field("kind"), "official")) : rows
+    ).paginate(args.paginationOpts)
+  },
+})
 
 export const upsert = internalMutation({
   args: {
@@ -141,6 +157,71 @@ export const upsert = internalMutation({
   },
 })
 
+const exampleDecks = [
+  ...magicExamples.map((deck) => ({
+    game: "mtg",
+    source: "mtgo-examples",
+    externalId: deck.id,
+    kind: "example",
+    name: deck.name,
+    format: deck.format,
+    sourceUrl: deck.sourceUrl,
+    publishedAt: Date.parse(deck.publishedAt),
+    entries: deck.cards.map((card) => ({
+      identityNamespace: "scryfall-oracle",
+      cardId: card.oracleId,
+      providerCardId: card.scryfallId,
+      printingId: card.scryfallId,
+      name: card.name,
+      quantity: card.quantity,
+      section: card.section,
+      entryKind: "card",
+      imageUrl: card.imageUrl,
+      smallImageUrl: card.smallImageUrl,
+    })),
+  })),
+  ...curatedDecks,
+]
+
+async function seedDecks(
+  ctx: MutationCtx,
+  args: { game: string; format?: string; overwrite?: boolean },
+) {
+  await requireReleasedCapability(ctx, args.game, "exampleDecks")
+  for (const deck of exampleDecks.filter(
+    (deck) => deck.game === args.game && (!args.format || deck.format === args.format),
+  )) {
+    const existing = await ctx.db
+      .query("deckCatalogs")
+      .withIndex("by_game_and_source_and_external_id", (q) =>
+        q.eq("game", deck.game).eq("source", deck.source).eq("externalId", deck.externalId),
+      )
+      .unique()
+    if (existing && !args.overwrite) continue
+    await ctx.runMutation(internal.deckCatalogs.upsert, deck)
+    if (deck.game === "ygo" && deck.format === "rush") {
+      for (let offset = 0; offset < rushCards.length; offset += MAX_CATALOG_BATCH)
+        await ctx.runMutation(internal.cardCatalog.cacheMany, {
+          cards: rushCards.slice(offset, offset + MAX_CATALOG_BATCH).map((card) => ({
+            ...card,
+            game: "ygo" as const,
+          })),
+        })
+    }
+  }
+  return null
+}
+
+export const seedCuratedDecks = internalMutation({
+  args: { game: v.string(), format: v.optional(v.string()), overwrite: v.optional(v.boolean()) },
+  handler: seedDecks,
+})
+
+export const seedMagicExamples = internalMutation({
+  args: {},
+  handler: async (ctx) => await seedDecks(ctx, { game: "mtg" }),
+})
+
 export const search = query({
   args: {
     game: v.string(),
@@ -181,13 +262,11 @@ export const searchCached = internalQuery({
 export const latestFetch = internalQuery({
   args: { game: v.string(), format: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const rows = ctx.db
-      .query("deckCatalogs")
-      .withIndex("by_game_and_fetched_at", (query) => query.eq("game", assertGameSystem(args.game)))
-      .order("desc")
-    const latest = await (
-      args.format ? rows.filter((q) => q.eq(q.field("format"), args.format!)) : rows
-    ).first()
+    const latest = await catalogQuery(ctx, {
+      game: assertGameSystem(args.game),
+      format: args.format,
+      query: "",
+    }).first()
     if (args.game === "pokemon") {
       const refresh = await ctx.db
         .query("providerHealth")
@@ -237,26 +316,34 @@ async function refreshPokemonTopDecks(
   includeImages: boolean,
   format: string,
 ): Promise<{ count: number; status: number }> {
-  const tournamentsResponse = await limitlessJson(
-    ctx,
-    `/tournaments?game=PTCG&format=${encodeURIComponent(format.toUpperCase())}&limit=5`,
-  )
-  const tournaments = Array.isArray(tournamentsResponse.value) ? tournamentsResponse.value : []
   let decks: LimitlessDeck[] = []
-  for (const tournament of tournaments) {
-    if (typeof tournament !== "object" || tournament === null || !("id" in tournament)) continue
-    const id = tournament.id
-    if (typeof id !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(id)) continue
-    const standings = await limitlessJson(ctx, `/tournaments/${encodeURIComponent(id)}/standings`)
-    decks.push(
-      ...normalizeLimitlessStandings(tournament, standings.value).filter(
-        (deck) => deck.format === format,
-      ),
+  const seenTournaments = new Set<string>()
+  for (let page = 1; page <= 2 && decks.length < MAX_FEED_DECKS; page++) {
+    const response = await limitlessJson(
+      ctx,
+      `/tournaments?game=PTCG&format=${encodeURIComponent(format.toUpperCase())}&limit=5&page=${page}`,
     )
-    if (decks.length >= MAX_FEED_DECKS) break
+    if (!Array.isArray(response.value))
+      throw new Error("Limitless returned an invalid tournament list")
+    for (const tournament of response.value.slice(0, 5)) {
+      if (typeof tournament !== "object" || tournament === null || !("id" in tournament)) continue
+      const id = tournament.id
+      if (typeof id !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(id) || seenTournaments.has(id))
+        continue
+      seenTournaments.add(id)
+      const standings = await limitlessJson(ctx, `/tournaments/${encodeURIComponent(id)}/standings`)
+      if (!Array.isArray(standings.value)) throw new Error("Limitless returned invalid standings")
+      decks.push(
+        ...normalizeLimitlessStandings(tournament, standings.value).filter(
+          (deck) => deck.format === format,
+        ),
+      )
+      if (decks.length >= MAX_FEED_DECKS) break
+    }
+    if (response.value.length < 5) break
   }
   decks = decks.slice(0, MAX_FEED_DECKS)
-  if (decks.length === 0) return { count: 0, status: tournamentsResponse.status }
+  if (decks.length === 0) return { count: 0, status: 200 }
 
   const summaries = await pokemonSummariesWhenAvailable(
     ctx,
@@ -321,215 +408,289 @@ async function refreshPokemonTopDecks(
       }),
     })
   }
-  return { count: decks.length, status: tournamentsResponse.status }
+  return { count: decks.length, status: 200 }
 }
+
+async function refreshYgoTopDecks(ctx: ActionCtx, includeImages: boolean) {
+  const game = "ygo"
+  const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
+    bucket: "ygoprodeck:deck-feed",
+    intervalMs: 1_000,
+  })
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
+  const response = await fetch(`${YGO_DECK_FEED_URL}?_sft_category=Tournament%20Meta%20Decks`, {
+    headers: { "Accept": "application/json", "User-Agent": "Scryve/1.0" },
+    signal: AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS),
+  })
+  if (!response.ok) throw new Error(`Yu-Gi-Oh! deck feed returned ${response.status}`)
+  const feed = normalizeYgoDeckFeed((await response.json()) as unknown).slice(0, MAX_FEED_DECKS)
+  if (feed.length === 0) throw new Error("Yu-Gi-Oh! deck feed contained no usable decks")
+
+  const ids = [
+    ...new Set(feed.flatMap((deck) => deck.entries.map((entry) => entry.providerCardId))),
+  ]
+  const cards: NormalizedCard[] = []
+  for (let offset = 0; offset < ids.length; offset += 40) {
+    const result = await cardsByYgoIds(ctx, ids.slice(offset, offset + 40), includeImages)
+    cards.push(...result.cards)
+  }
+  for (let offset = 0; offset < cards.length; offset += 25) {
+    await ctx.runMutation(internal.cardCatalog.cacheMany, {
+      cards: cards.slice(offset, offset + 25),
+    })
+  }
+  const byId = new Map<string, (typeof cards)[number]>()
+  for (const card of cards) {
+    byId.set(card.cardId, card)
+    for (const printing of card.printings) byId.set(printing.printingId, card)
+  }
+
+  for (const deck of feed) {
+    await ctx.runMutation(internal.deckCatalogs.upsert, {
+      game,
+      source: "ygoprodeck-decks",
+      externalId: deck.externalId,
+      kind: deck.kind,
+      name: deck.name,
+      format: "advanced",
+      sourceUrl: deck.sourceUrl,
+      entries: deck.entries.map((entry) => {
+        const card = byId.get(entry.providerCardId)
+        const printing =
+          card?.printings.find((candidate) => candidate.printingId === entry.providerCardId) ??
+          card?.printings[0]
+        const face = printing?.faces[0]
+        return {
+          ...(card
+            ? {
+                identityNamespace: card.identityNamespace,
+                cardId: card.cardId,
+                providerCardId: printing?.providerCardId ?? entry.providerCardId,
+                printingId: printing?.printingId ?? entry.providerCardId,
+                name: card.name,
+                ...(card.category ? { category: card.category } : {}),
+                ...(face?.imageUrl ? { imageUrl: face.imageUrl } : {}),
+                ...(face?.smallImageUrl ? { smallImageUrl: face.smallImageUrl } : {}),
+              }
+            : {
+                providerCardId: entry.providerCardId,
+                name: `Card ${entry.providerCardId}`,
+              }),
+          quantity: entry.quantity,
+          section: entry.section,
+          entryKind: "card",
+          originalReference: entry.providerCardId,
+        }
+      }),
+    })
+  }
+  return { count: feed.length, status: response.status }
+}
+
+function feedProvider(game: string) {
+  return game === "pokemon" ? "limitless" : "ygoprodeck-decks"
+}
+
+function feedOperation(game: string, format: string) {
+  return game === "pokemon" ? `deck-feed-refresh:${format}` : "deck-feed-refresh"
+}
+
+export const feedState = internalQuery({
+  args: { game: v.string(), format: v.string() },
+  handler: async (ctx, { game, format }) =>
+    await ctx.db
+      .query("providerHealth")
+      .withIndex("by_game_and_provider_and_operation", (q) =>
+        q
+          .eq("game", game)
+          .eq("provider", feedProvider(game))
+          .eq("operation", feedOperation(game, format)),
+      )
+      .unique(),
+})
+
+async function refreshFeed(ctx: ActionCtx, game: string, format: string) {
+  assertDeckGameFormat(game, format)
+  if (
+    !(game === "ygo" && format === "advanced") &&
+    !(game === "pokemon" && ["standard", "expanded"].includes(format))
+  )
+    return false
+  const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
+  const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
+  const fetchedAt = health?.lastSuccessAt ?? latest?.fetchedAt
+  if (fetchedAt !== undefined && Date.now() - fetchedAt < FEED_TTL_MS) return true
+  const startedAt = Date.now()
+  try {
+    await requireActionCapability(ctx, game === "pokemon" ? "pokemon" : "ygo", "exampleDecks")
+    const includeImages = await actionCapabilityEnabled(
+      ctx,
+      game === "pokemon" ? "pokemon" : "ygo",
+      "images",
+    )
+    const result =
+      game === "pokemon"
+        ? await refreshPokemonTopDecks(ctx, includeImages, format)
+        : await refreshYgoTopDecks(ctx, includeImages)
+    const finishedAt = Date.now()
+    await ctx.runMutation(internal.providerHealth.record, {
+      game,
+      provider: feedProvider(game),
+      operation: feedOperation(game, format),
+      status: "healthy",
+      lastAttemptAt: finishedAt,
+      lastSuccessAt: finishedAt,
+      responseMs: finishedAt - startedAt,
+      httpStatus: result.status,
+      message: `${result.count} decks cached`,
+    })
+    return true
+  } catch (error) {
+    const finishedAt = Date.now()
+    await ctx.runMutation(internal.providerHealth.record, {
+      game,
+      provider: feedProvider(game),
+      operation: feedOperation(game, format),
+      status: "unavailable",
+      lastAttemptAt: finishedAt,
+      responseMs: finishedAt - startedAt,
+      message: error instanceof Error ? error.message : "Deck feed refresh failed",
+    })
+    return false
+  }
+}
+
+export const refresh = internalAction({
+  args: { game: v.string(), format: v.string() },
+  handler: async (ctx, args) => await refreshFeed(ctx, args.game, args.format),
+})
+
+export const requestRefresh = internalMutation({
+  args: { game: v.string(), format: v.string(), background: v.boolean() },
+  handler: async (ctx, { game, format, background }) => {
+    await requireReleasedCapability(ctx, game, "exampleDecks")
+    const result = await deckRateLimiter.limit(ctx, "catalogRefresh", { key: `${game}:${format}` })
+    if (result.ok && background)
+      await ctx.scheduler.runAfter(0, internal.deckCatalogs.refresh, { game, format })
+    return result
+  },
+})
+
+type BrowseResult = {
+  decks: Doc<"deckCatalogs">[]
+  cursor: string | null
+  status: "ready" | "unsupported" | "refreshing" | "rate_limited" | "unavailable"
+  retryAfterMs?: number
+}
+
+async function browseDecks(
+  ctx: ActionCtx,
+  args: {
+    game: string
+    format?: string
+    query: string
+    cursor?: string
+    source?: "examples" | "official"
+  },
+): Promise<BrowseResult> {
+  const game = assertGameSystem(args.game)
+  const format = assertDeckGameFormat(
+    game,
+    args.format ?? (game === "ygo" ? "advanced" : "standard"),
+  )
+  await requireActionCapability(ctx, game, "exampleDecks")
+  if (args.query.trim().length > 120) return { decks: [], cursor: null, status: "ready" }
+  if (game === "mtg" || args.source)
+    await ctx.runMutation(internal.deckCatalogs.seedCuratedDecks, { game, format })
+  const readPage = async () => {
+    const page = await ctx.runQuery(internal.deckCatalogs.browseCached, {
+      game,
+      format,
+      query: args.query.trim(),
+      source: args.source,
+      paginationOpts: { numItems: 30, cursor: args.cursor ?? null },
+    })
+    return { decks: page.page, cursor: page.isDone ? null : page.continueCursor }
+  }
+  const cached = await readPage()
+  if (args.source === "official") return { ...cached, status: "ready" }
+  const supported =
+    game === "mtg"
+      ? exampleDecks.some((deck) => deck.game === game && deck.format === format)
+      : game === "ygo"
+        ? format === "advanced"
+        : ["standard", "expanded"].includes(format)
+  if (!supported) return { ...cached, status: cached.decks.length ? "ready" : "unsupported" }
+  if (game === "mtg") return { ...cached, status: "ready" }
+  const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
+  const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
+  const fetchedAt = health?.lastSuccessAt ?? latest?.fetchedAt
+  if (fetchedAt !== undefined && Date.now() - fetchedAt < FEED_TTL_MS)
+    return { ...cached, status: health?.status === "unavailable" ? "unavailable" : "ready" }
+  const background = fetchedAt !== undefined
+  const result = await ctx.runMutation(internal.deckCatalogs.requestRefresh, {
+    game,
+    format,
+    background,
+  })
+  if (!result.ok)
+    return {
+      ...cached,
+      status: health?.status === "unavailable" ? "unavailable" : "rate_limited",
+      retryAfterMs: result.retryAfter,
+    }
+  if (background)
+    return { ...cached, status: health?.status === "unavailable" ? "unavailable" : "refreshing" }
+  const refreshed = await refreshFeed(ctx, game, format)
+  return { ...(await readPage()), status: refreshed ? "ready" : "unavailable" }
+}
+
+export const browse = action({
+  args: {
+    game: v.string(),
+    format: v.optional(v.string()),
+    query: v.string(),
+    cursor: v.optional(v.string()),
+    source: v.optional(v.union(v.literal("examples"), v.literal("official"))),
+  },
+  handler: browseDecks,
+})
 
 export const searchTopDecks = action({
   args: { game: v.string(), query: v.string(), format: v.optional(v.string()) },
   handler: async (ctx, args): Promise<Doc<"deckCatalogs">[]> => {
-    const game = assertGameSystem(args.game)
-    const format = args.format
-      ? assertDeckGameFormat(game, args.format)
-      : game === "pokemon"
-        ? "standard"
-        : undefined
-    await requireActionCapability(ctx, game, "exampleDecks")
-    const cached: Doc<"deckCatalogs">[] = await ctx.runQuery(internal.deckCatalogs.searchCached, {
-      game,
-      query: args.query,
-      ...(format ? { format } : {}),
-    })
-    if (!(await ctx.auth.getUserIdentity())) return cached
-
-    if (
-      game === "mtg" ||
-      (game === "ygo" && format && format !== "advanced") ||
-      (game === "pokemon" && format && !["standard", "expanded"].includes(format))
-    )
-      return cached
-
-    const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
-    if (latest && Date.now() - latest.fetchedAt < FEED_TTL_MS) return cached
-
-    const refreshArgs = { game, format: format ?? "advanced" }
-    if (latest) {
-      await ctx.runMutation(internal.deckCatalogs.scheduleRefresh, refreshArgs)
-      return cached
-    }
-
-    await ctx.runAction(internal.deckCatalogs.refreshTopDecks, refreshArgs)
-    return await ctx.runQuery(internal.deckCatalogs.searchCached, {
-      game,
-      query: args.query,
-      ...(format ? { format } : {}),
-    })
-  },
-})
-
-export const scheduleRefresh = internalMutation({
-  args: { game: v.string(), format: v.string() },
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("deckCatalogRefreshes")
-      .withIndex("by_game_and_format", (q) => q.eq("game", args.game).eq("format", args.format))
-      .unique()
-    const scheduled = existing ? await ctx.db.system.get(existing.scheduledId) : null
-    if (scheduled?.state.kind === "pending" || scheduled?.state.kind === "inProgress") return
-    const scheduledId = await ctx.scheduler.runAfter(0, internal.deckCatalogs.refreshTopDecks, args)
-    if (existing) await ctx.db.patch(existing._id, { scheduledId })
-    else await ctx.db.insert("deckCatalogRefreshes", { ...args, scheduledId })
-  },
-})
-
-export const refreshTopDecks = internalAction({
-  args: { game: v.string(), format: v.string() },
-  handler: async (ctx, args): Promise<void> => {
-    const game = assertGameSystem(args.game)
-    const format = assertDeckGameFormat(game, args.format)
-    await requireActionCapability(ctx, game, "exampleDecks")
-    if (game !== "pokemon" && game !== "ygo") return
-    if (game === "pokemon" && !["standard", "expanded"].includes(format)) return
-    if (game === "ygo" && format !== "advanced") return
-    const latest = await ctx.runQuery(internal.deckCatalogs.latestFetch, { game, format })
-    if (latest && Date.now() - latest.fetchedAt < FEED_TTL_MS) return
-    const includeImages = await actionCapabilityEnabled(ctx, game, "images")
-
-    const startedAt = Date.now()
-    if (game === "pokemon") {
-      try {
-        const result = await refreshPokemonTopDecks(ctx, includeImages, format)
-        const finishedAt = Date.now()
-        await ctx.runMutation(internal.providerHealth.record, {
-          game,
-          provider: "limitless",
-          operation: `deck-feed-refresh:${format}`,
-          status: "healthy",
-          lastAttemptAt: finishedAt,
-          lastSuccessAt: finishedAt,
-          responseMs: finishedAt - startedAt,
-          httpStatus: result.status,
-          message: `${result.count} cleaned decks cached`,
-        })
-        return
-      } catch (error) {
-        const finishedAt = Date.now()
-        await ctx.runMutation(internal.providerHealth.record, {
-          game,
-          provider: "limitless",
-          operation: `deck-feed-refresh:${format}`,
-          status: "unavailable",
-          lastAttemptAt: finishedAt,
-          responseMs: finishedAt - startedAt,
-          message: error instanceof Error ? error.message : "Deck feed refresh failed",
-        })
-        throw new ConvexError({
-          code: "deck_provider_unavailable",
-          message: "Top Decks are temporarily unavailable",
-        })
-      }
-    }
-
-    try {
-      const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
-        bucket: "ygoprodeck:deck-feed",
-        intervalMs: 1_000,
-      })
-      if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
-      const response = await fetch(`${YGO_DECK_FEED_URL}?_sft_category=Tournament%20Meta%20Decks`, {
-        headers: { "Accept": "application/json", "User-Agent": "Scryve/1.0" },
-        signal: AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS),
-      })
-      if (!response.ok) throw new Error(`Yu-Gi-Oh! deck feed returned ${response.status}`)
-      const feed = normalizeYgoDeckFeed((await response.json()) as unknown).slice(0, MAX_FEED_DECKS)
-      if (feed.length === 0) throw new Error("Yu-Gi-Oh! deck feed contained no usable decks")
-
-      const ids = [
-        ...new Set(feed.flatMap((deck) => deck.entries.map((entry) => entry.providerCardId))),
-      ]
-      const cards: NormalizedCard[] = []
-      for (let offset = 0; offset < ids.length; offset += 40) {
-        const result = await cardsByYgoIds(ctx, ids.slice(offset, offset + 40), includeImages)
-        cards.push(...result.cards)
-      }
-      for (let offset = 0; offset < cards.length; offset += 25) {
-        await ctx.runMutation(internal.cardCatalog.cacheMany, {
-          cards: cards.slice(offset, offset + 25),
-        })
-      }
-      const byId = new Map<string, (typeof cards)[number]>()
-      for (const card of cards) {
-        byId.set(card.cardId, card)
-        for (const printing of card.printings) byId.set(printing.printingId, card)
-      }
-
-      for (const deck of feed) {
-        await ctx.runMutation(internal.deckCatalogs.upsert, {
-          game,
-          source: "ygoprodeck-decks",
-          externalId: deck.externalId,
-          kind: deck.kind,
-          name: deck.name,
-          format: "advanced",
-          sourceUrl: deck.sourceUrl,
-          entries: deck.entries.map((entry) => {
-            const card = byId.get(entry.providerCardId)
-            const printing =
-              card?.printings.find((candidate) => candidate.printingId === entry.providerCardId) ??
-              card?.printings[0]
-            const face = printing?.faces[0]
-            return {
-              ...(card
-                ? {
-                    identityNamespace: card.identityNamespace,
-                    cardId: card.cardId,
-                    providerCardId: printing?.providerCardId ?? entry.providerCardId,
-                    printingId: printing?.printingId ?? entry.providerCardId,
-                    name: card.name,
-                    ...(card.category ? { category: card.category } : {}),
-                    ...(face?.imageUrl ? { imageUrl: face.imageUrl } : {}),
-                    ...(face?.smallImageUrl ? { smallImageUrl: face.smallImageUrl } : {}),
-                  }
-                : {
-                    providerCardId: entry.providerCardId,
-                    name: `Card ${entry.providerCardId}`,
-                  }),
-              quantity: entry.quantity,
-              section: entry.section,
-              entryKind: "card",
-              originalReference: entry.providerCardId,
-            }
-          }),
-        })
-      }
-
-      const finishedAt = Date.now()
-      await ctx.runMutation(internal.providerHealth.record, {
-        game,
-        provider: "ygoprodeck-decks",
-        operation: "deck-feed-refresh",
-        status: "healthy",
-        lastAttemptAt: finishedAt,
-        lastSuccessAt: finishedAt,
-        responseMs: finishedAt - startedAt,
-        httpStatus: response.status,
-        message: `${feed.length} cleaned decks cached`,
-      })
-    } catch (error) {
-      const finishedAt = Date.now()
-      await ctx.runMutation(internal.providerHealth.record, {
-        game,
-        provider: "ygoprodeck-decks",
-        operation: "deck-feed-refresh",
-        status: "unavailable",
-        lastAttemptAt: finishedAt,
-        responseMs: finishedAt - startedAt,
-        message: error instanceof Error ? error.message : "Deck feed refresh failed",
-      })
+    const result = await browseDecks(ctx, args)
+    if (!result.decks.length && result.status === "unavailable")
       throw new ConvexError({
         code: "deck_provider_unavailable",
         message: "Top Decks are temporarily unavailable",
       })
+    return args.format === undefined && args.game !== "pokemon"
+      ? await ctx.runQuery(internal.deckCatalogs.searchCached, args)
+      : result.decks
+  },
+})
+
+export const refreshScheduled = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    if (await actionCapabilityEnabled(ctx, "mtg", "exampleDecks"))
+      await ctx.runMutation(internal.deckCatalogs.seedMagicExamples, {})
+    for (const [game, format] of [
+      ["ygo", "advanced"],
+      ["pokemon", "standard"],
+      ["pokemon", "expanded"],
+    ] as const) {
+      if (!(await actionCapabilityEnabled(ctx, game, "exampleDecks"))) continue
+      const health = await ctx.runQuery(internal.deckCatalogs.feedState, { game, format })
+      if (health?.lastSuccessAt && Date.now() - health.lastSuccessAt < FEED_TTL_MS) continue
+      await ctx.runMutation(internal.deckCatalogs.requestRefresh, {
+        game,
+        format,
+        background: true,
+      })
     }
+    return null
   },
 })
 
@@ -547,7 +708,8 @@ export const detail = query({
     const includeImages = await capabilityReleased(ctx, deck.game, "images")
     return {
       deck,
-      entries: entries.slice(0, MAX_DECK_CARDS).map((entry) => {
+      entries: entries.slice(0, MAX_DECK_CARDS).map((storedEntry) => {
+        const entry = { ...storedEntry, ...magicCatalogCardFields(storedEntry) }
         if (includeImages) {
           const imageUrl =
             deck.game === "ygo"
@@ -565,5 +727,19 @@ export const detail = query({
         return { ...textEntry, imageUrl: undefined, smallImageUrl: undefined }
       }),
     }
+  },
+})
+
+export const scheduleRefresh = internalMutation({
+  args: { game: v.string(), format: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(internal.deckCatalogs.requestRefresh, { ...args, background: true })
+  },
+})
+
+export const refreshTopDecks = internalAction({
+  args: { game: v.string(), format: v.string() },
+  handler: async (ctx, args) => {
+    await refreshFeed(ctx, args.game, args.format)
   },
 })

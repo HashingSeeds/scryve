@@ -18,4 +18,6 @@ crons.interval(
   {},
 )
 
+crons.interval("refresh deck catalogs", { hours: 6 }, internal.deckCatalogs.refreshScheduled, {})
+
 export default crons

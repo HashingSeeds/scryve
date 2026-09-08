@@ -1,6 +1,7 @@
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
+import rushCards from "./lib/games/rushCards.json"
 import schema from "./schema"
 
 const modules = {
@@ -33,6 +34,22 @@ const pokemonCard = {
 
 describe("card provider caching and health", () => {
   afterEach(() => jest.restoreAllMocks())
+
+  it("serves Rush card text from its own catalog and never sends Rush IDs to YGOPRODeck", async () => {
+    const t = convexTest(schema, modules)
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected provider"))
+    const card = { ...rushCards[0], game: "ygo" as const }
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: [card] })
+    const result = await t.action(api.cards.byCatalogId, { game: "ygo", cardId: card.cardId })
+    expect(result).toMatchObject({ identityNamespace: "konami-rush", name: card.name })
+    expect(result.text).toBeTruthy()
+    await expect(
+      t.action(api.cards.byCatalogId, { game: "ygo", cardId: "rush:missing" }),
+    ).rejects.toMatchObject({
+      data: { code: "card_not_found" },
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 
   it("loads card descriptions without signing in", async () => {
     const id = "11111111-1111-1111-1111-111111111111"

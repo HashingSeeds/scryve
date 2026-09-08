@@ -1,8 +1,10 @@
 import { v } from "convex/values"
 import { convexTest } from "convex-test"
 
+import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import { internalMutation } from "./_generated/server"
+import { DECK_GAME_LIST } from "./lib/deckGames"
 import schema from "./schema"
 
 const modules = {
@@ -30,6 +32,7 @@ describe("deck catalog search", () => {
       jest.useFakeTimers()
       const fetchedAt = Date.now()
       const t = convexTest(schema, modules)
+      registerRateLimiter(t)
       const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("provider offline"))
       const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {})
       try {
@@ -73,12 +76,12 @@ describe("deck catalog search", () => {
         })
         await t.finishAllScheduledFunctions(() => jest.runAllTimers())
         expect(fetchSpy).toHaveBeenCalledTimes(1)
+        jest.advanceTimersByTime(5 * 60 * 1000)
         await expect(secondUser.action(api.deckCatalogs.searchTopDecks, args)).resolves.toEqual(
           cached,
         )
         await t.finishAllScheduledFunctions(() => jest.runAllTimers())
         expect(fetchSpy).toHaveBeenCalledTimes(2)
-        expect(errorSpy).toHaveBeenCalledTimes(2)
       } finally {
         errorSpy.mockRestore()
         fetchSpy.mockRestore()
@@ -90,6 +93,7 @@ describe("deck catalog search", () => {
   it("serves cached top decks to guests without refreshing providers", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network unavailable"))
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     try {
       await t.run(async (ctx) => {
         await ctx.db.insert("deckCatalogs", {
@@ -121,6 +125,7 @@ describe("deck catalog search", () => {
 
   it("keeps the release gate on guest top-deck searches", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     await t.run(async (ctx) => {
       await ctx.db.insert("integrationOverrides", {
         game: "ygo",
@@ -139,6 +144,7 @@ describe("deck catalog search", () => {
     "filters by format before limiting results for query %j",
     async (query) => {
       const t = convexTest(schema, modules)
+      registerRateLimiter(t)
       await t.run(async (ctx) => {
         await ctx.db.insert("deckCatalogs", {
           game: "ygo",
@@ -182,6 +188,7 @@ it.each(["expanded", undefined])(
     const expectedFormat = requestedFormat ?? "standard"
     const otherFormat = expectedFormat === "standard" ? "expanded" : "standard"
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     await t.run(async (ctx) => {
       await ctx.db.insert("deckCatalogs", {
         game: "pokemon",
@@ -268,6 +275,7 @@ it.each(["expanded", undefined])(
 
 it.each(["standard", "expanded"])("caches a successful empty %s feed", async (format) => {
   const t = convexTest(schema, modules)
+  registerRateLimiter(t)
   const actor = t.withIdentity({ subject: "empty-catalog-reader" })
   const fetchSpy = jest
     .spyOn(global, "fetch")
@@ -281,3 +289,208 @@ it.each(["standard", "expanded"])("caches a successful empty %s feed", async (fo
     fetchSpy.mockRestore()
   }
 })
+
+it("seeds complete Magic examples once and returns legacy fields for local saves", async () => {
+  const t = convexTest(schema, modules)
+  const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
+  try {
+    for (const format of ["standard", "pioneer", "modern", "pauper"]) {
+      const result = await t.action(api.deckCatalogs.browse, { game: "mtg", format, query: "" })
+      expect(result.status).toBe("ready")
+      expect(result.decks).toHaveLength(2)
+      for (const deck of result.decks) {
+        expect(deck.sourceUrl).toMatch(/^https:\/\/www\.mtgo\.com\/decklist\//)
+        const detail = await t.query(api.deckCatalogs.detail, { catalogDeckId: deck._id })
+        expect(
+          detail.entries
+            .filter((card) => card.board === "main")
+            .reduce((sum, card) => sum + card.quantity, 0),
+        ).toBe(60)
+        expect(
+          detail.entries
+            .filter((card) => card.board === "sideboard")
+            .reduce((sum, card) => sum + card.quantity, 0),
+        ).toBe(15)
+        expect(detail.entries.every((card) => card.oracleId && card.scryfallId)).toBe(true)
+      }
+      const repeated = await t.action(api.deckCatalogs.browse, { game: "mtg", format, query: "" })
+      expect(repeated.decks).toEqual(result.decks)
+    }
+    expect(fetchSpy).not.toHaveBeenCalled()
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
+
+it("lets guests populate a cold feed and rate limits repeated provider failures", async () => {
+  const t = convexTest(schema, modules)
+  registerRateLimiter(t)
+  const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
+  try {
+    const args = { game: "pokemon", format: "standard", query: "" }
+    await expect(t.action(api.deckCatalogs.browse, args)).resolves.toMatchObject({
+      status: "unavailable",
+      decks: [],
+    })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    await expect(t.action(api.deckCatalogs.browse, args)).resolves.toMatchObject({
+      status: "unavailable",
+      retryAfterMs: expect.any(Number),
+    })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
+
+it("admits one simultaneous refresh per format without consuming other formats' quota", async () => {
+  const t = convexTest(schema, modules)
+  registerRateLimiter(t)
+  const args = { game: "pokemon", format: "standard", background: false }
+  const results = await Promise.all(
+    Array.from({ length: 5 }, () => t.mutation(internal.deckCatalogs.requestRefresh, args)),
+  )
+  expect(results.filter((result) => result.ok)).toHaveLength(1)
+  expect(results.filter((result) => !result.ok).every((result) => result.retryAfter! > 0)).toBe(
+    true,
+  )
+  await expect(
+    t.mutation(internal.deckCatalogs.requestRefresh, { ...args, format: "expanded" }),
+  ).resolves.toMatchObject({ ok: true })
+})
+
+it("retains stale decks while a background refresh fails", async () => {
+  jest.useFakeTimers()
+  const t = convexTest(schema, modules)
+  registerRateLimiter(t)
+  const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
+  try {
+    await t.run(async (ctx) => {
+      await ctx.db.insert("deckCatalogs", {
+        game: "pokemon",
+        source: "limitless",
+        externalId: "last-good",
+        name: "Keep this deck",
+        kind: "tournament",
+        format: "standard",
+        fetchedAt: Date.now() - 25 * 60 * 60 * 1000,
+      })
+    })
+    const args = { game: "pokemon", format: "standard", query: "" }
+    const first = await t.action(api.deckCatalogs.browse, args)
+    expect(first.status).toBe("refreshing")
+    expect(first.decks[0].name).toBe("Keep this deck")
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+    const second = await t.action(api.deckCatalogs.browse, args)
+    expect(second.status).toBe("unavailable")
+    expect(second.decks).toEqual(first.decks)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  } finally {
+    fetchSpy.mockRestore()
+    jest.useRealTimers()
+  }
+})
+
+it("paginates within one format and preserves cached access during a refresh limit", async () => {
+  const t = convexTest(schema, modules)
+  registerRateLimiter(t)
+  await t.run(async (ctx) => {
+    for (let i = 0; i < 36; i++)
+      await ctx.db.insert("deckCatalogs", {
+        game: "ygo",
+        source: "fixture",
+        externalId: String(i),
+        name: `Deck ${i}`,
+        kind: "tournament",
+        format: "advanced",
+        fetchedAt: Date.now() - 25 * 60 * 60 * 1000,
+      })
+  })
+  await t.mutation(internal.deckCatalogs.requestRefresh, {
+    game: "ygo",
+    format: "advanced",
+    background: false,
+  })
+  const args = { game: "ygo", format: "advanced", query: "" }
+  const first = await t.action(api.deckCatalogs.browse, args)
+  expect(first.status).toBe("rate_limited")
+  expect(first.decks).toHaveLength(30)
+  expect(first.cursor).not.toBeNull()
+  const second = await t.action(api.deckCatalogs.browse, { ...args, cursor: first.cursor! })
+  expect(second.decks).toHaveLength(6)
+  expect(second.cursor).toBeNull()
+  expect(new Set([...first.decks, ...second.decks].map((deck) => deck._id)).size).toBe(36)
+})
+
+it("does not fetch a provider for unsupported formats", async () => {
+  const t = convexTest(schema, modules)
+  const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected"))
+  try {
+    await expect(
+      t.action(api.deckCatalogs.browse, { game: "ygo", format: "rush", query: "" }),
+    ).resolves.toMatchObject({ status: "unsupported", decks: [] })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
+
+it("provides two complete, attributed examples for every selectable format without a provider", async () => {
+  const t = convexTest(schema, modules)
+  const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("offline"))
+  try {
+    for (const game of DECK_GAME_LIST) {
+      for (const format of game.formats) {
+        const args = { game: game.id, format: format.id, query: "", source: "examples" as const }
+        const result = await t.action(api.deckCatalogs.browse, args)
+        expect(result.status).toBe("ready")
+        expect(result.decks.length).toBeGreaterThanOrEqual(2)
+        for (const deck of result.decks) {
+          expect(deck.kind).toBe("example")
+          expect(deck.sourceUrl).toMatch(/^https:\/\//)
+          const detail = await t.query(api.deckCatalogs.detail, { catalogDeckId: deck._id })
+          expect(detail.entries.every((card) => card.cardId && card.quantity > 0)).toBe(true)
+          expect(
+            detail.entries.every((card) => format.sections.some((s) => s.id === card.section)),
+          ).toBe(true)
+          const main = detail.entries
+            .filter((c) => c.section === "main")
+            .reduce((n, c) => n + c.quantity, 0)
+          expect(main).toBeGreaterThanOrEqual(game.id === "pokemon" ? 60 : 40)
+          if (game.id === "mtg")
+            expect(detail.entries.every((c) => c.oracleId && c.scryfallId)).toBe(true)
+        }
+        expect((await t.action(api.deckCatalogs.browse, args)).decks).toEqual(result.decks)
+      }
+    }
+    expect(fetchSpy).not.toHaveBeenCalled()
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
+
+it.each(["ygo", "pokemon"])(
+  "separates %s official decks from examples and allows seed updates",
+  async (game) => {
+    const t = convexTest(schema, modules)
+    const args = {
+      game,
+      format: game === "ygo" ? "rush" : "standard",
+      query: "",
+      source: "official" as const,
+    }
+    const result = await t.action(api.deckCatalogs.browse, args)
+    expect(result.decks.length).toBeGreaterThanOrEqual(2)
+    expect(result.decks.every((deck) => deck.kind === "official")).toBe(true)
+    const deck = result.decks[0]
+    await t.run(async (ctx) => ctx.db.patch(deck._id, { name: "Old selection" }))
+    await t.mutation(internal.deckCatalogs.seedCuratedDecks, {
+      game,
+      format: args.format,
+      overwrite: true,
+    })
+    expect((await t.query(api.deckCatalogs.detail, { catalogDeckId: deck._id })).deck.name).toBe(
+      deck.name,
+    )
+  },
+)

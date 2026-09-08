@@ -369,7 +369,13 @@ export default defineSchema({
     .index("by_game_and_source_and_external_id", ["game", "source", "externalId"])
     .index("by_game_and_fetched_at", ["game", "fetchedAt"])
     .index("by_game_and_kind_and_fetched_at", ["game", "kind", "fetchedAt"])
-    .searchIndex("search_name", { searchField: "name", filterFields: ["game", "kind"] }),
+    .index("by_game_and_format_and_fetched_at", ["game", "format", "fetchedAt"])
+    .index("by_game_and_format_and_kind_and_fetched_at", ["game", "format", "kind", "fetchedAt"])
+    .searchIndex("search_name", { searchField: "name", filterFields: ["game", "kind"] })
+    .searchIndex("search_name_by_format", {
+      searchField: "name",
+      filterFields: ["game", "format", "kind"],
+    }),
 
   deckCatalogCards: defineTable({
     catalogDeckId: v.id("deckCatalogs"),

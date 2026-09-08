@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import { Linking, ScrollView, TouchableOpacity, View } from "react-native"
 import { Image, type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -15,7 +15,6 @@ import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
 import { Screen } from "@/components/Screen"
-import { SegmentedControl } from "@/components/SegmentedControl"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -52,9 +51,9 @@ type DeckCapacity = FunctionReturnType<typeof api.decks.listMine>["capacity"]
 type CapacityState = { status: "checking" } | { status: "ready"; capacity: DeckCapacity }
 
 const MODES: Array<{ id: CreationMode; label: string }> = [
-  { id: "precon", label: "Official precon" },
-  { id: "paste", label: "Paste list" },
-  { id: "blank", label: "From scratch" },
+  { id: "precon", label: "Browse" },
+  { id: "paste", label: "Paste" },
+  { id: "blank", label: "Empty" },
 ]
 
 const SEARCH_DEBOUNCE_MS = 350
@@ -134,6 +133,9 @@ type CatalogDeck = {
   name: string
   kind: string
   format?: string
+  source?: string
+  sourceUrl?: string
+  publishedAt?: number
 }
 
 function CapacityQuery({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {
@@ -171,6 +173,38 @@ function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
 
 function preconDetail(deck: PreconstructedDeck) {
   return [deck.type, deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
+    .filter(Boolean)
+    .join(" · ")
+}
+
+function catalogSourceLabel(deck: CatalogDeck) {
+  return deck.kind === "official"
+    ? deck.game === "ygo"
+      ? "Konami"
+      : "Pokémon"
+    : deck.source === "mtgo-examples"
+      ? "MTGO example"
+      : deck.source === "limitless"
+        ? "Limitless"
+        : deck.source === "ygoprodeck-decks"
+          ? "YGOPRODeck"
+          : deck.kind === "tournament"
+            ? "Tournament deck"
+            : "Example deck"
+}
+
+function catalogDeckDetail(deck: CatalogDeck) {
+  return [
+    catalogSourceLabel(deck),
+    deck.publishedAt === undefined
+      ? undefined
+      : new Date(deck.publishedAt).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        }),
+  ]
     .filter(Boolean)
     .join(" · ")
 }
@@ -245,7 +279,7 @@ export function AddDeckScreen({
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
-  const searchTopDecks = useAction(api.deckCatalogs.searchTopDecks)
+  const searchTopDecks = useAction(api.deckCatalogs.browse)
   const importCatalog = useMutation(api.decks.importCatalog)
   const fetchCardById = useAction(api.cards.byId)
   const fetchCatalogCardById = useAction(api.cards.byCatalogId)
@@ -253,6 +287,14 @@ export function AddDeckScreen({
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
   const [format, setDeckFormat] = useState(() => creationFormat(game, filterFormat))
   const [mode, setMode] = useState<CreationMode>("precon")
+  const [catalogSource, setCatalogSource] = useState<"examples" | "official">(() =>
+    ["commander", "brawl", "constructed"].includes(format) ? "official" : "examples",
+  )
+  const showMagicOfficial = game === "mtg" && catalogSource === "official"
+  const [catalogStatus, setCatalogStatus] =
+    useState<FunctionReturnType<typeof api.deckCatalogs.browse>["status"]>("ready")
+  const [catalogCursor, setCatalogCursor] = useState<string | null>(null)
+  const [retryAfterMs, setRetryAfterMs] = useState<number>()
   const [name, setName] = useState("")
   const [note, setNote] = useState("")
   const [deckList, setDeckList] = useState("")
@@ -362,11 +404,19 @@ export function AddDeckScreen({
     setSelectedPrecon(undefined)
     setFocusedPreviewCard(undefined)
     setMode("precon")
+    setCatalogSource(
+      ["commander", "brawl", "constructed"].includes(nextFormat) ? "official" : "examples",
+    )
+    setCatalogStatus("ready")
+    setCatalogCursor(null)
   }
 
   function chooseFormat(next: string) {
     setDeckFormat(next)
     setFormat(next)
+    setCatalogSource(["commander", "brawl", "constructed"].includes(next) ? "official" : "examples")
+    setCatalogStatus("ready")
+    setCatalogCursor(null)
     setPrecons([])
     setCatalogDecks([])
   }
@@ -398,41 +448,61 @@ export function AddDeckScreen({
   )
 
   useEffect(() => {
-    if (mode !== "precon" || game !== "mtg") return undefined
+    if (mode !== "precon" || !showMagicOfficial) return undefined
     const timer = setTimeout(() => void runSearch(preconQuery), SEARCH_DEBOUNCE_MS)
     return () => {
       clearTimeout(timer)
       searchToken.current += 1
     }
-  }, [game, mode, preconQuery, runSearch])
+  }, [showMagicOfficial, mode, preconQuery, runSearch])
 
   const runCatalogSearch = useCallback(
-    async (query: string) => {
-      const token = searchToken.current + 1
-      searchToken.current = token
+    async (query: string, cursor?: string) => {
+      const token = ++searchToken.current
       try {
         setSearching(true)
         setSearchError(undefined)
-        const found = await searchTopDecks({ game, format, query })
-        if (searchToken.current === token) setCatalogDecks(found)
+        const found = await searchTopDecks({
+          game,
+          format,
+          query,
+          source: catalogSource,
+          ...(cursor ? { cursor } : {}),
+        })
+        if (searchToken.current === token) {
+          setCatalogDecks((current) =>
+            cursor
+              ? [
+                  ...current,
+                  ...found.decks.filter((deck) => !current.some((row) => row._id === deck._id)),
+                ]
+              : found.decks,
+          )
+          setCatalogStatus(found.status)
+          setCatalogCursor(found.cursor)
+          setRetryAfterMs(found.retryAfterMs)
+        }
       } catch (cause) {
         if (searchToken.current === token)
-          setSearchError(convexErrorMessage(cause, "Could not load Top Decks"))
+          setSearchError(convexErrorMessage(cause, "Could not load decks"))
       } finally {
         if (searchToken.current === token) setSearching(false)
       }
     },
-    [format, game, searchTopDecks],
+    [format, game, catalogSource, searchTopDecks],
   )
 
   useEffect(() => {
-    if (mode !== "precon" || game === "mtg") return undefined
+    if (mode !== "precon" || showMagicOfficial) return undefined
+    setCatalogDecks([])
+    setCatalogCursor(null)
+    setCatalogStatus("ready")
     const timer = setTimeout(() => void runCatalogSearch(preconQuery), SEARCH_DEBOUNCE_MS)
     return () => {
       clearTimeout(timer)
       searchToken.current += 1
     }
-  }, [game, mode, preconQuery, runCatalogSearch])
+  }, [showMagicOfficial, mode, preconQuery, runCatalogSearch])
 
   async function createBlank() {
     setSaveAttempted(true)
@@ -548,6 +618,7 @@ export function AddDeckScreen({
       boardLabel,
       game: card.game,
       catalogCardId,
+      scryfallId: card.scryfallId,
       originalReference: card.originalReference,
     }
     setFocusedPreviewCard(focused)
@@ -626,12 +697,8 @@ export function AddDeckScreen({
 
   async function importPasted() {
     setSaveAttempted(true)
-    if (access && !access.ready) {
+    if (!guestMode && access && !access.ready) {
       access.request()
-      return
-    }
-    if (guestMode) {
-      access?.request()
       return
     }
     if (!capacityReady || atCapacity || waitingForGuest) return
@@ -656,6 +723,10 @@ export function AddDeckScreen({
         game,
         ...(note.trim() ? { note } : {}),
         cards: importCards(resolved.cards),
+      }
+      if (guestMode) {
+        saveGuest(payload)
+        return
       }
       const deckId = await createImportedDeck(payload)
       setName("")
@@ -812,6 +883,23 @@ export function AddDeckScreen({
               style={themed($label)}
               text={`${DECK_GAME_LIST.find((candidate) => candidate.id === selectedCatalogDeck.game)?.shortLabel ?? selectedCatalogDeck.game} · ${deckFormatLabel(selectedCatalogDeck.game, selectedCatalogDeck.format ?? defaultDeckFormat(selectedCatalogDeck.game))}${entries.length ? ` · ${cardCountLabel(quantity)}` : ""}`}
             />
+            <Text size="xs" style={themed($label)} text={catalogDeckDetail(selectedCatalogDeck)} />
+            {selectedCatalogDeck.kind === "example" ? (
+              <Text size="xs" text="Dated example. Cards may no longer be legal in this format." />
+            ) : null}
+            {selectedCatalogDeck.sourceUrl ? (
+              <TouchableOpacity
+                accessibilityRole="link"
+                style={themed($plainAction)}
+                onPress={() =>
+                  void Linking.openURL(selectedCatalogDeck.sourceUrl!).catch(() =>
+                    setError("Could not open the deck source."),
+                  )
+                }
+              >
+                <Text text="View source deck" style={themed($textAction)} />
+              </TouchableOpacity>
+            ) : null}
             <LoadingProgress
               state={catalogDetail ? "complete" : "loading"}
               accessibilityText={catalogDetail ? "Preview ready" : "Loading Top Deck"}
@@ -876,7 +964,7 @@ export function AddDeckScreen({
           {!guestBlocked ? (
             <Button
               testID="import-catalog-deck"
-              text={busy ? "Importing…" : "Import deck"}
+              text={busy ? "Importing…" : guestMode ? "Save deck on this device" : "Import deck"}
               preset="reversed"
               disabled={
                 busy ||
@@ -1044,7 +1132,7 @@ export function AddDeckScreen({
               <Text
                 weight="bold"
                 style={themed($previewImportButtonText)}
-                text={busy ? "Importing…" : "Import deck"}
+                text={busy ? "Importing…" : guestMode ? "Save deck on this device" : "Import deck"}
               />
             </TouchableOpacity>
           ) : null}
@@ -1089,26 +1177,54 @@ export function AddDeckScreen({
             />
           </View>
         </View>
-        <Text preset="subheading" text="Start from" />
-        <SegmentedControl
+        <View
           testID="mode-picker-options"
+          accessibilityRole="tablist"
           accessibilityLabel="Starting point"
-          segments={MODES.map((candidate) => ({
-            id: candidate.id,
-            label:
-              candidate.id === "precon"
-                ? game === "mtg"
-                  ? "Official deck"
-                  : "Top Decks"
-                : candidate.id === "blank"
-                  ? "Empty"
-                  : candidate.label,
-          }))}
-          selectedId={mode}
-          onSelect={(next) => setMode(next as CreationMode)}
-        />
+          style={themed($tabs)}
+        >
+          {MODES.map((candidate) => (
+            <TouchableOpacity
+              key={candidate.id}
+              testID={`mode-picker-options-${candidate.id}`}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: mode === candidate.id }}
+              style={[themed($tab), mode === candidate.id && themed($selectedTab)]}
+              onPress={() => setMode(candidate.id)}
+            >
+              <Text text={candidate.label} weight={mode === candidate.id ? "bold" : "normal"} />
+            </TouchableOpacity>
+          ))}
+        </View>
+        {mode === "precon" ? (
+          <View accessibilityRole="tablist" accessibilityLabel="Deck source" style={themed($tabs)}>
+            {(
+              [
+                { id: "examples", label: "Examples" },
+                { id: "official", label: "Official decks" },
+              ] as const
+            ).map((candidate) => (
+              <TouchableOpacity
+                key={candidate.id}
+                testID={`catalog-source-${candidate.id}`}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: catalogSource === candidate.id }}
+                style={[themed($tab), catalogSource === candidate.id && themed($selectedTab)]}
+                onPress={() => {
+                  setCatalogSource(candidate.id)
+                  setSearchError(undefined)
+                }}
+              >
+                <Text
+                  text={candidate.label}
+                  weight={catalogSource === candidate.id ? "bold" : "normal"}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
 
-        {mode === "precon" && game === "mtg" ? (
+        {mode === "precon" && showMagicOfficial ? (
           <View style={themed($stack)}>
             <TextField
               testID="precon-search-input"
@@ -1151,7 +1267,6 @@ export function AddDeckScreen({
                 disabled={previewLoading}
                 onPress={() => previewPrecon(deck)}
               >
-                <View style={themed($resultMark)} />
                 <View style={$flex1}>
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
                   {preconDetail(deck) ? (
@@ -1164,11 +1279,11 @@ export function AddDeckScreen({
           </View>
         ) : null}
 
-        {mode === "precon" && game !== "mtg" ? (
+        {mode === "precon" && !showMagicOfficial ? (
           <View style={themed($stack)}>
             <TextField
               testID="top-deck-search-input"
-              placeholder="Search Top Decks"
+              placeholder="Search decks"
               value={preconQuery}
               maxLength={120}
               autoCorrect={false}
@@ -1176,14 +1291,36 @@ export function AddDeckScreen({
               onChangeText={setPreconQuery}
             />
             {searching ? (
-              <Text size="xs" style={themed($label)} text="Loading Top Decks…" />
+              <Text size="xs" style={themed($label)} text="Loading decks…" />
             ) : searchError ? (
               <View style={themed($inlineStatus)}>
                 <AlertNote text={searchError} />
                 <Button text="Retry" onPress={() => void runCatalogSearch(preconQuery)} />
               </View>
-            ) : catalogDecks.length === 0 ? (
+            ) : catalogDecks.length === 0 &&
+              !["rate_limited", "unavailable", "refreshing"].includes(catalogStatus) ? (
               emptyCatalog
+            ) : null}
+            {catalogStatus === "rate_limited" ||
+            catalogStatus === "unavailable" ||
+            catalogStatus === "refreshing" ? (
+              <View style={themed($inlineStatus)}>
+                <Text
+                  size="sm"
+                  text={
+                    catalogStatus === "rate_limited"
+                      ? `Refresh available in ${Math.ceil((retryAfterMs ?? 30_000) / 1000)} seconds. Saved results remain available.`
+                      : catalogStatus === "refreshing"
+                        ? "Refreshing decks. Saved results remain available."
+                        : "Could not refresh decks. Saved results remain available."
+                  }
+                />
+                <Button
+                  text="Check again"
+                  disabled={searching}
+                  onPress={() => void runCatalogSearch(preconQuery)}
+                />
+              </View>
             ) : null}
             {catalogDecks.map((deck) => (
               <TouchableOpacity
@@ -1194,18 +1331,20 @@ export function AddDeckScreen({
                 style={themed($resultRow)}
                 onPress={() => setSelectedCatalogDeck(deck)}
               >
-                <View style={themed($resultMark)} />
                 <View style={$flex1}>
                   <Text weight="medium" text={deck.name} numberOfLines={2} />
-                  <Text
-                    size="xs"
-                    style={themed($label)}
-                    text={deck.kind === "tournament" ? "Tournament deck" : "Community deck"}
-                  />
+                  <Text size="xs" style={themed($label)} text={catalogDeckDetail(deck)} />
                 </View>
                 <Text weight="medium" style={themed($textAction)} text="Preview" />
               </TouchableOpacity>
             ))}
+            {catalogCursor ? (
+              <Button
+                text="Load more"
+                disabled={searching}
+                onPress={() => void runCatalogSearch(preconQuery, catalogCursor)}
+              />
+            ) : null}
           </View>
         ) : null}
 
@@ -1238,7 +1377,13 @@ export function AddDeckScreen({
             {noteField}
             {saveRecovery}
             <Button
-              text={busy ? "Resolving cards…" : "Import deck list"}
+              text={
+                busy
+                  ? "Resolving cards…"
+                  : guestMode
+                    ? "Save deck on this device"
+                    : "Import deck list"
+              }
               preset="reversed"
               disabled={
                 busy ||
@@ -1321,12 +1466,6 @@ const $resultRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
-const $resultMark: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  width: 5,
-  height: 36,
-  borderRadius: 3,
-  backgroundColor: colors.gameMenu.actions.history,
-})
 const $previewScreen: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 const $previewContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
@@ -1382,3 +1521,18 @@ const $plainAction: ThemedStyle<ViewStyle> = () => ({
   minHeight: 44,
   justifyContent: "center",
 })
+
+const $tabs: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.md,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  justifyContent: "center",
+  paddingVertical: spacing.xs,
+  borderBottomWidth: 2,
+  borderBottomColor: "transparent",
+})
+const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.text })

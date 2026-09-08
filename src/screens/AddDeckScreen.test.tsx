@@ -50,7 +50,13 @@ type MockCatalogDeck = {
   kind: string
   format?: string
 }
-const mockSearchTopDecks = jest.fn(async (): Promise<MockCatalogDeck[]> => [])
+const mockSearchTopDecks = jest.fn(async (_args: unknown): Promise<MockCatalogDeck[]> => [])
+const mockBrowse = jest.fn(async (args: unknown) => ({
+  decks: await mockSearchTopDecks(args),
+  cursor: null as string | null,
+  status: "ready",
+  retryAfterMs: undefined as number | undefined,
+}))
 const mockCatalogDetail: {
   value:
     | {
@@ -148,7 +154,7 @@ jest.mock("convex/react", () => ({
     if (reference === "cards.byId") return mockCardById
     if (reference === "cards.byCatalogId") return mockCatalogCardById
     if (reference === "cards.byPokemonReference") return mockPokemonCardByReference
-    if (reference === "deckCatalogs.searchTopDecks") return mockSearchTopDecks
+    if (reference === "deckCatalogs.browse") return mockBrowse
     if (reference === "deckImports.searchPreconstructed") return mockSearch
     if (reference === "deckImports.previewPreconstructed") return mockPreviewPrecon
     if (reference === "deckImports.resolvePreconstructed") return mockResolvePrecon
@@ -179,7 +185,7 @@ jest.mock("../../convex/_generated/api", () => ({
     },
     deckCatalogs: {
       detail: "deckCatalogs.detail",
-      searchTopDecks: "deckCatalogs.searchTopDecks",
+      browse: "deckCatalogs.browse",
     },
   },
 }))
@@ -248,7 +254,13 @@ describe("AddDeckScreen", () => {
         <AddDeckScreen
           onBack={jest.fn()}
           onCreated={onCreated}
-          access={{ ready, loading: false, request, ownerId: ready ? "owner-a" : undefined }}
+          access={{
+            ready,
+            loading: false,
+            signedIn: true,
+            request,
+            ownerId: ready ? "owner-a" : undefined,
+          }}
         />
       </ThemeProvider>
     )
@@ -356,13 +368,129 @@ describe("AddDeckScreen", () => {
     ])
   })
 
+  it("saves a guest's pasted list locally without requesting sign-in", async () => {
+    const request = jest.fn()
+    const onCreated = jest.fn()
+    mockResolvePasted.mockResolvedValueOnce({
+      cards: [
+        {
+          name: "Forest",
+          oracleId: "11111111-1111-1111-1111-111111111111",
+          scryfallId: "22222222-2222-2222-2222-222222222222",
+          quantity: 60,
+          board: "main",
+        },
+      ],
+      unresolved: [],
+      invalidLines: [],
+    })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AddDeckScreen
+          onBack={jest.fn()}
+          onCreated={onCreated}
+          access={{ ready: false, loading: false, signedIn: false, request }}
+        />
+      </ThemeProvider>,
+    )
+    chooseFormat(view, "standard")
+    chooseMode(view, "paste")
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Guest Forests")
+    fireEvent.changeText(view.getByLabelText("Deck list"), "60 Forest")
+    fireEvent.press(view.getByText("Save deck on this device"))
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith("guest"))
+    expect(loadGuestDeck()?.deck).toMatchObject({
+      name: "Guest Forests",
+      format: "standard",
+      cards: [{ name: "Forest", quantity: 60 }],
+    })
+    expect(request).not.toHaveBeenCalled()
+    expect(mockImport).not.toHaveBeenCalled()
+  })
+
+  it("switches Magic examples and official decks without changing the format", async () => {
+    const view = renderAddDeck()
+    chooseFormat(view, "modern")
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      source: "examples",
+      game: "mtg",
+      format: "modern",
+      query: "",
+    })
+    fireEvent.press(view.getByTestId("catalog-source-official"))
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(mockSearch).toHaveBeenLastCalledWith({ format: "modern", query: "" })
+    expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toContain("Modern")
+  })
+
+  it("keeps deck previews available during refresh limits and loads the next page", async () => {
+    mockBrowse
+      .mockResolvedValueOnce({
+        decks: [
+          {
+            _id: "cached",
+            game: "ygo",
+            name: "Cached deck",
+            kind: "tournament",
+            format: "advanced",
+          },
+        ],
+        cursor: "next-page",
+        status: "rate_limited",
+        retryAfterMs: 5000,
+      })
+      .mockResolvedValueOnce({
+        decks: [
+          { _id: "next", game: "ygo", name: "Next deck", kind: "tournament", format: "advanced" },
+        ],
+        cursor: null,
+        status: "ready",
+        retryAfterMs: undefined,
+      })
+    const view = renderAddDeck()
+    chooseGame(view, "ygo")
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(view.getByText("Cached deck")).toBeTruthy()
+    expect(view.getByText(/Refresh available in 5 seconds/)).toBeTruthy()
+    fireEvent.press(view.getByText("Load more"))
+    await waitFor(() => expect(view.getByText("Next deck")).toBeTruthy())
+    expect(view.getByText("Cached deck")).toBeTruthy()
+    expect(mockBrowse).toHaveBeenLastCalledWith({
+      source: "examples",
+      game: "ygo",
+      format: "advanced",
+      query: "",
+      cursor: "next-page",
+    })
+    fireEvent.press(view.getByText("Cached deck"))
+    expect(view.getByTestId("catalog-deck-preview")).toBeTruthy()
+  })
+
+  it.each(["ygo", "pokemon"])(
+    "browses %s official decks without requiring sign-in",
+    async (game) => {
+      const view = renderAddDeck()
+      chooseGame(view, game)
+      fireEvent.press(view.getByTestId("catalog-source-official"))
+      await act(async () => jest.advanceTimersByTime(400))
+      expect(mockBrowse).toHaveBeenLastCalledWith({
+        game,
+        format: game === "ygo" ? "advanced" : "standard",
+        query: "",
+        source: "official",
+      })
+      expect(view.getByText("Official decks")).toBeTruthy()
+    },
+  )
+
   afterEach(() => {
     jest.useRealTimers()
   })
 
   it("offers official, pasted, and scratch-built creation paths", () => {
     const view = renderAddDeck()
-    expect(view.getByText("Official deck")).toBeTruthy()
+    expect(view.getByText("Official decks")).toBeTruthy()
     chooseMode(view, "paste")
     expect(view.getByText("Deck list")).toBeTruthy()
     chooseMode(view, "blank")
@@ -460,11 +588,15 @@ describe("AddDeckScreen", () => {
   })
 
   it("offers paste and empty deck actions for a format with no lists", async () => {
-    mockSearch.mockResolvedValueOnce([])
     const view = renderAddDeck()
     chooseFormat(view, "standard")
     await act(async () => jest.advanceTimersByTime(400))
-    expect(mockSearch).toHaveBeenCalledWith({ query: "", format: "standard" })
+    expect(mockSearchTopDecks).toHaveBeenCalledWith({
+      source: "examples",
+      game: "mtg",
+      query: "",
+      format: "standard",
+    })
     expect(view.getByText("No decks here yet")).toBeTruthy()
     fireEvent.press(view.getByText("Start empty"))
     expect(view.getByTestId("deck-name-input")).toBeTruthy()
@@ -616,6 +748,7 @@ describe("AddDeckScreen", () => {
       "Format, Advanced",
     )
     expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      source: "examples",
       game: "ygo",
       format: "advanced",
       query: "",
@@ -624,6 +757,7 @@ describe("AddDeckScreen", () => {
     chooseFormat(view, "traditional")
     await act(async () => jest.advanceTimersByTime(400))
     expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      source: "examples",
       game: "ygo",
       format: "traditional",
       query: "",
@@ -660,6 +794,7 @@ describe("AddDeckScreen", () => {
     chooseGame(view, "ygo")
     await act(async () => jest.advanceTimersByTime(400))
     expect(mockSearchTopDecks).toHaveBeenLastCalledWith({
+      source: "examples",
       game: "ygo",
       format: "advanced",
       query: "",

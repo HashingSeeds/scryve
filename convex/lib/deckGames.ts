@@ -214,3 +214,14 @@ export function preconstructedFormat(type: string | undefined) {
   if (value === "challenger deck" || value === "event deck") return "standard"
   return "constructed"
 }
+
+export function magicCatalogCardFields(card: {
+  game: string
+  cardId?: string
+  printingId?: string
+  section: string
+}) {
+  if (card.game !== "mtg") return {}
+  const board = card.section === "commander" || card.section === "sideboard" ? card.section : "main"
+  return { oracleId: card.cardId, scryfallId: card.printingId, board } as const
+}
