@@ -475,6 +475,25 @@ describe("CurrentGameScreen", () => {
       expect(life(view, 2)).toBe("40")
     })
 
+    it("lets an eliminated attacker correct damage they dealt earlier", () => {
+      const initial = commanderGame()
+      initial.commanderDamage = {
+        [commanderDamageKey(initial.players[0].id, initial.players[1].id)]: 7,
+        [commanderDamageKey(initial.players[2].id, initial.players[0].id)]: 21,
+      }
+      initial.players[0].life = 19
+      initial.players[1].life = 33
+      const view = renderGame(initial)
+
+      expect(view.getByTestId("life-seat-1-1")).toBeDisabled()
+      armCommander(view, 1)
+      fireEvent.press(view.getByTestId("commander-stage-seat-2--1"))
+      expect(view.getByLabelText("6 commander damage from Ada, 34 life")).toBeTruthy()
+      fireEvent.press(view.getByTestId("commander-done-seat-1"))
+      expect(view.getByTestId("life-seat-1-1")).toBeDisabled()
+      expect(life(view, 2)).toBe("34")
+    })
+
     it("marks 21 from one commander as eliminated and leaves the game running", () => {
       const view = renderGame()
       armCommander(view, 1)
