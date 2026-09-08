@@ -282,7 +282,7 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   gap: spacing.md,
   paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.xl,
+  paddingBottom: spacing.md,
 })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",

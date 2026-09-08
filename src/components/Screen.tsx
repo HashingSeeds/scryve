@@ -353,5 +353,5 @@ const $standardContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   gap: spacing.md,
   paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.xl,
+  paddingBottom: spacing.md,
 })

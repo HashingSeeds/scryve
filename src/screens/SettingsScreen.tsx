@@ -388,7 +388,7 @@ export function SettingsScreen({
 const $scrollContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.xxxl,
+  paddingBottom: spacing.md,
 })
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
