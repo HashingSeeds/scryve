@@ -20,7 +20,7 @@ describe("Screen", () => {
       maxWidth: 720,
       alignSelf: "center",
       paddingHorizontal: 24,
-      paddingBottom: 32,
+      paddingBottom: 16,
     })
   })
 

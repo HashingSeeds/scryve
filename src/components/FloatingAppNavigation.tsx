@@ -15,15 +15,17 @@ export function FloatingAppNavigation({
   onSettings,
   onAccount,
   accountLabel = "Account",
+  bottomSafeArea = true,
 }: {
   destinationLabel: "Decks" | "Return to game" | "Play"
   onDestination: () => void
   onSettings: () => void
   onAccount: () => void
   accountLabel?: "Account" | "Sign in"
+  bottomSafeArea?: boolean
 }) {
   const { themed } = useAppTheme()
-  const safeArea = useSafeAreaInsetsStyle(["bottom"], "margin")
+  const safeArea = useSafeAreaInsetsStyle(bottomSafeArea ? ["bottom"] : [], "margin")
   const [utilityOpen, setUtilityOpen] = useState(false)
 
   return (

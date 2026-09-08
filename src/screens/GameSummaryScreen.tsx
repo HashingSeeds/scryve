@@ -442,7 +442,7 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: 680,
   alignSelf: "center",
   paddingHorizontal: spacing.lg,
-  paddingBottom: spacing.xl,
+  paddingBottom: spacing.md,
 })
 const $block: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,

@@ -131,7 +131,8 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "space-between",
   gap: spacing.xl,
   paddingHorizontal: spacing.lg,
-  paddingVertical: spacing.xl,
+  paddingTop: spacing.xl,
+  paddingBottom: spacing.md,
 })
 const $body: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $links: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })

@@ -9,6 +9,11 @@ import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
 
+jest.mock("react-native-safe-area-context", () => ({
+  ...jest.requireActual("react-native-safe-area-context"),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),
+}))
+
 class MemoryStorage implements StringStorage {
   values = new Map<string, string>()
   getString(key: string) {
@@ -53,6 +58,33 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("game-menu-button"))
     expect(view.getByTestId("undo-button").props.accessibilityState.disabled).toBe(true)
     expect(useKeepAwake).toHaveBeenCalledWith("count-local-game")
+  })
+
+  it.each(["commander", "standard"])("applies one navigation bottom inset in %s", (format) => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={createLocalGame({
+            players: [
+              { name: "Ada", color: "#41476E" },
+              { name: "Grace", color: "#39755C" },
+            ],
+            startingLife: 40,
+            system: "mtg",
+            format,
+            now: 1,
+          })}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onDecks={jest.fn()}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+          onGameEnded={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    const navigation = StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style)
+    expect(navigation.marginBottom ?? 0).toBe(format === "commander" ? 0 : 34)
   })
 
   it("keeps playing if haptics fail", () => {
