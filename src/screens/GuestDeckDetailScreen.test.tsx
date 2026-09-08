@@ -8,7 +8,7 @@ import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
 
 const mockSearchCards = jest.fn()
 const mockConvex = { action: mockSearchCards }
-jest.mock("convex/react", () => ({ useConvex: () => mockConvex }))
+jest.mock("convex/react", () => ({ useConvex: () => mockConvex, useAction: () => mockSearchCards }))
 
 let mockPreventRemove = false
 let mockPreventRemoveCallback:
@@ -206,7 +206,7 @@ test("loads rules text when opening a saved Magic card", async () => {
   const view = renderScreen()
   fireEvent.press(view.getByLabelText("1× Molecule Man"))
   await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
-  expect(mockSearchCards).toHaveBeenCalledWith(expect.anything(), { scryfallId: "molecule-man" })
+  expect(mockSearchCards).toHaveBeenCalledWith({ scryfallId: "molecule-man" })
 })
 
 test("shows lookup errors and retries when the saved card is reopened", async () => {

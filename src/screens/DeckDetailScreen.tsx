@@ -2,13 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useFocusEffect, useNavigation } from "expo-router"
-import { useAction, useMutation, useQuery } from "convex/react"
+import { useMutation, useQuery } from "convex/react"
 import { usePreventRemove } from "expo-router/react-navigation"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
-import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
@@ -21,11 +20,11 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
-import { catalogCardDetails } from "@/features/decks/cardFocus"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { DeckView } from "@/features/decks/DeckView"
+import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -259,9 +258,6 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
       if (statsAvailable) captureAnalytics("stats_viewed", { surface: "deck" })
     }, [statsAvailable]),
   )
-  const fetchCardById = useAction(api.cards.byId)
-  const fetchCatalogCardById = useAction(api.cards.byCatalogId)
-  const fetchPokemonCardByReference = useAction(api.cards.byPokemonReference)
   const saveVersion = useMutation(api.decks.saveVersion)
   const createVersion = useMutation(api.decks.createVersion)
   const updateVersion = useMutation(api.decks.updateVersion)
@@ -280,8 +276,6 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
-  const [detailsByCardKey, setDetailsByCardKey] = useState<Record<string, FocusedCardDetails>>({})
-  const [detailsError, setDetailsError] = useState<string>()
 
   const storedCards = useMemo(
     () =>
@@ -296,6 +290,16 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   const draftChanged =
     editing && (cardsChanged(draft, storedCards) || draftNote !== (detail?.deck.note ?? ""))
   const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
+  const { details, detailsError } = useCardDetails(
+    focusedCard
+      ? {
+          ...focusedCard,
+          detailKey: cardDetailsKey(focusedCard, detail?.deck.game ?? "mtg"),
+          game: detail?.deck.game ?? focusedCard.game ?? "mtg",
+          catalogCardId: focusedCard.cardId ?? focusedCard.printingId ?? focusedCard.providerCardId,
+        }
+      : undefined,
+  )
   const version = detail?.version
   const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)
   const canAddVersion = detail?.capacity.canCreate === true
@@ -384,38 +388,8 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
     )
   }
 
-  async function loadCardDetails(card: DeckCard) {
-    const game = detail?.deck.game ?? card.game ?? "mtg"
-    const detailsKey = cardDetailsKey(card, game)
-    if (detailsByCardKey[detailsKey]) return
-    try {
-      const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
-      const details = card.scryfallId
-        ? await fetchCardById({ scryfallId: card.scryfallId })
-        : catalogCardId
-          ? catalogCardDetails(await fetchCatalogCardById({ game, cardId: catalogCardId }))
-          : game === "pokemon" && card.originalReference
-            ? catalogCardDetails(
-                await fetchPokemonCardByReference({
-                  name: card.name,
-                  originalReference: card.originalReference,
-                }),
-              )
-            : undefined
-      if (!details) {
-        setDetailsError("No additional card details are available.")
-        return
-      }
-      setDetailsByCardKey((current) => ({ ...current, [detailsKey]: details }))
-    } catch (cause) {
-      setDetailsError(convexErrorMessage(cause, "Could not load card details"))
-    }
-  }
-
   function focusCard(card: DeckCard) {
     setFocusedKey(printingKey(card))
-    setDetailsError(undefined)
-    void loadCardDetails(card)
   }
 
   function decrementFocusedCard(card: DeckCard) {
@@ -582,7 +556,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
             quantity: focusedCard.quantity,
             boardLabel: boardLabel(configuredSections, cardSection(focusedCard)),
           }}
-          details={detailsByCardKey[cardDetailsKey(focusedCard, detail.deck.game)]}
+          details={details}
           detailsError={detailsError}
           {...(editing
             ? {

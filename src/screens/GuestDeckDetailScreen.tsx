@@ -2,18 +2,15 @@ import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import { useNavigation } from "expo-router"
-import { useConvex } from "convex/react"
 import { usePreventRemove } from "expo-router/react-navigation"
 
 import { Button } from "@/components/Button"
-import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog } from "@/components/CardFocusDialog"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
-import { catalogCardDetails } from "@/features/decks/cardFocus"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { printingKey } from "@/features/decks/deckCards"
 import { DeckView } from "@/features/decks/DeckView"
@@ -24,11 +21,10 @@ import {
   useGuestDeck,
   type GuestDeckPayload,
 } from "@/features/decks/guestDeck"
+import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { convexErrorMessage } from "@/utils/convexError"
 
-import { api } from "../../convex/_generated/api"
 import { DEFAULT_DECK_GAME, deckSections } from "../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 
@@ -42,7 +38,6 @@ function sameDraft(a: GuestDeckPayload | undefined, b: GuestDeckPayload | undefi
 export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
   const navigation = useNavigation()
-  const convex = useConvex()
   const stored = useGuestDeck()
   const [draft, setDraft] = useState<GuestDeckPayload | undefined>(() => stored?.deck)
   const revisionRef = useRef(
@@ -66,50 +61,16 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const focusedCard =
     focusedIndex === undefined ? undefined : (draft ?? stored?.deck)?.cards[focusedIndex]
   const focusedGame = (draft ?? stored?.deck)?.game ?? DEFAULT_DECK_GAME
-  const scryfallId = focusedCard?.scryfallId
-  const catalogCardId =
-    focusedCard?.cardId ?? focusedCard?.printingId ?? focusedCard?.providerCardId
-  const originalReference = focusedCard?.originalReference
-  const focusedName = focusedCard?.name
-  const [details, setDetails] = useState<FocusedCardDetails>()
-  const [detailsError, setDetailsError] = useState<string>()
-  useEffect(() => {
-    let active = true
-    setDetails(undefined)
-    setDetailsError(undefined)
-    async function load() {
-      if (!focusedName) return
-      try {
-        if (!convex) throw new Error("Card details unavailable")
-        const result = scryfallId
-          ? await convex.action(api.cards.byId, { scryfallId })
-          : catalogCardId
-            ? catalogCardDetails(
-                await convex.action(api.cards.byCatalogId, {
-                  game: focusedGame,
-                  cardId: catalogCardId,
-                }),
-              )
-            : focusedGame === "pokemon" && originalReference
-              ? catalogCardDetails(
-                  await convex.action(api.cards.byPokemonReference, {
-                    name: focusedName,
-                    originalReference,
-                  }),
-                )
-              : undefined
-        if (!active) return
-        if (result) setDetails(result)
-        else setDetailsError("No additional card details are available.")
-      } catch (cause) {
-        if (active) setDetailsError(convexErrorMessage(cause, "Could not load card details"))
-      }
-    }
-    void load()
-    return () => {
-      active = false
-    }
-  }, [convex, focusedGame, focusedName, scryfallId, catalogCardId, originalReference])
+  const { details, detailsError } = useCardDetails(
+    focusedCard
+      ? {
+          ...focusedCard,
+          detailKey: `${focusedGame}:${printingKey(focusedCard)}`,
+          game: focusedGame,
+          catalogCardId: focusedCard.cardId ?? focusedCard.printingId ?? focusedCard.providerCardId,
+        }
+      : undefined,
+  )
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   const draftRef = useRef(draft)
   useEffect(() => {
