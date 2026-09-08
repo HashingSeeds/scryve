@@ -2,7 +2,7 @@ import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
-import type { PlayerId } from "@/features/game/types"
+import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -15,12 +15,14 @@ import {
 } from "./commanderDamageLayout"
 import { overlayTint } from "./LifeControls"
 import type { LifeCardContentRotation } from "./playerCardTypes"
+import { PlayerMark } from "./PlayerMark"
 import { Sword } from "./Sword"
 import { Text } from "./Text"
 
 const CELL_GAP = 2
 
 export interface CommanderDamageBoardProps {
+  players?: readonly GamePlayer[]
   ownerPlayerId: PlayerId
   seats: readonly CommanderBoardSeat[]
   rows: number
@@ -46,6 +48,7 @@ export const commanderStageTestId = (seatNumber: number, step: number) =>
 
 export function CommanderDamageBoard({
   ownerPlayerId,
+  players,
   seats,
   rows,
   columns,
@@ -90,6 +93,49 @@ export function CommanderDamageBoard({
         <View key={rowIndex} style={themed($row)}>
           {cellRow.map((playerId, columnIndex) => {
             if (!playerId) return <View key={columnIndex} style={{ width: size, height: size }} />
+
+            if (players) {
+              const playerIndex = players.findIndex((player) => player.id === playerId)
+              const player = players[playerIndex]
+              const ownSeat = playerId === ownerPlayerId
+              const total = incoming[playerId] ?? 0
+              const fontSize = Math.min(36, Math.floor(size * 0.42))
+              return (
+                <View
+                  key={columnIndex}
+                  testID={commanderCellTestId(seatNumber, playerId)}
+                  accessible
+                  accessibilityLabel={
+                    ownSeat
+                      ? `${player.name}, own commander`
+                      : `${total} damage from ${player.name}`
+                  }
+                  style={[
+                    themed($inspectionCell),
+                    { width: size, height: size },
+                    ownSeat && themed($cellIdle),
+                  ]}
+                >
+                  <View style={[themed($inspectionValue), seatedGlyphRotation]}>
+                    <PlayerMark
+                      seatNumber={playerIndex + 1}
+                      shape={player.shape}
+                      color={foreground}
+                      size={Math.max(12, Math.floor(size * 0.2))}
+                    />
+                    <Text
+                      text={ownSeat ? "·" : String(total)}
+                      weight="medium"
+                      maxFontSizeMultiplier={1}
+                      style={[
+                        themed($cellText),
+                        { color: foreground, fontSize, lineHeight: Math.ceil(fontSize * 1.15) },
+                      ]}
+                    />
+                  </View>
+                </View>
+              )
+            }
 
             if (playerId === ownerPlayerId)
               return (
@@ -174,4 +220,14 @@ const $cellIdle: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 const $cellText: ThemedStyle<TextStyle> = () => ({
   textAlign: "center",
   fontVariant: ["tabular-nums"],
+})
+
+const $inspectionCell: ThemedStyle<ViewStyle> = () => ({
+  alignItems: "center",
+  justifyContent: "center",
+})
+const $inspectionValue: ThemedStyle<ViewStyle> = () => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 4,
 })

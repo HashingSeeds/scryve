@@ -24,6 +24,7 @@ import {
 export interface CommanderDamageGridBinding {
   incomingFor: (player: GamePlayer) => Record<PlayerId, number>
   armedPlayerId: PlayerId | null
+  inspection?: { playerId: PlayerId | null; onChange: (playerId: PlayerId | null) => void }
   /**
    * Only set when assignment and confirmation live on separate devices. Local
    * play has nobody to confirm to, so each step applies as it is pressed and
@@ -177,6 +178,18 @@ export function PlayerGrid({
                     commanderDamage && boardSeats
                       ? {
                           ownerPlayerId: player.id,
+                          players: commanderDamage.inspection ? players : undefined,
+                          inspection: commanderDamage.inspection
+                            ? {
+                                open: commanderDamage.inspection.playerId === player.id,
+                                onToggle: () =>
+                                  commanderDamage.inspection?.onChange(
+                                    commanderDamage.inspection.playerId === player.id
+                                      ? null
+                                      : player.id,
+                                  ),
+                              }
+                            : undefined,
                           seats: boardSeats.seats,
                           rows: boardSeats.rows,
                           columns: boardSeats.columns,

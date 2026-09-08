@@ -47,6 +47,7 @@ export interface CommanderDamageCardControlsProps {
   contentRotation: LifeCardContentRotation
   compact?: boolean
   mode: CommanderDamageCardMode
+  life?: number
 }
 
 export function CommanderDamageCardControls({
@@ -55,6 +56,7 @@ export function CommanderDamageCardControls({
   contentRotation,
   compact,
   mode,
+  life,
 }: CommanderDamageCardControlsProps) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
@@ -86,6 +88,7 @@ export function CommanderDamageCardControls({
               backgroundColor: overlayTint(foreground, 0.04),
             }
           : themed($activePlayerOverlay),
+        life !== undefined && themed($localOverlay),
         entranceStyle,
       ]}
     >
@@ -159,28 +162,56 @@ export function CommanderDamageCardControls({
             compact={compact}
             emphasized
             disabled={mode.submitDisabled}
-            showSword
+            showSword={life === undefined}
+            life={life}
             onPress={mode.onSubmit}
           />
         </View>
       )}
 
       {mode.kind !== "source" ? (
-        <View pointerEvents="none" style={[themed($summary), rotationStyle]}>
+        <View
+          pointerEvents="none"
+          accessible={life !== undefined}
+          accessibilityLabel={
+            life !== undefined ? `${modeAccessibilityLabel(mode)}, ${life} life` : undefined
+          }
+          accessibilityLiveRegion={life !== undefined ? "polite" : undefined}
+          style={[themed($summary), rotationStyle]}
+        >
           {mode.kind === "target" ? (
-            <View style={themed($incomingTotal)}>
+            <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
+              {life !== undefined ? (
+                <Text
+                  text={mode.attackerName}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={1.2}
+                  style={[themed($caption), { color: foreground }]}
+                />
+              ) : null}
+              {life === undefined ? (
+                <Text
+                  text="↓"
+                  weight="bold"
+                  maxFontSizeMultiplier={1.2}
+                  style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
+                />
+              ) : null}
               <Text
-                text="↓"
-                weight="bold"
-                maxFontSizeMultiplier={1.2}
-                style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
-              />
-              <Text
+                testID={`commander-total-seat-${seatNumber}`}
                 text={String(mode.total)}
                 weight="bold"
                 maxFontSizeMultiplier={1.2}
                 style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
               />
+              {life !== undefined ? (
+                <Text
+                  testID={`commander-life-seat-${seatNumber}`}
+                  text={`${life} life`}
+                  maxFontSizeMultiplier={1.2}
+                  style={[themed($localLife), { color: foreground }]}
+                />
+              ) : null}
             </View>
           ) : mode.kind === "claim" ? (
             <>
@@ -220,6 +251,7 @@ function CommanderAction({
   emphasized,
   disabled,
   showSword,
+  life,
   onPress,
 }: {
   testID: string
@@ -231,6 +263,7 @@ function CommanderAction({
   emphasized?: boolean
   disabled?: boolean
   showSword?: boolean
+  life?: number
   onPress: () => void
 }) {
   const { themed } = useAppTheme()
@@ -244,12 +277,15 @@ function CommanderAction({
       onPress={onPress}
       style={({ pressed }) => [
         themed($action),
-        emphasized && { backgroundColor: overlayTint(foreground, 0.18) },
+        emphasized && life === undefined && { backgroundColor: overlayTint(foreground, 0.18) },
         pressed && !disabled && { backgroundColor: overlayTint(foreground, 0.3) },
         disabled && themed($disabledAction),
       ]}
     >
       <View style={[themed($actionContent), rotationStyle]}>
+        {life !== undefined ? (
+          <Text text={String(life)} weight="bold" style={[themed($total), { color: foreground }]} />
+        ) : null}
         {showSword ? <Sword size={compact ? 30 : 40} color={foreground} /> : null}
         <Text
           text={text}
@@ -346,3 +382,11 @@ const $headline: ThemedStyle<TextStyle> = () => ({
   textAlign: "center",
 })
 const $caption: ThemedStyle<TextStyle> = () => ({ opacity: 0.78, textAlign: "center" })
+
+const $localOverlay: ThemedStyle<ViewStyle> = () => ({
+  backgroundColor: "#000000",
+  borderWidth: 0,
+  borderRadius: 0,
+})
+const $localTotal: ThemedStyle<ViewStyle> = () => ({ alignItems: "center", gap: 4 })
+const $localLife: ThemedStyle<TextStyle> = () => ({ fontSize: 18, lineHeight: 22 })
