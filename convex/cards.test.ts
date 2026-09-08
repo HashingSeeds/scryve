@@ -1,5 +1,6 @@
 import { convexTest } from "convex-test"
 
+import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
 import { normalizePokemonCards } from "./lib/games/pokemon"
 import rushCards from "./lib/games/rushCards.json"
@@ -38,6 +39,7 @@ describe("card provider caching and health", () => {
 
   it("serves Rush card text from its own catalog and never sends Rush IDs to YGOPRODeck", async () => {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected provider"))
     const card = { ...rushCards[0], game: "ygo" as const }
     await t.mutation(internal.cardCatalog.cacheMany, { cards: [card] })
@@ -66,6 +68,7 @@ describe("card provider caching and health", () => {
       }),
     )
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject({
       name: "Avenge",
       oracleText: "Destroy all creatures.",
@@ -75,6 +78,7 @@ describe("card provider caching and health", () => {
   it("upgrades a text-only cache after image access is enabled", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response([pokemonCard]))
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const actor = t.withIdentity({ subject: "pokemon-searcher" })
 
     await t.mutation(internal.integrationManifest.setCapabilityOverride, {
@@ -115,6 +119,7 @@ describe("card provider caching and health", () => {
   it("records successful empty Pokemon lookups as healthy card-not-found responses", async () => {
     jest.spyOn(global, "fetch").mockImplementation(() => response({}, 404))
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const actor = t.withIdentity({ subject: "pokemon-lookup" })
 
     await expect(
@@ -132,6 +137,7 @@ describe("card provider caching and health", () => {
   it("records unmatched Pokemon references as healthy card-not-found responses", async () => {
     const fetchSpy = jest.spyOn(global, "fetch")
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const actor = t.withIdentity({ subject: "pokemon-reference-lookup" })
 
     await expect(
@@ -153,6 +159,7 @@ describe("card provider caching and health", () => {
   it("reports a Pokemon reference search 404 as card-not-found rather than provider failure", async () => {
     jest.spyOn(global, "fetch").mockImplementation(() => response({}, 404))
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const actor = t.withIdentity({ subject: "pokemon-reference-404" })
     await expect(
       actor.action(api.cards.byPokemonReference, {
@@ -165,6 +172,7 @@ describe("card provider caching and health", () => {
   it("records successful empty Yu-Gi-Oh lookups as healthy card-not-found responses", async () => {
     jest.spyOn(global, "fetch").mockImplementation(() => response({ data: [] }))
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const actor = t.withIdentity({ subject: "ygo-lookup" })
 
     await expect(
@@ -182,6 +190,7 @@ describe("card provider caching and health", () => {
   it("still records genuine provider failures as unavailable", async () => {
     jest.spyOn(global, "fetch").mockImplementation(() => response({}, 503))
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const actor = t.withIdentity({ subject: "failed-pokemon-lookup" })
 
     await expect(
@@ -199,6 +208,7 @@ describe("card provider caching and health", () => {
   it("reports Scryfall 404 lookups as card-not-found", async () => {
     jest.spyOn(global, "fetch").mockImplementation(() => response({}, 404))
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     const actor = t.withIdentity({ subject: "magic-lookup" })
 
     await expect(
@@ -214,6 +224,25 @@ describe("card provider caching and health", () => {
 
 describe("image fallback candidates", () => {
   afterEach(() => jest.restoreAllMocks())
+
+  it.each(["Card", "Printing"])(
+    "includes Scryfall status and card ID when %s lookup fails",
+    async (lookup) => {
+      const id = "11111111-1111-1111-1111-111111111111"
+      const fetchSpy = jest.spyOn(global, "fetch")
+      if (lookup === "Printing") fetchSpy.mockImplementationOnce(() => response({ oracle_id: id }))
+      fetchSpy.mockImplementationOnce(() => response({ object: "error" }, 429))
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      await expect(t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id })).rejects.toThrow(
+        `${lookup} lookup failed (Scryfall HTTP 429, card ${id})`,
+      )
+      await expect(
+        t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id }),
+      ).rejects.toMatchObject({ data: { code: "scryfall_rate_limited" } })
+      expect(fetchSpy).toHaveBeenCalledTimes(lookup === "Printing" ? 2 : 1)
+    },
+  )
 
   it("finds Magic artwork by oracle identity without changing the stored printing", async () => {
     const id = "11111111-1111-1111-1111-111111111111"
@@ -239,6 +268,7 @@ describe("image fallback candidates", () => {
         }),
       )
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     expect(await t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id })).toEqual([
       "working",
     ])
@@ -253,6 +283,7 @@ describe("image fallback candidates", () => {
         response({ data: [{ id: 1, name: "Same card", card_images: [{ id: 1 }, { id: 2 }] }] }),
       )
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     expect(await t.action(api.cards.imageFallbacks, { game: "ygo", cardId: "1" })).toEqual([
       "https://ygo-images.scryve.sow.care/images/yugioh/cards/1.jpg",
       "https://ygo-images.scryve.sow.care/images/yugioh/cards/2.jpg",
@@ -291,6 +322,7 @@ describe("image fallback candidates", () => {
       )
     })
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     expect(
       await t.action(api.cards.imageFallbacks, { game: "pokemon", cardId: original.id }),
     ).toEqual([`${base}091/high.webp`])
@@ -300,6 +332,7 @@ describe("image fallback candidates", () => {
   it("returns no candidates for bundled Rush cards and rejects invalid identities", async () => {
     const fetchSpy = jest.spyOn(global, "fetch")
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     expect(await t.action(api.cards.imageFallbacks, { game: "ygo", cardId: "rush:15150" })).toEqual(
       [],
     )
@@ -312,6 +345,7 @@ describe("image fallback candidates", () => {
 
 it("does not fetch fallback images when image access is disabled", async () => {
   const t = convexTest(schema, modules)
+  registerRateLimiter(t)
   const fetchSpy = jest.spyOn(global, "fetch")
   try {
     await t.mutation(internal.integrationManifest.setCapabilityOverride, {
@@ -343,6 +377,7 @@ it.each([
   }
   const full = { ...summary, ...details }
   const t = convexTest(schema, modules)
+  registerRateLimiter(t)
   const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response(full))
   try {
     await t.mutation(internal.cardCatalog.cacheMany, { cards: normalizePokemonCards(summary) })
@@ -390,6 +425,7 @@ it("caps Pokemon fallback detail requests and prioritizes the original set", asy
   })
   try {
     const t = convexTest(schema, modules)
+    registerRateLimiter(t)
     expect(
       await t.action(api.cards.imageFallbacks, { game: "pokemon", cardId: original.id }),
     ).toEqual(["https://assets.tcgdex.net/en/me/me05/091/high.webp"])

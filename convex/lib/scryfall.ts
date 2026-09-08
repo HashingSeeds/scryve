@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values"
+
 import { internal } from "../_generated/api"
 import type { ActionCtx } from "../_generated/server"
 
@@ -8,21 +10,11 @@ const SCRYFALL_HEADERS = {
   "User-Agent": "ScryveDeckBuilder/1.0 (https://scryve.sow.care)",
 }
 
-const SCRYFALL_SLOW_INTERVAL_MS = 500
-const SCRYFALL_DEFAULT_INTERVAL_MS = 100
 const SCRYFALL_RATE_LIMIT_BLOCK_MS = 30_000
 
 type ScryfallRequestOptions = {
   method?: "GET" | "POST"
   body?: string
-}
-
-function requestPolicy(path: string) {
-  if (path.startsWith("/cards/search"))
-    return { bucket: "scryfall:cards-search", intervalMs: SCRYFALL_SLOW_INTERVAL_MS }
-  if (path === "/cards/collection")
-    return { bucket: "scryfall:cards-collection", intervalMs: SCRYFALL_SLOW_INTERVAL_MS }
-  return { bucket: "scryfall:default", intervalMs: SCRYFALL_DEFAULT_INTERVAL_MS }
 }
 
 function wait(milliseconds: number) {
@@ -34,9 +26,21 @@ export async function fetchScryfall(
   path: string,
   options: ScryfallRequestOptions = {},
 ) {
-  const policy = requestPolicy(path)
-  const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, policy)
-  if (waitMs > 0) await wait(waitMs)
+  const deadline = Date.now() + 10_000
+  while (true) {
+    const { waitMs, blocked } = await ctx.runMutation(
+      internal.externalApiRateLimits.acquireScryfall,
+      { path },
+    )
+    if (blocked || (waitMs > 0 && Date.now() + waitMs > deadline))
+      throw new ConvexError({
+        code: "scryfall_rate_limited",
+        message: "Scryfall requests are paused. Try again shortly.",
+        retryAfterMs: waitMs,
+      })
+    if (waitMs === 0) break
+    await wait(waitMs)
+  }
   const response = await fetch(`${SCRYFALL_BASE_URL}${path}`, {
     method: options.method,
     headers: {
@@ -47,7 +51,7 @@ export async function fetchScryfall(
   })
   if (response.status === 429)
     await ctx.runMutation(internal.externalApiRateLimits.block, {
-      bucket: policy.bucket,
+      bucket: "scryfall:cooldown",
       durationMs: SCRYFALL_RATE_LIMIT_BLOCK_MS,
     })
   return response
