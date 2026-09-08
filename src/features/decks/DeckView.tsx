@@ -107,7 +107,7 @@ export function DeckView({
         style={$flex}
         contentContainerStyle={themed($content)}
         sections={tab === "cards" ? sections : []}
-        keyExtractor={printingKey}
+        keyExtractor={(card, index) => `${printingKey(card)}:${index}`}
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={

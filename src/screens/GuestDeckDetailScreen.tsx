@@ -208,7 +208,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         onFocus={(card) => setFocusedIndex(current.cards.indexOf(card))}
         onIncrement={(card) => {
           setUndo(undefined)
-          updateCard(current.cards.indexOf(card), { ...card, quantity: card.quantity + 1 })
+          updateCard(current.cards.indexOf(card), { ...card, quantity: Math.min(999, card.quantity + 1) })
         }}
         onDecrement={(card) => {
           if (card.quantity === 1) setUndo({ name: card.name, cards: current.cards })
