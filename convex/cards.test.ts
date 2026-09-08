@@ -1,6 +1,8 @@
 import { convexTest } from "convex-test"
 
+import { registerRateLimiter } from "../test/registerRateLimiter"
 import { api, internal } from "./_generated/api"
+import { deckRateLimiter } from "./lib/deckRateLimits"
 import { normalizePokemonCards } from "./lib/games/pokemon"
 import rushCards from "./lib/games/rushCards.json"
 import schema from "./schema"
@@ -398,4 +400,37 @@ it("caps Pokemon fallback detail requests and prioritizes the original set", asy
   } finally {
     fetchSpy.mockRestore()
   }
+})
+
+it("allows guest card searches and enforces the shared guest quota", async () => {
+  const t = convexTest(schema, modules)
+  registerRateLimiter(t)
+  const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response([pokemonCard]))
+  try {
+    await expect(
+      t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
+    ).resolves.toMatchObject([{ name: "Charizard", cardId: "base1-4" }])
+    await t.run(async (ctx) => {
+      await deckRateLimiter.limit(ctx, "guestDeckImport", { count: 19 })
+    })
+    await expect(
+      t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
+    ).rejects.toMatchObject({ data: { code: "rate_limited" } })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
+
+it("keeps catalog capability restrictions for guest searches", async () => {
+  const t = convexTest(schema, modules)
+  registerRateLimiter(t)
+  await t.mutation(internal.integrationManifest.setCapabilityOverride, {
+    game: "pokemon",
+    capability: "cardCatalog",
+    release: "disabled",
+  })
+  await expect(
+    t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
+  ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
 })

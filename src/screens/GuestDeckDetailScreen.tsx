@@ -12,6 +12,7 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { GuestCardSearchDialog } from "@/features/decks/GuestCardSearchDialog"
 import {
   deleteGuestDeck,
   loadGuestDeck,
@@ -29,6 +30,7 @@ import {
   deckGame,
   deckSections,
 } from "../../convex/lib/deckGames"
+import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 
 type GuestDeckDetailScreenProps = { onBack: () => void }
 type GuestCard = GuestDeckPayload["cards"][number]
@@ -48,6 +50,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const baseRef = useRef(stored?.deck)
   const [error, setError] = useState<string>()
   const [conflict, setConflict] = useState(false)
+  const [adding, setAdding] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -157,6 +160,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   return (
     <Screen
       preset="fixed"
+      safeAreaEdges={["bottom"]}
       backgroundColor={theme.colors.surface}
       contentContainerStyle={themed($screen)}
     >
@@ -165,7 +169,11 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         leftTx="common:back"
         onLeftPress={() => (sameDraft(draft, baseRef.current) ? onBack() : setDiscarding(true))}
       />
-      <ScrollView contentContainerStyle={themed($content)}>
+      <ScrollView
+        style={$scroll}
+        contentContainerStyle={themed($content)}
+        keyboardShouldPersistTaps="handled"
+      >
         <TextField
           testID="guest-deck-name"
           label="Name"
@@ -194,6 +202,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
             preset="subheading"
             text={`Cards (${current.cards.reduce((total, card) => total + card.quantity, 0)})`}
           />
+          <Text size="sm" text="Use + and − to change copies, or Remove to delete a card." />
           {current.cards.map((card, index) => (
             <View
               key={`${card.name}-${index}`}
@@ -220,27 +229,39 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
                 <Text weight="medium" text={card.name} />
                 <Text size="sm" style={themed($metadata)} text={sectionLabel(card)} />
               </View>
-              <Button
-                testID={`guest-card-${index}-decrease`}
-                text="−"
-                accessibilityLabel={`Decrease ${card.name}`}
-                onPress={() =>
-                  card.quantity > 1
-                    ? updateCard(index, { ...card, quantity: card.quantity - 1 })
-                    : updateCard(index, undefined)
-                }
-              />
-              <Text accessibilityLabel={`${card.name} quantity`} text={String(card.quantity)} />
-              <Button
-                testID={`guest-card-${index}-increase`}
-                text="+"
-                accessibilityLabel={`Increase ${card.name}`}
-                disabled={card.quantity >= 999}
-                onPress={() => updateCard(index, { ...card, quantity: card.quantity + 1 })}
-              />
+              <View style={themed($cardControls)}>
+                <View style={themed($quantityControls)}>
+                  <Button
+                    testID={`guest-card-${index}-decrease`}
+                    text="−"
+                    accessibilityLabel={`Remove one ${card.name}`}
+                    onPress={() =>
+                      card.quantity > 1
+                        ? updateCard(index, { ...card, quantity: card.quantity - 1 })
+                        : updateCard(index, undefined)
+                    }
+                  />
+                  <Text accessibilityLabel={`${card.name} quantity`} text={`${card.quantity}×`} />
+                  <Button
+                    testID={`guest-card-${index}-increase`}
+                    text="+"
+                    accessibilityLabel={`Add one ${card.name}`}
+                    disabled={card.quantity >= 999}
+                    onPress={() => updateCard(index, { ...card, quantity: card.quantity + 1 })}
+                  />
+                </View>
+                <Button
+                  testID={`guest-card-${index}-remove`}
+                  text="Remove"
+                  accessibilityLabel={`Remove ${card.name} from deck`}
+                  onPress={() => updateCard(index, undefined)}
+                />
+              </View>
             </View>
           ))}
         </View>
+      </ScrollView>
+      <View style={themed($footer)}>
         {error ? <Text testID="guest-deck-error" style={themed($error)} text={error} /> : null}
         {conflict ? (
           <Button
@@ -257,16 +278,59 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
             }}
           />
         ) : null}
-        <Button testID="guest-deck-save" preset="reversed" text="Save" onPress={save} />
-        <Button
-          testID="guest-deck-delete"
-          text="Delete deck"
-          onPress={() => {
-            setDeleteRevision(revisionRef.current)
-            setDeleting(true)
+        <Button text="Add cards" testID="guest-deck-add-cards" onPress={() => setAdding(true)} />
+        <View style={themed($actions)}>
+          <Button
+            style={$action}
+            testID="guest-deck-save"
+            preset="reversed"
+            text="Save"
+            onPress={save}
+          />
+          <Button
+            style={$action}
+            testID="guest-deck-delete"
+            text="Delete deck"
+            onPress={() => {
+              setDeleteRevision(revisionRef.current)
+              setDeleting(true)
+            }}
+          />
+        </View>
+      </View>
+      {adding ? (
+        <GuestCardSearchDialog
+          game={game}
+          format={current.format}
+          onClose={() => setAdding(false)}
+          onAdd={(card) => {
+            const index = current.cards.findIndex(
+              (entry) =>
+                (entry.section ?? entry.board ?? "main") === card.section &&
+                (entry.printingId ??
+                  entry.providerCardId ??
+                  entry.scryfallId ??
+                  entry.cardId ??
+                  entry.name) ===
+                  (card.printingId ??
+                    card.providerCardId ??
+                    card.scryfallId ??
+                    card.cardId ??
+                    card.name),
+            )
+            if (index >= 0) {
+              const entry = current.cards[index]
+              if (entry.quantity >= 999) return "A card can have at most 999 copies."
+              updateCard(index, { ...entry, quantity: entry.quantity + 1 })
+            } else {
+              if (current.cards.length >= MAX_DECK_CARDS)
+                return `A deck can have at most ${MAX_DECK_CARDS} entries.`
+              update({ cards: [...current.cards, card] })
+            }
+            return undefined
           }}
         />
-      </ScrollView>
+      ) : null}
       {focusedCard && focusedIndex !== undefined ? (
         <CardFocusDialog
           card={{
@@ -374,3 +438,22 @@ const $cardCopy: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $cardImage: ImageStyle = { height: 56, width: 40 }
 const $metadata: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
+
+const $scroll: ViewStyle = { flex: 1 }
+const $action: ViewStyle = { flex: 1 }
+const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  borderTopColor: colors.border,
+  borderTopWidth: 1,
+  padding: spacing.md,
+  gap: spacing.sm,
+})
+const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.sm,
+})
+const $cardControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $quantityControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})

@@ -6,6 +6,7 @@ import type { ActionCtx, MutationCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { cardImageCandidates } from "./lib/cardImageFallback"
+import { deckRateLimiter } from "./lib/deckRateLimits"
 import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { pokemonCardById, pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
@@ -19,11 +20,6 @@ import {
 } from "./lib/scryfall"
 
 const MAX_SEARCH_RESULTS = 20
-
-async function requireActionIdentity(ctx: { auth: { getUserIdentity: () => Promise<unknown> } }) {
-  if (!(await ctx.auth.getUserIdentity()))
-    throw new ConvexError({ code: "unauthenticated", message: "Authentication required" })
-}
 
 function catalogWithoutImages(card: CatalogCard): CatalogCard {
   const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...cardWithoutImages } = card
@@ -103,9 +99,17 @@ async function recordHealth(
 export const search = action({
   args: { query: v.string(), game: v.optional(v.string()) },
   handler: async (ctx, args): Promise<CardReference[] | CatalogCard[]> => {
-    await requireActionIdentity(ctx)
     const query = args.query.trim()
     if (query.length < 2 || query.length > 120) return []
+    if (!(await ctx.auth.getUserIdentity())) {
+      const limit = await deckRateLimiter.limit(ctx, "guestDeckImport")
+      if (!limit.ok)
+        throw new ConvexError({
+          code: "rate_limited",
+          message: `Try searching again in ${Math.ceil(limit.retryAfter / 1000)} seconds.`,
+          retryAfterMs: limit.retryAfter,
+        })
+    }
     const game = assertGameSystem(args.game ?? "mtg")
     await requireActionCapability(ctx, game, "cardCatalog")
     const includeImages = await actionCapabilityEnabled(ctx, game, "images")

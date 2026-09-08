@@ -6,7 +6,9 @@ import { ThemeProvider } from "@/theme/context"
 
 import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
 
-jest.mock("convex/react", () => ({ useConvex: () => undefined }))
+const mockSearchCards = jest.fn()
+const mockConvex = { action: mockSearchCards }
+jest.mock("convex/react", () => ({ useConvex: () => mockConvex }))
 
 let mockPreventRemove = false
 let mockPreventRemoveCallback:
@@ -65,6 +67,7 @@ function renderScreen(onBack = jest.fn()) {
 }
 
 beforeEach(() => {
+  mockSearchCards.mockReset()
   mockPreventRemove = false
   mockPreventRemoveCallback = undefined
   mockNavigationDispatch.mockClear()
@@ -195,4 +198,68 @@ test("saving after cancelling system back keeps the editor open", () => {
   expect(mockPreventRemove).toBe(false)
   expect(mockNavigationDispatch).not.toHaveBeenCalled()
   expect(view.getByDisplayValue("Saved")).toBeTruthy()
+})
+
+test("removes all copies of a card from the list and saves the draft", () => {
+  const view = renderScreen()
+  fireEvent.press(view.getByLabelText("Remove Sol Ring from deck"))
+  expect(view.queryByText("Sol Ring")).toBeNull()
+  expect(view.getByText("Cards (0)")).toBeTruthy()
+  fireEvent.press(view.getByTestId("guest-deck-save"))
+  expect(mockSaveGuestDeck).toHaveBeenCalledWith(expect.objectContaining({ cards: [] }), {
+    localId: mockStored.localId,
+  })
+})
+
+test.each([
+  {
+    game: "mtg",
+    card: { name: "Island", scryfallId: "island-print", oracleId: "island", manaCost: "" },
+  },
+  {
+    game: "pokemon",
+    card: {
+      name: "Charizard",
+      cardId: "base1-4",
+      printingId: "base1-4",
+      game: "pokemon",
+      faces: [],
+      facets: {},
+    },
+  },
+])("adds new $game cards from search and saves only deck fields", async ({ game, card }) => {
+  mockCurrent = { ...mockStored, deck: { ...mockStored.deck, game, format: "standard", cards: [] } }
+  mockSearchCards.mockResolvedValue([{ ...card, imageUrl: "https://cards.example/card.jpg" }])
+  const view = renderScreen()
+  fireEvent.press(view.getByTestId("guest-deck-add-cards"))
+  fireEvent.changeText(view.getByTestId("guest-card-search-input"), card.name)
+  fireEvent.press(view.getByTestId("guest-card-search"))
+  await waitFor(() => expect(view.getByLabelText(`Add ${card.name} to deck`)).toBeTruthy())
+  expect(mockSearchCards).toHaveBeenCalledWith(expect.anything(), { game, query: card.name })
+  fireEvent.press(view.getByLabelText(`Add ${card.name} to deck`))
+  fireEvent.press(view.getByLabelText(`Add ${card.name} to deck`))
+  fireEvent.press(view.getByText("Done"))
+  expect(view.getByText("Cards (2)")).toBeTruthy()
+  fireEvent.press(view.getByTestId("guest-deck-save"))
+  const savedCards = mockSaveGuestDeck.mock.calls[0][0].cards
+  expect(savedCards).toHaveLength(1)
+  expect(savedCards[0]).toMatchObject({ name: card.name, quantity: 2, section: "main" })
+  expect(savedCards[0]).not.toHaveProperty("manaCost")
+  expect(savedCards[0]).not.toHaveProperty("faces")
+  expect(savedCards[0]).not.toHaveProperty("facets")
+})
+
+test("keeps edits after a failed search and lets guests retry", async () => {
+  mockSearchCards.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce([])
+  const view = renderScreen()
+  fireEvent.changeText(view.getByTestId("guest-deck-name"), "Unsaved")
+  fireEvent.press(view.getByTestId("guest-deck-add-cards"))
+  fireEvent.changeText(view.getByTestId("guest-card-search-input"), "Island")
+  fireEvent.press(view.getByTestId("guest-card-search"))
+  await waitFor(() => expect(view.getByText(/Check your connection/)).toBeTruthy())
+  fireEvent.press(view.getByTestId("guest-card-search"))
+  await waitFor(() => expect(view.getByText("No cards found.")).toBeTruthy())
+  fireEvent.press(view.getByText("Done"))
+  expect(view.getByDisplayValue("Unsaved")).toBeTruthy()
+  expect(view.getByText("Sol Ring")).toBeTruthy()
 })
