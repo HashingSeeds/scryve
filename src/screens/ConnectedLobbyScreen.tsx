@@ -548,7 +548,6 @@ function ConnectedLobbyContent({
         <PlayerActionsDialog
           publicId={publicId}
           players={[playerToReport]}
-          initialPlayer={playerToReport}
           onClose={() => setPlayerToReport(undefined)}
         />
       ) : null}
