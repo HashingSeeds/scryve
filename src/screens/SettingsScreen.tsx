@@ -35,6 +35,7 @@ import {
   analyticsId,
   setAnalyticsEnabled,
 } from "@/utils/analytics"
+import { diagnosticsId } from "@/utils/diagnosticsPolicy"
 
 const MIN_STARTING_LIFE = 1
 
@@ -283,12 +284,12 @@ export function SettingsScreen({
         />
         <Text
           size="xs"
-          text="No names, clipboard contents, or PostHog recordings. A random analytics ID measures return visits on this device. Turning sharing off discards unsent events; it does not delete events already sent. This choice is separate from Sentry crash diagnostics."
+          text="Usage events exclude names and clipboard contents. A random analytics ID measures return visits on this device. Turning sharing off discards unsent usage events. PostHog error reporting and masked recordings after errors remain enabled. Recordings stop after one minute without another error or when you leave the app."
         />
         {!analyticsConfigured() ? (
           <Text
             size="xs"
-            text="Usage sharing is unavailable in this build. No PostHog events will be sent."
+            text="PostHog is unavailable in this build. Usage sharing, error reporting, and recordings are disabled."
           />
         ) : null}
         {analyticsError ? <Text accessibilityRole="alert" size="xs" text={analyticsError} /> : null}
@@ -297,6 +298,13 @@ export function SettingsScreen({
             selectable
             size="xxs"
             text={`Analytics ID: ${analyticsId()}. Include this ID when requesting analytics deletion at privacy@sowinghope.how.`}
+          />
+        ) : null}
+        {diagnosticsId() ? (
+          <Text
+            selectable
+            size="xxs"
+            text={`Diagnostics ID: ${diagnosticsId()}. Include this ID when requesting diagnostic data deletion at privacy@sowinghope.how.`}
           />
         ) : null}
         {onRequestAccountDeletion ? (

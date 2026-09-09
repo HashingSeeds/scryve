@@ -8,7 +8,7 @@ This app uses two release paths: OTA updates for JS and asset changes within an 
 2. Publish the update to the preview channel: `eas update --channel preview`.
 3. Install and open a preview build. Smoke-test the update on the production-equivalent runtime using `pnpm e2e` for the Maestro smoke suite.
 4. Promote the exact tested update to production: `eas update:republish --group <update-group-id> --channel production`. Promote the tested update group; never republish or rebuild from a later commit.
-5. Watch Sentry for new fatal issues after publishing. Percentage rollouts (`eas update --rollout-percentage`) become worthwhile once there is a real user base.
+5. Watch PostHog Error Tracking for new fatal issues after publishing. Percentage rollouts (`eas update --rollout-percentage`) become worthwhile once there is a real user base.
 
 ## Native releases (fingerprint changed)
 
@@ -31,7 +31,7 @@ runtime-version:
 eas-build-id-ios:
 eas-build-id-android:
 convex-deploy-commit:
-sentry-release:
+posthog-release:
 ```
 
 ## Convex deploys
@@ -67,7 +67,53 @@ backfill or authorize an incidental production command.
 
 **Bad Convex deploy or migration:** Roll FORWARD with backward-compatible server code. A client rollback does not repair server data.
 
-## Optional PostHog analytics
+## PostHog diagnostics and optional analytics
+
+This migration requires new native binaries. The PostHog native plugin replaces
+Sentry, so an OTA update alone cannot enable native crash reporting or replay.
+Installed older clients continue using Sentry until they upgrade; keep their
+Sentry project available during that adoption window.
+
+Before releasing:
+
+- Enable exception autocapture and session recordings in the target PostHog
+  project. The client keeps replay off at launch and starts it explicitly after
+  a JavaScript error. No recording rules or Replay Vision scanners are needed.
+- Set `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` in the authorized
+  build environment. Without both, diagnostics and analytics are disabled.
+- Set `POSTHOG_CLI_API_KEY`, `POSTHOG_CLI_PROJECT_ID`, and, for EU hosting,
+  `POSTHOG_CLI_HOST=https://eu.posthog.com` in that build environment. These are
+  build-time credentials and must never be exposed through `EXPO_PUBLIC_*`.
+  `@posthog/cli` is a dev dependency; the Expo plugin uploads JavaScript maps,
+  iOS dSYMs, and Android mappings during native builds.
+- For OTA releases, upload the generated Hermes maps with
+  `pnpm posthog:sourcemaps:ota` after the authorized
+  EAS update. Preserve the maps from that exact update.
+- `build:web:pages` exports source maps, prepares asset paths, and runs
+  `posthog:sourcemaps:web` before deployment. The manual `bundle:web:prod` /
+  `deploy:web:prod` path does the same before publishing. The upload injects
+  web debug IDs and removes public source maps; missing upload credentials fail
+  the release. Ordinary development exports do not upload anything.
+- Verify handled errors, uncaught JavaScript errors, and native crashes on iOS
+  and Android in an isolated release build. Confirm readable stacks, the native
+  release, and the Expo update tags in PostHog. Native crash reports bypass the
+  JavaScript redaction hook; review their payloads in the test project.
+- Check masked post-error replay on both mobile platforms and web, including
+  deck names, player names, invitation links, and authentication screens.
+  Recordings begin after an error, end after one minute without another error,
+  and stop on backgrounding. Foregrounding does not resume recording. There is
+  no pre-error recording, and fatal crashes may have no replay.
+- Confirm error reports and recordings work with usage sharing off, including
+  after opting in, collecting events offline, and withdrawing consent. Unsent
+  analytics must disappear while diagnostic errors remain queued for reconnect.
+
+Analytics and diagnostics use separate PostHog clients, storage, and random
+installation identifiers. This preserves analytics queue deletion and keeps
+analytics opt-out from stopping error reporting or replay. Diagnostics never
+call `identify`; the settings screen exposes both IDs for deletion requests.
+Optional analytics retain the existing event allowlist. Neither client enables
+interaction autocapture, and recording is not enabled by analytics consent.
+
 
 Before setting `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` for a release:
 
@@ -96,8 +142,8 @@ reconnect remain unmeasured. No activity before consent is backfilled. Use event
 timestamps rather than ingestion times for offline cohorts.
 
 Usage sharing is a device preference, separate from legal acceptance and sign-in.
-The SDK stays unloaded without consent and build configuration. No PostHog replay
-plugin or provider is installed. Sentry diagnostics retain their existing behavior.
+The analytics client stays unloaded without consent and build configuration.
+The diagnostic client initializes at app startup when build configuration is present.
 For analytics deletion requests, locate events using the Analytics ID the player
 provides from Settings; these IDs are intentionally not linked to account IDs.
 

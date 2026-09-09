@@ -16,7 +16,10 @@ module.exports = {
     "prettier/prettier": "error",
     "self-explanatory-code/prefer-self-explanatory-code": [
       "error",
-      { baselineFile: ".eslint-comments-baseline.json" },
+      {
+        baselineFile: ".eslint-comments-baseline.json",
+        allowPatterns: ["^\\*?\\s*@jest-environment\\b"],
+      },
     ],
     // typescript-eslint
     "@typescript-eslint/array-type": 0,

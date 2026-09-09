@@ -86,7 +86,7 @@ export function LegalConsentScreen({
             testID="first-use-analytics-switch"
             label="Share usage with Scryve, optional"
             value={sharing}
-            helper="Off by default. Allow PostHog to receive game starts and finishes, system, format, player count, connection failures, and use of decks and stats with a random analytics ID. Offline events upload when you reconnect. No names, clipboard contents, or PostHog recordings. Change this in Settings any time."
+            helper="Off by default. Allow PostHog to receive game starts and finishes, system, format, player count, connection failures, and use of decks and stats with a random analytics ID. Offline events upload when you reconnect. Usage events exclude names and clipboard contents. Change this in Settings any time. PostHog error reporting and masked recordings after errors run independently of this choice."
             onValueChange={setSharing}
           />
           {sharingError ? (

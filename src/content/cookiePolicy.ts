@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const cookiePolicyContent = {
   id: "cookiePolicy",
   title: "COOKIE POLICY",
-  version: "2026-09-07",
-  effectiveDate: "September 7, 2026",
+  version: "2026-09-08",
+  effectiveDate: "September 8, 2026",
   sections: [
     {
       blocks: [
@@ -23,7 +23,7 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "No. This Cookie Policy applies to our Website only. The Scryve mobile application does not use cookies. It stores your settings, your local game history, and your sign-in token on your device so that it can work. If you enable optional usage sharing, it also stores a random analytics identifier and a bounded queue of PostHog events until they can be sent. See our Privacy Policy for details.",
+          text: "No. This Cookie Policy applies to our Website only. The Scryve mobile application does not use cookies. It stores your settings, your local game history, and your sign-in token on your device so that it can work. If you enable optional usage sharing, it also stores a random analytics identifier and a bounded queue of PostHog events until they can be sent. Diagnostics also store a separate random identifier and error reports awaiting upload, independently of usage sharing. See our Privacy Policy for details.",
         },
       ],
     },
@@ -58,7 +58,7 @@ export const cookiePolicyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "Optional usage sharing is off by default. You can enable or disable it in Scryve Settings without affecting your ability to play or sign in. We do not initialize PostHog before you choose to share. Turning sharing off discards unsent events and stops new collection. The analytics identifier remains available in Settings for deletion requests. Essential sign-in and security cookies are separate from this choice.",
+          text: "Optional usage sharing is off by default. You can enable or disable it in Scryve Settings without affecting your ability to play or sign in. The analytics client starts only after you choose to share. Turning sharing off discards unsent usage events and stops new analytics collection. PostHog diagnostics use separate local storage for a diagnostics identifier, session metadata, and error reporting. Recordings with the masking controls described in our Privacy Policy can start after JavaScript errors even when usage sharing is off. They stop one minute after the most recent error or when the app is backgrounded, and contain no activity from before the error. The analytics identifier remains available in Settings for deletion requests. Essential sign-in and security cookies are separate from this choice.",
         },
         {
           type: "paragraph",

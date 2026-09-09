@@ -86,11 +86,9 @@
     ],
     "expo-build-properties",
     [
-      "@sentry/react-native",
+      "posthog-react-native/expo",
       {
-        "url": "https://sentry.io/",
-        "project": "scryve",
-        "organization": "matthew-chisolm"
+        "uploadNativeSymbols": true
       }
     ]
   ],

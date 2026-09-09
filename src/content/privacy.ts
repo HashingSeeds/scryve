@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-09-07",
-  effectiveDate: "September 7, 2026",
+  version: "2026-09-08",
+  effectiveDate: "September 8, 2026",
   sections: [
     {
       blocks: [
@@ -215,7 +215,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "We do not include deck names, player names, deck contents, clipboard contents, invitation codes, or account identifiers in PostHog events. We disable PostHog automatic interaction capture, screen capture, error capture, and session replay. We disable geographic enrichment. Like any service receiving an internet request, PostHog receives the network IP address needed to deliver it. Sentry crash diagnostics and error-related replay are separate, as described below.",
+          text: "We do not include deck names, player names, deck contents, clipboard contents, invitation codes, or account identifiers in product analytics events. Automatic interaction and screen-view analytics are disabled. Geographic enrichment is disabled for product analytics. Like any service receiving an internet request, PostHog receives the network IP address needed to deliver it. PostHog error reporting and error-related recordings operate separately from optional usage sharing, as described below.",
         },
         {
           type: "paragraph",
@@ -239,7 +239,7 @@ export const privacyContent = {
           items: [
             "Authentication. Clerk provides us with account information such as your account identifier, email address, username, display name, and profile image.",
             "Purchases. Apple or Google processes your transaction. Through RevenueCat, we receive information needed to verify and manage your subscription entitlement, such as an application user identifier, product purchased, transaction or receipt information, subscription status, purchase and expiration dates, and renewal or cancellation status.",
-            "Diagnostics. Sentry processes and provides us with technical, device, usage, crash, feedback, and session replay information so we can identify errors and improve reliability.",
+            "Diagnostics. PostHog processes technical, device, crash, and error-related recording information so we can identify errors and improve reliability. Diagnostics remain enabled when optional usage sharing is off.",
           ],
         },
       ],
@@ -273,7 +273,15 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Diagnostics and Session Replay. We use Sentry to identify crashes, diagnose technical problems, collect user feedback, and improve the reliability of the Services. When an error occurs, Sentry may collect diagnostic information such as the app version, device and operating system information, the time of the error, application activity leading up to the error, and technical identifiers. We may also collect a privacy-protected replay of interactions with the application associated with an error. Text, images, and other potentially sensitive screen content are masked or excluded from these recordings. We use this information only for debugging, security, and service improvement, and not for advertising. For more information, review Sentry's privacy notice: https://sentry.io/privacy/.",
+          text: "Diagnostics and Session Replay. We use PostHog to identify crashes and diagnose technical problems, independently of optional usage sharing. Reports may contain error messages, stack traces, app and operating system versions, release identifiers, limited activity breadcrumbs, and a random diagnostics identifier that is separate from your analytics identifier and Scryve account. We filter common sensitive values from JavaScript error reports; native crash reports are collected directly by the native SDK. Error reports can be queued on your device while offline and sent on reconnect.",
+        },
+        {
+          type: "paragraph",
+          text: "After a JavaScript error, the app may record subsequent interactions for up to one minute after the most recent error, stopping when the app is backgrounded. There is no recording of the activity before the error, and a fatal crash may leave no recording. Recordings show interface layout and interactions, such as taps and scrolling. On mobile, we enable masking for standard text, text inputs, and images, plus sandboxed system views on iOS, such as photo and contact pickers. On the web, we mask text and input values and exclude image, SVG, canvas, video, and iframe elements. These controls depend on the SDK recognizing the content; custom-rendered or third-party views may require additional masking. Console logs and network request contents are not included in replays.",
+        },
+        {
+          type: "paragraph",
+          text: "Turning usage sharing off does not stop diagnostics or delete reports and recordings. We use diagnostics for debugging and service reliability, not advertising. Include the Diagnostics ID shown in Settings when requesting deletion at privacy@sowinghope.how. Account deletion alone cannot locate these reports. For information about PostHog, visit https://posthog.com/privacy.",
         },
       ],
     },
@@ -382,8 +390,7 @@ export const privacyContent = {
             "Cloudflare, for website hosting, security, abuse prevention, and wait-list form verification.",
             "RevenueCat, for verifying purchases and managing subscription entitlements.",
             "Apple and Google, when you purchase a subscription or use their platform services.",
-            "Sentry, for crash reporting, diagnostic logging, user feedback, and privacy-protected session replay.",
-            "PostHog, for optional product analytics only when you enable usage sharing.",
+            "PostHog, for crash reporting and masked recordings after errors, and for optional product analytics when you enable usage sharing.",
             "Resend, to email us when a player is reported so we can review it within 24 hours. That email contains the reported username and any note the reporter wrote; it does not identify the person who filed the report.",
             "Legal and Safety Disclosures. We may disclose information when required by law or when reasonably necessary to protect users, the Services, or our legal rights.",
             "Business Transfers. We may share or transfer information in connection with a merger, financing, acquisition, reorganization, or sale of all or part of our business or assets.",
@@ -425,7 +432,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: 'Our core service servers are located in the United States. Optional PostHog analytics use the United States or European Union region configured for that service. Regardless of your location, please be aware that your information may be transferred to, stored by, and processed by us in our facilities and in the facilities of the third parties with whom we may share your personal information (see " WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION? " above), including facilities in the United States, and other countries.',
+          text: 'Our core service servers are located in the United States. PostHog analytics and diagnostics use the United States or European Union region configured for that service. Regardless of your location, please be aware that your information may be transferred to, stored by, and processed by us in our facilities and in the facilities of the third parties with whom we may share your personal information (see " WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION? " above), including facilities in the United States, and other countries.',
         },
         {
           type: "paragraph",
@@ -628,7 +635,7 @@ export const privacyContent = {
             "E. Biometric information Fingerprints and voiceprints NO",
             "F. Internet or other similar network activity Interactions with our website and application, optional product analytics, diagnostic logs, crashes, and privacy-protected session replay YES",
             "G. Geolocation data Device location NO",
-            "H. Audio, electronic, sensory, or similar information Images and audio, video or call recordings created in connection with our business activities NO",
+            "H. Audio, electronic, sensory, or similar information Visual session replays with the masking controls described above. Replays do not record microphone audio, camera video, or calls YES",
             "I. Professional or employment-related information Business contact details in order to provide you our Services at a business level or job title, work history, and professional qualifications if you apply for a job with us NO",
             "J. Education Information Student records and directory information NO",
             "K. Inferences drawn from collected personal information Inferences drawn from any of the collected personal information listed above to create a profile or summary about, for example, an individual’s preferences and characteristics NO",
@@ -664,7 +671,7 @@ export const privacyContent = {
       blocks: [
         {
           type: "paragraph",
-          text: "We collect personal information directly from you, automatically from your device and use of the Services, from Clerk for authentication, from Apple or Google through RevenueCat for purchases and subscription status, from Sentry for diagnostics and error-related session replay, and from PostHog for optional product analytics when you enable usage sharing.",
+          text: "We collect personal information directly from you, automatically from your device and use of the Services, from Clerk for authentication, from Apple or Google through RevenueCat for purchases and subscription status, from PostHog for diagnostics and masked recordings after errors, and for optional product analytics when you enable usage sharing.",
         },
       ],
     },

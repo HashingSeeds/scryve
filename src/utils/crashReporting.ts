@@ -1,5 +1,4 @@
-import * as Sentry from "@sentry/react-native"
-
+import { captureDiagnosticError } from "./diagnostics"
 import { emitTelemetry } from "./telemetry"
 
 /**
@@ -29,6 +28,6 @@ export const reportCrash = (error: Error, type: ErrorType = ErrorType.FATAL) => 
     // Never print raw error text: it may contain auth, invite, or identity values.
     console.error(`[Scryve ${type}] Error details omitted by privacy policy`)
   } else {
-    Sentry.captureException(error, { tags: { errorType: type } })
+    captureDiagnosticError(error, type)
   }
 }

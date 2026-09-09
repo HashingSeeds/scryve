@@ -6,7 +6,6 @@ ignoredBuiltDependencies:
 nodeLinker: hoisted
 
 onlyBuiltDependencies:
-  - '@sentry/cli'
   - esbuild
   - unrs-resolver
 

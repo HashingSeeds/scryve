@@ -5,7 +5,9 @@ const path = require("node:path")
 // fonts and icons Expo exports under `dist/assets/node_modules/` would 404 in
 // production and the SPA fallback would answer with index.html instead.
 const CLOUDFLARE_SKIPPED_DIR = "assets/node_modules/"
-const DEPLOYABLE_DIR = "assets/vendor/"
+const DEPLOYABLE_DIR = "assets/vendor_pkgs_/"
+if (CLOUDFLARE_SKIPPED_DIR.length !== DEPLOYABLE_DIR.length)
+  throw new Error("Asset path rewrites must preserve source-map columns.")
 const REWRITABLE_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".map"])
 const WAITLIST_SOURCE = path.join(process.cwd(), "web", "waitlist")
 
