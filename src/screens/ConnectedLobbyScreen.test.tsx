@@ -295,7 +295,7 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByText(/Enter code ZX90QW/i)).toBeTruthy()
   })
 
-  it("opens a confirmation dialog from an opponent in the lobby", async () => {
+  it("offers report and block before opening the report form from the lobby", async () => {
     connectedHarness.projection = {
       ...connectedHarness.projection,
       status: "lobby",
@@ -320,6 +320,9 @@ describe("ConnectedLobbyScreen", () => {
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
 
     fireEvent.press(screen.getByTestId("lobby-report-player-seat-2"))
+    expect(screen.queryByText("Report Grace")).toBeNull()
+    expect(screen.getByTestId("block-player-seat-2")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("report-player-seat-2"))
     expect(screen.getByText("Report Grace")).toBeTruthy()
     expect(screen.getByText(/Reporting also blocks this player for you immediately/i)).toBeTruthy()
     expect(mockReportPlayer).not.toHaveBeenCalled()

@@ -44,20 +44,18 @@ const NOTE_MAX_LENGTH = 500
 export function PlayerActionsDialog({
   publicId,
   players,
-  initialPlayer,
   origin,
   onClose,
 }: {
   publicId: string
   players: ReportablePlayer[]
-  initialPlayer?: ReportablePlayer
   origin?: DialogOrigin
   onClose: () => void
 }) {
   const { themed } = useAppTheme()
   const report = useMutation(api.moderation.reportPlayer)
   const block = useMutation(api.moderation.blockPlayer)
-  const [selected, setSelected] = useState<ReportablePlayer | undefined>(initialPlayer)
+  const [selected, setSelected] = useState<ReportablePlayer>()
   const [reason, setReason] = useState<ReportReason>("offensive_username")
   const [note, setNote] = useState("")
   const [busy, setBusy] = useState(false)
@@ -97,7 +95,12 @@ export function PlayerActionsDialog({
           <Button text="Close" preset="reversed" onPress={onClose} />
         </View>
       ) : selected ? (
-        <View style={themed($section)}>
+        <ScrollView
+          style={themed($list)}
+          contentContainerStyle={themed($section)}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+        >
           <Text preset="subheading" text={`Report ${selected.displayName}`} />
           <Text
             size="xs"
@@ -154,7 +157,7 @@ export function PlayerActionsDialog({
               }
             />
           </View>
-        </View>
+        </ScrollView>
       ) : (
         <View style={themed($section)}>
           <Text preset="subheading" text="Players" />
