@@ -379,6 +379,39 @@ describe("ConnectedLobbyScreen", () => {
     expect(onStarted).toHaveBeenCalledTimes(1)
   })
 
+  it.each(["abandoned", "finished"] as const)(
+    "closes the lobby when its status becomes %s",
+    (status) => {
+      connectedHarness.projection = {
+        ...connectedHarness.projection,
+        status: "lobby",
+        isHost: false,
+      }
+      const onLeft = jest.fn()
+      const onStarted = jest.fn()
+      const content = themed(
+        <ConnectedLobbyScreen publicId="game-public" onStarted={onStarted} onLeft={onLeft} />,
+      )
+      const view = render(content)
+      fireEvent.press(screen.getByTestId("leave-connected-lobby-button"))
+      connectedHarness.projection = { ...connectedHarness.projection, status }
+      connectedHarness.socketConnected = false
+      view.rerender(
+        themed(
+          <ConnectedLobbyScreen publicId="game-public" onStarted={onStarted} onLeft={onLeft} />,
+        ),
+      )
+
+      expect(screen.getByText("Lobby closed")).toBeTruthy()
+      expect(screen.queryByText("Waiting for the host to start.")).toBeNull()
+      expect(screen.queryByTestId("connected-lobby-leave-confirmation")).toBeNull()
+      fireEvent.press(screen.getByText("OK"))
+      expect(onLeft).toHaveBeenCalledTimes(1)
+      expect(onStarted).not.toHaveBeenCalled()
+      expect(mockLeave).not.toHaveBeenCalled()
+    },
+  )
+
   it("confirms lobby leave and navigates only after the mutation succeeds", async () => {
     connectedHarness.projection = {
       ...connectedHarness.projection,
