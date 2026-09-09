@@ -58,7 +58,7 @@ export function CommanderDamageCardControls({
   mode,
   life,
 }: CommanderDamageCardControlsProps) {
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const progress = useSharedValue(reducedMotion === false ? 0 : 1)
   const rotationStyle: ViewStyle | undefined = contentRotation
@@ -73,7 +73,8 @@ export function CommanderDamageCardControls({
     opacity: progress.value,
     transform: [{ scale: 0.98 + progress.value * 0.02 }],
   }))
-  const controlForeground = mode.kind === "target" ? foreground : "#FFFFFF"
+  const controlForeground =
+    life !== undefined || mode.kind === "target" ? foreground : theme.colors.board.text
 
   return (
     <Animated.View
@@ -326,9 +327,9 @@ const $compactOverlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderRadius: spacing.md,
 })
 
-const $activePlayerOverlay: ThemedStyle<ViewStyle> = () => ({
-  backgroundColor: "#050505",
-  borderColor: "#FFFFFF",
+const $activePlayerOverlay: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.board.background,
+  borderColor: colors.board.text,
   borderWidth: 3,
 })
 
@@ -383,10 +384,12 @@ const $headline: ThemedStyle<TextStyle> = () => ({
 })
 const $caption: ThemedStyle<TextStyle> = () => ({ opacity: 0.78, textAlign: "center" })
 
-const $localOverlay: ThemedStyle<ViewStyle> = () => ({
-  backgroundColor: "#000000",
+const $localOverlay: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.transparent,
   borderWidth: 0,
-  borderRadius: 0,
 })
-const $localTotal: ThemedStyle<ViewStyle> = () => ({ alignItems: "center", gap: 4 })
+const $localTotal: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "center",
+  gap: spacing.xxs,
+})
 const $localLife: ThemedStyle<TextStyle> = () => ({ fontSize: 18, lineHeight: 22 })

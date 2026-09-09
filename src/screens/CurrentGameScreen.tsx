@@ -193,8 +193,7 @@ export function CurrentGameScreen({
   return (
     <Screen
       preset="fixed"
-      backgroundColor={commanderDamageEnabled ? "#000000" : undefined}
-      safeAreaEdges={commanderDamageEnabled ? ["top", "bottom", "left", "right"] : []}
+      safeAreaEdges={[]}
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
