@@ -165,7 +165,7 @@ const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
   overflow: "hidden",
   borderWidth: 1,
   borderColor: colors.separator,
-  backgroundColor: colors.background,
+  backgroundColor: colors.surface,
 })
 const $topRight: ViewStyle = { right: 0, top: 0 }
 const $bottomLeft: ViewStyle = { bottom: 0, left: 0 }
