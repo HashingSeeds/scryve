@@ -1,6 +1,8 @@
+import { useState } from "react"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { Text } from "@/components/Text"
+import { TextField } from "@/components/TextField"
 import { privacyContent } from "@/content/privacy"
 import { ThemeProvider } from "@/theme/context"
 import { analyticsEnabled } from "@/utils/analytics"
@@ -291,6 +293,51 @@ describe("LegalConsentGate", () => {
 
     expect(view.getByText("APP CONTENT")).toBeTruthy()
     expect(view.queryByText("Before you start")).toBeNull()
+  })
+
+  it("preserves a connection draft through sign-in and consent sync", async () => {
+    clearAccountAcceptanceCache()
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: false }
+    mockConvexAuth = { isAuthenticated: false, isLoading: false }
+    mockAccountAcceptances = undefined
+    function Draft() {
+      const [code, setCode] = useState("")
+      return <TextField testID="draft" value={code} onChangeText={setCode} />
+    }
+    const tree = () => (
+      <ThemeProvider initialContext="light">
+        <LegalConsentGate>
+          <Draft />
+        </LegalConsentGate>
+      </ThemeProvider>
+    )
+    const view = render(tree())
+    fireEvent.changeText(view.getByTestId("draft"), "ABC123")
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    view.rerender(tree())
+    expect(view.getByTestId("draft").props.value).toBe("ABC123")
+    mockConvexAuth = { isAuthenticated: true, isLoading: false }
+    mockAccountAcceptances = []
+    await act(async () => view.rerender(tree()))
+    expect(view.getByTestId("draft").props.value).toBe("ABC123")
+    expect(mockRecordAcceptance).toHaveBeenCalledTimes(2)
+    expect(accountAcceptanceCache.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
+  })
+
+  it("waits for the account id before importing device consent", async () => {
+    clearAccountAcceptanceCache()
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
+    mockAccountAcceptances = undefined
+    const view = renderGate()
+    await act(async () => await Promise.resolve())
+    expect(mockRecordAcceptance).not.toHaveBeenCalled()
+
+    mockAuth = { ...mockAuth, userId: "user-a" }
+    await act(async () => view.rerender(gateTree()))
+    expect(mockRecordAcceptance).toHaveBeenCalledTimes(2)
+    expect(accountAcceptanceCache.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
   })
 
   it("falls back to the device answer when the account cannot be reached", () => {
