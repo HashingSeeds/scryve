@@ -3,6 +3,8 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
+import { darkTheme } from "@/theme/theme"
+import { accessibleForeground } from "@/utils/colorContrast"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
@@ -33,6 +35,71 @@ const renderCard = (life: number) => render(card(life))
 describe("LifeCard", () => {
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => jest.useRealTimers())
+
+  it.each([false, true])(
+    "preserves seat colors and theme rounding in local commander modes, compact=%s",
+    (compact) => {
+      const color = darkTheme.colors.palette.primary200
+      const props = {
+        playerName: "Ada",
+        seatNumber: 1,
+        life: 40,
+        color,
+        compact,
+        onChange: jest.fn(),
+        commanderDamage: {
+          ownerPlayerId: commanderIds[0],
+          seats: commanderSeats.seats,
+          rows: commanderSeats.rows,
+          columns: commanderSeats.columns,
+          incoming: {},
+          inspection: { open: false, onToggle: jest.fn() },
+        },
+      }
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <LifeCard {...props} />
+        </ThemeProvider>,
+      )
+      const radius = compact ? darkTheme.spacing.md : darkTheme.spacing.lg
+      expect(StyleSheet.flatten(view.getByTestId("life-card-seat-1").props.style)).toMatchObject({
+        backgroundColor: color,
+        borderWidth: 0,
+        borderRadius: radius,
+      })
+      expect(StyleSheet.flatten(view.getByTestId("life-total-seat-1").props.style).color).toBe(
+        accessibleForeground(color),
+      )
+      view.rerender(
+        <ThemeProvider initialContext="dark">
+          <LifeCard
+            {...props}
+            commanderDamage={{
+              ...props.commanderDamage,
+              inspection: { open: true, onToggle: jest.fn() },
+            }}
+          />
+        </ThemeProvider>,
+      )
+      expect(
+        StyleSheet.flatten(view.getByTestId("commander-overview-seat-1").props.style),
+      ).toMatchObject({ backgroundColor: color, borderRadius: radius })
+      for (const armedPlayerId of commanderIds) {
+        view.rerender(
+          <ThemeProvider initialContext="dark">
+            <LifeCard {...props} commanderDamage={{ ...props.commanderDamage, armedPlayerId }} />
+          </ThemeProvider>,
+        )
+        expect(
+          StyleSheet.flatten(view.getByTestId("commander-card-mode-seat-1").props.style),
+        ).toMatchObject({
+          backgroundColor: darkTheme.colors.transparent,
+          borderRadius: radius,
+          borderWidth: 0,
+        })
+      }
+    },
+  )
 
   it("sizes the life total in JavaScript rather than relying on native auto-shrink", () => {
     const twoDigits = StyleSheet.flatten(

@@ -19,8 +19,6 @@ import { PlayerMark } from "./PlayerMark"
 import { Sword } from "./Sword"
 import { Text } from "./Text"
 
-const CELL_GAP = 2
-
 export interface CommanderDamageBoardProps {
   players?: readonly GamePlayer[]
   ownerPlayerId: PlayerId
@@ -63,7 +61,10 @@ export function CommanderDamageBoard({
   onPressSword,
   style,
 }: CommanderDamageBoardProps) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { spacing },
+  } = useAppTheme()
   const grid = commanderBoardGrid({ seats, rows, columns })
   const seatedGlyphRotation: ViewStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
@@ -71,7 +72,7 @@ export function CommanderDamageBoard({
   const size = commanderCellSize({
     rows: grid.rows,
     columns: grid.columns,
-    gap: CELL_GAP,
+    gap: spacing.xxxs,
     preferred: expanded
       ? compact
         ? 88
@@ -226,8 +227,8 @@ const $inspectionCell: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
   justifyContent: "center",
 })
-const $inspectionValue: ThemedStyle<ViewStyle> = () => ({
+const $inspectionValue: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
-  gap: 4,
+  gap: spacing.xxs,
 })

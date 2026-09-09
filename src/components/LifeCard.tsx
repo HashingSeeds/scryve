@@ -111,8 +111,7 @@ export function LifeCard({
     theme: { spacing },
   } = useAppTheme()
   const localCommander = !!commanderDamage?.inspection
-  const foreground = localCommander ? "#FFFFFF" : accessibleForeground(color)
-  const cardColor = localCommander ? "#000000" : color
+  const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
   const frozen = disabled || eliminated
@@ -140,11 +139,13 @@ export function LifeCard({
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
+  const toolbarSize = spacing.xl + spacing.sm
+  const inspectionControlInset = toolbarSize + spacing.xs * 2
   const inspectionInsets = {
-    top: contentRotation === 180 ? 60 : 12,
-    bottom: contentRotation === 0 ? 60 : 12,
-    left: contentRotation === 90 ? 60 : 12,
-    right: contentRotation === -90 ? 60 : 12,
+    top: contentRotation === 180 ? inspectionControlInset : spacing.sm,
+    bottom: contentRotation === 0 ? inspectionControlInset : spacing.sm,
+    left: contentRotation === 90 ? inspectionControlInset : spacing.sm,
+    right: contentRotation === -90 ? inspectionControlInset : spacing.sm,
   }
   const markStyle = getPlayerMarkCorner(contentRotation, cardPadding)
   const commanderOverviewEntering =
@@ -283,8 +284,7 @@ export function LifeCard({
         themed($card),
         compact && themed($compactCard),
         ownership === "disabled" && themed($disabledCard),
-        { backgroundColor: cardColor },
-        localCommander && themed($localCommanderCard),
+        { backgroundColor: color },
         style,
       ]}
     >
@@ -416,7 +416,7 @@ export function LifeCard({
           style={[
             themed($commanderOverview),
             compact && themed($compactCommanderOverview),
-            { backgroundColor: cardColor },
+            { backgroundColor: color },
           ]}
         >
           <View style={[themed($commanderOverviewContent), localCommander && inspectionInsets]}>
@@ -520,7 +520,12 @@ export function LifeCard({
         />
       ) : null}
       {commanderDamage?.inspection && !commanderCardMode ? (
-        <View style={[themed($commanderToolbar), commanderToolbarEdge(contentRotation)]}>
+        <View
+          style={[
+            themed($commanderToolbar),
+            commanderToolbarEdge(contentRotation, spacing.xs, toolbarSize),
+          ]}
+        >
           <Pressable
             testID={`commander-inspect-seat-${seatNumber}`}
             accessibilityRole="button"
@@ -556,7 +561,7 @@ export function LifeCard({
               shape={shape}
               color={foreground}
               rotation={contentRotation}
-              insetSwordColor={cardColor}
+              insetSwordColor={color}
               size={36}
             />
           </Pressable>
@@ -740,13 +745,18 @@ const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
 const $dialogTitle: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
 
-function commanderToolbarEdge(rotation: LifeCardContentRotation): ViewStyle {
-  if (rotation === 90) return { left: 8, top: 8, bottom: 8, width: 44, flexDirection: "column" }
+function commanderToolbarEdge(
+  rotation: LifeCardContentRotation,
+  inset: number,
+  size: number,
+): ViewStyle {
+  if (rotation === 90)
+    return { left: inset, top: inset, bottom: inset, width: size, flexDirection: "column" }
   if (rotation === -90)
-    return { right: 8, top: 8, bottom: 8, width: 44, flexDirection: "column-reverse" }
+    return { right: inset, top: inset, bottom: inset, width: size, flexDirection: "column-reverse" }
   if (rotation === 180)
-    return { top: 8, left: 8, right: 8, height: 44, flexDirection: "row-reverse" }
-  return { bottom: 8, left: 8, right: 8, height: 44, flexDirection: "row" }
+    return { top: inset, left: inset, right: inset, height: size, flexDirection: "row-reverse" }
+  return { bottom: inset, left: inset, right: inset, height: size, flexDirection: "row" }
 }
 const $commanderToolbar: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
@@ -754,15 +764,9 @@ const $commanderToolbar: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "space-between",
   alignItems: "center",
 })
-const $commanderToolbarButton: ThemedStyle<ViewStyle> = () => ({
-  width: 44,
-  height: 44,
+const $commanderToolbarButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: spacing.xl + spacing.sm,
+  height: spacing.xl + spacing.sm,
   alignItems: "center",
   justifyContent: "center",
-})
-
-const $localCommanderCard: ThemedStyle<ViewStyle> = () => ({
-  borderWidth: 1,
-  borderColor: "#333333",
-  borderRadius: 0,
 })
