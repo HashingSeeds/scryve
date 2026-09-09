@@ -278,6 +278,31 @@ function ConnectedLobbyContent({
 
   if (lobby === undefined) return <LobbyStatusScreen message="Loading lobby…" onBack={onBack} />
 
+  if (lobby.status === "abandoned" || lobby.status === "finished") {
+    const close = onLeft ?? onBack ?? (() => undefined)
+    return (
+      <Screen preset="fixed" backgroundColor={colors.surface}>
+        <DialogCard
+          visible
+          onClose={close}
+          backdropAccessibilityLabel="Close lobby"
+          dialogAccessibilityRole="alert"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text="Lobby closed" />
+          <Text
+            text={
+              lobby.status === "abandoned"
+                ? "This game was abandoned. You can start or join another game."
+                : "This game has ended. You can start or join another game."
+            }
+          />
+          <Button text="OK" onPress={close} />
+        </DialogCard>
+      </Screen>
+    )
+  }
+
   const claimedSeats = lobby.players.length
   const openSeats = Math.max(0, lobby.playerCount - claimedSeats)
   const everySeatClaimed = claimedSeats === lobby.playerCount

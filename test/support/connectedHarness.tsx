@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 
+import type { ConnectedGameStatus } from "@/features/connected/model"
 import { ThemeProvider } from "@/theme/context"
 
 type ActiveConnectedGame = {
@@ -25,7 +26,7 @@ type LobbyPlayer = {
 
 type LobbyProjection = {
   publicId: string
-  status: "lobby" | "active" | "finished"
+  status: ConnectedGameStatus
   playerCount: number
   startingLife: number
   ruleset: string
@@ -75,7 +76,7 @@ export type MockConnectedRuntime = {
   projection: {
     schemaVersion: 1
     publicId: string
-    status: "lobby" | "active" | "finished"
+    status: ConnectedGameStatus
     playerCount: number
     startingLife: number
     ruleset: string
