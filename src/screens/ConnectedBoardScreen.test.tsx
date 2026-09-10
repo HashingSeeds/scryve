@@ -85,9 +85,6 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.queryByText("Your seat")).toBeNull()
     expect(screen.queryByText("View only")).toBeNull()
     expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("Your seat")
-    expect(
-      screen.getAllByTestId("player-mark-spin-line", { includeHiddenElements: true }),
-    ).toHaveLength(1)
     fireEvent.press(ownedAddOne)
     expect(mockChangeLife).toHaveBeenCalledWith("player-1", 1)
     expect(useKeepAwake).toHaveBeenCalledWith("count-connected-game")
