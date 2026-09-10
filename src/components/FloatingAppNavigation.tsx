@@ -17,7 +17,7 @@ export function FloatingAppNavigation({
   accountLabel = "Account",
   bottomSafeArea = true,
 }: {
-  destinationLabel: "Decks" | "Return to game" | "Play"
+  destinationLabel: "Decks" | "Return to game" | "Play" | "Back to lobby"
   onDestination: () => void
   onSettings: () => void
   onAccount: () => void

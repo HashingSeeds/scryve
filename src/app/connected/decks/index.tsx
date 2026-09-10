@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react"
-import { router, useFocusEffect } from "expo-router"
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { CloudScreen, type CloudAccess } from "@/features/auth/CloudScreen"
@@ -8,6 +8,10 @@ import { DecksScreen } from "@/screens/DecksScreen"
 import { captureAnalytics } from "@/utils/analytics"
 
 export default function DecksRoute() {
+  const { lobbyId, system } = useLocalSearchParams<{ lobbyId?: string; system?: string }>()
+  const returnToLobby = lobbyId
+    ? () => router.dismissTo({ pathname: "/connected/lobby/[gameId]", params: { gameId: lobbyId } })
+    : undefined
   useFocusEffect(
     useCallback(() => {
       captureAnalytics("deck_used", { feature: "library" })
@@ -18,7 +22,11 @@ export default function DecksRoute() {
   const screen = (access?: CloudAccess) => (
     <DecksScreen
       access={access}
-      onPlay={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+      initialSystem={system}
+      onBack={returnToLobby}
+      onPlay={
+        returnToLobby ?? (() => router.replace({ pathname: "/", params: { destination: "play" } }))
+      }
       hasCurrentGame={hasCurrentGame}
       onSettings={() => router.push("/settings")}
       accountLabel={auth.isSignedIn ? "Account" : "Sign in"}

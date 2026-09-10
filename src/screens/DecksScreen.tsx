@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { FlatList, ScrollView, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
@@ -366,6 +366,8 @@ function DeckShelf({
 }
 
 export function DecksScreen({
+  onBack,
+  initialSystem,
   onPlay,
   hasCurrentGame = false,
   onSelect,
@@ -376,6 +378,8 @@ export function DecksScreen({
   unavailableMessage,
   access,
 }: {
+  onBack?: () => void
+  initialSystem?: string
   onPlay: () => void
   hasCurrentGame?: boolean
   onSelect: (deck: DeckSelection) => void
@@ -391,7 +395,14 @@ export function DecksScreen({
   const { deckIds: recentDeckIds } = useRecentDecks()
   const guest = useGuestDeck()
   const [collection, setCollection] = useState<DeckCollection>("all")
-  const [system, setSystem] = useState(ALL_SYSTEMS)
+  const [system, setSystem] = useState(
+    DECK_GAME_LIST.find((game) => game.id === initialSystem)?.id ?? ALL_SYSTEMS,
+  )
+  useEffect(() => {
+    if (initialSystem && DECK_GAME_LIST.some((game) => game.id === initialSystem)) {
+      setGame(initialSystem, ALL_FORMATS)
+    }
+  }, [initialSystem, setGame])
   const [search, setSearch] = useState("")
   const [filtersOpen, setFiltersOpen] = useState(false)
 
@@ -454,6 +465,8 @@ export function DecksScreen({
     >
       <Header
         title="Decks"
+        leftText={onBack ? "Back to lobby" : undefined}
+        onLeftPress={onBack}
         backgroundColor={theme.colors.surface}
         rightText="Add deck"
         onRightPress={onAddDeck}
@@ -585,7 +598,7 @@ export function DecksScreen({
         )}
       </View>
       <FloatingAppNavigation
-        destinationLabel={hasCurrentGame ? "Return to game" : "Play"}
+        destinationLabel={onBack ? "Back to lobby" : hasCurrentGame ? "Return to game" : "Play"}
         accountLabel={accountLabel}
         onDestination={onPlay}
         onSettings={onSettings}

@@ -6,11 +6,13 @@ import { FilterChips } from "@/components/FilterChips"
 import { PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
 import type { RemoteValue } from "@/features/async/remoteState"
+import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 import { seatDetail } from "./connectedCopy"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
 
 export type LobbySeat = {
   open?: boolean
@@ -24,6 +26,7 @@ export type LobbySeat = {
 }
 
 export type SeatDeck = {
+  game?: string
   _id: string
   name: string
   versions: { _id: string; versionNumber: number; name?: string }[]
@@ -41,9 +44,11 @@ export function LobbySeatList({
   versionLabel,
   selectingDeckSeats,
   deckRequired,
+  system,
   onSelectVersion,
   onReport,
   onEditAppearance,
+  onManageDecks,
 }: {
   seats: LobbySeat[]
   openSeats: number
@@ -52,8 +57,10 @@ export function LobbySeatList({
   versionLabel: (version: { versionNumber: number; name?: string }) => string
   selectingDeckSeats?: ReadonlySet<number>
   deckRequired?: boolean
+  system?: string
   onSelectVersion: (seat: number, deckVersionId?: string) => void
   onReport: (seat: LobbySeat) => void
+  onManageDecks?: () => void
   onEditAppearance?: (seat: LobbySeat, event?: GestureResponderEvent) => void
 }) {
   const { themed } = useAppTheme()
@@ -92,7 +99,11 @@ export function LobbySeatList({
             </View>
           )
         const decks = deckState.status === "ready" ? deckState.value : undefined
-        const usableDecks = decks?.filter((deck) => deck.versions.length > 0) ?? []
+        const usableDecks =
+          decks?.filter(
+            (deck) =>
+              deck.versions.length > 0 && (!system || (deck.game ?? DEFAULT_DECK_GAME) === system),
+          ) ?? []
         const chosenDeck = decks?.find((deck) =>
           deck.versions.some((version) => version._id === seat.deckVersionId),
         )
@@ -165,7 +176,13 @@ export function LobbySeatList({
             </View>
             {seat.controlledByMe ? (
               <View style={themed($deckChoices)}>
-                {deckState.status === "loading" ? (
+                {system === NO_PLAY_SYSTEM ? (
+                  <Text
+                    size="xxs"
+                    style={themed($seatPending)}
+                    text="Decks are not used for this game."
+                  />
+                ) : deckState.status === "loading" ? (
                   <View
                     testID={`seat-${seat.seat}-deck-loading`}
                     accessibilityRole="progressbar"
@@ -184,7 +201,11 @@ export function LobbySeatList({
                       accessibilityRole="alert"
                       size="xxs"
                       style={themed($seatPending)}
-                      text="Decks unavailable. You can play without one."
+                      text={
+                        deckRequired
+                          ? "Decks unavailable. A deck is required to start."
+                          : "Decks unavailable. You can play without one."
+                      }
                     />
                     <Button
                       testID={`retry-seat-${seat.seat}-decks`}
@@ -199,7 +220,11 @@ export function LobbySeatList({
                     <Text
                       size="xxs"
                       style={themed($seatPending)}
-                      text="No decks available. You can play without one."
+                      text={
+                        deckRequired
+                          ? "No decks for this system. Add a deck to get ready."
+                          : "No decks for this system. You can play without one."
+                      }
                     />
                   </View>
                 ) : (
@@ -243,6 +268,20 @@ export function LobbySeatList({
                     ) : null}
                   </>
                 )}
+                {!deckRequired && seat.deckVersionId && usableDecks.length === 0 ? (
+                  <Button
+                    text="No deck"
+                    disabled={selectingDeck}
+                    onPress={() => onSelectVersion(seat.seat)}
+                  />
+                ) : null}
+                {onManageDecks && system !== NO_PLAY_SYSTEM ? (
+                  <Button
+                    testID={`manage-seat-${seat.seat}-decks`}
+                    text="Manage decks"
+                    onPress={onManageDecks}
+                  />
+                ) : null}
                 {selectingDeck ? (
                   <Text
                     testID={`seat-${seat.seat}-deck-selection-status`}

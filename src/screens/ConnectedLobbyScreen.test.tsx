@@ -1,5 +1,6 @@
 import { Share } from "react-native"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
+import { ConvexError } from "convex/values"
 
 import { Screen } from "@/components/Screen"
 
@@ -15,6 +16,7 @@ import {
   mockSetAppearance,
   mockStart,
   mockSyncUser,
+  mockUpdateLobbySettings,
   resetConnectedHarness,
   themed,
 } from "../../test/support/connectedHarness"
@@ -63,6 +65,103 @@ jest.mock("@/utils/analytics", () => ({
 
 describe("ConnectedLobbyScreen", () => {
   beforeEach(resetConnectedHarness)
+
+  it("lets the host correct six players to two and require decks", async () => {
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      playerCount: 6,
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    await act(async () => fireEvent.press(screen.getByTestId("lobby-player-count-2")))
+    expect(mockUpdateLobbySettings).toHaveBeenLastCalledWith({
+      publicId: "game-public",
+      playerCount: 2,
+    })
+    await act(async () => fireEvent.press(screen.getByTestId("lobby-require-decks")))
+    expect(mockUpdateLobbySettings).toHaveBeenLastCalledWith({
+      publicId: "game-public",
+      deckRequired: true,
+    })
+  })
+
+  it("protects occupied seats and disables settings offline", () => {
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      playerCount: 6,
+      players: connectedHarness.projection.players.map((player, index) => ({
+        ...player,
+        seat: index === 0 ? 1 : 4,
+      })),
+    }
+    const view = render(
+      themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />),
+    )
+    expect(screen.getByTestId("lobby-player-count-2")).toBeDisabled()
+    expect(screen.getByTestId("lobby-player-count-4")).toBeEnabled()
+    connectedHarness.socketConnected = false
+    view.rerender(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    expect(screen.getByTestId("lobby-player-count-4")).toBeDisabled()
+    fireEvent.press(screen.getByTestId("lobby-require-decks"))
+    expect(mockUpdateLobbySettings).not.toHaveBeenCalled()
+  })
+
+  it("opens deck management for the joining player's game system", () => {
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: false,
+      players: connectedHarness.projection.players.map((player, index) => ({
+        ...player,
+        controlledByMe: index === 0,
+      })),
+    }
+    const onManageDecks = jest.fn()
+    render(
+      themed(
+        <ConnectedLobbyScreen
+          publicId="game-public"
+          onStarted={jest.fn()}
+          onManageDecks={onManageDecks}
+        />,
+      ),
+    )
+    fireEvent.press(screen.getByTestId("manage-seat-1-decks"))
+    expect(onManageDecks).toHaveBeenCalledWith("mtg")
+  })
+
+  it("does not offer required decks for a game without a system", () => {
+    connectedHarness.projection = {
+      ...connectedHarness.projection,
+      status: "lobby",
+      isHost: true,
+      system: "none",
+    }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    expect(screen.queryByTestId("lobby-require-decks")).toBeNull()
+    expect(screen.getByTestId("lobby-player-count-2")).toBeEnabled()
+  })
+
+  it("hides host settings from joining players", () => {
+    connectedHarness.projection = { ...connectedHarness.projection, status: "lobby", isHost: false }
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    expect(screen.queryByTestId("lobby-player-count")).toBeNull()
+    expect(screen.queryByTestId("lobby-require-decks")).toBeNull()
+  })
+
+  it("shows rejected settings without changing the selected count", async () => {
+    connectedHarness.projection = { ...connectedHarness.projection, status: "lobby", isHost: true }
+    mockUpdateLobbySettings.mockRejectedValueOnce(
+      new ConvexError({ message: "Lobby already started" }),
+    )
+    render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
+    await act(async () => fireEvent.press(screen.getByTestId("lobby-player-count-3")))
+    expect(screen.getByTestId("connected-action-error")).toHaveTextContent("Lobby already started")
+    expect(screen.getByTestId("lobby-player-count-2").props.accessibilityState.selected).toBe(true)
+  })
 
   it("does not carry lobby observation into another game on the same route", () => {
     mockCaptureGame.mockClear()
@@ -189,7 +288,7 @@ describe("ConnectedLobbyScreen", () => {
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
 
     expect(screen.getByTestId("seat-1-no-decks")).toHaveTextContent(
-      "No decks available. You can play without one.",
+      "No decks for this system. You can play without one.",
     )
   })
 

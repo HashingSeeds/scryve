@@ -6,7 +6,7 @@ import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
-import { clear } from "@/utils/storage"
+import { clear, loadString } from "@/utils/storage"
 
 import { DecksScreen } from "./DecksScreen"
 
@@ -356,5 +356,20 @@ describe("DecksScreen", () => {
     expect(view.getByText("Existing Deck")).toBeTruthy()
     expect(view.queryByTestId("decks-unavailable")).toBeNull()
     consoleError.mockRestore()
+  })
+
+  it("opens the lobby system and returns to the lobby", () => {
+    mockListMine.value = {
+      decks: [commanderDeck, pokemonDeck],
+      capacity: { used: 2, limit: 100, premium: true, canCreate: true },
+      analyticsLocked: false,
+    }
+    const onBack = jest.fn()
+    const view = renderShelf({ initialSystem: "pokemon", onBack })
+    expect(view.queryByText("Existing Deck")).toBeNull()
+    expect(view.getByText("Lucario Hariyama")).toBeTruthy()
+    expect(loadString("decks.game")).toBe("pokemon")
+    fireEvent.press(view.getAllByText("Back to lobby")[0])
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 })
