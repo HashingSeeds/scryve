@@ -200,12 +200,12 @@ function PentagonBevel({
   )
 }
 
-function PentagonHairline(): ReactElement {
+function PentagonHairline({ color }: { color: string }): ReactElement {
   return (
     <Polygon
       points={FACE_POINTS}
       fill="none"
-      stroke="#FFFFFF"
+      stroke={color}
       strokeOpacity={0.22}
       strokeWidth={HAIRLINE_STROKE_WIDTH}
       strokeLinejoin="round"
@@ -273,7 +273,7 @@ function KeystoneTwoShape({
         strokeLinejoin="round"
       />
       {isDark ? null : <PentagonBevel clipId="keystoneTwoFace" opacity={KEYSTONE_II_BEVEL} />}
-      <PentagonHairline />
+      <PentagonHairline color={boardBackgroundColor} />
     </>
   )
 }
@@ -333,7 +333,7 @@ function PrismShape({
         strokeLinejoin="round"
       />
       {isDark ? null : <PentagonBevel clipId="prismFace" opacity={PRISM_BEVEL} />}
-      <PentagonHairline />
+      <PentagonHairline color={boardBackgroundColor} />
     </>
   )
 }
