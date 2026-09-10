@@ -11,6 +11,12 @@ export default function LobbyRoute() {
         publicId={params.gameId}
         onBack={() => router.replace("/game/new?mode=connected")}
         onLeft={() => router.replace("/game/new?mode=connected")}
+        onManageDecks={(system) =>
+          router.push({
+            pathname: "/connected/decks",
+            params: { lobbyId: params.gameId, system },
+          })
+        }
         onStarted={() =>
           router.replace({
             pathname: "/connected/game/[gameId]",

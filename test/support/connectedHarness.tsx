@@ -25,6 +25,7 @@ type LobbyPlayer = {
 }
 
 type LobbyProjection = {
+  system?: string
   publicId: string
   status: ConnectedGameStatus
   playerCount: number
@@ -106,6 +107,7 @@ export const mockSyncUser = jest.fn(async () => "user")
 export const mockStart = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockLeave = jest.fn(async () => ({ publicId: "game-public", left: true }))
 export const mockAbandon = jest.fn(async () => ({ publicId: "game-public" }))
+export const mockUpdateLobbySettings = jest.fn(async () => undefined)
 export const mockSetAppearance = jest.fn(async () => ({ color: "#41476E", shape: "square" }))
 export const mockSelectDeck = jest.fn(async () => undefined)
 export const mockCreateLobby = jest.fn(async () => ({
@@ -130,6 +132,7 @@ function defaultProjection(): LobbyProjection {
     playerCount: 2,
     startingLife: 40,
     ruleset: "commander",
+    system: "mtg",
     isHost: false,
     players: [
       { seat: 1, displayName: "Ada", color: "#7C3AED", currentLife: 40 },
@@ -225,6 +228,7 @@ export function resetConnectedHarness() {
   mockStart.mockReset().mockResolvedValue({ publicId: "game-public" })
   mockLeave.mockReset().mockResolvedValue({ publicId: "game-public", left: true })
   mockAbandon.mockReset().mockResolvedValue({ publicId: "game-public" })
+  mockUpdateLobbySettings.mockReset().mockResolvedValue(undefined)
   mockSetAppearance.mockReset().mockResolvedValue({ color: "#41476E", shape: "square" })
   mockSelectDeck.mockReset().mockResolvedValue(undefined)
   mockCreateLobby.mockReset().mockResolvedValue({
@@ -289,6 +293,7 @@ export function createConvexReactMock() {
       if (name.includes("startGame")) return mockStart
       if (name.includes("leaveMyGame")) return mockLeave
       if (name.includes("abandonGame")) return mockAbandon
+      if (name.includes("updateLobbySettings")) return mockUpdateLobbySettings
       if (name.includes("setMyAppearance")) return mockSetAppearance
       if (name.includes("selectForSeat")) return mockSelectDeck
       if (name.includes("createLobby")) return mockCreateLobby
@@ -355,6 +360,7 @@ export const connectedApi = {
     startGame: "games.startGame",
     leaveMyGame: "games.leaveMyGame",
     abandonGame: "games.abandonGame",
+    updateLobbySettings: "games.updateLobbySettings",
     setMyAppearance: "games.setMyAppearance",
     migrateMyGameMemberships: "games.migrateMyGameMemberships",
     activeConnectedGames: "games.activeConnectedGames",

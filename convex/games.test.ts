@@ -18,11 +18,14 @@ async function synced(t: ReturnType<typeof convexTest>, subject: string, name: s
   return actor
 }
 
-async function lobby(t: ReturnType<typeof convexTest>, options: { deckRequired?: boolean } = {}) {
+async function lobby(
+  t: ReturnType<typeof convexTest>,
+  options: { deckRequired?: boolean; playerCount?: number } = {},
+) {
   const host = await synced(t, "host-subject", "Host")
   const created = await host.mutation(api.games.createLobby, {
     publicId: "public-game-id-123456",
-    playerCount: 2,
+    playerCount: options.playerCount ?? 2,
     startingLife: 40,
     ruleset: "commander",
     ...(options.deckRequired === undefined ? {} : { deckRequired: options.deckRequired }),
@@ -185,6 +188,97 @@ describe("Convex connected-game authorization", () => {
     expect(joinerProjection.players.map((player) => player.controlledByMe)).toEqual([false, true])
     expect(hostProjection.status).toBe(joinerProjection.status)
     expect(hostProjection.players.map((player) => player.currentLife)).toEqual([40, 40])
+  })
+
+  it("lets only the host change lobby settings without removing occupied seats", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await lobby(t)
+    const joiner = await synced(t, "settings-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, {
+      token,
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+    await expect(
+      joiner.mutation(api.games.updateLobbySettings, {
+        publicId: created.publicId,
+        playerCount: 4,
+      }),
+    ).rejects.toThrow("Host permission")
+    await expect(
+      host.mutation(api.games.updateLobbySettings, {
+        publicId: created.publicId,
+        playerCount: 1,
+      }),
+    ).rejects.toThrow("2–6 seats")
+    await expect(
+      host.mutation(api.games.updateLobbySettings, {
+        publicId: created.publicId,
+        playerCount: 3,
+      }),
+    ).resolves.toEqual({ playerCount: 3, deckRequired: false })
+    const third = await synced(t, "settings-third", "Third")
+    await expect(
+      third.mutation(api.games.claimSeat, {
+        token,
+        displayName: "Third",
+        color: "#112233",
+      }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 3 })
+    await t.run(async (ctx) => {
+      const game = await ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", created.publicId))
+        .unique()
+      const player = await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_game_seat", (q) => q.eq("gameId", game!._id).eq("seat", 2))
+        .unique()
+      await ctx.db.delete(player!._id)
+    })
+    await expect(
+      host.mutation(api.games.updateLobbySettings, {
+        publicId: created.publicId,
+        playerCount: 2,
+      }),
+    ).rejects.toThrow("cannot remove an occupied seat")
+  })
+
+  it("applies updated player and deck requirements to readiness and start", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await lobby(t, { playerCount: 3 })
+    const joiner = await synced(t, "requirements-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, {
+      token,
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+
+    await expect(
+      host.mutation(api.games.updateLobbySettings, {
+        publicId: created.publicId,
+        playerCount: 2,
+        deckRequired: true,
+      }),
+    ).resolves.toEqual({ playerCount: 2, deckRequired: true })
+    await expect(
+      host.query(api.games.lobbyProjection, { publicId: created.publicId }),
+    ).resolves.toMatchObject({ playerCount: 2, deckRequired: true })
+    await expect(
+      host.mutation(api.games.startGame, { publicId: created.publicId }),
+    ).rejects.toThrow("Every occupied seat must choose a deck")
+
+    await host.mutation(api.games.updateLobbySettings, {
+      publicId: created.publicId,
+      deckRequired: false,
+    })
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    await expect(
+      host.mutation(api.games.updateLobbySettings, {
+        publicId: created.publicId,
+        playerCount: 3,
+      }),
+    ).rejects.toThrow("Lobby settings can only change in a lobby")
   })
 
   it("keeps legacy lobbies deck-optional and blocks required lobbies without decks", async () => {
@@ -382,11 +476,11 @@ describe("Convex connected-game authorization", () => {
     })
   })
 
-  it("creates a no-system lobby with its board change amount", async () => {
+  it("keeps decks optional for no-system lobbies", async () => {
     const t = convexTest(schema, modules)
     const host = await synced(t, "no-system-host", "Host")
 
-    const created = await host.mutation(api.games.createLobby, {
+    const args = {
       publicId: "no-system-public-game-id",
       playerCount: 6,
       startingLife: 20,
@@ -397,12 +491,35 @@ describe("Convex connected-game authorization", () => {
       manualCodeCandidates: ["NON234"],
       hostDisplayName: "Host",
       hostColor: "#7C3AED",
-    })
+    }
+    await expect(
+      host.mutation(api.games.createLobby, { ...args, deckRequired: true }),
+    ).rejects.toMatchObject({ data: { code: "deck_requirement_not_supported" } })
+    const created = await host.mutation(api.games.createLobby, args)
     const projection = await host.query(api.games.lobbyProjection, {
       publicId: created.publicId,
     })
 
-    expect(projection).toMatchObject({ system: "none", lifeStep: 5 })
+    expect(projection).toMatchObject({ system: "none", lifeStep: 5, deckRequired: false })
+    await expect(
+      host.mutation(api.games.updateLobbySettings, {
+        publicId: created.publicId,
+        deckRequired: true,
+      }),
+    ).rejects.toMatchObject({ data: { code: "deck_requirement_not_supported" } })
+    await t.run(async (ctx) => {
+      const game = await ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", created.publicId))
+        .unique()
+      await ctx.db.patch(game!._id, { deckRequired: true })
+    })
+    await expect(
+      host.mutation(api.games.updateLobbySettings, {
+        publicId: created.publicId,
+        deckRequired: false,
+      }),
+    ).resolves.toEqual({ playerCount: 6, deckRequired: false })
     const games = await t.run((ctx) => ctx.db.query("games").collect())
     expect(games[0].format).toBeUndefined()
   })

@@ -1,5 +1,5 @@
 import { paginationOptsValidator } from "convex/server"
-import { v, type Infer } from "convex/values"
+import { ConvexError, v, type Infer } from "convex/values"
 
 import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
@@ -60,6 +60,14 @@ async function gameByPublicId(ctx: QueryCtx, publicId: string) {
 
 function assertPublicId(publicId: string) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(publicId)) throw new Error("Invalid public game identifier")
+}
+
+function assertDeckRequirementSupported(gameSystem: string, deckRequired?: boolean) {
+  if (gameSystem === NO_GAME_SYSTEM && deckRequired === true)
+    throw new ConvexError({
+      code: "deck_requirement_not_supported",
+      message: "Decks cannot be required for a system-less lobby",
+    })
 }
 
 function assertLifeDelta(delta: number) {
@@ -237,11 +245,20 @@ async function commanderDamageProjection(
   }
 }
 
-async function deckSelectionIsPlayable(ctx: QueryCtx, deckVersionId: Id<"deckVersions">) {
+async function deckSelectionIsPlayable(
+  ctx: QueryCtx,
+  deckVersionId: Id<"deckVersions">,
+  game: Doc<"games">,
+) {
   const version = await ctx.db.get(deckVersionId)
   if (!version || version.archivedAt !== undefined) return false
   const deck = await ctx.db.get(version.deckId)
-  return deck !== null && deck.archivedAt === undefined
+  return (
+    deck !== null &&
+    deck.archivedAt === undefined &&
+    (deck.game ?? DEFAULT_DECK_GAME) === (game.system ?? game.game ?? DEFAULT_DECK_GAME) &&
+    deck.format === (game.format ?? game.ruleset)
+  )
 }
 
 function totalEventCount(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
@@ -506,6 +523,7 @@ export const createLobby = mutation({
     const gameSystem = noSystem
       ? NO_GAME_SYSTEM
       : assertGameSystem(args.system ?? args.game ?? DEFAULT_DECK_GAME)
+    assertDeckRequirementSupported(gameSystem, args.deckRequired)
     if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
     assertPlayerCount(args.playerCount)
     assertStartingLife(
@@ -774,23 +792,30 @@ export const lobbyProjection = query({
               expiresAt: invite.expiresAt,
             }
           : null,
-      players: players
-        .sort((a, b) => a.seat - b.seat)
-        .map((p) => ({
-          playerId: p._id,
-          seat: p.seat,
-          displayName: displayNames.get(p._id) ?? seatLabelFor(p),
-          deckVersionId: p.deckVersionId,
-          color: p.color,
-          shape: appearanceOf(p).shape,
-          currentLife: p.currentLife,
-          ...(commanderDamage
-            ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
-            : {}),
-          controlledByMe:
-            p.userId === user._id &&
-            (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
-        })),
+      players: await Promise.all(
+        players
+          .sort((a, b) => a.seat - b.seat)
+          .map(async (p) => ({
+            playerId: p._id,
+            seat: p.seat,
+            displayName: displayNames.get(p._id) ?? seatLabelFor(p),
+            deckVersionId:
+              game.status === "lobby" &&
+              p.deckVersionId &&
+              !(await deckSelectionIsPlayable(ctx, p.deckVersionId, game))
+                ? undefined
+                : p.deckVersionId,
+            color: p.color,
+            shape: appearanceOf(p).shape,
+            currentLife: p.currentLife,
+            ...(commanderDamage
+              ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
+              : {}),
+            controlledByMe:
+              p.userId === user._id &&
+              (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
+          })),
+      ),
       ...(commanderDamage ? { commanderDamage } : {}),
     }
   },
@@ -921,6 +946,49 @@ export const setMyAppearance = mutation({
   },
 })
 
+export const updateLobbySettings = mutation({
+  args: {
+    publicId: v.string(),
+    playerCount: v.optional(v.number()),
+    deckRequired: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const game = await gameByPublicId(ctx, args.publicId)
+    await requireHost(ctx, game)
+    if (game.status !== "lobby")
+      throw new ConvexError({
+        code: "lobby_settings_not_allowed",
+        message: "Lobby settings can only change in a lobby",
+      })
+    assertDeckRequirementSupported(game.system ?? game.game ?? DEFAULT_DECK_GAME, args.deckRequired)
+    if (args.playerCount !== undefined) {
+      try {
+        assertPlayerCount(args.playerCount)
+      } catch (error) {
+        throw new ConvexError({
+          code: "invalid_player_count",
+          message: error instanceof Error ? error.message : "Choose 2–6 seats",
+        })
+      }
+      const players = await playersForGame(ctx, game._id)
+      if (args.playerCount < Math.max(...players.map((player) => player.seat)))
+        throw new ConvexError({
+          code: "occupied_seat",
+          message: "Player count cannot remove an occupied seat",
+        })
+    }
+    await ctx.db.patch(game._id, {
+      ...(args.playerCount === undefined ? {} : { playerCount: args.playerCount }),
+      ...(args.deckRequired === undefined ? {} : { deckRequired: args.deckRequired }),
+      updatedAt: Date.now(),
+    })
+    return {
+      playerCount: args.playerCount ?? game.playerCount,
+      deckRequired: args.deckRequired ?? game.deckRequired ?? false,
+    }
+  },
+})
+
 export const startGame = mutation({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
@@ -934,7 +1002,7 @@ export const startGame = mutation({
       for (const player of players) {
         if (
           player.deckVersionId === undefined ||
-          !(await deckSelectionIsPlayable(ctx, player.deckVersionId))
+          !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
         )
           throw new Error("Every occupied seat must choose a deck before starting")
       }
@@ -942,12 +1010,12 @@ export const startGame = mutation({
     const now = Date.now()
     await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
     for (const player of players) {
-      const deletedSinceSelection =
+      const invalidSinceSelection =
         player.deckVersionId !== undefined &&
-        !(await deckSelectionIsPlayable(ctx, player.deckVersionId))
+        !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
       await ctx.db.patch(player._id, {
         resumable: true,
-        ...(deletedSinceSelection ? { deckVersionId: undefined } : {}),
+        ...(invalidSinceSelection ? { deckVersionId: undefined } : {}),
       })
     }
     return { publicId: game.publicId }

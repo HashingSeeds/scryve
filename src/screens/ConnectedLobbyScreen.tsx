@@ -14,9 +14,11 @@ import {
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
+import { FilterChips } from "@/components/FilterChips"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { Switch } from "@/components/Toggle/Switch"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remoteValue } from "@/features/async/remoteState"
 import { readPublicCloudConfig } from "@/features/auth/config"
@@ -37,6 +39,7 @@ import {
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -71,11 +74,13 @@ export function ConnectedLobbyScreen({
   onStarted,
   onBack,
   onLeft,
+  onManageDecks,
 }: {
   publicId: string
   onStarted: () => void
   onBack?: () => void
   onLeft?: () => void
+  onManageDecks?: (system: string) => void
 }) {
   return (
     <ConvexQueryBoundary
@@ -94,6 +99,7 @@ export function ConnectedLobbyScreen({
         onStarted={onStarted}
         onBack={onBack}
         onLeft={onLeft}
+        onManageDecks={onManageDecks}
       />
     </ConvexQueryBoundary>
   )
@@ -104,11 +110,13 @@ function ConnectedLobbyContent({
   onStarted,
   onBack,
   onLeft,
+  onManageDecks,
 }: {
   publicId: string
   onStarted: () => void
   onBack?: () => void
   onLeft?: () => void
+  onManageDecks?: (system: string) => void
 }) {
   const {
     themed,
@@ -122,6 +130,9 @@ function ConnectedLobbyContent({
     includeRecentOperationIds: false,
   })
   const { isWebSocketConnected } = useConvexConnectionState()
+  const updateSettings = useMutation(api.games.updateLobbySettings)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const settingsInFlight = useRef(false)
   const start = useMutation(api.games.startGame)
   const leave = useMutation(api.games.leaveMyGame)
   const abandon = useMutation(api.games.abandonGame)
@@ -202,8 +213,23 @@ function ConnectedLobbyContent({
     }
   }
 
+  async function changeSettings(settings: { playerCount?: number; deckRequired?: boolean }) {
+    if (settingsInFlight.current || startInFlight.current || !isWebSocketConnected) return
+    settingsInFlight.current = true
+    setSavingSettings(true)
+    try {
+      setActionError(undefined)
+      await updateSettings({ publicId, ...settings })
+    } catch (cause) {
+      setActionError(convexErrorMessage(cause, "Could not update lobby settings"))
+    } finally {
+      settingsInFlight.current = false
+      setSavingSettings(false)
+    }
+  }
+
   async function startGame() {
-    if (startInFlight.current) return
+    if (startInFlight.current || settingsInFlight.current) return
     if (!isWebSocketConnected) {
       setActionError(onlineOnlyNotice("start"))
       return
@@ -312,7 +338,8 @@ function ConnectedLobbyContent({
   ).length
   const exitAction: LobbyExitAction = lobby.isHost ? "abandon" : "leave"
   const exitCopy = lobbyExitCopy(exitAction)
-  const startBlocked = !everySeatClaimed || missingDeck || !isWebSocketConnected || starting
+  const startBlocked =
+    !everySeatClaimed || missingDeck || !isWebSocketConnected || starting || savingSettings
   const openExitCopy = leaveAction ? lobbyExitCopy(leaveAction) : undefined
   const takenAppearances = lobby.players
     .filter((player) => player.seat !== appearanceSeat)
@@ -349,7 +376,7 @@ function ConnectedLobbyContent({
                 style={themed($dimmed)}
                 text={
                   manualCode
-                    ? "Share this code to invite players"
+                    ? "Invite code"
                     : lobbyDetail(lobby.startingLife, lobby.ruleset, lobby.system, lobby.format)
                 }
               />
@@ -378,9 +405,38 @@ function ConnectedLobbyContent({
             />
           ) : null}
         </View>
+        {lobby.isHost ? (
+          <View style={themed($section)}>
+            <Text preset="subheading" accessibilityRole="header" text="Players" />
+            <FilterChips
+              testID="lobby-player-count"
+              accessibilityLabel="Number of players"
+              selectedId={String(lobby.playerCount)}
+              chips={[2, 3, 4, 5, 6].map((count) => ({
+                id: String(count),
+                label: String(count),
+                disabled:
+                  !isWebSocketConnected ||
+                  savingSettings ||
+                  starting ||
+                  lobby.players.some((player) => player.seat > count),
+              }))}
+              onSelect={(count) => void changeSettings({ playerCount: Number(count) })}
+            />
+            {lobby.system !== NO_PLAY_SYSTEM || lobby.deckRequired ? (
+              <Switch
+                testID="lobby-require-decks"
+                label="Decks required"
+                value={Boolean(lobby.deckRequired)}
+                disabled={!isWebSocketConnected || savingSettings || starting}
+                onValueChange={(deckRequired) => void changeSettings({ deckRequired })}
+              />
+            ) : null}
+          </View>
+        ) : null}
         <View style={themed($section)}>
           <View style={themed($readinessHeading)}>
-            <Text preset="subheading" accessibilityRole="header" text="Ready check" />
+            <Text preset="subheading" accessibilityRole="header" text="Lobby" />
             <Text
               size="xs"
               style={themed($dimmed)}
@@ -398,11 +454,13 @@ function ConnectedLobbyContent({
               ]}
             />
           </View>
-          <Text
-            size="xxs"
-            style={themed($dimmed)}
-            text={deckRequirementLabel(Boolean(lobby.deckRequired))}
-          />
+          {!lobby.isHost ? (
+            <Text
+              size="xxs"
+              style={themed($dimmed)}
+              text={deckRequirementLabel(Boolean(lobby.deckRequired))}
+            />
+          ) : null}
           <LobbyDeckSource>
             {(deckState) => (
               <LobbySeatList
@@ -410,6 +468,9 @@ function ConnectedLobbyContent({
                 openSeats={openSeats}
                 totalSeats={lobby.playerCount}
                 deckState={deckState}
+                system={lobby.system}
+                format={lobby.format}
+                onManageDecks={onManageDecks ? () => onManageDecks(lobby.system) : undefined}
                 versionLabel={versionLabel}
                 selectingDeckSeats={selectingDeckSeats}
                 deckRequired={Boolean(lobby.deckRequired)}
@@ -468,11 +529,7 @@ function ConnectedLobbyContent({
               />
             ) : null}
             {missingDeck && isWebSocketConnected ? (
-              <Text
-                size="xxs"
-                style={themed($actionHint)}
-                text="Every seat needs a deck to start."
-              />
+              <Text size="xxs" style={themed($actionHint)} text="Waiting for decks" />
             ) : null}
           </>
         ) : (
