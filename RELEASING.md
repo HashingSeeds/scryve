@@ -5,17 +5,19 @@ This app uses two release paths: OTA updates for JS and asset changes within an 
 ## OTA updates (JS-only changes)
 
 1. Merge your changes to main.
-2. Publish the update to the preview channel: `eas update --channel preview`.
-3. Install and open a preview build. Smoke-test the update on the production-equivalent runtime using `pnpm e2e` for the Maestro smoke suite.
-4. Promote the exact tested update to production: `eas update:republish --group <update-group-id> --channel production`. Promote the tested update group; never republish or rebuild from a later commit.
-5. Watch Sentry for new fatal issues after publishing. Percentage rollouts (`eas update --rollout-percentage`) become worthwhile once there is a real user base.
+2. Confirm the native fingerprint matches the installed production build and that any required Convex change is already live.
+3. Test the commit in a preview build with `APP_VARIANT=preview pnpm exec eas update --channel preview --environment preview`. Run `pnpm e2e` and the manual smoke pass. Preview uses a different app identifier and runtime fingerprint, so this checks behavior but does not prove production compatibility.
+4. Publish the tested commit with production configuration: `APP_VARIANT=production pnpm exec eas update --channel production --environment production`.
+5. Watch Sentry for new fatal issues after publishing. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
+
+Do not republish a preview update group to production. If a future staging build uses the same native configuration, runtime, environment, and code signing as production, promote its tested group with `eas update:republish --group <update-group-id> --destination-channel production`.
 
 ## Native releases (fingerprint changed)
 
 1. Build preview binaries: `eas build --profile preview` and `eas build --profile preview:device`.
-2. Run the Maestro smoke suite. Perform a manual device pass on iOS and Android.
+2. Run the Maestro smoke suite and a manual device pass on iOS and Android. This checks behavior, not the production identity or runtime.
 3. Build production binaries: `eas build --profile production`.
-4. Distribute to TestFlight and Play internal testing.
+4. Distribute those exact production binaries to TestFlight and Play internal testing. Confirm the runtime and production channel in Settings, then repeat the manual smoke pass.
 5. Promote those exact builds to the stores after acceptance. Start public store releases with a staged rollout. The runtime version comes from the native fingerprint; any native change automatically requires a new binary before updates flow again.
 
 ## Release record
@@ -40,24 +42,27 @@ Production Convex deploys are an explicit release step (`npx convex deploy` agai
 
 ## Moderation retention rollout
 
-1. Deploy the schema expansion from PR #83 before deploying PR #84. Confirm
+1. Check the production deploy history for the PR #83 expansion checkpoint (`3c542e1`). If it is not live, deploy that checkpoint first. Confirm
    `gameCommanderClaims.by_actor_user`,
    `gameCommanderClaims.by_resolved_by_user`, and
    `moderationReports.by_retention_expires_at` have finished staging in the
-   target deployment. Do not merge the enforcement PR until this is complete.
-2. Deploy the enforcement commit as an explicit Convex release. It activates
-   those indexes, assigns deadlines to newly resolved reports, and enables the
-   daily purge. Record both deployment commits.
+   target deployment before deploying current main.
+2. Deploy current main at or after `25ae2de` as an explicit Convex release. This activates retention enforcement and deploys `games:updateLobbySettings` for the merged PR #107 client. Record the expansion and current-main deployment commits.
 3. Run `pnpm exec convex run --prod moderation:backfillRetention '{}'` against
    the authorized production target. The first invocation schedules subsequent
    pages. Wait for those scheduled mutations to finish; an error can be retried
    from the beginning because records with a deadline are skipped. Verify that
-   resolved reports have deadlines before considering the rollout complete.
-4. Publish the client with the updated privacy disclosure only after backend
-   enforcement is live. Follow the OTA or binary release steps above.
+   resolved reports have deadlines and the daily purge is scheduled.
+4. Confirm `games:updateLobbySettings` is live before publishing any client from PR #107. Publish the updated privacy disclosure only after retention enforcement and the backfill are complete. Follow the OTA or binary release steps above.
 
 These are separate authorized release actions. Merging a PR does not run the
 backfill or authorize an incidental production command.
+
+## Account deletion webhook protection rollout
+
+1. Deploy the optional `accountDeletionReceipts.deletedIdentityHash` field and `by_deleted_identity_hash` index as a schema-only expansion. Wait for the index to be ready before deploying the deletion-aware sync code.
+2. Deploy the server fix before publishing the revised privacy disclosure. Verify in a development deployment that delayed profile webhooks are ignored during deletion and after the receipt says completed.
+3. Keep the deletion hash when retaining or cleaning up receipts. Removing it allows delayed events to recreate profiles. Existing completed receipts contain no account identifier, so past deletions cannot be backfilled from those receipts. This fix protects deletions completed after the server change is deployed.
 
 ## Incident response
 
