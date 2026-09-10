@@ -34,6 +34,21 @@ jest.mock("@/features/connected/ConnectedSetupSource", () => {
   }
 })
 
+jest.mock("@/features/auth/CloudScreen", () => ({
+  CloudScreen: ({ children }: { children: (access: object) => import("react").ReactNode }) =>
+    children({ ready: true, loading: false, request: jest.fn() }),
+}))
+jest.mock("@/screens/JoinConnectedScreen", () => ({
+  JoinConnectedScreen: () =>
+    jest
+      .requireActual<typeof import("react")>("react")
+      .createElement(
+        jest.requireActual<typeof import("react-native")>("react-native").Text,
+        { testID: "inline-join" },
+        "Join with code",
+      ),
+}))
+
 describe("new local game route", () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -105,8 +120,8 @@ describe("new local game route", () => {
         <NewLocalGameRoute />
       </ThemeProvider>,
     )
-    expect(view.getByTestId("start-game-button")).toBeDisabled()
-    fireEvent.press(view.getByTestId("resume-local-game"))
+    expect(view.getByText("End current game…")).toBeTruthy()
+    fireEvent.press(view.getByTestId("setup-status"))
     expect(router.replace).toHaveBeenCalledWith("/game/current")
   })
 
@@ -131,10 +146,10 @@ describe("new local game route", () => {
     fireEvent.press(view.getByTestId("mode-local"))
     expect(view.getByTestId("player-name-1").props.value).toBe("Alex")
     expect(view.getByLabelText("Life, 21")).toBeTruthy()
-    fireEvent.press(view.getByTestId("end-local-game"))
+    fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("end-game-backdrop"))
     expect(localGameRepository.loadActiveGame()?.id).toBe(game.id)
-    fireEvent.press(view.getByTestId("end-local-game"))
+    fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("end-game-winner-1"))
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
     expect(localGameRepository.loadActiveGame()).toBeNull()
@@ -172,7 +187,7 @@ describe("new local game route", () => {
         <NewLocalGameRoute />
       </ThemeProvider>,
     )
-    fireEvent.press(view.getByTestId("end-local-game"))
+    fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("end-game-result-draw"))
     fireEvent.press(view.getByTestId("confirm-end-game-button"))
     expect(view.getByText("Could not save result")).toBeTruthy()
@@ -202,7 +217,7 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
     fireEvent.changeText(view.getByTestId("player-name-1"), "Alex")
-    fireEvent.press(view.getByTestId("save-players-button"))
+    fireEvent(view.getByTestId("player-name-1"), "blur")
     expect(localGameRepository.loadActiveGame()).toMatchObject({
       id: game.id,
       startingLife: 40,
@@ -211,7 +226,7 @@ describe("new local game route", () => {
         { id: game.players[1].id, name: "Two", life: 40 },
       ],
     })
-    expect(router.replace).toHaveBeenCalledWith("/game/current")
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it("uses the shared setup route for connected games", () => {
@@ -236,7 +251,10 @@ describe("new local game route", () => {
 
     expect(view.getByTestId("host-connected-button")).toBeTruthy()
     fireEvent.press(view.getByTestId("connected-action-join"))
-    expect(router.push).toHaveBeenCalledWith("/connected/join")
+    expect(router.push).not.toHaveBeenCalled()
+    expect(view.getByTestId("inline-join")).toBeTruthy()
+    fireEvent.press(view.getByTestId("connected-action-host"))
+    fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("resume-connected-active-game"))
     expect(router.replace).toHaveBeenCalledWith({
       pathname: "/connected/game/[gameId]",

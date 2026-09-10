@@ -86,7 +86,13 @@ it("keeps the draft through session loading, sign-in, query recovery, and reconn
   expect(mockOpenAuth).toHaveBeenCalledTimes(1)
   fireEvent.press(view.getByTestId("connected-action-join"))
   expect(mockOpenAuth).toHaveBeenCalledTimes(1)
-  expect(router.push).toHaveBeenCalledWith("/connected/join")
+  expect(router.push).not.toHaveBeenCalled()
+  expect(view.getByTestId("manual-code-input")).toBeTruthy()
+  fireEvent.changeText(view.getByTestId("manual-code-input"), "AB12CD")
+  fireEvent.press(view.getByTestId("connected-action-host"))
+  fireEvent.press(view.getByTestId("connected-action-join"))
+  expect(view.getByTestId("manual-code-input").props.value).toBe("AB12CD")
+  fireEvent.press(view.getByTestId("connected-action-host"))
   mockConnectedHarness.userId = "user-a"
   mockConnectedHarness.convexLoading = false
   mockConnectedHarness.convexAuthenticated = true
@@ -104,7 +110,9 @@ it("keeps the draft through session loading, sign-in, query recovery, and reconn
     expect(view.getByLabelText("Life, 21")).toBeTruthy()
     expect(view.getByTestId("host-connected-button")).toBeDisabled()
     mockConnectedHarness.paginatedError = undefined
+    fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("retry-connected-host-preparation"))
+    fireEvent.press(view.getByText("Done"))
     await waitFor(() => expect(view.getByTestId("host-connected-button")).toBeEnabled())
   } finally {
     errorLog.mockRestore()
