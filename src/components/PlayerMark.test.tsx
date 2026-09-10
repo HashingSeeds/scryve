@@ -37,16 +37,6 @@ describe("PlayerMark", () => {
     expect(view.UNSAFE_queryAllByType(Circle)).toHaveLength(0)
   })
 
-  it("adds an inset direction line when the mark identifies the local player", () => {
-    const view = render(<PlayerMark seatNumber={1} color="#FFFFFF" spinning />)
-
-    expect(view.getByTestId("player-mark-spin-line", { includeHiddenElements: true })).toBeTruthy()
-    expect(view.queryByTestId("player-mark-orbit-dot", { includeHiddenElements: true })).toBeNull()
-    expect(
-      view.getByTestId("player-mark-spinner-seat-1", { includeHiddenElements: true }),
-    ).toBeTruthy()
-  })
-
   it("shows a close X instead of a sword when the mark becomes the close button", () => {
     const view = render(
       <PlayerMark seatNumber={1} color="#FFFFFF" insetSwordColor="#2F7D5F" closeIcon />,
@@ -67,15 +57,6 @@ describe("PlayerMark", () => {
     const view = render(<PlayerMark seatNumber={1} color="#FFFFFF" closeIcon />)
 
     expect(view.queryByTestId("player-mark-close", { includeHiddenElements: true })).toBeNull()
-  })
-
-  it("cuts the sword out of the mark instead of stacking it on the direction line", () => {
-    const view = render(
-      <PlayerMark seatNumber={1} color="#FFFFFF" insetSwordColor="#2F7D5F" spinning />,
-    )
-
-    expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
-    expect(view.queryByTestId("player-mark-spin-line", { includeHiddenElements: true })).toBeNull()
   })
 
   it.each([

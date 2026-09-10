@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
   ZoomIn,
 } from "react-native-reanimated"
-import Svg, { Circle, G, Line, Path, Polygon, Rect } from "react-native-svg"
+import Svg, { Circle, G, Path, Polygon, Rect } from "react-native-svg"
 
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -45,7 +45,6 @@ export function PlayerMark({
   style,
 }: PlayerMarkProps) {
   const shape = chosenShape ?? shapeForSeat(seatNumber)
-  const insetColor = color.toUpperCase() === "#FFFFFF" ? "#000000" : "#FFFFFF"
   const reducedMotion = useReducedMotion()
   const spin = useSharedValue(0)
   const rotationStyle: ViewStyle | undefined = rotation
@@ -82,17 +81,6 @@ export function PlayerMark({
           <MarkShape shape={shape} color={color} />
           {insetSwordColor && !closeIcon ? (
             <SwordInset shape={shape} color={insetSwordColor} />
-          ) : insetSwordColor ? null : spinning ? (
-            <Line
-              testID="player-mark-spin-line"
-              x1="22"
-              y1="23"
-              x2="22"
-              y2="14"
-              stroke={insetColor}
-              strokeWidth="3.2"
-              strokeLinecap="round"
-            />
           ) : null}
         </Svg>
       </Animated.View>
