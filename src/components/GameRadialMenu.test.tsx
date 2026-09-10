@@ -76,6 +76,10 @@ describe("GameRadialMenu", () => {
     expect(pentagon!.props.fill).toBe("url(#keystoneTwoFill)")
     expect(darkTheme.colors.gameMenu.anchorBorder).toBe("#000000")
     expect(pentagon!.props.stroke).toBe(darkTheme.colors.gameMenu.anchorBorder)
+    expect(
+      view.UNSAFE_getAllByType(Polygon).find((polygon) => polygon.props.strokeWidth === 1.4)!.props
+        .stroke,
+    ).toBe(darkTheme.colors.gameMenu.anchorBorder)
     expect(view.UNSAFE_queryAllByType(Polyline)).toHaveLength(0)
   })
 
