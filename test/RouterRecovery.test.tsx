@@ -4,6 +4,7 @@ import { Screen } from "@/components/Screen"
 import { ThemeProvider } from "@/theme/context"
 
 import AccountRoute from "../src/app/account"
+import GameSummaryRoute from "../src/app/history/[gameId]"
 import InviteRoute from "../src/app/join/[token]"
 
 const mockOpenAuth = jest.fn()
@@ -14,6 +15,22 @@ jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn(), push: jest.fn() },
   useLocalSearchParams: () => ({ token: mockToken }),
 }))
+jest.mock("@/features/async/ConvexQueryBoundary", () => ({ ConvexQueryBoundary: () => null }))
+jest.mock("@/features/connected/ConnectedGate", () => ({ ConnectedGate: () => null }))
+jest.mock("@/features/connected/ConnectedSummarySource", () => ({
+  ConnectedSummarySource: () => null,
+}))
+jest.mock("@/features/game/localPersistence", () => ({
+  localGameRepository: { loadHistoryDetail: () => null },
+}))
+jest.mock("@/screens/GameSummaryScreen", () => {
+  const { TouchableOpacity } = jest.requireActual("react-native")
+  return {
+    GameSummaryScreen: ({ onBack }: { onBack: () => void }) => (
+      <TouchableOpacity accessibilityLabel="Back" onPress={onBack} />
+    ),
+  }
+})
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({
     configured: true,
@@ -50,6 +67,7 @@ function themed(element: React.ReactElement) {
 describe("Router recovery fallbacks", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.requireMock("expo-router").router.canGoBack.mockReturnValue(true)
     mockIsSignedIn = false
   })
 
@@ -74,6 +92,30 @@ describe("Router recovery fallbacks", () => {
       pathname: "/",
       params: { destination: "play" },
     })
+  })
+
+  it("returns a root game summary to Play when there is no route to go back to", () => {
+    const router = jest.requireMock("expo-router").router
+    router.canGoBack.mockReturnValue(false)
+    const view = render(themed(<GameSummaryRoute />))
+
+    fireEvent.press(view.getByLabelText("Back"))
+
+    expect(router.back).not.toHaveBeenCalled()
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/",
+      params: { destination: "play" },
+    })
+  })
+
+  it("returns a game summary to its existing route stack", () => {
+    const router = jest.requireMock("expo-router").router
+    const view = render(themed(<GameSummaryRoute />))
+
+    fireEvent.press(view.getByLabelText("Back"))
+
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it("gives the signed-in account profile the remaining route height", () => {

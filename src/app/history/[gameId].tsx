@@ -9,7 +9,10 @@ import { GameSummaryScreen } from "@/screens/GameSummaryScreen"
 
 export default function GameSummaryRoute() {
   const { gameId, source } = useLocalSearchParams<{ gameId?: string; source?: string }>()
-  const onBack = () => router.back()
+  const onBack = () =>
+    router.canGoBack()
+      ? router.back()
+      : router.replace({ pathname: "/", params: { destination: "play" } })
 
   if (source === "connected" && typeof gameId === "string") {
     return (
