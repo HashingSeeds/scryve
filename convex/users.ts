@@ -4,7 +4,7 @@ import { internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import { internalMutation, mutation } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
-import { requireIdentity } from "./lib/auth"
+import { hasAccountDeletion, requireIdentity } from "./lib/auth"
 import { placeUsernameOnHold, releaseUsernameHold } from "./lib/moderation"
 import { usernameFailsGate } from "./lib/nameFilter"
 import {
@@ -45,6 +45,7 @@ export const syncFromClerk = internalMutation({
     avatarUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    if (await hasAccountDeletion(ctx, args.clerkUserId)) return null
     const username = assertUsername(args.username)
     const usernameNormalized = normalizeUsername(username)
     const conflicting = await ctx.db
@@ -87,11 +88,8 @@ export const syncCurrent = mutation({
   args: { displayName: v.string(), avatarUrl: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    const deletionRequest = await ctx.db
-      .query("accountDeletionRequests")
-      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
-      .unique()
-    if (deletionRequest) throw new Error("Account deletion is in progress")
+    if (await hasAccountDeletion(ctx, identity.subject))
+      throw new Error("Account deletion is in progress")
     const displayName = assertDisplayName(args.displayName)
     const avatarUrl = assertAvatarUrl(args.avatarUrl)
     const now = Date.now()

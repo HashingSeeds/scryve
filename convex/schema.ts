@@ -593,5 +593,5 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_token", ["token"])
-    .index("by_deleted_identity_hash", { fields: ["deletedIdentityHash"], staged: true }),
+    .index("by_deleted_identity_hash", ["deletedIdentityHash"]),
 })

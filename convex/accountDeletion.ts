@@ -5,7 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel"
 import { env, internalMutation, internalQuery, mutation, query } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
 import { terminalizeGameForAccountDeletion } from "./games"
-import { requireIdentity } from "./lib/auth"
+import { deletedIdentityHash, requireIdentity } from "./lib/auth"
 import { moderationRetentionExpiresAt } from "./lib/moderationRetention"
 
 const DELETED_PLAYER_NAME = "Deleted player"
@@ -609,7 +609,14 @@ export const complete = internalMutation({
   handler: async (ctx, args) => {
     const request = await ctx.db.get(args.requestId)
     if (request) {
-      await updateReceipt(ctx, request, "completed", Date.now())
+      const now = Date.now()
+      const receiptId =
+        request.receiptId ?? (await createReceipt(ctx, "identity_pending", now)).receiptId
+      await ctx.db.patch(receiptId, {
+        status: "completed",
+        updatedAt: now,
+        deletedIdentityHash: await deletedIdentityHash(request.clerkUserId),
+      })
       await ctx.db.delete(request._id)
     }
     return null
