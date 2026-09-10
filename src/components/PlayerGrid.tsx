@@ -116,7 +116,7 @@ export function PlayerGrid({
       testID="player-grid"
       accessibilityLabel={`${players.length} player ${counter.label} grid`}
       onLayout={measureBoard}
-      style={[themed($grid), style]}
+      style={[themed($grid), style, lifeFontSize === undefined && $unmeasured]}
     >
       {rows.map((row, rowIndex) => (
         <View
@@ -389,6 +389,8 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+
+const $unmeasured: ViewStyle = { opacity: 0 }
 
 export function getPlayerGridLayout(input: {
   playerCount: number
