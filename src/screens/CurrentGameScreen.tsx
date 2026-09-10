@@ -239,7 +239,6 @@ export function CurrentGameScreen({
         ) : null}
         {menuOpen && onDecks && onSettings && onAccount ? (
           <FloatingAppNavigation
-            bottomSafeArea={!commanderDamageEnabled}
             destinationLabel="Decks"
             accountLabel={accountLabel}
             onDestination={onDecks}
