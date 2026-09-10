@@ -26,7 +26,9 @@ function wasScannerCancellation(cause: unknown): boolean {
 export function InviteScannerScreen({
   onInvite,
   onCancel,
+  embedded = false,
 }: {
+  embedded?: boolean
   onInvite: (invite: InvitePayload) => void
   onCancel: () => void
 }) {
@@ -110,9 +112,17 @@ export function InviteScannerScreen({
     void openScanner()
   }, [openScanner, scannerReady])
 
+  useEffect(
+    () => () => {
+      if (autoLaunched.current) void CameraView.dismissScanner().catch(() => undefined)
+    },
+    [],
+  )
+
   if (Platform.OS === "web") {
     return (
       <ScannerLayout
+        embedded={embedded}
         title="Scan invite"
         body="Camera QR scanning is available in the iOS and Android app. Enter the 6-character code instead."
         actions={<Button text="Enter code manually" preset="reversed" onPress={onCancel} />}
@@ -124,6 +134,7 @@ export function InviteScannerScreen({
     const canAsk = permission?.canAskAgain !== false
     return (
       <ScannerLayout
+        embedded={embedded}
         title="Camera permission"
         body="Scryve uses the camera only while this screen is open to read an invitation QR. Images are not captured, stored, or uploaded."
         notice={
@@ -159,6 +170,7 @@ export function InviteScannerScreen({
   if (!modernScannerAvailable) {
     return (
       <ScannerLayout
+        embedded={embedded}
         title="Scan invite"
         notice={
           <AlertNote text="The native QR scanner is unavailable on this device. Enter the invitation code manually." />
@@ -170,6 +182,7 @@ export function InviteScannerScreen({
 
   return (
     <ScannerLayout
+      embedded={embedded}
       title="Scan invite"
       body="Use the device scanner to find a trusted Scryve invite QR. Recognition stays on-device and no image is saved."
       notice={error ? <AlertNote text={error} /> : undefined}
@@ -189,26 +202,36 @@ export function InviteScannerScreen({
 }
 
 function ScannerLayout({
+  embedded,
   title,
   body,
   notice,
   actions,
 }: {
+  embedded?: boolean
   title: string
   body?: string
   notice?: ReactNode
   actions: ReactNode
 }) {
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   return (
     <Screen
       preset="fixed"
-      safeAreaEdges={["top", "bottom"]}
+      safeAreaEdges={embedded ? ["bottom"] : ["top", "bottom"]}
+      backgroundColor={embedded ? colors.surface : undefined}
       contentContainerStyle={themed($screen)}
     >
       <ScrollView style={$styles.flex1} contentContainerStyle={themed($content)}>
         <View style={themed($hero)}>
-          <Text preset="heading" accessibilityRole="header" text={title} />
+          <Text
+            preset={embedded ? "subheading" : "heading"}
+            accessibilityRole="header"
+            text={title}
+          />
           {body ? <Text size="sm" style={themed($dimmed)} text={body} /> : null}
         </View>
         {notice}

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { TouchableOpacity, View } from "react-native"
+import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -103,7 +103,7 @@ export interface NewGameScreenProps {
   onEndLocal?: (result: LocalGameResult) => void
   onAbandonLocal?: () => void
   onSavePlayers?: (players: NewPlayerInput[]) => void
-  onJoinConnected?: () => void
+  joinContent?: ReactNode
   onResumeConnected?: (game: ResumableGame) => void
 }
 
@@ -124,7 +124,7 @@ export function NewGameScreen({
   onEndLocal,
   onAbandonLocal,
   onSavePlayers,
-  onJoinConnected,
+  joinContent,
   onResumeConnected,
 }: NewGameScreenProps) {
   const {
@@ -163,11 +163,15 @@ export function NewGameScreen({
     initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
   const counter = playSystemRules(system).counter
+  const [showOptions, setShowOptions] = useState(false)
+  const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
   const [playerSaveError, setPlayerSaveError] = useState<string>()
   const [gameToExit, setGameToExit] = useState<ResumableGame>()
   const [exitingGameId, setExitingGameId] = useState<string>()
+  const [connectedAction, setConnectedAction] = useState("host")
   const connectedMode = mode === "connected"
+  const joining = connectedMode && connectedAction === "join" && Boolean(joinContent)
   const preparing = connectedMode && Boolean(connected?.status) && !connected?.ready
   const [showPreparation, setShowPreparation] = useState(false)
   useEffect(() => {
@@ -195,6 +199,29 @@ export function NewGameScreen({
     ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
     : validLife && nameValidation.valid && !localGame
   const busy = connectedMode && Boolean(connected?.busy)
+  const localGameBlocksStart = !connectedMode && Boolean(localGame)
+  const hostedGame = connectedMode ? connected?.activeGames?.find((game) => game.isHost) : undefined
+  const gameBlocksStart = localGameBlocksStart || Boolean(hostedGame)
+  const resumeGame = connectedMode && connected?.activeGames?.length === 1 ? hostedGame : undefined
+  const directResume =
+    localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
+
+  const hasStatusDetails = connectedMode
+    ? Boolean(connected?.activeGames?.length || connected?.blockedReason || connected?.error)
+    : Boolean(localGame)
+  const statusText = connectedMode
+    ? directResume
+      ? "Resume current game"
+      : (connected?.error ??
+        connected?.blockedReason ??
+        (connected?.activeGames?.length
+          ? "Games in progress"
+          : preparing && showPreparation
+            ? connected?.status
+            : ""))
+    : localGame
+      ? "Resume current game"
+      : ""
 
   function submit() {
     if (!valid || busy) return
@@ -233,10 +260,15 @@ export function NewGameScreen({
     setFormat(value)
   }
 
-  function savePlayers() {
+  function savePlayers(nextAppearances = appearances) {
+    if (!onSavePlayers || !initialGame) return
+    const savedNames = validatePlayerNames(
+      initialGame.players.map((_, index) => names[index].trim() || defaultName(index)),
+    )
+    if (!savedNames.valid) return
     setPlayerSaveError(undefined)
     try {
-      onSavePlayers?.(players)
+      onSavePlayers(savedNames.names.map((name, index) => ({ name, ...nextAppearances[index] })))
     } catch (cause) {
       setPlayerSaveError(cause instanceof Error ? cause.message : "Could not save players.")
     }
@@ -270,15 +302,17 @@ export function NewGameScreen({
 
   function saveAppearance() {
     if (appearanceSeat === undefined || !appearanceDraft) return
-    setAppearances((current) =>
-      current.map((appearance, index) => (index === appearanceSeat ? appearanceDraft : appearance)),
+    const next = appearances.map((appearance, index) =>
+      index === appearanceSeat ? appearanceDraft : appearance,
     )
+    setAppearances(next)
+    savePlayers(next)
     closeAppearancePicker()
   }
 
   return (
     <View style={[themed($root), $styles.flex1]}>
-      <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
+      <View style={themed($setupHeader)}>
         <Header
           title={onSavePlayers ? "Game setup" : "New game"}
           leftTx="common:back"
@@ -296,7 +330,7 @@ export function NewGameScreen({
           onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
         />
 
-        {connectedMode && onJoinConnected ? (
+        {connectedMode && joinContent ? (
           <SegmentedControl
             testID="connected-action"
             accessibilityLabel="Host or join"
@@ -304,299 +338,328 @@ export function NewGameScreen({
               { id: "host", label: "Host" },
               { id: "join", label: "Join" },
             ]}
-            selectedId="host"
-            onSelect={(action) => {
-              if (action !== "join") return
-              onJoinConnected()
-            }}
+            selectedId={connectedAction}
+            onSelect={setConnectedAction}
           />
         ) : null}
-
-        {connectedMode && connected?.blockedReason ? (
-          <Text
-            accessibilityRole="alert"
-            size="xs"
-            text={connected.blockedReason}
-            style={themed($footerNote)}
-          />
-        ) : null}
-        {connectedMode && connected?.error ? (
-          <View style={themed($connectedError)}>
-            <Text
-              accessibilityRole="alert"
-              size="xs"
-              text={connected.error}
-              style={themed($footerNote)}
-            />
-            {connected.retry ? (
-              <Button
-                testID="retry-connected-host-preparation"
-                text="Try again"
-                style={themed($retryConnected)}
-                onPress={connected.retry}
+      </View>
+      {joining ? (
+        joinContent
+      ) : (
+        <>
+          <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
+            <View style={themed($section)}>
+              <Text text="System" preset="subheading" accessibilityRole="header" />
+              <SegmentedControl
+                testID="play-system"
+                accessibilityLabel="Game system"
+                segments={[
+                  { id: NO_PLAY_SYSTEM, label: "No system" },
+                  ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
+                ]}
+                selectedId={system ?? NO_PLAY_SYSTEM}
+                onSelect={chooseSystem}
               />
-            ) : null}
-          </View>
-        ) : null}
-        {connectedMode &&
-        connected &&
-        !connected.ready &&
-        !connected.error &&
-        connected.retry &&
-        connected.blockedReason &&
-        !connected.access ? (
-          <Button text="Retry connection" onPress={connected.retry} />
-        ) : null}
-
-        {!connectedMode && localGame ? (
-          <View style={themed($activeLocalGame)}>
-            <Text text="Game in progress" preset="subheading" accessibilityRole="header" />
-            <Text
-              size="sm"
-              style={themed($footerStatus)}
-              text={`${playSystemFormats(localGame.system ?? "mtg").find((candidate) => candidate.id === localGame.format)?.label ?? "Local game"} · ${localGame.players.length} players`}
-            />
-            <Button
-              testID="resume-local-game"
-              text="Resume game"
-              preset="reversed"
-              style={themed($resumeButton)}
-              textStyle={themed($resumeButtonText)}
-              onPress={onResumeLocal}
-            />
-            <TouchableOpacity
-              testID="end-local-game"
-              accessibilityRole="button"
-              style={themed($localEndAction)}
-              onPress={() => setEndingLocal(true)}
-            >
-              <Text text="End game…" style={themed($footerNote)} />
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {connectedMode && connected?.activeGames?.length ? (
-          <View style={themed($section)}>
-            <Text text="Your connected games" preset="subheading" accessibilityRole="header" />
-            {connected.activeGames.map((game) => (
-              <View key={game.publicId} style={themed($connectedGame)}>
-                <ConnectedGameRow
-                  game={game}
-                  now={Date.now()}
-                  onPress={() => onResumeConnected?.(game)}
+              {system ? (
+                <SelectField
+                  testID="play-format"
+                  label="Format"
+                  value={format}
+                  options={playSystemFormats(system).map(({ id, label, blurb }) => ({
+                    id,
+                    label,
+                    ...(blurb ? { detail: blurb } : {}),
+                  }))}
+                  onSelect={chooseFormat}
                 />
-                <View style={themed($connectedGameActions)}>
-                  <Button
-                    testID={`resume-connected-action-${game.publicId}`}
-                    text="Resume"
-                    onPress={() => onResumeConnected?.(game)}
+              ) : null}
+            </View>
+
+            <View style={themed($valueGrid)}>
+              <View style={themed($playerValue)}>
+                <ValueField
+                  testID="player-count"
+                  label={connectedMode ? "Seats" : "Players"}
+                  value={playerCount}
+                  min={PLAYER_COUNTS[0]}
+                  max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
+                  onChange={choosePlayerCount}
+                />
+              </View>
+              <View style={themed($counterValue)}>
+                <ValueField
+                  testID="starting-counter"
+                  label={counter.heading}
+                  value={startingLife}
+                  min={1}
+                  max={counter.maxStartingValue}
+                  longStep={counter.longPressStep}
+                  step={lifeStep}
+                  onChange={setStartingLife}
+                />
+              </View>
+            </View>
+
+            {connectedMode ? (
+              <View style={themed($section)}>
+                <Text text="Decks" preset="subheading" accessibilityRole="header" />
+                <SegmentedControl
+                  testID="deck-requirement"
+                  accessibilityLabel="Deck requirement"
+                  segments={[
+                    { id: "optional", label: "Optional" },
+                    { id: "required", label: "Required" },
+                  ]}
+                  selectedId={deckRequired ? "required" : "optional"}
+                  onSelect={(value) => setDeckRequired(value === "required")}
+                />
+              </View>
+            ) : null}
+
+            <Button
+              testID="setup-options"
+              text={showOptions ? "Hide options" : "Layout and counter options"}
+              accessibilityState={{ expanded: showOptions }}
+              onPress={() => setShowOptions((value) => !value)}
+            />
+            {showOptions ? (
+              <View style={themed($statusDetails)}>
+                <View style={themed($section)}>
+                  <SelectField
+                    testID="life-step"
+                    label="Change by"
+                    value={String(lifeStep)}
+                    options={LIFE_STEP_OPTIONS.map((step) => ({
+                      id: String(step),
+                      label: String(step),
+                    }))}
+                    onSelect={(value) => {
+                      const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
+                      if (next) setLifeStep(next)
+                    }}
                   />
-                  <Button
-                    testID={`${game.isHost ? "end" : "leave"}-connected-${game.publicId}`}
-                    text={game.isHost ? "End game…" : "Leave game…"}
-                    disabled={busy || !connected.ready}
-                    onPress={() => setGameToExit(game)}
+                </View>
+
+                <View style={themed($section)}>
+                  <Text text="Layout" preset="subheading" accessibilityRole="header" />
+                  <PlayerLayoutPicker
+                    playerCount={playerCount}
+                    value={layout}
+                    onChange={setLayout}
                   />
                 </View>
               </View>
-            ))}
-            {connected.exitError ? (
-              <Text
-                accessibilityRole="alert"
-                style={themed($footerNote)}
-                text={connected.exitError}
-              />
             ) : null}
-            {connected.activeGamesNextPage?.status === "available" ? (
-              <Button text="Load more" onPress={connected.activeGamesNextPage.load} />
-            ) : connected.activeGamesNextPage?.status === "loading" ? (
-              <Text size="xs" style={themed($footerStatus)} text="Loading more games…" />
-            ) : null}
-          </View>
-        ) : null}
 
-        <View style={themed($section)}>
-          <Text text="System" preset="subheading" accessibilityRole="header" />
-          <SegmentedControl
-            testID="play-system"
-            accessibilityLabel="Game system"
-            segments={[
-              { id: NO_PLAY_SYSTEM, label: "No system" },
-              ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
-            ]}
-            selectedId={system ?? NO_PLAY_SYSTEM}
-            onSelect={chooseSystem}
-          />
-          {system ? (
-            <SelectField
-              testID="play-format"
-              label="Format"
-              value={format}
-              options={playSystemFormats(system).map(({ id, label, blurb }) => ({
-                id,
-                label,
-                ...(blurb ? { detail: blurb } : {}),
-              }))}
-              onSelect={chooseFormat}
-            />
-          ) : null}
-        </View>
-
-        <View style={themed($valueGrid)}>
-          <View style={themed($playerValue)}>
-            <ValueField
-              testID="player-count"
-              label={connectedMode ? "Seats" : "Players"}
-              value={playerCount}
-              min={PLAYER_COUNTS[0]}
-              max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
-              onChange={choosePlayerCount}
-            />
-          </View>
-          <View style={themed($counterValue)}>
-            <ValueField
-              testID="starting-counter"
-              label={counter.heading}
-              value={startingLife}
-              min={1}
-              max={counter.maxStartingValue}
-              longStep={counter.longPressStep}
-              step={lifeStep}
-              onChange={setStartingLife}
-            />
-          </View>
-        </View>
-
-        <View style={themed($section)}>
-          <SelectField
-            testID="life-step"
-            label="Change by"
-            value={String(lifeStep)}
-            options={LIFE_STEP_OPTIONS.map((step) => ({ id: String(step), label: String(step) }))}
-            onSelect={(value) => {
-              const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
-              if (next) setLifeStep(next)
-            }}
-          />
-        </View>
-
-        <View style={themed($section)}>
-          <Text text="Layout" preset="subheading" accessibilityRole="header" />
-          <PlayerLayoutPicker playerCount={playerCount} value={layout} onChange={setLayout} />
-        </View>
-
-        {connectedMode ? (
-          <View style={themed($section)}>
-            <Text text="Decks" preset="subheading" accessibilityRole="header" />
-            <SegmentedControl
-              testID="deck-requirement"
-              accessibilityLabel="Deck requirement"
-              segments={[
-                { id: "optional", label: "Optional" },
-                { id: "required", label: "Required" },
-              ]}
-              selectedId={deckRequired ? "required" : "optional"}
-              onSelect={(value) => setDeckRequired(value === "required")}
-            />
-          </View>
-        ) : null}
-
-        {!connectedMode ? (
-          <View style={themed($section)}>
-            <Text tx="game:playerNames" preset="subheading" accessibilityRole="header" />
-            <View style={themed($nameList)}>
-              {players.map((player, index) => (
-                <View key={index} style={themed($nameRow)}>
-                  <TouchableOpacity
-                    testID={`player-appearance-${index + 1}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Change appearance for ${player.name}`}
-                    activeOpacity={0.75}
-                    style={themed($appearanceButton)}
-                    onPress={(event) => openAppearancePicker(index, event)}
-                  >
-                    <PlayerMark
-                      seatNumber={index + 1}
-                      shape={player.shape}
-                      color={player.color}
-                      size={32}
-                    />
-                  </TouchableOpacity>
-                  <TextField
-                    testID={`player-name-${index + 1}`}
-                    value={names[index]}
-                    placeholder={defaultName(index)}
-                    accessibilityLabel={`Name for player ${index + 1}`}
-                    maxLength={MAX_PLAYER_NAME_LENGTH}
-                    status={nameValidation.errors[index] ? "error" : undefined}
-                    helper={nameValidation.errors[index]}
-                    containerStyle={themed($nameField)}
-                    onChangeText={(value) =>
-                      setNames((current) => current.map((name, i) => (i === index ? value : name)))
-                    }
-                  />
+            {!connectedMode ? (
+              <View style={themed($section)}>
+                <Text tx="game:playerNames" preset="subheading" accessibilityRole="header" />
+                <View style={themed($nameList)}>
+                  {players.map((player, index) => (
+                    <View key={index} style={themed($nameRow)}>
+                      <TouchableOpacity
+                        testID={`player-appearance-${index + 1}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Change appearance for ${player.name}`}
+                        activeOpacity={0.75}
+                        style={themed($appearanceButton)}
+                        onPress={(event) => openAppearancePicker(index, event)}
+                      >
+                        <PlayerMark
+                          seatNumber={index + 1}
+                          shape={player.shape}
+                          color={player.color}
+                          size={32}
+                        />
+                      </TouchableOpacity>
+                      <TextField
+                        testID={`player-name-${index + 1}`}
+                        value={names[index]}
+                        placeholder={defaultName(index)}
+                        accessibilityLabel={`Name for player ${index + 1}`}
+                        maxLength={MAX_PLAYER_NAME_LENGTH}
+                        status={nameValidation.errors[index] ? "error" : undefined}
+                        helper={nameValidation.errors[index]}
+                        containerStyle={themed($nameField)}
+                        onBlur={() => savePlayers()}
+                        onChangeText={(value) =>
+                          setNames((current) =>
+                            current.map((name, i) => (i === index ? value : name)),
+                          )
+                        }
+                      />
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-            {onSavePlayers && initialGame ? (
-              <>
-                <Text
-                  size="xs"
-                  text="Save names, colors, and marks without resetting life totals."
-                />
-                <Button
-                  testID="save-players-button"
-                  text="Save players"
-                  preset="reversed"
-                  disabled={!nameValidation.valid || playerCount !== initialGame.players.length}
-                  onPress={savePlayers}
-                />
-                {playerCount !== initialGame.players.length ? (
-                  <Text
-                    size="xs"
-                    text="Restore the player count to save players without resetting."
-                  />
-                ) : null}
                 {playerSaveError ? <Text accessibilityRole="alert" text={playerSaveError} /> : null}
-              </>
+              </View>
             ) : null}
+          </Screen>
+          <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
+            <View style={themed($footerContent)}>
+              <Button
+                testID={connectedMode ? "host-connected-button" : "start-game-button"}
+                text={
+                  gameBlocksStart
+                    ? "End current game…"
+                    : connectedMode
+                      ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
+                      : undefined
+                }
+                tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
+                preset="reversed"
+                style={gameBlocksStart ? themed($endCurrentButton) : undefined}
+                textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
+                disabled={
+                  localGameBlocksStart
+                    ? !onEndLocal
+                    : hostedGame
+                      ? !connected?.ready || busy
+                      : !valid || busy
+                }
+                accessibilityHint={
+                  gameBlocksStart
+                    ? "Opens the end-game prompt before you can start another game"
+                    : connectedMode
+                      ? "Creates a lobby others can join"
+                      : "Starts this local game on the current device"
+                }
+                onPress={
+                  localGameBlocksStart
+                    ? () => setEndingLocal(true)
+                    : hostedGame
+                      ? () => setGameToExit(hostedGame)
+                      : submit
+                }
+              />
+              <TouchableOpacity
+                testID="setup-status"
+                accessible={Boolean(statusText)}
+                accessibilityRole={hasStatusDetails ? "button" : "text"}
+                accessibilityLabel={statusText || "Game status"}
+                accessibilityHint={
+                  directResume
+                    ? "Returns to your current game"
+                    : hasStatusDetails
+                      ? "Opens game and connection details"
+                      : undefined
+                }
+                disabled={!hasStatusDetails}
+                style={[
+                  themed($statusRow),
+                  (directResume || (connectedMode && hasStatusDetails)) && themed($resumeAction),
+                ]}
+                onPress={
+                  localGameBlocksStart
+                    ? onResumeLocal
+                    : directResume && resumeGame
+                      ? () => onResumeConnected?.(resumeGame)
+                      : () => setShowStatus(true)
+                }
+              >
+                <Text
+                  testID={preparing && showPreparation ? "connected-host-preparation" : undefined}
+                  accessibilityLiveRegion="polite"
+                  size="xs"
+                  numberOfLines={1}
+                  text={statusText}
+                  style={themed(
+                    directResume || (connectedMode && hasStatusDetails) ? $resumeText : $statusText,
+                  )}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
-        ) : null}
-      </Screen>
-      <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
-        <View style={themed($footerContent)}>
-          <Button
-            testID={connectedMode ? "host-connected-button" : "start-game-button"}
-            text={
-              connectedMode
-                ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
-                : undefined
-            }
-            tx={connectedMode ? undefined : "game:startGame"}
-            preset="reversed"
-            disabled={!valid || busy}
-            accessibilityHint={
-              connectedMode
-                ? "Creates a lobby others can join"
-                : "Starts this local game on the current device"
-            }
-            onPress={submit}
-          />
-          {preparing && showPreparation ? (
+        </>
+      )}
+      <DialogCard
+        visible={showStatus}
+        onClose={() => setShowStatus(false)}
+        dialogTestID="setup-status-dialog"
+        accessibilityViewIsModal
+      >
+        <ScrollView contentContainerStyle={themed($statusDetails)}>
+          {connectedMode && connected?.blockedReason ? (
             <Text
-              testID="connected-host-preparation"
-              accessibilityRole="text"
-              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
               size="xs"
-              text={connected?.status}
+              text={connected.blockedReason}
               style={themed($footerStatus)}
             />
           ) : null}
-          {!connectedMode && localGame ? (
-            <Text size="xs" text="End your current game to start another." />
+          {connectedMode && connected?.error ? (
+            <View style={themed($connectedError)}>
+              <Text
+                accessibilityRole="alert"
+                size="xs"
+                text={connected.error}
+                style={themed($footerNote)}
+              />
+              {connected.retry ? (
+                <Button
+                  testID="retry-connected-host-preparation"
+                  text="Try again"
+                  style={themed($retryConnected)}
+                  onPress={connected.retry}
+                />
+              ) : null}
+            </View>
           ) : null}
-        </View>
-      </View>
+          {connectedMode &&
+          connected &&
+          !connected.ready &&
+          !connected.error &&
+          connected.retry &&
+          connected.blockedReason &&
+          !connected.access ? (
+            <Button text="Retry connection" onPress={connected.retry} />
+          ) : null}
+
+          {connectedMode && connected?.activeGames?.length ? (
+            <View style={themed($section)}>
+              <Text text="Your connected games" preset="subheading" accessibilityRole="header" />
+              {connected.activeGames.map((game) => (
+                <View key={game.publicId} style={themed($connectedGame)}>
+                  <ConnectedGameRow
+                    game={game}
+                    now={Date.now()}
+                    onPress={() => onResumeConnected?.(game)}
+                  />
+                  <TouchableOpacity
+                    testID={`${game.isHost ? "end" : "leave"}-connected-${game.publicId}`}
+                    accessibilityRole="button"
+                    disabled={busy || !connected.ready}
+                    accessibilityState={{ disabled: busy || !connected.ready }}
+                    style={themed($localEndAction)}
+                    onPress={() => {
+                      setShowStatus(false)
+                      setGameToExit(game)
+                    }}
+                  >
+                    <Text
+                      text={game.isHost ? "End game…" : "Leave game…"}
+                      style={themed($footerStatus)}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {connected.exitError ? (
+                <Text
+                  accessibilityRole="alert"
+                  style={themed($footerNote)}
+                  text={connected.exitError}
+                />
+              ) : null}
+              {connected.activeGamesNextPage?.status === "available" ? (
+                <Button text="Load more" onPress={connected.activeGamesNextPage.load} />
+              ) : connected.activeGamesNextPage?.status === "loading" ? (
+                <Text size="xs" style={themed($footerStatus)} text="Loading more games…" />
+              ) : null}
+            </View>
+          ) : null}
+        </ScrollView>
+        <Button text="Done" onPress={() => setShowStatus(false)} />
+      </DialogCard>
       {gameToExit ? (
         <ConfirmDialog
           visible
@@ -677,7 +740,7 @@ const MIN_NAME_ROW_WIDTH = 280
 
 const $root: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
 const $form: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  gap: spacing.lg,
+  gap: spacing.md,
   backgroundColor: colors.surface,
 })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
@@ -703,10 +766,6 @@ const $nameRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $connectedError: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $connectedGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $connectedGameActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  gap: spacing.xs,
-})
 const $retryConnected: ThemedStyle<ViewStyle> = () => ({ minHeight: 40 })
 const $nameField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
@@ -731,19 +790,46 @@ const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $footerStatus: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 
-const $activeLocalGame: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  borderLeftWidth: 2,
-  borderLeftColor: colors.tint,
-  paddingLeft: spacing.md,
-  gap: spacing.xs,
-})
 const $localEndAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,
   justifyContent: "center",
+  alignItems: "center",
   paddingVertical: spacing.xs,
 })
+const $statusRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  height: 44,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+const $statusText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  flex: 1,
+  color: colors.textDim,
+})
+const $statusDetails: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
+const $resumeAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignSelf: "center",
+  maxWidth: "100%",
+  paddingHorizontal: spacing.md,
+})
+const $resumeText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  flexShrink: 1,
+  color: colors.tint,
+  textAlign: "center",
+})
 
-const $resumeButton: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.tint })
-const $resumeButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({
+const $endCurrentButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.tint,
+})
+const $endCurrentButtonText: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: accessibleForeground(colors.tint),
+})
+
+const $setupHeader: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  width: "100%",
+  maxWidth: CONTENT_MAX_WIDTH,
+  alignSelf: "center",
+  paddingHorizontal: spacing.lg,
+  paddingBottom: spacing.md,
+  gap: spacing.md,
 })
