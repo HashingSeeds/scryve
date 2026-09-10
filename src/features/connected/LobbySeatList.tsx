@@ -108,7 +108,7 @@ export function LobbySeatList({
               (!system || (deck.game ?? DEFAULT_DECK_GAME) === system) &&
               (!format || deck.format === format),
           ) ?? []
-        const chosenDeck = decks?.find((deck) =>
+        const chosenDeck = usableDecks.find((deck) =>
           deck.versions.some((version) => version._id === seat.deckVersionId),
         )
         const chosenVersion = chosenDeck?.versions.find(

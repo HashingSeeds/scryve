@@ -665,6 +665,11 @@ describe("premium deck tracking", () => {
         deviceId: hostDeviceId,
       })
       const hostPlayer = lobby.players.find((player) => player.seat === 1)!
+      expect(hostPlayer.deckVersionId).toBeUndefined()
+      const joinerLobby = await joiner.query(api.games.lobbyProjection, {
+        publicId: created.publicId,
+      })
+      expect(joinerLobby.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
       await host.mutation(api.games.startGame, { publicId: created.publicId })
       await host.mutation(api.games.finishGame, {
         publicId: created.publicId,

@@ -400,6 +400,7 @@ export function DecksScreen({
   )
   useEffect(() => {
     if (initialSystem && DECK_GAME_LIST.some((game) => game.id === initialSystem)) {
+      setSystem(initialSystem)
       setGame(initialSystem, ALL_FORMATS)
     }
   }, [initialSystem, setGame])

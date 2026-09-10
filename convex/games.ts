@@ -792,23 +792,30 @@ export const lobbyProjection = query({
               expiresAt: invite.expiresAt,
             }
           : null,
-      players: players
-        .sort((a, b) => a.seat - b.seat)
-        .map((p) => ({
-          playerId: p._id,
-          seat: p.seat,
-          displayName: displayNames.get(p._id) ?? seatLabelFor(p),
-          deckVersionId: p.deckVersionId,
-          color: p.color,
-          shape: appearanceOf(p).shape,
-          currentLife: p.currentLife,
-          ...(commanderDamage
-            ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
-            : {}),
-          controlledByMe:
-            p.userId === user._id &&
-            (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
-        })),
+      players: await Promise.all(
+        players
+          .sort((a, b) => a.seat - b.seat)
+          .map(async (p) => ({
+            playerId: p._id,
+            seat: p.seat,
+            displayName: displayNames.get(p._id) ?? seatLabelFor(p),
+            deckVersionId:
+              game.status === "lobby" &&
+              p.deckVersionId &&
+              !(await deckSelectionIsPlayable(ctx, p.deckVersionId, game))
+                ? undefined
+                : p.deckVersionId,
+            color: p.color,
+            shape: appearanceOf(p).shape,
+            currentLife: p.currentLife,
+            ...(commanderDamage
+              ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
+              : {}),
+            controlledByMe:
+              p.userId === user._id &&
+              (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
+          })),
+      ),
       ...(commanderDamage ? { commanderDamage } : {}),
     }
   },

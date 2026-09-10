@@ -365,7 +365,21 @@ describe("DecksScreen", () => {
       analyticsLocked: false,
     }
     const onBack = jest.fn()
-    const view = renderShelf({ initialSystem: "pokemon", onBack })
+    const view = renderShelf({ initialSystem: "mtg", onBack })
+    expect(view.getByText("Existing Deck")).toBeTruthy()
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <DecksScreen
+          initialSystem="pokemon"
+          onBack={onBack}
+          onPlay={jest.fn()}
+          onSelect={jest.fn()}
+          onAddDeck={jest.fn()}
+          onSettings={jest.fn()}
+          onAccount={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
     expect(view.queryByText("Existing Deck")).toBeNull()
     expect(view.getByText("Lucario Hariyama")).toBeTruthy()
     expect(loadString("decks.game")).toBe("pokemon")
