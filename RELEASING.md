@@ -60,7 +60,7 @@ backfill or authorize an incidental production command.
 
 ## Account deletion webhook protection rollout
 
-1. Deploy the optional `accountDeletionReceipts.deletedIdentityHash` field and `by_deleted_identity_hash` index as a schema-only expansion. Wait for the index to be ready before deploying the deletion-aware sync code.
+1. Deploy the schema-only expansion checkpoint `0b8f313793dbdef7fa809b6311f669e9b2491d61` from PR #112. It adds the optional `accountDeletionReceipts.deletedIdentityHash` field and stages `by_deleted_identity_hash`. Wait for the staged index backfill to finish before deploying the following server-fix commit, which activates and queries it. Preserve both commits when merging PR #112 so the expansion checkpoint remains available.
 2. Deploy the server fix before publishing the revised privacy disclosure. Verify in a development deployment that delayed profile webhooks are ignored during deletion and after the receipt says completed.
 3. Keep the deletion hash when retaining or cleaning up receipts. Removing it allows delayed events to recreate profiles. Existing completed receipts contain no account identifier, so past deletions cannot be backfilled from those receipts. This fix protects deletions completed after the server change is deployed.
 
