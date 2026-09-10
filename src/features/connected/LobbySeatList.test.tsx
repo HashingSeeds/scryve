@@ -94,3 +94,38 @@ it.each(["none", "mtg"])("can clear an unavailable deck in an optional %s game",
   fireEvent.press(screen.getByText("No deck"))
   expect(onSelectVersion).toHaveBeenCalledWith(1)
 })
+
+it("only offers decks matching the lobby format", () => {
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        system="mtg"
+        format="vintage"
+        deckState={{
+          status: "ready",
+          value: [
+            {
+              _id: "commander",
+              name: "Commander deck",
+              format: "commander",
+              versions: [{ _id: "c", versionNumber: 1 }],
+            },
+            {
+              _id: "vintage",
+              name: "Vintage deck",
+              format: "vintage",
+              versions: [{ _id: "v", versionNumber: 1 }],
+            },
+          ],
+        }}
+        versionLabel={() => "Current"}
+        onSelectVersion={jest.fn()}
+        onReport={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.queryByText("Commander deck")).toBeNull()
+  expect(screen.getByText("Vintage deck")).toBeTruthy()
+})

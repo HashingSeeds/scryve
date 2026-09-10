@@ -469,6 +469,7 @@ function ConnectedLobbyContent({
                 totalSeats={lobby.playerCount}
                 deckState={deckState}
                 system={lobby.system}
+                format={lobby.format}
                 onManageDecks={onManageDecks ? () => onManageDecks(lobby.system) : undefined}
                 versionLabel={versionLabel}
                 selectingDeckSeats={selectingDeckSeats}

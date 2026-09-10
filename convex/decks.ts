@@ -854,6 +854,11 @@ export const selectForSeat = mutation({
         code: "deck_system_mismatch",
         message: "This deck belongs to another game system",
       })
+    if (deck.format !== (game.format ?? game.ruleset))
+      throw new ConvexError({
+        code: "deck_format_mismatch",
+        message: "Choose a deck matching the lobby format",
+      })
     await ctx.db.patch(player._id, { deckVersionId: version._id })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return { deckId: deck._id, deckVersionId: version._id }

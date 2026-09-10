@@ -47,6 +47,15 @@ describe("premium deck tracking", () => {
       hostColor: "#7C3AED",
       deviceId: hostDeviceId,
     })
+    await optionalHost.mutation(api.decks.update, { deckId, format: "vintage" })
+    await expect(
+      optionalHost.mutation(api.decks.selectForSeat, {
+        publicId: optionalLobby.publicId,
+        seat: 1,
+        deckVersionId,
+      }),
+    ).rejects.toMatchObject({ data: { code: "deck_format_mismatch" } })
+    await optionalHost.mutation(api.decks.update, { deckId, format: "commander" })
     await optionalHost.mutation(api.decks.selectForSeat, {
       publicId: optionalLobby.publicId,
       seat: 1,
@@ -598,77 +607,84 @@ describe("premium deck tracking", () => {
     })
   })
 
-  it("drops a seat selection whose version was deleted before the game started", async () => {
-    const t = convexTest(schema, modules)
-    const host = await synced(t, "stale-host", "Host")
-    const joiner = await synced(t, "stale-joiner", "Joiner")
-    const deckId = await host.mutation(api.decks.create, { name: "Goblins", format: "commander" })
-    const firstVersionId = await host.mutation(api.decks.saveVersion, {
-      deckId,
-      cards: [
-        {
-          oracleId: "11111111-1111-1111-1111-111111111111",
-          scryfallId: "22222222-2222-2222-2222-222222222222",
-          name: "Goblin Test Card",
-          quantity: 1,
-          board: "commander",
-        },
-      ],
-    })
-    await t.mutation(internal.entitlements.setUserFeature, {
-      clerkUserId: "stale-host",
-      feature: "deck_versions",
-      enabled: true,
-      source: "test",
-    })
-    await host.mutation(api.decks.createVersion, { deckId, name: "Version 2" })
-    const created = await host.mutation(api.games.createLobby, {
-      publicId: "stale-deck-public-1234",
-      playerCount: 2,
-      startingLife: 40,
-      ruleset: "commander",
-      inviteToken,
-      manualCodeCandidates: ["ABC235"],
-      hostDisplayName: "Host",
-      hostColor: "#7C3AED",
-      deviceId: hostDeviceId,
-    })
-    await joiner.mutation(api.games.claimSeat, {
-      token: inviteToken,
-      displayName: "Joiner",
-      color: "#2563EB",
-    })
-    await host.mutation(api.decks.selectForSeat, {
-      publicId: created.publicId,
-      seat: 1,
-      deckVersionId: firstVersionId,
-    })
-    await host.mutation(api.decks.deleteVersion, { versionId: firstVersionId })
+  it.each(["deleted version", "changed format"])(
+    "drops an invalid selection at start: %s",
+    async (reason) => {
+      const t = convexTest(schema, modules)
+      const host = await synced(t, "stale-host", "Host")
+      const joiner = await synced(t, "stale-joiner", "Joiner")
+      const deckId = await host.mutation(api.decks.create, { name: "Goblins", format: "commander" })
+      const firstVersionId = await host.mutation(api.decks.saveVersion, {
+        deckId,
+        cards: [
+          {
+            oracleId: "11111111-1111-1111-1111-111111111111",
+            scryfallId: "22222222-2222-2222-2222-222222222222",
+            name: "Goblin Test Card",
+            quantity: 1,
+            board: "commander",
+          },
+        ],
+      })
+      await t.mutation(internal.entitlements.setUserFeature, {
+        clerkUserId: "stale-host",
+        feature: "deck_versions",
+        enabled: true,
+        source: "test",
+      })
+      await host.mutation(api.decks.createVersion, { deckId, name: "Version 2" })
+      const created = await host.mutation(api.games.createLobby, {
+        publicId: "stale-deck-public-1234",
+        playerCount: 2,
+        startingLife: 40,
+        ruleset: "commander",
+        inviteToken,
+        manualCodeCandidates: ["ABC235"],
+        hostDisplayName: "Host",
+        hostColor: "#7C3AED",
+        deviceId: hostDeviceId,
+      })
+      await joiner.mutation(api.games.claimSeat, {
+        token: inviteToken,
+        displayName: "Joiner",
+        color: "#2563EB",
+      })
+      await host.mutation(api.decks.selectForSeat, {
+        publicId: created.publicId,
+        seat: 1,
+        deckVersionId: firstVersionId,
+      })
+      if (reason === "deleted version") {
+        await host.mutation(api.decks.deleteVersion, { versionId: firstVersionId })
+      } else {
+        await host.mutation(api.decks.update, { deckId, format: "vintage" })
+      }
 
-    const lobby = await host.query(api.games.lobbyProjection, {
-      publicId: created.publicId,
-      deviceId: hostDeviceId,
-    })
-    const hostPlayer = lobby.players.find((player) => player.seat === 1)!
-    await host.mutation(api.games.startGame, { publicId: created.publicId })
-    await host.mutation(api.games.finishGame, {
-      publicId: created.publicId,
-      result: { kind: "win", winnerPlayerIds: [hostPlayer.playerId] },
-    })
+      const lobby = await host.query(api.games.lobbyProjection, {
+        publicId: created.publicId,
+        deviceId: hostDeviceId,
+      })
+      const hostPlayer = lobby.players.find((player) => player.seat === 1)!
+      await host.mutation(api.games.startGame, { publicId: created.publicId })
+      await host.mutation(api.games.finishGame, {
+        publicId: created.publicId,
+        result: { kind: "win", winnerPlayerIds: [hostPlayer.playerId] },
+      })
 
-    const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
-    expect(summary?.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
-    await t.mutation(internal.entitlements.setUserFeature, {
-      clerkUserId: "stale-host",
-      feature: "deck_analytics",
-      enabled: true,
-      source: "test",
-    })
-    await expect(host.query(api.decks.stats, { deckId })).resolves.toMatchObject({
-      locked: false,
-      games: 0,
-    })
-  })
+      const summary = await host.query(api.games.connectedSummary, { publicId: created.publicId })
+      expect(summary?.players.find((player) => player.seat === 1)?.deckVersionId).toBeUndefined()
+      await t.mutation(internal.entitlements.setUserFeature, {
+        clerkUserId: "stale-host",
+        feature: "deck_analytics",
+        enabled: true,
+        source: "test",
+      })
+      await expect(host.query(api.decks.stats, { deckId })).resolves.toMatchObject({
+        locked: false,
+        games: 0,
+      })
+    },
+  )
 
   it("drops a seat selection whose deck was deleted before the game started", async () => {
     const t = convexTest(schema, modules)

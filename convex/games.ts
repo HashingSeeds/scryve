@@ -245,11 +245,20 @@ async function commanderDamageProjection(
   }
 }
 
-async function deckSelectionIsPlayable(ctx: QueryCtx, deckVersionId: Id<"deckVersions">) {
+async function deckSelectionIsPlayable(
+  ctx: QueryCtx,
+  deckVersionId: Id<"deckVersions">,
+  game: Doc<"games">,
+) {
   const version = await ctx.db.get(deckVersionId)
   if (!version || version.archivedAt !== undefined) return false
   const deck = await ctx.db.get(version.deckId)
-  return deck !== null && deck.archivedAt === undefined
+  return (
+    deck !== null &&
+    deck.archivedAt === undefined &&
+    (deck.game ?? DEFAULT_DECK_GAME) === (game.system ?? game.game ?? DEFAULT_DECK_GAME) &&
+    deck.format === (game.format ?? game.ruleset)
+  )
 }
 
 function totalEventCount(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
@@ -986,7 +995,7 @@ export const startGame = mutation({
       for (const player of players) {
         if (
           player.deckVersionId === undefined ||
-          !(await deckSelectionIsPlayable(ctx, player.deckVersionId))
+          !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
         )
           throw new Error("Every occupied seat must choose a deck before starting")
       }
@@ -994,12 +1003,12 @@ export const startGame = mutation({
     const now = Date.now()
     await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
     for (const player of players) {
-      const deletedSinceSelection =
+      const invalidSinceSelection =
         player.deckVersionId !== undefined &&
-        !(await deckSelectionIsPlayable(ctx, player.deckVersionId))
+        !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
       await ctx.db.patch(player._id, {
         resumable: true,
-        ...(deletedSinceSelection ? { deckVersionId: undefined } : {}),
+        ...(invalidSinceSelection ? { deckVersionId: undefined } : {}),
       })
     }
     return { publicId: game.publicId }

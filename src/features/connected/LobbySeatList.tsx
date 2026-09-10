@@ -26,6 +26,7 @@ export type LobbySeat = {
 
 export type SeatDeck = {
   game?: string
+  format?: string
   _id: string
   name: string
   versions: { _id: string; versionNumber: number; name?: string }[]
@@ -44,6 +45,7 @@ export function LobbySeatList({
   selectingDeckSeats,
   deckRequired,
   system,
+  format,
   onSelectVersion,
   onReport,
   onEditAppearance,
@@ -57,6 +59,7 @@ export function LobbySeatList({
   selectingDeckSeats?: ReadonlySet<number>
   deckRequired?: boolean
   system?: string
+  format?: string
   onSelectVersion: (seat: number, deckVersionId?: string) => void
   onReport: (seat: LobbySeat) => void
   onManageDecks?: () => void
@@ -101,7 +104,9 @@ export function LobbySeatList({
         const usableDecks =
           decks?.filter(
             (deck) =>
-              deck.versions.length > 0 && (!system || (deck.game ?? DEFAULT_DECK_GAME) === system),
+              deck.versions.length > 0 &&
+              (!system || (deck.game ?? DEFAULT_DECK_GAME) === system) &&
+              (!format || deck.format === format),
           ) ?? []
         const chosenDeck = decks?.find((deck) =>
           deck.versions.some((version) => version._id === seat.deckVersionId),
