@@ -287,9 +287,7 @@ describe("ConnectedLobbyScreen", () => {
 
     render(themed(<ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} />))
 
-    expect(screen.getByTestId("seat-1-no-decks")).toHaveTextContent(
-      "No decks for this system. You can play without one.",
-    )
+    expect(screen.getByTestId("seat-1-no-decks")).toHaveTextContent("No decks yet.")
   })
 
   it("shows the deck rule and blocks a required lobby with a missing deck", () => {
@@ -318,7 +316,7 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByText("Decks required")).toBeTruthy()
     expect(screen.getByText("0 of 2 ready")).toBeTruthy()
     expect(screen.getAllByText("40 life · Commander")).toHaveLength(1)
-    expect(screen.getByText("Every seat needs a deck to start.")).toBeTruthy()
+    expect(screen.getByText("Waiting for decks")).toBeTruthy()
     expect(screen.queryByTestId("seat-1-deck-no-deck")).toBeNull()
     expect(screen.getByTestId("start-connected-game-button")).toBeDisabled()
   })

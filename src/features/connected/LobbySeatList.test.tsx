@@ -58,8 +58,8 @@ it("offers deck management when a required system has no matching decks", () => 
     </ThemeProvider>,
   )
   expect(screen.queryByText("Magic deck")).toBeNull()
-  expect(screen.getByText("No decks for this system. Add a deck to get ready.")).toBeTruthy()
-  fireEvent.press(screen.getByText("Manage decks"))
+  expect(screen.queryByTestId("seat-1-no-decks")).toBeNull()
+  fireEvent.press(screen.getByText("Add a deck"))
   expect(onManageDecks).toHaveBeenCalledTimes(1)
 })
 

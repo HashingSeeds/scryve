@@ -10,7 +10,6 @@ import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { seatDetail } from "./connectedCopy"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { DEFAULT_DECK_GAME } from "../../../convex/lib/deckGames"
 
@@ -142,16 +141,30 @@ export function LobbySeatList({
               )}
               <View style={themed($seatCopy)}>
                 <Text weight="medium" numberOfLines={1} text={seat.displayName} />
+                {seat.controlledByMe || deckReady ? (
+                  <Text
+                    size="xxs"
+                    numberOfLines={2}
+                    style={themed(deckReady ? $seatDetail : $seatPending)}
+                    text={
+                      [
+                        seat.controlledByMe ? "You" : undefined,
+                        chosenDeck?.name,
+                        chosenVersion ? versionLabel(chosenVersion) : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || (deckReady ? "Deck selected" : "No deck")
+                    }
+                  />
+                ) : null}
                 <Text
+                  testID={`seat-${seat.seat}-readiness`}
                   size="xxs"
-                  numberOfLines={2}
-                  style={themed(deckReady ? $seatDetail : $seatPending)}
-                  text={seatDetail({
-                    controlledByMe: seat.controlledByMe,
-                    seat: seat.seat,
-                    deckName: chosenDeck?.name,
-                    versionName: chosenVersion ? versionLabel(chosenVersion) : undefined,
-                  })}
+                  weight="medium"
+                  style={themed(ready ? $seatReady : $seatPending)}
+                  text={
+                    ready ? "✓ Ready" : seat.controlledByMe ? "○ Choose a deck" : "○ Needs a deck"
+                  }
                 />
               </View>
               {!seat.controlledByMe && seat.playerId ? (
@@ -164,15 +177,6 @@ export function LobbySeatList({
                   onPress={() => onReport(seat)}
                 />
               ) : null}
-              <Text
-                testID={`seat-${seat.seat}-readiness`}
-                size="xxs"
-                weight="medium"
-                style={themed(ready ? $seatReady : $seatPending)}
-                text={
-                  ready ? "✓ Ready" : seat.controlledByMe ? "○ Choose a deck" : "○ Needs a deck"
-                }
-              />
             </View>
             {seat.controlledByMe ? (
               <View style={themed($deckChoices)}>
@@ -216,17 +220,15 @@ export function LobbySeatList({
                     />
                   </View>
                 ) : usableDecks.length === 0 ? (
-                  <View testID={`seat-${seat.seat}-no-decks`} style={themed($deckMessage)}>
-                    <Text
-                      size="xxs"
-                      style={themed($seatPending)}
-                      text={
-                        deckRequired
-                          ? "No decks for this system. Add a deck to get ready."
-                          : "No decks for this system. You can play without one."
-                      }
-                    />
-                  </View>
+                  onManageDecks ? null : (
+                    <View testID={`seat-${seat.seat}-no-decks`} style={themed($deckMessage)}>
+                      <Text
+                        size="xxs"
+                        style={themed($seatPending)}
+                        text={deckRequired ? "Add a deck to join." : "No decks yet."}
+                      />
+                    </View>
+                  )
                 ) : (
                   <>
                     <FilterChips
@@ -278,7 +280,7 @@ export function LobbySeatList({
                 {onManageDecks && system !== NO_PLAY_SYSTEM ? (
                   <Button
                     testID={`manage-seat-${seat.seat}-decks`}
-                    text="Manage decks"
+                    text={usableDecks.length === 0 ? "Add a deck" : "Manage decks"}
                     onPress={onManageDecks}
                   />
                 ) : null}

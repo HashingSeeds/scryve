@@ -376,7 +376,7 @@ function ConnectedLobbyContent({
                 style={themed($dimmed)}
                 text={
                   manualCode
-                    ? "Share this code to invite players"
+                    ? "Invite code"
                     : lobbyDetail(lobby.startingLife, lobby.ruleset, lobby.system, lobby.format)
                 }
               />
@@ -426,7 +426,7 @@ function ConnectedLobbyContent({
             {lobby.system !== NO_PLAY_SYSTEM || lobby.deckRequired ? (
               <Switch
                 testID="lobby-require-decks"
-                label="Require a deck for every player"
+                label="Decks required"
                 value={Boolean(lobby.deckRequired)}
                 disabled={!isWebSocketConnected || savingSettings || starting}
                 onValueChange={(deckRequired) => void changeSettings({ deckRequired })}
@@ -436,7 +436,7 @@ function ConnectedLobbyContent({
         ) : null}
         <View style={themed($section)}>
           <View style={themed($readinessHeading)}>
-            <Text preset="subheading" accessibilityRole="header" text="Ready check" />
+            <Text preset="subheading" accessibilityRole="header" text="Lobby" />
             <Text
               size="xs"
               style={themed($dimmed)}
@@ -454,11 +454,13 @@ function ConnectedLobbyContent({
               ]}
             />
           </View>
-          <Text
-            size="xxs"
-            style={themed($dimmed)}
-            text={deckRequirementLabel(Boolean(lobby.deckRequired))}
-          />
+          {!lobby.isHost ? (
+            <Text
+              size="xxs"
+              style={themed($dimmed)}
+              text={deckRequirementLabel(Boolean(lobby.deckRequired))}
+            />
+          ) : null}
           <LobbyDeckSource>
             {(deckState) => (
               <LobbySeatList
@@ -526,11 +528,7 @@ function ConnectedLobbyContent({
               />
             ) : null}
             {missingDeck && isWebSocketConnected ? (
-              <Text
-                size="xxs"
-                style={themed($actionHint)}
-                text="Every seat needs a deck to start."
-              />
+              <Text size="xxs" style={themed($actionHint)} text="Waiting for decks" />
             ) : null}
           </>
         ) : (
