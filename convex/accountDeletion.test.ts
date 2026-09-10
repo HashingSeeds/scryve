@@ -447,13 +447,26 @@ describe("account deletion", () => {
     ).not.toBeNull()
   })
 
-  it("creates a suppression receipt when completing a legacy request without a receipt", async () => {
+  it.each([false, true])("recreates a suppression receipt (dangling ID: %s)", async (dangling) => {
     const t = convexTest(schema, modules)
     const clerkUserId = "legacy-deleted-account"
     const actor = t.withIdentity({ subject: clerkUserId })
+    const receiptId = dangling
+      ? await t.run(async (ctx) => {
+          const id = await ctx.db.insert("accountDeletionReceipts", {
+            token: "removed-receipt",
+            status: "identity_pending",
+            requestedAt: 1_700_000_000_000,
+            updatedAt: 1_700_000_000_000,
+          })
+          await ctx.db.delete(id)
+          return id
+        })
+      : undefined
     const requestId = await t.run((ctx) =>
       ctx.db.insert("accountDeletionRequests", {
         clerkUserId,
+        receiptId,
         status: "identity_pending",
         attempts: 0,
         requestedAt: 1_700_000_000_000,
@@ -467,6 +480,7 @@ describe("account deletion", () => {
     expect(receipts[0]).toMatchObject({
       status: "completed",
       deletedIdentityHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      requestedAt: 1_700_000_000_000,
     })
     expect(await t.run((ctx) => ctx.db.get(requestId))).toBeNull()
     expect(

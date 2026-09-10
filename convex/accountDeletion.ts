@@ -610,8 +610,10 @@ export const complete = internalMutation({
     const request = await ctx.db.get(args.requestId)
     if (request) {
       const now = Date.now()
+      const receipt = request.receiptId ? await ctx.db.get(request.receiptId) : null
       const receiptId =
-        request.receiptId ?? (await createReceipt(ctx, "identity_pending", now)).receiptId
+        receipt?._id ??
+        (await createReceipt(ctx, "identity_pending", request.requestedAt)).receiptId
       await ctx.db.patch(receiptId, {
         status: "completed",
         updatedAt: now,
