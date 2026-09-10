@@ -15,6 +15,7 @@ import {
   getPlayerGridRows,
   PlayerGrid,
 } from "./PlayerGrid"
+import { PlayerMark } from "./PlayerMark"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -369,9 +370,10 @@ describe("PlayerGrid", () => {
         />
       </ThemeProvider>,
     )
-    expect(
-      view.getAllByTestId("player-mark-spin-line", { includeHiddenElements: true }),
-    ).toHaveLength(1)
+    expect(view.UNSAFE_getAllByType(PlayerMark).map((mark) => mark.props.spinning)).toEqual([
+      true,
+      false,
+    ])
     expect(StyleSheet.flatten(view.getByTestId("life-card-seat-1").props.style).borderStyle).toBe(
       undefined,
     )
