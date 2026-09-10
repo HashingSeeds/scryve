@@ -8,7 +8,16 @@ tags: [unconfigured]
 onFlowStart:
   - runFlow: ../shared/_OnFlowStart.yaml
 ---
-- assertVisible: "Local play stays available without an account or network."
+- assertVisible:
+    id: "player-grid"
 - tapOn:
-    id: "connected-play-button"
-- assertVisible: "Local play remains available."
+    id: "game-menu-button"
+- tapOn:
+    id: "connect-button"
+- assertVisible: ".*Connected play needs valid public configuration:.*Local play remains available.*"
+- tapOn: "Back"
+- assertVisible:
+    id: "player-grid"
+- tapOn:
+    id: "life-seat-1-1"
+- assertVisible: "Seat 1, Player 1, 21 life"

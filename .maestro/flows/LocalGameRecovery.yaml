@@ -6,22 +6,30 @@ tags: [local]
 onFlowStart:
   - runFlow: ../shared/_OnFlowStart.yaml
 ---
-- tapOn:
-    id: "new-game-button"
-- assertVisible: "New local game"
-- tapOn: "6 players"
-- tapOn:
-    id: "start-game-button"
 - assertVisible:
     id: "player-grid"
 - tapOn:
-    id: "life-seat-1-1"
-# the undo control lives inside the radial game menu
-- tapOn:
     id: "game-menu-button"
 - tapOn:
-    id: "undo-button"
+    id: "setup-button"
+- assertVisible: "New game"
+- repeat:
+    times: 4
+    commands:
+      - tapOn:
+          id: "player-count-increment"
+- assertVisible: "Players, 6"
+- tapOn:
+    id: "start-game-button"
+- assertVisible:
+    id: "life-seat-6-1"
+- tapOn:
+    id: "life-seat-1-1"
+- assertVisible: "Seat 1, Player 1, 21 life"
 - stopApp
 - launchApp
 - assertVisible:
-    id: "resume-game-button"
+    id: "player-grid"
+- assertVisible:
+    id: "life-seat-6-1"
+- assertVisible: "Seat 1, Player 1, 21 life"

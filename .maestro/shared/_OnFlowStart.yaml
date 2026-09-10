@@ -38,7 +38,7 @@ appId: ${MAESTRO_APP_ID}
       - waitForAnimationToEnd
       - tapOn: "Close" # dismiss the bottom sheet
 
-# a cleared install always lands on the legal consent gate before Home,
+# a cleared install always lands on the legal consent gate before Play,
 # so accept it here to keep individual flows starting from a usable app.
 - runFlow:
     when:

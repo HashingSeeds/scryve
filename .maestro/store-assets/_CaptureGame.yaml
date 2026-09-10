@@ -1,11 +1,22 @@
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow: ../shared/_OnFlowStart.yaml
-- assertVisible: "Life totals, without the fuss."
+- assertVisible:
+    id: "player-grid"
 - tapOn:
-    id: "new-game-button"
-- assertVisible: "New local game"
-- tapOn: "${PLAYER_COUNT} players"
+    id: "game-menu-button"
+- tapOn:
+    id: "setup-button"
+- assertVisible: "New game"
+- runFlow:
+    when:
+      true: ${PLAYER_COUNT > 2}
+    commands:
+      - repeat:
+          times: ${PLAYER_COUNT - 2}
+          commands:
+            - tapOn:
+                id: "player-count-increment"
 - scrollUntilVisible:
     element:
       id: "start-game-button"

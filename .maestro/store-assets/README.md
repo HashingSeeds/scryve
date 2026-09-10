@@ -48,7 +48,8 @@ Prerequisites:
 1. Use an iPhone simulator whose native pixel dimensions match an App Store screenshot size.
 2. Install a build with bundle ID `com.sowinghope.count` and the production RevenueCat iOS key.
 3. Sign into a non-Pro Clerk test account before running the flow.
-4. Publish the RevenueCat paywall for the `default` offering.
+4. Set the launch destination to Play in Settings. Resolve any stale game through the normal UI, then relaunch once to confirm the board opens without a "Continue game?" prompt. Choosing Continue alone does not persist that choice across relaunches. The capture preserves app state; keep the account signed in.
+5. Publish the RevenueCat paywall for the `default` offering.
 
 Run:
 
