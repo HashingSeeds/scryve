@@ -1,5 +1,5 @@
-import { AccessibilityInfo, StyleSheet } from "react-native"
-import { render } from "@testing-library/react-native"
+import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
+import { fireEvent, render } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
@@ -27,6 +27,35 @@ function players(count: number) {
 }
 
 describe("PlayerGrid", () => {
+  it("reveals the board only once life totals have their measured size", () => {
+    const window = Dimensions.get("window")
+    Dimensions.set({
+      window: { width: 390, height: 844, scale: 3, fontScale: 1 },
+    })
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={players(2)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    const grid = () => view.getByTestId("player-grid")
+    const fontSize = () =>
+      StyleSheet.flatten(view.getByTestId("life-total-seat-1").props.style).fontSize
+    const initialFontSize = fontSize()
+    const initialOpacity = StyleSheet.flatten(grid().props.style).opacity ?? 1
+
+    fireEvent(grid(), "layout", {
+      nativeEvent: { layout: { width: 390, height: 800, x: 0, y: 0 } },
+    })
+
+    const measuredFontSize = fontSize()
+    const measuredOpacity = StyleSheet.flatten(grid().props.style).opacity ?? 1
+    view.unmount()
+    Dimensions.set({ window })
+    expect(measuredFontSize).toBeGreaterThan(initialFontSize)
+    expect(initialOpacity).toBe(0)
+    expect(measuredOpacity).toBe(1)
+  })
+
   it.each([2, 3, 4, 5, 6])(
     "renders every card and four controls in a %i-player layout",
     (count) => {
