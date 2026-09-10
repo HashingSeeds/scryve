@@ -1,10 +1,10 @@
 import { useState } from "react"
 import type { ViewStyle } from "react-native"
-import { Platform, Pressable, View } from "react-native"
+import { Pressable, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 
 import { AppUtilityMenu } from "./AppUtilityMenu"
 import { Text } from "./Text"
@@ -15,24 +15,26 @@ export function FloatingAppNavigation({
   onSettings,
   onAccount,
   accountLabel = "Account",
-  bottomSafeArea = true,
 }: {
   destinationLabel: "Decks" | "Return to game" | "Play"
   onDestination: () => void
   onSettings: () => void
   onAccount: () => void
   accountLabel?: "Account" | "Sign in"
-  bottomSafeArea?: boolean
 }) {
-  const { themed } = useAppTheme()
-  const safeArea = useSafeAreaInsetsStyle(bottomSafeArea ? ["bottom"] : [], "margin")
+  const { themed, theme } = useAppTheme()
+  const insets = useSafeAreaInsets()
   const [utilityOpen, setUtilityOpen] = useState(false)
 
   return (
     <View
       testID="floating-app-navigation"
       pointerEvents="box-none"
-      style={[themed($navigation), utilityOpen && $expandedNavigation, safeArea]}
+      style={[
+        themed($navigation),
+        utilityOpen && $expandedNavigation,
+        { bottom: Math.max(insets.bottom, theme.spacing.md) },
+      ]}
     >
       <View style={$utility}>
         <AppUtilityMenu
@@ -62,7 +64,6 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   zIndex: 50,
   left: spacing.md,
   right: spacing.md,
-  bottom: Platform.OS === "ios" ? 0 : spacing.md,
   height: 48,
   alignItems: "center",
   justifyContent: "flex-end",

@@ -1,4 +1,4 @@
-import { Platform, StyleSheet } from "react-native"
+import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { deleteGuestDeck, saveGuestDeck } from "@/features/decks/guestDeck"
@@ -142,7 +142,7 @@ describe("DecksScreen", () => {
     expect(view.getByText("Return to game")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
     expect(StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style).bottom).toBe(
-      Platform.OS === "ios" ? 0 : spacing.md,
+      spacing.md,
     )
     fireEvent.press(view.getByLabelText("Return to game"))
     expect(onPlay).toHaveBeenCalledTimes(1)

@@ -84,7 +84,7 @@ describe("CurrentGameScreen", () => {
     )
     fireEvent.press(view.getByTestId("game-menu-button"))
     const navigation = StyleSheet.flatten(view.getByTestId("floating-app-navigation").props.style)
-    expect(navigation.marginBottom ?? 0).toBe(format === "commander" ? 0 : 34)
+    expect((navigation.bottom ?? 0) + (navigation.marginBottom ?? 0)).toBe(34)
   })
 
   it("keeps playing if haptics fail", () => {
