@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react"
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
+import { CloudScreen } from "@/features/auth/CloudScreen"
 import type { CreatedLobby } from "@/features/connected/ConnectedHostSource"
 import { ConnectedSetupSource } from "@/features/connected/ConnectedSetupSource"
 import {
@@ -10,9 +11,10 @@ import {
 } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { LocalGameResult } from "@/features/game/types"
+import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 import { NewGameScreen, type ConnectedHostFeed, type NewGameMode } from "@/screens/NewGameScreen"
 
-function openLobby(lobby: CreatedLobby) {
+function openLobby(lobby: Pick<CreatedLobby, "publicId">) {
   router.replace({ pathname: "/connected/lobby/[gameId]", params: { gameId: lobby.publicId } })
 }
 
@@ -20,6 +22,7 @@ export default function NewLocalGameRoute() {
   const params = useLocalSearchParams<{ mode?: string; setup?: string }>()
   const [mode, setMode] = useState<NewGameMode>(params.mode === "connected" ? "connected" : "local")
   const [connectedEnabled, setConnectedEnabled] = useState(mode === "connected")
+  const [joinCode, setJoinCode] = useState("")
   const [connected, setConnected] = useState<ConnectedHostFeed>()
   const [activeGame, setActiveGame] = useState(() => localGameRepository.loadActiveGame())
   const [defaults] = useState(() => localGameRepository.loadSettings())
@@ -65,7 +68,7 @@ export default function NewLocalGameRoute() {
           started && params.setup === "1"
             ? (players) => {
                 localGameRepository.updateActivePlayers(activeGame.id, players)
-                router.replace("/game/current")
+                setActiveGame(localGameRepository.loadActiveGame())
               }
             : undefined
         }
@@ -90,7 +93,19 @@ export default function NewLocalGameRoute() {
           })
         }}
         connected={connected}
-        onJoinConnected={() => router.push("/connected/join")}
+        joinContent={
+          <CloudScreen multiplayer onBack={() => setMode("local")}>
+            {(access) => (
+              <JoinConnectedScreen
+                embedded
+                access={access}
+                initialCode={joinCode}
+                onCodeChange={setJoinCode}
+                onJoined={(publicId) => openLobby({ publicId })}
+              />
+            )}
+          </CloudScreen>
+        }
         onResumeConnected={(game) =>
           router.replace({
             pathname:

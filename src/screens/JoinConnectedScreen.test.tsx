@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
+import { InviteScannerScreen } from "./InviteScannerScreen"
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
 import { mockClaimSeat, resetConnectedHarness, themed } from "../../test/support/connectedHarness"
 
@@ -32,6 +33,42 @@ jest.mock("@/utils/analytics", () => ({
 
 describe("JoinConnectedScreen", () => {
   beforeEach(resetConnectedHarness)
+
+  it.each([
+    { kind: "code" as const, code: "AB12CD" },
+    { kind: "token" as const, token: "a".repeat(43) },
+  ])("returns a scanned $kind to the embedded form before joining", async (invite) => {
+    const onJoined = jest.fn()
+    const onCodeChange = jest.fn()
+    const view = render(
+      themed(<JoinConnectedScreen embedded onJoined={onJoined} onCodeChange={onCodeChange} />),
+    )
+    fireEvent.press(view.getByTestId("scan-invite-button"))
+    const scanner = view.UNSAFE_getByType(InviteScannerScreen)
+    act(() => scanner.props.onInvite(invite))
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+    expect(view.getByTestId("claim-seat-button")).toBeEnabled()
+    if (invite.kind === "code") {
+      expect(view.getByTestId("manual-code-input")).toHaveProp("value", invite.code)
+      expect(onCodeChange).toHaveBeenCalledWith(invite.code)
+    }
+    fireEvent.press(view.getByTestId("claim-seat-button"))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
+    expect(mockClaimSeat).toHaveBeenCalledWith(
+      expect.objectContaining(
+        invite.kind === "code" ? { manualCode: invite.code } : { token: invite.token },
+      ),
+    )
+  })
+
+  it("keeps typed code when the embedded scanner is cancelled", () => {
+    const view = render(themed(<JoinConnectedScreen embedded onJoined={jest.fn()} />))
+    fireEvent.changeText(view.getByTestId("manual-code-input"), "AB12CD")
+    fireEvent.press(view.getByTestId("scan-invite-button"))
+    act(() => view.UNSAFE_getByType(InviteScannerScreen).props.onCancel())
+    expect(view.getByTestId("manual-code-input")).toHaveProp("value", "AB12CD")
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+  })
 
   it("does not report a failed request when navigation throws after joining", async () => {
     mockCaptureAnalytics.mockClear()
@@ -95,7 +132,7 @@ describe("JoinConnectedScreen", () => {
 
   it("shows the username other players will actually see", () => {
     render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
-    expect(screen.getByTestId("join-username")).toHaveTextContent("@ada_lovelace")
+    expect(screen.getByTestId("join-username")).toHaveTextContent("Joining as @ada_lovelace")
   })
 
   it("joins with a default appearance that can be changed in the lobby", async () => {
