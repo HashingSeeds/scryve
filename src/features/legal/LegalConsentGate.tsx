@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react"
-import { Platform } from "react-native"
+import { Platform, StyleSheet, View } from "react-native"
 import { router, usePathname } from "expo-router"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 
@@ -105,11 +105,14 @@ function DeviceConsentGate({ children, onResolved }: GateProps) {
 
   if (outstanding.length === 0) return <>{children}</>
   return (
-    <ConsentPrompt
-      documents={outstanding}
-      hasPriorAcceptance={hasPriorAcceptance(accepted)}
-      onAccept={accept}
-    />
+    <>
+      <View style={styles.hidden}>{children}</View>
+      <ConsentPrompt
+        documents={outstanding}
+        hasPriorAcceptance={hasPriorAcceptance(accepted)}
+        onAccept={accept}
+      />
+    </>
   )
 }
 
@@ -384,12 +387,16 @@ function ConfiguredConsentGate({
   const visibleOutstanding = signedIn ? outstanding : deviceOutstanding
   const loading = waitingForAuth || isLoadingAccount
   const showContent = bypass || (loading ? !behindSplashScreen : visibleOutstanding.length === 0)
+  const needsConsent = !showContent && !loading
+  const keepMounted = showContent || needsConsent
 
   return (
     <>
-      {showContent ? children : null}
+      {keepMounted ? (
+        <View style={[styles.fill, needsConsent && styles.hidden]}>{children}</View>
+      ) : null}
       {!showContent && loading ? <LaunchFallback /> : null}
-      {!showContent && !loading ? (
+      {needsConsent ? (
         <ConsentPrompt
           documents={visibleOutstanding}
           hasPriorAcceptance={hasPriorAcceptance(signedIn ? accepted : deviceAccepted)}
@@ -459,3 +466,8 @@ function acceptedWithoutBackendAnswer({
 function hasPriorAcceptance(accepted: AcceptedVersions) {
   return CONSENT_DOCUMENT_IDS.some((id: ConsentDocumentId) => Boolean(accepted[id]))
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  hidden: { display: "none" },
+})
