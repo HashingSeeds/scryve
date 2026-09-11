@@ -11,6 +11,7 @@ import { localGameRepository } from "@/features/game/localPersistence"
 import type { HistorySource } from "@/screens/historyEntries"
 import { HistoryScreen } from "@/screens/HistoryScreen"
 import { captureAnalytics } from "@/utils/analytics"
+import { goBack } from "@/utils/navigation"
 
 function ReportHistory({
   feed,
@@ -69,7 +70,7 @@ export default function HistoryRoute() {
     games,
     initialSource:
       source === "connected" || source === "local" ? (source as HistorySource) : undefined,
-    onBack: () => router.back(),
+    onBack: () => goBack({ pathname: "/", params: { destination: "play" } }),
     onSelectLocal: (gameId: string) =>
       router.push({ pathname: "/history/[gameId]", params: { gameId } }),
     onSelectConnected: (gameId: string) =>
