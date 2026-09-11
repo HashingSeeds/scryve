@@ -45,10 +45,11 @@ otherwise credible. If native inputs changed or the installed build's
 compatibility is uncertain:
 
 1. Compute the current platform fingerprint with
-   `APP_VARIANT=development eas fingerprint:generate --platform <ios|android> --environment development`.
+   `eas fingerprint:generate --platform <ios|android> --build-profile development --json --non-interactive`.
 2. Query finished EAS builds for the matching platform and `development`
-   profile. Compare candidate build IDs with
-   `APP_VARIANT=development eas fingerprint:compare --build-id <id> --environment development`.
+   profile. Compare each build's `fingerprint.hash` with the generated `hash`.
+   Use the build profile, not only `--environment development`: inherited `eas.json`
+   environment overrides affect native configuration and can otherwise produce a false mismatch.
 3. If a matching simulator or emulator build exists, stop and report its build
    ID and artifact URL as the compatible build to install.
 4. If none matches, stop and report that a new `development` build is required.

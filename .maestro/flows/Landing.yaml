@@ -6,15 +6,13 @@ tags: [smoke, local]
 onFlowStart:
   - runFlow: ../shared/_OnFlowStart.yaml
 ---
-- assertVisible: "Life totals, without the fuss."
-- tapOn: "New local game"
-- assertVisible: "New local game"
-- tapOn: "Start game"
 - assertVisible:
     id: "player-grid"
 - longPressOn:
     id: "life-seat-1--1"
 - assertVisible: "Subtract life"
+- tapOn:
+    id: "life-editor-input-seat-1"
 - inputText: "5"
 # the number pad's Done accessory overlaps the apply button and submits the
 # editor itself, so use it when present and fall back to the apply button.
@@ -31,11 +29,15 @@ onFlowStart:
       - tapOn:
           id: "life-editor-apply-seat-1"
 - assertVisible: "Seat 1, Player 1, 15 life"
-- tapOn: "Game options"
-- tapOn: "Undo"
+- tapOn:
+    id: "game-menu-button"
+- tapOn:
+    id: "undo-button"
 - assertVisible: "Seat 1, Player 1, 20 life"
-- tapOn: "Game options"
-- tapOn: "End game"
+- tapOn:
+    id: "game-menu-button"
+- tapOn:
+    id: "end-game-button"
 - assertVisible: "Who won?"
 - tapOn:
     id: "end-game-winner-0"

@@ -4,9 +4,13 @@ onFlowStart:
 ---
 # Prerequisite: the installed production-identifier build is signed into a non-Pro test account.
 - assertVisible:
-    id: "account-button"
+    id: "player-grid"
 - tapOn:
-    id: "account-button"
+    id: "game-menu-button"
+- tapOn:
+    id: "utility-menu-button"
+- tapOn:
+    id: "utility-account-button"
 - extendedWaitUntil:
     visible:
       id: "count-pro-paywall-button"
