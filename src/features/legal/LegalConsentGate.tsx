@@ -393,7 +393,7 @@ function ConfiguredConsentGate({
   return (
     <>
       {keepMounted ? (
-        <View style={needsConsent ? styles.hidden : undefined}>{children}</View>
+        <View style={[styles.fill, needsConsent && styles.hidden]}>{children}</View>
       ) : null}
       {!showContent && loading ? <LaunchFallback /> : null}
       {needsConsent ? (
@@ -468,5 +468,6 @@ function hasPriorAcceptance(accepted: AcceptedVersions) {
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   hidden: { display: "none" },
 })
