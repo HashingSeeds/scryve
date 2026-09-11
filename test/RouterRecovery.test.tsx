@@ -4,6 +4,7 @@ import { Screen } from "@/components/Screen"
 import { ThemeProvider } from "@/theme/context"
 
 import AccountRoute from "../src/app/account"
+import HistoryRoute from "../src/app/history"
 import GameSummaryRoute from "../src/app/history/[gameId]"
 import InviteRoute from "../src/app/join/[token]"
 
@@ -14,6 +15,7 @@ let mockIsSignedIn = false
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => true), replace: jest.fn(), push: jest.fn() },
   useLocalSearchParams: () => ({ token: mockToken }),
+  useFocusEffect: jest.fn(),
 }))
 jest.mock("@/features/async/ConvexQueryBoundary", () => ({ ConvexQueryBoundary: () => null }))
 jest.mock("@/features/connected/ConnectedGate", () => ({ ConnectedGate: () => null }))
@@ -21,7 +23,7 @@ jest.mock("@/features/connected/ConnectedSummarySource", () => ({
   ConnectedSummarySource: () => null,
 }))
 jest.mock("@/features/game/localPersistence", () => ({
-  localGameRepository: { loadHistoryDetail: () => null },
+  localGameRepository: { loadHistory: () => [], loadHistoryDetail: () => null },
 }))
 jest.mock("@/screens/GameSummaryScreen", () => {
   const { TouchableOpacity } = jest.requireActual("react-native")
@@ -59,6 +61,14 @@ jest.mock("@/features/auth/CloudScreen", () => ({
   CloudScreen: ({ children }: { children: () => React.ReactNode }) => children(),
 }))
 jest.mock("@/screens/JoinConnectedScreen", () => ({ JoinConnectedScreen: () => null }))
+jest.mock("@/screens/HistoryScreen", () => {
+  const { TouchableOpacity } = jest.requireActual("react-native")
+  return {
+    HistoryScreen: ({ onBack }: { onBack: () => void }) => (
+      <TouchableOpacity accessibilityLabel="Back" onPress={onBack} />
+    ),
+  }
+})
 
 function themed(element: React.ReactElement) {
   return <ThemeProvider initialContext="light">{element}</ThemeProvider>
@@ -111,6 +121,30 @@ describe("Router recovery fallbacks", () => {
   it("returns a game summary to its existing route stack", () => {
     const router = jest.requireMock("expo-router").router
     const view = render(themed(<GameSummaryRoute />))
+
+    fireEvent.press(view.getByLabelText("Back"))
+
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
+  })
+
+  it("returns a root history list to Play when there is no route to go back to", () => {
+    const router = jest.requireMock("expo-router").router
+    router.canGoBack.mockReturnValue(false)
+    const view = render(themed(<HistoryRoute />))
+
+    fireEvent.press(view.getByLabelText("Back"))
+
+    expect(router.back).not.toHaveBeenCalled()
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/",
+      params: { destination: "play" },
+    })
+  })
+
+  it("returns a history list to its existing route stack", () => {
+    const router = jest.requireMock("expo-router").router
+    const view = render(themed(<HistoryRoute />))
 
     fireEvent.press(view.getByLabelText("Back"))
 
