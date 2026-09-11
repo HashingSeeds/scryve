@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-09-07",
-  effectiveDate: "September 7, 2026",
+  version: "2026-09-10",
+  effectiveDate: "September 10, 2026",
   sections: [
     {
       blocks: [
@@ -446,7 +446,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "We retain wait-list submissions while we review and fulfill access requests. You may ask us to remove your submission at any time. We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. Open player reports remain until we resolve them. We schedule dismissed reports for deletion 90 days after resolution and upheld reports for deletion 365 days after resolution. Account deletion removes direct links between a retained report and the deleted account. We minimize and restrict access to retained moderation records, then delete or anonymize them through routine cleanup. A specific appeal, investigation, legal hold, or legal obligation may require us to keep a record longer, subject to review.",
+          text: "We retain wait-list submissions while we review and fulfill access requests. You may ask us to remove your submission at any time. We retain account and service information while your account is active and as needed to provide the Services. When you delete your account, we delete or de-identify account-linked information through our account deletion process. We retain a deletion-status receipt and a one-way hash of the deleted account identifier indefinitely to prevent delayed authentication-provider updates from recreating the account. The hash does not contain your name or email address, but it can be matched to the same account identifier. Other players may retain a match result, but your seats are unlinked and shown as belonging to a deleted player. Open player reports remain until we resolve them. We schedule dismissed reports for deletion 90 days after resolution and upheld reports for deletion 365 days after resolution. Account deletion removes direct links between a retained report and the deleted account. We minimize and restrict access to retained moderation records, then delete or anonymize them through routine cleanup. A specific appeal, investigation, legal hold, or legal obligation may require us to keep a record longer, subject to review.",
         },
         {
           type: "paragraph",
@@ -566,7 +566,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "Upon your request to terminate your account, we deactivate or delete your account and delete or de-identify account-linked information from our active databases. Open moderation reports remain until resolution. We schedule dismissed reports for deletion 90 days after resolution and upheld reports for deletion 365 days after resolution, without a direct link to the deleted account. A specific appeal, investigation, legal hold, or legal obligation may require longer retention, subject to review.",
+          text: "Upon your request to terminate your account, we deactivate or delete your account and delete or de-identify account-linked information from our active databases. We retain a deletion-status receipt and a one-way account-identifier hash to prevent the deleted account from being recreated by delayed updates, as described in Section 7. Open moderation reports remain until resolution. We schedule dismissed reports for deletion 90 days after resolution and upheld reports for deletion 365 days after resolution, without a direct link to the deleted account. A specific appeal, investigation, legal hold, or legal obligation may require longer retention, subject to review.",
         },
         {
           type: "paragraph",

@@ -406,7 +406,97 @@ describe("account deletion", () => {
     })
   })
 
-  it("keeps an identifier-free completion receipt readable after identity removal", async () => {
+  it("ignores delayed profile webhooks during and after deletion, including retries", async () => {
+    const t = convexTest(schema, modules)
+    const actor = t.withIdentity({ subject: "delayed-webhook-owner" })
+    const profile = {
+      clerkUserId: "delayed-webhook-owner",
+      username: "original-player",
+      displayName: "Original player",
+    }
+    const userId = await t.mutation(internal.users.syncFromClerk, profile)
+    const request = await actor.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+      confirmation: "DELETE",
+    })
+    const delayedProfile = { ...profile, displayName: "Delayed profile" }
+    expect(await t.mutation(internal.users.syncFromClerk, delayedProfile)).toBeNull()
+    expect(await t.run((ctx) => ctx.db.get(userId!))).toMatchObject({
+      displayName: "Original player",
+    })
+
+    await t.mutation(internal.accountDeletion.finalizeAppData, { requestId: request.requestId })
+    expect(await t.mutation(internal.users.syncFromClerk, delayedProfile)).toBeNull()
+    await t.mutation(internal.accountDeletion.complete, { requestId: request.requestId })
+    await t.mutation(internal.accountDeletion.complete, { requestId: request.requestId })
+    expect(await t.mutation(internal.users.syncFromClerk, delayedProfile)).toBeNull()
+    await expect(
+      actor.mutation(api.users.syncCurrent, { displayName: "Unexpired session" }),
+    ).rejects.toThrow("Account deletion is in progress")
+    expect(await t.run((ctx) => ctx.db.query("users").collect())).toEqual([])
+    expect(
+      await t.query(api.accountDeletion.deletionReceipt, {
+        receiptToken: request.receiptToken,
+      }),
+    ).toMatchObject({ status: "completed" })
+
+    expect(
+      await t.mutation(internal.users.syncFromClerk, {
+        ...profile,
+        clerkUserId: "replacement-account",
+      }),
+    ).not.toBeNull()
+  })
+
+  it.each([false, true])("recreates a suppression receipt (dangling ID: %s)", async (dangling) => {
+    const t = convexTest(schema, modules)
+    const clerkUserId = "legacy-deleted-account"
+    const actor = t.withIdentity({ subject: clerkUserId })
+    const receiptId = dangling
+      ? await t.run(async (ctx) => {
+          const id = await ctx.db.insert("accountDeletionReceipts", {
+            token: "removed-receipt",
+            status: "identity_pending",
+            requestedAt: 1_700_000_000_000,
+            updatedAt: 1_700_000_000_000,
+          })
+          await ctx.db.delete(id)
+          return id
+        })
+      : undefined
+    const requestId = await t.run((ctx) =>
+      ctx.db.insert("accountDeletionRequests", {
+        clerkUserId,
+        receiptId,
+        status: "identity_pending",
+        attempts: 0,
+        requestedAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_000_000,
+      }),
+    )
+
+    await t.mutation(internal.accountDeletion.complete, { requestId })
+    const receipts = await t.run((ctx) => ctx.db.query("accountDeletionReceipts").collect())
+    expect(receipts).toHaveLength(1)
+    expect(receipts[0]).toMatchObject({
+      status: "completed",
+      deletedIdentityHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      requestedAt: 1_700_000_000_000,
+    })
+    expect(await t.run((ctx) => ctx.db.get(requestId))).toBeNull()
+    expect(
+      await t.mutation(internal.users.syncFromClerk, {
+        clerkUserId,
+        username: "legacy-player",
+        displayName: "Legacy player",
+      }),
+    ).toBeNull()
+    await expect(
+      actor.mutation(api.users.syncCurrent, { displayName: "Unexpired session" }),
+    ).rejects.toThrow("Account deletion is in progress")
+    expect(await t.run((ctx) => ctx.db.query("users").collect())).toEqual([])
+  })
+
+  it("keeps a completion receipt without raw identifiers readable after identity removal", async () => {
     const t = convexTest(schema, modules)
     const actor = t.withIdentity({ subject: "receipt-owner" })
     const request = await actor.mutation(api.accountDeletion.requestCurrentAccountDeletion, {

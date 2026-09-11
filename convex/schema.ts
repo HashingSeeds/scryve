@@ -581,6 +581,7 @@ export default defineSchema({
   }).index("by_clerk_user", ["clerkUserId"]),
 
   accountDeletionReceipts: defineTable({
+    deletedIdentityHash: v.optional(v.string()),
     token: v.string(),
     status: v.union(
       v.literal("processing"),
@@ -590,5 +591,7 @@ export default defineSchema({
     ),
     requestedAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_token", ["token"]),
+  })
+    .index("by_token", ["token"])
+    .index("by_deleted_identity_hash", ["deletedIdentityHash"]),
 })

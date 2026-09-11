@@ -30,11 +30,13 @@ async function settle(t: Harness) {
 }
 
 async function syncUser(t: Harness, subject: string, username: string) {
-  return await t.mutation(internal.users.syncFromClerk, {
+  const userId = await t.mutation(internal.users.syncFromClerk, {
     clerkUserId: subject,
     displayName: `${subject} Realname`,
     username,
   })
+  if (!userId) throw new Error("Test user was unexpectedly suppressed by account deletion")
+  return userId
 }
 
 async function seatedGame(t: Harness, usernames: [string, string]) {
