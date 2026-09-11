@@ -295,6 +295,32 @@ describe("LegalConsentGate", () => {
     expect(view.queryByText("Before you start")).toBeNull()
   })
 
+  it("keeps setup mounted behind a post-sign-in consent prompt", async () => {
+    deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: false }
+    function Draft() {
+      const [code, setCode] = useState("")
+      return <TextField testID="draft" value={code} onChangeText={setCode} />
+    }
+    const tree = () => (
+      <ThemeProvider initialContext="light">
+        <LegalConsentGate>
+          <Draft />
+        </LegalConsentGate>
+      </ThemeProvider>
+    )
+    const view = render(tree())
+    fireEvent.changeText(view.getByTestId("draft"), "ABC123")
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = []
+    view.rerender(tree())
+    expect(view.getByText("Before you start")).toBeTruthy()
+    expect(view.getByTestId("draft", { includeHiddenElements: true }).props.value).toBe("ABC123")
+    await act(async () => void fireEvent.press(view.getByTestId("accept-legal-button")))
+    expect(view.queryByText("Before you start")).toBeNull()
+    expect(view.getByTestId("draft").props.value).toBe("ABC123")
+  })
+
   it("preserves a connection draft through sign-in and consent sync", async () => {
     clearAccountAcceptanceCache()
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
