@@ -19,6 +19,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import type { DeckRecord } from "@/features/decks/deckCopy"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
+import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useGuestDeck } from "@/features/decks/guestDeck"
 import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
@@ -255,6 +256,7 @@ function DeckShelf({
   recentDeckIds,
   clearVisibleFilters,
   onSelect,
+  access,
 }: {
   system: string
   format: string
@@ -263,9 +265,17 @@ function DeckShelf({
   recentDeckIds: string[]
   clearVisibleFilters: () => void
   onSelect: (deck: DeckSelection) => void
+  access?: CloudAccess
 }) {
   const { themed } = useAppTheme()
-  const mine = useQuery(api.decks.listMine)
+  const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
+  const onlineMine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
+  const synced = useDeckSync(syncEnabled, access?.ownerId, onlineMine?.decks)
+  const mine = syncEnabled
+    ? synced.loading && synced.decks.length === 0
+      ? undefined
+      : { decks: synced.decks }
+    : onlineMine
   const setFavorite = useMutation(api.decks.setFavorite)
   const [favoriteError, setFavoriteError] = useState<string>()
   const collectionDecks = useMemo(() => {
@@ -567,7 +577,7 @@ export function DecksScreen({
               ) : null}
             </View>
           ) : null
-        ) : access && !access.ready ? (
+        ) : access && !access.ready && !(isDeckSyncEnabled() && access.ownerId) ? (
           access.loading ? (
             <DeckShelfSkeleton />
           ) : (
@@ -594,6 +604,7 @@ export function DecksScreen({
               recentDeckIds={recentDeckIds}
               clearVisibleFilters={clearVisibleFilters}
               onSelect={onSelect}
+              access={access}
             />
           </ConvexQueryBoundary>
         )}

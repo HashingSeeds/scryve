@@ -70,6 +70,7 @@ const mockListMine: { value: ShelfState | undefined; error?: Error } = {
 }
 
 jest.mock("convex/react", () => ({
+  useConvex: () => ({}),
   useQuery: () => {
     if (mockListMine.error) throw mockListMine.error
     return mockListMine.value
