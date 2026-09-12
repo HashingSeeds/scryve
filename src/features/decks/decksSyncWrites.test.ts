@@ -129,9 +129,9 @@ describe("deck metadata writes", () => {
     stopRestarted()
   })
 
-  it("enforces the failure limit across separate drains without dropping edits", async () => {
+  it("pauses at failure capacity and resumes after resolving an edit without dropping work", async () => {
     const local = new MemoryStorage()
-    const decks = Array.from({ length: 33 }, (_, index) => ({
+    const decks = Array.from({ length: 34 }, (_, index) => ({
       ...metadata(),
       id: `deck-${index}`,
       deckId: `deck-${index}` as Id<"decks">,
@@ -154,6 +154,21 @@ describe("deck metadata writes", () => {
     await flush()
     expect(controller.getSnapshot().failures).toHaveLength(32)
     expect(controller.getSnapshot().pending).toMatchObject([{ note: "Keep this too" }])
+    expect(controller.getSnapshot().capacityBlocked).toBe(true)
+    const calls = jest.mocked(client.mutation).mock.calls.length
+    await controller.drain()
+    expect(client.mutation).toHaveBeenCalledTimes(calls)
+    expect(() => controller.update(decks[33].deckId, { note: "Later" })).toThrow("Sync paused")
+    controller.discardFailure(controller.getSnapshot().failures[0].action.operationId)
+    await flush()
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], capacityBlocked: false })
+    jest.mocked(client.mutation).mockResolvedValue({ ...decks[33], revision: 1, note: "Later" })
+    controller.update(decks[33].deckId, { note: "Later" })
+    await flush()
+    expect(controller.getSnapshot().pending).toEqual([])
+    expect(
+      controller.getSnapshot().metadata.find((deck) => deck.deckId === decks[33].deckId)?.note,
+    ).toBe("Later")
     stop()
   })
 

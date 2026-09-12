@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useFocusEffect, useNavigation } from "expo-router"
@@ -286,6 +286,8 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
+  const metadataSaveStarted = useRef(false)
+  const settingsSaveStarted = useRef(false)
 
   const pendingMetadata = metadataWrites.pending.filter((write) => write.deckId === deckId)
   const failedEdit = metadataWrites.failures
@@ -376,6 +378,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   }
 
   function startEditing() {
+    metadataSaveStarted.current = false
     setDraft(storedCards)
     setDraftNote(deck?.note ?? "")
     setDraftMetadataRevision(currentMetadataRevision)
@@ -437,6 +440,8 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
 
   async function save() {
     if (noteDirty && !cardsDirty && canQueueMetadata && draftMetadataRevision !== undefined) {
+      if (metadataSaveStarted.current) return
+      metadataSaveStarted.current = true
       try {
         setError(undefined)
         metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
@@ -444,6 +449,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         setEditing(false)
         setUndo(undefined)
       } catch (cause) {
+        metadataSaveStarted.current = false
         fail(cause, "Could not save deck")
       }
       return
@@ -519,11 +525,14 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
 
   async function submitSettings({ name, format }: { name: string; format: string }) {
     if (canQueueMetadata && settingsMetadataRevision !== undefined) {
+      if (settingsSaveStarted.current) return
+      settingsSaveStarted.current = true
       try {
         setError(undefined)
         metadataWrites.update(deckId, { name, format }, settingsMetadataRevision)
         setDialog("none")
       } catch (cause) {
+        settingsSaveStarted.current = false
         fail(cause, "Could not update deck")
       }
       return
@@ -605,9 +614,11 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
           syncEnabled && access?.ownerId
             ? failedEdit
               ? "Local edit not synced"
-              : pendingMetadata.length
-                ? "Saved locally · Pending sync"
-                : "Synced"
+              : metadataWrites.capacityBlocked
+                ? "Sync paused. Resolve a saved local edit to continue."
+                : pendingMetadata.length
+                  ? "Saved locally · Pending sync"
+                  : "Synced"
             : undefined
         }
         onBack={onBack}
@@ -615,6 +626,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         onSave={save}
         onCancel={requestDiscard}
         onDetails={() => {
+          settingsSaveStarted.current = false
           setSettingsMetadataRevision(currentMetadataRevision)
           setDialog("settings")
         }}

@@ -349,7 +349,23 @@ function DeckShelf({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
-        favoriteError ? <Text size="xs" style={themed($errorText)} text={favoriteError} /> : null
+        <View>
+          {favoriteError ? (
+            <Text size="xs" style={themed($errorText)} text={favoriteError} />
+          ) : null}
+          {writes.capacityBlocked && writes.failures[0] ? (
+            <View>
+              <Text text="Sync paused. Resolve a saved local edit to continue." />
+              <Button
+                text="Review saved edit"
+                onPress={() => {
+                  const { deckId, name, game, format } = writes.failures[0].action
+                  onSelect({ deckId, name, game, format })
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
       }
       renderItem={({ item: deck }) => (
         <DeckRow

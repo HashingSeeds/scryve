@@ -48,6 +48,7 @@ export interface DeckSyncWriteSnapshot {
   metadata: SyncedDeck[]
   pending: PendingDeckWrite[]
   failures: FailedDeckWrite[]
+  capacityBlocked: boolean
 }
 
 const SCOPE = "metadata"
@@ -191,6 +192,7 @@ export class DeckMetadataWriteController {
   private readonly listeners = new Set<() => void>()
   private snapshot: DeckSyncWriteSnapshot
   private users = 0
+  private capacityBlocked = false
   private draining = false
   private drainAgain = false
   private generation = 0
@@ -239,6 +241,8 @@ export class DeckMetadataWriteController {
   }
 
   update(deckId: string, patch: DeckMetadataPatch, expectedRevision?: number): void {
+    if (this.capacityBlocked)
+      throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
     if (this.snapshot.failures.some((failure) => failure.action.deckId === deckId))
       throw new Error("Resolve the saved local edit before making another change")
     this.enqueue(deckId, patch, expectedRevision)
@@ -283,7 +287,9 @@ export class DeckMetadataWriteController {
     for (const entry of this.snapshot.failures)
       if (entry.action.deckId === failure.action.deckId)
         this.repository.dismissFailed(entry.action.operationId)
+    this.capacityBlocked = false
     this.publish()
+    void this.drain()
   }
 
   reapplyFailure(operationId: string): void {
@@ -317,7 +323,7 @@ export class DeckMetadataWriteController {
       this.drainAgain = true
       return
     }
-    if (this.users === 0) return
+    if (this.users === 0 || this.capacityBlocked) return
     const generation = this.generation
     if (this.retryTimer) clearTimeout(this.retryTimer)
     this.retryTimer = undefined
@@ -363,6 +369,8 @@ export class DeckMetadataWriteController {
         shouldContinue: () => generation === this.generation && this.users > 0,
         onChange: () => this.publish(),
       })
+      this.capacityBlocked = result.blockedByFailureCapacity
+      this.publish()
       if (result.stoppedForRetry && generation === this.generation && this.users > 0)
         this.retryTimer = setTimeout(
           () => {
@@ -401,7 +409,12 @@ export class DeckMetadataWriteController {
         updatedAt: action.queuedAt,
       })
     }
-    return { metadata: [...byId.values()], pending, failures: this.repository.loadFailed() }
+    return {
+      metadata: [...byId.values()],
+      pending,
+      failures: this.repository.loadFailed(),
+      capacityBlocked: this.capacityBlocked,
+    }
   }
 
   private publish(): void {
@@ -434,7 +447,12 @@ export function getDeckMetadataWriteController(
   return controller
 }
 
-const emptySnapshot: DeckSyncWriteSnapshot = { metadata: [], pending: [], failures: [] }
+const emptySnapshot: DeckSyncWriteSnapshot = {
+  metadata: [],
+  pending: [],
+  failures: [],
+  capacityBlocked: false,
+}
 
 export function useDeckMetadataWrites(enabled: boolean, ownerId?: string) {
   const client = useConvex()

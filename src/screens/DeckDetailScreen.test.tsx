@@ -23,6 +23,7 @@ const mockMetadataWriteState = {
   metadata: [] as Array<Record<string, unknown>>,
   pending: [] as Array<Record<string, unknown>>,
   failures: [] as Array<Record<string, unknown>>,
+  capacityBlocked: false,
 }
 jest.mock("@/features/decks/decksSync", () => ({
   isDeckSyncEnabled: () => mockDeckSyncState.enabled,
@@ -227,6 +228,7 @@ describe("DeckDetailScreen", () => {
     mockMetadataWriteState.metadata = []
     mockMetadataWriteState.pending = []
     mockMetadataWriteState.failures = []
+    mockMetadataWriteState.capacityBlocked = false
   })
 
   it("records stats again when the screen regains focus", () => {
@@ -277,7 +279,7 @@ describe("DeckDetailScreen", () => {
     expect(request).not.toHaveBeenCalled()
   })
 
-  it("edits cached notes offline without saving a card version when sync is enabled", () => {
+  it("edits cached metadata offline and ignores rapid duplicate submits", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
     mockMetadataWriteState.metadata = [cachedMetadata]
@@ -298,15 +300,24 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("deck-tab-notes"))
     fireEvent.press(view.getByText("Edit notes"))
     fireEvent.changeText(view.getByTestId("deck-note-input"), "Keep this draft")
-    fireEvent.press(view.getByTestId("save-version-button"))
+    const saveNote = view.getByTestId("save-version-button")
+    act(() => {
+      fireEvent.press(saveNote)
+      fireEvent.press(saveNote)
+    })
 
     expect(mockUpdateMetadata).toHaveBeenCalledWith("deck-1", { note: "Keep this draft" }, 4)
+    expect(mockUpdateMetadata).toHaveBeenCalledTimes(1)
     expect(mockSaveVersion).not.toHaveBeenCalled()
     expect(request).not.toHaveBeenCalled()
 
     fireEvent.press(view.getByTestId("deck-settings-button"))
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Offline rename")
-    fireEvent.press(view.getByTestId("deck-settings-save"))
+    const saveSettings = view.getByTestId("deck-settings-save")
+    act(() => {
+      fireEvent.press(saveSettings)
+      fireEvent.press(saveSettings)
+    })
     expect(mockUpdateMetadata).toHaveBeenLastCalledWith(
       "deck-1",
       {
@@ -315,6 +326,32 @@ describe("DeckDetailScreen", () => {
       },
       4,
     )
+    expect(mockUpdateMetadata).toHaveBeenCalledTimes(2)
+  })
+
+  it("explains when the saved-edit queue has paused sync", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockMetadataWriteState.pending = [{ deckId: "deck-1" }]
+    mockMetadataWriteState.capacityBlocked = true
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Sync paused. Resolve a saved local edit to continue.")).toBeTruthy()
   })
 
   it("keeps cached metadata hidden when sync is disabled", () => {
