@@ -261,7 +261,7 @@ export default defineSchema({
     .index("by_owner_and_updated_at", ["ownerUserId", "updatedAt"])
     .index("by_owner_and_archived_at", ["ownerUserId", "archivedAt"])
     .index("by_owner_and_guest_local_id", ["ownerUserId", "guestLocalId"])
-    .index("by_owner_and_sync_id", { fields: ["ownerUserId", "syncId"], staged: true }),
+    .index("by_owner_and_sync_id", ["ownerUserId", "syncId"]),
 
   deckSyncReceipts: defineTable({
     ownerUserId: v.id("users"),

@@ -499,6 +499,15 @@ export const processDecks = internalMutation({
     if (!request || request.status !== "processing" || !request.userId) return null
     try {
       await touchRequest(ctx, request)
+      const receipts = await ctx.db
+        .query("deckSyncReceipts")
+        .withIndex("by_owner_and_operation_id", (q) => q.eq("ownerUserId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (receipts.length) {
+        for (const receipt of receipts) await ctx.db.delete(receipt._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
+        return null
+      }
       const deck = await ctx.db
         .query("decks")
         .withIndex("by_owner_and_updated_at", (q) => q.eq("ownerUserId", request.userId!))

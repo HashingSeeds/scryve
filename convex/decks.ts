@@ -1,5 +1,7 @@
+import { paginationOptsValidator } from "convex/server"
 import { ConvexError, type Infer, v } from "convex/values"
 
+import { api } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
@@ -11,6 +13,7 @@ import {
   magicCatalogCardFields,
   defaultDeckFormat,
 } from "./lib/deckGames"
+import { syncedDeck, syncedDeckValidator } from "./lib/deckSync"
 import { DEFAULT_VERSION_NAME } from "./lib/deckVersions"
 import {
   deckCapacity,
@@ -608,6 +611,7 @@ export const update = mutation({
       ...(game === undefined ? {} : { game }),
       ...(note === undefined ? {} : { note }),
       updatedAt: Date.now(),
+      syncRevision: (deck.syncRevision ?? 0) + 1,
     })
     return null
   },
@@ -813,8 +817,123 @@ export const archive = mutation({
     if (deck.archivedAt !== undefined)
       throw new ConvexError({ code: "deck_already_archived", message: "Deck already deleted" })
     const now = Date.now()
-    await ctx.db.patch(deck._id, { archivedAt: now, updatedAt: now })
+    await ctx.db.patch(deck._id, {
+      archivedAt: now,
+      updatedAt: now,
+      syncRevision: (deck.syncRevision ?? 0) + 1,
+    })
     return null
+  },
+})
+
+export const syncPage = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    const { numItems } = args.paginationOpts
+    if (!Number.isSafeInteger(numItems) || numItems < 1 || numItems > 100)
+      throw new ConvexError({ code: "invalid_page_size", message: "Request 1–100 decks per page" })
+    const result = await ctx.db
+      .query("decks")
+      .withIndex("by_owner_and_sync_id", (q) => q.eq("ownerUserId", user._id))
+      .paginate(args.paginationOpts)
+    return { ...result, page: result.page.map(syncedDeck) }
+  },
+})
+
+const SYNC_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+export const syncWrite = mutation({
+  args: {
+    id: v.string(),
+    operationId: v.string(),
+    expectedRevision: v.number(),
+    name: v.string(),
+    format: v.string(),
+    game: v.string(),
+    note: v.string(),
+    deleted: v.boolean(),
+  },
+  returns: syncedDeckValidator,
+  handler: async (ctx, args): Promise<Infer<typeof syncedDeckValidator>> => {
+    const user = await requireUser(ctx)
+    if (!SYNC_UUID.test(args.operationId))
+      throw new ConvexError({
+        code: "invalid_operation_id",
+        message: "Operation ID must be a UUID",
+      })
+    if (
+      !Number.isSafeInteger(args.expectedRevision) ||
+      args.expectedRevision < 0 ||
+      args.expectedRevision >= Number.MAX_SAFE_INTEGER
+    )
+      throw new ConvexError({ code: "invalid_revision", message: "Invalid deck revision" })
+    const databaseId = ctx.db.normalizeId("decks", args.id)
+    if (!databaseId && !SYNC_UUID.test(args.id))
+      throw new ConvexError({
+        code: "invalid_sync_id",
+        message: "Deck ID must be a UUID or deck ID",
+      })
+    const requestKey = JSON.stringify([
+      args.id,
+      args.expectedRevision,
+      args.name,
+      args.format,
+      args.game,
+      args.note,
+      args.deleted,
+    ])
+    const receipt = await ctx.db
+      .query("deckSyncReceipts")
+      .withIndex("by_owner_and_operation_id", (q) =>
+        q.eq("ownerUserId", user._id).eq("operationId", args.operationId),
+      )
+      .unique()
+    if (receipt) {
+      if (receipt.requestKey !== requestKey)
+        throw new ConvexError({
+          code: "sync_operation_mismatch",
+          message: "Operation ID was reused for a different change",
+        })
+      return receipt.result
+    }
+
+    let deck = databaseId
+      ? await ctx.db.get(databaseId)
+      : await ctx.db
+          .query("decks")
+          .withIndex("by_owner_and_sync_id", (q) =>
+            q.eq("ownerUserId", user._id).eq("syncId", args.id),
+          )
+          .unique()
+    if (
+      (databaseId && !deck) ||
+      (deck && (deck.ownerUserId !== user._id || (deck.syncId ?? deck._id) !== args.id)) ||
+      (!deck && args.deleted)
+    )
+      throw new ConvexError({ code: "deck_not_found", message: "Deck not found" })
+    if ((deck?.syncRevision ?? 0) !== args.expectedRevision)
+      throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
+    const metadata = { name: args.name, format: args.format, game: args.game, note: args.note }
+    let deckId: Id<"decks">
+    if (!deck) {
+      deckId = await ctx.runMutation(api.decks.create, metadata)
+      await ctx.db.patch(deckId, { syncId: args.id, syncRevision: 1 })
+    } else {
+      deckId = deck._id
+      if (args.deleted) await ctx.runMutation(api.decks.archive, { deckId })
+      else await ctx.runMutation(api.decks.update, { deckId, ...metadata })
+    }
+    deck = await ctx.db.get(deckId)
+    if (!deck) throw new Error("Deck disappeared during sync")
+    const result = syncedDeck(deck)
+    await ctx.db.insert("deckSyncReceipts", {
+      ownerUserId: user._id,
+      operationId: args.operationId,
+      requestKey,
+      result,
+    })
+    return result
   },
 })
 
