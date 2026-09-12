@@ -20,6 +20,7 @@ import type { DeckRecord } from "@/features/decks/deckCopy"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
+import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { useGuestDeck } from "@/features/decks/guestDeck"
 import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
@@ -271,10 +272,22 @@ function DeckShelf({
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const onlineMine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
   const synced = useDeckSync(syncEnabled, access?.ownerId, onlineMine)
+  const writes = useDeckMetadataWrites(syncEnabled, access?.ownerId)
+  const localDecks = useMemo(() => {
+    const metadata = new Map(writes.metadata.map((deck) => [String(deck.deckId), deck]))
+    return synced.decks
+      .map((deck) => {
+        const local = metadata.get(deck._id)
+        return local
+          ? { ...deck, name: local.name, format: local.format, updatedAt: local.updatedAt }
+          : deck
+      })
+      .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+  }, [synced.decks, writes.metadata])
   const mine = syncEnabled
     ? synced.loading && synced.decks.length === 0
       ? undefined
-      : { decks: synced.decks }
+      : { decks: localDecks }
     : onlineMine
   const setFavorite = useMutation(api.decks.setFavorite)
   const [favoriteError, setFavoriteError] = useState<string>()
@@ -336,7 +349,23 @@ function DeckShelf({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
-        favoriteError ? <Text size="xs" style={themed($errorText)} text={favoriteError} /> : null
+        <View>
+          {favoriteError ? (
+            <Text size="xs" style={themed($errorText)} text={favoriteError} />
+          ) : null}
+          {writes.capacityBlocked && writes.failures[0] ? (
+            <View>
+              <Text text="Sync paused. Resolve a saved local edit to continue." />
+              <Button
+                text="Review saved edit"
+                onPress={() => {
+                  const { deckId, name, game, format } = writes.failures[0].action
+                  onSelect({ deckId, name, game, format })
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
       }
       renderItem={({ item: deck }) => (
         <DeckRow

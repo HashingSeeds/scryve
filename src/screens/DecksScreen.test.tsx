@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import * as deckSync from "@/features/decks/decksSync"
+import * as deckWrites from "@/features/decks/decksSyncWrites"
 import { deleteGuestDeck, saveGuestDeck } from "@/features/decks/guestDeck"
 import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
@@ -10,6 +11,7 @@ import { spacing } from "@/theme/spacing"
 import { clear, loadString } from "@/utils/storage"
 
 import { DecksScreen } from "./DecksScreen"
+import type { Id } from "../../convex/_generated/dataModel"
 
 type ShelfState = {
   decks: Array<{
@@ -29,7 +31,7 @@ type ShelfState = {
 }
 
 const commanderDeck = {
-  _id: "existing-deck",
+  _id: "existing-deck" as Id<"decks">,
   name: "Existing Deck",
   format: "commander",
   game: "mtg",
@@ -41,7 +43,7 @@ const commanderDeck = {
 }
 
 const standardDeck = {
-  _id: "standard-deck",
+  _id: "standard-deck" as Id<"decks">,
   name: "Mono Red",
   format: "standard",
   game: "mtg",
@@ -60,6 +62,8 @@ const pokemonDeck = {
   coverImageUrl: undefined,
 }
 
+const mockConvexClient = {}
+
 const mockSetFavorite = jest.fn(async () => null)
 
 const mockListMine: { value: ShelfState | undefined; error?: Error } = {
@@ -71,7 +75,7 @@ const mockListMine: { value: ShelfState | undefined; error?: Error } = {
 }
 
 jest.mock("convex/react", () => ({
-  useConvex: () => ({}),
+  useConvex: () => mockConvexClient,
   useQuery: (_reference: unknown, args?: unknown) => {
     if (args === "skip") return undefined
     if (mockListMine.error) throw mockListMine.error
@@ -106,6 +110,64 @@ function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
 
 describe("DecksScreen", () => {
   afterEach(() => jest.restoreAllMocks())
+
+  it("shows pending shelf metadata and opens a saved edit when sync is paused", () => {
+    jest.spyOn(deckSync, "isDeckSyncEnabled").mockReturnValue(true)
+    jest.spyOn(deckSync, "useDeckSync").mockReturnValue({
+      decks: [commanderDeck, standardDeck],
+      metadata: [],
+      loading: false,
+      retry: jest.fn(),
+    })
+    const local = {
+      id: standardDeck._id,
+      deckId: standardDeck._id as Id<"decks">,
+      name: "Local name",
+      format: "modern",
+      game: "mtg",
+      note: "Saved note",
+      revision: 1,
+      deleted: false,
+      createdAt: 1,
+      updatedAt: 200,
+    }
+    jest.spyOn(deckWrites, "useDeckMetadataWrites").mockReturnValue({
+      metadata: [local],
+      pending: [],
+      capacityBlocked: true,
+      failures: [
+        {
+          schemaVersion: 1,
+          reason: "Conflict",
+          failedAt: 2,
+          action: {
+            ...local,
+            deleted: false,
+            schemaVersion: 1,
+            ownerId: "owner-a",
+            operationId: "failed",
+            expectedRevision: 0,
+            queuedAt: 1,
+            attempts: 1,
+          },
+        },
+      ],
+      update: jest.fn(),
+      discardFailure: jest.fn(),
+      reapplyFailure: jest.fn(),
+    })
+    const onSelect = jest.fn()
+    const view = renderShelf({ onSelect })
+    expect(view.getByText("Local name")).toBeTruthy()
+    expect(view.queryByText("Mono Red")).toBeNull()
+    fireEvent.press(view.getByLabelText("Local name"))
+    expect(onSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: "Local name", format: "modern" }),
+    )
+    expect(view.getByText("Sync paused. Resolve a saved local edit to continue.")).toBeTruthy()
+    fireEvent.press(view.getByText("Review saved edit"))
+    expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ deckId: standardDeck._id }))
+  })
 
   it("offers retry instead of an empty shelf when sync has no cached data", () => {
     jest.spyOn(deckSync, "isDeckSyncEnabled").mockReturnValue(true)

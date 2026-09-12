@@ -28,6 +28,9 @@ export function DeckView({
   dirty,
   busy,
   guest,
+  cardsUnavailable,
+  editingDisabled,
+  saveStatus,
   error,
   onBack,
   onEdit,
@@ -52,6 +55,9 @@ export function DeckView({
   dirty: boolean
   busy?: boolean
   guest?: boolean
+  cardsUnavailable?: boolean
+  editingDisabled?: boolean
+  saveStatus?: string
   error?: ReactNode
   onBack: () => void
   onEdit: () => void
@@ -80,13 +86,16 @@ export function DeckView({
             <TouchableOpacity
               accessibilityRole="button"
               testID={editing ? "save-version-button" : "edit-deck-button"}
-              disabled={busy || (editing && !dirty)}
+              disabled={busy || editingDisabled || (editing && !dirty)}
               style={$touch}
               onPress={editing ? onSave : onEdit}
             >
               <Text
                 text={editing ? (busy ? "Saving…" : "Save") : "Edit"}
-                style={[themed($action), (busy || (editing && !dirty)) && $disabled]}
+                style={[
+                  themed($action),
+                  (busy || editingDisabled || (editing && !dirty)) && $disabled,
+                ]}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -94,10 +103,10 @@ export function DeckView({
               accessibilityLabel="Deck details"
               testID="deck-settings-button"
               style={$touch}
-              disabled={busy || editing}
+              disabled={busy || editing || editingDisabled}
               onPress={onDetails}
             >
-              <Text text="•••" style={editing ? $disabled : undefined} />
+              <Text text="•••" style={busy || editing || editingDisabled ? $disabled : undefined} />
             </TouchableOpacity>
           </View>
         }
@@ -117,7 +126,15 @@ export function DeckView({
               <Text
                 size="xs"
                 style={themed($dim)}
-                text={`${deckGame(game)?.shortLabel ?? game} · ${deckFormatLabel(game, format)} · ${totalQuantity(cards)} ${totalQuantity(cards) === 1 ? "card" : "cards"}`}
+                text={[
+                  deckGame(game)?.shortLabel ?? game,
+                  deckFormatLabel(game, format),
+                  cardsUnavailable
+                    ? undefined
+                    : `${totalQuantity(cards)} ${totalQuantity(cards) === 1 ? "card" : "cards"}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               />
             </View>
             <View style={themed($tabs)} accessibilityRole="tablist">
@@ -155,15 +172,22 @@ export function DeckView({
                   <>
                     <Text text={note || "No notes yet."} size="sm" />
                     <TouchableOpacity
+                      testID="edit-deck-notes"
                       style={$noteAction}
                       accessibilityRole="button"
+                      disabled={editingDisabled}
                       onPress={onEdit}
                     >
-                      <Text text="Edit notes" style={themed($action)} />
+                      <Text
+                        text="Edit notes"
+                        style={[themed($action), editingDisabled && $disabled]}
+                      />
                     </TouchableOpacity>
                   </>
                 )}
               </View>
+            ) : cardsUnavailable ? (
+              <Text style={themed($notes)} text="Card list unavailable offline." />
             ) : cards.length === 0 ? (
               <Text style={themed($notes)} text="No cards yet. Add your first card below." />
             ) : null}
@@ -199,7 +223,7 @@ export function DeckView({
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={`${item.quantity === 1 ? "Remove" : "Decrease"} ${item.name}`}
-                  disabled={busy}
+                  disabled={busy || cardsUnavailable || editingDisabled}
                   style={$touch}
                   onPress={() => onDecrement(item)}
                 >
@@ -222,7 +246,7 @@ export function DeckView({
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={`Increase ${item.name}`}
-                  disabled={busy || item.quantity >= 999}
+                  disabled={busy || cardsUnavailable || editingDisabled || item.quantity >= 999}
                   style={$touch}
                   onPress={() => onIncrement(item)}
                 >
@@ -249,13 +273,13 @@ export function DeckView({
           <Text
             size="xxs"
             style={[themed($dim), $flex]}
-            text={dirty ? "Unsaved changes" : guest ? "Saved on device" : "Saved"}
+            text={dirty ? "Unsaved changes" : (saveStatus ?? (guest ? "Saved on device" : "Saved"))}
           />
           <Button
             testID="deck-add-cards"
             text="+ Add cards"
             onPress={onAdd}
-            disabled={busy}
+            disabled={busy || cardsUnavailable || editingDisabled}
             style={themed($primary)}
             textStyle={{ color: accessibleForeground(theme.colors.tint) }}
           />

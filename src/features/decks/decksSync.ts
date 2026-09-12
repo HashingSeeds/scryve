@@ -181,6 +181,11 @@ export class DeckSyncController {
     this.publish(this.snapshot.loading, this.snapshot.unavailable)
   }
 
+  acceptMetadata(decks: readonly SyncedDeck[]): void {
+    this.metadata = this.repository.mergeMetadata(decks)
+    this.publish(this.snapshot.loading, this.snapshot.unavailable)
+  }
+
   async refresh(): Promise<void> {
     if (this.refreshing) {
       this.refreshAgain = true
