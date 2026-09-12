@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import * as deckSync from "@/features/decks/decksSync"
 import { deleteGuestDeck, saveGuestDeck } from "@/features/decks/guestDeck"
 import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
@@ -70,7 +71,9 @@ const mockListMine: { value: ShelfState | undefined; error?: Error } = {
 }
 
 jest.mock("convex/react", () => ({
-  useQuery: () => {
+  useConvex: () => ({}),
+  useQuery: (_reference: unknown, args?: unknown) => {
+    if (args === "skip") return undefined
     if (mockListMine.error) throw mockListMine.error
     return mockListMine.value
   },
@@ -102,6 +105,34 @@ function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
 }
 
 describe("DecksScreen", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("offers retry instead of an empty shelf when sync has no cached data", () => {
+    jest.spyOn(deckSync, "isDeckSyncEnabled").mockReturnValue(true)
+    const retry = jest.fn()
+    jest.spyOn(deckSync, "useDeckSync").mockReturnValue({
+      decks: [],
+      metadata: [],
+      loading: false,
+      unavailable: true,
+      retry,
+    })
+    mockListMine.error = new Error("Private query must be skipped while offline")
+    const view = renderShelf({
+      access: {
+        ready: false,
+        loading: false,
+        signedIn: true,
+        ownerId: "owner-a",
+        request: jest.fn(),
+      },
+    })
+    expect(view.getByText("Reconnect to load your decks.")).toBeTruthy()
+    expect(view.queryByText("No decks yet")).toBeNull()
+    fireEvent.press(view.getByText("Try again"))
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
   it("opens the local deck while auth is loading without querying the private shelf", () => {
     saveGuestDeck({ name: "Guest Commander", format: "commander", game: "mtg", cards: [] })
     mockListMine.error = new Error("Private query must not run")
