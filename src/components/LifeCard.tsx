@@ -140,13 +140,6 @@ export function LifeCard({
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
   const toolbarSize = spacing.xl + spacing.sm
-  const inspectionControlInset = toolbarSize + spacing.xs * 2
-  const inspectionInsets = {
-    top: contentRotation === 180 ? inspectionControlInset : spacing.sm,
-    bottom: contentRotation === 0 ? inspectionControlInset : spacing.sm,
-    left: contentRotation === 90 ? inspectionControlInset : spacing.sm,
-    right: contentRotation === -90 ? inspectionControlInset : spacing.sm,
-  }
   const markStyle = getPlayerMarkCorner(contentRotation, cardPadding)
   const commanderOverviewEntering =
     reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
@@ -419,7 +412,7 @@ export function LifeCard({
             { backgroundColor: color },
           ]}
         >
-          <View style={[themed($commanderOverviewContent), localCommander && inspectionInsets]}>
+          <View style={themed($commanderOverviewContent)}>
             <CommanderDamageBoard
               ownerPlayerId={commanderDamage.ownerPlayerId}
               players={commanderDamage.players}
@@ -435,20 +428,8 @@ export function LifeCard({
               foreground={foreground}
               style={themed($expandedCommanderBoard)}
               maxSize={{
-                width: Math.max(
-                  cardSize.width -
-                    (localCommander
-                      ? inspectionInsets.left + inspectionInsets.right
-                      : cardPadding * 2),
-                  0,
-                ),
-                height: Math.max(
-                  cardSize.height -
-                    (localCommander
-                      ? inspectionInsets.top + inspectionInsets.bottom
-                      : cardPadding * 2),
-                  0,
-                ),
+                width: Math.max(cardSize.width - cardPadding * 2, 0),
+                height: Math.max(cardSize.height - cardPadding * 2, 0),
               }}
             />
           </View>
