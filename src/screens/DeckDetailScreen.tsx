@@ -23,6 +23,8 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
+import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
+import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { DeckView } from "@/features/decks/DeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useAppTheme } from "@/theme/context"
@@ -242,10 +244,16 @@ export function DeckDetailScreen(props: DeckDetailScreenProps) {
 function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
   const navigation = useNavigation()
+  const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
+  const synced = useDeckSync(syncEnabled, access?.ownerId)
+  const metadataWrites = useDeckMetadataWrites(syncEnabled, access?.ownerId)
+  const knownDeleted = [...synced.metadata, ...metadataWrites.metadata].some(
+    (deck) => deck.deckId === deckId && deck.deleted,
+  )
   const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
   const detail = useQuery(
     api.decks.detail,
-    (access?.ready ?? true)
+    (access?.ready ?? true) && !knownDeleted
       ? {
           deckId: deckId as Id<"decks">,
           ...(selectedVersionId ? { versionId: selectedVersionId } : {}),
@@ -272,10 +280,38 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
     useState<Parameters<typeof navigation.dispatch>[0]>()
   const [adding, setAdding] = useState(false)
   const [draftNote, setDraftNote] = useState("")
+  const [draftMetadataRevision, setDraftMetadataRevision] = useState<number>()
+  const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
   const [undo, setUndo] = useState<{ name: string; cards: DeckCard[] }>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
+
+  const pendingMetadata = metadataWrites.pending.filter((write) => write.deckId === deckId)
+  const failedEdit = metadataWrites.failures
+    .filter((failure) => failure.action.deckId === deckId)
+    .sort(
+      (left, right) =>
+        right.failedAt - left.failedAt ||
+        right.action.expectedRevision - left.action.expectedRevision,
+    )[0]
+  const optimisticMetadata = pendingMetadata.length
+    ? metadataWrites.metadata.find((deck) => deck.deckId === deckId && !deck.deleted)
+    : undefined
+  const cachedMetadata = syncEnabled
+    ? (optimisticMetadata ??
+      synced.metadata.find((deck) => deck.deckId === deckId && !deck.deleted) ??
+      metadataWrites.metadata.find((deck) => deck.deckId === deckId && !deck.deleted))
+    : undefined
+  const deck = optimisticMetadata ?? detail?.deck ?? cachedMetadata ?? failedEdit?.action
+  const canQueueMetadata = Boolean(
+    syncEnabled &&
+    access?.ownerId &&
+    metadataWrites.metadata.some((item) => item.deckId === deckId),
+  )
+  const currentMetadataRevision = metadataWrites.metadata.find(
+    (item) => item.deckId === deckId && !item.deleted,
+  )?.revision
 
   const storedCards = useMemo(
     () =>
@@ -287,8 +323,9 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
     [detail?.cards],
   )
   const cards = editing ? draft : storedCards
-  const draftChanged =
-    editing && (cardsChanged(draft, storedCards) || draftNote !== (detail?.deck.note ?? ""))
+  const cardsDirty = editing && cardsChanged(draft, storedCards)
+  const noteDirty = editing && draftNote !== (deck?.note ?? "")
+  const draftChanged = cardsDirty || noteDirty
   const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
   const { details, detailsError } = useCardDetails(
     focusedCard
@@ -340,7 +377,8 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
 
   function startEditing() {
     setDraft(storedCards)
-    setDraftNote(detail?.deck.note ?? "")
+    setDraftNote(deck?.note ?? "")
+    setDraftMetadataRevision(currentMetadataRevision)
     setUndo(undefined)
     setError(undefined)
     setEditing(true)
@@ -398,14 +436,30 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   }
 
   async function save() {
+    if (noteDirty && !cardsDirty && canQueueMetadata && draftMetadataRevision !== undefined) {
+      try {
+        setError(undefined)
+        metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
+        captureAnalytics("deck_used", { feature: "saved" })
+        setEditing(false)
+        setUndo(undefined)
+      } catch (cause) {
+        fail(cause, "Could not save deck")
+      }
+      return
+    }
     await run(async () => {
-      if (draftNote !== (detail?.deck.note ?? ""))
-        await updateDeck({ deckId: deckId as Id<"decks">, note: draftNote })
-      await saveVersion({
-        deckId: deckId as Id<"decks">,
-        ...(version ? { versionId: version._id } : {}),
-        cards: draft,
-      })
+      if (cardsDirty)
+        await saveVersion({
+          deckId: deckId as Id<"decks">,
+          ...(version ? { versionId: version._id } : {}),
+          cards: draft,
+        })
+      if (noteDirty) {
+        if (canQueueMetadata && draftMetadataRevision !== undefined)
+          metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
+        else await updateDeck({ deckId: deckId as Id<"decks">, note: draftNote })
+      }
       captureAnalytics("deck_used", { feature: "saved" })
       setEditing(false)
       setUndo(undefined)
@@ -464,6 +518,16 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   }
 
   async function submitSettings({ name, format }: { name: string; format: string }) {
+    if (canQueueMetadata && settingsMetadataRevision !== undefined) {
+      try {
+        setError(undefined)
+        metadataWrites.update(deckId, { name, format }, settingsMetadataRevision)
+        setDialog("none")
+      } catch (cause) {
+        fail(cause, "Could not update deck")
+      }
+      return
+    }
     await run(async () => {
       await updateDeck({ deckId: deckId as Id<"decks">, name, format })
       setDialog("none")
@@ -478,9 +542,45 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
     }, "Could not delete deck")
   }
 
-  if (!detail) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
+  if (!deck) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
 
-  const configuredSections = deckSections(detail.deck.game, detail.deck.format)
+  const configuredSections = deckSections(deck.game, deck.format)
+  const syncError = failedEdit ? (
+    <View style={themed($syncFailure)}>
+      <AlertNote text={`Could not sync local edit: ${failedEdit.reason}`} />
+      <Text size="xs" text={`Name: ${failedEdit.action.name}`} />
+      <Text
+        size="xs"
+        text={`Format: ${deckFormatLabel(failedEdit.action.game, failedEdit.action.format)}`}
+      />
+      <Text size="xs" text={`Note: ${failedEdit.action.note || "No note"}`} />
+      <View style={themed($actionRow)}>
+        <Button
+          testID="reapply-deck-metadata"
+          text="Use this version"
+          disabled={knownDeleted}
+          onPress={() => {
+            try {
+              metadataWrites.reapplyFailure(failedEdit.action.operationId)
+            } catch (cause) {
+              fail(cause, "Could not use this version")
+            }
+          }}
+        />
+        <Button
+          testID="discard-deck-metadata"
+          text="Discard local edit"
+          onPress={() => {
+            try {
+              metadataWrites.discardFailure(failedEdit.action.operationId)
+            } catch (cause) {
+              fail(cause, "Could not discard local edit")
+            }
+          }}
+        />
+      </View>
+    </View>
+  ) : undefined
 
   return (
     <Screen
@@ -492,19 +592,32 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
       <DeckView
         tab={tab}
         onTabChange={setTab}
-        name={detail.deck.name}
-        game={detail.deck.game}
-        format={detail.deck.format}
+        name={deck.name}
+        game={deck.game}
+        format={deck.format}
         cards={cards}
-        note={editing ? draftNote : (detail.deck.note ?? "")}
+        note={editing ? draftNote : (deck.note ?? "")}
         editing={editing}
         dirty={draftChanged}
         busy={busy}
+        cardsUnavailable={!detail}
+        saveStatus={
+          syncEnabled && access?.ownerId
+            ? failedEdit
+              ? "Local edit not synced"
+              : pendingMetadata.length
+                ? "Saved locally · Pending sync"
+                : "Synced"
+            : undefined
+        }
         onBack={onBack}
         onEdit={startEditing}
         onSave={save}
         onCancel={requestDiscard}
-        onDetails={() => setDialog("settings")}
+        onDetails={() => {
+          setSettingsMetadataRevision(currentMetadataRevision)
+          setDialog("settings")
+        }}
         onAdd={() => {
           if (!editing) startEditing()
           setAdding(true)
@@ -524,9 +637,16 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
               }
             : undefined
         }
-        error={error && dialog === "none" ? <AlertNote text={error} /> : undefined}
+        error={
+          dialog === "none" && (error || syncError) ? (
+            <View style={themed($syncFailure)}>
+              {error ? <AlertNote text={error} /> : null}
+              {syncError}
+            </View>
+          ) : undefined
+        }
       />
-      {adding ? (
+      {adding && detail ? (
         <CardSearchScreen
           game={detail.deck.game}
           format={detail.deck.format}
@@ -541,7 +661,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         />
       ) : null}
 
-      {focusedCard ? (
+      {focusedCard && detail ? (
         <CardFocusDialog
           card={{
             game: detail.deck.game,
@@ -568,7 +688,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         />
       ) : null}
 
-      {dialog === "newVersion" ? (
+      {dialog === "newVersion" && detail ? (
         <DeckVersionDialog
           title="New version"
           submitLabel="Create version"
@@ -597,10 +717,10 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
 
       {dialog === "settings" ? (
         <DeckSettingsDialog
-          game={detail.deck.game}
+          game={deck.game}
           initial={{
-            name: detail.deck.name,
-            format: detail.deck.format,
+            name: deck.name,
+            format: deck.format,
           }}
           busy={busy}
           error={error}
@@ -608,74 +728,76 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
           onDelete={() => setDialog("deleteDeck")}
           onClose={() => setDialog("none")}
         >
-          <View style={themed($versions)}>
-            <View style={themed($versionHeading)}>
-              <Text weight="bold" size="sm" text="Versions" />
-              <TouchableOpacity
-                testID="version-picker-__new__"
-                accessibilityRole="button"
-                accessibilityLabel="New version"
-                disabled={editing}
-                onPress={startNewVersion}
-              >
-                <Text weight="bold" size="sm" style={themed($textAction)} text="New version" />
-              </TouchableOpacity>
-            </View>
-            {detail.versions.map((candidate) => {
-              const selected = candidate._id === version?._id
-              const record = candidate.record
-              const candidateRecord = record?.games
-                ? `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ""}`
-                : "Unplayed"
-              return (
+          {detail ? (
+            <View style={themed($versions)}>
+              <View style={themed($versionHeading)}>
+                <Text weight="bold" size="sm" text="Versions" />
                 <TouchableOpacity
-                  key={candidate._id}
-                  testID={`version-picker-${candidate._id}`}
+                  testID="version-picker-__new__"
                   accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  style={themed($versionRow)}
+                  accessibilityLabel="New version"
                   disabled={editing}
-                  onPress={() => {
-                    chooseVersion(candidate._id)
-                    setDialog("none")
-                  }}
+                  onPress={startNewVersion}
                 >
-                  <View
-                    testID={`version-marker-${candidate._id}`}
-                    style={[themed($versionMark), selected && themed($versionMarkSelected)]}
-                  />
-                  <View style={themed($versionCopy)}>
-                    <Text weight="medium" text={versionLabel(candidate)} />
-                    {candidate.note ? (
+                  <Text weight="bold" size="sm" style={themed($textAction)} text="New version" />
+                </TouchableOpacity>
+              </View>
+              {detail.versions.map((candidate) => {
+                const selected = candidate._id === version?._id
+                const record = candidate.record
+                const candidateRecord = record?.games
+                  ? `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ""}`
+                  : "Unplayed"
+                return (
+                  <TouchableOpacity
+                    key={candidate._id}
+                    testID={`version-picker-${candidate._id}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={themed($versionRow)}
+                    disabled={editing}
+                    onPress={() => {
+                      chooseVersion(candidate._id)
+                      setDialog("none")
+                    }}
+                  >
+                    <View
+                      testID={`version-marker-${candidate._id}`}
+                      style={[themed($versionMark), selected && themed($versionMarkSelected)]}
+                    />
+                    <View style={themed($versionCopy)}>
+                      <Text weight="medium" text={versionLabel(candidate)} />
+                      {candidate.note ? (
+                        <Text
+                          size="xxs"
+                          style={themed($dimmedText)}
+                          text={candidate.note}
+                          numberOfLines={2}
+                        />
+                      ) : null}
+                    </View>
+                    <View style={themed($versionContext)}>
+                      <Text weight="medium" style={$tabularNumbers} text={candidateRecord} />
                       <Text
                         size="xxs"
                         style={themed($dimmedText)}
-                        text={candidate.note}
-                        numberOfLines={2}
+                        text={cardCountLabel(candidate.cardQuantity)}
                       />
+                    </View>
+                    {selected ? (
+                      <TouchableOpacity
+                        testID="rename-version-button"
+                        accessibilityRole="button"
+                        onPress={() => setDialog("renameVersion")}
+                      >
+                        <Text size="lg" text="•••" />
+                      </TouchableOpacity>
                     ) : null}
-                  </View>
-                  <View style={themed($versionContext)}>
-                    <Text weight="medium" style={$tabularNumbers} text={candidateRecord} />
-                    <Text
-                      size="xxs"
-                      style={themed($dimmedText)}
-                      text={cardCountLabel(candidate.cardQuantity)}
-                    />
-                  </View>
-                  {selected ? (
-                    <TouchableOpacity
-                      testID="rename-version-button"
-                      accessibilityRole="button"
-                      onPress={() => setDialog("renameVersion")}
-                    >
-                      <Text size="lg" text="•••" />
-                    </TouchableOpacity>
-                  ) : null}
-                </TouchableOpacity>
-              )
-            })}
-          </View>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          ) : null}
         </DeckSettingsDialog>
       ) : null}
 
@@ -885,6 +1007,7 @@ const $actionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "center",
   gap: spacing.xs,
 })
+const $syncFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $primaryActionButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minWidth: 160,
   minHeight: 44,

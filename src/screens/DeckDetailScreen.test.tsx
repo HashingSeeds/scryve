@@ -12,6 +12,36 @@ jest.mock("@/utils/analytics", () => ({
   captureAnalytics: (...args: unknown[]) => mockCaptureAnalytics(...args),
 }))
 
+const mockDeckSyncState = {
+  enabled: false,
+  metadata: [] as Array<Record<string, unknown>>,
+}
+const mockUpdateMetadata = jest.fn()
+const mockDiscardMetadataFailure = jest.fn()
+const mockReapplyMetadataFailure = jest.fn()
+const mockMetadataWriteState = {
+  metadata: [] as Array<Record<string, unknown>>,
+  pending: [] as Array<Record<string, unknown>>,
+  failures: [] as Array<Record<string, unknown>>,
+}
+jest.mock("@/features/decks/decksSync", () => ({
+  isDeckSyncEnabled: () => mockDeckSyncState.enabled,
+  useDeckSync: () => ({
+    decks: [],
+    metadata: mockDeckSyncState.metadata,
+    loading: false,
+    retry: jest.fn(),
+  }),
+}))
+jest.mock("@/features/decks/decksSyncWrites", () => ({
+  useDeckMetadataWrites: () => ({
+    ...mockMetadataWriteState,
+    update: mockUpdateMetadata,
+    discardFailure: mockDiscardMetadataFailure,
+    reapplyFailure: mockReapplyMetadataFailure,
+  }),
+}))
+
 const mockSaveVersion = jest.fn(async () => "version-main")
 const mockCreateVersion = jest.fn(async () => "version-new")
 const mockUpdateVersion = jest.fn(async () => null)
@@ -88,6 +118,19 @@ const loadedDetail = {
   capacity: { used: 2, limit: 5, premium: true, canCreate: true },
   record: { games: 6, wins: 3, losses: 3, draws: 0, unknown: 0 },
   analyticsLocked: false,
+}
+
+const cachedMetadata = {
+  id: "metadata-1",
+  deckId: "deck-1",
+  revision: 4,
+  name: "Existing Deck",
+  format: "commander",
+  game: "mtg",
+  note: "Ramp into big spells",
+  deleted: false,
+  createdAt: 0,
+  updatedAt: 1,
 }
 
 const mockDetail = {
@@ -179,6 +222,11 @@ describe("DeckDetailScreen", () => {
       capacity: { used: 2, limit: 5, premium: true, canCreate: true },
     }
     mockDetail.error = undefined
+    mockDeckSyncState.enabled = false
+    mockDeckSyncState.metadata = []
+    mockMetadataWriteState.metadata = []
+    mockMetadataWriteState.pending = []
+    mockMetadataWriteState.failures = []
   })
 
   it("records stats again when the screen regains focus", () => {
@@ -227,6 +275,167 @@ describe("DeckDetailScreen", () => {
     view.rerender(detail(true))
     expect(view.getByText("Ramp into big spells")).toBeTruthy()
     expect(request).not.toHaveBeenCalled()
+  })
+
+  it("edits cached notes offline without saving a card version when sync is enabled", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    const request = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{ ready: false, loading: false, signedIn: true, ownerId: "owner-a", request }}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Card list unavailable offline.")).toBeTruthy()
+    expect(view.getByTestId("deck-add-cards")).toBeDisabled()
+    expect(view.queryByText(/0 cards/)).toBeNull()
+    fireEvent.press(view.getByTestId("deck-tab-notes"))
+    fireEvent.press(view.getByText("Edit notes"))
+    fireEvent.changeText(view.getByTestId("deck-note-input"), "Keep this draft")
+    fireEvent.press(view.getByTestId("save-version-button"))
+
+    expect(mockUpdateMetadata).toHaveBeenCalledWith("deck-1", { note: "Keep this draft" }, 4)
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+    expect(request).not.toHaveBeenCalled()
+
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Offline rename")
+    fireEvent.press(view.getByTestId("deck-settings-save"))
+    expect(mockUpdateMetadata).toHaveBeenLastCalledWith(
+      "deck-1",
+      {
+        name: "Offline rename",
+        format: "commander",
+      },
+      4,
+    )
+  })
+
+  it("keeps cached metadata hidden when sync is disabled", () => {
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          summary={{ name: "Existing Deck", game: "mtg", format: "commander" }}
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.queryByText("Card list unavailable offline.")).toBeNull()
+    expect(view.getByTestId("edit-deck-button")).toBeDisabled()
+  })
+
+  it("shows the latest failed metadata snapshot with explicit recovery actions", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockMetadataWriteState.pending = [{ deckId: "deck-1" }]
+    const screen = () => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+
+    fireEvent.press(view.getByTestId("deck-tab-notes"))
+    fireEvent.press(view.getByText("Edit notes"))
+    fireEvent.changeText(view.getByTestId("deck-note-input"), "Unsent draft")
+    mockMetadataWriteState.failures = [
+      {
+        failedAt: 2,
+        reason: "Revision conflict",
+        action: {
+          operationId: "failed-edit",
+          deckId: "deck-1",
+          expectedRevision: 3,
+          name: "Offline rename",
+          format: "modern",
+          game: "mtg",
+          note: "Saved offline note",
+        },
+      },
+    ]
+    view.rerender(screen())
+
+    expect(view.getByTestId("deck-note-input").props.value).toBe("Unsent draft")
+    expect(view.getByText("Name: Offline rename")).toBeTruthy()
+    expect(view.getByText("Format: Modern")).toBeTruthy()
+    expect(view.getByText("Note: Saved offline note")).toBeTruthy()
+    fireEvent.press(view.getByText("Use this version"))
+    fireEvent.press(view.getByText("Discard local edit"))
+    expect(mockReapplyMetadataFailure).toHaveBeenCalledWith("failed-edit")
+    expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("failed-edit")
+  })
+
+  it("keeps a failed edit inspectable when the remote deck was deleted", () => {
+    const tombstone = { ...cachedMetadata, revision: 6, deleted: true }
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [tombstone]
+    mockMetadataWriteState.metadata = [tombstone]
+    mockMetadataWriteState.failures = [
+      {
+        failedAt: 3,
+        reason: "Deck was deleted",
+        action: {
+          operationId: "deleted-edit",
+          deckId: "deck-1",
+          expectedRevision: 5,
+          name: "Private draft",
+          format: "commander",
+          game: "mtg",
+          note: "Still recoverable",
+        },
+      },
+    ]
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: true,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(queryArgs).toHaveLength(0)
+    expect(view.getByText("Name: Private draft")).toBeTruthy()
+    expect(view.getByText("Note: Still recoverable")).toBeTruthy()
+    expect(view.getByText("Local edit not synced")).toBeTruthy()
+    expect(view.getByText("Use this version")).toBeDisabled()
+    fireEvent.press(view.getByText("Discard local edit"))
+    expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("deleted-edit")
   })
 
   it("keeps same-name Pokemon reprints distinct when only original references identify them", () => {

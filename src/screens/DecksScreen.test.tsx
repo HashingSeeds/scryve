@@ -60,6 +60,8 @@ const pokemonDeck = {
   coverImageUrl: undefined,
 }
 
+const mockConvexClient = {}
+
 const mockSetFavorite = jest.fn(async () => null)
 
 const mockListMine: { value: ShelfState | undefined; error?: Error } = {
@@ -71,7 +73,7 @@ const mockListMine: { value: ShelfState | undefined; error?: Error } = {
 }
 
 jest.mock("convex/react", () => ({
-  useConvex: () => ({}),
+  useConvex: () => mockConvexClient,
   useQuery: (_reference: unknown, args?: unknown) => {
     if (args === "skip") return undefined
     if (mockListMine.error) throw mockListMine.error

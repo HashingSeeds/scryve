@@ -6,6 +6,7 @@ import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { readRevenueCatConfig } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
+import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
 import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
@@ -71,6 +72,7 @@ export function ConfiguredAuth({
 
   return (
     <ConvexProviderWithAuth client={client} useAuth={convexUseAuth}>
+      <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
       <RevenueCatProvider
         apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
