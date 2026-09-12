@@ -62,6 +62,8 @@ describe("deck sync reads", () => {
     await new Promise(setImmediate)
     expect(controller.getSnapshot().decks.map((deck) => deck._id)).toEqual(["deck-2", "deck-1"])
     expect(controller.getSnapshot().unavailable).toBe(true)
+    controller.saveShelf([])
+    expect(controller.getSnapshot().unavailable).toBe(true)
     stop()
   })
 

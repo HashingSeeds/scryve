@@ -355,7 +355,7 @@ function DeckShelf({
         />
       )}
       ListEmptyComponent={
-        syncEnabled && synced.unavailable ? (
+        syncEnabled && synced.unavailable && synced.decks.length === 0 ? (
           <View style={themed($empty)}>
             <Text text="Reconnect to load your decks." />
             <Button text="Try again" onPress={() => void synced.retry()} />

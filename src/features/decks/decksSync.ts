@@ -178,7 +178,7 @@ export class DeckSyncController {
   saveShelf(decks: readonly MineDeck[]): void {
     this.shelf = [...decks]
     this.repository.saveShelf(decks)
-    this.publish(false)
+    this.publish(this.snapshot.loading, this.snapshot.unavailable)
   }
 
   async refresh(): Promise<void> {
