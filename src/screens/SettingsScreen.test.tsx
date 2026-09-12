@@ -77,6 +77,7 @@ describe("SettingsScreen", () => {
     expect(view.getByText("Update: 12345678-abc…")).toBeTruthy()
     fireEvent.press(view.getByText("Copy debug info"))
     await waitFor(() => expect(view.getByText("Copied")).toBeTruthy())
+    expect(view.queryByText("Copy debug info")).toBeNull()
     expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
       [
         "Scryve",
