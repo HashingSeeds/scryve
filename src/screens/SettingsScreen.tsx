@@ -377,11 +377,11 @@ export function SettingsScreen({
           })}
           <Button
             testID="copy-debug-info-button"
-            text="Copy debug info"
+            text={copyStatus === "Copied" ? "Copied" : "Copy debug info"}
             onPress={copyDebugInfo}
             style={themed($copyButton)}
           />
-          {copyStatus ? (
+          {copyStatus && copyStatus !== "Copied" ? (
             <Text text={copyStatus} size="sm" accessibilityLiveRegion="polite" />
           ) : null}
         </View>
