@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import {
   playerGridLayoutForCount,
@@ -74,6 +75,7 @@ export function PlayerGrid({
   style,
 }: PlayerGridProps) {
   const { width, height, fontScale } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
   const {
     themed,
     theme: { spacing },
@@ -116,7 +118,17 @@ export function PlayerGrid({
       testID="player-grid"
       accessibilityLabel={`${players.length} player ${counter.label} grid`}
       onLayout={measureBoard}
-      style={[themed($grid), style, lifeFontSize === undefined && $unmeasured]}
+      style={[
+        themed($grid),
+        {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+        style,
+        lifeFontSize === undefined && $unmeasured,
+      ]}
     >
       {rows.map((row, rowIndex) => (
         <View
@@ -215,7 +227,7 @@ export function PlayerGrid({
                       : undefined
                   }
                   onChange={(delta) => onChange(player.id, delta)}
-                  style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
+                  style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex, insets })}
                 />
               </View>
             )
@@ -326,11 +338,15 @@ export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number
   columnIndex: number
+  insets?: { top: number; bottom: number; left: number; right: number }
 }): ViewStyle | undefined {
-  const touchesTopEdge = input.rowIndex === 0
-  const touchesBottomEdge = input.rowIndex === input.rows.length - 1
-  const touchesLeftEdge = input.columnIndex === 0
-  const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
+  const touchesTopEdge = input.rowIndex === 0 && !(input.insets && input.insets.top > 0)
+  const touchesBottomEdge =
+    input.rowIndex === input.rows.length - 1 && !(input.insets && input.insets.bottom > 0)
+  const touchesLeftEdge = input.columnIndex === 0 && !(input.insets && input.insets.left > 0)
+  const touchesRightEdge =
+    input.columnIndex === input.rows[input.rowIndex].length - 1 &&
+    !(input.insets && input.insets.right > 0)
   const squared: ViewStyle = {
     ...(touchesTopEdge && touchesLeftEdge ? { borderTopLeftRadius: 0 } : null),
     ...(touchesTopEdge && touchesRightEdge ? { borderTopRightRadius: 0 } : null),
