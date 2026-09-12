@@ -273,17 +273,13 @@ export function SettingsScreen({
           testID="analytics-switch"
           disabled={!analyticsConfigured() && !sharing}
           label="Share usage with Scryve"
-          helper="Optional and off by default, including without an account. Allow PostHog to receive game starts and finishes, systems, formats, player counts, connection failures, and use of decks and stats. Offline events upload when you reconnect."
+          helper="Off by default. Anonymous usage stats to improve Scryve. Details in Privacy Policy."
           value={sharing}
           onValueChange={(value) => {
             const saved = setAnalyticsEnabled(value)
             setSharing(analyticsEnabled())
             setAnalyticsError(saved ? "" : "Could not save your choice. Please try again.")
           }}
-        />
-        <Text
-          size="xs"
-          text="No names, clipboard contents, or PostHog recordings. A random analytics ID measures return visits on this device. Turning sharing off discards unsent events; it does not delete events already sent. This choice is separate from Sentry crash diagnostics."
         />
         {!analyticsConfigured() ? (
           <Text
