@@ -175,6 +175,17 @@ describe("deck sync", () => {
     const ownerDeck = await owner.mutation(api.decks.syncWrite, writeArgs(firstSyncId, operationId))
     const otherDeck = await other.mutation(api.decks.syncWrite, writeArgs(firstSyncId, operationId))
     expect(otherDeck.deckId).not.toBe(ownerDeck.deckId)
+    await expect(
+      other.mutation(api.decks.syncWrite, {
+        ...writeArgs(firstSyncId, "14141414-1414-4414-8414-141414141414", 1),
+        expectedOwnerId: "first-owner",
+      }),
+    ).rejects.toMatchObject({ data: { code: "sync_owner_changed" } })
+    const otherPage = await other.query(api.decks.syncPage, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(otherPage.ownerId).toBe("second-owner")
+    expect((await other.query(api.decks.listMine, {})).ownerId).toBe("second-owner")
 
     await expect(
       other.mutation(

@@ -370,7 +370,7 @@ export const listMine = query({
           }
         }),
     )
-    return { decks, capacity, analyticsLocked: !analytics }
+    return { ownerId: user.clerkUserId, decks, capacity, analyticsLocked: !analytics }
   },
 })
 
@@ -837,7 +837,7 @@ export const syncPage = query({
       .query("decks")
       .withIndex("by_owner_and_sync_id", (q) => q.eq("ownerUserId", user._id))
       .paginate(args.paginationOpts)
-    return { ...result, page: result.page.map(syncedDeck) }
+    return { ...result, ownerId: user.clerkUserId, page: result.page.map(syncedDeck) }
   },
 })
 
@@ -847,6 +847,7 @@ export const syncWrite = mutation({
   args: {
     id: v.string(),
     operationId: v.string(),
+    expectedOwnerId: v.optional(v.string()),
     expectedRevision: v.number(),
     name: v.string(),
     format: v.string(),
@@ -857,6 +858,11 @@ export const syncWrite = mutation({
   returns: syncedDeckValidator,
   handler: async (ctx, args): Promise<Infer<typeof syncedDeckValidator>> => {
     const user = await requireUser(ctx)
+    if (args.expectedOwnerId !== undefined && args.expectedOwnerId !== user.clerkUserId)
+      throw new ConvexError({
+        code: "sync_owner_changed",
+        message: "The signed-in account changed",
+      })
     if (!SYNC_UUID.test(args.operationId))
       throw new ConvexError({
         code: "invalid_operation_id",

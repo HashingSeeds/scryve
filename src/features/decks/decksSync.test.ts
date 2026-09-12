@@ -31,6 +31,40 @@ const syncedDeck = (revision: number, deleted = false) => ({
 })
 
 describe("deck sync reads", () => {
+  it("rejects a page from a previous account without claiming an empty shelf loaded", async () => {
+    const repository = new DeckSyncRepository("owner-b", new MemoryStorage())
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValue({ ownerId: "owner-a", page: [syncedDeck(1)], isDone: true }),
+      watchQuery: () => ({ onUpdate: () => jest.fn() }),
+    } as unknown as ConvexReactClient
+    const controller = new DeckSyncController(client, repository)
+    const stop = controller.start()
+    await new Promise(setImmediate)
+    expect(controller.getSnapshot()).toMatchObject({ decks: [], unavailable: true })
+    expect(repository.loadMetadata()).toEqual([])
+    stop()
+  })
+
+  it("keeps the last cached shelf after a failed read and sorts newest decks first", async () => {
+    const repository = new DeckSyncRepository("owner-a", new MemoryStorage())
+    repository.mergeMetadata([
+      syncedDeck(1),
+      { ...syncedDeck(3), id: "deck-2", deckId: "deck-2" as Id<"decks"> },
+    ])
+    const client = {
+      query: jest.fn().mockRejectedValue(new Error("Offline")),
+      watchQuery: () => ({ onUpdate: () => jest.fn() }),
+    } as unknown as ConvexReactClient
+    const controller = new DeckSyncController(client, repository)
+    const stop = controller.start()
+    await new Promise(setImmediate)
+    expect(controller.getSnapshot().decks.map((deck) => deck._id)).toEqual(["deck-2", "deck-1"])
+    expect(controller.getSnapshot().unavailable).toBe(true)
+    stop()
+  })
+
   it("restores rich shelf data and applies metadata without losing derived fields", () => {
     const storage = new MemoryStorage()
     const repository = new DeckSyncRepository("owner-a", storage)
@@ -79,8 +113,18 @@ describe("deck sync reads", () => {
     const client = {
       query: jest
         .fn()
-        .mockResolvedValueOnce({ page: [syncedDeck(1)], isDone: false, continueCursor: "page-2" })
-        .mockResolvedValueOnce({ page: [], isDone: true, continueCursor: "done" }),
+        .mockResolvedValueOnce({
+          ownerId: "owner-a",
+          page: [syncedDeck(1)],
+          isDone: false,
+          continueCursor: "page-2",
+        })
+        .mockResolvedValueOnce({
+          ownerId: "owner-a",
+          page: [],
+          isDone: true,
+          continueCursor: "done",
+        }),
       watchQuery: jest.fn((_reference, args: { paginationOpts: { cursor: string | null } }) => {
         const index = watched.push(args.paginationOpts.cursor) - 1
         return { onUpdate: () => unsubscribes[index] }
@@ -105,7 +149,9 @@ describe("deck sync reads", () => {
     let changed = () => {}
     let finish: (value: unknown) => void = () => {}
     const client = {
-      query: jest.fn().mockResolvedValue({ page: [syncedDeck(1)], isDone: true }),
+      query: jest
+        .fn()
+        .mockResolvedValue({ ownerId: "owner-a", page: [syncedDeck(1)], isDone: true }),
       watchQuery: () => ({
         onUpdate: (callback: () => void) => {
           changed = callback
@@ -125,7 +171,7 @@ describe("deck sync reads", () => {
     changed()
     expect(client.query).toHaveBeenCalledTimes(2)
     stop()
-    finish({ page: [syncedDeck(2, true)], isDone: true })
+    finish({ ownerId: "owner-a", page: [syncedDeck(2, true)], isDone: true })
     await new Promise(setImmediate)
     expect(repository.loadMetadata()).toMatchObject([{ revision: 1, deleted: false }])
     expect(new DeckSyncRepository("owner-b", storage).loadMetadata()).toEqual([])

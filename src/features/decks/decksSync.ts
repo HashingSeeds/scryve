@@ -30,6 +30,7 @@ export interface DeckSyncSnapshot {
   decks: DeckShelfItem[]
   metadata: SyncedDeck[]
   loading: boolean
+  unavailable?: boolean
 }
 
 const READ_FLAG_KEY = "scryve.decks.syncRead.v1"
@@ -96,7 +97,7 @@ export function setDeckSyncEnabled(enabled: boolean) {
 
 export class DeckSyncRepository {
   constructor(
-    private readonly ownerId: string,
+    readonly ownerId: string,
     private readonly local: DeckSyncStorage = storage,
   ) {}
 
@@ -198,6 +199,7 @@ export class DeckSyncController {
           paginationOpts: { cursor, numItems: PAGE_SIZE },
         })
         if (generation !== this.generation || this.users === 0) return
+        if (result.ownerId !== this.repository.ownerId) throw new Error("Account changed")
         decks.push(...result.page)
         cursor = result.isDone ? null : result.continueCursor
         if (result.isDone) break
@@ -206,7 +208,7 @@ export class DeckSyncController {
       this.pruneSubscriptions(cursors)
       this.publish(false)
     } catch {
-      if (generation === this.generation && this.users > 0) this.publish(false)
+      if (generation === this.generation && this.users > 0) this.publish(false, true)
     } finally {
       this.refreshing = false
       if (this.refreshAgain && this.users > 0) {
@@ -238,25 +240,27 @@ export class DeckSyncController {
 
   private buildSnapshot(loading: boolean): DeckSyncSnapshot {
     const summaries = new Map(this.shelf.map((deck) => [String(deck._id), deck]))
-    const decks = this.metadata.flatMap((metadata) => {
-      if (metadata.deleted) return []
-      const summary = summaries.get(metadata.deckId)
-      return [
-        summary
-          ? { ...summary, name: metadata.name, format: metadata.format, game: metadata.game }
-          : {
-              _id: metadata.deckId,
-              name: metadata.name,
-              format: metadata.format,
-              game: metadata.game,
-            },
-      ]
-    })
+    const decks = [...this.metadata]
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .flatMap((metadata) => {
+        if (metadata.deleted) return []
+        const summary = summaries.get(metadata.deckId)
+        return [
+          summary
+            ? { ...summary, name: metadata.name, format: metadata.format, game: metadata.game }
+            : {
+                _id: metadata.deckId,
+                name: metadata.name,
+                format: metadata.format,
+                game: metadata.game,
+              },
+        ]
+      })
     return { decks, metadata: [...this.metadata], loading }
   }
 
-  private publish(loading: boolean): void {
-    this.snapshot = this.buildSnapshot(loading)
+  private publish(loading: boolean, unavailable = false): void {
+    this.snapshot = { ...this.buildSnapshot(loading), unavailable }
     for (const listener of this.listeners) listener()
   }
 }
@@ -282,7 +286,11 @@ export function getDeckSyncController(
 
 const emptySnapshot: DeckSyncSnapshot = { decks: [], metadata: [], loading: true }
 
-export function useDeckSync(enabled: boolean, ownerId?: string, shelf?: readonly MineDeck[]) {
+export function useDeckSync(
+  enabled: boolean,
+  ownerId?: string,
+  shelf?: { ownerId: string; decks: readonly MineDeck[] },
+) {
   const client = useConvex()
   const controller = useMemo(
     () => (enabled && ownerId ? getDeckSyncController(client, ownerId) : undefined),
@@ -290,11 +298,12 @@ export function useDeckSync(enabled: boolean, ownerId?: string, shelf?: readonly
   )
   useEffect(() => controller?.start(), [controller])
   useEffect(() => {
-    if (shelf) controller?.saveShelf(shelf)
-  }, [controller, shelf])
-  return useSyncExternalStore(
+    if (shelf && shelf.ownerId === ownerId) controller?.saveShelf(shelf.decks)
+  }, [controller, ownerId, shelf])
+  const snapshot = useSyncExternalStore(
     controller?.subscribe ?? (() => () => undefined),
     controller?.getSnapshot ?? (() => emptySnapshot),
     controller?.getSnapshot ?? (() => emptySnapshot),
   )
+  return { ...snapshot, retry: () => controller?.refresh() }
 }

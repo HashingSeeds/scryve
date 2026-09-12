@@ -270,7 +270,7 @@ function DeckShelf({
   const { themed } = useAppTheme()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const onlineMine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
-  const synced = useDeckSync(syncEnabled, access?.ownerId, onlineMine?.decks)
+  const synced = useDeckSync(syncEnabled, access?.ownerId, onlineMine)
   const mine = syncEnabled
     ? synced.loading && synced.decks.length === 0
       ? undefined
@@ -355,7 +355,12 @@ function DeckShelf({
         />
       )}
       ListEmptyComponent={
-        mine ? (
+        syncEnabled && synced.unavailable ? (
+          <View style={themed($empty)}>
+            <Text text="Reconnect to load your decks." />
+            <Button text="Try again" onPress={() => void synced.retry()} />
+          </View>
+        ) : mine ? (
           <View style={themed($empty)}>
             <Text preset="subheading" text={filtered ? "Nothing matches" : emptyTitle} />
             <Text
