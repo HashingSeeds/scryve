@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import {
   playerGridLayoutForCount,
@@ -74,6 +75,7 @@ export function PlayerGrid({
   style,
 }: PlayerGridProps) {
   const { width, height, fontScale } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
   const {
     themed,
     theme: { spacing },
@@ -157,6 +159,12 @@ export function PlayerGrid({
                     ? "unowned"
                     : "owned"
                   : undefined
+            const contentInsets = {
+              top: rowIndex === 0 ? insets.top : 0,
+              bottom: rowIndex === rows.length - 1 ? insets.bottom : 0,
+              left: columnIndex === 0 ? insets.left : 0,
+              right: columnIndex === row.length - 1 ? insets.right : 0,
+            }
             return (
               <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={themed($cell)}>
                 <LifeCard
@@ -167,6 +175,7 @@ export function PlayerGrid({
                   color={player.color}
                   compact={layout.compact}
                   contentRotation={contentRotation}
+                  contentInsets={contentInsets}
                   lifeFontSize={lifeFontSize}
                   system={system}
                   lifeStep={lifeStep}
