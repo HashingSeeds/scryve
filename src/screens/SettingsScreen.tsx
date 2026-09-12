@@ -375,7 +375,12 @@ export function SettingsScreen({
               />
             )
           })}
-          <ListItem text="Copy debug info" onPress={copyDebugInfo} />
+          <Button
+            testID="copy-debug-info-button"
+            text="Copy debug info"
+            onPress={copyDebugInfo}
+            style={themed($copyButton)}
+          />
           {copyStatus ? (
             <Text text={copyStatus} size="sm" accessibilityLiveRegion="polite" />
           ) : null}
@@ -412,16 +417,17 @@ const $label: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $accountSection: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.sm,
-  marginTop: spacing.sm,
   paddingTop: spacing.lg,
   borderTopWidth: 1,
   borderColor: colors.separator,
 })
 const $legalSection: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  marginTop: spacing.sm,
   paddingTop: spacing.lg,
   borderTopWidth: 1,
   borderColor: colors.separator,
+})
+const $copyButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  marginTop: spacing.sm,
 })
 const $dangerButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
   minHeight: 50,
