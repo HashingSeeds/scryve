@@ -173,7 +173,7 @@ describe("PlayerGrid", () => {
 
     expect(getPlayerGridRows(4, layout)).toEqual([[0], [1, 2], [3]])
     expect(layout).toMatchObject({ columnCount: 2, rowCount: 3, variant: "tabletop" })
-    expect(getPlayerGridRowFlex([0], layout)).toBe(0.58)
+    expect(getPlayerGridRowFlex([0], layout)).toBe(0.8)
     expect(getPlayerGridRowFlex([1, 2], layout)).toBe(1)
     expect(getPlayerGridLayoutOptions(4)).toEqual([
       { variant: "auto", label: "Balanced" },

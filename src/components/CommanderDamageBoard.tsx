@@ -93,14 +93,14 @@ export function CommanderDamageBoard({
       {grid.cells.map((cellRow, rowIndex) => (
         <View key={rowIndex} style={themed($row)}>
           {cellRow.map((playerId, columnIndex) => {
-            if (!playerId) return <View key={columnIndex} style={{ width: size, height: size }} />
+            if (!playerId) return null
 
             if (players) {
               const playerIndex = players.findIndex((player) => player.id === playerId)
               const player = players[playerIndex]
               const ownSeat = playerId === ownerPlayerId
               const total = incoming[playerId] ?? 0
-              const fontSize = Math.min(36, Math.floor(size * 0.42))
+              const fontSize = Math.min(40, Math.floor(size * 0.5))
               return (
                 <View
                   key={columnIndex}
@@ -122,7 +122,7 @@ export function CommanderDamageBoard({
                       seatNumber={playerIndex + 1}
                       shape={player.shape}
                       color={foreground}
-                      size={Math.max(12, Math.floor(size * 0.2))}
+                      size={Math.max(14, Math.floor(size * 0.25))}
                     />
                     <Text
                       text={ownSeat ? "·" : String(total)}
@@ -207,6 +207,7 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xxxs,
   alignItems: "center",
+  justifyContent: "center",
 })
 
 const $cell: ThemedStyle<ViewStyle> = ({ spacing }) => ({

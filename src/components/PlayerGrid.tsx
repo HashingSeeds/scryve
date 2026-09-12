@@ -58,7 +58,6 @@ export interface PlayerGridProps {
 }
 
 const SINGLE_PLAYER_ROW_FLEX = 0.8
-const TABLETOP_SINGLE_PLAYER_ROW_FLEX = 0.58
 
 export function PlayerGrid({
   players,
@@ -328,7 +327,7 @@ export function getPlayerGridRowFlex(
   layout: ReturnType<typeof getPlayerGridLayout>,
 ): number {
   if (row.length !== 1 || layout.columnCount === 1) return 1
-  return layout.variant === "tabletop" ? TABLETOP_SINGLE_PLAYER_ROW_FLEX : SINGLE_PLAYER_ROW_FLEX
+  return SINGLE_PLAYER_ROW_FLEX
 }
 
 export function getScreenCornerSquaringStyle(input: {
