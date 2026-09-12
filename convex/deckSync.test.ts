@@ -49,6 +49,30 @@ function writeArgs(
 }
 
 describe("deck sync", () => {
+  it("canonicalizes UUID casing for deck identity and operation replay", async () => {
+    const t = convexTest(schema, modules)
+    const owner = await synced(t, "uuid-owner")
+    const args = writeArgs(
+      "aabbccdd-aabb-4aab-8aab-aabbccddeeff",
+      "abcdefab-abcd-4abc-8abc-abcdefabcdef",
+    )
+    const created = await owner.mutation(api.decks.syncWrite, {
+      ...args,
+      id: args.id.toUpperCase(),
+      operationId: args.operationId.toUpperCase(),
+    })
+    expect(created.id).toBe(args.id)
+    await expect(owner.mutation(api.decks.syncWrite, args)).resolves.toEqual(created)
+    const updated = await owner.mutation(api.decks.syncWrite, {
+      ...args,
+      id: args.id.toUpperCase(),
+      operationId: "bcdefabc-bcde-4bcd-8bcd-bcdefabcdefa",
+      expectedRevision: 1,
+      name: "Renamed",
+    })
+    expect(updated).toMatchObject({ deckId: created.deckId, revision: 2, name: "Renamed" })
+  })
+
   it("creates once and replays the original receipt after later edits and deletion", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "replay-owner")

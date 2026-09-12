@@ -841,7 +841,7 @@ export const syncPage = query({
   },
 })
 
-const SYNC_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+const SYNC_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export const syncWrite = mutation({
   args: {
@@ -874,8 +874,10 @@ export const syncWrite = mutation({
         code: "invalid_sync_id",
         message: "Deck ID must be a UUID or deck ID",
       })
+    const id = databaseId ? args.id : args.id.toLowerCase()
+    const operationId = args.operationId.toLowerCase()
     const requestKey = JSON.stringify([
-      args.id,
+      id,
       args.expectedRevision,
       args.name,
       args.format,
@@ -886,7 +888,7 @@ export const syncWrite = mutation({
     const receipt = await ctx.db
       .query("deckSyncReceipts")
       .withIndex("by_owner_and_operation_id", (q) =>
-        q.eq("ownerUserId", user._id).eq("operationId", args.operationId),
+        q.eq("ownerUserId", user._id).eq("operationId", operationId),
       )
       .unique()
     if (receipt) {
@@ -902,13 +904,11 @@ export const syncWrite = mutation({
       ? await ctx.db.get(databaseId)
       : await ctx.db
           .query("decks")
-          .withIndex("by_owner_and_sync_id", (q) =>
-            q.eq("ownerUserId", user._id).eq("syncId", args.id),
-          )
+          .withIndex("by_owner_and_sync_id", (q) => q.eq("ownerUserId", user._id).eq("syncId", id))
           .unique()
     if (
       (databaseId && !deck) ||
-      (deck && (deck.ownerUserId !== user._id || (deck.syncId ?? deck._id) !== args.id)) ||
+      (deck && (deck.ownerUserId !== user._id || (deck.syncId ?? deck._id) !== id)) ||
       (!deck && args.deleted)
     )
       throw new ConvexError({ code: "deck_not_found", message: "Deck not found" })
@@ -918,7 +918,7 @@ export const syncWrite = mutation({
     let deckId: Id<"decks">
     if (!deck) {
       deckId = await ctx.runMutation(api.decks.create, metadata)
-      await ctx.db.patch(deckId, { syncId: args.id, syncRevision: 1 })
+      await ctx.db.patch(deckId, { syncId: id, syncRevision: 1 })
     } else {
       deckId = deck._id
       if (args.deleted) await ctx.runMutation(api.decks.archive, { deckId })
@@ -929,7 +929,7 @@ export const syncWrite = mutation({
     const result = syncedDeck(deck)
     await ctx.db.insert("deckSyncReceipts", {
       ownerUserId: user._id,
-      operationId: args.operationId,
+      operationId,
       requestKey,
       result,
     })
