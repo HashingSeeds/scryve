@@ -101,6 +101,36 @@ describe("LifeCard", () => {
     },
   )
 
+  it("pads commander overlay content with safe-area insets so text clears the notch", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          contentInsets={{ top: 59, bottom: 0, left: 0, right: 0 }}
+          onChange={jest.fn()}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            inspection: { open: false, onToggle: jest.fn() },
+            armedPlayerId: commanderIds[1],
+            attackerName: "Bo",
+            onStage: jest.fn(),
+            onPressSword: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+    expect(
+      StyleSheet.flatten(view.getByTestId("commander-card-mode-seat-1").props.style),
+    ).toMatchObject({ paddingTop: 59, paddingBottom: 0, paddingLeft: 0, paddingRight: 0 })
+  })
+
   it("sizes the life total in JavaScript rather than relying on native auto-shrink", () => {
     const twoDigits = StyleSheet.flatten(
       renderCard(20).getByTestId("life-total-seat-1").props.style,

@@ -118,17 +118,7 @@ export function PlayerGrid({
       testID="player-grid"
       accessibilityLabel={`${players.length} player ${counter.label} grid`}
       onLayout={measureBoard}
-      style={[
-        themed($grid),
-        {
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-        },
-        style,
-        lifeFontSize === undefined && $unmeasured,
-      ]}
+      style={[themed($grid), style, lifeFontSize === undefined && $unmeasured]}
     >
       {rows.map((row, rowIndex) => (
         <View
@@ -169,6 +159,12 @@ export function PlayerGrid({
                     ? "unowned"
                     : "owned"
                   : undefined
+            const contentInsets = {
+              top: rowIndex === 0 ? insets.top : 0,
+              bottom: rowIndex === rows.length - 1 ? insets.bottom : 0,
+              left: columnIndex === 0 ? insets.left : 0,
+              right: columnIndex === row.length - 1 ? insets.right : 0,
+            }
             return (
               <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={themed($cell)}>
                 <LifeCard
@@ -179,6 +175,7 @@ export function PlayerGrid({
                   color={player.color}
                   compact={layout.compact}
                   contentRotation={contentRotation}
+                  contentInsets={contentInsets}
                   lifeFontSize={lifeFontSize}
                   system={system}
                   lifeStep={lifeStep}
@@ -227,7 +224,7 @@ export function PlayerGrid({
                       : undefined
                   }
                   onChange={(delta) => onChange(player.id, delta)}
-                  style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex, insets })}
+                  style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
                 />
               </View>
             )
@@ -338,15 +335,11 @@ export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number
   columnIndex: number
-  insets?: { top: number; bottom: number; left: number; right: number }
 }): ViewStyle | undefined {
-  const touchesTopEdge = input.rowIndex === 0 && !(input.insets && input.insets.top > 0)
-  const touchesBottomEdge =
-    input.rowIndex === input.rows.length - 1 && !(input.insets && input.insets.bottom > 0)
-  const touchesLeftEdge = input.columnIndex === 0 && !(input.insets && input.insets.left > 0)
-  const touchesRightEdge =
-    input.columnIndex === input.rows[input.rowIndex].length - 1 &&
-    !(input.insets && input.insets.right > 0)
+  const touchesTopEdge = input.rowIndex === 0
+  const touchesBottomEdge = input.rowIndex === input.rows.length - 1
+  const touchesLeftEdge = input.columnIndex === 0
+  const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
   const squared: ViewStyle = {
     ...(touchesTopEdge && touchesLeftEdge ? { borderTopLeftRadius: 0 } : null),
     ...(touchesTopEdge && touchesRightEdge ? { borderTopRightRadius: 0 } : null),

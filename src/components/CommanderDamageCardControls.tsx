@@ -9,7 +9,11 @@ import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { overlayTint } from "./LifeControls"
-import type { LifeCardContentRotation } from "./playerCardTypes"
+import {
+  lifeCardContentInsetStyle,
+  type LifeCardContentInsets,
+  type LifeCardContentRotation,
+} from "./playerCardTypes"
 import { Sword } from "./Sword"
 import { Text } from "./Text"
 
@@ -45,6 +49,7 @@ export interface CommanderDamageCardControlsProps {
   seatNumber: number
   foreground: string
   contentRotation: LifeCardContentRotation
+  contentInsets?: LifeCardContentInsets
   compact?: boolean
   mode: CommanderDamageCardMode
   life?: number
@@ -54,6 +59,7 @@ export function CommanderDamageCardControls({
   seatNumber,
   foreground,
   contentRotation,
+  contentInsets,
   compact,
   mode,
   life,
@@ -83,6 +89,7 @@ export function CommanderDamageCardControls({
       style={[
         themed($overlay),
         compact && themed($compactOverlay),
+        lifeCardContentInsetStyle(contentInsets),
         mode.kind === "target"
           ? {
               borderColor: overlayTint(foreground, 0.28),
