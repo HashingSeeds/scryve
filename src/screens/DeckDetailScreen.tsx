@@ -364,20 +364,23 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   async function run(work: () => Promise<void>, fallback: string) {
     if (access && !access.ready) {
       access.request()
-      return
+      return false
     }
     try {
       setBusy(true)
       setError(undefined)
       await work()
+      return true
     } catch (cause) {
       fail(cause, fallback)
+      return false
     } finally {
       setBusy(false)
     }
   }
 
   function startEditing() {
+    if (knownDeleted) return
     metadataSaveStarted.current = false
     setDraft(storedCards)
     setDraftNote(deck?.note ?? "")
@@ -403,6 +406,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   }
 
   function addCard(card: DeckCard) {
+    if (knownDeleted) return
     setUndo(undefined)
     setDraft((current) => {
       const existing = current.find((candidate) => printingKey(candidate) === printingKey(card))
@@ -417,6 +421,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   }
 
   function removeCard(card: DeckCard) {
+    if (knownDeleted) return
     setUndo(card.quantity === 1 ? { name: card.name, cards: draft } : undefined)
     setDraft((current) =>
       current.flatMap((candidate) =>
@@ -439,9 +444,14 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   }
 
   async function save() {
+    if (metadataSaveStarted.current) return
+    metadataSaveStarted.current = true
+    if (knownDeleted) {
+      metadataSaveStarted.current = false
+      fail(new Error("This deck was deleted."), "Could not save deck")
+      return
+    }
     if (noteDirty && !cardsDirty && canQueueMetadata && draftMetadataRevision !== undefined) {
-      if (metadataSaveStarted.current) return
-      metadataSaveStarted.current = true
       try {
         setError(undefined)
         metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
@@ -454,7 +464,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
       }
       return
     }
-    await run(async () => {
+    const saved = await run(async () => {
       if (cardsDirty)
         await saveVersion({
           deckId: deckId as Id<"decks">,
@@ -470,6 +480,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
       setEditing(false)
       setUndo(undefined)
     }, "Could not save deck")
+    if (!saved) metadataSaveStarted.current = false
   }
 
   function chooseVersion(versionId: string) {
@@ -524,6 +535,11 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   }
 
   async function submitSettings({ name, format }: { name: string; format: string }) {
+    if (knownDeleted) {
+      settingsSaveStarted.current = false
+      fail(new Error("This deck was deleted."), "Could not update deck")
+      return
+    }
     if (canQueueMetadata && settingsMetadataRevision !== undefined) {
       if (settingsSaveStarted.current) return
       settingsSaveStarted.current = true
@@ -610,6 +626,7 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         dirty={draftChanged}
         busy={busy}
         cardsUnavailable={!detail}
+        editingDisabled={knownDeleted}
         saveStatus={
           syncEnabled && access?.ownerId
             ? failedEdit
@@ -626,11 +643,13 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         onSave={save}
         onCancel={requestDiscard}
         onDetails={() => {
+          if (knownDeleted) return
           settingsSaveStarted.current = false
           setSettingsMetadataRevision(currentMetadataRevision)
           setDialog("settings")
         }}
         onAdd={() => {
+          if (knownDeleted) return
           if (!editing) startEditing()
           setAdding(true)
         }}

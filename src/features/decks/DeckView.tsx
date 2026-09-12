@@ -29,6 +29,7 @@ export function DeckView({
   busy,
   guest,
   cardsUnavailable,
+  editingDisabled,
   saveStatus,
   error,
   onBack,
@@ -55,6 +56,7 @@ export function DeckView({
   busy?: boolean
   guest?: boolean
   cardsUnavailable?: boolean
+  editingDisabled?: boolean
   saveStatus?: string
   error?: ReactNode
   onBack: () => void
@@ -84,13 +86,16 @@ export function DeckView({
             <TouchableOpacity
               accessibilityRole="button"
               testID={editing ? "save-version-button" : "edit-deck-button"}
-              disabled={busy || (editing && !dirty)}
+              disabled={busy || editingDisabled || (editing && !dirty)}
               style={$touch}
               onPress={editing ? onSave : onEdit}
             >
               <Text
                 text={editing ? (busy ? "Saving…" : "Save") : "Edit"}
-                style={[themed($action), (busy || (editing && !dirty)) && $disabled]}
+                style={[
+                  themed($action),
+                  (busy || editingDisabled || (editing && !dirty)) && $disabled,
+                ]}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -98,10 +103,10 @@ export function DeckView({
               accessibilityLabel="Deck details"
               testID="deck-settings-button"
               style={$touch}
-              disabled={busy || editing}
+              disabled={busy || editing || editingDisabled}
               onPress={onDetails}
             >
-              <Text text="•••" style={editing ? $disabled : undefined} />
+              <Text text="•••" style={busy || editing || editingDisabled ? $disabled : undefined} />
             </TouchableOpacity>
           </View>
         }
@@ -167,11 +172,16 @@ export function DeckView({
                   <>
                     <Text text={note || "No notes yet."} size="sm" />
                     <TouchableOpacity
+                      testID="edit-deck-notes"
                       style={$noteAction}
                       accessibilityRole="button"
+                      disabled={editingDisabled}
                       onPress={onEdit}
                     >
-                      <Text text="Edit notes" style={themed($action)} />
+                      <Text
+                        text="Edit notes"
+                        style={[themed($action), editingDisabled && $disabled]}
+                      />
                     </TouchableOpacity>
                   </>
                 )}
@@ -213,7 +223,7 @@ export function DeckView({
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={`${item.quantity === 1 ? "Remove" : "Decrease"} ${item.name}`}
-                  disabled={busy || cardsUnavailable}
+                  disabled={busy || cardsUnavailable || editingDisabled}
                   style={$touch}
                   onPress={() => onDecrement(item)}
                 >
@@ -236,7 +246,7 @@ export function DeckView({
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={`Increase ${item.name}`}
-                  disabled={busy || cardsUnavailable || item.quantity >= 999}
+                  disabled={busy || cardsUnavailable || editingDisabled || item.quantity >= 999}
                   style={$touch}
                   onPress={() => onIncrement(item)}
                 >
@@ -269,7 +279,7 @@ export function DeckView({
             testID="deck-add-cards"
             text="+ Add cards"
             onPress={onAdd}
-            disabled={busy || cardsUnavailable}
+            disabled={busy || cardsUnavailable || editingDisabled}
             style={themed($primary)}
             textStyle={{ color: accessibleForeground(theme.colors.tint) }}
           />

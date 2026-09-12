@@ -471,6 +471,11 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Note: Still recoverable")).toBeTruthy()
     expect(view.getByText("Local edit not synced")).toBeTruthy()
     expect(view.getByText("Use this version")).toBeDisabled()
+    expect(view.getByTestId("edit-deck-button")).toBeDisabled()
+    expect(view.getByTestId("deck-settings-button")).toBeDisabled()
+    expect(view.getByTestId("deck-add-cards")).toBeDisabled()
+    fireEvent.press(view.getByTestId("deck-tab-notes"))
+    expect(view.getByTestId("edit-deck-notes")).toBeDisabled()
     fireEvent.press(view.getByText("Discard local edit"))
     expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("deleted-edit")
   })
@@ -537,7 +542,7 @@ describe("DeckDetailScreen", () => {
     expect(view.getByTestId("edit-deck-button")).toBeDisabled()
   })
 
-  it("edits the list behind an explicit edit mode and saves into the same version", async () => {
+  it("saves combined card and note edits once after a rapid double submit", async () => {
     const view = renderDetail()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     expect(view.getByText("Edit deck")).toBeTruthy()
@@ -546,13 +551,21 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByText("Record")).toBeNull()
     expect(view.queryByTestId("deck-tab-versions")).toBeNull()
     fireEvent.press(view.getAllByText("+")[0])
-    fireEvent.press(view.getByTestId("save-version-button"))
+    fireEvent.press(view.getByTestId("deck-tab-notes"))
+    fireEvent.changeText(view.getByTestId("deck-note-input"), "Updated note")
+    const save = view.getByTestId("save-version-button")
+    act(() => {
+      fireEvent.press(save)
+      fireEvent.press(save)
+    })
     await waitFor(() => expect(mockSaveVersion).toHaveBeenCalledTimes(1))
     expect(mockSaveVersion).toHaveBeenCalledWith({
       deckId: "deck-1",
       versionId: "version-main",
       cards: [expect.objectContaining({ name: "Sol Ring", quantity: 2 })],
     })
+    expect(mockUpdateDeck).toHaveBeenCalledTimes(1)
+    expect(mockUpdateDeck).toHaveBeenCalledWith({ deckId: "deck-1", note: "Updated note" })
   })
 
   it("protects changed edits behind confirmation", () => {
