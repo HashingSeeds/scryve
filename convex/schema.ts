@@ -1,6 +1,8 @@
 import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
+import { syncedDeckValidator } from "./lib/deckSync"
+
 const genericDeckCardFields = {
   game: v.optional(v.string()),
   identityNamespace: v.optional(v.string()),
@@ -243,6 +245,8 @@ export default defineSchema({
 
   decks: defineTable({
     ownerUserId: v.id("users"),
+    syncId: v.optional(v.string()),
+    syncRevision: v.optional(v.number()),
     guestLocalId: v.optional(v.string()),
     guestUpdatedAt: v.optional(v.number()),
     name: v.string(),
@@ -256,7 +260,15 @@ export default defineSchema({
   })
     .index("by_owner_and_updated_at", ["ownerUserId", "updatedAt"])
     .index("by_owner_and_archived_at", ["ownerUserId", "archivedAt"])
-    .index("by_owner_and_guest_local_id", ["ownerUserId", "guestLocalId"]),
+    .index("by_owner_and_guest_local_id", ["ownerUserId", "guestLocalId"])
+    .index("by_owner_and_sync_id", ["ownerUserId", "syncId"]),
+
+  deckSyncReceipts: defineTable({
+    ownerUserId: v.id("users"),
+    operationId: v.string(),
+    requestKey: v.string(),
+    result: syncedDeckValidator,
+  }).index("by_owner_and_operation_id", ["ownerUserId", "operationId"]),
 
   deckVersions: defineTable({
     deckId: v.id("decks"),

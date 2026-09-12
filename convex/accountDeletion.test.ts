@@ -8,6 +8,7 @@ const modules = {
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
   "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
   "./accountDeletionActions.ts": async () => jest.requireActual("./accountDeletionActions"),
+  "./decks.ts": async () => jest.requireActual("./decks"),
   "./games.ts": async () => jest.requireActual("./games"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
@@ -388,6 +389,54 @@ describe("account deletion", () => {
     expect(resolverClaim.actorUserId).toBe(fixture.remainingUserId)
     expect(resolverClaim.deviceId).toBe("device-remain-01")
     expect(resolverClaim.resolvedByUserId).toBeUndefined()
+  })
+
+  it("deletes sync receipts in resumable owner-scoped batches before deleting decks", async () => {
+    const t = convexTest(schema, modules)
+    const owner = t.withIdentity({ subject: "sync-deletion-owner" })
+    const other = t.withIdentity({ subject: "sync-deletion-other" })
+    await owner.mutation(api.users.syncCurrent, { displayName: "Sync Owner" })
+    await other.mutation(api.users.syncCurrent, { displayName: "Other Owner" })
+    const operation = {
+      id: "11111111-1111-4111-8111-111111111111",
+      operationId: "22222222-2222-4222-8222-222222222222",
+      expectedRevision: 0,
+      name: "Offline deck",
+      format: "commander",
+      game: "mtg",
+      note: "Private note",
+      deleted: false,
+    }
+    const saved = await owner.mutation(api.decks.syncWrite, operation)
+    const otherSaved = await other.mutation(api.decks.syncWrite, operation)
+    await t.run(async (ctx) => {
+      const deck = await ctx.db.get(saved.deckId)
+      for (let index = 0; index < 50; index++)
+        await ctx.db.insert("deckSyncReceipts", {
+          ownerUserId: deck!.ownerUserId,
+          operationId: `older-operation-${index}`,
+          requestKey: "older accepted metadata",
+          result: saved,
+        })
+    })
+    const request = await owner.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+      confirmation: "DELETE",
+    })
+    const receiptCount = () =>
+      t.run(async (ctx) => (await ctx.db.query("deckSyncReceipts").collect()).length)
+    await t.mutation(internal.accountDeletion.processDecks, { requestId: request.requestId })
+    expect(await receiptCount()).toBe(2)
+    expect(await t.run((ctx) => ctx.db.get(saved.deckId))).not.toBeNull()
+    await t.mutation(internal.accountDeletion.processDecks, { requestId: request.requestId })
+    expect(await receiptCount()).toBe(1)
+    await t.mutation(internal.accountDeletion.processDecks, { requestId: request.requestId })
+    await t.mutation(internal.accountDeletion.processDecks, { requestId: request.requestId })
+    expect(await t.run((ctx) => ctx.db.get(saved.deckId))).toBeNull()
+    expect(await t.run((ctx) => ctx.db.get(otherSaved.deckId))).not.toBeNull()
+    await expect(other.mutation(api.decks.syncWrite, operation)).resolves.toEqual(otherSaved)
+    await expect(owner.mutation(api.decks.syncWrite, operation)).rejects.toThrow(
+      "Account deletion is in progress",
+    )
   })
 
   it("accepts deletion for a Clerk identity that has no Scryve projection", async () => {

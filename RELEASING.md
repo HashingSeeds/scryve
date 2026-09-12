@@ -40,6 +40,15 @@ sentry-release:
 
 Production Convex deploys are an explicit release step (`npx convex deploy` against production), performed before publishing the client update or binary that depends on them. Never an incidental side effect of local development. Convex schema and function changes must follow the compatibility rules in AGENTS.md.
 
+## Deck sync rollout
+
+1. Deploy schema expansion checkpoint `cc26f1873b5826cd41def31d68bc5f21772b580c` first. It adds optional deck sync fields, the receipt table, and the staged `decks.by_owner_and_sync_id` index. Wait for that index to finish backfilling before deploying the subsequent backend commit that activates and queries it. Preserve both commits when merging the backend PR.
+2. Deploy the backend with `decks:syncPage` and `decks:syncWrite` before enabling deck sync or publishing a client that uses those endpoints. Existing clients continue using the original deck endpoints.
+3. Keep the client flag disabled until a development-device pass verifies offline metadata edits, restart with pending writes, reconnect, conflicting edits, remote deletion, and account switching. Offline creation, deletion, and card/version editing are outside this rollout.
+4. Retain operation receipts for as long as a client can replay pending writes. Do not add a time-based purge without defining a supported offline/retry window. Account deletion removes the owner's receipts in batches.
+
+These are explicit release steps. Merging the PRs does not deploy Convex or enable client sync.
+
 ## Moderation retention rollout
 
 1. Check the production deploy history for the PR #83 expansion checkpoint (`3c542e1`). If it is not live, deploy that checkpoint first. Confirm
