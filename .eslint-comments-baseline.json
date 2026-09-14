@@ -510,10 +510,16 @@
     },
     "src/features/decks/deckVersionsCache.ts": {
       "689df4d918f576ade8e6fcf1a6e3a089c2f00f97e7784d454da1d18d641d4d00": 1,
+      "5c8f5bc07885bb5c5c9f7de4cf31cf0a723bda67c386151398afdab743f8c32f": 1,
+      "4ebbffb39802b0357cf7ca284cb62818ac773b589684d63dd655e61c90f25c84": 1,
+      "906bc4efe6865266b8fe74150e88b601797975dafc0c9d1d41acbb85fce9eacb": 1,
       "b5de63c7651bb9211f71379ded43be2f61783de2a7e79930c9a512bd5dbdd2a3": 1
     },
     "src/screens/DeckDetailScreen.tsx": {
       "062f900589b0d1f21963f948c9ef7c70051ecb77fade60f771eaa80f1c344bc1": 1,
+      "767fb31e60d36a89123a6f3287aaeeba29b13cf46dab2545fac8ba735d382964": 1,
+      "48dd235cea1edaa7e2597a014f7fda4028a1c48464a401ba32a747bfade8f6e6": 1,
+      "c56ec028f74f6efbaa2e5a4595ca1115fc4968cb88f1490ff656c21ac42027ad": 1,
       "4232b876e641a999726635faeadfa768036d1de877eebde71ca85d86701d59c9": 1
     }
   }
