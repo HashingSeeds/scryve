@@ -93,25 +93,23 @@ export function LegalConsentScreen({
         ) : null}
       </View>
 
-      {!isReturningUser && analyticsConfigured() ? (
-        <View style={themed($links)}>
+      <View style={themed($actions)}>
+        {!isReturningUser && analyticsConfigured() ? (
           <Switch
             testID="first-use-analytics-switch"
-            label="Share usage with Scryve, optional"
+            label="Share usage with Scryve"
             value={sharing}
-            helper="Off by default. Allow PostHog to receive game starts and finishes, system, format, player count, connection failures, and use of decks and stats with a random analytics ID. Offline events upload when you reconnect. No names, clipboard contents, or PostHog recordings. Change this in Settings any time."
+            helper="Off by default. Sharing helps us build what you want."
             onValueChange={setSharing}
           />
-          {sharingError ? (
-            <Text
-              accessibilityRole="alert"
-              size="xs"
-              text="Could not save your sharing choice. Try again or turn sharing off to continue."
-            />
-          ) : null}
-        </View>
-      ) : null}
-      <View style={themed($actions)}>
+        ) : null}
+        {sharingError ? (
+          <Text
+            accessibilityRole="alert"
+            size="xs"
+            text="Could not save your sharing choice. Try again or turn sharing off to continue."
+          />
+        ) : null}
         {error ? (
           <Text accessibilityRole="alert" text={error} size="xs" style={themed($error)} />
         ) : null}
