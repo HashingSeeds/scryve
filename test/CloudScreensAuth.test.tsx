@@ -23,6 +23,16 @@ const mockAuthContext = createContext({
   userId: undefined as string | undefined,
 })
 let mockUsername: string | null = "alex"
+const mockConvexClient = {
+  url: "https://example.convex.cloud",
+  query: jest.fn(async () => ({
+    ownerId: mockConnectedHarness.userId,
+    page: [],
+    isDone: true,
+    continueCursor: "",
+  })),
+  watchQuery: jest.fn(() => ({ onUpdate: jest.fn(() => jest.fn()) })),
+}
 
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () =>
@@ -47,7 +57,7 @@ jest.mock("convex/react", () => ({
   ...jest
     .requireActual<typeof import("./support/connectedHarness")>("./support/connectedHarness")
     .createConvexReactMock(),
-  useConvex: () => ({ query: jest.fn() }),
+  useConvex: () => mockConvexClient,
 }))
 jest.mock("../convex/_generated/api", () =>
   jest
