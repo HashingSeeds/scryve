@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { useConvexAuth, useConvexConnectionState, useMutation, useQuery } from "convex/react"
 
 import type { ConnectionStatus } from "@/components/ConnectionBadge"
@@ -47,12 +47,15 @@ interface ConnectedGameRuntimeBase {
 export type ConnectedGameRuntime = ConnectedGameRuntimeBase &
   (
     | { status: "loading"; projection: null }
+    | { status: "unavailable"; message: string; projection: null }
     | {
         status: "ready"
         source: "cache" | "remote"
         projection: ConnectedDisplayProjection
       }
   )
+
+export const CONNECTED_GAME_UNAVAILABLE_MS = 1_500
 
 function operationCheckFor(event: ConnectedActionEvent) {
   if (event.type === "life.changed")
@@ -194,6 +197,17 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
     ...(head ? { operation: operationCheckFor(head) } : {}),
   })
   const remoteReady = toConnectedProjection(remote) !== null
+  const unreachableWithoutCache =
+    !snapshot.projection && !remoteReady && !isWebSocketConnected && !isLoading && !isRefreshing
+  const [unreachableTimedOut, setUnreachableTimedOut] = useState(false)
+  useEffect(() => {
+    if (!unreachableWithoutCache) {
+      setUnreachableTimedOut(false)
+      return
+    }
+    const timer = setTimeout(() => setUnreachableTimedOut(true), CONNECTED_GAME_UNAVAILABLE_MS)
+    return () => clearTimeout(timer)
+  }, [unreachableWithoutCache])
   const observedGame = useRef<{ id: string; status: string } | undefined>(undefined)
   useEffect(() => {
     const projection = snapshot.projection
@@ -257,5 +271,13 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
         source: remoteReady ? "remote" : "cache",
         projection: snapshot.projection,
       }
-    : { ...runtime, status: "loading", projection: null }
+    : unreachableTimedOut
+      ? {
+          ...runtime,
+          status: "unavailable",
+          message:
+            "This board is not saved on this device. Reconnect so the game can be loaded here.",
+          projection: null,
+        }
+      : { ...runtime, status: "loading", projection: null }
 }

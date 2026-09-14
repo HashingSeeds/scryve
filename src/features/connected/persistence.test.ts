@@ -532,6 +532,50 @@ function resumeEntry(publicId: string, updatedAt: number, isHost = true): Resuma
   }
 }
 
+describe("connected resume index", () => {
+  it("stores sanitized rows even when the server page carries extra fields", () => {
+    const storage = new MemoryStorage()
+    const deployment = "small-ibis-123.convex.cloud"
+    const key = CONNECTED_KEYS.resumeIndex("user-1", deployment)
+    new ConnectedGameRepository(storage, "user-1", {}, deployment).syncResumeIndex(
+      [
+        { ...resumeEntry("game-public", 7), deckVersionId: "deck-1", invitation: { token: "t" } },
+      ] as never,
+      true,
+    )
+    const stored = JSON.parse(storage.getString(key) ?? "{}")
+    expect(stored.games).toHaveLength(1)
+    expect(Object.keys(stored.games[0]).sort()).toEqual([
+      "isHost",
+      "playerCount",
+      "publicId",
+      "ruleset",
+      "startingLife",
+      "status",
+      "updatedAt",
+    ])
+  })
+
+  it("keeps hosted games inside the bound before joined ones are evicted", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(
+      storage,
+      "user-1",
+      {},
+      "small-ibis-123.convex.cloud",
+    )
+    const joined = Array.from({ length: RESUME_INDEX_LIMIT }, (_, index) =>
+      resumeEntry(`game-joined-${index}`, RESUME_INDEX_LIMIT - index, false),
+    )
+    repository.syncResumeIndex(joined, true)
+    repository.syncResumeIndex([resumeEntry("game-hosted", 0)], false)
+    const loaded = restarted(repository, storage).loadResumeIndex()
+    expect(loaded).toHaveLength(RESUME_INDEX_LIMIT)
+    expect(loaded[0]).toMatchObject({ publicId: "game-hosted", isHost: true })
+    expect(loaded.map((game) => game.publicId)).not.toContain("game-joined-29")
+  })
+})
+
 function restarted(repository: ConnectedGameRepository, storage: MemoryStorage) {
   return new ConnectedGameRepository(
     storage,

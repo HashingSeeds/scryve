@@ -357,4 +357,20 @@ describe("useConnectedGame connection readiness", () => {
     view.rerender(undefined)
     expect(mockEmitTelemetry).toHaveBeenCalledTimes(1)
   })
+
+  it("declares the board unavailable only after staying offline without cache or remote", async () => {
+    mockRemote = undefined
+    const hook = renderHook(() => useConnectedGame("game-public", "user-1"))
+    expect(hook.result.current.status).toBe("loading")
+    await waitFor(() => expect(hook.result.current.status).toBe("unavailable"), { timeout: 4_000 })
+    if (hook.result.current.status !== "unavailable") throw new Error("Expected unavailable")
+    expect(hook.result.current.message).toContain("Reconnect")
+    mockSocketConnected = true
+    hook.rerender(undefined)
+    await waitFor(() => expect(hook.result.current.status).toBe("loading"))
+    mockRemote = mockRemoteProjection
+    hook.rerender(undefined)
+    expect(hook.result.current.status).toBe("ready")
+    hook.unmount()
+  })
 })
