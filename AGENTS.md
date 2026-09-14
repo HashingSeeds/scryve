@@ -45,7 +45,7 @@ We need to be on the same page with terminology. When communicating, use this la
 - **rule** means a specific piece of governance on how the game is played in a system or format.
 
 ## Ways to hurt yourself
-This section is empty for now. If you have consistently 1. struggled with something, or 2. noticed you and I have misunderstood each other you can document what you think would have helped you here.
+On Linux, an iOS `agent-device` failure does not mean mobile verification is unavailable. Check Android targets with `agent-device devices --platform android` and use an Android emulator when authorized. Check existing QA emulator profiles for the installed development app before concluding it is missing. Respect emulator sessions owned by other worktrees.
 
 ## Verifying
 

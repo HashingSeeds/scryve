@@ -4,6 +4,7 @@ import { Linking, ScrollView, TouchableOpacity, View } from "react-native"
 import { type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
+import { ConvexError } from "convex/values"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -328,8 +329,16 @@ export function AddDeckScreen({
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string>()
   const [previewError, setPreviewError] = useState<string>()
+  const [previewRetryAt, setPreviewRetryAt] = useState<number>()
+  const [previewRetrySeconds, setPreviewRetrySeconds] = useState(0)
   const searchToken = useRef(0)
   const previewToken = useRef(0)
+  useEffect(
+    () => () => {
+      previewToken.current += 1
+    },
+    [],
+  )
   const catalogDetail = useQuery(
     api.deckCatalogs.detail,
     selectedCatalogDeck ? { catalogDeckId: selectedCatalogDeck._id } : "skip",
@@ -385,6 +394,8 @@ export function AddDeckScreen({
   }
 
   function chooseGame(next: string) {
+    previewToken.current += 1
+    setPreviewRetryAt(undefined)
     const nextFormat = defaultDeckFormat(next)
     setGame(next, nextFormat)
     setDeckFormat(nextFormat)
@@ -499,31 +510,69 @@ export function AddDeckScreen({
     }
   }
 
-  async function previewPrecon(deck: PreconstructedDeck, keepOutline = false) {
-    const token = previewToken.current + 1
-    previewToken.current = token
-    try {
-      setSelectedPrecon(deck)
-      if (!keepOutline) setPreconOutline(undefined)
-      setResolvedPrecon(undefined)
-      setError(undefined)
-      setPreviewError(undefined)
-      setPreviewLoading(true)
-      const outline = await previewPreconstructed({ fileName: deck.fileName })
-      if (previewToken.current !== token) return
-      setPreconOutline(outline)
-      const resolved = await resolvePreconstructed({ fileName: deck.fileName })
-      if (previewToken.current === token) setResolvedPrecon(resolved)
-    } catch (cause) {
-      if (previewToken.current === token)
-        setPreviewError(convexErrorMessage(cause, "Could not load this deck"))
-    } finally {
-      if (previewToken.current === token) setPreviewLoading(false)
+  const previewPrecon = useCallback(
+    async (deck: PreconstructedDeck, keepOutline = false) => {
+      const token = previewToken.current + 1
+      previewToken.current = token
+      try {
+        setSelectedPrecon(deck)
+        if (!keepOutline) setPreconOutline(undefined)
+        setResolvedPrecon(undefined)
+        setError(undefined)
+        setPreviewError(undefined)
+        setPreviewRetryAt(undefined)
+        setPreviewLoading(true)
+        const outline = await previewPreconstructed({ fileName: deck.fileName })
+        if (previewToken.current !== token) return
+        setPreconOutline(outline)
+        const resolved = await resolvePreconstructed({ fileName: deck.fileName })
+        if (previewToken.current === token) setResolvedPrecon(resolved)
+      } catch (cause) {
+        if (previewToken.current === token) {
+          setPreviewError(convexErrorMessage(cause, "Could not load this deck"))
+          const data: unknown = cause instanceof ConvexError ? cause.data : undefined
+          if (
+            typeof data === "object" &&
+            data !== null &&
+            "code" in data &&
+            data.code === "scryfall_rate_limited" &&
+            "retryAfterMs" in data &&
+            typeof data.retryAfterMs === "number" &&
+            Number.isFinite(data.retryAfterMs) &&
+            data.retryAfterMs > 0
+          ) {
+            setPreviewRetryAt(Date.now() + data.retryAfterMs)
+            setPreviewRetrySeconds(Math.ceil(data.retryAfterMs / 1000))
+          }
+        }
+      } finally {
+        if (previewToken.current === token) setPreviewLoading(false)
+      }
+    },
+    [previewPreconstructed, resolvePreconstructed],
+  )
+
+  useEffect(() => {
+    if (previewRetryAt === undefined || !selectedPrecon) return
+    const deadline = previewRetryAt
+    const deck = selectedPrecon
+    let timer: ReturnType<typeof setTimeout>
+    function tick() {
+      const remaining = deadline - Date.now()
+      if (remaining <= 0) {
+        void previewPrecon(deck, true)
+        return
+      }
+      setPreviewRetrySeconds(Math.ceil(remaining / 1000))
+      timer = setTimeout(tick, Math.min(1000, remaining))
     }
-  }
+    tick()
+    return () => clearTimeout(timer)
+  }, [previewRetryAt, selectedPrecon, previewPrecon])
 
   function closePreview() {
     previewToken.current += 1
+    setPreviewRetryAt(undefined)
     setSelectedPrecon(undefined)
     setPreconOutline(undefined)
     setResolvedPrecon(undefined)
@@ -1013,7 +1062,10 @@ export function AddDeckScreen({
               <AlertNote text={previewError} />
               <Button
                 testID="retry-precon-preview"
-                text="Retry"
+                text={
+                  previewRetryAt === undefined ? "Retry" : `Retrying in ${previewRetrySeconds}s`
+                }
+                disabled={previewRetryAt !== undefined}
                 onPress={() => void previewPrecon(selectedPrecon, true)}
               />
             </View>
