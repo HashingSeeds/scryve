@@ -266,6 +266,29 @@ function parseResumeEntry(value: unknown): ResumableGame | null {
   }
 }
 
+const resumeOrder = (left: ResumableGame, right: ResumableGame) =>
+  Number(right.isHost) - Number(left.isHost) || right.updatedAt - left.updatedAt
+
+function filteredResumeBound(games: Array<ResumableGame | null>): ResumableGame[] {
+  return games
+    .filter((game): game is ResumableGame => game !== null)
+    .sort(resumeOrder)
+    .slice(0, RESUME_INDEX_LIMIT)
+}
+
+const resumeIndexListeners = new Set<() => void>()
+
+export function subscribeResumeIndex(listener: () => void): () => void {
+  resumeIndexListeners.add(listener)
+  return () => {
+    resumeIndexListeners.delete(listener)
+  }
+}
+
+function notifyResumeIndexChanged(): void {
+  for (const listener of [...resumeIndexListeners]) listener()
+}
+
 const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
   parsePending,
   parseFailed,
@@ -312,23 +335,17 @@ export class ConnectedGameRepository {
 
   syncResumeIndex(games: readonly ResumableGame[], exhaustedPageSet: boolean): void {
     if (this.ownerId === "anonymous") return
-    const current = this.loadResumeIndex()
-    let next: ResumableGame[]
     if (exhaustedPageSet) {
-      next = [...games]
-    } else {
-      const byId = new Map(current.map((game) => [game.publicId, game]))
-      for (const game of games) byId.set(game.publicId, game)
-      next = [...byId.values()]
+      this.persistResumeIndex(filteredResumeBound(games.map(parseResumeEntry)))
+      return
     }
-    const bounded = next
-      .filter((game) => parseResumeEntry(game) !== null)
-      .sort((left, right) => right.updatedAt - left.updatedAt)
-      .slice(0, RESUME_INDEX_LIMIT)
-    const key = CONNECTED_KEYS.resumeIndex(this.ownerId, this.deployment)
-    const serialized = JSON.stringify({ schemaVersion: 1, games: bounded })
-    if (this.storage.getString(key) === serialized) return
-    this.storage.set(key, serialized)
+    const current = this.loadResumeIndex()
+    const byId = new Map(current.map((game) => [game.publicId, game]))
+    for (const candidate of games) {
+      const game = parseResumeEntry(candidate)
+      if (game) byId.set(game.publicId, game)
+    }
+    this.persistResumeIndex([...byId.values()])
   }
 
   loadResumeIndex(): ResumableGame[] {
@@ -337,22 +354,30 @@ export class ConnectedGameRepository {
       this.storage.getString(CONNECTED_KEYS.resumeIndex(this.ownerId, this.deployment)),
     )
     if (!isRecord(stored) || stored.schemaVersion !== 1 || !Array.isArray(stored.games)) return []
-    return stored.games
-      .map(parseResumeEntry)
-      .filter((game): game is ResumableGame => game !== null)
-      .sort((left, right) => right.updatedAt - left.updatedAt)
-      .slice(0, RESUME_INDEX_LIMIT)
+    return filteredResumeBound(stored.games.map(parseResumeEntry))
   }
 
   removeResumeEntry(gameId: string): void {
     if (this.ownerId === "anonymous") return
-    const remaining = this.loadResumeIndex().filter((game) => game.publicId !== gameId)
     const current = this.loadResumeIndex()
+    const remaining = current.filter((game) => game.publicId !== gameId)
     if (remaining.length === current.length) return
-    this.storage.set(
-      CONNECTED_KEYS.resumeIndex(this.ownerId, this.deployment),
-      JSON.stringify({ schemaVersion: 1, games: remaining }),
-    )
+    this.persistResumeIndex(remaining)
+  }
+
+  private persistResumeIndex(next: ResumableGame[]): void {
+    const bounded =
+      next.length > RESUME_INDEX_LIMIT
+        ? [...next].sort(resumeOrder).slice(0, RESUME_INDEX_LIMIT)
+        : next
+    const key = CONNECTED_KEYS.resumeIndex(this.ownerId, this.deployment)
+    const serialized = JSON.stringify({
+      schemaVersion: 1,
+      games: bounded,
+    } as const)
+    if (this.storage.getString(key) === serialized) return
+    this.storage.set(key, serialized)
+    notifyResumeIndexChanged()
   }
 
   isMembershipMigrationComplete(): boolean {

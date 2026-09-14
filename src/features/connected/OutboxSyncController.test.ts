@@ -597,4 +597,70 @@ describe("outbox sync controller", () => {
     expect(repository.loadProjection("game-public")).not.toBeNull()
     expect(controller.getSnapshot().pending).toHaveLength(1)
   })
+
+  it("does not resurrect a confirmed terminal game from a stale active projection", () => {
+    const { repository, controller } = harness({
+      repository: new ConnectedGameRepository(
+        new MemoryStorage(),
+        "user-1",
+        {},
+        "small-ibis-123.convex.cloud",
+      ),
+    })
+    controller.onRemoteProjection({ ...projection(5, 25), status: "finished" })
+    expect(repository.loadResumeIndex()).toEqual([])
+
+    controller.onRemoteProjection({ ...projection(3, 30), status: "active" })
+    expect(repository.loadResumeIndex()).toEqual([])
+  })
+
+  it("keeps the row of an active game when a stale terminal projection arrives", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(
+      storage,
+      "user-1",
+      {},
+      "small-ibis-123.convex.cloud",
+    )
+    repository.saveProjection({ ...projection(2, 30), status: "active" })
+    repository.syncResumeIndex(
+      [
+        {
+          publicId: "game-public",
+          status: "active",
+          isHost: true,
+          playerCount: 2,
+          ruleset: "standard",
+          updatedAt: 3,
+        },
+      ],
+      true,
+    )
+    const { controller } = harness({ repository })
+    controller.onRemoteProjection(projection(4, 25))
+    controller.onRemoteProjection({ ...projection(1, 20), status: "finished" })
+    expect(repository.loadResumeIndex().map((game) => game.publicId)).toEqual(["game-public"])
+    expect(repository.loadProjection("game-public")?.status).toBe("active")
+  })
+
+  it("skips resume-index writes for membership-identical projections", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(
+      storage,
+      "user-1",
+      {},
+      "small-ibis-123.convex.cloud",
+    )
+    const persistSpy = jest.spyOn(storage, "set")
+    const { controller } = harness({ repository })
+    controller.onRemoteProjection(projection(1, 20))
+    const writesAfterFirst = persistSpy.mock.calls.filter(([key]) =>
+      String(key).includes("resume"),
+    ).length
+    expect(writesAfterFirst).toBe(1)
+
+    controller.onRemoteProjection(projection(2, 19))
+    controller.onRemoteProjection(projection(3, 18))
+    expect(persistSpy.mock.calls.filter(([key]) => String(key).includes("resume"))).toHaveLength(1)
+  })
 })

@@ -71,6 +71,21 @@ function openConnectedFinish() {
 describe("ConnectedBoardScreen", () => {
   beforeEach(resetConnectedHarness)
 
+  it("renders the unavailable shell with a back door when the board cannot hydrate offline", () => {
+    const onBack = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      status: "unavailable",
+      message: "This board is not saved on this device. Reconnect to load it.",
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    expect(screen.getByTestId("connected-board-unavailable-status").props.accessibilityLabel).toBe(
+      connectedHarness.runtime.message,
+    )
+    fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalled()
+  })
+
   it("enables only the signed-in player's accessible controls", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(

@@ -6,7 +6,11 @@ import { remotePage } from "@/features/async/remoteState"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
-import { connectedDeploymentScope, ConnectedGameRepository } from "@/features/connected/persistence"
+import {
+  connectedDeploymentScope,
+  ConnectedGameRepository,
+  subscribeResumeIndex,
+} from "@/features/connected/persistence"
 import {
   useConnectedProfile,
   type ConnectedProfileState,
@@ -134,7 +138,11 @@ function ConnectedHostQuerySource({
       activeGamesState.nextPage.status === "exhausted",
     )
   }, [connectedUserId, resumeRepository, activeGamesState])
-  const cachedResumeGames = useMemo(() => resumeRepository.loadResumeIndex(), [resumeRepository])
+  const [cachedResumeGames, setCachedResumeGames] = useState<ResumableGame[]>([])
+  useEffect(() => {
+    setCachedResumeGames(resumeRepository.loadResumeIndex())
+    return subscribeResumeIndex(() => setCachedResumeGames(resumeRepository.loadResumeIndex()))
+  }, [resumeRepository])
 
   async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
     captureAnalytics("connection_attempt", { action: "create", stage: "started" })
@@ -206,6 +214,7 @@ function ConnectedHostQuerySource({
       setExitError(undefined)
       if (game.isHost) await abandonGame({ publicId: game.publicId })
       else await leaveGame({ publicId: game.publicId, deviceId })
+      resumeRepository.removeResumeEntry(game.publicId)
       return true
     } catch (cause) {
       setExitError(cause instanceof Error ? cause.message : "Could not update this game.")

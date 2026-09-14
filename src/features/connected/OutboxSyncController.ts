@@ -22,7 +22,7 @@ import type {
   PendingLifeAction,
   ConnectedOperationStatus,
 } from "./model"
-import { toConnectedProjection, toResumableEntry } from "./model"
+import { toConnectedProjection, toResumableEntry, resumeEntrySignature } from "./model"
 import type { ConnectedGameRepository } from "./persistence"
 import { mergeConfirmedProjection, oldestFirst, overlayPendingDeltas } from "./reconciliation"
 
@@ -110,6 +110,7 @@ export class OutboxSyncController {
   }
   private reconnectPending = true
   private environmentInitialized = false
+  private lastResumeSignature: string | undefined
   private readonly inFlight = new Set<string>()
   private readonly dismissedFailureIds = new Set<string>()
   private operationStatus: ConnectedOperationStatus | null = null
@@ -192,11 +193,15 @@ export class OutboxSyncController {
     const merged = mergeConfirmedProjection(this.confirmed, incoming)
     if (!optimistic) this.options.repository.saveProjection(merged)
     this.confirmed = merged
-    const entry = toResumableEntry(incoming)
+    const entry = toResumableEntry(merged)
     if (entry) {
-      if (!optimistic) this.options.repository.syncResumeIndex([entry], false)
+      const signature = resumeEntrySignature(entry)
+      if (this.lastResumeSignature !== signature) {
+        this.options.repository.syncResumeIndex([entry], false)
+        this.lastResumeSignature = signature
+      }
     } else {
-      this.options.repository.removeResumeEntry(incoming.publicId)
+      this.options.repository.removeResumeEntry(merged.publicId)
     }
     if (!optimistic) {
       const observed = new Set(incoming.recentOperationIds)

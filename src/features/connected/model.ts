@@ -299,3 +299,16 @@ export function toResumableEntry(projection: ConnectedProjection): ResumableGame
     ...(projection.startingLife ? { startingLife: projection.startingLife } : {}),
   }
 }
+
+export function resumeEntrySignature(entry: ResumableGame): string {
+  return [
+    entry.status,
+    entry.isHost,
+    entry.playerCount,
+    entry.ruleset,
+    entry.system ?? "",
+    entry.format ?? "",
+    entry.deckRequired ? "deck" : "",
+    entry.startingLife ?? "",
+  ].join("|")
+}
