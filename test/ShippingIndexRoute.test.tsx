@@ -13,6 +13,7 @@ import {
 } from "@/features/game/domain"
 import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
+import { darkTheme } from "@/theme/theme"
 
 import Index from "../src/app/index"
 
@@ -55,6 +56,44 @@ describe("shipping index route", () => {
     expect(view.getByTestId("game-board")).toBeTruthy()
     expect(localGameRepository.loadActiveGame()).toBeNull()
   })
+
+  it.each(["Continue", "End game", "Abandon"])(
+    "handles %s from the themed stale game page",
+    (choice) => {
+      const game = createLocalGame({
+        players: [
+          { name: "Player 1", color: PLAYER_COLORS[0] },
+          { name: "Player 2", color: PLAYER_COLORS[1] },
+        ],
+        startingLife: 20,
+      })
+      game.players[0].life = 19
+      game.updatedAt = Date.now() - 25 * 60 * 60 * 1000
+      localGameRepository.saveActiveGame(game)
+
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <Index />
+        </ThemeProvider>,
+      )
+
+      expect(view.getByText("Continue game?")).toBeTruthy()
+      expect(view.getByRole("button", { name: "Continue" })).toHaveStyle({
+        backgroundColor: darkTheme.colors.tint,
+      })
+      expect(view.queryByTestId("game-board")).toBeNull()
+      fireEvent.press(view.getByRole("button", { name: choice }))
+      expect(view.queryByText("Continue game?")).toBeNull()
+      expect(view.getByTestId("game-board")).toBeTruthy()
+      if (choice === "Abandon") {
+        expect(localGameRepository.loadActiveGame()).toBeNull()
+      } else {
+        expect(localGameRepository.loadActiveGame()?.id).toBe(game.id)
+        expect(view.getByText("19")).toBeTruthy()
+        if (choice === "End game") expect(view.getByTestId("end-game-dialog")).toBeTruthy()
+      }
+    },
+  )
 
   it("uses saved system defaults on the immediate play mat", () => {
     localGameRepository.saveSettings({

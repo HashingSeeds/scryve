@@ -39,7 +39,7 @@ export default function Index() {
     destination?: string
   }>()
   const auth = useAuthAccess()
-  const { themed } = useAppTheme()
+  const { themed, theme } = useAppTheme()
   const [settings, setSettings] = useState(() => localGameRepository.loadSettings())
   const [dismissedGameId, setDismissedGameId] = useState<string>()
   const [oldGameChoice, setOldGameChoice] = useState<"continue" | "end">()
@@ -83,13 +83,14 @@ export default function Index() {
       <Screen
         preset="auto"
         safeAreaEdges={["top", "bottom"]}
+        backgroundColor={theme.colors.surface}
         contentContainerStyle={themed($oldGame)}
       >
         <Text text="Continue game?" preset="heading" accessibilityRole="header" />
         <Text text="This game has been waiting for more than 24 hours. Nothing was discarded." />
         <Button
           text="Continue"
-          preset="reversed"
+          preset="primary"
           style={themed($primaryAction)}
           onPress={() => setOldGameChoice("continue")}
         />
@@ -136,6 +137,7 @@ const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   gap: spacing.md,
   paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.lg,
 })
 
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({
