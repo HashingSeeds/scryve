@@ -179,6 +179,37 @@ describe("ConnectedHostSource durable resume discovery", () => {
     )
   })
 
+  it("does not render the previous account's rows after an owner switch while offline", async () => {
+    const repository = new ConnectedGameRepository(undefined, OWNER, {}, DEPLOYMENT)
+    repository.syncResumeIndex([game("game-user-a", 10)], true)
+    mockProfileState = {
+      status: "offline",
+      profile: { userId: OWNER, displayName: "Ada" },
+      retry: jest.fn(),
+    }
+    mockPaginated = { results: [], status: "LoadingFirstPage", loadMore: () => undefined }
+    const view = renderSource()
+    await waitFor(() =>
+      expect(feedFeeds[feedFeeds.length - 1].activeGames?.map(({ publicId }) => publicId)).toEqual([
+        "game-user-a",
+      ]),
+    )
+    mockProfileState = {
+      status: "offline",
+      profile: { userId: "user-b", displayName: "Bo" },
+      retry: jest.fn(),
+    }
+    view.rerender(
+      <ConnectedHostSource onLobbyCreated={() => undefined}>
+        {(feed) => {
+          feedFeeds.push(feed)
+          return null
+        }}
+      </ConnectedHostSource>,
+    )
+    expect(feedFeeds[feedFeeds.length - 1].activeGames).toBeUndefined()
+  })
+
   it("drops the durable row after a successful explicit exit even during a partial page set", async () => {
     mockPaginated = {
       results: [game("game-keep", 5), game("game-left", 6, false)],
