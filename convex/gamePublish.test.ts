@@ -93,7 +93,7 @@ describe("publishLocalGame", () => {
       expect.objectContaining({
         playerId: created.players[0].playerId,
         seat: 1,
-        displayName: "Host",
+        displayName: "Player 1",
         color: "#7C3AED",
         shape: "circle",
         currentLife: 33,
@@ -110,6 +110,17 @@ describe("publishLocalGame", () => {
         controlledByMe: true,
       }),
     ])
+    const allPlayers = await t.run(async (ctx) => {
+      const gameId = (await ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", created.publicId))
+        .unique())!._id
+      return await ctx.db
+        .query("gamePlayers")
+        .withIndex("by_game", (q) => q.eq("gameId", gameId))
+        .take(7)
+    })
+    expect(allPlayers.map((player) => player.displayName)).toEqual(["Host", "Guest"])
     expect(projection.commanderDamage?.totals).toEqual([
       {
         fromPlayerId: created.players[0].playerId,
@@ -224,7 +235,7 @@ describe("claimImportedSeat", () => {
     })
     expect(guestView.players[1]).toEqual(
       expect.objectContaining({
-        displayName: "Guest",
+        displayName: "Player 2",
         color: "#2563EB",
         shape: "triangle",
         currentLife: 17,
@@ -350,5 +361,166 @@ describe("claimImportedSeat", () => {
     await expect(
       host.query(api.games.lobbyProjection, { publicId: created.publicId }),
     ).resolves.toMatchObject({ status: "active" })
+  })
+})
+
+describe("imported game invite renewal and discovery", () => {
+  it("rotates the invite on an active imported game and rejects the revoked token", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await published(t)
+    const renewed = await host.mutation(api.games.rotateInvite, {
+      publicId: created.publicId,
+      inviteToken: "n".repeat(43),
+      manualCodeCandidates: ["GHI789", "JKL012"],
+    })
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    await expect(
+      guest.mutation(api.games.claimableSeats, {
+        publicId: created.publicId,
+        manualCode: created.manualCode,
+      }),
+    ).rejects.toThrow("Invite is invalid, expired, or revoked")
+    await expect(
+      guest.mutation(api.games.claimImportedSeat, {
+        publicId: created.publicId,
+        seat: 2,
+        manualCode: created.manualCode,
+      }),
+    ).rejects.toThrow("Invite is invalid, expired, or revoked")
+    await expect(
+      guest.mutation(api.games.claimableSeats, {
+        publicId: created.publicId,
+        manualCode: renewed.manualCode,
+      }),
+    ).resolves.toEqual({ mode: "connected", seats: [2] })
+    await expect(
+      guest.mutation(api.games.claimImportedSeat, {
+        publicId: created.publicId,
+        seat: 2,
+        manualCode: renewed.manualCode,
+        deviceId: joinerDevice,
+      }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+  })
+
+  it("discovers unclaimed seats without identity data and enforces boundaries", async () => {
+    const t = convexTest(schema, modules)
+    const { created } = await published(t)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    await expect(
+      guest.mutation(api.games.claimableSeats, {
+        publicId: created.publicId,
+        manualCode: created.manualCode,
+      }),
+    ).resolves.toEqual({ mode: "connected", seats: [2] })
+    await expect(
+      t.mutation(api.games.claimableSeats, {
+        publicId: created.publicId,
+        manualCode: created.manualCode,
+      }),
+    ).rejects.toThrow("Authentication required")
+    await expect(
+      guest.mutation(api.games.claimableSeats, {
+        publicId: created.publicId,
+        manualCode: "ZZZ999",
+      }),
+    ).rejects.toThrow("Invite is invalid, expired, or revoked")
+    await guest.mutation(api.games.claimImportedSeat, {
+      publicId: created.publicId,
+      seat: 2,
+      manualCode: created.manualCode,
+    })
+    await expect(
+      guest.mutation(api.games.claimableSeats, {
+        publicId: created.publicId,
+        manualCode: created.manualCode,
+      }),
+    ).resolves.toEqual({ mode: "connected", seats: [] })
+  })
+
+  it("blocks blocked invitees from seat discovery and claiming", async () => {
+    const t = convexTest(schema, modules)
+    const { created } = await published(t)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    const hostUser = await t.run((ctx) =>
+      ctx.db
+        .query("users")
+        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "host-subject"))
+        .unique(),
+    )
+    const guestUser = await t.run((ctx) =>
+      ctx.db
+        .query("users")
+        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "guest-subject"))
+        .unique(),
+    )
+    await t.run((ctx) =>
+      ctx.db.insert("userBlocks", {
+        blockerUserId: hostUser!._id,
+        blockedUserId: guestUser!._id,
+        createdAt: 1,
+      }),
+    )
+    await expect(
+      guest.mutation(api.games.claimableSeats, {
+        publicId: created.publicId,
+        manualCode: created.manualCode,
+      }),
+    ).rejects.toThrow("You cannot join a game with a player you blocked or who blocked you")
+    await expect(
+      guest.mutation(api.games.claimImportedSeat, {
+        publicId: created.publicId,
+        seat: 2,
+        manualCode: created.manualCode,
+      }),
+    ).rejects.toThrow("You cannot join a game with a player you blocked or who blocked you")
+  })
+
+  it("restores the legacy no-username display fallback for owned seats", async () => {
+    const t = convexTest(schema, modules)
+    const legacyHost = await signedIn(t, "legacy-host-subject", "LegacyHost")
+    const legacy = await legacyHost.mutation(api.games.createLobby, {
+      publicId: "legacy-fallback-id-0001",
+      playerCount: 2,
+      startingLife: 20,
+      ruleset: "standard",
+      inviteToken: "f".repeat(43),
+      manualCodeCandidates: ["FAL234"],
+      hostDisplayName: "LegacyHost",
+      hostColor: "#41476E",
+    })
+    const projection = await legacyHost.query(api.games.lobbyProjection, {
+      publicId: legacy.publicId,
+    })
+    expect(projection.players.map((player) => player.displayName)).toEqual(["Player 1"])
+  })
+
+  it("does not bypass authorization when a pre-claim operation is retried after a claim", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await published(t)
+    const write = {
+      publicId: created.publicId,
+      playerId: created.players[1].playerId,
+      operationId: "pre-claim-retry-op-00001",
+      delta: 5,
+      deviceId: hostDevice,
+      clientCreatedAt: 1,
+    }
+    await host.mutation(api.games.changeLife, write)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    await guest.mutation(api.games.claimImportedSeat, {
+      publicId: created.publicId,
+      seat: 2,
+      manualCode: created.manualCode,
+      deviceId: joinerDevice,
+    })
+    await expect(host.mutation(api.games.changeLife, write)).rejects.toThrow(
+      "Seat-owner permission required",
+    )
+    const projection = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: hostDevice,
+    })
+    expect(projection.players[1].currentLife).toBe(22)
   })
 })
