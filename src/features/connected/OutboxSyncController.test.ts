@@ -580,4 +580,21 @@ describe("outbox sync controller", () => {
     await settle()
     expect(attempts).toHaveLength(1)
   })
+
+  it("records a resumable row for a live projection and drops it on terminal state without destroying unsent intent", () => {
+    const deployment = "small-ibis-123.convex.cloud"
+    const { repository, controller } = harness({
+      repository: new ConnectedGameRepository(new MemoryStorage(), "user-1", {}, deployment),
+    })
+    controller.setEnvironment(ONLINE)
+    controller.changeLife("player-1", 5)
+
+    controller.onRemoteProjection(projection(3, 25))
+    expect(repository.loadResumeIndex().map((game) => game.publicId)).toEqual(["game-public"])
+
+    controller.onRemoteProjection({ ...projection(4, 25), status: "finished" })
+    expect(repository.loadResumeIndex()).toEqual([])
+    expect(repository.loadProjection("game-public")).not.toBeNull()
+    expect(controller.getSnapshot().pending).toHaveLength(1)
+  })
 })

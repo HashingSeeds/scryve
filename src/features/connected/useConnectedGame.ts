@@ -20,7 +20,7 @@ import type {
 import { toConnectedProjection } from "./model"
 import { OutboxSyncController } from "./OutboxSyncController"
 import type { ConnectedGameResult } from "./OutboxSyncController"
-import { ConnectedGameRepository } from "./persistence"
+import { connectedDeploymentScope, ConnectedGameRepository } from "./persistence"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -95,7 +95,11 @@ function acknowledgementForQueuedResolution(
 export function useConnectedGame(publicId: string, ownerId = "anonymous"): ConnectedGameRuntime {
   const { isAuthenticated, isLoading, isRefreshing } = useConvexAuth()
   const { isWebSocketConnected } = useConvexConnectionState()
-  const repository = useMemo(() => new ConnectedGameRepository(undefined, ownerId), [ownerId])
+  const deployment = useMemo(() => connectedDeploymentScope(), [])
+  const repository = useMemo(
+    () => new ConnectedGameRepository(undefined, ownerId, {}, deployment),
+    [ownerId, deployment],
+  )
   const deviceId = useRef(asDeviceId(new LocalGameRepository().getDeviceId())).current
   const changeLifeMutation = useMutation(api.games.changeLife)
   const finishMutation = useMutation(api.games.finishGame)

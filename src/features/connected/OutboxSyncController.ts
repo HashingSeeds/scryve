@@ -22,7 +22,7 @@ import type {
   PendingLifeAction,
   ConnectedOperationStatus,
 } from "./model"
-import { toConnectedProjection } from "./model"
+import { toConnectedProjection, toResumableEntry } from "./model"
 import type { ConnectedGameRepository } from "./persistence"
 import { mergeConfirmedProjection, oldestFirst, overlayPendingDeltas } from "./reconciliation"
 
@@ -192,6 +192,12 @@ export class OutboxSyncController {
     const merged = mergeConfirmedProjection(this.confirmed, incoming)
     if (!optimistic) this.options.repository.saveProjection(merged)
     this.confirmed = merged
+    const entry = toResumableEntry(incoming)
+    if (entry) {
+      if (!optimistic) this.options.repository.syncResumeIndex([entry], false)
+    } else {
+      this.options.repository.removeResumeEntry(incoming.publicId)
+    }
     if (!optimistic) {
       const observed = new Set(incoming.recentOperationIds)
       const remaining: PendingLifeAction[] = []
