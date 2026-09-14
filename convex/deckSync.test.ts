@@ -379,7 +379,7 @@ function versionArgs(
   overrides: { cards?: (typeof syncCard)[]; returnConflict?: boolean } = {},
 ) {
   return {
-    deckId,
+    deckId: deckId as Id<"decks">,
     versionId: versionId as Id<"deckVersions">,
     operationId,
     expectedRevision,
@@ -631,6 +631,36 @@ describe("deck version sync", () => {
     expect(stored).toMatchObject({ syncRevision: 2 })
   })
 
+  it("saves cards by database deckId for decks created through syncWrite", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "version-dbid-owner")
+    const created = await actor.mutation(api.decks.syncWrite, {
+      id: "44444444-4444-4444-8444-444444444444",
+      operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      expectedRevision: 0,
+      name: "Offline deck",
+      format: "commander",
+      game: "mtg",
+      note: "",
+      deleted: false,
+    })
+    if ("status" in created) throw new Error("expected successful sync write")
+    const deckId = created.deckId
+    const bootstrap = await actor.query(api.decks.versionsPull, {
+      deckId,
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    const versionId = bootstrap.page[0].versionId
+    await expect(
+      actor.mutation(
+        api.decks.syncVersionWrite,
+        versionArgs(deckId, versionId, "abababab-abab-4bab-8bab-abababababab", 1, {
+          cards: [otherCard],
+        }),
+      ),
+    ).resolves.toMatchObject({ deckId, versionId, revision: 2, cardCount: 1 })
+  })
+
   it("bounds card payloads and rejects malformed identifiers", async () => {
     const t = convexTest(schema, modules)
     const { actor, deckId, versionId } = await seedVersion(t, "version-bounds-owner")
@@ -657,13 +687,13 @@ describe("deck version sync", () => {
       actor.mutation(
         api.decks.syncVersionWrite,
         versionArgs(
-          "unknown-deck",
+          "00000000000000010004decks",
           "00000000000000010003deckVersions",
           "bcbcacac-bcbc-4cbc-8cbc-bcbcbcbcbcbc",
           2,
         ),
       ),
-    ).rejects.toMatchObject({ data: { code: "invalid_sync_id" } })
+    ).rejects.toMatchObject({ data: { code: "deck_not_found" } })
     await expect(
       actor.mutation(
         api.decks.syncVersionWrite,

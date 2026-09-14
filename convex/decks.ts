@@ -976,7 +976,7 @@ export const syncWrite = mutation({
 
 export const syncVersionWrite = mutation({
   args: {
-    deckId: v.string(),
+    deckId: v.id("decks"),
     versionId: v.id("deckVersions"),
     operationId: v.string(),
     expectedRevision: v.number(),
@@ -1006,16 +1006,9 @@ export const syncVersionWrite = mutation({
       args.expectedRevision >= Number.MAX_SAFE_INTEGER
     )
       throw new ConvexError({ code: "invalid_revision", message: "Invalid version revision" })
-    const deckDatabaseId = ctx.db.normalizeId("decks", args.deckId)
-    if (!deckDatabaseId && !SYNC_UUID.test(args.deckId))
-      throw new ConvexError({
-        code: "invalid_sync_id",
-        message: "Deck ID must be a UUID or deck ID",
-      })
-    const deckRef = deckDatabaseId ? args.deckId : args.deckId.toLowerCase()
     const operationId = args.operationId.toLowerCase()
     const requestKey = JSON.stringify([
-      deckRef,
+      args.deckId,
       args.versionId,
       args.expectedRevision,
       canonicalCards(args.cards),
@@ -1035,16 +1028,7 @@ export const syncVersionWrite = mutation({
       return receipt.result
     }
 
-    const deck = deckDatabaseId
-      ? await ctx.db.get(deckDatabaseId)
-      : await ctx.db
-          .query("decks")
-          .withIndex("by_owner_and_sync_id", (q) =>
-            q.eq("ownerUserId", user._id).eq("syncId", deckRef),
-          )
-          .unique()
-    if (!deck || deck.ownerUserId !== user._id || (deck.syncId ?? deck._id) !== deckRef)
-      throw new ConvexError({ code: "deck_not_found", message: "Deck not found" })
+    const { deck } = await ownedDeck(ctx, args.deckId)
     assertNotArchived(deck)
     const game = deck.game ?? DEFAULT_DECK_GAME
     await requireReleasedCapability(ctx, game, "deckImport")
