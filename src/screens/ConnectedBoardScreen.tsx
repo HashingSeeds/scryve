@@ -212,7 +212,7 @@ function ConnectedBoardRuntime({
   } | null>(null)
   const finishSubmitInFlight = useRef(false)
   useStoreReview(
-    runtime.status !== "loading" &&
+    runtime.status === "ready" &&
       runtime.projection.status === "finished" &&
       !menuOpen &&
       !statusOpen &&
@@ -242,6 +242,13 @@ function ConnectedBoardRuntime({
     return (
       <ConnectedBoardShell
         state={{ status: "loading", message: "Loading connected board…" }}
+        onBack={onBack}
+      />
+    )
+  if (runtime.status === "unavailable")
+    return (
+      <ConnectedBoardShell
+        state={{ status: "unavailable", message: runtime.message }}
         onBack={onBack}
       />
     )

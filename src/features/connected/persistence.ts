@@ -1,3 +1,4 @@
+import { readPublicCloudConfig } from "@/features/auth/config"
 import {
   DURABLE_OUTBOX_LIMITS,
   DurableOutbox,
@@ -10,6 +11,7 @@ import {
 } from "@/features/sync/durableOutbox"
 import { storage as mmkvStorage } from "@/utils/storage"
 
+import type { ResumableGame } from "./connectedCopy"
 import type {
   CommanderDamageResolvedEvent,
   CommanderDamageSubmittedEvent,
@@ -42,9 +44,21 @@ export interface ConnectedPersistenceLimits extends DurableOutboxLimits {}
 export type EnqueueResult = DurableEnqueueResult<PendingLifeAction>
 export type FailActionResult = DurableFailResult<PendingLifeAction, FailedLifeAction>
 
+export const RESUME_INDEX_LIMIT = 30
+
 const scoped = (ownerId: string, gameId: string) =>
   `${ownerId.length}:${ownerId}.${gameId.length}:${gameId}`
 const ownerScoped = (ownerId: string) => `${ownerId.length}:${ownerId}`
+
+export function connectedDeploymentScope(): string {
+  const config = readPublicCloudConfig()
+  if (!config.configured) return "unconfigured"
+  try {
+    return new URL(config.value.convexUrl).host
+  } catch {
+    return config.value.convexUrl
+  }
+}
 
 export const CONNECTED_KEYS = {
   projection: (gameId: string, ownerId = "anonymous") =>
@@ -59,6 +73,8 @@ export const CONNECTED_KEYS = {
     `count.connected.failed.record.v1.${scoped(ownerId, gameId)}.${operationId}`,
   membershipMigration: (ownerId: string) =>
     `count.connected.membership-migration.v1.${ownerScoped(ownerId)}`,
+  resumeIndex: (ownerId: string, deployment: string) =>
+    `count.connected.resume.v1.${deployment}.${ownerScoped(ownerId)}`,
   legacyOutbox: (gameId: string) => `count.connected.outbox.v0.${gameId}`,
 } as const
 
@@ -223,6 +239,56 @@ function parseFailed(value: unknown): FailedLifeAction | null {
   return { schemaVersion: 1, action, reason: value.reason, failedAt: value.failedAt }
 }
 
+function parseResumeEntry(value: unknown): ResumableGame | null {
+  if (!isRecord(value) || typeof value.publicId !== "string" || !value.publicId) return null
+  if (value.status !== "lobby" && value.status !== "active") return null
+  if (typeof value.isHost !== "boolean") return null
+  if (typeof value.playerCount !== "number" || !Number.isInteger(value.playerCount)) return null
+  if (typeof value.ruleset !== "string" || typeof value.updatedAt !== "number") return null
+  if (!Number.isSafeInteger(value.updatedAt) || value.updatedAt < 0) return null
+  if (value.deckRequired !== undefined && typeof value.deckRequired !== "boolean") return null
+  if (
+    value.startingLife !== undefined &&
+    (typeof value.startingLife !== "number" || !Number.isSafeInteger(value.startingLife))
+  )
+    return null
+  return {
+    publicId: value.publicId,
+    status: value.status,
+    isHost: value.isHost,
+    playerCount: value.playerCount,
+    ruleset: value.ruleset,
+    updatedAt: value.updatedAt,
+    ...(typeof value.system === "string" ? { system: value.system } : {}),
+    ...(typeof value.format === "string" ? { format: value.format } : {}),
+    ...(value.deckRequired === true ? { deckRequired: true } : {}),
+    ...(value.startingLife !== undefined ? { startingLife: value.startingLife } : {}),
+  }
+}
+
+const resumeOrder = (left: ResumableGame, right: ResumableGame) =>
+  Number(right.isHost) - Number(left.isHost) || right.updatedAt - left.updatedAt
+
+function filteredResumeBound(games: Array<ResumableGame | null>): ResumableGame[] {
+  return games
+    .filter((game): game is ResumableGame => game !== null)
+    .sort(resumeOrder)
+    .slice(0, RESUME_INDEX_LIMIT)
+}
+
+const resumeIndexListeners = new Set<() => void>()
+
+export function subscribeResumeIndex(listener: () => void): () => void {
+  resumeIndexListeners.add(listener)
+  return () => {
+    resumeIndexListeners.delete(listener)
+  }
+}
+
+function notifyResumeIndexChanged(): void {
+  for (const listener of [...resumeIndexListeners]) listener()
+}
+
 const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
   parsePending,
   parseFailed,
@@ -243,6 +309,7 @@ export class ConnectedGameRepository {
     private readonly storage: ConnectedStringStorage = mmkvStorage,
     private readonly ownerId = "anonymous",
     limits: Partial<ConnectedPersistenceLimits> = {},
+    private readonly deployment = connectedDeploymentScope(),
   ) {
     this.outbox = new DurableOutbox(storage, ownerId, outboxKeys, outboxCodec, limits)
   }
@@ -264,6 +331,53 @@ export class ConnectedGameRepository {
       return null
     }
     return projection
+  }
+
+  syncResumeIndex(games: readonly ResumableGame[], exhaustedPageSet: boolean): void {
+    if (this.ownerId === "anonymous") return
+    if (exhaustedPageSet) {
+      this.persistResumeIndex(filteredResumeBound(games.map(parseResumeEntry)))
+      return
+    }
+    const current = this.loadResumeIndex()
+    const byId = new Map(current.map((game) => [game.publicId, game]))
+    for (const candidate of games) {
+      const game = parseResumeEntry(candidate)
+      if (game) byId.set(game.publicId, game)
+    }
+    this.persistResumeIndex([...byId.values()])
+  }
+
+  loadResumeIndex(): ResumableGame[] {
+    if (this.ownerId === "anonymous") return []
+    const stored = parseJson(
+      this.storage.getString(CONNECTED_KEYS.resumeIndex(this.ownerId, this.deployment)),
+    )
+    if (!isRecord(stored) || stored.schemaVersion !== 1 || !Array.isArray(stored.games)) return []
+    return filteredResumeBound(stored.games.map(parseResumeEntry))
+  }
+
+  removeResumeEntry(gameId: string): void {
+    if (this.ownerId === "anonymous") return
+    const current = this.loadResumeIndex()
+    const remaining = current.filter((game) => game.publicId !== gameId)
+    if (remaining.length === current.length) return
+    this.persistResumeIndex(remaining)
+  }
+
+  private persistResumeIndex(next: ResumableGame[]): void {
+    const bounded =
+      next.length > RESUME_INDEX_LIMIT
+        ? [...next].sort(resumeOrder).slice(0, RESUME_INDEX_LIMIT)
+        : next
+    const key = CONNECTED_KEYS.resumeIndex(this.ownerId, this.deployment)
+    const serialized = JSON.stringify({
+      schemaVersion: 1,
+      games: bounded,
+    } as const)
+    if (this.storage.getString(key) === serialized) return
+    this.storage.set(key, serialized)
+    notifyResumeIndexChanged()
   }
 
   isMembershipMigrationComplete(): boolean {
