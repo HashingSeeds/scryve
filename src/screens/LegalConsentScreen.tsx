@@ -99,7 +99,7 @@ export function LegalConsentScreen({
             testID="first-use-analytics-switch"
             label="Share usage with Scryve"
             value={sharing}
-            helper="Off by default. Sharing helps us build what you want."
+            helper="Off by default. Sharing helps us build what you want. Details in Privacy Policy."
             onValueChange={setSharing}
           />
         ) : null}
