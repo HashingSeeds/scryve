@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { router, type ErrorBoundaryProps } from "expo-router"
 import { useClerk, useUser } from "@clerk/expo"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
@@ -39,15 +39,13 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
 export default function DeleteAccountRoute() {
   const auth = useAuthAccess()
   const [receiptToken, setReceiptToken] = useState(loadAccountDeletionReceiptToken)
-  const analyticsIdRotatedForToken = useRef<string | undefined>(undefined)
   const rememberReceipt = useCallback((token: string) => {
     if (!isValidReceiptToken(token)) return
-    if (analyticsIdRotatedForToken.current !== token) {
-      analyticsIdRotatedForToken.current = token
+    if (loadAccountDeletionReceiptToken() !== token) {
       new LocalGameRepository().resetAnalyticsId()
+      saveAccountDeletionReceiptToken(token)
     }
     setReceiptToken(token)
-    saveAccountDeletionReceiptToken(token)
   }, [])
   if (!auth.configured || !auth.isSignedIn)
     if (auth.configured && receiptToken)

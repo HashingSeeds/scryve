@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import { useClerk } from "@clerk/expo"
 import { useQuery } from "convex/react"
 
 import {
   isValidReceiptToken,
+  loadAccountDeletionReceiptToken,
   saveAccountDeletionReceiptToken,
 } from "@/features/auth/accountDeletionReceiptStore"
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -24,16 +25,15 @@ function SignedInDeletionGuard() {
     api.accountDeletion.currentAccountDeletion,
     auth.isSignedIn ? {} : "skip",
   )
-  const handledToken = useRef<string | undefined>(undefined)
-
   useEffect(() => {
     if (!auth.isSignedIn || !deletion || deletion.status === "failed") return
-    if (deletion.receiptToken && isValidReceiptToken(deletion.receiptToken)) {
-      if (handledToken.current !== deletion.receiptToken) {
-        handledToken.current = deletion.receiptToken
-        new LocalGameRepository().resetAnalyticsId()
-        saveAccountDeletionReceiptToken(deletion.receiptToken)
-      }
+    if (
+      deletion.receiptToken &&
+      isValidReceiptToken(deletion.receiptToken) &&
+      loadAccountDeletionReceiptToken() !== deletion.receiptToken
+    ) {
+      new LocalGameRepository().resetAnalyticsId()
+      saveAccountDeletionReceiptToken(deletion.receiptToken)
     }
     void clerk.signOut().catch(() => undefined)
   }, [auth.isSignedIn, clerk, deletion])

@@ -19,7 +19,10 @@ const mockOpenAuth = jest.fn()
 const mockResetAnalyticsId = jest.fn()
 const mockSignOut = jest.fn(async () => undefined)
 const mockRequestDeletion = jest.fn()
-const mockSaveReceiptToken = jest.fn((_token: string) => true)
+const mockSaveReceiptToken = jest.fn((token: string) => {
+  mockReceiptToken = token
+  return true
+})
 let mockIsSignedIn = false
 let mockDeletion:
   | {

@@ -6,6 +6,7 @@ const mockSignOut = jest.fn(async () => undefined)
 const mockSaveReceiptToken = jest.fn((_token: string) => true)
 const mockResetAnalyticsId = jest.fn(() => "analytics-id")
 let mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
+let mockLoadedReceiptToken: string | undefined = undefined
 let mockDeletion: { status: string; receiptToken?: string } | null | undefined = null
 
 jest.mock("@clerk/expo", () => ({
@@ -19,6 +20,7 @@ jest.mock("@/features/auth/AuthContext", () => ({
 }))
 jest.mock("@/features/auth/accountDeletionReceiptStore", () => ({
   isValidReceiptToken: (token: string) => /^[0-9a-f]{64}$/.test(token),
+  loadAccountDeletionReceiptToken: () => mockLoadedReceiptToken,
   saveAccountDeletionReceiptToken: (...args: [string]) => mockSaveReceiptToken(...args),
 }))
 jest.mock("@/features/game/localPersistence", () => ({
@@ -29,6 +31,7 @@ describe("AccountDeletionSessionGuard", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
+    mockLoadedReceiptToken = undefined
     mockDeletion = null
   })
 
@@ -40,6 +43,17 @@ describe("AccountDeletionSessionGuard", () => {
     expect(view.toJSON()).toBeNull()
     expect(mockSaveReceiptToken).toHaveBeenCalledWith("f".repeat(64))
     expect(mockResetAnalyticsId).toHaveBeenCalledTimes(1)
+    expect(mockSignOut).toHaveBeenCalledTimes(1)
+  })
+
+  it("rotates once when the receipt is already saved", () => {
+    mockLoadedReceiptToken = "f".repeat(64)
+    mockDeletion = { status: "processing", receiptToken: "f".repeat(64) }
+
+    render(<AccountDeletionSessionGuard />)
+
+    expect(mockResetAnalyticsId).not.toHaveBeenCalled()
+    expect(mockSaveReceiptToken).not.toHaveBeenCalled()
     expect(mockSignOut).toHaveBeenCalledTimes(1)
   })
 
