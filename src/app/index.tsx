@@ -132,6 +132,8 @@ export default function Index() {
 }
 
 const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexGrow: 1,
+  justifyContent: "space-between",
   width: "100%",
   maxWidth: 480,
   alignSelf: "center",
