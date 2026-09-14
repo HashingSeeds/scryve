@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/theme/context"
 import {
   CommanderDamageBoard,
   commanderCellTestId,
+  commanderChipTestId,
   commanderStageTestId,
   commanderSwordTestId,
 } from "./CommanderDamageBoard"
@@ -122,5 +123,40 @@ describe("CommanderDamageBoard", () => {
     const view = board({ maxSize: { width: 8, height: 8 } }, 1)
     const cell = view.getByTestId(commanderCellTestId(2, ids[0]))
     expect(StyleSheet.flatten(cell.props.style).width).toBe(COMMANDER_MIN_CELL_SIZE)
+  })
+
+  it("dims zero totals in the inspection grid so real damage stands out", () => {
+    const players = ids.map((id, index) => ({
+      id,
+      name: `Player ${index + 1}`,
+      color: "#C0392B",
+      life: 40,
+      seat: index + 1,
+    }))
+    const view = board(
+      {
+        players,
+        incoming: { [ids[0]]: 5 } as Record<PlayerId, number>,
+      },
+      1,
+    )
+    const idle = StyleSheet.flatten(view.getByTestId(commanderCellTestId(2, ids[2])).props.style)
+    const active = StyleSheet.flatten(view.getByTestId(commanderCellTestId(2, ids[0])).props.style)
+    expect(idle.opacity).toBeLessThan(1)
+    expect(active.opacity).toBeUndefined()
+  })
+
+  it("seats each mark on the attacker color with a readable glyph", () => {
+    const players = ids.map((id, index) => ({
+      id,
+      name: `Player ${index + 1}`,
+      color: "#C0392B",
+      life: 40,
+      seat: index + 1,
+    }))
+    const view = board({ players }, 1)
+    expect(
+      StyleSheet.flatten(view.getByTestId(commanderChipTestId(2, ids[0])).props.style),
+    ).toMatchObject({ backgroundColor: "#C0392B" })
   })
 })

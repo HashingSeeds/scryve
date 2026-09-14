@@ -5,6 +5,7 @@ import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { accessibleForeground } from "@/utils/colorContrast"
 
 import {
   COMMANDER_CELL_SIZE,
@@ -40,6 +41,8 @@ export interface CommanderDamageBoardProps {
 
 export const commanderCellTestId = (seatNumber: number, playerId: PlayerId) =>
   `commander-cell-seat-${seatNumber}-${playerId}`
+export const commanderChipTestId = (seatNumber: number, playerId: PlayerId) =>
+  `commander-chip-seat-${seatNumber}-${playerId}`
 export const commanderSwordTestId = (seatNumber: number) => `commander-sword-seat-${seatNumber}`
 export const commanderStageTestId = (seatNumber: number, step: number) =>
   `commander-stage-seat-${seatNumber}-${step}`
@@ -93,14 +96,15 @@ export function CommanderDamageBoard({
       {grid.cells.map((cellRow, rowIndex) => (
         <View key={rowIndex} style={themed($row)}>
           {cellRow.map((playerId, columnIndex) => {
-            if (!playerId) return <View key={columnIndex} style={{ width: size, height: size }} />
+            if (!playerId) return null
 
             if (players) {
               const playerIndex = players.findIndex((player) => player.id === playerId)
               const player = players[playerIndex]
               const ownSeat = playerId === ownerPlayerId
               const total = incoming[playerId] ?? 0
-              const fontSize = Math.min(36, Math.floor(size * 0.42))
+              const fontSize = Math.min(36, Math.floor(size * 0.45))
+              const disc = Math.max(12, Math.floor(size * 0.32))
               return (
                 <View
                   key={columnIndex}
@@ -114,16 +118,30 @@ export function CommanderDamageBoard({
                   style={[
                     themed($inspectionCell),
                     { width: size, height: size },
-                    ownSeat && themed($cellIdle),
+                    (ownSeat || total === 0) && themed($cellIdle),
                   ]}
                 >
                   <View style={[themed($inspectionValue), seatedGlyphRotation]}>
-                    <PlayerMark
-                      seatNumber={playerIndex + 1}
-                      shape={player.shape}
-                      color={foreground}
-                      size={Math.max(12, Math.floor(size * 0.2))}
-                    />
+                    <View
+                      testID={commanderChipTestId(seatNumber, playerId)}
+                      style={[
+                        themed($inspectionChip),
+                        {
+                          width: disc,
+                          height: disc,
+                          borderRadius: disc / 2,
+                          backgroundColor: player.color,
+                          marginBottom: Math.round(fontSize * 0.15),
+                        },
+                      ]}
+                    >
+                      <PlayerMark
+                        seatNumber={playerIndex + 1}
+                        shape={player.shape}
+                        color={accessibleForeground(player.color)}
+                        size={Math.floor(disc * 0.72)}
+                      />
+                    </View>
                     <Text
                       text={ownSeat ? "·" : String(total)}
                       weight="medium"
@@ -207,6 +225,7 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   gap: spacing.xxxs,
   alignItems: "center",
+  justifyContent: "center",
 })
 
 const $cell: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -231,4 +250,8 @@ const $inspectionValue: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xxs,
+})
+const $inspectionChip: ThemedStyle<ViewStyle> = () => ({
+  alignItems: "center",
+  justifyContent: "center",
 })
