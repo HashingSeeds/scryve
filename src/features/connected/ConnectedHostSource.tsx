@@ -138,10 +138,27 @@ function ConnectedHostQuerySource({
       activeGamesState.nextPage.status === "exhausted",
     )
   }, [connectedUserId, resumeRepository, activeGamesState])
-  const [cachedResumeGames, setCachedResumeGames] = useState<ResumableGame[]>([])
+  const [cachedResumeState, setCachedResumeState] = useState(() => ({
+    repository: resumeRepository,
+    games: resumeRepository.loadResumeIndex(),
+  }))
+  if (cachedResumeState.repository !== resumeRepository)
+    setCachedResumeState({
+      repository: resumeRepository,
+      games: resumeRepository.loadResumeIndex(),
+    })
+  const cachedResumeGames = cachedResumeState.games
   useEffect(() => {
-    setCachedResumeGames(resumeRepository.loadResumeIndex())
-    return subscribeResumeIndex(() => setCachedResumeGames(resumeRepository.loadResumeIndex()))
+    setCachedResumeState({
+      repository: resumeRepository,
+      games: resumeRepository.loadResumeIndex(),
+    })
+    return subscribeResumeIndex(() =>
+      setCachedResumeState({
+        repository: resumeRepository,
+        games: resumeRepository.loadResumeIndex(),
+      }),
+    )
   }, [resumeRepository])
 
   async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
