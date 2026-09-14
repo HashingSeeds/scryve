@@ -927,7 +927,6 @@ export const publishLocalGame = mutation({
 
 export const claimableSeats = mutation({
   args: {
-    publicId: v.string(),
     token: v.optional(v.string()),
     manualCode: v.optional(v.string()),
   },
@@ -939,7 +938,6 @@ export const claimableSeats = mutation({
     const game = await ctx.db.get(invite.gameId)
     if (
       !game ||
-      game.publicId !== args.publicId ||
       game.status !== "active" ||
       !(await inviteIsCurrent(ctx, game, invite, Date.now()))
     )
@@ -951,6 +949,7 @@ export const claimableSeats = mutation({
         throw new Error("You cannot join a game with a player you blocked or who blocked you")
     }
     return {
+      publicId: game.publicId,
       mode: game.mode,
       seats: players
         .filter((player) => player.userId === undefined)
