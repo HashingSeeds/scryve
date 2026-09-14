@@ -15,9 +15,11 @@ import type { ThemedStyle } from "@/theme/types"
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
 import {
+  COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   COMPACT_LIFE_TARGET_SIZE,
   getLifeFontSizeThatFits,
   getLifeTargetTextSpace,
+  LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
@@ -93,6 +95,8 @@ export function PlayerGrid({
     digits: Math.max(...players.map((player) => String(player.life).length)),
     fontScale,
     targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
+    sidewaysGlyphReserve:
+      2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs),
   })
 
   function measureBoard(event: LayoutChangeEvent) {
@@ -260,15 +264,27 @@ export function getLifeFontSize(input: {
   digits: number
   fontScale: number
   targetSize: number
+  sidewaysGlyphReserve: number
 }): number | undefined {
   if (!(input.cellWidth > 0) || !(input.cellHeight > 0)) return undefined
   const targetSpace = getLifeTargetTextSpace(input.targetSize)
-  return getLifeFontSizeThatFits({
-    availableWidth: Math.max(Math.min(input.cellWidth - LIFE_CONTROL_GUTTER * 2, targetSpace), 1),
-    availableHeight: Math.max(Math.min(input.cellHeight * LIFE_HEIGHT_RATIO, targetSpace), 1),
-    digits: input.digits,
-    fontScale: input.fontScale,
-  })
+  const fit = (availableWidth: number, availableHeight: number) =>
+    getLifeFontSizeThatFits({
+      availableWidth,
+      availableHeight,
+      digits: input.digits,
+      fontScale: input.fontScale,
+    })
+  return Math.min(
+    fit(
+      Math.max(Math.min(input.cellWidth - LIFE_CONTROL_GUTTER * 2, targetSpace), 1),
+      Math.max(Math.min(input.cellHeight * LIFE_HEIGHT_RATIO, targetSpace), 1),
+    ),
+    fit(
+      Math.max(Math.min(input.cellHeight - input.sidewaysGlyphReserve, targetSpace), 1),
+      Math.max(Math.min(input.cellWidth - LIFE_CONTROL_GUTTER * 2, targetSpace), 1),
+    ),
+  )
 }
 
 export function getPlayerGridRows(

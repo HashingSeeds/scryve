@@ -3,8 +3,14 @@ import { fireEvent, render } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
+import { spacing } from "@/theme/spacing"
 
-import { COMPACT_LIFE_TARGET_SIZE, LIFE_TARGET_SIZE } from "./playerCardTypes"
+import {
+  COMPACT_LIFE_GLYPH_LINE_HEIGHT,
+  COMPACT_LIFE_TARGET_SIZE,
+  LIFE_GLYPH_LINE_HEIGHT,
+  LIFE_TARGET_SIZE,
+} from "./playerCardTypes"
 import {
   getCellSize,
   getLifeFontSize,
@@ -268,6 +274,10 @@ describe("PlayerGrid", () => {
   describe("life total sizing", () => {
     const board = { width: 390, height: 690 }
 
+    function glyphReserve(compact: boolean) {
+      return 2 * ((compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)
+    }
+
     function sizeFor(playerCount: number, digits = 2, fontScale = 1) {
       const layout = getPlayerGridLayout({ playerCount, width: 390, height: 844 })
       return getLifeFontSize({
@@ -275,6 +285,7 @@ describe("PlayerGrid", () => {
         digits,
         fontScale,
         targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
+        sidewaysGlyphReserve: glyphReserve(layout.compact),
       })
     }
 
@@ -286,6 +297,7 @@ describe("PlayerGrid", () => {
           digits: 2,
           fontScale: 1,
           targetSize: COMPACT_LIFE_TARGET_SIZE,
+          sidewaysGlyphReserve: glyphReserve(true),
         }),
       ).toBeUndefined()
     })
@@ -310,9 +322,19 @@ describe("PlayerGrid", () => {
         digits: 2,
         fontScale: 1.3,
         targetSize: COMPACT_LIFE_TARGET_SIZE,
+        sidewaysGlyphReserve: glyphReserve(true),
       })!
 
       expect(size * 1.3 * 2 * 0.62).toBeLessThanOrEqual(COMPACT_LIFE_TARGET_SIZE - 16)
+    })
+
+    it("leaves room for the edge glyphs beside long sideways totals", () => {
+      const layout = getPlayerGridLayout({ playerCount: 6, width: 390, height: 844 })
+      const { cellHeight } = getCellSize({ board, layout, gap: 4 })
+      for (const digits of [2, 3, 4]) {
+        const size = sizeFor(6, digits)!
+        expect(size * digits * 0.62).toBeLessThanOrEqual(cellHeight - glyphReserve(true))
+      }
     })
 
     it("keeps every seat on one shared size so the board reads as a scoreboard", () => {
@@ -330,6 +352,7 @@ describe("PlayerGrid", () => {
           digits: 9,
           fontScale: 1,
           targetSize: COMPACT_LIFE_TARGET_SIZE,
+          sidewaysGlyphReserve: glyphReserve(true),
         }),
       ).toBe(12)
     })

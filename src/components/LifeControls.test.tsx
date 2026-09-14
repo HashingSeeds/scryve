@@ -134,4 +134,34 @@ describe("LifeControls", () => {
       flexDirection: "column-reverse",
     })
   })
+
+  it("pins sideways glyphs to the outer edges clear of the rotated life total", () => {
+    const left = render(
+      <ThemeProvider initialContext="light">
+        <LifeControls playerName="Ada" contentRotation={90} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(StyleSheet.flatten(left.getByTestId("life-seat-1--1").props.style)).toMatchObject({
+      justifyContent: "flex-start",
+      alignItems: "center",
+    })
+    expect(StyleSheet.flatten(left.getByTestId("life-seat-1-1").props.style)).toMatchObject({
+      justifyContent: "flex-end",
+      alignItems: "center",
+    })
+
+    const right = render(
+      <ThemeProvider initialContext="light">
+        <LifeControls playerName="Grace" contentRotation={-90} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    expect(StyleSheet.flatten(right.getByTestId("life-seat-1--1").props.style)).toMatchObject({
+      justifyContent: "flex-end",
+      alignItems: "center",
+    })
+    expect(StyleSheet.flatten(right.getByTestId("life-seat-1-1").props.style)).toMatchObject({
+      justifyContent: "flex-start",
+      alignItems: "center",
+    })
+  })
 })
