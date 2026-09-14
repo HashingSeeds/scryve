@@ -1586,6 +1586,113 @@ export const finishGame = mutation({
   },
 })
 
+type CompletionResult =
+  { kind: "win"; winnerPlayerIds: Id<"gamePlayers">[] } | { kind: "draw" } | { kind: "unknown" }
+
+function completionRequestKey(
+  publicId: string,
+  kind: "finish" | "abandon",
+  result: CompletionResult,
+) {
+  return JSON.stringify([publicId, kind, result])
+}
+
+async function completeGameWithOperation(
+  ctx: MutationCtx,
+  args: {
+    publicId: string
+    operationId: string
+    kind: "finish" | "abandon"
+    result?: CompletionResult
+  },
+) {
+  assertOperationId(args.operationId)
+  const result: CompletionResult =
+    args.kind === "finish" ? (args.result ?? { kind: "unknown" }) : { kind: "unknown" }
+  const requestKey = completionRequestKey(args.publicId, args.kind, result)
+  const game = await gameByPublicId(ctx, args.publicId)
+  const user = await requireHost(ctx, game)
+  const existing = await ctx.db
+    .query("gameCompletionReceipts")
+    .withIndex("by_host_and_operation_id", (q) =>
+      q.eq("hostUserId", user._id).eq("operationId", args.operationId),
+    )
+    .unique()
+  if (existing) {
+    if (existing.gameId !== game._id || existing.requestKey !== requestKey)
+      throw new Error("Operation identifier was reused with different data")
+    return { ...existing.ack, deduplicated: true }
+  }
+  if (game.status === "finished" || game.status === "abandoned") {
+    const summary = await ctx.db
+      .query("gameSummaries")
+      .withIndex("by_game", (q) => q.eq("gameId", game._id))
+      .unique()
+    if (!summary) throw new Error("Game already has a terminal state without a summary")
+    return {
+      publicId: game.publicId,
+      summaryId: summary._id,
+      finishedAt: summary.finishedAt,
+      deduplicated: false,
+      superseded: true as const,
+    }
+  }
+  if (args.kind === "finish" && game.status !== "active")
+    throw new Error("Only an active game can be finished")
+  const summary = await terminalizeGame(
+    ctx,
+    game,
+    args.kind === "finish" ? "finished" : "abandoned",
+    args.kind === "finish" ? "host_finished" : "host_abandoned",
+    user._id,
+    result,
+  )
+  const ack = {
+    publicId: game.publicId,
+    summaryId: summary._id,
+    finishedAt: summary.finishedAt,
+  }
+  await ctx.db.insert("gameCompletionReceipts", {
+    hostUserId: user._id,
+    gameId: game._id,
+    operationId: args.operationId,
+    requestKey,
+    ack,
+  })
+  return { ...ack, deduplicated: false }
+}
+
+export const finishGameWithOperation = mutation({
+  args: {
+    publicId: v.string(),
+    operationId: v.string(),
+    result: v.optional(
+      v.union(
+        v.object({ kind: v.literal("win"), winnerPlayerIds: v.array(v.id("gamePlayers")) }),
+        v.object({ kind: v.literal("draw") }),
+        v.object({ kind: v.literal("unknown") }),
+      ),
+    ),
+  },
+  handler: async (ctx, args) =>
+    completeGameWithOperation(ctx, {
+      publicId: args.publicId,
+      operationId: args.operationId,
+      kind: "finish",
+      ...(args.result === undefined ? {} : { result: args.result }),
+    }),
+})
+
+export const abandonGameWithOperation = mutation({
+  args: { publicId: v.string(), operationId: v.string() },
+  handler: async (ctx, args) =>
+    completeGameWithOperation(ctx, {
+      publicId: args.publicId,
+      operationId: args.operationId,
+      kind: "abandon",
+    }),
+})
+
 export const leaveMyGame = mutation({
   args: { publicId: v.string(), deviceId: v.optional(v.string()) },
   handler: async (ctx, args) => {

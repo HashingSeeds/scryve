@@ -7,6 +7,7 @@ import schema from "./schema"
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
+  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
   "./games.ts": async () => jest.requireActual("./games"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
@@ -1620,5 +1621,208 @@ describe("connected commander damage claims", () => {
         resolutionOperationId: "commander-resolution-legacy-binding",
       }),
     ).rejects.toThrow("reused with different data")
+  })
+})
+
+describe("Convex replay-safe game completion", () => {
+  it("replays the original acknowledgement after a lost response without duplicate effects", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const args = {
+      publicId: game.publicId,
+      operationId: "completion-finish-replay-01",
+      result: { kind: "win" as const, winnerPlayerIds: [game.hostPlayerId] },
+    }
+    const first = await game.host.mutation(api.games.finishGameWithOperation, args)
+    expect(first).toMatchObject({
+      publicId: game.publicId,
+      deduplicated: false,
+      summaryId: expect.any(String),
+      finishedAt: expect.any(Number),
+    })
+    await expect(
+      game.host.mutation(api.games.finishGameWithOperation, args),
+    ).resolves.toMatchObject({
+      ...first,
+      deduplicated: true,
+    })
+    const state = await t.run(async (ctx) => ({
+      summaries: await ctx.db.query("gameSummaries").collect(),
+      history: await ctx.db.query("gameHistoryEntries").collect(),
+      deckResults: await ctx.db.query("deckGameResults").collect(),
+      receipts: await ctx.db.query("gameCompletionReceipts").collect(),
+    }))
+    expect(state.summaries).toHaveLength(1)
+    expect(state.history).toHaveLength(2)
+    expect(state.deckResults).toHaveLength(0)
+    expect(state.receipts).toHaveLength(1)
+  })
+
+  it("rejects the same completion operation ID with a different payload", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const args = {
+      publicId: game.publicId,
+      operationId: "completion-mismatch-check1",
+      result: { kind: "draw" as const },
+    }
+    const first = await game.host.mutation(api.games.finishGameWithOperation, args)
+    await expect(
+      game.host.mutation(api.games.finishGameWithOperation, {
+        ...args,
+        result: { kind: "win", winnerPlayerIds: [game.hostPlayerId] },
+      }),
+    ).rejects.toThrow("reused with different data")
+    await expect(
+      game.host.mutation(api.games.abandonGameWithOperation, {
+        publicId: game.publicId,
+        operationId: args.operationId,
+      }),
+    ).rejects.toThrow("reused with different data")
+    await game.host.mutation(api.games.createLobby, {
+      publicId: "mismatch-second-game-01",
+      playerCount: 2,
+      startingLife: 20,
+      ruleset: "standard",
+      inviteToken: "m".repeat(43),
+      manualCodeCandidates: ["MIS234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+    })
+    await expect(
+      game.host.mutation(api.games.finishGameWithOperation, {
+        publicId: "mismatch-second-game-01",
+        operationId: args.operationId,
+        result: { kind: "draw" as const },
+      }),
+    ).rejects.toThrow("reused with different data")
+    expect(first).toMatchObject({ deduplicated: false })
+  })
+
+  it("returns the authoritative summary for a competing finish or abandon operation", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const abandoned = await game.host.mutation(api.games.abandonGameWithOperation, {
+      publicId: game.publicId,
+      operationId: "completion-abandon-winner1",
+    })
+    expect(abandoned).toMatchObject({ deduplicated: false, summaryId: expect.any(String) })
+    await expect(
+      game.host.mutation(api.games.finishGameWithOperation, {
+        publicId: game.publicId,
+        operationId: "completion-compete-finish01",
+        result: { kind: "win", winnerPlayerIds: [game.hostPlayerId] },
+      }),
+    ).resolves.toMatchObject({
+      summaryId: abandoned.summaryId,
+      finishedAt: abandoned.finishedAt,
+      deduplicated: false,
+      superseded: true,
+    })
+    await expect(
+      game.host.mutation(api.games.finishGame, { publicId: game.publicId }),
+    ).rejects.toThrow("Only an active game")
+  })
+
+  it("keeps completion host-only and leaves the game untouched for non-hosts", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await expect(
+      game.joiner.mutation(api.games.finishGameWithOperation, {
+        publicId: game.publicId,
+        operationId: "completion-nonhost-finish1",
+      }),
+    ).rejects.toThrow("Host permission")
+    await expect(
+      game.joiner.mutation(api.games.abandonGameWithOperation, {
+        publicId: game.publicId,
+        operationId: "completion-nonhost-aband1",
+      }),
+    ).rejects.toThrow("Host permission")
+    await expect(
+      t.mutation(api.games.finishGameWithOperation, {
+        publicId: game.publicId,
+        operationId: "completion-nonhost-aband2",
+      }),
+    ).rejects.toThrow("Authentication required")
+    const summaryCount = await t.run((ctx) => ctx.db.query("gameSummaries").collect())
+    expect(summaryCount).toHaveLength(0)
+    await expect(
+      game.host.mutation(api.games.finishGameWithOperation, {
+        publicId: game.publicId,
+        operationId: "completion-nonhost-after1",
+      }),
+    ).resolves.toMatchObject({ deduplicated: false })
+  })
+
+  it("preserves legacy endpoint behavior alongside the receipt-bound operations", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const legacy = await game.host.mutation(api.games.finishGame, { publicId: game.publicId })
+    await expect(
+      game.host.mutation(api.games.finishGameWithOperation, {
+        publicId: game.publicId,
+        operationId: "completion-after-legacy-1",
+      }),
+    ).resolves.toMatchObject({
+      summaryId: legacy.summaryId,
+      finishedAt: legacy.finishedAt,
+      superseded: true,
+    })
+    await expect(
+      game.host.mutation(api.games.finishGame, { publicId: game.publicId }),
+    ).rejects.toThrow("Only an active game")
+  })
+
+  it("abandons a lobby once, replays identically, and requires an active game to finish", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await lobby(t)
+    const args = { publicId: created.publicId, operationId: "completion-lobby-abandon-1" }
+    const first = await host.mutation(api.games.abandonGameWithOperation, args)
+    await expect(host.mutation(api.games.abandonGameWithOperation, args)).resolves.toMatchObject({
+      ...first,
+      deduplicated: true,
+    })
+    await expect(
+      host.mutation(api.games.finishGameWithOperation, {
+        publicId: created.publicId,
+        operationId: "completion-lobby-finish-1",
+      }),
+    ).resolves.toMatchObject({
+      summaryId: first.summaryId,
+      finishedAt: first.finishedAt,
+      superseded: true,
+    })
+  })
+
+  it("deletes completion receipts during bounded account-deletion cleanup", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await game.host.mutation(api.games.finishGameWithOperation, {
+      publicId: game.publicId,
+      operationId: "completion-deletion-cleanup1",
+    })
+    const { user, request } = await t.run(async (ctx) => {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "host-subject"))
+        .unique()
+      const requestId = await ctx.db.insert("accountDeletionRequests", {
+        clerkUserId: user!.clerkUserId,
+        userId: user!._id,
+        status: "processing",
+        attempts: 0,
+        requestedAt: 1_700_000_000_000,
+        updatedAt: 1_700_000_000_000,
+      })
+      return { user: user!, request: await ctx.db.get(requestId) }
+    })
+    expect(user).toBeDefined()
+    expect(request).toBeDefined()
+    for (let pass = 0; pass < 5; pass += 1) {
+      await t.mutation(internal.accountDeletion.processUserLinkedData, { requestId: request!._id })
+    }
+    const remaining = await t.run((ctx) => ctx.db.query("gameCompletionReceipts").collect())
+    expect(remaining).toHaveLength(0)
   })
 })
