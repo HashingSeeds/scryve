@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { act, render, waitFor } from "@testing-library/react-native"
 
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
@@ -100,14 +101,21 @@ function game(publicId: string, updatedAt: number, isHost = true): ResumableGame
 
 function renderSource() {
   feedFeeds.length = 0
+  committedFeeds.length = 0
   return render(
     <ConnectedHostSource onLobbyCreated={(_: CreatedLobby) => undefined}>
-      {(feed) => {
-        feedFeeds.push(feed)
-        return null
-      }}
+      {(feed) => <FeedCommitProbe feed={feed} />}
     </ConnectedHostSource>,
   )
+}
+
+const committedFeeds: ConnectedHostFeed[] = []
+
+function FeedCommitProbe({ feed }: { feed: ConnectedHostFeed }) {
+  useEffect(() => {
+    committedFeeds.push(feed)
+  }, [feed])
+  return null
 }
 
 describe("ConnectedHostSource durable resume discovery", () => {
@@ -134,7 +142,9 @@ describe("ConnectedHostSource durable resume discovery", () => {
       retry: jest.fn(),
     }
     const view = renderSource()
-    await waitFor(() => expect(feedFeeds[feedFeeds.length - 1].activeGames?.length).toBe(2))
+    await waitFor(() =>
+      expect(committedFeeds[committedFeeds.length - 1].activeGames?.length).toBe(2),
+    )
 
     mockProfileState = {
       status: "offline",
@@ -144,17 +154,16 @@ describe("ConnectedHostSource durable resume discovery", () => {
     mockPaginated = { results: [], status: "LoadingFirstPage", loadMore: () => undefined }
     view.rerender(
       <ConnectedHostSource onLobbyCreated={() => undefined}>
-        {(feed) => {
-          feedFeeds.push(feed)
-          return null
-        }}
+        {(feed) => <FeedCommitProbe feed={feed} />}
       </ConnectedHostSource>,
     )
     await waitFor(() =>
-      expect(feedFeeds[feedFeeds.length - 1].activeGames?.map(({ publicId }) => publicId)).toEqual([
-        "game-online",
-        "game-joined",
-      ]),
+      expect(committedFeeds[committedFeeds.length - 1]?.activeGames?.length).toBe(2),
+    )
+    await waitFor(() =>
+      expect(
+        committedFeeds[committedFeeds.length - 1]?.activeGames?.map(({ publicId }) => publicId),
+      ).toEqual(["game-online", "game-joined"]),
     )
   })
 
@@ -173,9 +182,9 @@ describe("ConnectedHostSource durable resume discovery", () => {
     mockPaginated = { results: [], status: "LoadingFirstPage", loadMore: () => undefined }
     renderSource()
     await waitFor(() =>
-      expect(feedFeeds[feedFeeds.length - 1].activeGames?.map(({ publicId }) => publicId)).toEqual([
-        "game-cached",
-      ]),
+      expect(
+        committedFeeds[committedFeeds.length - 1].activeGames?.map(({ publicId }) => publicId),
+      ).toEqual(["game-cached"]),
     )
   })
 
@@ -190,24 +199,26 @@ describe("ConnectedHostSource durable resume discovery", () => {
     mockPaginated = { results: [], status: "LoadingFirstPage", loadMore: () => undefined }
     const view = renderSource()
     await waitFor(() =>
-      expect(feedFeeds[feedFeeds.length - 1].activeGames?.map(({ publicId }) => publicId)).toEqual([
-        "game-user-a",
-      ]),
+      expect(
+        committedFeeds[committedFeeds.length - 1].activeGames?.map(({ publicId }) => publicId),
+      ).toEqual(["game-user-a"]),
     )
     mockProfileState = {
       status: "offline",
       profile: { userId: "user-b", displayName: "Bo" },
       retry: jest.fn(),
     }
+    const commitsBeforeSwitch = committedFeeds.length
     view.rerender(
       <ConnectedHostSource onLobbyCreated={() => undefined}>
-        {(feed) => {
-          feedFeeds.push(feed)
-          return null
-        }}
+        {(feed) => <FeedCommitProbe feed={feed} />}
       </ConnectedHostSource>,
     )
-    expect(feedFeeds[feedFeeds.length - 1].activeGames).toBeUndefined()
+    await waitFor(() => expect(committedFeeds.length).toBeGreaterThan(commitsBeforeSwitch))
+    for (const feed of committedFeeds.slice(commitsBeforeSwitch)) {
+      expect(feed.activeGames?.map(({ publicId }) => publicId) ?? []).not.toContain("game-user-a")
+    }
+    expect(committedFeeds[committedFeeds.length - 1].activeGames).toBeUndefined()
   })
 
   it("drops the durable row after a successful explicit exit even during a partial page set", async () => {
@@ -222,10 +233,11 @@ describe("ConnectedHostSource durable resume discovery", () => {
       retry: jest.fn(),
     }
     renderSource()
-    await waitFor(() => expect(feedFeeds.length).toBeGreaterThan(0))
+    await waitFor(() => expect(committedFeeds.length).toBeGreaterThan(0))
     let exited = false
+    const latest = () => committedFeeds[committedFeeds.length - 1]
     await act(async () => {
-      exited = await feedFeeds[feedFeeds.length - 1].exitGame(game("game-left", 6, false))
+      exited = await latest().exitGame(game("game-left", 6, false))
     })
     expect(exited).toBe(true)
     expect(new ConnectedGameRepository(undefined, OWNER, {}, DEPLOYMENT).loadResumeIndex()).toEqual(

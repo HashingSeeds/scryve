@@ -58,6 +58,12 @@ export function ConnectedHostSource({
   )
 }
 
+function readResumeGamesOnRevision(
+  repository: ConnectedGameRepository,
+  revision: number,
+): ResumableGame[] {
+  return revision >= 0 ? repository.loadResumeIndex() : []
+}
 function ConnectedHostQuerySource({
   connectedProfile,
   onLobbyCreated,
@@ -138,28 +144,15 @@ function ConnectedHostQuerySource({
       activeGamesState.nextPage.status === "exhausted",
     )
   }, [connectedUserId, resumeRepository, activeGamesState])
-  const [cachedResumeState, setCachedResumeState] = useState(() => ({
-    repository: resumeRepository,
-    games: resumeRepository.loadResumeIndex(),
-  }))
-  if (cachedResumeState.repository !== resumeRepository)
-    setCachedResumeState({
-      repository: resumeRepository,
-      games: resumeRepository.loadResumeIndex(),
-    })
-  const cachedResumeGames = cachedResumeState.games
+  const [resumeIndexRevision, refreshResumeIndex] = useState(0)
   useEffect(() => {
-    setCachedResumeState({
-      repository: resumeRepository,
-      games: resumeRepository.loadResumeIndex(),
-    })
-    return subscribeResumeIndex(() =>
-      setCachedResumeState({
-        repository: resumeRepository,
-        games: resumeRepository.loadResumeIndex(),
-      }),
-    )
+    refreshResumeIndex((revision) => revision + 1)
+    return subscribeResumeIndex(() => refreshResumeIndex((revision) => revision + 1))
   }, [resumeRepository])
+  const cachedResumeGames = useMemo(
+    () => readResumeGamesOnRevision(resumeRepository, resumeIndexRevision),
+    [resumeRepository, resumeIndexRevision],
+  )
 
   async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
     captureAnalytics("connection_attempt", { action: "create", stage: "started" })
