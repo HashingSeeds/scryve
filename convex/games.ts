@@ -134,7 +134,11 @@ function displayNameForViewer(
   blocked: boolean,
 ) {
   if (blocked) return seatLabelFor(player)
-  return (user ? publicUsernameFor(user) : undefined) ?? player.usernameAtJoin ?? player.displayName
+  return (
+    (user ? publicUsernameFor(user) : undefined) ??
+    player.usernameAtJoin ??
+    (player.deletedAt || player.userId === undefined ? player.displayName : seatLabelFor(player))
+  )
 }
 
 async function displayNamesForViewer(
@@ -921,6 +925,41 @@ export const publishLocalGame = mutation({
   },
 })
 
+export const claimableSeats = mutation({
+  args: {
+    publicId: v.string(),
+    token: v.optional(v.string()),
+    manualCode: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    await consumeJoinAttempt(ctx, String(user.clerkUserId))
+    const invite = await findInvite(ctx, args)
+    if (!invite) throw new Error("Invite is invalid, expired, or revoked")
+    const game = await ctx.db.get(invite.gameId)
+    if (
+      !game ||
+      game.publicId !== args.publicId ||
+      game.status !== "active" ||
+      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+    )
+      throw new Error("Invite is invalid, expired, or revoked")
+    const players = await playersForGame(ctx, game._id)
+    for (const seated of players) {
+      if (!seated.userId || seated.userId === user._id) continue
+      if (await isBlockedBetween(ctx, user._id, seated.userId))
+        throw new Error("You cannot join a game with a player you blocked or who blocked you")
+    }
+    return {
+      mode: game.mode,
+      seats: players
+        .filter((player) => player.userId === undefined)
+        .map((player) => player.seat)
+        .sort((left, right) => left - right),
+    }
+  },
+})
+
 export const claimImportedSeat = mutation({
   args: {
     publicId: v.string(),
@@ -1322,7 +1361,8 @@ export const rotateInvite = mutation({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     await requireHost(ctx, game)
-    if (game.status !== "lobby") throw new Error("Only a lobby invite can be rotated")
+    if (game.status !== "lobby" && game.status !== "active")
+      throw new Error("Only a lobby or active game invite can be rotated")
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
     const manualCode = await allocateInvite(ctx, args.inviteToken, args.manualCodeCandidates)
