@@ -60,6 +60,8 @@ const mockRepository = {
   fail: jest.fn(),
   dismissFailed: jest.fn(),
   cleanupTerminalGame: jest.fn(),
+  syncResumeIndex: jest.fn(),
+  removeResumeEntry: jest.fn(),
 }
 
 jest.mock("./drainOutbox", () => ({
@@ -73,6 +75,7 @@ jest.mock("@/features/game/localPersistence", () => ({
 }))
 jest.mock("./persistence", () => ({
   ConnectedGameRepository: jest.fn(() => mockRepository),
+  connectedDeploymentScope: () => "test.convex.cloud",
 }))
 jest.mock("../../../convex/_generated/api", () => ({
   api: {

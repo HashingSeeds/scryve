@@ -1,5 +1,6 @@
+import type { ResumableGame } from "./connectedCopy"
 import type { ConnectedProjection, PendingLifeAction } from "./model"
-import { CONNECTED_KEYS, ConnectedGameRepository } from "./persistence"
+import { CONNECTED_KEYS, ConnectedGameRepository, RESUME_INDEX_LIMIT } from "./persistence"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
 
 class MemoryStorage {
@@ -516,5 +517,122 @@ describe("connected MMKV repository", () => {
     expect(repository.loadProjection("game-public")).toBeNull()
     expect(repository.loadOutbox("game-public")).toEqual([])
     expect(repository.loadFailed("game-public")).toEqual([])
+  })
+})
+
+function resumeEntry(publicId: string, updatedAt: number, isHost = true): ResumableGame {
+  return {
+    publicId,
+    status: "active",
+    isHost,
+    playerCount: 2,
+    ruleset: "standard",
+    updatedAt,
+    startingLife: 20,
+  }
+}
+
+function restarted(repository: ConnectedGameRepository, storage: MemoryStorage) {
+  return new ConnectedGameRepository(
+    storage,
+    (repository as unknown as { ownerId: string }).ownerId,
+    {},
+    (repository as unknown as { deployment: string }).deployment,
+  )
+}
+
+describe("connected resume index", () => {
+  it("persists hydrated rows readable by a freshly constructed repository", () => {
+    const storage = new MemoryStorage()
+    const deployment = "small-ibis-123.convex.cloud"
+    new ConnectedGameRepository(storage, "user-1", {}, deployment).syncResumeIndex(
+      [resumeEntry("game-public", 10)],
+      true,
+    )
+    const restarted = new ConnectedGameRepository(storage, "user-1", {}, deployment)
+    expect(restarted.loadResumeIndex()).toEqual([resumeEntry("game-public", 10)])
+  })
+
+  it("merges partial pages with cached entries and replaces only on an exhausted page set", () => {
+    const storage = new MemoryStorage()
+    const deployment = "small-ibis-123.convex.cloud"
+    const repository = new ConnectedGameRepository(storage, "user-1", {}, deployment)
+    repository.syncResumeIndex([resumeEntry("game-older", 1)], true)
+    repository.syncResumeIndex([resumeEntry("game-new", 5)], false)
+    expect(
+      restarted(repository, storage)
+        .loadResumeIndex()
+        .map((game) => game.publicId),
+    ).toEqual(["game-new", "game-older"])
+    repository.syncResumeIndex([], false)
+    expect(
+      restarted(repository, storage)
+        .loadResumeIndex()
+        .map((game) => game.publicId),
+    ).toEqual(["game-new", "game-older"])
+    repository.syncResumeIndex([resumeEntry("game-new", 6)], true)
+    expect(
+      restarted(repository, storage)
+        .loadResumeIndex()
+        .map((game) => game.publicId),
+    ).toEqual(["game-new"])
+  })
+
+  it("drops invalid entries when reading and caps the index", () => {
+    const storage = new MemoryStorage()
+    const deployment = "small-ibis-123.convex.cloud"
+    const repository = new ConnectedGameRepository(storage, "user-1", {}, deployment)
+    const games = Array.from({ length: RESUME_INDEX_LIMIT + 1 }, (_, index) =>
+      resumeEntry(`game-${index}`, index),
+    )
+    repository.syncResumeIndex(games, true)
+    const key = CONNECTED_KEYS.resumeIndex("user-1", deployment)
+    const stored = JSON.parse(storage.getString(key) ?? "{}")
+    stored.games.push({ publicId: "game-broken", status: "finished" })
+    storage.set(key, JSON.stringify(stored))
+    const loaded = new ConnectedGameRepository(storage, "user-1", {}, deployment).loadResumeIndex()
+    expect(loaded).toHaveLength(RESUME_INDEX_LIMIT)
+    expect(loaded.map((game) => game.publicId)).not.toContain("game-broken")
+  })
+
+  it("scopes rows by deployment and account", () => {
+    const storage = new MemoryStorage()
+    new ConnectedGameRepository(storage, "user-1", {}, "other.convex.cloud").syncResumeIndex(
+      [resumeEntry("game-other-deployment", 1)],
+      true,
+    )
+    new ConnectedGameRepository(
+      storage,
+      "user-2",
+      {},
+      "small-ibis-123.convex.cloud",
+    ).syncResumeIndex([resumeEntry("game-other-account", 1)], true)
+    const repository = new ConnectedGameRepository(
+      storage,
+      "user-1",
+      {},
+      "small-ibis-123.convex.cloud",
+    )
+    expect(repository.loadResumeIndex()).toEqual([])
+  })
+
+  it("removes a single entry without touching the rest and ignores anonymous writes", () => {
+    const storage = new MemoryStorage()
+    const deployment = "small-ibis-123.convex.cloud"
+    const repository = new ConnectedGameRepository(storage, "user-1", {}, deployment)
+    repository.syncResumeIndex([resumeEntry("game-a", 1), resumeEntry("game-b", 2)], true)
+    repository.removeResumeEntry("game-a")
+    expect(
+      restarted(repository, storage)
+        .loadResumeIndex()
+        .map(({ publicId }) => publicId),
+    ).toEqual(["game-b"])
+    const anonymous = new ConnectedGameRepository(storage, "anonymous", {}, deployment)
+    anonymous.syncResumeIndex([resumeEntry("game-anon", 1)], true)
+    anonymous.removeResumeEntry("game-b")
+    expect(anonymous.loadResumeIndex()).toEqual([])
+    expect(
+      new ConnectedGameRepository(storage, "user-1", {}, deployment).loadResumeIndex(),
+    ).toHaveLength(1)
   })
 })
