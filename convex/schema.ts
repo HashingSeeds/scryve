@@ -138,6 +138,22 @@ export default defineSchema({
     attempts: v.number(),
   }).index("by_clerk_user", ["clerkUserId"]),
 
+  gamePublishReceipts: defineTable({
+    ownerUserId: v.id("users"),
+    operationId: v.string(),
+    requestKey: v.string(),
+    publicId: v.string(),
+    manualCode: v.string(),
+    expiresAt: v.number(),
+    players: v.array(
+      v.object({
+        localId: v.string(),
+        playerId: v.id("gamePlayers"),
+        seat: v.number(),
+      }),
+    ),
+  }).index("by_owner_and_operation_id", ["ownerUserId", "operationId"]),
+
   gameEvents: defineTable({
     gameId: v.id("games"),
     playerId: v.id("gamePlayers"),
