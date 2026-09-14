@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
+import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
@@ -76,29 +77,39 @@ export function LegalConsentScreen({
       </View>
 
       <View style={themed($links)}>
-        {includesTerms ? <Button text="Read the Terms of Use" onPress={onOpenTerms} /> : null}
-        {includesPrivacy ? <Button text="Read the Privacy Policy" onPress={onOpenPrivacy} /> : null}
+        {includesTerms ? (
+          <Button
+            text="Read the Terms of Use"
+            style={themed($secondaryAction)}
+            onPress={onOpenTerms}
+          />
+        ) : null}
+        {includesPrivacy ? (
+          <Button
+            text="Read the Privacy Policy"
+            style={themed($secondaryAction)}
+            onPress={onOpenPrivacy}
+          />
+        ) : null}
       </View>
 
-      {!isReturningUser && analyticsConfigured() ? (
-        <View style={themed($links)}>
+      <View style={themed($actions)}>
+        {!isReturningUser && analyticsConfigured() ? (
           <Switch
             testID="first-use-analytics-switch"
-            label="Share usage with Scryve, optional"
+            label="Share usage with Scryve"
             value={sharing}
-            helper="Off by default. Allow PostHog to receive game starts and finishes, system, format, player count, connection failures, and use of decks and stats with a random analytics ID. Offline events upload when you reconnect. No names, clipboard contents, or PostHog recordings. Change this in Settings any time."
+            helper="Off by default. Sharing helps us build what you want. Details in Privacy Policy."
             onValueChange={setSharing}
           />
-          {sharingError ? (
-            <Text
-              accessibilityRole="alert"
-              size="xs"
-              text="Could not save your sharing choice. Try again or turn sharing off to continue."
-            />
-          ) : null}
-        </View>
-      ) : null}
-      <View style={themed($actions)}>
+        ) : null}
+        {sharingError ? (
+          <Text
+            accessibilityRole="alert"
+            size="xs"
+            text="Could not save your sharing choice. Try again or turn sharing off to continue."
+          />
+        ) : null}
         {error ? (
           <Text accessibilityRole="alert" text={error} size="xs" style={themed($error)} />
         ) : null}
@@ -106,6 +117,7 @@ export function LegalConsentScreen({
           testID="accept-legal-button"
           text={isSubmitting ? "Saving…" : "I agree"}
           preset="reversed"
+          style={themed($primaryAction)}
           disabled={isSubmitting}
           onPress={() => {
             if (!isReturningUser && sharing !== analyticsEnabled()) {
@@ -137,6 +149,14 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $body: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $links: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
+
+const $primaryAction: ThemedStyle<ViewStyle> = () => ({
+  borderRadius: CHOICE_RADIUS,
+})
+const $secondaryAction: ThemedStyle<ViewStyle> = () => ({
+  borderRadius: CHOICE_RADIUS,
+  borderWidth: 2,
+})
 const $eyebrow: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })

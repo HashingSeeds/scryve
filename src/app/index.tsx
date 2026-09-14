@@ -3,6 +3,7 @@ import type { ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { Button } from "@/components/Button"
+import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -86,10 +87,20 @@ export default function Index() {
       >
         <Text text="Continue game?" preset="heading" accessibilityRole="header" />
         <Text text="This game has been waiting for more than 24 hours. Nothing was discarded." />
-        <Button text="Continue" preset="reversed" onPress={() => setOldGameChoice("continue")} />
-        <Button text="End game" onPress={() => setOldGameChoice("end")} />
+        <Button
+          text="Continue"
+          preset="reversed"
+          style={themed($primaryAction)}
+          onPress={() => setOldGameChoice("continue")}
+        />
+        <Button
+          text="End game"
+          style={themed($secondaryAction)}
+          onPress={() => setOldGameChoice("end")}
+        />
         <Button
           text="Abandon"
+          style={themed($secondaryAction)}
           onPress={() => {
             localGameRepository.clearActiveGame()
             setDismissedGameId(activeGame.id)
@@ -125,4 +136,12 @@ const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   gap: spacing.md,
   paddingHorizontal: spacing.lg,
+})
+
+const $primaryAction: ThemedStyle<ViewStyle> = () => ({
+  borderRadius: CHOICE_RADIUS,
+})
+const $secondaryAction: ThemedStyle<ViewStyle> = () => ({
+  borderRadius: CHOICE_RADIUS,
+  borderWidth: 2,
 })
