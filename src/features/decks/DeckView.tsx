@@ -11,7 +11,6 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { accessibleForeground } from "@/utils/colorContrast"
 
 import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { deckFormatLabel, deckGame, deckSections } from "../../../convex/lib/deckGames"
@@ -78,7 +77,7 @@ export function DeckView({
       <Header
         title={editing ? "Edit deck" : guest ? "Guest deck" : "Deck"}
         backgroundColor={theme.colors.surface}
-        leftIcon={editing ? undefined : "back"}
+        leftTx={editing ? undefined : "common:back"}
         leftText={editing ? "Cancel" : undefined}
         onLeftPress={editing ? onCancel : onBack}
         RightActionComponent={
@@ -122,7 +121,7 @@ export function DeckView({
         ListHeaderComponent={
           <>
             <View style={themed($title)}>
-              <Text text={name} style={$heading} weight="semiBold" />
+              <Text text={name} preset="heading" size="xl" />
               <Text
                 size="xs"
                 style={themed($dim)}
@@ -280,8 +279,8 @@ export function DeckView({
             text="+ Add cards"
             onPress={onAdd}
             disabled={busy || cardsUnavailable || editingDisabled}
-            style={themed($primary)}
-            textStyle={{ color: accessibleForeground(theme.colors.tint) }}
+            style={$primary}
+            preset="primary"
           />
         </View>
       </BottomActionBar>
@@ -297,7 +296,6 @@ const $touch: ViewStyle = {
   justifyContent: "center",
 }
 const $disabled: TextStyle = { opacity: 0.4 }
-const $heading: TextStyle = { fontSize: 28, lineHeight: 34 }
 const $quantity: TextStyle = { minWidth: 18, textAlign: "center", fontVariant: ["tabular-nums"] }
 const $image: ImageStyle = { width: 32, height: 45 }
 const $noteInput: TextStyle = { minHeight: 160, textAlignVertical: "top" }
@@ -364,10 +362,4 @@ const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxWidth: 720,
   alignSelf: "center",
 })
-const $primary: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  flex: 2,
-  minHeight: 44,
-  borderRadius: 6,
-  backgroundColor: colors.tint,
-  borderColor: colors.tint,
-})
+const $primary: ViewStyle = { flex: 2, minHeight: 44 }

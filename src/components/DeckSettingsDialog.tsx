@@ -52,7 +52,7 @@ export function DeckSettingsDialog({
       placement="bottom"
       wide
     >
-      <ScrollView contentContainerStyle={$content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={themed($content)} keyboardShouldPersistTaps="handled">
         <Text preset="subheading" text="Deck details" />
         <TextField
           testID="deck-name-input"
@@ -78,7 +78,7 @@ export function DeckSettingsDialog({
         <Button
           testID="deck-settings-save"
           text={busy ? "Saving…" : "Save changes"}
-          preset="reversed"
+          preset="primary"
           disabled={busy || !name.trim()}
           onPress={() => onSubmit({ name, format })}
         />
@@ -102,4 +102,4 @@ const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 const $destructiveText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 
-const $content: ViewStyle = { gap: 16 }
+const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })

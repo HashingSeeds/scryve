@@ -848,6 +848,7 @@ export const syncWrite = mutation({
     id: v.string(),
     operationId: v.string(),
     expectedOwnerId: v.optional(v.string()),
+    returnConflict: v.optional(v.boolean()),
     expectedRevision: v.number(),
     name: v.string(),
     format: v.string(),
@@ -855,8 +856,17 @@ export const syncWrite = mutation({
     note: v.string(),
     deleted: v.boolean(),
   },
-  returns: syncedDeckValidator,
-  handler: async (ctx, args): Promise<Infer<typeof syncedDeckValidator>> => {
+  returns: v.union(
+    syncedDeckValidator,
+    v.object({ status: v.literal("conflict"), deck: syncedDeckValidator }),
+  ),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    | Infer<typeof syncedDeckValidator>
+    | { status: "conflict"; deck: Infer<typeof syncedDeckValidator> }
+  > => {
     const user = await requireUser(ctx)
     if (args.expectedOwnerId !== undefined && args.expectedOwnerId !== user.clerkUserId)
       throw new ConvexError({
@@ -918,8 +928,10 @@ export const syncWrite = mutation({
       (!deck && args.deleted)
     )
       throw new ConvexError({ code: "deck_not_found", message: "Deck not found" })
-    if ((deck?.syncRevision ?? 0) !== args.expectedRevision)
+    if ((deck?.syncRevision ?? 0) !== args.expectedRevision) {
+      if (args.returnConflict && deck) return { status: "conflict", deck: syncedDeck(deck) }
       throw new ConvexError({ code: "sync_conflict", message: "Deck changed on another device" })
+    }
     const metadata = { name: args.name, format: args.format, game: args.game, note: args.note }
     let deckId: Id<"decks">
     if (!deck) {

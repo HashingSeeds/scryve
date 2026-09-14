@@ -26,6 +26,7 @@ import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
+import { accessibleForeground } from "@/utils/colorContrast"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
@@ -50,6 +51,7 @@ type ShelfDeck = {
 }
 
 export type DeckSelection = {
+  reviewChanges?: boolean
   deckId: string
   name: string
   game: string
@@ -93,12 +95,14 @@ function matchesSearch(deck: ShelfDeck, search: string) {
 function DeckRow({
   deck,
   showGame,
+  needsReview,
   onPress,
   onToggleFavorite,
 }: {
   deck: ShelfDeck
   showGame: boolean
-  onPress: () => void
+  needsReview?: boolean
+  onPress: (reviewChanges?: boolean) => void
   onToggleFavorite?: () => void
 }) {
   const { theme, themed } = useAppTheme()
@@ -116,9 +120,9 @@ function DeckRow({
       <TouchableOpacity
         style={themed($openButton)}
         accessibilityRole="button"
-        accessibilityLabel={deck.name}
+        accessibilityLabel={`${deck.name}${needsReview ? ". Needs review" : ""}`}
         activeOpacity={0.75}
-        onPress={onPress}
+        onPress={() => onPress()}
       >
         <View style={themed($rowCopy)}>
           <Text weight="bold" size="sm" numberOfLines={1} text={deck.name} />
@@ -138,6 +142,17 @@ function DeckRow({
           </View>
         ) : null}
       </TouchableOpacity>
+      {needsReview ? (
+        <TouchableOpacity
+          testID={`deck-needs-review-${deck._id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Review deck changes: ${deck.name}`}
+          style={themed($favoriteButton)}
+          onPress={() => onPress(true)}
+        >
+          <Text text="!" size="xs" weight="bold" style={themed($reviewIndicator)} />
+        </TouchableOpacity>
+      ) : null}
       {onToggleFavorite ? (
         <TouchableOpacity
           testID={`favorite-deck-${deck._id}`}
@@ -204,7 +219,7 @@ function StarIcon({ selected, color }: { selected: boolean; color: string }) {
 }
 
 function ActiveFilterChip({ label, onPress }: { label: string; onPress: () => void }) {
-  const { themed } = useAppTheme()
+  const { theme, themed } = useAppTheme()
   return (
     <TouchableOpacity
       accessibilityRole="button"
@@ -214,7 +229,7 @@ function ActiveFilterChip({ label, onPress }: { label: string; onPress: () => vo
       onPress={onPress}
     >
       <Text size="xxs" weight="medium" style={themed($activeFilterText)} text={label} />
-      <Icon icon="x" color="#FFFFFF" size={12} />
+      <Icon icon="x" color={accessibleForeground(theme.colors.tint)} size={12} />
     </TouchableOpacity>
   )
 }
@@ -273,6 +288,10 @@ function DeckShelf({
   const onlineMine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
   const synced = useDeckSync(syncEnabled, access?.ownerId, onlineMine)
   const writes = useDeckMetadataWrites(syncEnabled, access?.ownerId)
+  const failedDeckIds = useMemo(
+    () => new Set(writes.failures.map((failure) => String(failure.action.deckId))),
+    [writes.failures],
+  )
   const localDecks = useMemo(() => {
     const metadata = new Map(writes.metadata.map((deck) => [String(deck.deckId), deck]))
     return synced.decks
@@ -344,6 +363,7 @@ function DeckShelf({
     <FlatList
       testID="decks-list"
       data={visibleDecks}
+      extraData={failedDeckIds}
       keyExtractor={(deck) => String(deck._id)}
       contentContainerStyle={themed($listContent)}
       showsVerticalScrollIndicator={false}
@@ -360,7 +380,7 @@ function DeckShelf({
                 text="Review saved edit"
                 onPress={() => {
                   const { deckId, name, game, format } = writes.failures[0].action
-                  onSelect({ deckId, name, game, format })
+                  onSelect({ deckId, name, game, format, reviewChanges: true })
                 }}
               />
             </View>
@@ -371,9 +391,11 @@ function DeckShelf({
         <DeckRow
           deck={deck}
           showGame={system === ALL_SYSTEMS}
+          needsReview={failedDeckIds.has(String(deck._id))}
           onToggleFavorite={() => void toggleFavorite(deck)}
-          onPress={() => {
+          onPress={(reviewChanges) => {
             onSelect({
+              ...(reviewChanges ? { reviewChanges } : {}),
               deckId: deck._id,
               name: deck.name,
               game: deck.game ?? DEFAULT_DECK_GAME,
@@ -698,7 +720,7 @@ export function DecksScreen({
           <Button
             testID="deck-filters-done"
             style={themed($dialogButton)}
-            preset="reversed"
+            preset="primary"
             text="Show decks"
             onPress={() => setFiltersOpen(false)}
           />
@@ -743,7 +765,7 @@ const $collectionChipSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.tint,
 })
 const $collectionChipSelectedText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.palette.neutral100,
+  color: accessibleForeground(colors.tint),
 })
 const $filtersButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 36,
@@ -768,7 +790,7 @@ const $activeFilter: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   backgroundColor: colors.tint,
 })
 const $activeFilterText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.palette.neutral100,
+  color: accessibleForeground(colors.tint),
 })
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $filterGroup: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
@@ -807,6 +829,7 @@ const $rowContext: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "flex-end",
   gap: spacing.xxxs,
 })
+const $reviewIndicator: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $favoriteButton: ThemedStyle<ViewStyle> = () => ({
   width: 44,
   height: 44,

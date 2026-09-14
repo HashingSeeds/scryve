@@ -36,12 +36,16 @@ export interface DeckSyncSnapshot {
 const READ_FLAG_KEY = "scryve.decks.syncRead.v1"
 const PAGE_SIZE = 100
 
-function metadataKey(ownerId: string) {
-  return `scryve.decks.syncMetadata.v1.${ownerId}`
+export function scopedOwnerId(ownerId: string, deploymentUrl?: string) {
+  return deploymentUrl ? `${encodeURIComponent(new URL(deploymentUrl).origin)}.${ownerId}` : ownerId
 }
 
-function shelfKey(ownerId: string) {
-  return `scryve.decks.syncShelf.v1.${ownerId}`
+function metadataKey(ownerId: string, deploymentUrl?: string) {
+  return `scryve.decks.syncMetadata.v1.${scopedOwnerId(ownerId, deploymentUrl)}`
+}
+
+function shelfKey(ownerId: string, deploymentUrl?: string) {
+  return `scryve.decks.syncShelf.v1.${scopedOwnerId(ownerId, deploymentUrl)}`
 }
 
 function parseJson(value: string | undefined): unknown {
@@ -88,7 +92,7 @@ function storedDecks<T>(value: unknown, guard: (item: unknown) => item is T): T[
 }
 
 export function isDeckSyncEnabled() {
-  return storage.getBoolean(READ_FLAG_KEY) ?? false
+  return storage.getBoolean(READ_FLAG_KEY) ?? true
 }
 
 export function setDeckSyncEnabled(enabled: boolean) {
@@ -99,10 +103,14 @@ export class DeckSyncRepository {
   constructor(
     readonly ownerId: string,
     private readonly local: DeckSyncStorage = storage,
+    private readonly deploymentUrl?: string,
   ) {}
 
   loadMetadata(): SyncedDeck[] {
-    return storedDecks(parseJson(this.local.getString(metadataKey(this.ownerId))), isSyncedDeck)
+    return storedDecks(
+      parseJson(this.local.getString(metadataKey(this.ownerId, this.deploymentUrl))),
+      isSyncedDeck,
+    )
   }
 
   mergeMetadata(incoming: readonly SyncedDeck[]): SyncedDeck[] {
@@ -113,19 +121,22 @@ export class DeckSyncRepository {
     }
     const decks = [...byId.values()]
     this.local.set(
-      metadataKey(this.ownerId),
+      metadataKey(this.ownerId, this.deploymentUrl),
       JSON.stringify({ schemaVersion: 1, decks } satisfies StoredMetadata),
     )
     return decks
   }
 
   loadShelf(): MineDeck[] {
-    return storedDecks(parseJson(this.local.getString(shelfKey(this.ownerId))), isMineDeck)
+    return storedDecks(
+      parseJson(this.local.getString(shelfKey(this.ownerId, this.deploymentUrl))),
+      isMineDeck,
+    )
   }
 
   saveShelf(decks: readonly MineDeck[]): void {
     this.local.set(
-      shelfKey(this.ownerId),
+      shelfKey(this.ownerId, this.deploymentUrl),
       JSON.stringify({ schemaVersion: 1, decks } satisfies StoredShelf),
     )
   }
@@ -273,9 +284,9 @@ export class DeckSyncController {
 const controllers = new WeakMap<object, Map<string, DeckSyncController>>()
 
 export function getDeckSyncController(
-  client: Pick<ConvexReactClient, "query" | "watchQuery">,
+  client: Pick<ConvexReactClient, "query" | "watchQuery" | "url">,
   ownerId: string,
-  repository = new DeckSyncRepository(ownerId),
+  repository = new DeckSyncRepository(ownerId, storage, client.url),
 ) {
   let byOwner = controllers.get(client)
   if (!byOwner) {

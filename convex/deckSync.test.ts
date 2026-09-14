@@ -61,6 +61,7 @@ describe("deck sync", () => {
       id: args.id.toUpperCase(),
       operationId: args.operationId.toUpperCase(),
     })
+    if ("status" in created) throw new Error("expected successful sync write")
     expect(created.id).toBe(args.id)
     await expect(owner.mutation(api.decks.syncWrite, args)).resolves.toEqual(created)
     const updated = await owner.mutation(api.decks.syncWrite, {
@@ -70,6 +71,7 @@ describe("deck sync", () => {
       expectedRevision: 1,
       name: "Renamed",
     })
+    if ("status" in updated) throw new Error("expected successful sync write")
     expect(updated).toMatchObject({ deckId: created.deckId, revision: 2, name: "Renamed" })
   })
 
@@ -79,6 +81,7 @@ describe("deck sync", () => {
     const createArgs = writeArgs(firstSyncId, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 
     const created = await actor.mutation(api.decks.syncWrite, createArgs)
+    if ("status" in created) throw new Error("expected successful sync write")
     expect(created).toMatchObject({
       id: firstSyncId,
       revision: 1,
@@ -139,6 +142,15 @@ describe("deck sync", () => {
       ),
     ).rejects.toMatchObject({ data: { code: "sync_conflict" } })
     await expect(
+      actor.mutation(api.decks.syncWrite, {
+        ...writeArgs(deckId, "12121212-1212-4212-8212-121212121212", 0, { name: "Stale" }),
+        returnConflict: true,
+      }),
+    ).resolves.toMatchObject({ status: "conflict", deck: { deckId, revision: 1, name: "Updated" } })
+    await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      deck: { name: "Updated" },
+    })
+    await expect(
       actor.mutation(
         api.decks.syncWrite,
         writeArgs(deckId, "ffffffff-ffff-4fff-8fff-ffffffffffff", 1, {
@@ -174,6 +186,8 @@ describe("deck sync", () => {
     const operationId = "12121212-1212-4212-8212-121212121212"
     const ownerDeck = await owner.mutation(api.decks.syncWrite, writeArgs(firstSyncId, operationId))
     const otherDeck = await other.mutation(api.decks.syncWrite, writeArgs(firstSyncId, operationId))
+    if ("status" in ownerDeck || "status" in otherDeck)
+      throw new Error("expected successful sync write")
     expect(otherDeck.deckId).not.toBe(ownerDeck.deckId)
     await expect(
       other.mutation(api.decks.syncWrite, {
@@ -316,6 +330,7 @@ describe("deck sync", () => {
     )
     const lastSlot = writeArgs(secondSyncId, "acacacac-acac-4cac-8cac-acacacacacac")
     const created = await owner.mutation(api.decks.syncWrite, lastSlot)
+    if ("status" in created) throw new Error("expected successful sync write")
     await expect(owner.mutation(api.decks.syncWrite, lastSlot)).resolves.toEqual(created)
     await expect(
       owner.mutation(

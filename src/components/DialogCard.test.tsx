@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
+import { colors as darkColors } from "@/theme/colorsDark"
 import { ThemeProvider } from "@/theme/context"
 
 import { DialogCard } from "./DialogCard"
@@ -62,6 +63,27 @@ describe("DialogCard", () => {
 
     expect(view.queryByTestId("dialog-backdrop")).toBeNull()
     expect(view.queryByText("Dialog body")).toBeNull()
+  })
+
+  it("uses the dark theme shadow and overlay rather than inverted palette colors", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <DialogCard
+          visible
+          onClose={jest.fn()}
+          dialogTestID="dark-sheet"
+          backdropTestID="dark-backdrop"
+        >
+          <Text text="Review" />
+        </DialogCard>
+      </ThemeProvider>,
+    )
+    expect(StyleSheet.flatten(view.getByTestId("dark-sheet").props.style).shadowColor).toBe(
+      darkColors.shadow,
+    )
+    expect(StyleSheet.flatten(view.getByTestId("dark-backdrop").props.style).backgroundColor).toBe(
+      darkColors.overlay,
+    )
   })
 
   it("supports an edge-aligned bottom sheet", () => {

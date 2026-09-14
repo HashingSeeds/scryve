@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native"
-import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
@@ -35,6 +35,7 @@ jest.mock("@/features/decks/decksSync", () => ({
   }),
 }))
 jest.mock("@/features/decks/decksSyncWrites", () => ({
+  DECK_CONFLICT_REASON: "Deck changed on another device. Choose which version to keep.",
   useDeckMetadataWrites: () => ({
     ...mockMetadataWriteState,
     update: mockUpdateMetadata,
@@ -202,10 +203,10 @@ jest.mock("../../convex/_generated/api", () => ({
   },
 }))
 
-function renderDetail() {
+function renderDetail(access?: Parameters<typeof DeckDetailScreen>[0]["access"]) {
   return render(
     <ThemeProvider initialContext="light">
-      <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} />
+      <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} access={access} />
     </ThemeProvider>,
   )
 }
@@ -406,7 +407,7 @@ describe("DeckDetailScreen", () => {
     mockMetadataWriteState.failures = [
       {
         failedAt: 2,
-        reason: "Revision conflict",
+        reason: "Deck changed on another device. Choose which version to keep.",
         action: {
           operationId: "failed-edit",
           deckId: "deck-1",
@@ -421,13 +422,111 @@ describe("DeckDetailScreen", () => {
     view.rerender(screen())
 
     expect(view.getByTestId("deck-note-input").props.value).toBe("Unsent draft")
-    expect(view.getByText("Name: Offline rename")).toBeTruthy()
-    expect(view.getByText("Format: Modern")).toBeTruthy()
-    expect(view.getByText("Note: Saved offline note")).toBeTruthy()
-    fireEvent.press(view.getByText("Use this version"))
-    fireEvent.press(view.getByText("Discard local edit"))
+    expect(view.queryByText(/CONVEX/)).toBeNull()
+    fireEvent.press(view.getByText("Review changes"))
+    expect(view.getByText("Account")).toBeTruthy()
+    expect(view.getByText("This device")).toBeTruthy()
+    expect(within(view.getByTestId("deck-sync-conflict")).getByText("Existing Deck")).toBeTruthy()
+    expect(view.getByText("Offline rename")).toBeTruthy()
+    expect(view.getByText("Modern")).toBeTruthy()
+    expect(view.getByText("Saved offline note")).toBeTruthy()
+    fireEvent.press(view.getByText("Later"))
+    expect(mockDiscardMetadataFailure).not.toHaveBeenCalled()
+    expect(mockReapplyMetadataFailure).not.toHaveBeenCalled()
+    expect(view.getByTestId("deck-note-input").props.value).toBe("Unsent draft")
+    fireEvent.press(view.getByText("Review changes"))
+    fireEvent.press(view.getByText("Keep mine"))
+    fireEvent.press(view.getByText("Review changes"))
+    fireEvent.press(view.getByTestId("discard-deck-metadata"))
     expect(mockReapplyMetadataFailure).toHaveBeenCalledWith("failed-edit")
     expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("failed-edit")
+  })
+
+  it("opens a requested review after failures load and lets it stay closed", () => {
+    mockDeckSyncState.enabled = true
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    const screen = () => (
+      <ThemeProvider initialContext="dark">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          reviewChanges
+          access={{ ready: true, loading: false, ownerId: "owner-a", request: jest.fn() }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    expect(view.queryByTestId("deck-sync-conflict")).toBeNull()
+    mockMetadataWriteState.failures = [
+      {
+        failedAt: 1,
+        reason: "Deck changed on another device. Choose which version to keep.",
+        action: { ...cachedMetadata, name: "Local rename", operationId: "review-request" },
+      },
+    ]
+    view.rerender(screen())
+    expect(view.getByTestId("deck-sync-conflict")).toBeTruthy()
+    fireEvent.press(view.getByText("Later"))
+    view.rerender(screen())
+    expect(view.queryByTestId("deck-sync-conflict")).toBeNull()
+    expect(mockDiscardMetadataFailure).not.toHaveBeenCalled()
+  })
+
+  it("compares only changed fields for a rename conflict", () => {
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDeckSyncState.enabled = true
+    mockMetadataWriteState.failures = [
+      {
+        failedAt: 1,
+        reason: "Deck changed on another device. Choose which version to keep.",
+        action: { ...cachedMetadata, name: "Renamed deck", operationId: "rename-conflict" },
+      },
+    ]
+    const view = renderDetail({
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    })
+    fireEvent.press(view.getByText("Review changes"))
+    const sheet = within(view.getByTestId("deck-sync-conflict"))
+    expect(sheet.getByText("Renamed deck")).toBeTruthy()
+    expect(sheet.getByText("Existing Deck")).toBeTruthy()
+    expect(sheet.queryByText("Format")).toBeNull()
+    expect(sheet.queryByText("Notes")).toBeNull()
+    fireEvent.press(sheet.getByText("Keep account"))
+    expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("rename-conflict")
+  })
+
+  it.each([
+    ["This format is not available", "This format is not available"],
+    [
+      "[CONVEX M(decks:syncWrite)] Server Error",
+      "This edit could not be synced. Try again or discard it.",
+    ],
+  ])("shows a readable reason for non-conflict failures: %s", (reason, message) => {
+    mockDeckSyncState.enabled = true
+    mockMetadataWriteState.failures = [
+      {
+        failedAt: 1,
+        reason,
+        action: { ...cachedMetadata, operationId: "rejected-edit" },
+      },
+    ]
+    const view = renderDetail({
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    })
+    fireEvent.press(view.getByText("Review changes"))
+    expect(view.getByText(message)).toBeTruthy()
+    expect(view.queryByText(/CONVEX/)).toBeNull()
+    expect(view.queryByText("Account")).toBeNull()
+    fireEvent.press(view.getByText("Discard local edit"))
+    expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("rejected-edit")
   })
 
   it("keeps a failed edit inspectable when the remote deck was deleted", () => {
@@ -467,16 +566,17 @@ describe("DeckDetailScreen", () => {
     )
 
     expect(queryArgs).toHaveLength(0)
+    fireEvent.press(view.getByText("Review changes"))
     expect(view.getByText("Name: Private draft")).toBeTruthy()
     expect(view.getByText("Note: Still recoverable")).toBeTruthy()
     expect(view.getByText("Local edit not synced")).toBeTruthy()
-    expect(view.getByText("Use this version")).toBeDisabled()
+    expect(view.getByText("Retry sync")).toBeDisabled()
     expect(view.getByTestId("edit-deck-button")).toBeDisabled()
     expect(view.getByTestId("deck-settings-button")).toBeDisabled()
     expect(view.getByTestId("deck-add-cards")).toBeDisabled()
     fireEvent.press(view.getByTestId("deck-tab-notes"))
     expect(view.getByTestId("edit-deck-notes")).toBeDisabled()
-    fireEvent.press(view.getByText("Discard local edit"))
+    fireEvent.press(view.getByTestId("discard-deck-metadata"))
     expect(mockDiscardMetadataFailure).toHaveBeenCalledWith("deleted-edit")
   })
 
