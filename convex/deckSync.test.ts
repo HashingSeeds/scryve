@@ -476,6 +476,23 @@ describe("deck version sync", () => {
     ).resolves.toMatchObject({ versionId, revision: 2 })
   })
 
+  it("projects readVersion cards exactly like detail with images disabled", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, deckId, versionId } = await seedVersion(t, "version-projection-owner")
+    await t.mutation(internal.integrationManifest.setCapabilityOverride, {
+      game: "mtg",
+      capability: "images",
+      release: "disabled",
+      note: "Version read projection test",
+    })
+    const detail = await actor.query(api.decks.detail, { deckId, versionId })
+    const read = await actor.query(api.decks.readVersion, { deckId, versionId })
+    expect(read.version.versionId).toBe(versionId)
+    expect(read.cards).toEqual(detail.cards)
+    expect("imageUrl" in (read.cards[0] ?? {})).toBe(false)
+    expect("smallImageUrl" in (read.cards[0] ?? {})).toBe(false)
+  })
+
   it("bootstraps revisions, tombstones, and archived reads for a fresh client", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "version-pull-owner")

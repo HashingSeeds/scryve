@@ -635,6 +635,24 @@ export const setFavorite = mutation({
   },
 })
 
+function projectCard(deck: Doc<"decks">, includeImages: boolean, card: Doc<"deckCards">) {
+  if (includeImages) {
+    const imageUrl =
+      deck.game === "ygo"
+        ? ygoImageUrl(card.printingId, card.providerCardId, card.cardId)
+        : undefined
+    return imageUrl
+      ? {
+          ...card,
+          imageUrl: card.imageUrl ?? imageUrl,
+          smallImageUrl: card.smallImageUrl ?? card.imageUrl ?? imageUrl,
+        }
+      : card
+  }
+  const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...textCard } = card
+  return textCard
+}
+
 export const detail = query({
   args: { deckId: v.id("decks"), versionId: v.optional(v.id("deckVersions")) },
   handler: async (ctx, args) => {
@@ -667,23 +685,7 @@ export const detail = query({
       deck: publicDeck(deck),
       versions,
       version: selected ?? null,
-      cards: cards.slice(0, MAX_DECK_CARDS).map((card) => {
-        if (includeImages) {
-          const imageUrl =
-            deck.game === "ygo"
-              ? ygoImageUrl(card.printingId, card.providerCardId, card.cardId)
-              : undefined
-          return imageUrl
-            ? {
-                ...card,
-                imageUrl: card.imageUrl ?? imageUrl,
-                smallImageUrl: card.smallImageUrl ?? card.imageUrl ?? imageUrl,
-              }
-            : card
-        }
-        const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...textCard } = card
-        return textCard
-      }),
+      cards: cards.slice(0, MAX_DECK_CARDS).map((card) => projectCard(deck, includeImages, card)),
       capacity: await deckVersionCapacity(ctx, user, stored.length),
       record: analytics ? await deckRecord(ctx, deck._id) : undefined,
       analyticsLocked: !analytics,
@@ -1091,9 +1093,9 @@ export const syncVersionWrite = mutation({
   },
 })
 export const versionsPull = query({
-  args: { deckId: v.string(), paginationOpts: paginationOptsValidator },
+  args: { deckId: v.id("decks"), paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
-    const { deck } = await ownedDeck(ctx, ctx.db.normalizeId("decks", args.deckId)!)
+    const { deck } = await ownedDeck(ctx, args.deckId)
     const { numItems } = args.paginationOpts
     if (!Number.isSafeInteger(numItems) || numItems < 1 || numItems > 100)
       throw new ConvexError({
@@ -1118,7 +1120,11 @@ export const readVersion = query({
       .query("deckCards")
       .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version._id))
       .take(MAX_DECK_CARDS + 1)
-    return { version: syncedVersion(version), cards: cards.slice(0, MAX_DECK_CARDS) }
+    const includeImages = await capabilityReleased(ctx, deck.game ?? DEFAULT_DECK_GAME, "images")
+    return {
+      version: syncedVersion(version),
+      cards: cards.slice(0, MAX_DECK_CARDS).map((card) => projectCard(deck, includeImages, card)),
+    }
   },
 })
 
