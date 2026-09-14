@@ -1,5 +1,26 @@
 export type LifeCardContentRotation = -90 | 0 | 90 | 180
 
+export interface LifeCardContentInsets {
+  top: number
+  bottom: number
+  left: number
+  right: number
+}
+
+export function lifeCardContentInsetStyle(insets?: LifeCardContentInsets): {
+  paddingTop: number
+  paddingBottom: number
+  paddingLeft: number
+  paddingRight: number
+} {
+  return {
+    paddingTop: insets?.top ?? 0,
+    paddingBottom: insets?.bottom ?? 0,
+    paddingLeft: insets?.left ?? 0,
+    paddingRight: insets?.right ?? 0,
+  }
+}
+
 export const LIFE_TARGET_SIZE = 200
 export const COMPACT_LIFE_TARGET_SIZE = 140
 export const LIFE_TARGET_TEXT_INSET = 8

@@ -27,11 +27,13 @@ import {
   getLifeFontSizeThatFits,
   getLifeLineHeight,
   getLifeTargetTextSpace,
+  lifeCardContentInsetStyle,
   LIFE_FONT_SIZE,
   LIFE_MAX_FONT_SCALE,
   LIFE_TARGET_SIZE,
   PLAYER_MARK_MUTED_OPACITY,
   PLAYER_MARK_SIZE,
+  type LifeCardContentInsets,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
@@ -75,6 +77,7 @@ export interface LifeCardProps {
   color: string
   compact?: boolean
   contentRotation?: LifeCardContentRotation
+  contentInsets?: LifeCardContentInsets
   lifeFontSize?: number
   system?: PlaySystemId
   lifeStep?: number
@@ -95,6 +98,7 @@ export function LifeCard({
   color,
   compact,
   contentRotation = 0,
+  contentInsets,
   lifeFontSize,
   system,
   lifeStep,
@@ -136,6 +140,7 @@ export function LifeCard({
       }),
     )
   const cardPadding = compact ? spacing.xxs : spacing.xs
+  const safeContentStyle = lifeCardContentInsetStyle(contentInsets)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
@@ -419,7 +424,13 @@ export function LifeCard({
             { backgroundColor: color },
           ]}
         >
-          <View style={[themed($commanderOverviewContent), localCommander && inspectionInsets]}>
+          <View
+            style={[
+              themed($commanderOverviewContent),
+              localCommander && inspectionInsets,
+              safeContentStyle,
+            ]}
+          >
             <CommanderDamageBoard
               ownerPlayerId={commanderDamage.ownerPlayerId}
               players={commanderDamage.players}
@@ -439,14 +450,18 @@ export function LifeCard({
                   cardSize.width -
                     (localCommander
                       ? inspectionInsets.left + inspectionInsets.right
-                      : cardPadding * 2),
+                      : cardPadding * 2) -
+                    (contentInsets?.left ?? 0) -
+                    (contentInsets?.right ?? 0),
                   0,
                 ),
                 height: Math.max(
                   cardSize.height -
                     (localCommander
                       ? inspectionInsets.top + inspectionInsets.bottom
-                      : cardPadding * 2),
+                      : cardPadding * 2) -
+                    (contentInsets?.top ?? 0) -
+                    (contentInsets?.bottom ?? 0),
                   0,
                 ),
               }}
@@ -481,6 +496,7 @@ export function LifeCard({
           seatNumber={seatNumber}
           foreground={foreground}
           contentRotation={contentRotation}
+          contentInsets={contentInsets}
           compact={compact}
           mode={commanderCardMode}
           life={localCommander ? life : undefined}

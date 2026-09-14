@@ -101,6 +101,42 @@ describe("LifeCard", () => {
     },
   )
 
+  it("contains rotated commander labels and controls inside the padded safe area", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          compact
+          contentRotation={180}
+          contentInsets={{ top: 59, bottom: 0, left: 0, right: 0 }}
+          onChange={jest.fn()}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            inspection: { open: false, onToggle: jest.fn() },
+            armedPlayerId: commanderIds[1],
+            attackerName: "Bo",
+            onStage: jest.fn(),
+            onPressSword: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+    expect(
+      StyleSheet.flatten(view.getByTestId("commander-card-mode-seat-1").props.style),
+    ).toMatchObject({ paddingTop: 59, paddingBottom: 0, paddingLeft: 0, paddingRight: 0 })
+    const content = view.getByTestId("commander-card-content-seat-1")
+    expect(StyleSheet.flatten(content.props.style)).toMatchObject({ flex: 1 })
+    expect(content.findByProps({ testID: "commander-target-seat-1" })).toBeTruthy()
+    expect(content.findByProps({ testID: "commander-life-seat-1" })).toBeTruthy()
+  })
+
   it("sizes the life total in JavaScript rather than relying on native auto-shrink", () => {
     const twoDigits = StyleSheet.flatten(
       renderCard(20).getByTestId("life-total-seat-1").props.style,
