@@ -1,4 +1,5 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { ConvexError } from "convex/values"
 
 import { deleteGuestDeck, loadGuestDeck, saveGuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
@@ -1018,6 +1019,53 @@ describe("AddDeckScreen", () => {
 
     expect(view.getByTestId("deck-name-input").props.value).toBe("Patient Deck")
     expect(view.getByText("Create deck")).toBeEnabled()
+  })
+
+  it("counts down a Scryfall cooldown and retries while keeping the outline", async () => {
+    mockResolvePrecon.mockRejectedValueOnce(
+      new ConvexError({
+        code: "scryfall_rate_limited",
+        message: "Scryfall requests are paused. Try again shortly.",
+        retryAfterMs: 3000,
+      }),
+    )
+    const view = renderAddDeck()
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
+    await act(async () => jest.advanceTimersByTime(400))
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+    await waitFor(() => expect(view.getByText("Retrying in 3s")).toBeTruthy())
+    expect(view.getByTestId("retry-precon-preview")).toBeDisabled()
+    expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy()
+    fireEvent.press(view.getByTestId("retry-precon-preview"))
+    expect(mockResolvePrecon).toHaveBeenCalledTimes(1)
+    await act(async () => jest.advanceTimersByTime(1000))
+    expect(view.getByText("Retrying in 2s")).toBeTruthy()
+    jest.setSystemTime(Date.now() + 10_000)
+    await act(async () => jest.advanceTimersByTime(1000))
+    expect(mockResolvePrecon).toHaveBeenCalledTimes(2)
+    expect(view.queryByTestId("retry-precon-preview")).toBeNull()
+    expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy()
+  })
+
+  it.each(["close", "unmount"])("cancels a preview cooldown on %s", async (exit) => {
+    mockResolvePrecon.mockRejectedValueOnce(
+      new ConvexError({
+        code: "scryfall_rate_limited",
+        message: "Scryfall requests are paused. Try again shortly.",
+        retryAfterMs: 3000,
+      }),
+    )
+    const view = renderAddDeck()
+    continueSetup(view)
+    fireEvent.changeText(view.getByTestId("precon-search-input"), "Explorers")
+    await act(async () => jest.advanceTimersByTime(400))
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+    await waitFor(() => expect(view.getByText("Retrying in 3s")).toBeTruthy())
+    if (exit === "close") fireEvent.press(view.getByLabelText("common:back"))
+    else view.unmount()
+    await act(async () => jest.advanceTimersByTime(4000))
+    expect(mockResolvePrecon).toHaveBeenCalledTimes(1)
   })
 
   it("retries a failed preview without losing the selected deck", async () => {
