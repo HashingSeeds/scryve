@@ -281,6 +281,16 @@ describe("LegalConsentGate", () => {
     expect(view.getByText("APP CONTENT")).toBeTruthy()
   })
 
+  it("keeps on-file consent when deletion clears the server-side acceptances", () => {
+    accountAcceptanceCache.write("user-a", REQUIRED_CONSENT_VERSIONS)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    mockAccountAcceptances = []
+    const view = renderGate()
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+    expect(view.queryByText("Before you start")).toBeNull()
+    expect(accountAcceptanceCache.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
+  })
+
   it("keeps the app on screen when a mid-session sign-in has to check the account", () => {
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
     mockAuth = { configured: true, isLoaded: true, isSignedIn: false }

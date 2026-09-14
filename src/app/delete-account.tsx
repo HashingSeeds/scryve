@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { router, type ErrorBoundaryProps } from "expo-router"
-import { useUser } from "@clerk/expo"
+import { useClerk, useUser } from "@clerk/expo"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 
 import { Button } from "@/components/Button"
@@ -123,6 +123,7 @@ function SignedOutDeletionReceipt({
 
 function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: string) => void }) {
   const { isLoaded: isUserLoaded, user } = useUser()
+  const clerk = useClerk()
   const { isAuthenticated, isLoading } = useConvexAuth()
   const requestDeletion = useMutation(api.accountDeletion.requestCurrentAccountDeletion)
   const deletion = useQuery(api.accountDeletion.currentAccountDeletion)
@@ -158,6 +159,7 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
     try {
       const result = await requestDeletion({ confirmation: "DELETE" })
       onReceipt(result.receiptToken)
+      await clerk.signOut()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not submit the deletion request")
     } finally {

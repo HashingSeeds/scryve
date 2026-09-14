@@ -6,6 +6,7 @@ import { Slot, SplashScreen, type ErrorBoundaryProps } from "expo-router"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
+import { AccountDeletionSessionGuard } from "@/features/auth/AccountDeletionSessionGuard"
 import { CloudProviders } from "@/features/auth/AuthContext"
 import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
@@ -60,6 +61,7 @@ function Root() {
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <KeyboardProvider>
             <LegalConsentGate onResolved={resolveConsent}>
+              <AccountDeletionSessionGuard />
               <Slot />
             </LegalConsentGate>
           </KeyboardProvider>
