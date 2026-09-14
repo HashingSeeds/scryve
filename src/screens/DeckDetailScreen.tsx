@@ -368,8 +368,9 @@ function DeckDetailContent({
   const cards = editing ? draft : displayCards
   const cardsUnavailable = !detail && cachedCards === undefined
   // Cached cards render read-only so an offline save can't push stale lists to the server.
-  const cardsCached = cachedCards !== undefined
-  const cardsDirty = editing && cardsChanged(draft, displayCards)
+  const editingFromCache = useRef(false)
+  const cardsCached = editing ? editingFromCache.current : cachedCards !== undefined
+  const cardsDirty = editing && !editingFromCache.current && cardsChanged(draft, displayCards)
   const noteDirty = editing && draftNote !== (deck?.note ?? "")
   const draftChanged = cardsDirty || noteDirty
   const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
@@ -405,6 +406,22 @@ function DeckDetailContent({
   const canAddVersion = detail?.capacity.canCreate === true
   const canDeleteVersion = (detail?.versions.length ?? 0) > 1
   const premium = detail?.capacity.premium === true
+
+  // A cache-origin edit re-seeds the (user-uneditable) card draft once live detail arrives,
+  // so the stale cached list can never be saved back to the server.
+  useEffect(() => {
+    if (!editing || !editingFromCache.current || detail === undefined) return
+    editingFromCache.current = false
+    setDraft(displayCards)
+  }, [detail, displayCards, editing])
+
+  // Keeps the persistent cache fresh with live reads so the next offline session is current.
+  useEffect(() => {
+    const liveVersion = detail?.version
+    const recordCards = versionCache.record
+    if (!detail || !liveVersion || !recordCards) return
+    recordCards(liveVersion._id, liveVersion.syncRevision ?? 0, detail.cards)
+  }, [detail, versionCache.record])
 
   usePreventRemove(draftChanged, ({ data }) => {
     setPendingNavigation(data.action)
@@ -443,6 +460,7 @@ function DeckDetailContent({
   function startEditing() {
     if (knownDeleted) return
     metadataSaveStarted.current = false
+    editingFromCache.current = cachedCards !== undefined
     setDraft(displayCards)
     setDraftNote(deck?.note ?? "")
     setDraftMetadataRevision(currentMetadataRevision)

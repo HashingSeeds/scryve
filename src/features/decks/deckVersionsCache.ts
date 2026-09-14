@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react"
-import { useConvex, type ConvexReactClient } from "convex/react"
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react"
+import { useConvex, useConvexConnectionState, type ConvexReactClient } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { storage } from "@/utils/storage"
@@ -135,9 +135,10 @@ const MAX_VERSION_PAGES = 10
 export class DeckVersionCacheController {
   private readonly listeners = new Set<() => void>()
   private snapshot = new Map<string, DeckVersionCacheSnapshot>()
-  private inFlight = new Set<string>()
+  private wanted = new Map<string, string | undefined>()
+  private inFlight = new Map<string, number>()
   private users = 0
-  private generation = 0
+  private epoch = 0
 
   constructor(
     private readonly client: Pick<ConvexReactClient, "query">,
@@ -155,31 +156,49 @@ export class DeckVersionCacheController {
     this.users += 1
     return () => {
       this.users = Math.max(0, this.users - 1)
-      this.generation += 1
+      if (this.users > 0) return
+      this.epoch += 1
+      this.inFlight.clear()
     }
   }
 
+  /** Publishes the cached snapshot immediately, then refreshes from the server once. */
   ensure(deckId: string, selectedVersionId: string | undefined): void {
     if (this.users === 0) return
-    this.publish(deckId, selectedVersionId)
+    this.wanted.set(deckId, selectedVersionId)
+    this.publish(deckId)
     const key = `${deckId}:${selectedVersionId ?? ""}`
     if (this.inFlight.has(key)) return
-    const generation = ++this.generation
-    this.inFlight.add(key)
-    void this.refresh(deckId, selectedVersionId, generation, key)
+    this.inFlight.set(key, this.epoch)
+    void this.refresh(deckId, this.epoch, key)
   }
 
-  private async refresh(
+  /** Drops offline-stalled reads so the next ensure() refetches after a reconnect. */
+  resume(): void {
+    this.epoch += 1
+    this.inFlight.clear()
+  }
+
+  /** Seeds version cards from a live detail read; never overwrites a newer cached revision. */
+  record(
     deckId: string,
-    selectedVersionId: string | undefined,
-    generation: number,
-    key: string,
-  ): Promise<void> {
+    versionId: string,
+    revision: number,
+    cards: readonly CachedVersionCard[],
+  ): void {
+    if (this.users === 0) return
+    const cached = this.repository.loadCards(versionId)
+    if (cached && cached.revision >= revision) return
+    this.repository.saveCards(versionId, revision, cards)
+    this.publish(deckId)
+  }
+
+  private async refresh(deckId: string, epoch: number, key: string): Promise<void> {
     try {
-      const versions = await this.pullVersions(deckId, generation)
-      if (generation !== this.generation) return
-      this.publish(deckId, selectedVersionId)
-      const versionId = selectedVersionId ?? this.latestActive(versions)?.versionId
+      const versions = await this.pullVersions(deckId, epoch)
+      if (epoch !== this.epoch) return
+      this.publish(deckId)
+      const versionId = this.wanted.get(deckId) ?? this.latestActive(versions)?.versionId
       if (!versionId) return
       const metadata = versions.find((version) => version.versionId === versionId)
       const cached = this.repository.loadCards(versionId)
@@ -188,18 +207,18 @@ export class DeckVersionCacheController {
         deckId: deckId as Id<"decks">,
         versionId: versionId as Id<"deckVersions">,
       })
-      if (generation !== this.generation) return
+      if (epoch !== this.epoch) return
       if (read.version.deckId === deckId)
         this.repository.saveCards(versionId, read.version.revision, read.cards)
-      this.publish(deckId, selectedVersionId)
+      this.publish(deckId)
     } catch {
       // Offline: the cached snapshot published by ensure() stands.
     } finally {
-      this.inFlight.delete(key)
+      if (this.inFlight.get(key) === epoch) this.inFlight.delete(key)
     }
   }
 
-  private async pullVersions(deckId: string, generation: number): Promise<CachedVersion[]> {
+  private async pullVersions(deckId: string, epoch: number): Promise<CachedVersion[]> {
     const merged: CachedVersion[] = []
     let cursor: string | null = null
     for (let page = 0; page < MAX_VERSION_PAGES; page++) {
@@ -207,7 +226,7 @@ export class DeckVersionCacheController {
         deckId: deckId as Id<"decks">,
         paginationOpts: { cursor, numItems: VERSION_PAGE_SIZE },
       })
-      if (generation !== this.generation) return []
+      if (epoch !== this.epoch) return []
       if (result.deckId !== deckId) throw new Error("Version list for another deck")
       merged.push(...result.page)
       if (result.isDone) break
@@ -226,14 +245,15 @@ export class DeckVersionCacheController {
     )
   }
 
-  private publish(deckId: string, selectedVersionId: string | undefined): void {
+  private publish(deckId: string): void {
+    const selectedVersionId = this.wanted.get(deckId)
     const versions = this.repository.loadVersions(deckId)
     const version = selectedVersionId
       ? versions.find((candidate) => candidate.versionId === selectedVersionId)
       : this.latestActive(versions)
-    const stored = this.renderableCards(version)
+    const cards = this.renderableCards(version)
     const next = new Map(this.snapshot)
-    next.set(deckId, { versions, version, cards: stored })
+    next.set(deckId, { versions, version, cards })
     this.snapshot = next
     for (const listener of this.listeners) listener()
   }
@@ -279,17 +299,28 @@ export function useDeckVersionCache(
   selectedVersionId: string | undefined,
 ) {
   const client = useConvex()
+  const connection = useConvexConnectionState()
   const controller = useMemo(
     () => (enabled && ownerId ? getDeckVersionCacheController(client, ownerId) : undefined),
     [client, enabled, ownerId],
   )
   useEffect(() => controller?.start(), [controller])
+  const wasConnected = useRef<boolean | undefined>(undefined)
   useEffect(() => {
+    const connected = connection?.isWebSocketConnected
+    if (controller && connected && wasConnected.current === false) controller.resume()
+    wasConnected.current = connected
     controller?.ensure(deckId, selectedVersionId)
-  }, [controller, deckId, selectedVersionId])
-  return useSyncExternalStore(
+  }, [controller, deckId, selectedVersionId, connection?.isWebSocketConnected])
+  const record = useCallback(
+    (versionId: string, revision: number, cards: readonly CachedVersionCard[]) =>
+      controller?.record(deckId, versionId, revision, cards),
+    [controller, deckId],
+  )
+  const snapshot = useSyncExternalStore(
     controller?.subscribe ?? noSubscribers,
     () => controller?.getSnapshot().get(deckId) ?? emptySnapshot,
     () => emptySnapshot,
   )
+  return { ...snapshot, record }
 }

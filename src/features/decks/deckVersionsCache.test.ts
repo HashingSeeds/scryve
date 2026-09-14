@@ -280,6 +280,127 @@ describe("deck version cache", () => {
     expect(repository.loadCards("version-1")).toBeUndefined()
   })
 
+  it("serves the latest selection after rapid A-B-A switching", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    const readRequests: string[] = []
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => ({
+          deckId,
+          page: [versionRow(), versionRow({ versionId: "version-2", versionNumber: 2 })],
+          isDone: true,
+          continueCursor: null,
+        }),
+        readVersion: (args: { deckId: string; versionId: string }) => {
+          readRequests.push(args.versionId)
+          return { version: versionRow({ versionId: args.versionId }), cards: [cardRow] }
+        },
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, "version-1")
+    controller.ensure(deckId, "version-2")
+    controller.ensure(deckId, "version-1")
+    await flush()
+
+    expect(controller.getSnapshot().get(deckId)).toMatchObject({
+      version: { versionId: "version-1" },
+      cards: [{ name: "Sol Ring" }],
+    })
+    expect(new Set(readRequests)).toEqual(new Set(["version-1"]))
+    stop()
+  })
+
+  it("keeps another consumer's in-flight reads alive when one consumer stops", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => ({
+          deckId,
+          page: [versionRow()],
+          isDone: true,
+          continueCursor: null,
+        }),
+        readVersion: () => ({ version: versionRow(), cards: [cardRow] }),
+      }),
+      repository,
+    )
+    const stopFirst = controller.start()
+    const stopSecond = controller.start()
+    controller.ensure(deckId, undefined)
+    stopFirst()
+    await flush()
+
+    expect(repository.loadVersions(deckId)).toHaveLength(1)
+    expect(repository.loadCards("version-1")).toMatchObject({ revision: 1 })
+    stopSecond()
+  })
+
+  it("refetches after a reconnect drops stalled offline reads", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    let stalled = true
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () =>
+          stalled
+            ? new Promise(() => undefined)
+            : { deckId, page: [versionRow()], isDone: true, continueCursor: null },
+        readVersion: () => ({ version: versionRow(), cards: [cardRow] }),
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, undefined)
+    await flush()
+    expect(repository.loadVersions(deckId)).toEqual([])
+
+    controller.resume()
+    stalled = false
+    controller.ensure(deckId, undefined)
+    await flush()
+    expect(controller.getSnapshot().get(deckId)).toMatchObject({
+      version: { versionId: "version-1" },
+      cards: [{ name: "Sol Ring" }],
+    })
+    stop()
+  })
+
+  it("seeds version cards from live reads without regressing newer revisions", () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    repository.mergeVersions(deckId, [versionRow({ revision: 2 })])
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => {
+          throw new Error("Offline")
+        },
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, "version-1")
+
+    controller.record(deckId, "version-1", 3, [{ ...cardRow, name: "Live" }])
+    expect(repository.loadCards("version-1")).toMatchObject({
+      revision: 3,
+      cards: [{ name: "Live" }],
+    })
+    expect(controller.getSnapshot().get(deckId)).toMatchObject({
+      cards: [{ name: "Live" }],
+    })
+
+    controller.record(deckId, "version-1", 2, [cardRow])
+    expect(repository.loadCards("version-1")).toMatchObject({
+      revision: 3,
+      cards: [{ name: "Live" }],
+    })
+    stop()
+  })
+
   it("ignores version payloads addressed to a different deck", async () => {
     const storage = new MemoryStorage()
     const repository = new DeckVersionCacheRepository("owner-a", storage)
