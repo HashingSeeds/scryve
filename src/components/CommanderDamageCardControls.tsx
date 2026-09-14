@@ -100,151 +100,153 @@ export function CommanderDamageCardControls({
         entranceStyle,
       ]}
     >
-      {mode.kind === "target" ? (
-        <View
-          testID={`commander-target-seat-${seatNumber}`}
-          style={[themed($zones), zonesRotationStyle(contentRotation)]}
-        >
-          <CommanderAction
-            testID={`commander-stage-seat-${seatNumber}--1`}
-            label={`Remove one commander damage from seat ${seatNumber}`}
-            text="−"
-            foreground={controlForeground}
-            rotationStyle={rotationStyle}
-            compact={compact}
-            disabled={mode.total <= 0}
-            onPress={() => mode.onChange(-1)}
-          />
-          <CommanderAction
-            testID={`commander-stage-seat-${seatNumber}-1`}
-            label={`Add one commander damage to seat ${seatNumber}`}
-            text="+"
-            foreground={controlForeground}
-            rotationStyle={rotationStyle}
-            compact={compact}
-            disabled={mode.total >= MAX_COMMANDER_DAMAGE}
-            onPress={() => mode.onChange(1)}
-          />
-        </View>
-      ) : mode.kind === "claim" ? (
-        <View style={[themed($zones), zonesRotationStyle(contentRotation)]}>
-          <CommanderAction
-            testID={`commander-decline-seat-${seatNumber}-${mode.claimId}`}
-            label={`Decline ${mode.damage} commander damage from ${mode.attackerName}`}
-            text="Decline"
-            foreground={controlForeground}
-            rotationStyle={rotationStyle}
-            compact={compact}
-            onPress={mode.onDecline}
-          />
-          <CommanderAction
-            testID={`commander-confirm-seat-${seatNumber}-${mode.claimId}`}
-            label={`Confirm ${mode.damage} commander damage from ${mode.attackerName}`}
-            text="Confirm"
-            foreground={controlForeground}
-            rotationStyle={rotationStyle}
-            compact={compact}
-            emphasized
-            onPress={mode.onConfirm}
-          />
-        </View>
-      ) : (
-        <View style={[themed($zones), zonesRotationStyle(contentRotation)]}>
-          {mode.onCancel ? (
+      <View testID={`commander-card-content-seat-${seatNumber}`} style={$safeContent}>
+        {mode.kind === "target" ? (
+          <View
+            testID={`commander-target-seat-${seatNumber}`}
+            style={[themed($zones), zonesRotationStyle(contentRotation)]}
+          >
             <CommanderAction
-              testID={`commander-cancel-seat-${seatNumber}`}
-              label={`Cancel assigning commander damage from seat ${seatNumber}`}
-              text="Cancel"
+              testID={`commander-stage-seat-${seatNumber}--1`}
+              label={`Remove one commander damage from seat ${seatNumber}`}
+              text="−"
               foreground={controlForeground}
               rotationStyle={rotationStyle}
               compact={compact}
-              onPress={mode.onCancel}
+              disabled={mode.total <= 0}
+              onPress={() => mode.onChange(-1)}
             />
-          ) : null}
-          <CommanderAction
-            testID={`commander-${mode.submitLabel === "Send" ? "send" : "done"}-seat-${seatNumber}`}
-            label={`${mode.submitLabel} assigning commander damage from seat ${seatNumber}`}
-            text={mode.submitLabel}
-            foreground={controlForeground}
-            rotationStyle={rotationStyle}
-            compact={compact}
-            emphasized
-            disabled={mode.submitDisabled}
-            showSword={life === undefined}
-            life={life}
-            onPress={mode.onSubmit}
-          />
-        </View>
-      )}
+            <CommanderAction
+              testID={`commander-stage-seat-${seatNumber}-1`}
+              label={`Add one commander damage to seat ${seatNumber}`}
+              text="+"
+              foreground={controlForeground}
+              rotationStyle={rotationStyle}
+              compact={compact}
+              disabled={mode.total >= MAX_COMMANDER_DAMAGE}
+              onPress={() => mode.onChange(1)}
+            />
+          </View>
+        ) : mode.kind === "claim" ? (
+          <View style={[themed($zones), zonesRotationStyle(contentRotation)]}>
+            <CommanderAction
+              testID={`commander-decline-seat-${seatNumber}-${mode.claimId}`}
+              label={`Decline ${mode.damage} commander damage from ${mode.attackerName}`}
+              text="Decline"
+              foreground={controlForeground}
+              rotationStyle={rotationStyle}
+              compact={compact}
+              onPress={mode.onDecline}
+            />
+            <CommanderAction
+              testID={`commander-confirm-seat-${seatNumber}-${mode.claimId}`}
+              label={`Confirm ${mode.damage} commander damage from ${mode.attackerName}`}
+              text="Confirm"
+              foreground={controlForeground}
+              rotationStyle={rotationStyle}
+              compact={compact}
+              emphasized
+              onPress={mode.onConfirm}
+            />
+          </View>
+        ) : (
+          <View style={[themed($zones), zonesRotationStyle(contentRotation)]}>
+            {mode.onCancel ? (
+              <CommanderAction
+                testID={`commander-cancel-seat-${seatNumber}`}
+                label={`Cancel assigning commander damage from seat ${seatNumber}`}
+                text="Cancel"
+                foreground={controlForeground}
+                rotationStyle={rotationStyle}
+                compact={compact}
+                onPress={mode.onCancel}
+              />
+            ) : null}
+            <CommanderAction
+              testID={`commander-${mode.submitLabel === "Send" ? "send" : "done"}-seat-${seatNumber}`}
+              label={`${mode.submitLabel} assigning commander damage from seat ${seatNumber}`}
+              text={mode.submitLabel}
+              foreground={controlForeground}
+              rotationStyle={rotationStyle}
+              compact={compact}
+              emphasized
+              disabled={mode.submitDisabled}
+              showSword={life === undefined}
+              life={life}
+              onPress={mode.onSubmit}
+            />
+          </View>
+        )}
 
-      {mode.kind !== "source" ? (
-        <View
-          pointerEvents="none"
-          accessible={life !== undefined}
-          accessibilityLabel={
-            life !== undefined ? `${modeAccessibilityLabel(mode)}, ${life} life` : undefined
-          }
-          accessibilityLiveRegion={life !== undefined ? "polite" : undefined}
-          style={[themed($summary), rotationStyle]}
-        >
-          {mode.kind === "target" ? (
-            <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
-              {life !== undefined ? (
+        {mode.kind !== "source" ? (
+          <View
+            pointerEvents="none"
+            accessible={life !== undefined}
+            accessibilityLabel={
+              life !== undefined ? `${modeAccessibilityLabel(mode)}, ${life} life` : undefined
+            }
+            accessibilityLiveRegion={life !== undefined ? "polite" : undefined}
+            style={[themed($summary), rotationStyle]}
+          >
+            {mode.kind === "target" ? (
+              <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
+                {life !== undefined ? (
+                  <Text
+                    text={mode.attackerName}
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={1.2}
+                    style={[themed($caption), { color: foreground }]}
+                  />
+                ) : null}
+                {life === undefined ? (
+                  <Text
+                    text="↓"
+                    weight="bold"
+                    maxFontSizeMultiplier={1.2}
+                    style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
+                  />
+                ) : null}
                 <Text
-                  text={mode.attackerName}
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={1.2}
-                  style={[themed($caption), { color: foreground }]}
-                />
-              ) : null}
-              {life === undefined ? (
-                <Text
-                  text="↓"
+                  testID={`commander-total-seat-${seatNumber}`}
+                  text={String(mode.total)}
                   weight="bold"
                   maxFontSizeMultiplier={1.2}
-                  style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
+                  style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
                 />
-              ) : null}
-              <Text
-                testID={`commander-total-seat-${seatNumber}`}
-                text={String(mode.total)}
-                weight="bold"
-                maxFontSizeMultiplier={1.2}
-                style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
-              />
-              {life !== undefined ? (
+                {life !== undefined ? (
+                  <Text
+                    testID={`commander-life-seat-${seatNumber}`}
+                    text={`${life} life`}
+                    maxFontSizeMultiplier={1.2}
+                    style={[themed($localLife), { color: foreground }]}
+                  />
+                ) : null}
+              </View>
+            ) : mode.kind === "claim" ? (
+              <>
                 <Text
-                  testID={`commander-life-seat-${seatNumber}`}
-                  text={`${life} life`}
+                  text={`${mode.attackerName} dealt ${mode.damage}`}
+                  weight="bold"
+                  numberOfLines={1}
                   maxFontSizeMultiplier={1.2}
-                  style={[themed($localLife), { color: foreground }]}
+                  style={[themed($headline), { color: controlForeground }]}
                 />
-              ) : null}
-            </View>
-          ) : mode.kind === "claim" ? (
-            <>
-              <Text
-                text={`${mode.attackerName} dealt ${mode.damage}`}
-                weight="bold"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.2}
-                style={[themed($headline), { color: controlForeground }]}
-              />
-              <Text
-                text={
-                  mode.additionalClaims > 0
-                    ? `Confirm commander damage · ${mode.additionalClaims} more pending`
-                    : "Confirm commander damage"
-                }
-                size="xxs"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.2}
-                style={[themed($caption), { color: controlForeground }]}
-              />
-            </>
-          ) : null}
-        </View>
-      ) : null}
+                <Text
+                  text={
+                    mode.additionalClaims > 0
+                      ? `Confirm commander damage · ${mode.additionalClaims} more pending`
+                      : "Confirm commander damage"
+                  }
+                  size="xxs"
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={1.2}
+                  style={[themed($caption), { color: controlForeground }]}
+                />
+              </>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
     </Animated.View>
   )
 }
@@ -339,6 +341,8 @@ const $activePlayerOverlay: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderColor: colors.board.text,
   borderWidth: 3,
 })
+
+const $safeContent: ViewStyle = { flex: 1 }
 
 const $zones: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFill,
