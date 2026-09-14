@@ -37,6 +37,9 @@ export const PLAYER_MARK_SIZE = 80
 export const COMPACT_PLAYER_MARK_SIZE = 60
 export const PLAYER_MARK_MUTED_OPACITY = 0.72
 
+export const LIFE_GLYPH_LINE_HEIGHT = 50
+export const COMPACT_LIFE_GLYPH_LINE_HEIGHT = 34
+
 export function getLifeLineHeight(fontSize: number) {
   return Math.ceil(fontSize * LIFE_LINE_HEIGHT_RATIO)
 }

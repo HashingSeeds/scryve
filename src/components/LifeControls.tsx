@@ -7,7 +7,11 @@ import type { LifeDelta } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import type { LifeCardContentRotation } from "./playerCardTypes"
+import {
+  COMPACT_LIFE_GLYPH_LINE_HEIGHT,
+  LIFE_GLYPH_LINE_HEIGHT,
+  type LifeCardContentRotation,
+} from "./playerCardTypes"
 import { Text } from "./Text"
 
 export interface LifeControlsProps {
@@ -86,6 +90,7 @@ export function LifeControls({
       >
         {HALF_CARD_ZONES.map(({ direction, glyph, edge }) => {
           const delta = direction * tapStep
+          const pinsToTopEdge = direction === (contentRotation === 90 ? -1 : 1)
           const feedback =
             direction * recentDelta > 0
               ? recentDelta > 0
@@ -116,7 +121,7 @@ export function LifeControls({
               style={({ pressed }) => [
                 themed($zone),
                 sideways
-                  ? themed($zoneSideways)
+                  ? themed(pinsToTopEdge ? $zoneSidewaysTop : $zoneSidewaysBottom)
                   : edge === "left"
                     ? themed($zoneLeft)
                     : themed($zoneRight),
@@ -181,20 +186,27 @@ const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $zoneLeft: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-start" })
 const $zoneRight: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-end" })
-const $zoneSideways: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $zoneSidewaysTop: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
+  justifyContent: "flex-start",
+  paddingHorizontal: 0,
+  paddingVertical: spacing.xs,
+})
+const $zoneSidewaysBottom: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "center",
+  justifyContent: "flex-end",
   paddingHorizontal: 0,
   paddingVertical: spacing.xs,
 })
 
 const $glyph: ThemedStyle<TextStyle> = () => ({
   fontSize: 44,
-  lineHeight: 50,
+  lineHeight: LIFE_GLYPH_LINE_HEIGHT,
   opacity: 0.6,
 })
 
 const $compactGlyph: ThemedStyle<TextStyle> = () => ({
   fontSize: 30,
-  lineHeight: 34,
+  lineHeight: COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   opacity: 0.6,
 })
