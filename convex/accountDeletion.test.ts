@@ -441,6 +441,51 @@ describe("account deletion", () => {
     )
   })
 
+  it("deletes version sync receipts before the metadata receipts they mirror", async () => {
+    const t = convexTest(schema, modules)
+    const owner = t.withIdentity({ subject: "version-receipt-deletion-owner" })
+    await owner.mutation(api.users.syncCurrent, { displayName: "Version Receipt Owner" })
+    const saved = await owner.mutation(api.decks.syncWrite, {
+      id: "11111111-1111-4111-8111-111111111111",
+      operationId: "22222222-2222-4222-8222-222222222222",
+      expectedRevision: 0,
+      name: "Offline deck",
+      format: "commander",
+      game: "mtg",
+      note: "",
+      deleted: false,
+    })
+    if ("status" in saved) throw new Error("expected successful sync write")
+    const deckId = saved.deckId
+    const versionId = await owner.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [],
+    })
+    await owner.mutation(api.decks.syncVersionWrite, {
+      deckId: "11111111-1111-4111-8111-111111111111",
+      versionId,
+      operationId: "33333333-3333-4333-8333-333333333333",
+      expectedRevision: 1,
+      cards: [],
+    })
+    const request = await owner.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
+      confirmation: "DELETE",
+    })
+    expect(
+      await t.run(async (ctx) => (await ctx.db.query("deckVersionSyncReceipts").collect()).length),
+    ).toBe(1)
+    await t.mutation(internal.accountDeletion.processDecks, { requestId: request.requestId })
+    expect(
+      await t.run(async (ctx) => (await ctx.db.query("deckVersionSyncReceipts").collect()).length),
+    ).toBe(0)
+    expect(await t.run((ctx) => ctx.db.get(deckId))).not.toBeNull()
+    await t.mutation(internal.accountDeletion.processDecks, { requestId: request.requestId })
+    expect(
+      await t.run(async (ctx) => (await ctx.db.query("deckSyncReceipts").collect()).length),
+    ).toBe(0)
+    expect(await t.run((ctx) => ctx.db.get(deckId))).not.toBeNull()
+  })
+
   it("accepts deletion for a Clerk identity that has no Scryve projection", async () => {
     const t = convexTest(schema, modules)
     const actor = t.withIdentity({ subject: "clerk-only-user" })

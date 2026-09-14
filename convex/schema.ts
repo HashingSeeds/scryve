@@ -280,7 +280,6 @@ export default defineSchema({
     deckId: v.id("decks"),
     versionNumber: v.number(),
     fingerprint: v.string(),
-    syncId: v.optional(v.string()),
     syncRevision: v.optional(v.number()),
     name: v.optional(v.string()),
     note: v.optional(v.string()),

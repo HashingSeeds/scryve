@@ -32,7 +32,6 @@ export function syncedDeck(deck: Doc<"decks">) {
 }
 
 export const syncedVersionValidator = v.object({
-  id: v.string(),
   deckId: v.id("decks"),
   versionId: v.id("deckVersions"),
   revision: v.number(),
@@ -48,7 +47,6 @@ export const syncedVersionValidator = v.object({
 
 export function syncedVersion(version: Doc<"deckVersions">) {
   return {
-    id: version.syncId ?? version._id,
     deckId: version.deckId,
     versionId: version._id,
     revision: version.syncRevision ?? 0,
