@@ -4,6 +4,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
+import { analyticsId } from "@/utils/analytics"
 
 import { SettingsScreen } from "./SettingsScreen"
 
@@ -46,6 +47,10 @@ jest.mock("expo-updates", () => ({
   },
 }))
 jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn() }))
+jest.mock("@/utils/analytics", () => ({
+  ...jest.requireActual<typeof import("@/utils/analytics")>("@/utils/analytics"),
+  analyticsId: jest.fn(() => null),
+}))
 
 describe("SettingsScreen", () => {
   beforeEach(() => {
@@ -59,9 +64,12 @@ describe("SettingsScreen", () => {
       channel: "preview",
     })
     jest.mocked(Clipboard.setStringAsync).mockReset().mockResolvedValue(true)
+    jest.mocked(analyticsId).mockReset().mockReturnValue(null)
   })
 
   it("shows installed metadata and copies full identifiers", async () => {
+    const id = "analytics_" + "a".repeat(32)
+    jest.mocked(analyticsId).mockReturnValue(id)
     const view = render(
       <ThemeProvider initialContext="dark">
         <SettingsScreen
@@ -75,6 +83,7 @@ describe("SettingsScreen", () => {
     expect(view.getByText("Build: 42")).toBeTruthy()
     expect(view.getByText("Runtime: abcdef123456…")).toBeTruthy()
     expect(view.getByText("Update: 12345678-abc…")).toBeTruthy()
+    expect(view.getByText(`Analytics ID: ${id}`)).toBeTruthy()
     fireEvent.press(view.getByText("Copy debug info"))
     await waitFor(() => expect(view.getByText("Copied")).toBeTruthy())
     expect(view.queryByText("Copy debug info")).toBeNull()
@@ -87,6 +96,7 @@ describe("SettingsScreen", () => {
         `Update: ${mockUpdates.updateId}`,
         "Channel: preview",
         `Platform: ${Platform.OS}`,
+        `Analytics ID: ${id}`,
       ].join("\n"),
     )
   })

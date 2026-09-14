@@ -93,10 +93,13 @@ export function SettingsScreen({
   }
   const copyDebugInfo = async () => {
     try {
+      const id = analyticsId()
       const copied = await Clipboard.setStringAsync(
-        ["Scryve", ...Object.entries(appInfo).map(([label, value]) => `${label}: ${value}`)].join(
-          "\n",
-        ),
+        [
+          "Scryve",
+          ...Object.entries(appInfo).map(([label, value]) => `${label}: ${value}`),
+          ...(id ? [`Analytics ID: ${id}`] : []),
+        ].join("\n"),
       )
       setCopyStatus(copied ? "Copied" : "Could not copy. Try again.")
     } catch {
@@ -288,13 +291,6 @@ export function SettingsScreen({
           />
         ) : null}
         {analyticsError ? <Text accessibilityRole="alert" size="xs" text={analyticsError} /> : null}
-        {analyticsId() ? (
-          <Text
-            selectable
-            size="xxs"
-            text={`Analytics ID: ${analyticsId()}. Include this ID when requesting analytics deletion at privacy@sowinghope.how.`}
-          />
-        ) : null}
         {onRequestAccountDeletion ? (
           <View style={themed($accountSection)}>
             <Text text="Account & data" preset="subheading" accessibilityRole="header" />
@@ -359,6 +355,21 @@ export function SettingsScreen({
         ) : null}
         <View style={themed($legalSection)}>
           <Text text="App information" preset="subheading" accessibilityRole="header" />
+          {analyticsId() ? (
+            <>
+              <Text
+                size="sm"
+                selectable
+                accessibilityLabel={`Analytics ID: ${analyticsId()}`}
+                text={`Analytics ID: ${analyticsId()}`}
+              />
+              <Text
+                size="xs"
+                style={themed($muted)}
+                text="Include this ID when requesting analytics deletion at privacy@sowinghope.how."
+              />
+            </>
+          ) : null}
           {Object.entries(appInfo).map(([label, value]) => {
             const shorten = (label === "Runtime" || label === "Update") && value.length > 16
             return (
