@@ -5,6 +5,7 @@ import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { contrastRatio } from "@/utils/colorContrast"
 
 import {
   COMMANDER_CELL_SIZE,
@@ -33,6 +34,7 @@ export interface CommanderDamageBoardProps {
   compact?: boolean
   expanded?: boolean
   foreground: string
+  cardBackground?: string
   seatNumber: number
   onPressSword?: () => void
   style?: StyleProp<ViewStyle>
@@ -43,6 +45,22 @@ export const commanderCellTestId = (seatNumber: number, playerId: PlayerId) =>
 export const commanderSwordTestId = (seatNumber: number) => `commander-sword-seat-${seatNumber}`
 export const commanderStageTestId = (seatNumber: number, step: number) =>
   `commander-stage-seat-${seatNumber}-${step}`
+
+const COMMANDER_MARK_MIN_CONTRAST = 3
+
+export function commanderMarkColor(
+  playerColor: string,
+  cardBackground: string | undefined,
+  foreground: string,
+): string {
+  if (
+    cardBackground &&
+    /^#[0-9A-Fa-f]{6}$/.test(playerColor) &&
+    contrastRatio(playerColor, cardBackground) >= COMMANDER_MARK_MIN_CONTRAST
+  )
+    return playerColor
+  return foreground
+}
 
 export function CommanderDamageBoard({
   ownerPlayerId,
@@ -57,6 +75,7 @@ export function CommanderDamageBoard({
   compact,
   expanded,
   foreground,
+  cardBackground,
   seatNumber,
   onPressSword,
   style,
@@ -114,14 +133,14 @@ export function CommanderDamageBoard({
                   style={[
                     themed($inspectionCell),
                     { width: size, height: size },
-                    ownSeat && themed($cellIdle),
+                    (ownSeat || total === 0) && themed($cellIdle),
                   ]}
                 >
                   <View style={[themed($inspectionValue), seatedGlyphRotation]}>
                     <PlayerMark
                       seatNumber={playerIndex + 1}
                       shape={player.shape}
-                      color={foreground}
+                      color={commanderMarkColor(player.color, cardBackground, foreground)}
                       size={Math.max(14, Math.floor(size * 0.25))}
                     />
                     <Text

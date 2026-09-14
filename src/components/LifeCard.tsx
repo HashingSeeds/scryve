@@ -431,6 +431,7 @@ export function LifeCard({
               compact={compact}
               expanded
               foreground={foreground}
+              cardBackground={color}
               style={themed($expandedCommanderBoard)}
               maxSize={{
                 width: Math.max(
