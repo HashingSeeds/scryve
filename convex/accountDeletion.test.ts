@@ -409,6 +409,8 @@ describe("account deletion", () => {
     }
     const saved = await owner.mutation(api.decks.syncWrite, operation)
     const otherSaved = await other.mutation(api.decks.syncWrite, operation)
+    if ("status" in saved || "status" in otherSaved)
+      throw new Error("expected successful sync write")
     await t.run(async (ctx) => {
       const deck = await ctx.db.get(saved.deckId)
       for (let index = 0; index < 50; index++)

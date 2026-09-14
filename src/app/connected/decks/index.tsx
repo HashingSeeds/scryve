@@ -37,6 +37,7 @@ export default function DecksRoute() {
           pathname: "/connected/decks/[deckId]",
           params: {
             deckId: deck.deckId,
+            ...(deck.reviewChanges ? { reviewChanges: "true" } : {}),
             deckName: deck.name,
             deckGame: deck.game,
             deckFormat: deck.format,

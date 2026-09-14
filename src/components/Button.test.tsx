@@ -1,6 +1,8 @@
 import { StyleSheet, View } from "react-native"
 import { render } from "@testing-library/react-native"
 
+import { colors as lightColors } from "@/theme/colors"
+import { colors as darkColors } from "@/theme/colorsDark"
 import { ThemeProvider } from "@/theme/context"
 import { contrastRatio } from "@/utils/colorContrast"
 
@@ -13,6 +15,30 @@ type NestedButtonContentKey = Extract<
 type NestedButtonContentIsExcluded = [NestedButtonContentKey] extends [never] ? true : false
 
 describe("Button", () => {
+  it.each(["light", "dark"] as const)(
+    "uses the theme tint and readable labels for primary actions in %s mode",
+    (mode) => {
+      const themeColors = mode === "dark" ? darkColors : lightColors
+      const content = (disabled: boolean) => (
+        <ThemeProvider initialContext={mode}>
+          <Button testID="primary-action" text="Keep mine" preset="primary" disabled={disabled} />
+        </ThemeProvider>
+      )
+      const view = render(content(false))
+      for (const disabled of [false, true]) {
+        view.rerender(content(disabled))
+        const button = StyleSheet.flatten(view.getByTestId("primary-action").props.style)
+        const label = StyleSheet.flatten(view.getByText("Keep mine").props.style)
+        expect(button.backgroundColor).toBe(themeColors.tint)
+        expect(button.opacity ?? 1).toBe(disabled ? 0.55 : 1)
+        expect(
+          contrastRatio(label.color as string, button.backgroundColor as string),
+        ).toBeGreaterThanOrEqual(4.5)
+        expect(view.getByTestId("primary-action").props.accessibilityState.disabled).toBe(disabled)
+      }
+    },
+  )
+
   it("keeps nested text overrides presentation-only", () => {
     const nestedButtonContentIsExcluded: NestedButtonContentIsExcluded = true
 

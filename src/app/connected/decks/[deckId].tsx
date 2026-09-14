@@ -7,13 +7,15 @@ import { DeckDetailScreen, type DeckDetailSummary } from "@/screens/DeckDetailSc
 import { GuestDeckDetailScreen } from "@/screens/GuestDeckDetailScreen"
 
 export default function DeckDetailRoute() {
-  const { deckId, deckName, deckGame, deckFormat, deckCardQuantity } = useLocalSearchParams<{
-    deckId?: string
-    deckName?: string
-    deckGame?: string
-    deckFormat?: string
-    deckCardQuantity?: string
-  }>()
+  const { deckId, deckName, deckGame, deckFormat, deckCardQuantity, reviewChanges } =
+    useLocalSearchParams<{
+      reviewChanges?: string
+      deckId?: string
+      deckName?: string
+      deckGame?: string
+      deckFormat?: string
+      deckCardQuantity?: string
+    }>()
   useEffect(() => {
     if (deckId) recordRecentDeck(deckId)
   }, [deckId])
@@ -36,6 +38,7 @@ export default function DeckDetailRoute() {
           access={access}
           deckId={deckId}
           summary={summary}
+          reviewChanges={reviewChanges === "true"}
           onBack={() => router.back()}
         />
       )}

@@ -11,10 +11,11 @@ import {
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle, ThemedStyleArray } from "@/theme/types"
+import { accessibleForeground } from "@/utils/colorContrast"
 
 import { Text, TextProps as AppTextProps } from "./Text"
 
-type Presets = "default" | "filled" | "reversed"
+type Presets = "default" | "filled" | "reversed" | "primary"
 type ButtonTextProps = Omit<AppTextProps, "tx" | "text" | "txOptions" | "children">
 
 export interface ButtonAccessoryProps {
@@ -223,6 +224,7 @@ const $leftAccessoryStyle: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $viewPresets: Record<Presets, ThemedStyleArray<ViewStyle>> = {
+  primary: [$styles.row, $baseViewStyle, ({ colors }) => ({ backgroundColor: colors.tint })],
   default: [
     $styles.row,
     $baseViewStyle,
@@ -245,18 +247,21 @@ const $viewPresets: Record<Presets, ThemedStyleArray<ViewStyle>> = {
 }
 
 const $textPresets: Record<Presets, ThemedStyleArray<TextStyle>> = {
+  primary: [$baseTextStyle, ({ colors }) => ({ color: accessibleForeground(colors.tint) })],
   default: [$baseTextStyle],
   filled: [$baseTextStyle],
   reversed: [$baseTextStyle, ({ colors }) => ({ color: colors.palette.neutral100 })],
 }
 
 const $pressedViewPresets: Record<Presets, ThemedStyle<ViewStyle>> = {
+  primary: () => ({ opacity: 0.85 }),
   default: ({ colors }) => ({ backgroundColor: colors.palette.neutral200 }),
   filled: ({ colors }) => ({ backgroundColor: colors.palette.neutral400 }),
   reversed: ({ colors }) => ({ backgroundColor: colors.palette.neutral700 }),
 }
 
 const $pressedTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
+  primary: () => ({}),
   default: () => ({ opacity: 0.9 }),
   filled: () => ({ opacity: 0.9 }),
   reversed: () => ({ opacity: 0.9 }),
@@ -274,6 +279,7 @@ const $disabledSolidViewStyle: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 
 const $disabledViewPresets: Record<Presets, ThemedStyle<ViewStyle>> = {
+  primary: () => ({ opacity: 0.55 }),
   default: $disabledViewStyle,
   filled: $disabledViewStyle,
   reversed: $disabledSolidViewStyle,
@@ -284,6 +290,7 @@ const $disabledTextStyle: ThemedStyle<TextStyle> = () => ({
 })
 
 const $disabledTextPresets: Record<Presets, ThemedStyle<TextStyle>> = {
+  primary: $disabledTextStyle,
   default: $disabledTextStyle,
   filled: $disabledTextStyle,
   reversed: ({ colors }) => ({ color: colors.palette.neutral800 }),

@@ -1,7 +1,15 @@
 import type { ConvexReactClient } from "convex/react"
 
-import { DeckSyncController, DeckSyncRepository, type DeckSyncStorage } from "./decksSync"
+import {
+  DeckSyncController,
+  DeckSyncRepository,
+  getDeckSyncController,
+  isDeckSyncEnabled,
+  setDeckSyncEnabled,
+  type DeckSyncStorage,
+} from "./decksSync"
 import type { Id } from "../../../convex/_generated/dataModel"
+import { storage } from "../../utils/storage"
 
 class MemoryStorage implements DeckSyncStorage {
   values = new Map<string, string>()
@@ -31,6 +39,59 @@ const syncedDeck = (revision: number, deleted = false) => ({
 })
 
 describe("deck sync reads", () => {
+  it("enables metadata hydration on a fresh device while respecting an explicit opt-out", () => {
+    storage.delete("scryve.decks.syncRead.v1")
+    expect(isDeckSyncEnabled()).toBe(true)
+
+    setDeckSyncEnabled(false)
+    expect(isDeckSyncEnabled()).toBe(false)
+    storage.delete("scryve.decks.syncRead.v1")
+  })
+
+  it("does not restore cached deck ids from another deployment", () => {
+    const storage = new MemoryStorage()
+    const oldDeployment = new DeckSyncRepository(
+      "owner-a",
+      storage,
+      "https://old-deployment.convex.cloud",
+    )
+    oldDeployment.mergeMetadata([
+      {
+        ...syncedDeck(1),
+        id: "ks7ektdpa7v1qgvebg4n2r8mqs8ea9dr",
+        deckId: "ks7ektdpa7v1qgvebg4n2r8mqs8ea9dr" as Id<"decks">,
+      },
+    ])
+
+    expect(
+      new DeckSyncRepository(
+        "owner-a",
+        storage,
+        "https://old-deployment.convex.cloud",
+      ).loadMetadata()[0].deckId,
+    ).toBe("ks7ektdpa7v1qgvebg4n2r8mqs8ea9dr")
+    const newDeployment = new DeckSyncRepository(
+      "owner-a",
+      storage,
+      "https://new-deployment.convex.cloud",
+    )
+    expect(newDeployment.loadMetadata()).toEqual([])
+  })
+
+  it("scopes default controllers to the client's URL", () => {
+    const client = (url: string) =>
+      ({ url, query: jest.fn(), watchQuery: jest.fn() }) as unknown as ConvexReactClient
+    const oldDeployment = getDeckSyncController(client("http://localhost:3210"), "factory-owner")
+    oldDeployment.acceptMetadata([syncedDeck(1)])
+
+    expect(
+      getDeckSyncController(client("http://localhost:3210"), "factory-owner").getSnapshot().decks,
+    ).toHaveLength(1)
+    expect(
+      getDeckSyncController(client("http://localhost:3211"), "factory-owner").getSnapshot().decks,
+    ).toEqual([])
+  })
+
   it("rejects a page from a previous account without claiming an empty shelf loaded", async () => {
     const repository = new DeckSyncRepository("owner-b", new MemoryStorage())
     const client = {

@@ -10,6 +10,7 @@ import { CloudProviders, useAuthAccess } from "./AuthContext"
 const mockUseAuth = jest.fn((_options?: unknown) => ({ isLoaded: true, isSignedIn: false }))
 const mockUseUser = jest.fn(() => ({ user: { id: "user_test" } }))
 const mockClerkProvider = jest.fn(({ children }: { children: ReactNode }) => children)
+const mockConvexClient = { url: "https://example.convex.cloud" }
 jest.mock("react-native/Libraries/Modal/Modal", () => {
   const React = jest.requireActual("react")
   const NativeView = jest.requireActual("react-native").View
@@ -45,6 +46,7 @@ jest.mock("@clerk/expo/native", () => {
 jest.mock("convex/react", () => ({
   ConvexProviderWithAuth: ({ children }: { children: ReactNode }) => children,
   ConvexReactClient: jest.fn(),
+  useConvex: () => mockConvexClient,
   useConvexAuth: () => ({ isAuthenticated: false, isLoading: true }),
   useConvexConnectionState: () => ({ isWebSocketConnected: false }),
 }))

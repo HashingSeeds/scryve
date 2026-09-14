@@ -24,7 +24,7 @@ import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
-import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
+import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { DeckView } from "@/features/decks/DeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useAppTheme } from "@/theme/context"
@@ -39,7 +39,14 @@ import { deckFormatLabel, deckGame, deckSections } from "../../convex/lib/deckGa
 import { versionLabel } from "../../convex/lib/deckVersions"
 
 type DeckDialog =
-  "none" | "newVersion" | "renameVersion" | "deleteVersion" | "settings" | "deleteDeck" | "discard"
+  | "none"
+  | "newVersion"
+  | "renameVersion"
+  | "deleteVersion"
+  | "settings"
+  | "deleteDeck"
+  | "discard"
+  | "syncConflict"
 
 export function cardDetailsKey(card: DeckCard, game: string) {
   if (card.scryfallId) return card.scryfallId
@@ -88,6 +95,7 @@ export type DeckDetailSummary = {
 }
 
 type DeckDetailScreenProps = {
+  reviewChanges?: boolean
   access?: CloudAccess
   deckId: string
   summary?: DeckDetailSummary
@@ -144,7 +152,7 @@ function DeckDetailPlaceholder({
       >
         <View style={themed($headerBlock)}>
           <View style={themed($titleBlock)}>
-            <Text preset="heading" text={summary?.name ?? "Deck"} />
+            <Text preset="heading" size="xl" text={summary?.name ?? "Deck"} />
             {loadingMetadata ? (
               <Text size="sm" style={themed($dimmedText)} text={loadingMetadata} />
             ) : null}
@@ -208,8 +216,8 @@ function DeckDetailPlaceholder({
           <Button
             testID="edit-deck-button"
             text="Edit list"
-            style={themed($primaryActionButton)}
-            textStyle={themed($primaryActionText)}
+            preset="primary"
+            style={$primaryActionButton}
             disabled
           />
         </View>
@@ -241,7 +249,13 @@ export function DeckDetailScreen(props: DeckDetailScreenProps) {
   )
 }
 
-function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreenProps) {
+function DeckDetailContent({
+  deckId,
+  summary,
+  onBack,
+  access,
+  reviewChanges,
+}: DeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
   const navigation = useNavigation()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
@@ -297,6 +311,13 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
         right.failedAt - left.failedAt ||
         right.action.expectedRevision - left.action.expectedRevision,
     )[0]
+  const reviewRequested = useRef(reviewChanges)
+  useEffect(() => {
+    if (reviewRequested.current && failedEdit) {
+      reviewRequested.current = false
+      setDialog("syncConflict")
+    }
+  }, [failedEdit])
   const optimisticMetadata = pendingMetadata.length
     ? metadataWrites.metadata.find((deck) => deck.deckId === deckId && !deck.deleted)
     : undefined
@@ -570,41 +591,33 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
   if (!deck) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
 
   const configuredSections = deckSections(deck.game, deck.format)
+  const accountMetadata =
+    metadataWrites.metadata.find((item) => item.deckId === deckId && !item.deleted) ??
+    cachedMetadata ??
+    detail?.deck
+  const versionConflict = failedEdit?.reason === DECK_CONFLICT_REASON
+  const comparedFields =
+    failedEdit && accountMetadata
+      ? [
+          { label: "Name", local: failedEdit.action.name, account: accountMetadata.name },
+          {
+            label: "Format",
+            local: deckFormatLabel(failedEdit.action.game, failedEdit.action.format),
+            account: deckFormatLabel(accountMetadata.game, accountMetadata.format),
+          },
+          {
+            label: "Notes",
+            local: failedEdit.action.note ?? "",
+            account: accountMetadata.note ?? "",
+          },
+        ].filter((field) => field.local !== field.account)
+      : []
+  const failureMessage =
+    failedEdit && !/\[CONVEX|Server Error|ArgumentValidationError|\n/i.test(failedEdit.reason)
+      ? failedEdit.reason
+      : "This edit could not be synced. Try again or discard it."
   const syncError = failedEdit ? (
-    <View style={themed($syncFailure)}>
-      <AlertNote text={`Could not sync local edit: ${failedEdit.reason}`} />
-      <Text size="xs" text={`Name: ${failedEdit.action.name}`} />
-      <Text
-        size="xs"
-        text={`Format: ${deckFormatLabel(failedEdit.action.game, failedEdit.action.format)}`}
-      />
-      <Text size="xs" text={`Note: ${failedEdit.action.note || "No note"}`} />
-      <View style={themed($actionRow)}>
-        <Button
-          testID="reapply-deck-metadata"
-          text="Use this version"
-          disabled={knownDeleted}
-          onPress={() => {
-            try {
-              metadataWrites.reapplyFailure(failedEdit.action.operationId)
-            } catch (cause) {
-              fail(cause, "Could not use this version")
-            }
-          }}
-        />
-        <Button
-          testID="discard-deck-metadata"
-          text="Discard local edit"
-          onPress={() => {
-            try {
-              metadataWrites.discardFailure(failedEdit.action.operationId)
-            } catch (cause) {
-              fail(cause, "Could not discard local edit")
-            }
-          }}
-        />
-      </View>
-    </View>
+    <Button text="Review changes" onPress={() => setDialog("syncConflict")} />
   ) : undefined
 
   return (
@@ -677,6 +690,101 @@ function DeckDetailContent({ deckId, summary, onBack, access }: DeckDetailScreen
           ) : undefined
         }
       />
+      {dialog === "syncConflict" && failedEdit ? (
+        <DialogCard
+          visible
+          placement="bottom"
+          wide
+          onClose={() => setDialog("none")}
+          dialogTestID="deck-sync-conflict"
+          backdropAccessibilityLabel="Later"
+          accessibilityViewIsModal
+        >
+          <ScrollView contentContainerStyle={themed($syncFailure)}>
+            <Text
+              preset="subheading"
+              text={versionConflict ? "Keep which version?" : "Review local edit"}
+            />
+            {versionConflict && !knownDeleted && accountMetadata ? (
+              <>
+                <View style={themed($comparisonRow)}>
+                  <Text weight="bold" size="sm" text="This device" style={$comparisonCell} />
+                  <Text weight="bold" size="sm" text="Account" style={$comparisonCell} />
+                </View>
+                {comparedFields.map((field) => (
+                  <View key={field.label} style={themed($conflictVersion)}>
+                    <Text weight="medium" size="xs" text={field.label} />
+                    <View style={themed($comparisonRow)}>
+                      <Text
+                        size="sm"
+                        text={field.local || "Empty"}
+                        accessibilityLabel={`${field.label}, this device: ${field.local || "Empty"}`}
+                        style={$comparisonCell}
+                      />
+                      <Text
+                        size="sm"
+                        text={field.account || "Empty"}
+                        accessibilityLabel={`${field.label}, account: ${field.account || "Empty"}`}
+                        style={$comparisonCell}
+                      />
+                    </View>
+                  </View>
+                ))}
+                {comparedFields.length === 0 ? (
+                  <Text size="sm" text="Both versions match." />
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Text
+                  size="sm"
+                  text={
+                    knownDeleted
+                      ? "Deck deleted. Your edit is saved on this device."
+                      : failureMessage
+                  }
+                />
+                <View style={themed($conflictVersion)}>
+                  <Text size="sm" text={`Name: ${failedEdit.action.name}`} />
+                  <Text
+                    size="sm"
+                    text={`Format: ${deckFormatLabel(failedEdit.action.game, failedEdit.action.format)}`}
+                  />
+                  <Text size="sm" text={`Note: ${failedEdit.action.note || "No note"}`} />
+                </View>
+              </>
+            )}
+            {error ? <AlertNote text={error} /> : null}
+            <Button
+              testID="reapply-deck-metadata"
+              text={versionConflict ? "Keep mine" : "Retry sync"}
+              preset="primary"
+              disabled={knownDeleted || !accountMetadata}
+              onPress={() => {
+                try {
+                  metadataWrites.reapplyFailure(failedEdit.action.operationId)
+                  setDialog("none")
+                } catch (cause) {
+                  fail(cause, "Could not save your changes")
+                }
+              }}
+            />
+            <Button
+              testID="discard-deck-metadata"
+              text={versionConflict && !knownDeleted ? "Keep account" : "Discard local edit"}
+              onPress={() => {
+                try {
+                  metadataWrites.discardFailure(failedEdit.action.operationId)
+                  setDialog("none")
+                } catch (cause) {
+                  fail(cause, "Could not discard local edit")
+                }
+              }}
+            />
+            <Button text="Later" onPress={() => setDialog("none")} />
+          </ScrollView>
+        </DialogCard>
+      ) : null}
       {adding && detail ? (
         <CardSearchScreen
           game={detail.deck.game}
@@ -1039,17 +1147,7 @@ const $actionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 const $syncFailure: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $primaryActionButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minWidth: 160,
-  minHeight: 44,
-  paddingVertical: spacing.xs,
-  borderRadius: 22,
-  borderColor: colors.tint,
-  backgroundColor: colors.tint,
-})
-const $primaryActionText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.textInverse,
-})
+const $primaryActionButton: ViewStyle = { minWidth: 160, minHeight: 44 }
 
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
@@ -1058,3 +1156,16 @@ const $destructiveButton: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderWidth: 1,
 })
 const $destructiveText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
+
+const $conflictVersion: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.xs,
+  paddingVertical: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.separator,
+})
+
+const $comparisonCell: TextStyle = { flex: 1, flexShrink: 1 }
+const $comparisonRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.md,
+})

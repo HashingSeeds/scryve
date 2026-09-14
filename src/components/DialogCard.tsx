@@ -145,7 +145,7 @@ export function DialogCard({
 
 const $dialogFill: ViewStyle = { flex: 1 }
 const $dialogBackdrop: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.palette.overlay50,
+  backgroundColor: colors.overlay,
 })
 const $dialogLayout: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
@@ -168,7 +168,7 @@ const $dialog: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderWidth: 1,
   borderColor: colors.separator,
   backgroundColor: colors.background,
-  shadowColor: colors.palette.neutral900,
+  shadowColor: colors.shadow,
   shadowOffset: { width: 0, height: spacing.xxs },
   shadowOpacity: 0.35,
   shadowRadius: spacing.md,

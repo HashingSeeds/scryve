@@ -19,6 +19,7 @@ import { storage } from "@/utils/storage"
 import {
   DeckSyncRepository,
   getDeckSyncController,
+  scopedOwnerId,
   type DeckSyncController,
   type SyncedDeck,
 } from "./decksSync"
@@ -53,6 +54,7 @@ export interface DeckSyncWriteSnapshot {
 
 const SCOPE = "metadata"
 const RETRY_DELAY_MS = 2_000
+export const DECK_CONFLICT_REASON = "Deck changed on another device. Choose which version to keep."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -70,13 +72,16 @@ const permanentErrors = new Set([
   "deck_limit_reached",
 ])
 
-const keys: DurableOutboxKeys = {
-  pendingIndex: (_scope, owner) => `scryve.decks.pending.v1.${owner}`,
-  pendingRecord: (_scope, operationId, owner) =>
-    `scryve.decks.pendingRecord.v1.${owner}.${operationId}`,
-  failedIndex: (_scope, owner) => `scryve.decks.failed.v1.${owner}`,
-  failedRecord: (_scope, operationId, owner) =>
-    `scryve.decks.failedRecord.v1.${owner}.${operationId}`,
+function outboxKeys(deploymentUrl?: string): DurableOutboxKeys {
+  return {
+    pendingIndex: (_scope, owner) =>
+      `scryve.decks.pending.v1.${scopedOwnerId(owner, deploymentUrl)}`,
+    pendingRecord: (_scope, operationId, owner) =>
+      `scryve.decks.pendingRecord.v1.${scopedOwnerId(owner, deploymentUrl)}.${operationId}`,
+    failedIndex: (_scope, owner) => `scryve.decks.failed.v1.${scopedOwnerId(owner, deploymentUrl)}`,
+    failedRecord: (_scope, operationId, owner) =>
+      `scryve.decks.failedRecord.v1.${scopedOwnerId(owner, deploymentUrl)}.${operationId}`,
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -116,9 +121,12 @@ function parseFailed(value: unknown): FailedDeckWrite | null {
   )
     return null
   const action = parsePending(value.action)
-  return action
-    ? { schemaVersion: 1, action, reason: value.reason, failedAt: value.failedAt }
-    : null
+  const reason =
+    value.reason === "Deck changed on another device" ||
+    value.reason === "An earlier edit conflicted. Choose which version to keep."
+      ? DECK_CONFLICT_REASON
+      : value.reason
+  return action ? { schemaVersion: 1, action, reason, failedAt: value.failedAt } : null
 }
 
 const codec: DurableOutboxCodec<PendingDeckWrite, FailedDeckWrite> = {
@@ -140,9 +148,10 @@ export class DeckSyncWriteRepository {
   constructor(
     readonly ownerId: string,
     local: DurableStringStorage = storage,
+    deploymentUrl?: string,
   ) {
-    this.outbox = new DurableOutbox(local, ownerId, keys, codec)
-    this.metadata = new DeckSyncRepository(ownerId, local)
+    this.outbox = new DurableOutbox(local, ownerId, outboxKeys(deploymentUrl), codec)
+    this.metadata = new DeckSyncRepository(ownerId, local, deploymentUrl)
   }
 
   loadMetadata() {
@@ -335,6 +344,8 @@ export class DeckMetadataWriteController {
         operationId: (action) => action.operationId,
         classifyFailure: (cause) => {
           const code = convexErrorCode(cause)
+          if (code === "sync_conflict")
+            return { kind: "reject" as const, reason: DECK_CONFLICT_REASON }
           return code && permanentErrors.has(code)
             ? {
                 kind: "reject" as const,
@@ -349,12 +360,13 @@ export class DeckMetadataWriteController {
           )
             throw new ConvexError({
               code: "sync_conflict",
-              message: "An earlier edit conflicted. Choose which version to keep.",
+              message: DECK_CONFLICT_REASON,
             })
-          const deck = await this.client.mutation(api.decks.syncWrite, {
+          const result = await this.client.mutation(api.decks.syncWrite, {
             id: action.id,
             operationId: action.operationId,
             expectedOwnerId: this.repository.ownerId,
+            returnConflict: true,
             expectedRevision: action.expectedRevision,
             name: action.name,
             format: action.format,
@@ -362,8 +374,14 @@ export class DeckMetadataWriteController {
             note: action.note,
             deleted: false,
           })
+          const deck = "status" in result ? result.deck : result
           if (this.reads) this.reads.acceptMetadata([deck])
           else this.repository.mergeMetadata([deck])
+          if ("status" in result)
+            throw new ConvexError({
+              code: "sync_conflict",
+              message: DECK_CONFLICT_REASON,
+            })
           return { operationId: action.operationId }
         },
         shouldContinue: () => generation === this.generation && this.users > 0,
@@ -426,9 +444,9 @@ export class DeckMetadataWriteController {
 const controllers = new WeakMap<object, Map<string, DeckMetadataWriteController>>()
 
 export function getDeckMetadataWriteController(
-  client: Pick<ConvexReactClient, "mutation" | "query" | "watchQuery">,
+  client: Pick<ConvexReactClient, "mutation" | "query" | "watchQuery" | "url">,
   ownerId: string,
-  repository = new DeckSyncWriteRepository(ownerId),
+  repository = new DeckSyncWriteRepository(ownerId, storage, client.url),
 ) {
   let byOwner = controllers.get(client)
   if (!byOwner) {

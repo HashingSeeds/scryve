@@ -4,7 +4,9 @@ import { clear, load } from "@/utils/storage"
 
 import DeckDetailRoute from "../app/connected/decks/[deckId]"
 
-let mockParams: { deckId?: string } = { deckId: "deck-from-route" }
+const mockDetailScreen = jest.fn((_props: unknown) => null)
+
+let mockParams: { deckId?: string; reviewChanges?: string } = { deckId: "deck-from-route" }
 
 jest.mock("expo-router", () => ({
   Redirect: () => null,
@@ -17,13 +19,21 @@ jest.mock("@/features/auth/CloudScreen", () => ({
 }))
 
 jest.mock("@/screens/DeckDetailScreen", () => ({
-  DeckDetailScreen: () => null,
+  DeckDetailScreen: (props: unknown) => mockDetailScreen(props),
 }))
 
 describe("deck detail route", () => {
   beforeEach(() => {
     clear()
     mockParams = { deckId: "deck-from-route" }
+  })
+
+  it("passes a shelf review request to the detail screen", () => {
+    mockParams = { deckId: "deck-from-route", reviewChanges: "true" }
+    render(<DeckDetailRoute />)
+    expect(mockDetailScreen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reviewChanges: true }),
+    )
   })
 
   it("records a nonempty deck id as recent", async () => {

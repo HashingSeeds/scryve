@@ -1,13 +1,15 @@
-import { StyleSheet } from "react-native"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { Image, StyleSheet } from "react-native"
+import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import * as deckSync from "@/features/decks/decksSync"
 import * as deckWrites from "@/features/decks/decksSyncWrites"
 import { deleteGuestDeck, saveGuestDeck } from "@/features/decks/guestDeck"
 import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
+import { colors as darkColors } from "@/theme/colorsDark"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
+import { accessibleForeground, contrastRatio } from "@/utils/colorContrast"
 import { clear, loadString } from "@/utils/storage"
 
 import { DecksScreen } from "./DecksScreen"
@@ -93,9 +95,12 @@ jest.mock("../../convex/_generated/api", () => ({
   },
 }))
 
-function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
-  return render(
-    <ThemeProvider initialContext="light">
+function shelf(
+  props: Partial<Parameters<typeof DecksScreen>[0]> = {},
+  theme: "light" | "dark" = "light",
+) {
+  return (
+    <ThemeProvider initialContext={theme}>
       <DecksScreen
         onPlay={jest.fn()}
         onSelect={jest.fn()}
@@ -104,8 +109,12 @@ function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
         onAccount={jest.fn()}
         {...props}
       />
-    </ThemeProvider>,
+    </ThemeProvider>
   )
+}
+
+function renderShelf(props: Partial<Parameters<typeof DecksScreen>[0]> = {}) {
+  return render(shelf(props))
 }
 
 describe("DecksScreen", () => {
@@ -160,13 +169,15 @@ describe("DecksScreen", () => {
     const view = renderShelf({ onSelect })
     expect(view.getByText("Local name")).toBeTruthy()
     expect(view.queryByText("Mono Red")).toBeNull()
-    fireEvent.press(view.getByLabelText("Local name"))
+    fireEvent.press(view.getByLabelText("Local name. Needs review"))
     expect(onSelect).toHaveBeenLastCalledWith(
       expect.objectContaining({ name: "Local name", format: "modern" }),
     )
     expect(view.getByText("Sync paused. Resolve a saved local edit to continue.")).toBeTruthy()
     fireEvent.press(view.getByText("Review saved edit"))
-    expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ deckId: standardDeck._id }))
+    expect(onSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ deckId: standardDeck._id, reviewChanges: true }),
+    )
   })
 
   it("offers retry instead of an empty shelf when sync has no cached data", () => {
@@ -218,6 +229,16 @@ describe("DecksScreen", () => {
   })
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.spyOn(deckSync, "isDeckSyncEnabled").mockReturnValue(false)
+    jest.spyOn(deckWrites, "useDeckMetadataWrites").mockReturnValue({
+      metadata: [],
+      pending: [],
+      failures: [],
+      capacityBlocked: false,
+      update: jest.fn(),
+      discardFailure: jest.fn(),
+      reapplyFailure: jest.fn(),
+    })
     clear()
     deleteGuestDeck()
     mockListMine.value = {
@@ -282,6 +303,79 @@ describe("DecksScreen", () => {
     })
   })
 
+  it("marks only decks with saved edits that need review until they are resolved", () => {
+    jest.spyOn(deckSync, "isDeckSyncEnabled").mockReturnValue(true)
+    jest.spyOn(deckSync, "useDeckSync").mockReturnValue({
+      decks: [commanderDeck, standardDeck],
+      metadata: [],
+      loading: false,
+      retry: jest.fn(),
+    })
+    const writes = {
+      metadata: [],
+      pending: [],
+      capacityBlocked: false,
+      failures: [
+        {
+          schemaVersion: 1 as const,
+          reason: "Conflict",
+          failedAt: 2,
+          action: {
+            schemaVersion: 1 as const,
+            ownerId: "owner-a",
+            operationId: "failed",
+            id: standardDeck._id,
+            deckId: standardDeck._id,
+            expectedRevision: 0,
+            name: standardDeck.name,
+            format: standardDeck.format,
+            game: standardDeck.game,
+            note: "",
+            deleted: false,
+            createdAt: 1,
+            updatedAt: 2,
+            queuedAt: 1,
+            attempts: 1,
+          },
+        },
+      ],
+      update: jest.fn(),
+      discardFailure: jest.fn(),
+      reapplyFailure: jest.fn(),
+    }
+    jest.spyOn(deckWrites, "useDeckMetadataWrites").mockImplementation(() => writes)
+    const onSelect = jest.fn()
+    const view = renderShelf({ onSelect })
+
+    expect(
+      view.getByTestId("deck-needs-review-standard-deck", { includeHiddenElements: true }),
+    ).toBeTruthy()
+    expect(view.queryByTestId("deck-needs-review-existing-deck")).toBeNull()
+    fireEvent.press(view.getByLabelText("Mono Red. Needs review"))
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ deckId: standardDeck._id }))
+
+    onSelect.mockClear()
+    fireEvent.press(view.getByRole("button", { name: "Review deck changes: Mono Red" }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ deckId: standardDeck._id, reviewChanges: true }),
+    )
+
+    view.rerender(shelf({ onSelect }, "dark"))
+    const indicator = view.getByTestId("deck-needs-review-standard-deck")
+    expect(StyleSheet.flatten(within(indicator).getByText("!").props.style).color).toBe(
+      darkColors.error,
+    )
+    expect(contrastRatio(darkColors.error, darkColors.surface)).toBeGreaterThanOrEqual(3)
+
+    writes.failures = []
+    view.rerender(shelf({ onSelect }))
+    expect(
+      view.queryByTestId("deck-needs-review-standard-deck", { includeHiddenElements: true }),
+    ).toBeNull()
+    expect(view.getByLabelText("Mono Red")).toBeTruthy()
+  })
+
   it("matches the compact source filters used by History", () => {
     const view = renderShelf()
 
@@ -298,6 +392,32 @@ describe("DecksScreen", () => {
       StyleSheet.flatten(view.getByTestId("collection-filter-favorites").props.style)
         .backgroundColor,
     ).toBeUndefined()
+  })
+
+  it.each([
+    ["light", colors],
+    ["dark", darkColors],
+  ] as const)("keeps selected shelf controls readable in %s mode", (theme, themeColors) => {
+    const view = render(shelf({}, theme))
+    expect(StyleSheet.flatten(view.getByText("All").props.style).color).toBe(
+      accessibleForeground(themeColors.tint),
+    )
+
+    fireEvent.press(view.getByTestId("deck-filters-button"))
+    fireEvent.press(view.getByTestId("system-filter-mtg"))
+    const done = view.getByTestId("deck-filters-done")
+    expect(StyleSheet.flatten(done.props.style).backgroundColor).toBe(themeColors.tint)
+    expect(StyleSheet.flatten(within(done).getByText("Show decks").props.style).color).toBe(
+      accessibleForeground(themeColors.tint),
+    )
+    fireEvent.press(done)
+    const activeFilter = view.getByLabelText("Remove filter Magic")
+    expect(StyleSheet.flatten(within(activeFilter).getByText("Magic").props.style).color).toBe(
+      accessibleForeground(themeColors.tint),
+    )
+    expect(
+      StyleSheet.flatten(within(activeFilter).UNSAFE_getByType(Image).props.style).tintColor,
+    ).toBe(accessibleForeground(themeColors.tint))
   })
 
   it("shows the deck shelf structure while decks load", () => {
