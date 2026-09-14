@@ -233,9 +233,11 @@ function ConfiguredConsentGate({
 
   const serverAcceptanceIsCurrent =
     Boolean(fromServer) && missingConsent(REQUIRED_CONSENT_VERSIONS, fromServer ?? {}).length === 0
+  const serverAcceptancesWipedByDeletion =
+    fromServer !== undefined && Object.keys(fromServer).length === 0 && cacheSaysAccepted
 
   useEffect(() => {
-    if (!userId || !fromServer) return
+    if (!userId || !fromServer || serverAcceptancesWipedByDeletion) return
     if ((pendingSyncIsCurrent || recentlySyncedCurrentUser) && !serverAcceptanceIsCurrent) return
     accountAcceptanceCache.write(userId, fromServer)
     setCached(fromServer)
@@ -249,6 +251,7 @@ function ConfiguredConsentGate({
     pendingSyncIsCurrent,
     recentlySyncedCurrentUser,
     serverAcceptanceIsCurrent,
+    serverAcceptancesWipedByDeletion,
     setCached,
     setPendingSync,
     userId,
@@ -267,13 +270,14 @@ function ConfiguredConsentGate({
     inheritsDeviceAcceptance || pendingSyncIsCurrent || recentlySyncedCurrentUser
   const accepted = trustsLocalAcceptance
     ? REQUIRED_CONSENT_VERSIONS
-    : (fromServer ??
-      acceptedWithoutBackendAnswer({
-        cacheSaysAccepted,
-        cached,
-        accountUnreachable,
-        deviceAccepted,
-      }))
+    : fromServer !== undefined && !serverAcceptancesWipedByDeletion
+      ? fromServer
+      : acceptedWithoutBackendAnswer({
+          cacheSaysAccepted,
+          cached,
+          accountUnreachable,
+          deviceAccepted,
+        })
   const outstanding = useMemo(() => missingConsent(REQUIRED_CONSENT_VERSIONS, accepted), [accepted])
 
   const keepAcceptanceOnThisDevice = useCallback(() => {

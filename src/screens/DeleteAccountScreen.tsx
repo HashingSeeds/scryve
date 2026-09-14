@@ -91,6 +91,11 @@ export function DeleteAccountScreen({
               title="Local games stay on this device"
               body="Offline game history is stored only on this device. It is not linked to your account and is not remotely erased."
             />
+            <Step
+              number="4"
+              title="All devices are signed out"
+              body="This device and any other signed-in devices are signed out automatically."
+            />
           </View>
         ) : null}
         {canRequestDeletion ? (

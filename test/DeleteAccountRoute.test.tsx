@@ -1,5 +1,5 @@
 import { router } from "expo-router"
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -17,6 +17,12 @@ let mockReceipt:
   | undefined
 const mockOpenAuth = jest.fn()
 const mockResetAnalyticsId = jest.fn()
+const mockSignOut = jest.fn(async () => undefined)
+const mockRequestDeletion = jest.fn()
+const mockSaveReceiptToken = jest.fn((token: string) => {
+  mockReceiptToken = token
+  return true
+})
 let mockIsSignedIn = false
 let mockDeletion:
   | {
@@ -34,10 +40,11 @@ jest.mock("expo-router", () => ({
 }))
 jest.mock("@clerk/expo", () => ({
   useUser: () => ({ isLoaded: true, user: { primaryEmailAddress: { emailAddress: "a@b.co" } } }),
+  useClerk: () => ({ signOut: (...args: []) => mockSignOut(...args) }),
 }))
 jest.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
-  useMutation: () => jest.fn(),
+  useMutation: () => mockRequestDeletion,
   useQuery: () => (mockIsSignedIn ? mockDeletion : mockReceipt),
 }))
 jest.mock("@/features/game/localPersistence", () => ({
@@ -54,7 +61,7 @@ jest.mock("@/features/auth/AuthContext", () => ({
 jest.mock("@/features/auth/accountDeletionReceiptStore", () => ({
   isValidReceiptToken: (token: string) => /^[0-9a-f]{64}$/.test(token),
   loadAccountDeletionReceiptToken: () => mockReceiptToken,
-  saveAccountDeletionReceiptToken: jest.fn(() => true),
+  saveAccountDeletionReceiptToken: (...args: [string]) => mockSaveReceiptToken(...args),
   clearAccountDeletionReceiptToken: jest.fn(),
 }))
 
@@ -65,6 +72,11 @@ describe("delete account route", () => {
     mockReceipt = undefined
     mockIsSignedIn = false
     mockDeletion = undefined
+    mockRequestDeletion.mockResolvedValue({
+      requestId: "request-id",
+      receiptToken: "e".repeat(64),
+      status: "processing",
+    })
   })
 
   it("contains query failures and offers a scoped retry", () => {
@@ -121,6 +133,26 @@ describe("delete account route", () => {
 
     fireEvent.press(view.getByText("Sign in to retry"))
     expect(mockOpenAuth).toHaveBeenCalledTimes(1)
+  })
+
+  it("signs out after requesting deletion so the signed-out receipt takes over", async () => {
+    mockIsSignedIn = true
+    mockDeletion = null
+
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <DeleteAccountRoute />
+      </ThemeProvider>,
+    )
+
+    fireEvent.changeText(view.getByTestId("delete-confirmation-input"), "DELETE")
+    await act(async () => {
+      fireEvent.press(view.getByTestId("confirm-account-deletion-button"))
+    })
+
+    expect(mockRequestDeletion).toHaveBeenCalledWith({ confirmation: "DELETE" })
+    expect(mockSaveReceiptToken).toHaveBeenCalledWith("e".repeat(64))
+    expect(mockSignOut).toHaveBeenCalledTimes(1)
   })
 
   it("rotates the analytics id for a deletion requested on another device", () => {
