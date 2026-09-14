@@ -223,7 +223,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: "We process this optional analytics data with your consent to understand feature use and improve Scryve, not for advertising. PostHog processes it on our behalf in the United States or European Union, depending on the hosting region configured for the service. We retain uploaded analytics events for up to 90 days. The analytics identifier remains on your device so you can include the Analytics ID shown in Settings in a deletion request to privacy@sowinghope.how. Account deletion alone cannot locate these events because we do not link the identifier to your account. For information about PostHog, visit https://posthog.com/privacy.",
+          text: "We process this optional analytics data with your consent to understand feature use and improve Scryve, not for advertising. PostHog processes it on our behalf in the United States. We retain uploaded analytics events for up to 90 days. The analytics identifier remains on your device so you can include the Analytics ID shown in Settings in a deletion request to privacy@sowinghope.how. Account deletion alone cannot locate these events because we do not link the identifier to your account. For information about PostHog, visit https://posthog.com/privacy.",
         },
       ],
     },
@@ -425,7 +425,7 @@ export const privacyContent = {
         },
         {
           type: "paragraph",
-          text: 'Our core service servers are located in the United States. Optional PostHog analytics use the United States or European Union region configured for that service. Regardless of your location, please be aware that your information may be transferred to, stored by, and processed by us in our facilities and in the facilities of the third parties with whom we may share your personal information (see " WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION? " above), including facilities in the United States, and other countries.',
+          text: 'Our core service servers are located in the United States. Optional PostHog analytics use the United States region configured for that service. Regardless of your location, please be aware that your information may be transferred to, stored by, and processed by us in our facilities and in the facilities of the third parties with whom we may share your personal information (see " WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION? " above), including facilities in the United States, and other countries.',
         },
         {
           type: "paragraph",
