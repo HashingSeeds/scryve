@@ -5,7 +5,7 @@ import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { contrastRatio } from "@/utils/colorContrast"
+import { accessibleForeground } from "@/utils/colorContrast"
 
 import {
   COMMANDER_CELL_SIZE,
@@ -34,7 +34,6 @@ export interface CommanderDamageBoardProps {
   compact?: boolean
   expanded?: boolean
   foreground: string
-  cardBackground?: string
   seatNumber: number
   onPressSword?: () => void
   style?: StyleProp<ViewStyle>
@@ -42,25 +41,11 @@ export interface CommanderDamageBoardProps {
 
 export const commanderCellTestId = (seatNumber: number, playerId: PlayerId) =>
   `commander-cell-seat-${seatNumber}-${playerId}`
+export const commanderChipTestId = (seatNumber: number, playerId: PlayerId) =>
+  `commander-chip-seat-${seatNumber}-${playerId}`
 export const commanderSwordTestId = (seatNumber: number) => `commander-sword-seat-${seatNumber}`
 export const commanderStageTestId = (seatNumber: number, step: number) =>
   `commander-stage-seat-${seatNumber}-${step}`
-
-const COMMANDER_MARK_MIN_CONTRAST = 3
-
-export function commanderMarkColor(
-  playerColor: string,
-  cardBackground: string | undefined,
-  foreground: string,
-): string {
-  if (
-    cardBackground &&
-    /^#[0-9A-Fa-f]{6}$/.test(playerColor) &&
-    contrastRatio(playerColor, cardBackground) >= COMMANDER_MARK_MIN_CONTRAST
-  )
-    return playerColor
-  return foreground
-}
 
 export function CommanderDamageBoard({
   ownerPlayerId,
@@ -75,7 +60,6 @@ export function CommanderDamageBoard({
   compact,
   expanded,
   foreground,
-  cardBackground,
   seatNumber,
   onPressSword,
   style,
@@ -119,7 +103,8 @@ export function CommanderDamageBoard({
               const player = players[playerIndex]
               const ownSeat = playerId === ownerPlayerId
               const total = incoming[playerId] ?? 0
-              const fontSize = Math.min(40, Math.floor(size * 0.5))
+              const fontSize = Math.min(36, Math.floor(size * 0.45))
+              const disc = Math.max(12, Math.floor(size * 0.32))
               return (
                 <View
                   key={columnIndex}
@@ -137,12 +122,26 @@ export function CommanderDamageBoard({
                   ]}
                 >
                   <View style={[themed($inspectionValue), seatedGlyphRotation]}>
-                    <PlayerMark
-                      seatNumber={playerIndex + 1}
-                      shape={player.shape}
-                      color={commanderMarkColor(player.color, cardBackground, foreground)}
-                      size={Math.max(14, Math.floor(size * 0.25))}
-                    />
+                    <View
+                      testID={commanderChipTestId(seatNumber, playerId)}
+                      style={[
+                        themed($inspectionChip),
+                        {
+                          width: disc,
+                          height: disc,
+                          borderRadius: disc / 2,
+                          backgroundColor: player.color,
+                          marginBottom: Math.round(fontSize * 0.15),
+                        },
+                      ]}
+                    >
+                      <PlayerMark
+                        seatNumber={playerIndex + 1}
+                        shape={player.shape}
+                        color={accessibleForeground(player.color)}
+                        size={Math.floor(disc * 0.72)}
+                      />
+                    </View>
                     <Text
                       text={ownSeat ? "·" : String(total)}
                       weight="medium"
@@ -251,4 +250,8 @@ const $inspectionValue: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xxs,
+})
+const $inspectionChip: ThemedStyle<ViewStyle> = () => ({
+  alignItems: "center",
+  justifyContent: "center",
 })

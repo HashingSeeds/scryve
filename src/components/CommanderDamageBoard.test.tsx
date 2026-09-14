@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/theme/context"
 import {
   CommanderDamageBoard,
   commanderCellTestId,
-  commanderMarkColor,
+  commanderChipTestId,
   commanderStageTestId,
   commanderSwordTestId,
 } from "./CommanderDamageBoard"
@@ -136,7 +136,6 @@ describe("CommanderDamageBoard", () => {
     const view = board(
       {
         players,
-        cardBackground: "#397B61",
         incoming: { [ids[0]]: 5 } as Record<PlayerId, number>,
       },
       1,
@@ -146,16 +145,18 @@ describe("CommanderDamageBoard", () => {
     expect(idle.opacity).toBeLessThan(1)
     expect(active.opacity).toBeUndefined()
   })
-})
 
-describe("commanderMarkColor", () => {
-  it("keeps the attacker color when it contrasts with the card", () => {
-    expect(commanderMarkColor("#C0392B", "#FFFFFF", "#000000")).toBe("#C0392B")
-  })
-
-  it("falls back to the foreground without a card color or a readable attacker color", () => {
-    expect(commanderMarkColor("#FFFFFF", "#FFFFFF", "#000000")).toBe("#000000")
-    expect(commanderMarkColor("#C0392B", undefined, "#000000")).toBe("#000000")
-    expect(commanderMarkColor("red", "#FFFFFF", "#000000")).toBe("#000000")
+  it("seats each mark on the attacker color with a readable glyph", () => {
+    const players = ids.map((id, index) => ({
+      id,
+      name: `Player ${index + 1}`,
+      color: "#C0392B",
+      life: 40,
+      seat: index + 1,
+    }))
+    const view = board({ players }, 1)
+    expect(
+      StyleSheet.flatten(view.getByTestId(commanderChipTestId(2, ids[0])).props.style),
+    ).toMatchObject({ backgroundColor: "#C0392B" })
   })
 })
