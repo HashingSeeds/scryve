@@ -1,6 +1,16 @@
+import { Pressable, StyleSheet } from "react-native"
 import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
+import { CHOICE_RADIUS } from "@/components/ChoiceButton"
+import {
+  applyGameCommand,
+  asActorId,
+  asDeviceId,
+  asOperationId,
+  createLocalGame,
+  PLAYER_COLORS,
+} from "@/features/game/domain"
 import { DEFAULT_LOCAL_SETTINGS, localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -92,4 +102,52 @@ describe("shipping index route", () => {
     fireEvent.press(view.getByTestId("connect-button"))
     expect(router.push).toHaveBeenCalledWith("/game/new?mode=connected")
   })
+
+  it.each(["light", "dark"] as const)(
+    "styles stale-game prompt actions with the themed choice treatment (%s)",
+    (initialContext) => {
+      const fresh = createLocalGame({
+        players: [
+          { name: "Player 1", color: PLAYER_COLORS[0] },
+          { name: "Player 2", color: PLAYER_COLORS[1] },
+        ],
+        startingLife: 20,
+      })
+      const started = applyGameCommand(
+        fresh,
+        { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+        {
+          actorId: asActorId("local"),
+          deviceId: asDeviceId("device"),
+          now: () => Date.now(),
+          operationId: () => asOperationId("op-1"),
+        },
+      )
+      localGameRepository.saveActiveGame({
+        ...started,
+        updatedAt: Date.now() - 25 * 60 * 60 * 1000,
+      })
+
+      const view = render(
+        <ThemeProvider initialContext={initialContext}>
+          <Index />
+        </ThemeProvider>,
+      )
+      for (const [label, borderWidth] of [
+        ["Continue", undefined],
+        ["End game", 2],
+        ["Abandon", 2],
+      ] as const) {
+        let node = view.getByText(label)
+        while (node && node.type !== Pressable) node = node.parent as typeof node
+        const style =
+          typeof node.props.style === "function"
+            ? node.props.style({ pressed: false })
+            : node.props.style
+        const flat = StyleSheet.flatten(style)
+        expect(flat.borderRadius).toBe(CHOICE_RADIUS)
+        if (borderWidth !== undefined) expect(flat.borderWidth).toBe(borderWidth)
+      }
+    },
+  )
 })

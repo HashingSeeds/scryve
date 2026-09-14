@@ -3,6 +3,7 @@ import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
+import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { Switch } from "@/components/Toggle/Switch"
@@ -76,8 +77,20 @@ export function LegalConsentScreen({
       </View>
 
       <View style={themed($links)}>
-        {includesTerms ? <Button text="Read the Terms of Use" onPress={onOpenTerms} /> : null}
-        {includesPrivacy ? <Button text="Read the Privacy Policy" onPress={onOpenPrivacy} /> : null}
+        {includesTerms ? (
+          <Button
+            text="Read the Terms of Use"
+            style={themed($secondaryAction)}
+            onPress={onOpenTerms}
+          />
+        ) : null}
+        {includesPrivacy ? (
+          <Button
+            text="Read the Privacy Policy"
+            style={themed($secondaryAction)}
+            onPress={onOpenPrivacy}
+          />
+        ) : null}
       </View>
 
       {!isReturningUser && analyticsConfigured() ? (
@@ -106,6 +119,7 @@ export function LegalConsentScreen({
           testID="accept-legal-button"
           text={isSubmitting ? "Saving…" : "I agree"}
           preset="reversed"
+          style={themed($primaryAction)}
           disabled={isSubmitting}
           onPress={() => {
             if (!isReturningUser && sharing !== analyticsEnabled()) {
@@ -137,6 +151,14 @@ const $screen: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $body: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $links: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
 const $actions: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
+
+const $primaryAction: ThemedStyle<ViewStyle> = () => ({
+  borderRadius: CHOICE_RADIUS,
+})
+const $secondaryAction: ThemedStyle<ViewStyle> = () => ({
+  borderRadius: CHOICE_RADIUS,
+  borderWidth: 2,
+})
 const $eyebrow: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $error: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
