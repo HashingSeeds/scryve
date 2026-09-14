@@ -135,6 +135,7 @@ const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   width: "100%",
   maxWidth: 480,
   alignSelf: "center",
+  justifyContent: "space-between",
   gap: spacing.md,
   paddingHorizontal: spacing.lg,
   paddingVertical: spacing.lg,
