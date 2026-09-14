@@ -2,6 +2,7 @@ import type { FunctionReturnType } from "convex/server"
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
+import type { Id } from "./_generated/dataModel"
 import schema from "./schema"
 
 const modules = {
@@ -379,7 +380,7 @@ function versionArgs(
 ) {
   return {
     deckId,
-    versionId,
+    versionId: versionId as Id<"deckVersions">,
     operationId,
     expectedRevision,
     cards: [syncCard],
@@ -424,6 +425,112 @@ describe("deck version sync", () => {
     })
     const stored = await t.run(async (ctx) => await ctx.db.get(versionId))
     expect(stored).toMatchObject({ syncRevision: 3 })
+  })
+
+  it("rejects reused operation IDs when any card field changed", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, deckId, versionId } = await seedVersion(t, "version-name-owner")
+    const renamed = {
+      ...syncCard,
+      name: "Card (corrected)",
+      imageUrl: "https://images.example.test/a.png",
+    }
+    await actor.mutation(
+      api.decks.syncVersionWrite,
+      versionArgs(deckId, versionId, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", 2),
+    )
+    await expect(
+      actor.mutation(
+        api.decks.syncVersionWrite,
+        versionArgs(deckId, versionId, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", 2, {
+          cards: [renamed],
+        }),
+      ),
+    ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+  })
+
+  it("reaches active versions in decks with more than twenty archived rows", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, deckId, versionId } = await seedVersion(t, "version-deep-owner")
+    await t.run(async (ctx) => {
+      const deck = await ctx.db.get(deckId)
+      for (let index = 0; index < 30; index++)
+        await ctx.db.insert("deckVersions", {
+          deckId: deck!._id,
+          versionNumber: 1,
+          fingerprint: "1-stale",
+          name: `Stale ${index}`,
+          cardCount: 0,
+          cardQuantity: 0,
+          syncRevision: 1,
+          archivedAt: Date.now() + index,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        })
+    })
+    await expect(
+      actor.mutation(
+        api.decks.syncVersionWrite,
+        versionArgs(deckId, versionId, "bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbcbc", 2),
+      ),
+    ).resolves.toMatchObject({ versionId, revision: 2 })
+  })
+
+  it("bootstraps revisions, tombstones, and archived reads for a fresh client", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "version-pull-owner")
+    const created = await actor.mutation(api.decks.syncWrite, {
+      id: "33333333-3333-4333-8333-333333333333",
+      operationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      expectedRevision: 0,
+      name: "Offline deck",
+      format: "commander",
+      game: "mtg",
+      note: "",
+      deleted: false,
+    })
+    if ("status" in created) throw new Error("expected successful sync write")
+    const deckId = created.deckId
+    const bootstrap = await actor.query(api.decks.versionsPull, {
+      deckId,
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(bootstrap.page).toHaveLength(1)
+    expect(bootstrap.page[0]).toMatchObject({ deckId, revision: 1, deleted: false, cardCount: 0 })
+    expect(bootstrap.isDone).toBe(true)
+    const versionId = bootstrap.page[0].versionId
+    const read = await actor.query(api.decks.readVersion, { deckId, versionId })
+    expect(read.version).toMatchObject({ versionId, revision: 1 })
+    expect(read.cards).toEqual([])
+
+    const userId = await t.run(async (ctx) => {
+      const deck = await ctx.db.get(deckId)
+      if (!deck || typeof deck.ownerUserId !== "string") throw new Error("expected a deck")
+      return deck.ownerUserId
+    })
+    await t.run(async (ctx) => {
+      await ctx.db.insert("userEntitlements", {
+        userId,
+        feature: "deck_versions",
+        enabled: true,
+        source: "test",
+        updatedAt: Date.now(),
+      })
+    })
+    const spareId = await actor.mutation(api.decks.createVersion, { deckId, name: "Spare" })
+    await actor.mutation(api.decks.saveVersion, { deckId, versionId: spareId, cards: [syncCard] })
+    await actor.mutation(api.decks.deleteVersion, { versionId: spareId })
+
+    const tombstones = await actor.query(api.decks.versionsPull, {
+      deckId,
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(tombstones.page).toHaveLength(2)
+    const archivedRow = tombstones.page.find((row) => row.deleted)
+    expect(archivedRow?.versionId).toBe(spareId)
+    const archivedRead = await actor.query(api.decks.readVersion, { deckId, versionId: spareId })
+    expect(archivedRead.version).toMatchObject({ versionId: spareId, deleted: true, revision: 3 })
+    expect(archivedRead.cards).toHaveLength(1)
   })
 
   it("conflicts on stale revisions after legacy writes and recovers", async () => {
@@ -521,15 +628,20 @@ describe("deck version sync", () => {
     await expect(
       actor.mutation(
         api.decks.syncVersionWrite,
-        versionArgs(deckId, "NOT-A-UUID", "bcbcacab-bcbc-4cbc-8cbc-bcbcbcbcbcbb", 2),
+        versionArgs(
+          deckId,
+          "00000000000000010003deckVersions",
+          "bcbcacab-bcbc-4cbc-8cbc-bcbcbcbcbcbb",
+          2,
+        ),
       ),
-    ).rejects.toMatchObject({ data: { code: "invalid_version_id" } })
+    ).rejects.toMatchObject({ data: { code: "deck_version_not_found" } })
     await expect(
       actor.mutation(
         api.decks.syncVersionWrite,
         versionArgs(
           "unknown-deck",
-          "88888888-8888-4888-8888-888888888882",
+          "00000000000000010003deckVersions",
           "bcbcacac-bcbc-4cbc-8cbc-bcbcbcbcbcbc",
           2,
         ),
