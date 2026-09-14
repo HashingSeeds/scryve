@@ -30,3 +30,35 @@ export function syncedDeck(deck: Doc<"decks">) {
     updatedAt: deck.updatedAt,
   }
 }
+
+export const syncedVersionValidator = v.object({
+  id: v.string(),
+  deckId: v.id("decks"),
+  versionId: v.id("deckVersions"),
+  revision: v.number(),
+  versionNumber: v.number(),
+  name: v.string(),
+  note: v.string(),
+  fingerprint: v.string(),
+  cardCount: v.number(),
+  cardQuantity: v.number(),
+  deleted: v.boolean(),
+  updatedAt: v.number(),
+})
+
+export function syncedVersion(version: Doc<"deckVersions">) {
+  return {
+    id: version.syncId ?? version._id,
+    deckId: version.deckId,
+    versionId: version._id,
+    revision: version.syncRevision ?? 0,
+    versionNumber: version.versionNumber,
+    name: version.name ?? "",
+    note: version.note ?? "",
+    fingerprint: version.fingerprint,
+    cardCount: version.cardCount ?? 0,
+    cardQuantity: version.cardQuantity ?? 0,
+    deleted: version.archivedAt !== undefined,
+    updatedAt: version.updatedAt ?? version.createdAt,
+  }
+}

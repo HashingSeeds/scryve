@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
-import { syncedDeckValidator } from "./lib/deckSync"
+import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
 
 const genericDeckCardFields = {
   game: v.optional(v.string()),
@@ -270,10 +270,18 @@ export default defineSchema({
     result: syncedDeckValidator,
   }).index("by_owner_and_operation_id", ["ownerUserId", "operationId"]),
 
+  deckVersionSyncReceipts: defineTable({
+    ownerUserId: v.id("users"),
+    operationId: v.string(),
+    requestKey: v.string(),
+    result: syncedVersionValidator,
+  }).index("by_owner_and_operation_id", ["ownerUserId", "operationId"]),
   deckVersions: defineTable({
     deckId: v.id("decks"),
     versionNumber: v.number(),
     fingerprint: v.string(),
+    syncId: v.optional(v.string()),
+    syncRevision: v.optional(v.number()),
     name: v.optional(v.string()),
     note: v.optional(v.string()),
     cardCount: v.optional(v.number()),
