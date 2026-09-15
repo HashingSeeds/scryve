@@ -4,7 +4,7 @@ import type { FunctionReturnType } from "convex/server"
 
 import { storage } from "@/utils/storage"
 
-import { scopedOwnerId, type DeckSyncStorage } from "./decksSync"
+import { scopedOwnerId } from "./decksSync"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -17,6 +17,13 @@ export type StorableVersionCard = Omit<
   "_id" | "_creationTime" | "deckVersionId"
 > &
   Partial<Pick<CachedVersionCard, "_id" | "_creationTime" | "deckVersionId">>
+
+/** Deletion support is scoped to this cache; MMKV satisfies it structurally. */
+export interface DeckVersionCacheStorage {
+  getString(key: string): string | undefined
+  set(key: string, value: string): void
+  delete(key: string): void
+}
 
 export interface DeckVersionCacheSnapshot {
   versions: CachedVersion[]
@@ -84,7 +91,7 @@ function isCachedCard(value: unknown): value is StorableVersionCard {
 export class DeckVersionCacheRepository {
   constructor(
     readonly ownerId: string,
-    private readonly local: DeckSyncStorage = storage,
+    private readonly local: DeckVersionCacheStorage = storage,
     private readonly deploymentUrl?: string,
   ) {}
 
@@ -96,13 +103,40 @@ export class DeckVersionCacheRepository {
     return value.versions.filter(isCachedVersion)
   }
 
-  mergeVersions(deckId: string, incoming: readonly CachedVersion[]): CachedVersion[] {
+  /**
+   * Merges a pull into the stored list, then reconciles retention: confirmed tombstones
+   * and (only when the pull is authoritative-complete) rows absent from the server's list
+   * are dropped together with their cached card payloads. Durable local write intent lives
+   * elsewhere (D3) and is never touched — read-cache keys only.
+   */
+  mergeVersions(
+    deckId: string,
+    incoming: readonly CachedVersion[],
+    complete = false,
+  ): CachedVersion[] {
     const byId = new Map(this.loadVersions(deckId).map((version) => [version.versionId, version]))
     for (const version of incoming) {
       const current = byId.get(version.versionId)
       if (!current || version.revision >= current.revision) byId.set(version.versionId, version)
     }
-    const versions = [...byId.values()]
+    const dropped = new Set<string>()
+    const versions = [...byId.values()].filter((version) => {
+      if (version.deleted) {
+        dropped.add(version.versionId)
+        return false
+      }
+      return true
+    })
+    if (complete) {
+      const authoritative = new Set(incoming.map((version) => version.versionId))
+      for (let index = versions.length - 1; index >= 0; index--) {
+        if (authoritative.has(versions[index].versionId)) continue
+        dropped.add(versions[index].versionId)
+        versions.splice(index, 1)
+      }
+    }
+    for (const versionId of dropped)
+      this.local.delete(cardsKey(this.ownerId, this.deploymentUrl, versionId))
     this.local.set(
       versionsKey(this.ownerId, this.deploymentUrl, deckId),
       JSON.stringify({ schemaVersion: 1, versions } satisfies StoredVersions),
@@ -118,10 +152,15 @@ export class DeckVersionCacheRepository {
       !isRecord(value) ||
       value.schemaVersion !== 1 ||
       !isCount(value.revision) ||
-      !Array.isArray(value.cards)
+      !Array.isArray(value.cards) ||
+      !value.cards.every(isCachedCard)
     )
       return undefined
-    return { schemaVersion: 1, revision: value.revision, cards: value.cards.filter(isCachedCard) }
+    return {
+      schemaVersion: 1,
+      revision: value.revision,
+      cards: value.cards as CachedVersionCard[],
+    }
   }
 
   saveCards(
@@ -167,6 +206,7 @@ export class DeckVersionCacheController {
   private snapshot = new Map<string, DeckVersionCacheSnapshot>()
   private wanted = new Map<string, string | undefined>()
   private inFlight = new Map<string, number>()
+  private decks = new Map<string, number>()
   private users = 0
   private epoch = 0
 
@@ -190,6 +230,7 @@ export class DeckVersionCacheController {
       this.epoch += 1
       this.inFlight.clear()
       this.wanted.clear()
+      this.decks.clear()
     }
   }
 
@@ -200,14 +241,17 @@ export class DeckVersionCacheController {
     this.publish(deckId)
     const key = `${deckId}:${selectedVersionId ?? ""}`
     if (this.inFlight.has(key)) return
+    const ordinal = (this.decks.get(deckId) ?? 0) + 1
+    this.decks.set(deckId, ordinal)
     this.inFlight.set(key, this.epoch)
-    void this.refresh(deckId, this.epoch, key)
+    void this.refresh(deckId, ordinal, this.epoch, key)
   }
 
   /** Drops offline-stalled reads so the next ensure() refetches after a reconnect. */
   resume(): void {
     this.epoch += 1
     this.inFlight.clear()
+    this.decks.clear()
   }
 
   /** Seeds version cards from a live detail read; never overwrites a newer cached revision. */
@@ -224,21 +268,31 @@ export class DeckVersionCacheController {
     this.publish(deckId)
   }
 
-  private async refresh(deckId: string, epoch: number, key: string): Promise<void> {
+  private superseded(deckId: string, ordinal: number, epoch: number): boolean {
+    return epoch !== this.epoch || ordinal !== this.decks.get(deckId)
+  }
+
+  private async refresh(
+    deckId: string,
+    ordinal: number,
+    epoch: number,
+    key: string,
+  ): Promise<void> {
     try {
-      const versions = await this.pullVersions(deckId, epoch)
-      if (epoch !== this.epoch) return
+      const versions = await this.pullVersions(deckId, epoch, ordinal)
+      if (this.superseded(deckId, ordinal, epoch)) return
       this.publish(deckId)
       const versionId = this.wanted.get(deckId) ?? this.latestActive(versions)?.versionId
       if (!versionId) return
       const metadata = versions.find((version) => version.versionId === versionId)
       const cached = this.repository.loadCards(versionId)
-      if (cached && (!metadata || cached.revision >= metadata.revision)) return
+      if (!metadata) return
+      if (cached && cached.revision >= metadata.revision) return
       const read: VersionRead = await this.client.query(api.decks.readVersion, {
         deckId: deckId as Id<"decks">,
         versionId: versionId as Id<"deckVersions">,
       })
-      if (epoch !== this.epoch) return
+      if (this.superseded(deckId, ordinal, epoch)) return
       if (read.version.deckId === deckId)
         this.repository.saveCards(versionId, read.version.revision, read.cards)
       this.publish(deckId)
@@ -249,7 +303,11 @@ export class DeckVersionCacheController {
     }
   }
 
-  private async pullVersions(deckId: string, epoch: number): Promise<CachedVersion[]> {
+  private async pullVersions(
+    deckId: string,
+    epoch: number,
+    ordinal: number,
+  ): Promise<CachedVersion[]> {
     const merged: CachedVersion[] = []
     let cursor: string | null = null
     for (let page = 0; page < MAX_VERSION_PAGES; page++) {
@@ -257,12 +315,13 @@ export class DeckVersionCacheController {
         deckId: deckId as Id<"decks">,
         paginationOpts: { cursor, numItems: VERSION_PAGE_SIZE },
       })
-      if (epoch !== this.epoch) return []
+      if (this.superseded(deckId, ordinal, epoch)) return []
       if (result.deckId !== deckId) throw new Error("Version list for another deck")
       merged.push(...result.page)
-      if (result.isDone) break
+      if (result.isDone) return this.repository.mergeVersions(deckId, merged, true)
       cursor = result.continueCursor
     }
+    // Incomplete: the newest pages are merged, but nothing is reconciled away.
     return this.repository.mergeVersions(deckId, merged)
   }
 
