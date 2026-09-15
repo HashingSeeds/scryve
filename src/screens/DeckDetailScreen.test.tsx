@@ -41,7 +41,11 @@ const mockVersionCacheState = {
   cards: undefined as Array<Record<string, unknown>> | undefined,
 }
 jest.mock("@/features/decks/deckVersionsCache", () => ({
-  useDeckVersionCache: () => ({ ...mockVersionCacheState, refresh: mockVersionCacheRefresh }),
+  useDeckVersionCache: () => ({
+    ...mockVersionCacheState,
+    refresh: mockVersionCacheRefresh,
+    recordCapacity: jest.fn(),
+  }),
 }))
 jest.mock("@/features/decks/decksSyncWrites", () => ({
   DECK_CONFLICT_REASON: "Deck changed on another device. Choose which version to keep.",

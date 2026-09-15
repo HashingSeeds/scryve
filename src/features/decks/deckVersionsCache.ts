@@ -26,14 +26,15 @@ export interface DeckVersionCacheStorage {
 }
 
 export interface DeckVersionCacheSnapshot {
-  versions: CachedVersion[]
-  version: CachedVersion | undefined
+  versions: StoredVersion[]
+  version: StoredVersion | undefined
   cards: StorableVersionCard[] | undefined
+  capacity?: DeckVersionCapacityHint
 }
 
 interface StoredVersions {
   schemaVersion: 1
-  versions: CachedVersion[]
+  versions: StoredVersion[]
 }
 
 interface StoredCards {
@@ -49,6 +50,25 @@ function versionsKey(ownerId: string, deploymentUrl: string | undefined, deckId:
 function cardsKey(ownerId: string, deploymentUrl: string | undefined, versionId: string) {
   return `scryve.decks.versionCards.v1.${scopedOwnerId(ownerId, deploymentUrl)}.${versionId}`
 }
+
+function capacityKey(ownerId: string, deploymentUrl: string | undefined, deckId: string) {
+  return `scryve.decks.versionCapacity.v1.${scopedOwnerId(ownerId, deploymentUrl)}.${deckId}`
+}
+
+function versionMapKey(ownerId: string, deploymentUrl: string | undefined, versionId: string) {
+  return `scryve.decks.versionIdMap.v1.${scopedOwnerId(ownerId, deploymentUrl)}.${versionId}`
+}
+
+export interface DeckVersionCapacityHint {
+  limit: number
+  premium: boolean
+}
+
+/**
+ * A version row stored locally that the server does not know yet. Confirmed server rows
+ * never carry `local`, so tombstone refreshes never drop a pending offline draft.
+ */
+export type StoredVersion = CachedVersion & { local?: boolean }
 
 function parseJson(value: string | undefined): unknown {
   if (!value) return null
@@ -88,6 +108,10 @@ function isCachedCard(value: unknown): value is StorableVersionCard {
   return isRecord(value) && typeof value.name === "string" && isCount(value.quantity)
 }
 
+function isCapacityHint(value: unknown): value is DeckVersionCapacityHint {
+  return isRecord(value) && isCount(value.limit) && typeof value.premium === "boolean"
+}
+
 export class DeckVersionCacheRepository {
   constructor(
     readonly ownerId: string,
@@ -95,7 +119,22 @@ export class DeckVersionCacheRepository {
     private readonly deploymentUrl?: string,
   ) {}
 
-  loadVersions(deckId: string): CachedVersion[] {
+  /** Last known server capacity for the deck guides offline creation; server stays authoritative. */
+  saveCapacity(deckId: string, capacity: DeckVersionCapacityHint): void {
+    this.local.set(
+      capacityKey(this.ownerId, this.deploymentUrl, deckId),
+      JSON.stringify({ schemaVersion: 1, limit: capacity.limit, premium: capacity.premium }),
+    )
+  }
+
+  loadCapacity(deckId: string): DeckVersionCapacityHint | undefined {
+    const value = parseJson(
+      this.local.getString(capacityKey(this.ownerId, this.deploymentUrl, deckId)),
+    )
+    return isCapacityHint(value) ? { limit: value.limit, premium: value.premium } : undefined
+  }
+
+  loadVersions(deckId: string): StoredVersion[] {
     const value = parseJson(
       this.local.getString(versionsKey(this.ownerId, this.deploymentUrl, deckId)),
     )
@@ -111,9 +150,9 @@ export class DeckVersionCacheRepository {
    */
   mergeVersions(
     deckId: string,
-    incoming: readonly CachedVersion[],
+    incoming: readonly StoredVersion[],
     complete = false,
-  ): CachedVersion[] {
+  ): StoredVersion[] {
     const byId = new Map(this.loadVersions(deckId).map((version) => [version.versionId, version]))
     for (const version of incoming) {
       const current = byId.get(version.versionId)
@@ -121,6 +160,7 @@ export class DeckVersionCacheRepository {
     }
     const dropped = new Set<string>()
     const versions = [...byId.values()].filter((version) => {
+      if (version.local) return true
       if (version.deleted) {
         dropped.add(version.versionId)
         return false
@@ -130,7 +170,7 @@ export class DeckVersionCacheRepository {
     if (complete) {
       const authoritative = new Set(incoming.map((version) => version.versionId))
       for (let index = versions.length - 1; index >= 0; index--) {
-        if (authoritative.has(versions[index].versionId)) continue
+        if (authoritative.has(versions[index].versionId) || versions[index].local) continue
         dropped.add(versions[index].versionId)
         versions.splice(index, 1)
       }
@@ -180,20 +220,72 @@ export class DeckVersionCacheRepository {
     const current = versions.find((version) => version.versionId === versionId)
     const stored = this.loadCards(versionId)
     if (!current || current.revision >= revision || !stored) return
-    const next = versions.map((version) =>
-      version.versionId === versionId
-        ? {
-            ...version,
-            revision,
-            cardCount: stored.cards.length,
-            cardQuantity: stored.cards.reduce((total, card) => total + card.quantity, 0),
-          }
-        : version,
+    this.replaceVersions(
+      deckId,
+      versions.map((version) =>
+        version.versionId === versionId
+          ? {
+              ...version,
+              revision,
+              cardCount: stored.cards.length,
+              cardQuantity: stored.cards.reduce((total, card) => total + card.quantity, 0),
+            }
+          : version,
+      ),
     )
+  }
+
+  private replaceVersions(deckId: string, versions: readonly StoredVersion[]): void {
     this.local.set(
       versionsKey(this.ownerId, this.deploymentUrl, deckId),
-      JSON.stringify({ schemaVersion: 1, versions: next } satisfies StoredVersions),
+      JSON.stringify({ schemaVersion: 1, versions: [...versions] } satisfies StoredVersions),
     )
+  }
+
+  /** Registers an offline draft version so it renders before and while the create is queued. */
+  saveDraft(deckId: string, draft: StoredVersion): void {
+    const versions = this.loadVersions(deckId)
+    this.replaceVersions(deckId, [...versions, draft])
+  }
+
+  /** Swaps a created draft for its confirmed server row, dropping the draft's card payload. */
+  confirmDraft(deckId: string, provisionalId: string, confirmed: StoredVersion): void {
+    const versions = this.loadVersions(deckId)
+    const draft = versions.find((version) => version.versionId === provisionalId)
+    const fallback = draft ? { ...confirmed, versionNumber: draft.versionNumber } : confirmed
+    this.local.delete(cardsKey(this.ownerId, this.deploymentUrl, provisionalId))
+    this.replaceVersions(
+      deckId,
+      versions.filter((version) => version.versionId !== provisionalId),
+    )
+    this.mergeVersions(deckId, [fallback])
+  }
+
+  /** Discards a draft version and its card payload after a failed or cancelled create. */
+  discardDraft(deckId: string, provisionalId: string): void {
+    this.local.delete(cardsKey(this.ownerId, this.deploymentUrl, provisionalId))
+    this.local.delete(versionMapKey(this.ownerId, this.deploymentUrl, provisionalId))
+    this.replaceVersions(
+      deckId,
+      this.loadVersions(deckId).filter((version) => version.versionId !== provisionalId),
+    )
+  }
+
+  /** Durable identity map from a local provisional version id to its real server id. */
+  recordMapping(provisionalId: string, versionId: string): void {
+    this.local.set(
+      versionMapKey(this.ownerId, this.deploymentUrl, provisionalId),
+      JSON.stringify({ schemaVersion: 1, versionId }),
+    )
+  }
+
+  /** Row for a provisional id once the server has acknowledged the create. */
+  resolveMapped(deckId: string, provisionalId: string): StoredVersion | undefined {
+    const value = parseJson(
+      this.local.getString(versionMapKey(this.ownerId, this.deploymentUrl, provisionalId)),
+    )
+    if (!isRecord(value) || typeof value.versionId !== "string") return undefined
+    return this.loadVersions(deckId).find((version) => version.versionId === value.versionId)
   }
 }
 
@@ -268,6 +360,12 @@ export class DeckVersionCacheController {
     this.publish(deckId)
   }
 
+  /** Keeps the last server-known version capacity as the offline creation hint. */
+  recordCapacity(deckId: string, capacity: DeckVersionCapacityHint): void {
+    if (this.users === 0) return
+    this.repository.saveCapacity(deckId, capacity)
+  }
+
   private superseded(deckId: string, ordinal: number, epoch: number): boolean {
     return epoch !== this.epoch || ordinal !== this.decks.get(deckId)
   }
@@ -338,12 +436,26 @@ export class DeckVersionCacheController {
   private publish(deckId: string): void {
     const selectedVersionId = this.wanted.get(deckId)
     const versions = this.repository.loadVersions(deckId)
-    const version = selectedVersionId
+    const direct = selectedVersionId
       ? versions.find((candidate) => candidate.versionId === selectedVersionId)
+      : undefined
+    const mapped = selectedVersionId
+      ? this.repository.resolveMapped(deckId, selectedVersionId)
+      : undefined
+    // A mapped draft resolves to its confirmed server row; before the create acks the draft stands.
+    const version = selectedVersionId
+      ? direct?.local
+        ? (mapped ?? direct)
+        : (direct ?? mapped)
       : this.latestActive(versions)
     const cards = this.renderableCards(version)
     const next = new Map(this.snapshot)
-    next.set(deckId, { versions, version, cards })
+    next.set(deckId, {
+      versions,
+      version,
+      cards,
+      capacity: this.repository.loadCapacity(deckId),
+    })
     this.snapshot = next
     for (const listener of this.listeners) listener()
   }
@@ -379,6 +491,7 @@ const emptySnapshot: DeckVersionCacheSnapshot = {
   versions: [],
   version: undefined,
   cards: undefined,
+  capacity: undefined,
 }
 const noSubscribers = () => () => undefined
 
@@ -407,6 +520,10 @@ export function useDeckVersionCache(
       controller?.record(deckId, versionId, revision, cards),
     [controller, deckId],
   )
+  const recordCapacity = useCallback(
+    (capacity: DeckVersionCapacityHint) => controller?.recordCapacity(deckId, capacity),
+    [controller, deckId],
+  )
   const refresh = useCallback(
     () => controller?.ensure(deckId, selectedVersionId),
     [controller, deckId, selectedVersionId],
@@ -416,5 +533,5 @@ export function useDeckVersionCache(
     () => controller?.getSnapshot().get(deckId) ?? emptySnapshot,
     () => emptySnapshot,
   )
-  return { ...snapshot, record, refresh }
+  return { ...snapshot, record, recordCapacity, refresh }
 }
