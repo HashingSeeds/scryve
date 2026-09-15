@@ -296,7 +296,8 @@ describe("claimImportedSeat", () => {
   it("rejects strangers, stale invites, claimed seats, and never touches normal connected games", async () => {
     const t = convexTest(schema, modules)
     const { host, created } = await published(t)
-    await host.mutation(api.games.claimImportedSeat, {
+    const guestTwo = await signedIn(t, "guest-two-subject", "GuestTwo")
+    await guestTwo.mutation(api.games.claimImportedSeat, {
       publicId: created.publicId,
       seat: 2,
       manualCode: created.manualCode,
@@ -513,7 +514,7 @@ describe("imported game invite renewal and discovery", () => {
     expect(projection.players.map((player) => player.displayName)).toEqual(["Player 1"])
   })
 
-  it("claims a second imported seat from a second device like legacy claimSeat", async () => {
+  it("rejects a second imported seat even from a different device", async () => {
     const t = convexTest(schema, modules)
     const { created } = await published(t, {
       players: [
@@ -542,12 +543,7 @@ describe("imported game invite renewal and discovery", () => {
         manualCode: created.manualCode,
         deviceId: "device-third-0003",
       }),
-    ).resolves.toEqual({ publicId: created.publicId, seat: 3 })
-    const projection = await guest.query(api.games.lobbyProjection, {
-      publicId: created.publicId,
-      deviceId: joinerDevice,
-    })
-    expect(projection.players.map((player) => player.controlledByMe)).toEqual([false, true, false])
+    ).rejects.toThrow("You already hold a seat in this game")
   })
 
   it("does not bypass authorization when a pre-claim operation is retried after a claim", async () => {
