@@ -1140,7 +1140,7 @@ export const syncCreateVersion = mutation({
       args.deckId,
       args.name,
       args.note ?? null,
-      canonicalCards(args.cards),
+      ...args.cards.map((card, index) => `card${index}:${canonicalCards([card])}`),
     ])
     const replay = await versionOperationReceipt(ctx, user, args.operationId, requestKey)
     if (replay) return replay
