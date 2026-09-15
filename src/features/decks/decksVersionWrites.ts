@@ -19,6 +19,7 @@ import { storage } from "@/utils/storage"
 import { scopedOwnerId } from "./decksSync"
 import { DeckVersionCacheRepository, type CachedVersion } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
+import { MAX_DECK_NOTE_LENGTH, assertVersionName } from "../../../convex/lib/policy"
 
 type VersionWriteArgs = FunctionArgs<typeof api.decks.syncVersionWrite>
 type VersionUpdateArgs = FunctionArgs<typeof api.decks.syncUpdateVersion>
@@ -170,6 +171,18 @@ function compareActions(left: PendingVersionWrite, right: PendingVersionWrite) {
   )
 }
 
+/** Builds the replay set for a failed chain. Card writes replace the whole list,
+ *  so only the newest survives; metadata ops are separate intents and all replay. */
+function replayChain(actions: readonly PendingVersionWrite[]): PendingVersionWrite[] {
+  const lastCardIndex = actions.reduce(
+    (last, action, index) => ((action.op ?? "cards") === "cards" ? index : last),
+    -1,
+  )
+  return actions.filter(
+    (action, index) => (action.op ?? "cards") !== "cards" || index === lastCardIndex,
+  )
+}
+
 export class DeckVersionWriteRepository {
   private readonly outbox: DurableOutbox<PendingVersionWrite, FailedVersionWrite>
   private readonly keys: DurableOutboxKeys
@@ -223,28 +236,6 @@ export class DeckVersionWriteRepository {
 
   dismissFailed(operationId: string) {
     this.outbox.dismissFailed(SCOPE, operationId)
-  }
-
-  private versionMapKey(provisionalId: string) {
-    return `scryve.decks.versionIdMap.v1.${scopedOwnerId(this.ownerId, this.deploymentUrl)}.${provisionalId}`
-  }
-
-  /** Durable identity map from a local provisional version id to its real server id. */
-  recordVersion(provisionalId: string, versionId: string) {
-    this.local.set(
-      this.versionMapKey(provisionalId),
-      JSON.stringify({ schemaVersion: 1, versionId }),
-    )
-  }
-
-  resolveVersion(provisionalId: string): string | undefined {
-    let value: unknown
-    try {
-      value = JSON.parse(this.local.getString(this.versionMapKey(provisionalId)) ?? "null")
-    } catch {
-      return undefined
-    }
-    return isRecord(value) && typeof value.versionId === "string" ? value.versionId : undefined
   }
 
   recordConflict(deckId: string, version: CachedVersion) {
@@ -364,6 +355,10 @@ export class DeckVersionWriteController {
   ): string {
     if (this.capacityBlocked)
       throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
+    // Local policy parity keeps permanently invalid payloads out of the retry loop.
+    const versionName = assertVersionName(name)
+    if (note.trim().length > MAX_DECK_NOTE_LENGTH)
+      throw new Error(`Notes must be at most ${MAX_DECK_NOTE_LENGTH} characters`)
     const provisionalId = randomUUID()
     const activeVersions = this.repository.cache
       .loadVersions(deckId)
@@ -376,7 +371,7 @@ export class DeckVersionWriteController {
       versionId: provisionalId as VersionWriteArgs["versionId"],
       revision: 0,
       versionNumber,
-      name,
+      name: versionName,
       note,
       fingerprint: "local",
       cardCount: cards.length,
@@ -389,7 +384,7 @@ export class DeckVersionWriteController {
     this.publish()
     this.enqueue(deckId, provisionalId, cards, 0, {
       op: "create",
-      name,
+      name: versionName,
       ...(note ? { note } : {}),
     })
     void this.drain()
@@ -404,12 +399,15 @@ export class DeckVersionWriteController {
   ): void {
     if (this.capacityBlocked)
       throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
+    const name = patch.name !== undefined ? assertVersionName(patch.name) : undefined
+    if (patch.note !== undefined && patch.note.trim().length > MAX_DECK_NOTE_LENGTH)
+      throw new Error(`Notes must be at most ${MAX_DECK_NOTE_LENGTH} characters`)
     if (this.snapshot.failures.some((failure) => failure.action.versionId === versionId))
       throw new Error("Resolve the saved version change before making another change")
     this.publish()
     this.enqueue(deckId, versionId, [], expectedRevision, {
       op: "rename",
-      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(name !== undefined ? { name } : {}),
       ...(patch.note !== undefined ? { note: patch.note } : {}),
     })
     void this.drain()
@@ -474,20 +472,28 @@ export class DeckVersionWriteController {
     }
     if (conflictRevision === undefined)
       throw new Error("This card edit cannot be replayed. Discard it and edit again.")
-    this.enqueue(
-      latest.action.deckId,
-      latest.action.versionId,
-      latest.action.cards,
-      conflictRevision,
-    )
+    // Replay the whole guarded chain so a mixed card→rename→delete intent survives:
+    // only same-op card replaces dedupe (full-list semantics), and metadata ops keep their op kind.
+    const replayed = replayChain(related.map((entry) => entry.action).sort(compareActions))
+    for (const [index, action] of replayed.entries()) {
+      this.enqueue(
+        action.deckId,
+        action.versionId,
+        action.cards,
+        index === 0 ? conflictRevision : action.expectedRevision,
+        {
+          ...(action.op ? { op: action.op } : {}),
+          ...(action.name !== undefined ? { name: action.name } : {}),
+          ...(action.note !== undefined ? { note: action.note } : {}),
+        },
+      )
+    }
     for (const entry of related) this.repository.dismissFailed(entry.action.operationId)
     this.capacityBlocked = false
     this.publish()
     void this.drain()
   }
 
-  /** Routes a queued op to its backend mutation. Dependent ops reference version ids
-   *  from enqueue time; a pending create is resolved through the durable id map. */
   private async send(action: PendingVersionWrite): Promise<VersionWriteResult> {
     if (action.op === "create")
       return this.client.mutation(api.decks.syncCreateVersion, {
@@ -500,12 +506,12 @@ export class DeckVersionWriteController {
     const draftRow = this.repository.cache
       .loadVersions(action.deckId)
       .find((version) => version.versionId === action.versionId)
-    if (draftRow?.local && !this.repository.resolveVersion(action.versionId))
+    if (draftRow?.local && !this.repository.cache.mappedVersionId(action.versionId))
       throw new ConvexError({
         code: "deck_version_not_found",
         message: DECK_VERSION_DRAFT_UNSYNCED_REASON,
       })
-    const serverVersionId = this.repository.resolveVersion(action.versionId) ?? action.versionId
+    const serverVersionId = this.mappedVersion(action.versionId)
     if (action.op === "rename")
       return this.client.mutation(api.decks.syncUpdateVersion, {
         versionId: serverVersionId as VersionUpdateArgs["versionId"],
@@ -582,7 +588,7 @@ export class DeckVersionWriteController {
             })
           }
           if (action.op === "create") {
-            this.repository.recordVersion(action.versionId, result.versionId)
+            this.repository.cache.recordMapping(action.versionId, result.versionId)
             this.repository.cache.saveCards(result.versionId, result.revision, action.cards)
             this.repository.cache.confirmDraft(action.deckId, action.versionId, result)
             this.repository.rebasePending(action.versionId, result.revision)
@@ -626,6 +632,11 @@ export class DeckVersionWriteController {
       failures: this.repository.loadFailed(),
       capacityBlocked: this.capacityBlocked,
     }
+  }
+
+  /** Version id of a queued write once a pending create got its server identity. */
+  mappedVersion(versionId: string): string {
+    return this.repository.cache.mappedVersionId(versionId) ?? versionId
   }
 
   private publish(): void {
@@ -695,5 +706,6 @@ export function useDeckVersionWrites(enabled: boolean, ownerId?: string) {
     ) => controller?.renameVersion(deckId, versionId, patch, expectedRevision),
     deleteVersion: (deckId: string, versionId: string, expectedRevision: number) =>
       controller?.deleteVersion(deckId, versionId, expectedRevision),
+    mappedVersion: (versionId: string) => controller?.mappedVersion(versionId) ?? versionId,
   }
 }

@@ -27,7 +27,6 @@ import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import {
   DECK_VERSION_CONFLICT_REASON,
-  DECK_VERSION_LAST_REASON,
   DECK_VERSION_QUEUE_CONFLICT_REASON,
   useDeckVersionWrites,
   type PendingVersionWrite,
@@ -383,6 +382,8 @@ function DeckDetailContent({
   )
   const cachedVersion = versionCache.version
   const version = detail?.version
+  const activeVersionId = version?._id ?? cachedVersion?.versionId
+  const canQueueVersionLifecycle = syncEnabled && Boolean(access?.ownerId)
   const versionTarget = version
     ? { versionId: version._id, expectedRevision: version.syncRevision ?? 0 }
     : cachedVersion && versionCache.cards !== undefined
@@ -391,20 +392,35 @@ function DeckDetailContent({
           expectedRevision: cachedVersion.revision,
         }
       : undefined
-  const pendingVersionAction = versionWrites.pending
-    .filter((write) => write.deckId === deckId && write.versionId === versionTarget?.versionId)
+  // Queue row overlay matches the displayed version through the durable provisional map,
+  // so queued card edits stay visible across the create acknowledgement.
+  const displayedVersionIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (version?._id) ids.add(version._id)
+    if (activeVersionId) ids.add(activeVersionId)
+    return ids
+  }, [version?._id, activeVersionId])
+  const pendingCardWrite = versionWrites.pending
+    .filter((write) => write.deckId === deckId && (write.op ?? "cards") === "cards")
+    .filter((write) => {
+      const mapped = versionWrites.mappedVersion(write.versionId)
+      return (
+        displayedVersionIds.has(write.versionId) ||
+        (mapped !== write.versionId && displayedVersionIds.has(mapped))
+      )
+    })
     .reduce<PendingVersionWrite | undefined>(
       (newest, action) =>
         !newest || action.expectedRevision > newest.expectedRevision ? action : newest,
       undefined,
     )
-  const displayCards = pendingVersionAction
-    ? mergedPrintings(pendingVersionAction.cards as DeckCard[])
+  const displayCards = pendingCardWrite
+    ? mergedPrintings(pendingCardWrite.cards as DeckCard[])
     : storedCards.length > 0
       ? storedCards
       : (cachedCards ?? storedCards)
+  const cardsUnavailable = !detail && cachedCards === undefined && !pendingCardWrite
   const cards = editing ? draft : displayCards
-  const cardsUnavailable = !detail && cachedCards === undefined && !pendingVersionAction
   const writeMotion = versionWrites.pending.length + versionWrites.failures.length
   const lastWriteMotion = useRef(-1)
   const refreshVersionCache = versionCache.refresh
@@ -456,8 +472,6 @@ function DeckDetailContent({
     [versionCache.versions],
   )
   const versionRows = detail?.versions ?? cachedVersionRows
-  const activeVersionId = version?._id ?? cachedVersion?.versionId
-  const canQueueVersionLifecycle = syncEnabled && Boolean(access?.ownerId)
   const cachedVersionCount = versionCache.versions.filter((version) => !version.deleted).length
   const canAddVersion =
     detail?.capacity.canCreate === true ||
@@ -469,7 +483,7 @@ function DeckDetailContent({
     : canQueueVersionLifecycle && cachedVersionCount > 1
   const premium = detail?.capacity.premium === true || versionCache.capacity?.premium === true
   const versionCapture =
-    pendingVersionAction || storedCards.length > 0 || cachedCards !== undefined
+    pendingCardWrite || storedCards.length > 0 || cachedCards !== undefined
       ? displayCards
       : undefined
 
@@ -670,41 +684,42 @@ function DeckDetailContent({
   }
 
   async function submitNewVersion({ name, note, copyCards }: DeckVersionDraft) {
-    if (detail) {
-      await run(async () => {
-        const versionId = await createVersion({
-          deckId: deckId as Id<"decks">,
-          name,
-          ...(note.trim() ? { note } : {}),
-          ...(copyCards && version ? { fromVersionId: version._id } : {}),
-        })
-        setSelectedVersionId(versionId)
+    if (canQueueVersionLifecycle) {
+      // Copy captures what the user currently sees locally, queue overlay included;
+      // a server snapshot fromVersionId would silently miss pending offline cards.
+      const captured = copyCards ? versionCapture : undefined
+      if (copyCards && captured === undefined) {
+        setError("Saved cards are not available. Reconnect or create an empty version.")
+        return
+      }
+      try {
+        const provisionalId = versionWrites.createVersion(
+          deckId,
+          name.trim(),
+          note.trim(),
+          captured ?? [],
+        )
+        setSelectedVersionId(provisionalId as Id<"deckVersions">)
         setDialog("none")
-      }, "Could not create version")
+      } catch (cause) {
+        fail(cause, "Could not create version")
+      }
       return
     }
-    if (!canQueueVersionLifecycle) {
+    if (!detail) {
       setError("Reconnect to create versions.")
       return
     }
-    // Copy captures what the user sees locally; a server snapshot is never silently reused.
-    const captured = copyCards ? versionCapture : undefined
-    if (copyCards && captured === undefined) {
-      setError("Saved cards are not available offline. Reconnect or create an empty version.")
-      return
-    }
-    try {
-      const provisionalId = versionWrites.createVersion(
-        deckId,
-        name.trim(),
-        note.trim(),
-        captured ?? [],
-      )
-      setSelectedVersionId(provisionalId as Id<"deckVersions">)
+    await run(async () => {
+      const versionId = await createVersion({
+        deckId: deckId as Id<"decks">,
+        name,
+        ...(note.trim() ? { note } : {}),
+        ...(copyCards && version ? { fromVersionId: version._id } : {}),
+      })
+      setSelectedVersionId(versionId)
       setDialog("none")
-    } catch (cause) {
-      fail(cause, "Could not create version")
-    }
+    }, "Could not create version")
   }
 
   async function submitRenameVersion({ name, note }: DeckVersionDraft) {
@@ -739,11 +754,7 @@ function DeckDetailContent({
       version?._id ?? (activeVersionSummary ? (activeVersionId as Id<"deckVersions">) : undefined)
     if (!versionId) return
     const expectedRevision = versionTarget?.expectedRevision ?? 0
-    if (canQueueVersionLifecycle && detail === undefined) {
-      if (!canDeleteVersion) {
-        setError(DECK_VERSION_LAST_REASON)
-        return
-      }
+    if (canQueueVersionLifecycle) {
       try {
         versionWrites.deleteVersion(deckId, versionId, expectedRevision)
         setSelectedVersionId(undefined)
@@ -1173,7 +1184,7 @@ function DeckDetailContent({
             <View style={themed($versions)}>
               <View style={themed($versionHeading)}>
                 <Text weight="bold" size="sm" text="Versions" />
-                {detail ? (
+                {detail || canQueueVersionLifecycle ? (
                   <TouchableOpacity
                     testID="version-picker-__new__"
                     accessibilityRole="button"
