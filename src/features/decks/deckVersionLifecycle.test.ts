@@ -193,7 +193,7 @@ describe("deck version lifecycle", () => {
     const stored = await t.run(async (ctx) => ctx.db.query("deckVersions").take(10))
     const created = stored.find((version) => version.name === "Offline Draft")
     expect(created).toMatchObject({ cardCount: 1, syncRevision: 1 })
-    expect(repository.resolveVersion(provisionalId)).toBe(created?._id as string)
+    expect(repository.cache.mappedVersionId(provisionalId)).toBe(created?._id as string)
     expect(repository.cache.resolveMapped(id as string, provisionalId)?.versionId).toBe(
       created?._id,
     )
@@ -243,6 +243,101 @@ describe("deck version lifecycle", () => {
     stop()
     expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
     expect(repository.cache.loadVersions(deckId)).toHaveLength(2)
+  })
+
+  it("replays a conflicted rename as its own op instead of an empty card replace", async () => {
+    const local = new MemoryStorage()
+    const repository = new DeckVersionWriteRepository("owner", local)
+    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
+    const client = {
+      mutation: jest
+        .fn()
+        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
+        .mockResolvedValue(versionSnapshot(2)),
+    } as unknown as ConvexReactClient
+    const controller = new DeckVersionWriteController(client, repository, () => 1)
+    const stop = controller.start()
+    controller.renameVersion(deckId, versionId, { name: "Renamed" }, 1)
+    await flush()
+    expect(controller.getSnapshot().failures).toHaveLength(1)
+    controller.reapplyFailure(controller.getSnapshot().failures[0].action.operationId)
+    await flush()
+    stop()
+
+    const calls = jest.mocked(client.mutation).mock.calls
+    expect(calls[0][1]).toMatchObject({
+      expectedRevision: 1,
+      name: "Renamed",
+    })
+    expect(jest.mocked(client.mutation)).toHaveBeenNthCalledWith(
+      2,
+      api.decks.syncUpdateVersion,
+      expect.objectContaining({ expectedRevision: 1, name: "Renamed" }),
+    )
+    // The replayed metadata op must never land as an empty syncVersionWrite replace.
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+  })
+
+  it("replays a mixed conflicts chain preserving the card payload and both intents", async () => {
+    const local = new MemoryStorage()
+    const repository = new DeckVersionWriteRepository("owner", local)
+    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
+    const client = {
+      mutation: jest
+        .fn()
+        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
+        .mockResolvedValue(versionSnapshot(2)),
+    } as unknown as ConvexReactClient
+    const controller = new DeckVersionWriteController(client, repository, () => 1)
+    const stop = controller.start()
+    controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 2 }], 0)
+    controller.renameVersion(deckId, versionId, { name: "Renamed" }, 1)
+    await flush()
+    expect(controller.getSnapshot().failures).toHaveLength(2)
+
+    controller.reapplyFailure(controller.getSnapshot().failures[0].action.operationId)
+    await flush()
+    stop()
+
+    const writes = jest
+      .mocked(client.mutation)
+      .mock.calls.filter((call) => call[0] !== api.decks.syncCreateVersion)
+    expect(writes).toHaveLength(3)
+    expect(writes[1][1]).toMatchObject({
+      expectedRevision: 1,
+      cards: [{ name: "Sol Ring", quantity: 2 }],
+    })
+    expect(writes[2][1]).toMatchObject({ expectedRevision: 2, name: "Renamed" })
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+  })
+
+  it("replays a conflicted delete as a deletion instead of an empty card replace", async () => {
+    const local = new MemoryStorage()
+    const repository = new DeckVersionWriteRepository("owner", local)
+    repository.cache.mergeVersions(deckId, [
+      versionSnapshot(1),
+      { ...versionSnapshot(2), versionId: "version-2" as Id<"deckVersions"> },
+    ])
+    const client = {
+      mutation: jest
+        .fn()
+        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
+        .mockResolvedValue(versionSnapshot(2)),
+    } as unknown as ConvexReactClient
+    const controller = new DeckVersionWriteController(client, repository, () => 1)
+    const stop = controller.start()
+    controller.deleteVersion(deckId, versionId, 1)
+    await flush()
+    controller.reapplyFailure(controller.getSnapshot().failures[0].action.operationId)
+    await flush()
+    stop()
+
+    expect(jest.mocked(client.mutation)).toHaveBeenNthCalledWith(
+      2,
+      api.decks.syncDeleteVersion,
+      expect.objectContaining({ expectedRevision: 1 }),
+    )
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
   })
 
   it("keeps local intent when a create hits the version limit and discarding removes the draft", async () => {
@@ -320,7 +415,7 @@ describe("deck version lifecycle", () => {
       name: "Offline Draft",
       local: true,
     })
-    repository.recordVersion("draft-1", versionId)
+    repository.cache.recordMapping("draft-1", versionId)
     const cache = new DeckVersionCacheController(
       { query: jest.fn() } as unknown as ConvexReactClient,
       repository.cache,

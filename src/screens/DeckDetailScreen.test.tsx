@@ -39,6 +39,7 @@ const mockVersionCacheState = {
   versions: [] as Array<Record<string, unknown>>,
   version: undefined as Record<string, unknown> | undefined,
   cards: undefined as Array<Record<string, unknown>> | undefined,
+  capacity: undefined as Record<string, unknown> | undefined,
 }
 jest.mock("@/features/decks/deckVersionsCache", () => ({
   useDeckVersionCache: () => ({
@@ -59,6 +60,10 @@ jest.mock("@/features/decks/decksSyncWrites", () => ({
 const mockVersionCardUpdate = jest.fn()
 const mockVersionCardDiscard = jest.fn()
 const mockVersionCardReapply = jest.fn()
+const mockVersionCreate = jest.fn()
+const mockVersionRename = jest.fn()
+const mockVersionDelete = jest.fn()
+const mockMappedVersion = jest.fn((versionId: string) => versionId)
 const mockVersionCardWriteState = {
   pending: [] as Array<Record<string, unknown>>,
   failures: [] as Array<Record<string, unknown>>,
@@ -72,6 +77,10 @@ jest.mock("@/features/decks/decksVersionWrites", () => ({
     update: mockVersionCardUpdate,
     discardFailure: mockVersionCardDiscard,
     reapplyFailure: mockVersionCardReapply,
+    createVersion: mockVersionCreate,
+    renameVersion: mockVersionRename,
+    deleteVersion: mockVersionDelete,
+    mappedVersion: mockMappedVersion,
   }),
 }))
 
@@ -267,6 +276,7 @@ describe("DeckDetailScreen", () => {
     mockVersionCardWriteState.pending = []
     mockVersionCardWriteState.failures = []
     mockVersionCardWriteState.capacityBlocked = false
+    mockVersionCacheState.capacity = undefined
     mockVersionCardUpdate.mockClear()
     mockVersionCacheRefresh.mockClear()
   })
@@ -1224,6 +1234,135 @@ describe("DeckDetailScreen", () => {
     await waitFor(() =>
       expect(mockDeleteVersion).toHaveBeenCalledWith({ versionId: "version-main" }),
     )
+  })
+
+  it("routes an online rename through the durable version queue with the live revision", async () => {
+    mockDeckSyncState.enabled = true
+    const access = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    const view = renderDetail(access)
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("rename-version-button"))
+    fireEvent.changeText(view.getByTestId("version-name-input"), "Queued rename")
+    fireEvent.press(view.getByTestId("version-submit"))
+    await waitFor(() => expect(mockVersionRename).toHaveBeenCalledTimes(1))
+    expect(mockVersionRename).toHaveBeenCalledWith(
+      "deck-1",
+      "version-main",
+      { name: "Queued rename", note: "The list I actually sleeve" },
+      0,
+    )
+    expect(mockUpdateVersion).not.toHaveBeenCalled()
+  })
+
+  it("routes an online delete through the durable version queue", async () => {
+    mockDeckSyncState.enabled = true
+    const access = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    const view = renderDetail(access)
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("rename-version-button"))
+    fireEvent.press(view.getByTestId("delete-version-button"))
+    fireEvent.press(view.getByTestId("delete-version-confirm"))
+    await waitFor(() => expect(mockVersionDelete).toHaveBeenCalledWith("deck-1", "version-main", 0))
+    expect(mockDeleteVersion).not.toHaveBeenCalled()
+  })
+
+  it("queues an online create whose copied card list includes queued card edits", async () => {
+    mockDeckSyncState.enabled = true
+    const view = renderDetail({
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    })
+    mockVersionCardWriteState.pending = [
+      {
+        schemaVersion: 1,
+        ownerId: "owner-a",
+        deckId: "deck-1",
+        versionId: "version-main",
+        operationId: "queued-cards",
+        expectedRevision: 5,
+        cards: [{ name: "Sol Ring", quantity: 2 }],
+        queuedAt: 1,
+        attempts: 0,
+        op: "cards",
+      },
+    ]
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("version-picker-__new__"))
+    fireEvent.changeText(view.getByTestId("version-name-input"), "Budget swap")
+    fireEvent.press(view.getByTestId("version-submit"))
+    await waitFor(() => expect(mockVersionCreate).toHaveBeenCalledTimes(1))
+    expect(mockVersionCreate).toHaveBeenCalledWith("deck-1", "Budget swap", "", [
+      { name: "Sol Ring", quantity: 2 },
+    ])
+    expect(mockCreateVersion).not.toHaveBeenCalled()
+  })
+
+  it("keeps a pending offline rename from blanking the card list or empty copies", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [solRing]
+    mockVersionCacheState.capacity = { limit: 5, premium: true }
+    mockVersionCardWriteState.pending = [
+      {
+        schemaVersion: 1,
+        ownerId: "owner-a",
+        deckId: "deck-1",
+        versionId: "version-main",
+        operationId: "queued-rename",
+        expectedRevision: 3,
+        cards: [],
+        queuedAt: 1,
+        attempts: 0,
+        op: "rename",
+        name: "Renamed offline",
+      },
+    ]
+    const view = renderDetail({
+      ready: false,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    })
+    expect(view.getByText("Sol Ring")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("version-picker-__new__"))
+    fireEvent.changeText(view.getByTestId("version-name-input"), "Copy offline")
+    fireEvent.press(view.getByTestId("version-submit"))
+    expect(mockVersionCreate).toHaveBeenCalledTimes(1)
+    expect(mockVersionCreate).toHaveBeenCalledWith("deck-1", "Copy offline", "", [
+      expect.objectContaining({ name: "Sol Ring", quantity: 1, board: "main" }),
+    ])
   })
 
   it("hides version deletion when the deck has only one version", () => {

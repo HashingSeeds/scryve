@@ -279,13 +279,20 @@ export class DeckVersionCacheRepository {
     )
   }
 
-  /** Row for a provisional id once the server has acknowledged the create. */
-  resolveMapped(deckId: string, provisionalId: string): StoredVersion | undefined {
+  /** Raw local id a provisional id was acknowledged as, without needing the deck row. */
+  mappedVersionId(provisionalId: string): string | undefined {
     const value = parseJson(
       this.local.getString(versionMapKey(this.ownerId, this.deploymentUrl, provisionalId)),
     )
-    if (!isRecord(value) || typeof value.versionId !== "string") return undefined
-    return this.loadVersions(deckId).find((version) => version.versionId === value.versionId)
+    return isRecord(value) && typeof value.versionId === "string" ? value.versionId : undefined
+  }
+
+  /** Row for a provisional id once the server has acknowledged the create. */
+  resolveMapped(deckId: string, provisionalId: string): StoredVersion | undefined {
+    const mapped = this.mappedVersionId(provisionalId)
+    return mapped
+      ? this.loadVersions(deckId).find((version) => version.versionId === mapped)
+      : undefined
   }
 }
 
