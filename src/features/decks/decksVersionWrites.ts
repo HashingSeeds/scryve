@@ -19,10 +19,14 @@ import { storage } from "@/utils/storage"
 import { scopedOwnerId } from "./decksSync"
 import { DeckVersionCacheRepository, type CachedVersion } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
+import { MAX_DECK_NOTE_LENGTH, assertVersionName } from "../../../convex/lib/policy"
 
 type VersionWriteArgs = FunctionArgs<typeof api.decks.syncVersionWrite>
+type VersionUpdateArgs = FunctionArgs<typeof api.decks.syncUpdateVersion>
+type VersionDeleteArgs = FunctionArgs<typeof api.decks.syncDeleteVersion>
 type VersionWriteResult = FunctionReturnType<typeof api.decks.syncVersionWrite>
 export type VersionCardPayload = NonNullable<VersionWriteArgs["cards"]>[number]
+export type VersionLifecycleOp = "cards" | "create" | "rename" | "delete"
 
 export interface PendingVersionWrite extends DurablePendingRecord {
   schemaVersion: 1
@@ -32,6 +36,10 @@ export interface PendingVersionWrite extends DurablePendingRecord {
   operationId: string
   expectedRevision: number
   cards: VersionCardPayload[]
+  /** Legacy card writes carry no op and behave as "cards". */
+  op?: VersionLifecycleOp
+  name?: string
+  note?: string
 }
 
 export interface FailedVersionWrite extends DurableFailedRecord<PendingVersionWrite> {
@@ -50,6 +58,9 @@ export const DECK_VERSION_CONFLICT_REASON =
   "Deck cards changed on another device. Choose which card list to keep."
 export const DECK_VERSION_QUEUE_CONFLICT_REASON =
   "An earlier card edit conflicted. Choose which card list to keep."
+export const DECK_VERSION_DRAFT_UNSYNCED_REASON =
+  "This offline draft was never synced. Discard it and create the version again."
+export const DECK_VERSION_LAST_REASON = "A deck must keep at least one version."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -65,6 +76,8 @@ const permanentErrors = new Set([
   "invalid_card_quantity",
   "invalid_card",
   "deck_system_mismatch",
+  "version_limit_reached",
+  "last_version",
 ])
 
 function outboxKeys(deploymentUrl?: string): DurableOutboxKeys {
@@ -92,6 +105,12 @@ function isCard(value: unknown): value is VersionCardPayload {
   return isRecord(value) && typeof value.name === "string" && isCount(value.quantity)
 }
 
+const lifecycleOps = new Set<VersionLifecycleOp>(["cards", "create", "rename", "delete"])
+
+function isLifecycleOp(value: unknown): value is VersionLifecycleOp {
+  return typeof value === "string" && lifecycleOps.has(value as VersionLifecycleOp)
+}
+
 function parsePending(value: unknown): PendingVersionWrite | null {
   if (
     !isRecord(value) ||
@@ -105,9 +124,15 @@ function parsePending(value: unknown): PendingVersionWrite | null {
     !value.cards.every(isCard) ||
     typeof value.queuedAt !== "number" ||
     !isCount(value.attempts) ||
-    (value.lastAttemptAt !== undefined && typeof value.lastAttemptAt !== "number")
+    (value.lastAttemptAt !== undefined && typeof value.lastAttemptAt !== "number") ||
+    (value.op !== undefined && !isLifecycleOp(value.op)) ||
+    (value.name !== undefined && typeof value.name !== "string") ||
+    (value.note !== undefined && typeof value.note !== "string")
   )
     return null
+  const op = value.op ?? "cards"
+  if (op === "create" && typeof value.name !== "string") return null
+  if (op === "rename" && value.name === undefined && value.note === undefined) return null
   return value as unknown as PendingVersionWrite
 }
 
@@ -143,6 +168,18 @@ function compareActions(left: PendingVersionWrite, right: PendingVersionWrite) {
     left.expectedRevision - right.expectedRevision ||
     left.queuedAt - right.queuedAt ||
     left.operationId.localeCompare(right.operationId)
+  )
+}
+
+/** Builds the replay set for a failed chain. Card writes replace the whole list,
+ *  so only the newest survives; metadata ops are separate intents and all replay. */
+function replayChain(actions: readonly PendingVersionWrite[]): PendingVersionWrite[] {
+  const lastCardIndex = actions.reduce(
+    (last, action, index) => ((action.op ?? "cards") === "cards" ? index : last),
+    -1,
+  )
+  return actions.filter(
+    (action, index) => (action.op ?? "cards") !== "cards" || index === lastCardIndex,
   )
 }
 
@@ -279,6 +316,7 @@ export class DeckVersionWriteController {
     versionId: string,
     cards: readonly VersionCardPayload[],
     expectedRevision: number,
+    extra?: { op?: VersionLifecycleOp; name?: string; note?: string },
   ): void {
     const queuedForVersion = this.snapshot.pending.filter(
       (action) => action.versionId === versionId,
@@ -297,11 +335,100 @@ export class DeckVersionWriteController {
       cards: [...cards] as VersionCardPayload[],
       queuedAt: this.now(),
       attempts: 0,
+      ...(extra?.op ? { op: extra.op } : {}),
+      ...(extra?.name !== undefined ? { name: extra.name } : {}),
+      ...(extra?.note !== undefined ? { note: extra.note } : {}),
     }
     const result = this.repository.enqueue(action, this.snapshot.pending)
     if (!result.accepted)
       throw new Error("The offline card queue is full. Reconnect before making more changes.")
     this.publish()
+  }
+
+  /** Queues an offline version create and registers its provisional local row.
+   *  Returns the provisional version id callers keep using until the create is mapped. */
+  createVersion(
+    deckId: string,
+    name: string,
+    note: string,
+    cards: readonly VersionCardPayload[],
+  ): string {
+    if (this.capacityBlocked)
+      throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
+    // Local policy parity keeps permanently invalid payloads out of the retry loop.
+    const versionName = assertVersionName(name)
+    if (note.trim().length > MAX_DECK_NOTE_LENGTH)
+      throw new Error(`Notes must be at most ${MAX_DECK_NOTE_LENGTH} characters`)
+    const provisionalId = randomUUID()
+    const activeVersions = this.repository.cache
+      .loadVersions(deckId)
+      .filter((version) => !version.deleted)
+    const versionNumber =
+      activeVersions.reduce((highest, v) => Math.max(highest, v.versionNumber), 0) + 1
+    const now = this.now()
+    this.repository.cache.saveDraft(deckId, {
+      deckId: deckId as VersionWriteArgs["deckId"],
+      versionId: provisionalId as VersionWriteArgs["versionId"],
+      revision: 0,
+      versionNumber,
+      name: versionName,
+      note,
+      fingerprint: "local",
+      cardCount: cards.length,
+      cardQuantity: cards.reduce((total, card) => total + card.quantity, 0),
+      deleted: false,
+      updatedAt: now,
+      local: true,
+    })
+    this.repository.cache.saveCards(provisionalId, 0, cards)
+    this.publish()
+    this.enqueue(deckId, provisionalId, cards, 0, {
+      op: "create",
+      name: versionName,
+      ...(note ? { note } : {}),
+    })
+    void this.drain()
+    return provisionalId
+  }
+
+  renameVersion(
+    deckId: string,
+    versionId: string,
+    patch: { name?: string; note?: string },
+    expectedRevision: number,
+  ): void {
+    if (this.capacityBlocked)
+      throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
+    const name = patch.name !== undefined ? assertVersionName(patch.name) : undefined
+    if (patch.note !== undefined && patch.note.trim().length > MAX_DECK_NOTE_LENGTH)
+      throw new Error(`Notes must be at most ${MAX_DECK_NOTE_LENGTH} characters`)
+    if (this.snapshot.failures.some((failure) => failure.action.versionId === versionId))
+      throw new Error("Resolve the saved version change before making another change")
+    this.publish()
+    this.enqueue(deckId, versionId, [], expectedRevision, {
+      op: "rename",
+      ...(name !== undefined ? { name } : {}),
+      ...(patch.note !== undefined ? { note: patch.note } : {}),
+    })
+    void this.drain()
+  }
+
+  deleteVersion(deckId: string, versionId: string, expectedRevision: number): void {
+    if (this.capacityBlocked)
+      throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
+    if (this.snapshot.failures.some((failure) => failure.action.versionId === versionId))
+      throw new Error("Resolve the saved version change before making another change")
+    this.publish()
+    const remaining = this.repository.cache
+      .loadVersions(deckId)
+      .filter((version) => !version.deleted && version.versionId !== versionId).length
+    const pendingCreates = this.snapshot.pending.filter(
+      (action) =>
+        action.deckId === deckId && action.op === "create" && action.versionId !== versionId,
+    ).length
+    if (remaining + pendingCreates === 0) throw new Error(DECK_VERSION_LAST_REASON)
+    this.enqueue(deckId, versionId, [], expectedRevision, { op: "delete" })
+    void this.drain()
   }
 
   discardFailure(operationId: string): void {
@@ -310,6 +437,8 @@ export class DeckVersionWriteController {
     for (const entry of this.snapshot.failures)
       if (entry.action.versionId === failure.action.versionId)
         this.repository.dismissFailed(entry.action.operationId)
+    if (failure.action.op === "create")
+      this.repository.cache.discardDraft(failure.action.deckId, failure.action.versionId)
     this.capacityBlocked = false
     this.publish()
     void this.drain()
@@ -329,18 +458,84 @@ export class DeckVersionWriteController {
     const conflictRevision = this.repository.cache
       .loadVersions(latest.action.deckId)
       .find((version) => version.versionId === failure.action.versionId)?.revision
+    if (latest.action.op === "create") {
+      this.enqueue(latest.action.deckId, latest.action.versionId, latest.action.cards, 0, {
+        op: "create",
+        name: latest.action.name ?? "",
+        ...(latest.action.note ? { note: latest.action.note } : {}),
+      })
+      for (const entry of related) this.repository.dismissFailed(entry.action.operationId)
+      this.capacityBlocked = false
+      this.publish()
+      void this.drain()
+      return
+    }
     if (conflictRevision === undefined)
       throw new Error("This card edit cannot be replayed. Discard it and edit again.")
-    this.enqueue(
-      latest.action.deckId,
-      latest.action.versionId,
-      latest.action.cards,
-      conflictRevision,
-    )
+    // Replay the whole guarded chain so a mixed card→rename→delete intent survives:
+    // only same-op card replaces dedupe (full-list semantics), and metadata ops keep their op kind.
+    const replayed = replayChain(related.map((entry) => entry.action).sort(compareActions))
+    for (const [index, action] of replayed.entries()) {
+      this.enqueue(
+        action.deckId,
+        action.versionId,
+        action.cards,
+        index === 0 ? conflictRevision : action.expectedRevision,
+        {
+          ...(action.op ? { op: action.op } : {}),
+          ...(action.name !== undefined ? { name: action.name } : {}),
+          ...(action.note !== undefined ? { note: action.note } : {}),
+        },
+      )
+    }
     for (const entry of related) this.repository.dismissFailed(entry.action.operationId)
     this.capacityBlocked = false
     this.publish()
     void this.drain()
+  }
+
+  private async send(action: PendingVersionWrite): Promise<VersionWriteResult> {
+    if (action.op === "create")
+      return this.client.mutation(api.decks.syncCreateVersion, {
+        deckId: action.deckId,
+        operationId: action.operationId,
+        name: action.name ?? "",
+        ...(action.note ? { note: action.note } : {}),
+        cards: action.cards,
+      })
+    const draftRow = this.repository.cache
+      .loadVersions(action.deckId)
+      .find((version) => version.versionId === action.versionId)
+    if (draftRow?.local && !this.repository.cache.mappedVersionId(action.versionId))
+      throw new ConvexError({
+        code: "deck_version_not_found",
+        message: DECK_VERSION_DRAFT_UNSYNCED_REASON,
+      })
+    const serverVersionId = this.mappedVersion(action.versionId)
+    if (action.op === "rename")
+      return this.client.mutation(api.decks.syncUpdateVersion, {
+        versionId: serverVersionId as VersionUpdateArgs["versionId"],
+        operationId: action.operationId,
+        expectedRevision: action.expectedRevision,
+        ...(action.name !== undefined ? { name: action.name } : {}),
+        ...(action.note !== undefined ? { note: action.note } : {}),
+        returnConflict: true,
+      })
+    if (action.op === "delete")
+      return this.client.mutation(api.decks.syncDeleteVersion, {
+        versionId: serverVersionId as VersionDeleteArgs["versionId"],
+        operationId: action.operationId,
+        expectedRevision: action.expectedRevision,
+        returnConflict: true,
+      })
+    return this.client.mutation(api.decks.syncVersionWrite, {
+      deckId: action.deckId,
+      versionId: serverVersionId as VersionWriteArgs["versionId"],
+      operationId: action.operationId,
+      expectedRevision: action.expectedRevision,
+      cards: action.cards,
+      returnConflict: true,
+    })
   }
 
   async drain(): Promise<void> {
@@ -384,17 +579,7 @@ export class DeckVersionWriteController {
               code: "sync_conflict",
               message: "An earlier edit conflicted. Choose which version to keep.",
             })
-          const result: VersionWriteResult = await this.client.mutation(
-            api.decks.syncVersionWrite,
-            {
-              deckId: action.deckId,
-              versionId: action.versionId,
-              operationId: action.operationId,
-              expectedRevision: action.expectedRevision,
-              cards: action.cards,
-              returnConflict: true,
-            },
-          )
+          const result = await this.send(action)
           if ("status" in result) {
             this.repository.recordConflict(action.deckId, result.version)
             throw new ConvexError({
@@ -402,9 +587,21 @@ export class DeckVersionWriteController {
               message: DECK_VERSION_CONFLICT_REASON,
             })
           }
-          this.repository.cache.saveCards(action.versionId, result.revision, action.cards)
-          this.repository.cache.bumpVersion(action.deckId, action.versionId, result.revision)
-          this.repository.rebasePending(action.versionId, result.revision)
+          if (action.op === "create") {
+            this.repository.cache.recordMapping(action.versionId, result.versionId)
+            this.repository.cache.saveCards(result.versionId, result.revision, action.cards)
+            this.repository.cache.confirmDraft(action.deckId, action.versionId, result)
+            this.repository.rebasePending(action.versionId, result.revision)
+          }
+          if (action.op === "rename" || action.op === "delete") {
+            this.repository.cache.mergeVersions(action.deckId, [result])
+            this.repository.rebasePending(action.versionId, result.revision)
+          }
+          if (action.op === "cards" || action.op === undefined) {
+            this.repository.cache.saveCards(action.versionId, result.revision, action.cards)
+            this.repository.cache.bumpVersion(action.deckId, action.versionId, result.revision)
+            this.repository.rebasePending(action.versionId, result.revision)
+          }
           return { operationId: action.operationId }
         },
         shouldContinue: () => generation === this.generation && this.users > 0,
@@ -435,6 +632,11 @@ export class DeckVersionWriteController {
       failures: this.repository.loadFailed(),
       capacityBlocked: this.capacityBlocked,
     }
+  }
+
+  /** Version id of a queued write once a pending create got its server identity. */
+  mappedVersion(versionId: string): string {
+    return this.repository.cache.mappedVersionId(versionId) ?? versionId
   }
 
   private publish(): void {
@@ -490,5 +692,20 @@ export function useDeckVersionWrites(enabled: boolean, ownerId?: string) {
     ) => controller?.update(deckId, versionId, cards, expectedRevision),
     discardFailure: (operationId: string) => controller?.discardFailure(operationId),
     reapplyFailure: (operationId: string) => controller?.reapplyFailure(operationId),
+    createVersion: (
+      deckId: string,
+      name: string,
+      note: string,
+      cards: readonly VersionCardPayload[],
+    ) => controller?.createVersion(deckId, name, note, cards),
+    renameVersion: (
+      deckId: string,
+      versionId: string,
+      patch: { name?: string; note?: string },
+      expectedRevision: number,
+    ) => controller?.renameVersion(deckId, versionId, patch, expectedRevision),
+    deleteVersion: (deckId: string, versionId: string, expectedRevision: number) =>
+      controller?.deleteVersion(deckId, versionId, expectedRevision),
+    mappedVersion: (versionId: string) => controller?.mappedVersion(versionId) ?? versionId,
   }
 }
