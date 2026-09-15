@@ -27,6 +27,7 @@ import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import {
   DECK_VERSION_CONFLICT_REASON,
+  DECK_VERSION_LAST_REASON,
   DECK_VERSION_QUEUE_CONFLICT_REASON,
   useDeckVersionWrites,
   type PendingVersionWrite,
@@ -287,6 +288,12 @@ function DeckDetailContent({
     deckId,
     selectedVersionId,
   )
+  // Keeps the server-known capacity hint so offline new-version creation has a guard.
+  const recordVersionCapacity = versionCache.recordCapacity
+  useEffect(() => {
+    const capacity = detail?.capacity
+    if (capacity) recordVersionCapacity({ limit: capacity.limit, premium: capacity.premium })
+  }, [detail, recordVersionCapacity])
   const statsAvailable = Boolean(detail)
   useFocusEffect(
     useCallback(() => {
@@ -429,6 +436,10 @@ function DeckDetailContent({
       : undefined,
   )
   const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)
+  // Offline selection resolves through the cached rows; saved drafts included.
+  const activeVersionSummary =
+    versionSummary ??
+    versionCache.versions.find((candidate) => candidate.versionId === activeVersionId)
   const cachedVersionRows = useMemo(
     () =>
       versionCache.versions
@@ -446,9 +457,21 @@ function DeckDetailContent({
   )
   const versionRows = detail?.versions ?? cachedVersionRows
   const activeVersionId = version?._id ?? cachedVersion?.versionId
-  const canAddVersion = detail?.capacity.canCreate === true
-  const canDeleteVersion = (detail?.versions.length ?? 0) > 1
-  const premium = detail?.capacity.premium === true
+  const canQueueVersionLifecycle = syncEnabled && Boolean(access?.ownerId)
+  const cachedVersionCount = versionCache.versions.filter((version) => !version.deleted).length
+  const canAddVersion =
+    detail?.capacity.canCreate === true ||
+    (detail === undefined &&
+      canQueueVersionLifecycle &&
+      cachedVersionCount < (versionCache.capacity?.limit ?? 0))
+  const canDeleteVersion = detail
+    ? (detail.versions.length ?? 0) > 1
+    : canQueueVersionLifecycle && cachedVersionCount > 1
+  const premium = detail?.capacity.premium === true || versionCache.capacity?.premium === true
+  const versionCapture =
+    pendingVersionAction || storedCards.length > 0 || cachedCards !== undefined
+      ? displayCards
+      : undefined
 
   useEffect(() => {
     if (!editing || !editingFromCache.current || detail === undefined) return
@@ -637,7 +660,7 @@ function DeckDetailContent({
   function startNewVersion() {
     setError(undefined)
     if (!canAddVersion) {
-      const limit = detail?.capacity.limit ?? 0
+      const limit = detail?.capacity.limit ?? versionCache.capacity?.limit ?? 0
       setError(
         `This deck holds up to ${limit} version${limit === 1 ? "" : "s"}. Delete one to add another.`,
       )
@@ -647,19 +670,58 @@ function DeckDetailContent({
   }
 
   async function submitNewVersion({ name, note, copyCards }: DeckVersionDraft) {
-    await run(async () => {
-      const versionId = await createVersion({
-        deckId: deckId as Id<"decks">,
-        name,
-        ...(note.trim() ? { note } : {}),
-        ...(copyCards && version ? { fromVersionId: version._id } : {}),
-      })
-      setSelectedVersionId(versionId)
+    if (detail) {
+      await run(async () => {
+        const versionId = await createVersion({
+          deckId: deckId as Id<"decks">,
+          name,
+          ...(note.trim() ? { note } : {}),
+          ...(copyCards && version ? { fromVersionId: version._id } : {}),
+        })
+        setSelectedVersionId(versionId)
+        setDialog("none")
+      }, "Could not create version")
+      return
+    }
+    if (!canQueueVersionLifecycle) {
+      setError("Reconnect to create versions.")
+      return
+    }
+    // Copy captures what the user sees locally; a server snapshot is never silently reused.
+    const captured = copyCards ? versionCapture : undefined
+    if (copyCards && captured === undefined) {
+      setError("Saved cards are not available offline. Reconnect or create an empty version.")
+      return
+    }
+    try {
+      const provisionalId = versionWrites.createVersion(
+        deckId,
+        name.trim(),
+        note.trim(),
+        captured ?? [],
+      )
+      setSelectedVersionId(provisionalId as Id<"deckVersions">)
       setDialog("none")
-    }, "Could not create version")
+    } catch (cause) {
+      fail(cause, "Could not create version")
+    }
   }
 
   async function submitRenameVersion({ name, note }: DeckVersionDraft) {
+    if (canQueueVersionLifecycle && activeVersionId) {
+      try {
+        versionWrites.renameVersion(
+          deckId,
+          activeVersionId as Id<"deckVersions">,
+          { name, note },
+          versionTarget?.expectedRevision ?? 0,
+        )
+        setDialog("none")
+      } catch (cause) {
+        fail(cause, "Could not update version")
+      }
+      return
+    }
     if (!version) return
     await run(async () => {
       await updateVersion({ versionId: version._id, name, note })
@@ -673,8 +735,26 @@ function DeckDetailContent({
   }
 
   async function confirmDeleteVersion() {
-    if (!version) return
+    const versionId =
+      version?._id ?? (activeVersionSummary ? (activeVersionId as Id<"deckVersions">) : undefined)
+    if (!versionId) return
+    const expectedRevision = versionTarget?.expectedRevision ?? 0
+    if (canQueueVersionLifecycle && detail === undefined) {
+      if (!canDeleteVersion) {
+        setError(DECK_VERSION_LAST_REASON)
+        return
+      }
+      try {
+        versionWrites.deleteVersion(deckId, versionId, expectedRevision)
+        setSelectedVersionId(undefined)
+        setDialog("none")
+      } catch (cause) {
+        fail(cause, "Could not delete version")
+      }
+      return
+    }
     await run(async () => {
+      if (!version) return
       await deleteVersion({ versionId: version._id })
       setSelectedVersionId(undefined)
       setDialog("none")
@@ -1043,11 +1123,17 @@ function DeckDetailContent({
         />
       ) : null}
 
-      {dialog === "newVersion" && detail ? (
+      {dialog === "newVersion" && (detail || canQueueVersionLifecycle) ? (
         <DeckVersionDialog
           title="New version"
           submitLabel="Create version"
-          copyFromLabel={version ? versionLabel(versionSummary ?? version) : undefined}
+          copyFromLabel={
+            (versionSummary ?? activeVersionSummary ?? version) !== undefined
+              ? versionLabel(
+                  (versionSummary ?? activeVersionSummary ?? version) as { versionNumber: number },
+                )
+              : undefined
+          }
           busy={busy}
           error={error}
           onSubmit={submitNewVersion}
@@ -1055,12 +1141,12 @@ function DeckDetailContent({
         />
       ) : null}
 
-      {dialog === "renameVersion" && versionSummary ? (
+      {dialog === "renameVersion" && activeVersionSummary ? (
         <DeckVersionDialog
           title="Version details"
           submitLabel="Save"
-          initialName={versionLabel(versionSummary)}
-          initialNote={versionSummary.note ?? ""}
+          initialName={versionLabel(activeVersionSummary)}
+          initialNote={activeVersionSummary.note ?? ""}
           notesLocked={!premium}
           busy={busy}
           error={error}
