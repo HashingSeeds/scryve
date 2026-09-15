@@ -1,11 +1,14 @@
 import type { ConvexReactClient } from "convex/react"
 import { getFunctionName } from "convex/server"
 
-import type { DeckSyncStorage } from "./decksSync"
-import { DeckVersionCacheController, DeckVersionCacheRepository } from "./deckVersionsCache"
+import {
+  DeckVersionCacheController,
+  DeckVersionCacheRepository,
+  type DeckVersionCacheStorage,
+} from "./deckVersionsCache"
 import type { Id } from "../../../convex/_generated/dataModel"
 
-class MemoryStorage implements DeckSyncStorage {
+class MemoryStorage implements DeckVersionCacheStorage {
   values = new Map<string, string>()
 
   getString(key: string) {
@@ -14,6 +17,10 @@ class MemoryStorage implements DeckSyncStorage {
 
   set(key: string, value: string) {
     this.values.set(key, value)
+  }
+
+  delete(key: string) {
+    this.values.delete(key)
   }
 }
 
@@ -231,16 +238,23 @@ describe("deck version cache", () => {
     expect(repository.loadCards("version-missing")).toBeUndefined()
   })
 
-  it("keeps tombstones out of the default selection and hides their cached cards", () => {
+  it("purges confirmed tombstones with their card bytes and renders them uncached", () => {
     const storage = new MemoryStorage()
     const repository = new DeckVersionCacheRepository("owner-a", storage)
-    repository.mergeVersions(deckId, [
-      versionRow(),
-      versionRow({ versionId: "version-2", versionNumber: 2, deleted: true, revision: 4 }),
-    ])
+    repository.mergeVersions(deckId, [versionRow()])
     repository.saveCards("version-2", 3, [
       { ...cardRow, deckVersionId: "version-2" as Id<"deckVersions"> },
     ])
+    expect(repository.loadCards("version-2")).toBeDefined()
+
+    // A later pull confirms version-2 was archived server-side.
+    const retained = repository.mergeVersions(deckId, [
+      versionRow(),
+      versionRow({ versionId: "version-2", versionNumber: 2, deleted: true, revision: 4 }),
+    ])
+    expect(retained.map((version) => version.versionId)).toEqual(["version-1"])
+    expect(repository.loadCards("version-2")).toBeUndefined()
+
     const controller = new DeckVersionCacheController(
       fakeClient({
         versionsPull: () => {
@@ -251,17 +265,43 @@ describe("deck version cache", () => {
     )
     const stop = controller.start()
     controller.ensure(deckId, undefined)
+    expect(controller.getSnapshot().get(deckId)).toMatchObject({
+      version: { versionId: "version-1" },
+      cards: undefined,
+    })
 
-    const snapshot = controller.getSnapshot().get(deckId)
-    expect(snapshot).toMatchObject({ version: { versionId: "version-1" }, cards: undefined })
-    expect(snapshot?.versions).toHaveLength(2)
-
+    // Explicitly selecting the purged tombstone falls back to explicit uncached.
     controller.ensure(deckId, "version-2")
     expect(controller.getSnapshot().get(deckId)).toMatchObject({
-      version: { versionId: "version-2", deleted: true },
+      version: undefined,
       cards: undefined,
     })
     stop()
+  })
+
+  it("reconciles an authoritative complete pull but keeps rows across a partial one", () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    repository.mergeVersions(deckId, [
+      versionRow(),
+      versionRow({ versionId: "version-2", versionNumber: 2 }),
+    ])
+    repository.saveCards("version-2", 1, [
+      { ...cardRow, deckVersionId: "version-2" as Id<"deckVersions"> },
+    ])
+
+    // Partial pull (e.g. capped pages, offline stall) must not reconcile rows away.
+    repository.mergeVersions(deckId, [versionRow()])
+    expect(repository.loadVersions(deckId).map((version) => version.versionId)).toEqual([
+      "version-1",
+      "version-2",
+    ])
+    expect(repository.loadCards("version-2")).toBeDefined()
+
+    // An authoritative complete pull that no longer lists version-2 drops its row and bytes.
+    const retained = repository.mergeVersions(deckId, [versionRow()], true)
+    expect(retained.map((version) => version.versionId)).toEqual(["version-1"])
+    expect(repository.loadCards("version-2")).toBeUndefined()
   })
 
   it("serves a selected previously cached version while offline", async () => {
