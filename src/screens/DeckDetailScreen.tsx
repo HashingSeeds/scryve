@@ -28,6 +28,7 @@ import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/de
 import {
   DECK_VERSION_CONFLICT_REASON,
   useDeckVersionWrites,
+  type PendingVersionWrite,
 } from "@/features/decks/decksVersionWrites"
 import { useDeckVersionCache } from "@/features/decks/deckVersionsCache"
 import { DeckView } from "@/features/decks/DeckView"
@@ -382,10 +383,28 @@ function DeckDetailContent({
           expectedRevision: cachedVersion.revision,
         }
       : undefined
-  const displayCards = storedCards.length > 0 ? storedCards : (cachedCards ?? storedCards)
+  const pendingVersionAction = versionWrites.pending
+    .filter((write) => write.deckId === deckId && write.versionId === versionTarget?.versionId)
+    .reduce<PendingVersionWrite | undefined>(
+      (newest, action) =>
+        !newest || action.expectedRevision > newest.expectedRevision ? action : newest,
+      undefined,
+    )
+  const displayCards = pendingVersionAction
+    ? mergedPrintings(pendingVersionAction.cards as DeckCard[])
+    : storedCards.length > 0
+      ? storedCards
+      : (cachedCards ?? storedCards)
   const cards = editing ? draft : displayCards
-  const cardsUnavailable = !detail && cachedCards === undefined
-  // Cached cards render read-only so an offline save can't push stale lists to the server.
+  const cardsUnavailable = !detail && cachedCards === undefined && !pendingVersionAction
+  const writeMotion = versionWrites.pending.length + versionWrites.failures.length
+  const lastWriteMotion = useRef(-1)
+  const refreshVersionCache = versionCache.refresh
+  useEffect(() => {
+    if (lastWriteMotion.current === writeMotion) return
+    lastWriteMotion.current = writeMotion
+    refreshVersionCache()
+  }, [refreshVersionCache, writeMotion])
   const editingBase = useRef<DeckCard[]>([])
   const editingFromCache = useRef(false)
   const cardsCached = editing
@@ -702,6 +721,11 @@ function DeckDetailContent({
     cachedMetadata ??
     detail?.deck
   const versionConflict = failedEdit?.reason === DECK_CONFLICT_REASON
+  const failedVersionSnapshot = failedCardEdit
+    ? versionCache.versions.find(
+        (snapshot) => snapshot.versionId === failedCardEdit.action.versionId,
+      )
+    : undefined
   const comparedFields =
     failedEdit && accountMetadata
       ? [
@@ -845,6 +869,12 @@ function DeckDetailContent({
                 }
                 numberOfLines={2}
               />
+              {failedVersionSnapshot ? (
+                <Text
+                  size="sm"
+                  text={`Account copy: ${failedVersionSnapshot.cardQuantity} cards · ${failedVersionSnapshot.cardCount} entries · revision ${failedVersionSnapshot.revision}`}
+                />
+              ) : null}
             </View>
             {error ? <AlertNote text={error} /> : null}
             <Button
