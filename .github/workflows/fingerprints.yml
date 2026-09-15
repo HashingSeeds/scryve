@@ -65,7 +65,7 @@ jobs:
       - name: Check base fingerprint cache
         id: base_state
         run: |
-          count=$(find base-fingerprints -name 'fingerprint-*.json' 2>/dev/null | wc -l | tr -d ' ')
+          count=$(find base-fingerprints -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
           echo "need_base=$([ "$count" -eq 6 ] && echo no || echo yes)" >> "$GITHUB_OUTPUT"
 
       - name: Prepare base revision
