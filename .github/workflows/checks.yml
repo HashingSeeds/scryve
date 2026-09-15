@@ -11,7 +11,39 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      ygo: ${{ steps.filter.outputs.ygo }}
+      exportable: ${{ steps.filter.outputs.exportable }}
+    steps:
+      - name: Filter changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ygo:
+              - 'workers/ygo-image-mirror/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+            exportable:
+              - 'src/**'
+              - 'app.config.ts'
+              - 'app.json'
+              - 'assets/**'
+              - 'web/**'
+              - 'patches/**'
+              - 'babel.config.js'
+              - 'metro.config.js'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+
   ygo-image-mirror:
+    needs: changes
+    if: needs.changes.outputs.ygo == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -81,6 +113,8 @@ jobs:
           echo "Jest result: ${{ steps.jest.outcome }}" >> "$GITHUB_STEP_SUMMARY"
 
   export:
+    needs: changes
+    if: needs.changes.outputs.exportable == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:

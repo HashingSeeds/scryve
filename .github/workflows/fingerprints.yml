@@ -3,6 +3,17 @@ name: native fingerprints
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "app.json"
+      - "app.config.ts"
+      - "eas.json"
+      - "patches/**"
+      - "assets/**"
+      - "babel.config.js"
+      - "metro.config.js"
+      - ".nvmrc"
 
 permissions:
   contents: read
@@ -45,7 +56,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Restore cached base fingerprints
+        uses: actions/cache@v4
+        with:
+          path: base-fingerprints
+          key: base-fingerprints-${{ github.event.pull_request.base.sha }}
+
+      - name: Check base fingerprint cache
+        id: base_state
+        run: |
+          count=$(find base-fingerprints -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
+          echo "need_base=$([ "$count" -eq 6 ] && echo no || echo yes)" >> "$GITHUB_OUTPUT"
+
       - name: Prepare base revision
+        if: steps.base_state.outputs.need_base == 'yes'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -95,14 +119,21 @@ jobs:
                 --non-interactive > "$fingerprint_file"
               current_hash=$(jq -er '.hash' "$fingerprint_file")
 
-              (
-                cd "$RUNNER_TEMP/base"
-                eas fingerprint:generate \
-                  --build-profile "$profile" \
-                  --platform "$platform" \
-                  --json \
-                  --non-interactive
-              ) > "$base_fingerprint_file"
+              cached_base_fingerprint_file="base-fingerprints/${profile//:/-}-$platform.json"
+              if [ -f "$cached_base_fingerprint_file" ]; then
+                cp "$cached_base_fingerprint_file" "$base_fingerprint_file"
+              else
+                (
+                  cd "$RUNNER_TEMP/base"
+                  eas fingerprint:generate \
+                    --build-profile "$profile" \
+                    --platform "$platform" \
+                    --json \
+                    --non-interactive
+                ) > "$base_fingerprint_file"
+                mkdir -p "$(dirname "$cached_base_fingerprint_file")"
+                cp "$base_fingerprint_file" "$cached_base_fingerprint_file"
+              fi
               base_hash=$(jq -er '.hash' "$base_fingerprint_file")
 
               if [ "$current_hash" = "$base_hash" ]; then
