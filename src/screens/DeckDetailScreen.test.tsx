@@ -1260,6 +1260,82 @@ describe("DeckDetailScreen", () => {
     expect(mockUpdateVersion).not.toHaveBeenCalled()
   })
 
+  it("opens version details for a provisional selected version offline to rename, note, and delete", async () => {
+    mockDetail.value = undefined
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    const cachedMain = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 1,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    const provisionalCopy = {
+      ...cachedMain,
+      versionId: "version-offline-copy",
+      versionNumber: 2,
+      name: "Offline copy",
+      fingerprint: "local",
+      local: true,
+    }
+    mockVersionCacheState.versions = [cachedMain, provisionalCopy]
+    mockVersionCacheState.version = provisionalCopy
+    mockVersionCacheState.cards = [{ ...solRing, deckVersionId: "version-offline-copy" }]
+    mockVersionCacheState.capacity = { limit: 5, premium: true }
+    const offlineAccess = {
+      ready: false,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    const screen = (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} access={offlineAccess} />
+      </ThemeProvider>
+    )
+    const view = render(screen)
+
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("rename-version-button"))
+    expect(view.getByTestId("deck-version-dialog")).toBeTruthy()
+    fireEvent.changeText(view.getByTestId("version-name-input"), "Offline renamed")
+    fireEvent.changeText(view.getByTestId("version-note-input"), "No network needed")
+    fireEvent.press(view.getByTestId("version-submit"))
+    await waitFor(() =>
+      expect(mockVersionRename).toHaveBeenCalledWith(
+        "deck-1",
+        "version-offline-copy",
+        { name: "Offline renamed", note: "No network needed" },
+        1,
+      ),
+    )
+    expect(mockUpdateVersion).not.toHaveBeenCalled()
+
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("rename-version-button"))
+    fireEvent.press(view.getByTestId("delete-version-button"))
+    fireEvent.press(view.getByTestId("delete-version-confirm"))
+    await waitFor(() =>
+      expect(mockVersionDelete).toHaveBeenCalledWith("deck-1", "version-offline-copy", 1),
+    )
+
+    mockVersionCacheState.versions = [cachedMain]
+    mockVersionCacheState.version = cachedMain
+    view.rerender(screen)
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("rename-version-button"))
+    expect(view.queryByTestId("delete-version-button")).toBeNull()
+  })
+
   it("routes an online delete through the durable version queue", async () => {
     mockDeckSyncState.enabled = true
     const access = {
