@@ -34,6 +34,14 @@ jest.mock("@/features/decks/decksSync", () => ({
     retry: jest.fn(),
   }),
 }))
+const mockVersionCacheState = {
+  versions: [] as Array<Record<string, unknown>>,
+  version: undefined as Record<string, unknown> | undefined,
+  cards: undefined as Array<Record<string, unknown>> | undefined,
+}
+jest.mock("@/features/decks/deckVersionsCache", () => ({
+  useDeckVersionCache: () => mockVersionCacheState,
+}))
 jest.mock("@/features/decks/decksSyncWrites", () => ({
   DECK_CONFLICT_REASON: "Deck changed on another device. Choose which version to keep.",
   useDeckMetadataWrites: () => ({
@@ -226,10 +234,267 @@ describe("DeckDetailScreen", () => {
     mockDetail.error = undefined
     mockDeckSyncState.enabled = false
     mockDeckSyncState.metadata = []
+    mockVersionCacheState.versions = []
+    mockVersionCacheState.version = undefined
+    mockVersionCacheState.cards = undefined
     mockMetadataWriteState.metadata = []
     mockMetadataWriteState.pending = []
     mockMetadataWriteState.failures = []
     mockMetadataWriteState.capacityBlocked = false
+  })
+
+  it("renders cached version contents on an offline restart and keeps them read-only", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [solRing]
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Sol Ring")).toBeTruthy()
+    expect(view.getByText("1×")).toBeTruthy()
+    expect(view.queryByText("Card list unavailable offline.")).toBeNull()
+    expect(view.getByTestId("deck-add-cards")).toBeDisabled()
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    expect(view.getByLabelText("Increase Sol Ring")).toBeDisabled()
+    expect(view.getByLabelText("Remove Sol Ring")).toBeDisabled()
+  })
+
+  it("distinguishes uncached versions from cached empty decks offline", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+
+    mockVersionCacheState.version = undefined
+    mockVersionCacheState.versions = []
+    const uncached = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+    expect(uncached.getByText("Card list unavailable offline.")).toBeTruthy()
+    uncached.unmount()
+
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-empty",
+      revision: 1,
+      versionNumber: 2,
+      name: "Empty",
+      note: "",
+      fingerprint: "f2",
+      cardCount: 0,
+      cardQuantity: 0,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = []
+    const empty = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+    expect(empty.getByText("No cards yet. Add your first card below.")).toBeTruthy()
+    expect(empty.queryByText("Card list unavailable offline.")).toBeNull()
+  })
+
+  it("switches among previously cached versions while offline", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    const cachedVersions = [
+      {
+        deckId: "deck-1",
+        versionId: "version-main",
+        revision: 1,
+        versionNumber: 1,
+        name: "Main",
+        note: "",
+        fingerprint: "f1",
+        cardCount: 1,
+        cardQuantity: 1,
+        deleted: false,
+        updatedAt: 1,
+      },
+      {
+        deckId: "deck-1",
+        versionId: "version-sideboard",
+        revision: 1,
+        versionNumber: 2,
+        name: "vs Control",
+        note: "More removal",
+        fingerprint: "f2",
+        cardCount: 1,
+        cardQuantity: 1,
+        deleted: false,
+        updatedAt: 2,
+      },
+    ]
+    mockVersionCacheState.versions = cachedVersions
+    mockVersionCacheState.version = cachedVersions[1]
+    mockVersionCacheState.cards = [
+      { ...solRing, name: "Counterspell", deckVersionId: "version-sideboard" },
+    ]
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByText("Counterspell")).toBeTruthy()
+    expect(view.queryByText("Sol Ring")).toBeNull()
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    expect(view.getByText("vs Control")).toBeTruthy()
+    fireEvent.press(view.getByTestId("version-picker-version-main"))
+    mockVersionCacheState.version = cachedVersions[0]
+    mockVersionCacheState.cards = [solRing]
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("Sol Ring")).toBeTruthy()
+  })
+
+  it("re-seeds a cache-origin edit when live detail arrives and never flags it dirty", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 1,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [{ ...solRing, name: "Stale Snapshot" }]
+    const screen = (ready: boolean) => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{ ready, loading: false, signedIn: true, ownerId: "owner-a", request: jest.fn() }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen(false))
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    expect(view.queryByText("Unsaved changes")).toBeNull()
+
+    mockDetail.value = loadedDetail
+    view.rerender(screen(true))
+
+    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
+    expect(view.queryByText("Unsaved changes")).toBeNull()
+    expect(view.getByTestId("save-version-button")).toBeDisabled()
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+    expect(view.getByLabelText("Increase Sol Ring")).not.toBeDisabled()
+    expect(view.getByLabelText("Remove Sol Ring")).not.toBeDisabled()
+  })
+
+  it("re-seeds an uncached offline edit on reconnect without auto-dirtying or empty-saving", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockVersionCacheState.version = undefined
+    mockVersionCacheState.versions = []
+    mockVersionCacheState.cards = undefined
+    const screen = (ready: boolean) => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{ ready, loading: false, signedIn: true, ownerId: "owner-a", request: jest.fn() }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen(false))
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    expect(view.queryByText("Unsaved changes")).toBeNull()
+
+    mockDetail.value = loadedDetail
+    view.rerender(screen(true))
+
+    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
+    expect(view.queryByText("Unsaved changes")).toBeNull()
+    expect(view.getByTestId("save-version-button")).toBeDisabled()
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+    expect(view.getByLabelText("Increase Sol Ring")).not.toBeDisabled()
   })
 
   it("records stats again when the screen regains focus", () => {
