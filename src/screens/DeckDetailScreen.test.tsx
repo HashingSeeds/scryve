@@ -334,6 +334,90 @@ describe("DeckDetailScreen", () => {
     expect(mockSaveVersion).not.toHaveBeenCalled()
   })
 
+  it("keeps a pending card write scoped to the selected version across a switch", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    const cached = (overrides: Record<string, unknown>) => ({
+      deckId: "deck-1",
+      revision: 1,
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 2,
+      ...overrides,
+    })
+    const cachedVersions = [
+      cached({ versionId: "version-main", versionNumber: 1, name: "Main" }),
+      cached({
+        versionId: "version-sideboard",
+        versionNumber: 2,
+        name: "vs Control",
+        note: "More removal",
+      }),
+    ]
+    mockVersionCacheState.versions = cachedVersions
+    mockVersionCacheState.version = cachedVersions[0]
+    mockVersionCacheState.cards = [solRing]
+    mockVersionCardWriteState.pending = [
+      {
+        schemaVersion: 1,
+        ownerId: "owner-a",
+        deckId: "deck-1",
+        versionId: "version-main",
+        operationId: "queued-cards",
+        expectedRevision: 5,
+        cards: [{ name: "Sol Ring", quantity: 2 }],
+        queuedAt: 1,
+        attempts: 0,
+        op: "cards",
+      },
+    ]
+    const screen = () => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+
+    expect(view.getByText("2×")).toBeTruthy()
+    expect(view.getByText("Sol Ring")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("version-picker-version-sideboard"))
+
+    mockVersionCacheState.version = cachedVersions[1]
+    mockVersionCacheState.cards = [
+      { ...solRing, name: "Counterspell", deckVersionId: "version-sideboard" },
+    ]
+    view.rerender(screen())
+
+    expect(view.getByText("Counterspell")).toBeTruthy()
+    expect(view.queryByText("Sol Ring")).toBeNull()
+    expect(view.queryByText("2×")).toBeNull()
+
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByLabelText("Increase Counterspell"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    expect(mockVersionCardUpdate).toHaveBeenCalledWith(
+      "deck-1",
+      "version-sideboard",
+      [expect.objectContaining({ name: "Counterspell", quantity: 2 })],
+      1,
+    )
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+  })
+
   it("distinguishes uncached versions from cached empty decks offline", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]

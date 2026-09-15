@@ -360,29 +360,33 @@ function DeckDetailContent({
     (item) => item.deckId === deckId && !item.deleted,
   )?.revision
 
+  const cachedVersion = versionCache.version
+  const staleSelection =
+    selectedVersionId !== undefined && detail?.version?._id !== selectedVersionId
+  const version = staleSelection ? undefined : detail?.version
+  const activeVersionId = version?._id ?? cachedVersion?.versionId
   const storedCards = useMemo(
     () =>
-      mergedPrintings(
-        (detail?.cards ?? []).map(
-          ({ _id: _, _creationTime: __, deckVersionId: ___, ...card }) => card,
-        ),
-      ),
-    [detail?.cards],
+      version
+        ? mergedPrintings(
+            (detail?.cards ?? []).map(
+              ({ _id: _, _creationTime: __, deckVersionId: ___, ...card }) => card,
+            ),
+          )
+        : [],
+    [version, detail?.cards],
   )
   const cachedCards = useMemo(
     () =>
-      detail === undefined && versionCache.cards !== undefined
+      (detail === undefined || staleSelection) && versionCache.cards !== undefined
         ? mergedPrintings(
             versionCache.cards.map(
               ({ _id: _, _creationTime: __, deckVersionId: ___, ...card }) => card,
             ),
           )
         : undefined,
-    [versionCache.cards, detail],
+    [versionCache.cards, detail, staleSelection],
   )
-  const cachedVersion = versionCache.version
-  const version = detail?.version
-  const activeVersionId = version?._id ?? cachedVersion?.versionId
   const canQueueVersionLifecycle = syncEnabled && Boolean(access?.ownerId)
   const versionTarget = version
     ? { versionId: version._id, expectedRevision: version.syncRevision ?? 0 }
@@ -392,21 +396,20 @@ function DeckDetailContent({
           expectedRevision: cachedVersion.revision,
         }
       : undefined
-  // Queue row overlay matches the displayed version through the durable provisional map,
-  // so queued card edits stay visible across the create acknowledgement.
-  const displayedVersionIds = useMemo(() => {
-    const ids = new Set<string>()
-    if (version?._id) ids.add(version._id)
-    if (activeVersionId) ids.add(activeVersionId)
-    return ids
-  }, [version?._id, activeVersionId])
+  const overlayVersionId = selectedVersionId ?? activeVersionId
+  const overlayVersionIds = new Set<string>()
+  if (overlayVersionId) {
+    overlayVersionIds.add(overlayVersionId)
+    const mapped = versionWrites.mappedVersion(overlayVersionId)
+    if (mapped !== overlayVersionId) overlayVersionIds.add(mapped)
+  }
   const pendingCardWrite = versionWrites.pending
     .filter((write) => write.deckId === deckId && (write.op ?? "cards") === "cards")
     .filter((write) => {
       const mapped = versionWrites.mappedVersion(write.versionId)
       return (
-        displayedVersionIds.has(write.versionId) ||
-        (mapped !== write.versionId && displayedVersionIds.has(mapped))
+        overlayVersionIds.has(write.versionId) ||
+        (mapped !== write.versionId && overlayVersionIds.has(mapped))
       )
     })
     .reduce<PendingVersionWrite | undefined>(
