@@ -113,10 +113,15 @@ export class DeckVersionCacheRepository {
       !isRecord(value) ||
       value.schemaVersion !== 1 ||
       !isCount(value.revision) ||
-      !Array.isArray(value.cards)
+      !Array.isArray(value.cards) ||
+      !value.cards.every(isCachedCard)
     )
       return undefined
-    return { schemaVersion: 1, revision: value.revision, cards: value.cards.filter(isCachedCard) }
+    return {
+      schemaVersion: 1,
+      revision: value.revision,
+      cards: value.cards as CachedVersionCard[],
+    }
   }
 
   saveCards(versionId: string, revision: number, cards: readonly CachedVersionCard[]): StoredCards {
