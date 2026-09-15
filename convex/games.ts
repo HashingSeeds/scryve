@@ -100,6 +100,15 @@ function assertDeviceId(deviceId: string) {
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId)) throw new Error("Invalid device identifier")
 }
 
+function assertLocalId(localId: string) {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(localId)) throw new Error("Invalid local player identifier")
+}
+
+function assertSnapshotLife(life: number) {
+  if (!Number.isInteger(life) || life < -1_000_000 || life > 1_000_000)
+    throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
+}
+
 async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string) {
   const now = Date.now()
   const record = await ctx.db
@@ -128,7 +137,7 @@ function displayNameForViewer(
   return (
     (user ? publicUsernameFor(user) : undefined) ??
     player.usernameAtJoin ??
-    (player.deletedAt ? player.displayName : seatLabelFor(player))
+    (player.deletedAt || player.userId === undefined ? player.displayName : seatLabelFor(player))
   )
 }
 
@@ -700,6 +709,302 @@ export const claimSeat = mutation({
   },
 })
 
+export const publishLocalGame = mutation({
+  args: {
+    operationId: v.string(),
+    publicId: v.string(),
+    system: v.optional(v.string()),
+    format: v.optional(v.string()),
+    ruleset: v.string(),
+    startingLife: v.number(),
+    lifeStep: v.optional(v.number()),
+    inviteToken: v.string(),
+    manualCodeCandidates: v.array(v.string()),
+    deviceId: v.optional(v.string()),
+    hostLocalId: v.string(),
+    players: v.array(
+      v.object({
+        localId: v.string(),
+        seat: v.number(),
+        displayName: v.string(),
+        color: v.string(),
+        shape: v.optional(v.string()),
+        currentLife: v.number(),
+      }),
+    ),
+    commanderTotals: v.optional(
+      v.array(v.object({ fromSeat: v.number(), toSeat: v.number(), total: v.number() })),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    assertOperationId(args.operationId)
+    assertPublicId(args.publicId)
+    assertInviteToken(args.inviteToken)
+    assertManualCodeCandidates(args.manualCodeCandidates)
+    if (args.deviceId) assertDeviceId(args.deviceId)
+    assertLocalId(args.hostLocalId)
+    assertPlayerCount(args.players.length)
+    const gameSystem =
+      args.system === undefined || args.system === NO_GAME_SYSTEM
+        ? NO_GAME_SYSTEM
+        : assertGameSystem(args.system)
+    const noSystem = gameSystem === NO_GAME_SYSTEM
+    if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
+    assertStartingLife(
+      args.startingLife,
+      gameSystem === "pokemon" ? 99 : gameSystem === "ygo" ? 999_999 : 999,
+    )
+    if (args.lifeStep !== undefined) {
+      assertLifeDelta(args.lifeStep)
+      if (args.lifeStep < 1) throw new Error("Life step must be positive")
+    }
+    const ruleset = assertRuleset(args.ruleset)
+    const format = noSystem
+      ? undefined
+      : args.format === undefined
+        ? ruleset
+        : assertDeckGameFormat(gameSystem, args.format)
+    const localIds = new Set<string>()
+    const seats = new Set<number>()
+    for (const player of args.players) {
+      assertLocalId(player.localId)
+      assertDisplayName(player.displayName)
+      assertAllowedColor(player.color)
+      if (player.shape !== undefined) assertAllowedShape(player.shape)
+      assertSnapshotLife(player.currentLife)
+      if (localIds.has(player.localId)) throw new Error("Local player identifiers must be unique")
+      localIds.add(player.localId)
+      if (
+        !Number.isInteger(player.seat) ||
+        player.seat < 1 ||
+        player.seat > args.players.length ||
+        seats.has(player.seat)
+      )
+        throw new Error("Snapshot seats must be unique numbers from 1 to the player count")
+      seats.add(player.seat)
+    }
+    if (!localIds.has(args.hostLocalId))
+      throw new Error("Host seat must be one of the snapshot players")
+    const commanderGame = gameSystem === "mtg" && (format ?? ruleset) === "commander"
+    const totals = args.commanderTotals ?? []
+    if (totals.length > 0 && !commanderGame)
+      throw new Error("Commander damage totals are only supported in Commander games")
+    const totalPairs = new Set<string>()
+    for (const total of totals) {
+      if (!seats.has(total.fromSeat) || !seats.has(total.toSeat) || total.fromSeat === total.toSeat)
+        throw new Error("Commander damage totals must reference distinct snapshot seats")
+      const pair = `${total.fromSeat}->${total.toSeat}`
+      if (totalPairs.has(pair)) throw new Error("Duplicate commander damage pair")
+      totalPairs.add(pair)
+      if (!Number.isInteger(total.total) || total.total < 0 || total.total > MAX_COMMANDER_DAMAGE)
+        throw new Error("Commander damage total must be between 0 and 99")
+    }
+    if (totalPairs.size > MAX_PLAYERS_PER_GAME_READ * (MAX_PLAYERS_PER_GAME_READ - 1))
+      throw new Error("Too many commander damage totals")
+    const requestKey = JSON.stringify([
+      args.publicId,
+      args.system ?? null,
+      args.format ?? null,
+      args.ruleset,
+      args.startingLife,
+      args.lifeStep ?? null,
+      args.inviteToken,
+      args.manualCodeCandidates,
+      args.deviceId ?? null,
+      args.hostLocalId,
+      args.players.map((player) => [
+        player.localId,
+        player.seat,
+        player.displayName,
+        player.color,
+        player.shape ?? null,
+        player.currentLife,
+      ]),
+      args.commanderTotals ?? null,
+    ])
+    const receipt = await ctx.db
+      .query("gamePublishReceipts")
+      .withIndex("by_owner_and_operation_id", (q) =>
+        q.eq("ownerUserId", user._id).eq("operationId", args.operationId),
+      )
+      .unique()
+    if (receipt) {
+      if (receipt.requestKey !== requestKey)
+        throw new Error("Operation identifier was reused with different data")
+      return {
+        publicId: receipt.publicId,
+        manualCode: receipt.manualCode,
+        expiresAt: receipt.expiresAt,
+        players: receipt.players,
+      }
+    }
+    for (const status of ["lobby", "active"] as const) {
+      const existingHostedGame = await ctx.db
+        .query("games")
+        .withIndex("by_host_status", (q) => q.eq("hostUserId", user._id).eq("status", status))
+        .first()
+      if (existingHostedGame)
+        throw new Error("You already host a lobby or active game; resume it before hosting another")
+    }
+    if (
+      await ctx.db
+        .query("games")
+        .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
+        .unique()
+    )
+      throw new Error("Game identifier collision; retry")
+    const manualCode = await allocateInvite(ctx, args.inviteToken, args.manualCodeCandidates)
+    const now = Date.now()
+    const expiresAt = now + INVITE_LIFETIME_MS
+    const gameId = await ctx.db.insert("games", {
+      publicId: args.publicId,
+      hostUserId: user._id,
+      mode: "connected",
+      status: "active",
+      playerCount: args.players.length,
+      startingLife: args.startingLife,
+      ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
+      ruleset,
+      game: gameSystem,
+      system: gameSystem,
+      ...(format ? { format } : {}),
+      createdAt: now,
+      startedAt: now,
+      updatedAt: now,
+      eventSequence: 0,
+    })
+    const mapping: { localId: string; playerId: Id<"gamePlayers">; seat: number }[] = []
+    const playerIdsBySeat = new Map<number, Id<"gamePlayers">>()
+    for (const player of [...args.players].sort((left, right) => left.seat - right.seat)) {
+      const isHost = player.localId === args.hostLocalId
+      const playerId = await ctx.db.insert("gamePlayers", {
+        gameId,
+        seat: player.seat,
+        ...(isHost ? { userId: user._id } : {}),
+        ...(isHost && args.deviceId ? { deviceId: args.deviceId } : {}),
+        displayName: assertDisplayName(player.displayName),
+        ...(isHost ? { usernameAtJoin: user.username } : {}),
+        color: player.color,
+        shape: player.shape ?? shapeForSeat(player.seat),
+        currentLife: player.currentLife,
+        eventCount: 0,
+        resumable: true,
+        joinedAt: now,
+      })
+      mapping.push({ localId: player.localId, playerId, seat: player.seat })
+      playerIdsBySeat.set(player.seat, playerId)
+    }
+    for (const total of totals) {
+      await ctx.db.insert("gameCommanderDamage", {
+        gameId,
+        fromPlayerId: playerIdsBySeat.get(total.fromSeat)!,
+        toPlayerId: playerIdsBySeat.get(total.toSeat)!,
+        total: total.total,
+        updatedAt: now,
+      })
+    }
+    const invitationId = await ctx.db.insert("invitations", {
+      gameId,
+      token: args.inviteToken,
+      manualCode,
+      expiresAt,
+      createdAt: now,
+    })
+    await ctx.db.patch(gameId, { currentInvitationId: invitationId })
+    await ctx.db.insert("gamePublishReceipts", {
+      ownerUserId: user._id,
+      operationId: args.operationId,
+      requestKey,
+      publicId: args.publicId,
+      manualCode,
+      expiresAt,
+      players: mapping,
+    })
+    return { publicId: args.publicId, manualCode, expiresAt, players: mapping }
+  },
+})
+
+export const claimableSeats = mutation({
+  args: {
+    token: v.optional(v.string()),
+    manualCode: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    await consumeJoinAttempt(ctx, String(user.clerkUserId))
+    const invite = await findInvite(ctx, args)
+    if (!invite) throw new Error("Invite is invalid, expired, or revoked")
+    const game = await ctx.db.get(invite.gameId)
+    if (
+      !game ||
+      game.status !== "active" ||
+      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+    )
+      throw new Error("Invite is invalid, expired, or revoked")
+    const players = await playersForGame(ctx, game._id)
+    for (const seated of players) {
+      if (!seated.userId || seated.userId === user._id) continue
+      if (await isBlockedBetween(ctx, user._id, seated.userId))
+        throw new Error("You cannot join a game with a player you blocked or who blocked you")
+    }
+    return {
+      publicId: game.publicId,
+      mode: game.mode,
+      seats: players
+        .filter((player) => player.userId === undefined)
+        .map((player) => player.seat)
+        .sort((left, right) => left - right),
+    }
+  },
+})
+
+export const claimImportedSeat = mutation({
+  args: {
+    publicId: v.string(),
+    seat: v.number(),
+    token: v.optional(v.string()),
+    manualCode: v.optional(v.string()),
+    deviceId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    await consumeJoinAttempt(ctx, String(user.clerkUserId))
+    if (args.deviceId) assertDeviceId(args.deviceId)
+    const invite = await findInvite(ctx, args)
+    if (!invite) throw new Error("Invite is invalid, expired, or revoked")
+    const game = await ctx.db.get(invite.gameId)
+    if (
+      !game ||
+      game.publicId !== args.publicId ||
+      game.status !== "active" ||
+      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+    )
+      throw new Error("Invite is invalid, expired, or revoked")
+    const players = await playersForGame(ctx, game._id)
+    for (const seated of players) {
+      if (!seated.userId || seated.userId === user._id) continue
+      if (await isBlockedBetween(ctx, user._id, seated.userId))
+        throw new Error("You cannot join a game with a player you blocked or who blocked you")
+    }
+    const target = players.find((player) => player.seat === args.seat)
+    if (!target) throw new Error("Seat not found")
+    if (target.userId === user._id) return { publicId: game.publicId, seat: target.seat }
+    const heldSeat = players.find(
+      (player) => player.seat !== target.seat && player.userId === user._id,
+    )
+    if (heldSeat) throw new Error("You already hold a seat in this game")
+    if (target.userId !== undefined) throw new Error("Seat already claimed")
+    await ctx.db.patch(target._id, {
+      userId: user._id,
+      ...(args.deviceId ? { deviceId: args.deviceId } : {}),
+      usernameAtJoin: user.username,
+    })
+    await ctx.db.patch(game._id, { updatedAt: Date.now() })
+    return { publicId: game.publicId, seat: target.seat }
+  },
+})
+
 const connectedOperation = v.union(
   v.object({
     kind: v.literal("life.changed"),
@@ -812,7 +1117,7 @@ export const lobbyProjection = query({
               ? { eliminatedByCommanderDamage: eliminatedPlayerIds.has(p._id) }
               : {}),
             controlledByMe:
-              p.userId === user._id &&
+              (p.userId === user._id || (p.userId === undefined && isHost)) &&
               (args.deviceId ? p.deviceId === undefined || p.deviceId === args.deviceId : true),
           })),
       ),
@@ -1059,7 +1364,8 @@ export const rotateInvite = mutation({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     await requireHost(ctx, game)
-    if (game.status !== "lobby") throw new Error("Only a lobby invite can be rotated")
+    if (game.status !== "lobby" && game.status !== "active")
+      throw new Error("Only a lobby or active game invite can be rotated")
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
     const manualCode = await allocateInvite(ctx, args.inviteToken, args.manualCodeCandidates)
@@ -1105,7 +1411,7 @@ export const changeLife = mutation({
     if (
       !target ||
       target.gameId !== game._id ||
-      target.userId !== user._id ||
+      (target.userId === undefined ? game.hostUserId !== user._id : target.userId !== user._id) ||
       (target.deviceId !== undefined && target.deviceId !== args.deviceId)
     )
       throw new Error("Seat-owner permission required")
@@ -1175,7 +1481,7 @@ async function commanderPlayerForWrite(
   if (
     !player ||
     player.gameId !== game._id ||
-    player.userId !== user._id ||
+    (player.userId === undefined ? game.hostUserId !== user._id : player.userId !== user._id) ||
     (player.deviceId !== undefined && player.deviceId !== deviceId)
   )
     throw new Error(
