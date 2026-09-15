@@ -366,6 +366,11 @@ export class DeckVersionWriteController {
     const versionNumber =
       activeVersions.reduce((highest, v) => Math.max(highest, v.versionNumber), 0) + 1
     const now = this.now()
+    this.enqueue(deckId, provisionalId, cards, 0, {
+      op: "create",
+      name: versionName,
+      ...(note ? { note } : {}),
+    })
     this.repository.cache.saveDraft(deckId, {
       deckId: deckId as VersionWriteArgs["deckId"],
       versionId: provisionalId as VersionWriteArgs["versionId"],
@@ -382,11 +387,6 @@ export class DeckVersionWriteController {
     })
     this.repository.cache.saveCards(provisionalId, 0, cards)
     this.publish()
-    this.enqueue(deckId, provisionalId, cards, 0, {
-      op: "create",
-      name: versionName,
-      ...(note ? { note } : {}),
-    })
     void this.drain()
     return provisionalId
   }

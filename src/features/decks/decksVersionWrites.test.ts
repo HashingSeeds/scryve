@@ -307,6 +307,24 @@ describe("deck version card writes", () => {
     )
   })
 
+  it("leaves no version row in the cache when the offline queue rejects a create", () => {
+    class FullOutboxRepository extends DeckVersionWriteRepository {
+      override enqueue() {
+        return { accepted: false, reason: "record_limit" as const, pending: [] }
+      }
+    }
+    const repository = new FullOutboxRepository("owner", new MemoryStorage())
+    const controller = new DeckVersionWriteController(
+      { mutation: jest.fn() } as unknown as ConvexReactClient,
+      repository,
+    )
+    expect(() => controller.createVersion(deckId, "Offline Draft", "", [cachedRemoteCard])).toThrow(
+      /offline card queue is full/i,
+    )
+    expect(repository.cache.loadVersions(deckId)).toEqual([])
+    expect(controller.getSnapshot().pending).toEqual([])
+  })
+
   it("keeps account-only queued writes pending and unreplayed across sessions", async () => {
     const local = new MemoryStorage()
     const mutation = jest
