@@ -86,6 +86,16 @@ describe("deck version lifecycle sync", () => {
     await expect(
       actor.mutation(api.decks.syncCreateVersion, { ...args, cards: [otherCard] }),
     ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+    const reorderArgs = {
+      deckId,
+      operationId: "bbbbbbb0-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      name: "Ordered",
+      cards: [syncCard, otherCard],
+    }
+    await actor.mutation(api.decks.syncCreateVersion, reorderArgs)
+    await expect(
+      actor.mutation(api.decks.syncCreateVersion, { ...reorderArgs, cards: [otherCard, syncCard] }),
+    ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
   })
 
   it("keeps ownership boundaries for create, update, and delete", async () => {
