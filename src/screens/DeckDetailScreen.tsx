@@ -407,8 +407,9 @@ function DeckDetailContent({
   const canDeleteVersion = (detail?.versions.length ?? 0) > 1
   const premium = detail?.capacity.premium === true
 
-  // A cache-origin edit re-seeds the (user-uneditable) card draft once live detail arrives,
-  // so the stale cached list can never be saved back to the server.
+  // An edit started without an authoritative live card snapshot (offline, cached or not)
+  // re-seeds the user-uneditable card draft once live detail arrives, so a stale or empty
+  // seeded list can never be saved back to the server.
   useEffect(() => {
     if (!editing || !editingFromCache.current || detail === undefined) return
     editingFromCache.current = false
@@ -460,7 +461,8 @@ function DeckDetailContent({
   function startEditing() {
     if (knownDeleted) return
     metadataSaveStarted.current = false
-    editingFromCache.current = cachedCards !== undefined
+    // No authoritative live snapshot at edit start: pin re-seed (cached or uncached alike).
+    editingFromCache.current = detail === undefined || cachedCards !== undefined
     setDraft(displayCards)
     setDraftNote(deck?.note ?? "")
     setDraftMetadataRevision(currentMetadataRevision)

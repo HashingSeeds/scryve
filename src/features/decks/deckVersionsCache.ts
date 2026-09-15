@@ -159,6 +159,7 @@ export class DeckVersionCacheController {
       if (this.users > 0) return
       this.epoch += 1
       this.inFlight.clear()
+      this.wanted.clear()
     }
   }
 
