@@ -233,6 +233,18 @@ export default defineSchema({
     .index("by_game", ["gameId"])
     .index("by_public_id", ["publicId"]),
 
+  gameCompletionReceipts: defineTable({
+    hostUserId: v.id("users"),
+    gameId: v.id("games"),
+    operationId: v.string(),
+    requestKey: v.string(),
+    ack: v.object({
+      publicId: v.string(),
+      summaryId: v.id("gameSummaries"),
+      finishedAt: v.number(),
+    }),
+  }).index("by_host_and_operation_id", ["hostUserId", "operationId"]),
+
   gameHistoryEntries: defineTable({
     userId: v.id("users"),
     gameId: v.id("games"),
