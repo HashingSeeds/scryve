@@ -4,7 +4,7 @@ import type { FunctionReturnType } from "convex/server"
 
 import { storage } from "@/utils/storage"
 
-import { scopedOwnerId, type DeckSyncStorage } from "./decksSync"
+import { scopedOwnerId } from "./decksSync"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -12,6 +12,13 @@ type VersionsPage = FunctionReturnType<typeof api.decks.versionsPull>
 type VersionRead = FunctionReturnType<typeof api.decks.readVersion>
 export type CachedVersion = VersionsPage["page"][number]
 export type CachedVersionCard = VersionRead["cards"][number]
+
+/** Deletion support is scoped to this cache; MMKV satisfies it structurally. */
+export interface DeckVersionCacheStorage {
+  getString(key: string): string | undefined
+  set(key: string, value: string): void
+  delete(key: string): void
+}
 
 export interface DeckVersionCacheSnapshot {
   versions: CachedVersion[]
@@ -79,7 +86,7 @@ function isCachedCard(value: unknown): value is CachedVersionCard {
 export class DeckVersionCacheRepository {
   constructor(
     readonly ownerId: string,
-    private readonly local: DeckSyncStorage = storage,
+    private readonly local: DeckVersionCacheStorage = storage,
     private readonly deploymentUrl?: string,
   ) {}
 
@@ -91,13 +98,40 @@ export class DeckVersionCacheRepository {
     return value.versions.filter(isCachedVersion)
   }
 
-  mergeVersions(deckId: string, incoming: readonly CachedVersion[]): CachedVersion[] {
+  /**
+   * Merges a pull into the stored list, then reconciles retention: confirmed tombstones
+   * and (only when the pull is authoritative-complete) rows absent from the server's list
+   * are dropped together with their cached card payloads. Durable local write intent lives
+   * elsewhere (D3) and is never touched — read-cache keys only.
+   */
+  mergeVersions(
+    deckId: string,
+    incoming: readonly CachedVersion[],
+    complete = false,
+  ): CachedVersion[] {
     const byId = new Map(this.loadVersions(deckId).map((version) => [version.versionId, version]))
     for (const version of incoming) {
       const current = byId.get(version.versionId)
       if (!current || version.revision >= current.revision) byId.set(version.versionId, version)
     }
-    const versions = [...byId.values()]
+    const dropped = new Set<string>()
+    const versions = [...byId.values()].filter((version) => {
+      if (version.deleted) {
+        dropped.add(version.versionId)
+        return false
+      }
+      return true
+    })
+    if (complete) {
+      const authoritative = new Set(incoming.map((version) => version.versionId))
+      for (let index = versions.length - 1; index >= 0; index--) {
+        if (authoritative.has(versions[index].versionId)) continue
+        dropped.add(versions[index].versionId)
+        versions.splice(index, 1)
+      }
+    }
+    for (const versionId of dropped)
+      this.local.delete(cardsKey(this.ownerId, this.deploymentUrl, versionId))
     this.local.set(
       versionsKey(this.ownerId, this.deploymentUrl, deckId),
       JSON.stringify({ schemaVersion: 1, versions } satisfies StoredVersions),
@@ -235,9 +269,10 @@ export class DeckVersionCacheController {
       if (epoch !== this.epoch) return []
       if (result.deckId !== deckId) throw new Error("Version list for another deck")
       merged.push(...result.page)
-      if (result.isDone) break
+      if (result.isDone) return this.repository.mergeVersions(deckId, merged, true)
       cursor = result.continueCursor
     }
+    // Incomplete: the newest pages are merged, but nothing is reconciled away.
     return this.repository.mergeVersions(deckId, merged)
   }
 
