@@ -990,6 +990,10 @@ export const claimImportedSeat = mutation({
     const target = players.find((player) => player.seat === args.seat)
     if (!target) throw new Error("Seat not found")
     if (target.userId === user._id) return { publicId: game.publicId, seat: target.seat }
+    const heldSeat = players.find(
+      (player) => player.seat !== target.seat && player.userId === user._id,
+    )
+    if (heldSeat) throw new Error("You already hold a seat in this game")
     if (target.userId !== undefined) throw new Error("Seat already claimed")
     await ctx.db.patch(target._id, {
       userId: user._id,
