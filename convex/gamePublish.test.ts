@@ -513,6 +513,43 @@ describe("imported game invite renewal and discovery", () => {
     expect(projection.players.map((player) => player.displayName)).toEqual(["Player 1"])
   })
 
+  it("claims a second imported seat from a second device like legacy claimSeat", async () => {
+    const t = convexTest(schema, modules)
+    const { created } = await published(t, {
+      players: [
+        ...baseSnapshot.players,
+        {
+          localId: "local-third-player",
+          seat: 3,
+          displayName: "Third",
+          color: "#39755C",
+          shape: "square",
+          currentLife: 40,
+        },
+      ],
+    })
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    await guest.mutation(api.games.claimImportedSeat, {
+      publicId: created.publicId,
+      seat: 2,
+      manualCode: created.manualCode,
+      deviceId: joinerDevice,
+    })
+    await expect(
+      guest.mutation(api.games.claimImportedSeat, {
+        publicId: created.publicId,
+        seat: 3,
+        manualCode: created.manualCode,
+        deviceId: "device-third-0003",
+      }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 3 })
+    const projection = await guest.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: joinerDevice,
+    })
+    expect(projection.players.map((player) => player.controlledByMe)).toEqual([false, true, false])
+  })
+
   it("does not bypass authorization when a pre-claim operation is retried after a claim", async () => {
     const t = convexTest(schema, modules)
     const { host, created } = await published(t)
