@@ -481,6 +481,8 @@ function DeckDetailContent({
   const canDeleteVersion = detail
     ? (detail.versions.length ?? 0) > 1
     : canQueueVersionLifecycle && cachedVersionCount > 1
+  const canManageVersion =
+    Boolean(detail) || (canQueueVersionLifecycle && activeVersionSummary !== undefined)
   const premium = detail?.capacity.premium === true || versionCache.capacity?.premium === true
   const versionCapture =
     pendingCardWrite || storedCards.length > 0 || cachedCards !== undefined
@@ -1241,7 +1243,7 @@ function DeckDetailContent({
                         text={cardCountLabel(candidate.cardQuantity)}
                       />
                     </View>
-                    {selected && detail ? (
+                    {selected && canManageVersion ? (
                       <TouchableOpacity
                         testID="rename-version-button"
                         accessibilityRole="button"
