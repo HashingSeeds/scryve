@@ -178,6 +178,49 @@ describe("deck version cache", () => {
     stop()
   })
 
+  it("treats a corrupted payload as uncached so a same-revision refetch repairs it", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    repository.saveCards("version-1", 1, [cardRow])
+    repository.mergeVersions(deckId, [versionRow()])
+    storage.set(
+      "scryve.decks.versionCards.v1.owner-a.version-1",
+      JSON.stringify({
+        schemaVersion: 1,
+        revision: 1,
+        cards: [{ name: "Sol Ring", quantity: 1 }, { quantity: 1 }],
+      }),
+    )
+    expect(repository.loadCards("version-1")).toBeUndefined()
+
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => ({
+          deckId,
+          page: [versionRow()],
+          isDone: true,
+          continueCursor: null,
+        }),
+        readVersion: () => ({ version: versionRow(), cards: [cardRow] }),
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, "version-1")
+    await flush()
+
+    const snapshot = controller.getSnapshot().get(deckId)
+    expect(snapshot).toMatchObject({
+      version: { versionId: "version-1", revision: 1 },
+      cards: [{ name: "Sol Ring", quantity: 1 }],
+    })
+    expect(repository.loadCards("version-1")).toMatchObject({
+      revision: 1,
+      cards: [{ name: "Sol Ring", quantity: 1 }],
+    })
+    stop()
+  })
+
   it("treats a cached empty version as cached and an unfetched one as uncached", () => {
     const storage = new MemoryStorage()
     const repository = new DeckVersionCacheRepository("owner-a", storage)
