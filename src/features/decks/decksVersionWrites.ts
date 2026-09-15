@@ -48,6 +48,8 @@ const SCOPE = "versionCards"
 const RETRY_DELAY_MS = 2_000
 export const DECK_VERSION_CONFLICT_REASON =
   "Deck cards changed on another device. Choose which card list to keep."
+export const DECK_VERSION_QUEUE_CONFLICT_REASON =
+  "An earlier card edit conflicted. Choose which card list to keep."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -120,7 +122,9 @@ function parseFailed(value: unknown): FailedVersionWrite | null {
   const reason =
     value.reason === "Deck version changed on another device"
       ? DECK_VERSION_CONFLICT_REASON
-      : value.reason
+      : value.reason === "An earlier edit conflicted. Choose which version to keep."
+        ? DECK_VERSION_QUEUE_CONFLICT_REASON
+        : value.reason
   const action = parsePending(value.action)
   return action ? { schemaVersion: 1, action, reason, failedAt: value.failedAt } : null
 }
@@ -357,7 +361,12 @@ export class DeckVersionWriteController {
         classifyFailure: (cause) => {
           const code = convexErrorCode(cause)
           if (code === "sync_conflict")
-            return { kind: "reject" as const, reason: DECK_VERSION_CONFLICT_REASON }
+            return {
+              kind: "reject" as const,
+              reason: /earlier edit conflicted/.test(convexErrorMessage(cause, ""))
+                ? DECK_VERSION_QUEUE_CONFLICT_REASON
+                : DECK_VERSION_CONFLICT_REASON,
+            }
           return code && permanentErrors.has(code)
             ? {
                 kind: "reject" as const,
@@ -366,6 +375,15 @@ export class DeckVersionWriteController {
             : { kind: "retry" as const }
         },
         send: async (action) => {
+          if (
+            this.repository
+              .loadFailed()
+              .some((failure) => failure.action.versionId === action.versionId)
+          )
+            throw new ConvexError({
+              code: "sync_conflict",
+              message: "An earlier edit conflicted. Choose which version to keep.",
+            })
           const result: VersionWriteResult = await this.client.mutation(
             api.decks.syncVersionWrite,
             {

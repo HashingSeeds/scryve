@@ -5,6 +5,7 @@ import { convexTest } from "convex-test"
 import {
   DeckVersionWriteRepository,
   DECK_VERSION_CONFLICT_REASON,
+  DECK_VERSION_QUEUE_CONFLICT_REASON,
   DeckVersionWriteController,
   getDeckVersionWriteController,
   type PendingVersionWrite,
@@ -203,6 +204,69 @@ describe("deck version card writes", () => {
     const cached = repository.cache.loadCards(versionId)
     expect(cached).toMatchObject({ revision: 5 })
     stop()
+  })
+
+  it("streams no dependent tail to transport while an earlier version edit is parked", async () => {
+    const local = new MemoryStorage()
+    const repository = new DeckVersionWriteRepository("owner", local)
+    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
+    const client = {
+      mutation: jest
+        .fn()
+        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
+        .mockResolvedValue({ ...versionSnapshot(2), revision: 2 }),
+    } as unknown as ConvexReactClient
+    const controller = new DeckVersionWriteController(client, repository, () => 1)
+    const stop = controller.start()
+    controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 2 }], 0)
+    controller.update(deckId, versionId, [{ name: "Sol Ring", quantity: 5 }], 1)
+    await flush()
+    stop()
+
+    expect(jest.mocked(client.mutation)).toHaveBeenCalledTimes(1)
+    expect(controller.getSnapshot()).toMatchObject({
+      pending: [],
+      failures: [
+        { reason: DECK_VERSION_CONFLICT_REASON },
+        { reason: DECK_VERSION_QUEUE_CONFLICT_REASON, action: { cards: [{ quantity: 5 }] } },
+      ],
+    })
+  })
+
+  it("recovers a guarded tail after restart by keeping mine with the latest payload", async () => {
+    const local = new MemoryStorage()
+    const repository = new DeckVersionWriteRepository("owner", local)
+    repository.cache.mergeVersions(deckId, [versionSnapshot(1)])
+    const client = {
+      mutation: jest
+        .fn()
+        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(1) })
+        .mockResolvedValue({ ...versionSnapshot(2), revision: 2 }),
+    } as unknown as ConvexReactClient
+    const first = new DeckVersionWriteController(client, repository, () => 1)
+    const stopFirst = first.start()
+    first.update(deckId, versionId, [{ name: "Sol Ring", quantity: 2 }], 0)
+    first.update(deckId, versionId, [{ name: "Sol Ring", quantity: 5 }], 1)
+    await flush()
+    stopFirst()
+
+    const restarted = new DeckVersionWriteController(client, repository)
+    const stopRestarted = restarted.start()
+    expect(restarted.getSnapshot()).toMatchObject({
+      pending: [],
+      failures: [{ action: { expectedRevision: 0 } }, { action: { expectedRevision: 1 } }],
+    })
+    restarted.reapplyFailure(restarted.getSnapshot().failures[0].action.operationId)
+    await flush()
+    stopRestarted()
+    const replayedCalls = jest.mocked(client.mutation).mock.calls
+    expect(replayedCalls).toHaveLength(2)
+    expect(replayedCalls[1][1]).toMatchObject({
+      expectedRevision: 1,
+      cards: [{ name: "Sol Ring", quantity: 5 }],
+    })
+    expect(restarted.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+    expect(repository.cache.loadCards(versionId)).toMatchObject({ revision: 2 })
   })
 
   it("discards a rejected card edit without poisoning the confirmed cache", async () => {
