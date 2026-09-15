@@ -467,6 +467,36 @@ describe("DeckDetailScreen", () => {
     expect(view.getByLabelText("Remove Sol Ring")).not.toBeDisabled()
   })
 
+  it("re-seeds an uncached offline edit on reconnect without auto-dirtying or empty-saving", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockVersionCacheState.version = undefined
+    mockVersionCacheState.versions = []
+    mockVersionCacheState.cards = undefined
+    const screen = (ready: boolean) => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{ ready, loading: false, signedIn: true, ownerId: "owner-a", request: jest.fn() }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen(false))
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    expect(view.queryByText("Unsaved changes")).toBeNull()
+
+    mockDetail.value = loadedDetail
+    view.rerender(screen(true))
+
+    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
+    expect(view.queryByText("Unsaved changes")).toBeNull()
+    expect(view.getByTestId("save-version-button")).toBeDisabled()
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+    expect(view.getByLabelText("Increase Sol Ring")).not.toBeDisabled()
+  })
+
   it("records stats again when the screen regains focus", () => {
     const view = renderDetail()
     expect(mockCaptureAnalytics).toHaveBeenCalledTimes(1)
