@@ -502,6 +502,26 @@ describe("deck version card writes", () => {
     expect(cached).toMatchObject({ revision: version.revision + 1 })
   })
 
+  it("drains from the shared controller after detail unmount while the session stays mounted", async () => {
+    const client = {
+      mutation: jest.fn().mockResolvedValue({ ...versionSnapshot(1), revision: 1 }),
+      url: "http://localhost:3210",
+      query: jest.fn(),
+      watchQuery: jest.fn(),
+    } as unknown as ConvexReactClient
+    const controller = getDeckVersionWriteController(client, "lifetime-owner")
+    const stopSession = controller.start()
+    const stopDetail = controller.start()
+    stopDetail()
+
+    controller.update(deckId, versionId, [{ name: "After detail unmount", quantity: 3 }], 0)
+    await flush()
+
+    expect(client.mutation).toHaveBeenCalledTimes(1)
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+    stopSession()
+  })
+
   it("scopes default write controllers to the client's deployment URL", () => {
     const client = (url: string) =>
       ({
