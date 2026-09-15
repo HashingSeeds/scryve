@@ -27,6 +27,7 @@ import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import {
   DECK_VERSION_CONFLICT_REASON,
+  DECK_VERSION_QUEUE_CONFLICT_REASON,
   useDeckVersionWrites,
   type PendingVersionWrite,
 } from "@/features/decks/decksVersionWrites"
@@ -721,6 +722,9 @@ function DeckDetailContent({
     cachedMetadata ??
     detail?.deck
   const versionConflict = failedEdit?.reason === DECK_CONFLICT_REASON
+  const versionCardConflict =
+    failedCardEdit?.reason === DECK_VERSION_CONFLICT_REASON ||
+    failedCardEdit?.reason === DECK_VERSION_QUEUE_CONFLICT_REASON
   const failedVersionSnapshot = failedCardEdit
     ? versionCache.versions.find(
         (snapshot) => snapshot.versionId === failedCardEdit.action.versionId,
@@ -838,18 +842,14 @@ function DeckDetailContent({
           <ScrollView contentContainerStyle={themed($syncFailure)}>
             <Text
               preset="subheading"
-              text={
-                failedCardEdit.reason === DECK_VERSION_CONFLICT_REASON
-                  ? "Keep which card list?"
-                  : "Review saved card edits"
-              }
+              text={versionCardConflict ? "Keep which card list?" : "Review saved card edits"}
             />
             <Text
               size="sm"
               text={
                 knownDeleted
                   ? "Deck deleted. Your card edits are saved on this device."
-                  : failedCardEdit.reason === DECK_VERSION_CONFLICT_REASON
+                  : versionCardConflict
                     ? "The card list changed on another device after you saved. Your edits are still saved on this device."
                     : failureMessage
               }
@@ -879,9 +879,7 @@ function DeckDetailContent({
             {error ? <AlertNote text={error} /> : null}
             <Button
               testID="reapply-version-cards"
-              text={
-                failedCardEdit.reason === DECK_VERSION_CONFLICT_REASON ? "Keep mine" : "Retry sync"
-              }
+              text={versionCardConflict ? "Keep mine" : "Retry sync"}
               preset="primary"
               onPress={() => {
                 try {
@@ -894,11 +892,7 @@ function DeckDetailContent({
             />
             <Button
               testID="discard-version-cards"
-              text={
-                failedCardEdit.reason === DECK_VERSION_CONFLICT_REASON
-                  ? "Keep account"
-                  : "Discard local edit"
-              }
+              text={versionCardConflict ? "Keep account" : "Discard local edit"}
               onPress={() => {
                 try {
                   versionWrites.discardFailure(failedCardEdit.action.operationId)
