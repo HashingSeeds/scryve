@@ -12,6 +12,11 @@ type VersionsPage = FunctionReturnType<typeof api.decks.versionsPull>
 type VersionRead = FunctionReturnType<typeof api.decks.readVersion>
 export type CachedVersion = VersionsPage["page"][number]
 export type CachedVersionCard = VersionRead["cards"][number]
+export type StorableVersionCard = Omit<
+  CachedVersionCard,
+  "_id" | "_creationTime" | "deckVersionId"
+> &
+  Partial<Pick<CachedVersionCard, "_id" | "_creationTime" | "deckVersionId">>
 
 /** Deletion support is scoped to this cache; MMKV satisfies it structurally. */
 export interface DeckVersionCacheStorage {
@@ -23,7 +28,7 @@ export interface DeckVersionCacheStorage {
 export interface DeckVersionCacheSnapshot {
   versions: CachedVersion[]
   version: CachedVersion | undefined
-  cards: CachedVersionCard[] | undefined
+  cards: StorableVersionCard[] | undefined
 }
 
 interface StoredVersions {
@@ -34,7 +39,7 @@ interface StoredVersions {
 interface StoredCards {
   schemaVersion: 1
   revision: number
-  cards: CachedVersionCard[]
+  cards: StorableVersionCard[]
 }
 
 function versionsKey(ownerId: string, deploymentUrl: string | undefined, deckId: string) {
@@ -79,7 +84,7 @@ function isCachedVersion(value: unknown): value is CachedVersion {
   )
 }
 
-function isCachedCard(value: unknown): value is CachedVersionCard {
+function isCachedCard(value: unknown): value is StorableVersionCard {
   return isRecord(value) && typeof value.name === "string" && isCount(value.quantity)
 }
 
@@ -158,12 +163,37 @@ export class DeckVersionCacheRepository {
     }
   }
 
-  saveCards(versionId: string, revision: number, cards: readonly CachedVersionCard[]): StoredCards {
+  saveCards(
+    versionId: string,
+    revision: number,
+    cards: readonly StorableVersionCard[],
+  ): StoredCards {
     const existing = this.loadCards(versionId)
     if (existing && existing.revision > revision) return existing
     const stored: StoredCards = { schemaVersion: 1, revision, cards: [...cards] }
     this.local.set(cardsKey(this.ownerId, this.deploymentUrl, versionId), JSON.stringify(stored))
     return stored
+  }
+
+  bumpVersion(deckId: string, versionId: string, revision: number): void {
+    const versions = this.loadVersions(deckId)
+    const current = versions.find((version) => version.versionId === versionId)
+    const stored = this.loadCards(versionId)
+    if (!current || current.revision >= revision || !stored) return
+    const next = versions.map((version) =>
+      version.versionId === versionId
+        ? {
+            ...version,
+            revision,
+            cardCount: stored.cards.length,
+            cardQuantity: stored.cards.reduce((total, card) => total + card.quantity, 0),
+          }
+        : version,
+    )
+    this.local.set(
+      versionsKey(this.ownerId, this.deploymentUrl, deckId),
+      JSON.stringify({ schemaVersion: 1, versions: next } satisfies StoredVersions),
+    )
   }
 }
 
@@ -229,7 +259,7 @@ export class DeckVersionCacheController {
     deckId: string,
     versionId: string,
     revision: number,
-    cards: readonly CachedVersionCard[],
+    cards: readonly StorableVersionCard[],
   ): void {
     if (this.users === 0) return
     const cached = this.repository.loadCards(versionId)
@@ -373,7 +403,7 @@ export function useDeckVersionCache(
     controller?.ensure(deckId, selectedVersionId)
   }, [controller, deckId, selectedVersionId, connection?.isWebSocketConnected])
   const record = useCallback(
-    (versionId: string, revision: number, cards: readonly CachedVersionCard[]) =>
+    (versionId: string, revision: number, cards: readonly StorableVersionCard[]) =>
       controller?.record(deckId, versionId, revision, cards),
     [controller, deckId],
   )

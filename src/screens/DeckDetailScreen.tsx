@@ -25,6 +25,10 @@ import { cardSection, printingKey, type DeckCard } from "@/features/decks/deckCa
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
+import {
+  DECK_VERSION_CONFLICT_REASON,
+  useDeckVersionWrites,
+} from "@/features/decks/decksVersionWrites"
 import { useDeckVersionCache } from "@/features/decks/deckVersionsCache"
 import { DeckView } from "@/features/decks/DeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
@@ -48,7 +52,6 @@ type DeckDialog =
   | "deleteDeck"
   | "discard"
   | "syncConflict"
-
 export function cardDetailsKey(card: DeckCard, game: string) {
   if (card.scryfallId) return card.scryfallId
   const identity = [
@@ -262,6 +265,7 @@ function DeckDetailContent({
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const synced = useDeckSync(syncEnabled, access?.ownerId)
   const metadataWrites = useDeckMetadataWrites(syncEnabled, access?.ownerId)
+  const versionWrites = useDeckVersionWrites(syncEnabled, access?.ownerId)
   const knownDeleted = [...synced.metadata, ...metadataWrites.metadata].some(
     (deck) => deck.deckId === deckId && deck.deleted,
   )
@@ -311,6 +315,7 @@ function DeckDetailContent({
   const settingsSaveStarted = useRef(false)
 
   const pendingMetadata = metadataWrites.pending.filter((write) => write.deckId === deckId)
+  const pendingCards = versionWrites.pending.filter((write) => write.deckId === deckId)
   const failedEdit = metadataWrites.failures
     .filter((failure) => failure.action.deckId === deckId)
     .sort(
@@ -318,13 +323,16 @@ function DeckDetailContent({
         right.failedAt - left.failedAt ||
         right.action.expectedRevision - left.action.expectedRevision,
     )[0]
+  const failedCardEdit = versionWrites.failures
+    .filter((failure) => failure.action.deckId === deckId)
+    .sort((left, right) => right.failedAt - left.failedAt)[0]
   const reviewRequested = useRef(reviewChanges)
   useEffect(() => {
-    if (reviewRequested.current && failedEdit) {
+    if (reviewRequested.current && (failedEdit || failedCardEdit)) {
       reviewRequested.current = false
       setDialog("syncConflict")
     }
-  }, [failedEdit])
+  }, [failedEdit, failedCardEdit])
   const optimisticMetadata = pendingMetadata.length
     ? metadataWrites.metadata.find((deck) => deck.deckId === deckId && !deck.deleted)
     : undefined
@@ -339,6 +347,7 @@ function DeckDetailContent({
     access?.ownerId &&
     metadataWrites.metadata.some((item) => item.deckId === deckId),
   )
+  const canQueueCards = syncEnabled && Boolean(access?.ownerId)
   const currentMetadataRevision = metadataWrites.metadata.find(
     (item) => item.deckId === deckId && !item.deleted,
   )?.revision
@@ -364,13 +373,28 @@ function DeckDetailContent({
     [versionCache.cards, detail],
   )
   const cachedVersion = versionCache.version
+  const version = detail?.version
+  const versionTarget = version
+    ? { versionId: version._id, expectedRevision: version.syncRevision ?? 0 }
+    : cachedVersion && versionCache.cards !== undefined
+      ? {
+          versionId: cachedVersion.versionId as Id<"deckVersions">,
+          expectedRevision: cachedVersion.revision,
+        }
+      : undefined
   const displayCards = storedCards.length > 0 ? storedCards : (cachedCards ?? storedCards)
   const cards = editing ? draft : displayCards
   const cardsUnavailable = !detail && cachedCards === undefined
   // Cached cards render read-only so an offline save can't push stale lists to the server.
+  const editingBase = useRef<DeckCard[]>([])
   const editingFromCache = useRef(false)
-  const cardsCached = editing ? editingFromCache.current : cachedCards !== undefined
-  const cardsDirty = editing && !editingFromCache.current && cardsChanged(draft, displayCards)
+  const cardsCached = editing
+    ? versionTarget
+      ? false
+      : editingFromCache.current
+    : cachedCards !== undefined
+  const cardsDirty =
+    editing && !editingFromCache.current && cardsChanged(draft, editingBase.current)
   const noteDirty = editing && draftNote !== (deck?.note ?? "")
   const draftChanged = cardsDirty || noteDirty
   const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
@@ -384,7 +408,6 @@ function DeckDetailContent({
         }
       : undefined,
   )
-  const version = detail?.version
   const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)
   const cachedVersionRows = useMemo(
     () =>
@@ -407,13 +430,11 @@ function DeckDetailContent({
   const canDeleteVersion = (detail?.versions.length ?? 0) > 1
   const premium = detail?.capacity.premium === true
 
-  // An edit started without an authoritative live card snapshot (offline, cached or not)
-  // re-seeds the user-uneditable card draft once live detail arrives, so a stale or empty
-  // seeded list can never be saved back to the server.
   useEffect(() => {
     if (!editing || !editingFromCache.current || detail === undefined) return
     editingFromCache.current = false
     setDraft(displayCards)
+    editingBase.current = displayCards
   }, [detail, displayCards, editing])
 
   // Keeps the persistent cache fresh with live reads so the next offline session is current.
@@ -461,8 +482,8 @@ function DeckDetailContent({
   function startEditing() {
     if (knownDeleted) return
     metadataSaveStarted.current = false
-    // No authoritative live snapshot at edit start: pin re-seed (cached or uncached alike).
-    editingFromCache.current = detail === undefined || cachedCards !== undefined
+    editingFromCache.current = detail === undefined && !versionTarget
+    editingBase.current = displayCards
     setDraft(displayCards)
     setDraftNote(deck?.note ?? "")
     setDraftMetadataRevision(currentMetadataRevision)
@@ -545,13 +566,38 @@ function DeckDetailContent({
       }
       return
     }
+    const queueCard = cardsDirty && canQueueCards && Boolean(versionTarget)
+    const queueNote = noteDirty && canQueueMetadata && draftMetadataRevision !== undefined
+    if (queueCard || (noteDirty && queueNote && !cardsDirty)) {
+      try {
+        setError(undefined)
+        if (queueCard && versionTarget)
+          versionWrites.update(
+            deckId,
+            versionTarget.versionId,
+            draft,
+            versionTarget.expectedRevision,
+          )
+        if (queueNote) metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
+        if (noteDirty && !queueNote)
+          await updateDeck({ deckId: deckId as Id<"decks">, note: draftNote })
+        captureAnalytics("deck_used", { feature: "saved" })
+        setEditing(false)
+        setUndo(undefined)
+      } catch (cause) {
+        metadataSaveStarted.current = false
+        fail(cause, "Could not save deck")
+      }
+      return
+    }
     const saved = await run(async () => {
-      if (cardsDirty)
+      if (cardsDirty) {
         await saveVersion({
           deckId: deckId as Id<"decks">,
           ...(version ? { versionId: version._id } : {}),
           cards: draft,
         })
+      }
       if (noteDirty) {
         if (canQueueMetadata && draftMetadataRevision !== undefined)
           metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
@@ -673,12 +719,16 @@ function DeckDetailContent({
         ].filter((field) => field.local !== field.account)
       : []
   const failureMessage =
-    failedEdit && !/\[CONVEX|Server Error|ArgumentValidationError|\n/i.test(failedEdit.reason)
-      ? failedEdit.reason
-      : "This edit could not be synced. Try again or discard it."
-  const syncError = failedEdit ? (
-    <Button text="Review changes" onPress={() => setDialog("syncConflict")} />
-  ) : undefined
+    (failedCardEdit &&
+    !/\[CONVEX|Server Error|ArgumentValidationError|\n/i.test(failedCardEdit.reason)
+      ? failedCardEdit.reason
+      : failedEdit && !/\[CONVEX|Server Error|ArgumentValidationError|\n/i.test(failedEdit.reason)
+        ? failedEdit.reason
+        : undefined) ?? "This edit could not be synced. Try again or discard it."
+  const syncError =
+    failedEdit || failedCardEdit ? (
+      <Button text="Review changes" onPress={() => setDialog("syncConflict")} />
+    ) : undefined
 
   return (
     <Screen
@@ -703,11 +753,11 @@ function DeckDetailContent({
         editingDisabled={knownDeleted}
         saveStatus={
           syncEnabled && access?.ownerId
-            ? failedEdit
+            ? failedEdit || failedCardEdit
               ? "Local edit not synced"
-              : metadataWrites.capacityBlocked
+              : metadataWrites.capacityBlocked || versionWrites.capacityBlocked
                 ? "Sync paused. Resolve a saved local edit to continue."
-                : pendingMetadata.length
+                : pendingMetadata.length || pendingCards.length
                   ? "Saved locally · Pending sync"
                   : "Synced"
             : undefined
@@ -751,6 +801,87 @@ function DeckDetailContent({
           ) : undefined
         }
       />
+      {dialog === "syncConflict" && failedCardEdit && !failedEdit ? (
+        <DialogCard
+          visible
+          placement="bottom"
+          wide
+          onClose={() => setDialog("none")}
+          dialogTestID="version-sync-conflict"
+          backdropAccessibilityLabel="Later"
+          accessibilityViewIsModal
+        >
+          <ScrollView contentContainerStyle={themed($syncFailure)}>
+            <Text
+              preset="subheading"
+              text={
+                failedCardEdit.reason === DECK_VERSION_CONFLICT_REASON
+                  ? "Keep which card list?"
+                  : "Review saved card edits"
+              }
+            />
+            <Text
+              size="sm"
+              text={
+                knownDeleted
+                  ? "Deck deleted. Your card edits are saved on this device."
+                  : failedCardEdit.reason === DECK_VERSION_CONFLICT_REASON
+                    ? "The card list changed on another device after you saved. Your edits are still saved on this device."
+                    : failureMessage
+              }
+            />
+            <View style={themed($conflictVersion)}>
+              <Text
+                size="sm"
+                text={`${failedCardEdit.action.cards.reduce((total, card) => total + card.quantity, 0)} cards · ${failedCardEdit.action.cards.length} entries`}
+              />
+              <Text
+                size="sm"
+                text={
+                  failedCardEdit.action.cards
+                    .slice(0, 3)
+                    .map((card) => card.name)
+                    .join(", ") || "No cards"
+                }
+                numberOfLines={2}
+              />
+            </View>
+            {error ? <AlertNote text={error} /> : null}
+            <Button
+              testID="reapply-version-cards"
+              text={
+                failedCardEdit.reason === DECK_VERSION_CONFLICT_REASON ? "Keep mine" : "Retry sync"
+              }
+              preset="primary"
+              onPress={() => {
+                try {
+                  versionWrites.reapplyFailure(failedCardEdit.action.operationId)
+                  setDialog("none")
+                } catch (cause) {
+                  fail(cause, "Could not save your card changes")
+                }
+              }}
+            />
+            <Button
+              testID="discard-version-cards"
+              text={
+                failedCardEdit.reason === DECK_VERSION_CONFLICT_REASON
+                  ? "Keep account"
+                  : "Discard local edit"
+              }
+              onPress={() => {
+                try {
+                  versionWrites.discardFailure(failedCardEdit.action.operationId)
+                  setDialog("none")
+                } catch (cause) {
+                  fail(cause, "Could not discard local card edits")
+                }
+              }}
+            />
+            <Button text="Later" onPress={() => setDialog("none")} />
+          </ScrollView>
+        </DialogCard>
+      ) : null}
       {dialog === "syncConflict" && failedEdit ? (
         <DialogCard
           visible
