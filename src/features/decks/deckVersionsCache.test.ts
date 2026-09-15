@@ -579,6 +579,28 @@ describe("deck version cache", () => {
     stop()
   })
 
+  it("republishes the persisted capacity hint once detail supplies it", () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => {
+          throw new Error("Offline")
+        },
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, undefined)
+    expect(controller.getSnapshot().get(deckId)?.capacity).toBeUndefined()
+
+    controller.recordCapacity(deckId, { limit: 5, premium: true })
+
+    expect(controller.getSnapshot().get(deckId)?.capacity).toEqual({ limit: 5, premium: true })
+    expect(repository.loadCapacity(deckId)).toEqual({ limit: 5, premium: true })
+    stop()
+  })
+
   it("ignores version payloads addressed to a different deck", async () => {
     const storage = new MemoryStorage()
     const repository = new DeckVersionCacheRepository("owner-a", storage)
