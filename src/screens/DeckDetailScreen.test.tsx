@@ -51,6 +51,24 @@ jest.mock("@/features/decks/decksSyncWrites", () => ({
     reapplyFailure: mockReapplyMetadataFailure,
   }),
 }))
+const mockVersionCardUpdate = jest.fn()
+const mockVersionCardDiscard = jest.fn()
+const mockVersionCardReapply = jest.fn()
+const mockVersionCardWriteState = {
+  pending: [] as Array<Record<string, unknown>>,
+  failures: [] as Array<Record<string, unknown>>,
+  capacityBlocked: false,
+}
+jest.mock("@/features/decks/decksVersionWrites", () => ({
+  DECK_VERSION_CONFLICT_REASON:
+    "Deck cards changed on another device. Choose which card list to keep.",
+  useDeckVersionWrites: () => ({
+    ...mockVersionCardWriteState,
+    update: mockVersionCardUpdate,
+    discardFailure: mockVersionCardDiscard,
+    reapplyFailure: mockVersionCardReapply,
+  }),
+}))
 
 const mockSaveVersion = jest.fn(async () => "version-main")
 const mockCreateVersion = jest.fn(async () => "version-new")
@@ -241,9 +259,13 @@ describe("DeckDetailScreen", () => {
     mockMetadataWriteState.pending = []
     mockMetadataWriteState.failures = []
     mockMetadataWriteState.capacityBlocked = false
+    mockVersionCardWriteState.pending = []
+    mockVersionCardWriteState.failures = []
+    mockVersionCardWriteState.capacityBlocked = false
+    mockVersionCardUpdate.mockClear()
   })
 
-  it("renders cached version contents on an offline restart and keeps them read-only", () => {
+  it("renders cached version contents offline and queues durable card edits on save", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
     mockMetadataWriteState.metadata = [cachedMetadata]
@@ -283,8 +305,17 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByText("Card list unavailable offline.")).toBeNull()
     expect(view.getByTestId("deck-add-cards")).toBeDisabled()
     fireEvent.press(view.getByTestId("edit-deck-button"))
-    expect(view.getByLabelText("Increase Sol Ring")).toBeDisabled()
-    expect(view.getByLabelText("Remove Sol Ring")).toBeDisabled()
+    expect(view.getByLabelText("Increase Sol Ring")).toBeEnabled()
+    expect(view.getByLabelText("Remove Sol Ring")).toBeEnabled()
+    fireEvent.press(view.getByLabelText("Increase Sol Ring"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    expect(mockVersionCardUpdate).toHaveBeenCalledWith(
+      "deck-1",
+      "version-main",
+      [expect.objectContaining({ name: "Sol Ring", quantity: 2 })],
+      2,
+    )
+    expect(mockSaveVersion).not.toHaveBeenCalled()
   })
 
   it("distinguishes uncached versions from cached empty decks offline", () => {
@@ -424,7 +455,7 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Sol Ring")).toBeTruthy()
   })
 
-  it("re-seeds a cache-origin edit when live detail arrives and never flags it dirty", () => {
+  it("keeps a valid cached-origin edit when live detail arrives without auto-saving", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
     mockMetadataWriteState.metadata = [cachedMetadata]
@@ -459,12 +490,13 @@ describe("DeckDetailScreen", () => {
     mockDetail.value = loadedDetail
     view.rerender(screen(true))
 
-    expect(view.getByLabelText("1× Sol Ring")).toBeTruthy()
+    expect(view.getByLabelText("1× Stale Snapshot")).toBeTruthy()
     expect(view.queryByText("Unsaved changes")).toBeNull()
     expect(view.getByTestId("save-version-button")).toBeDisabled()
     expect(mockSaveVersion).not.toHaveBeenCalled()
-    expect(view.getByLabelText("Increase Sol Ring")).not.toBeDisabled()
-    expect(view.getByLabelText("Remove Sol Ring")).not.toBeDisabled()
+    expect(mockVersionCardUpdate).not.toHaveBeenCalled()
+    expect(view.getByLabelText("Increase Stale Snapshot")).not.toBeDisabled()
+    expect(view.getByLabelText("Remove Stale Snapshot")).not.toBeDisabled()
   })
 
   it("re-seeds an uncached offline edit on reconnect without auto-dirtying or empty-saving", () => {
@@ -735,6 +767,72 @@ describe("DeckDetailScreen", () => {
     view.rerender(screen())
     expect(view.queryByTestId("deck-sync-conflict")).toBeNull()
     expect(mockDiscardMetadataFailure).not.toHaveBeenCalled()
+  })
+
+  it("offers keep mine and keep account for a conflicted saved card list", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 2,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.cards = [solRing]
+    const screen = () => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    mockVersionCardWriteState.failures = [
+      {
+        failedAt: 2,
+        reason: "Deck cards changed on another device. Choose which card list to keep.",
+        action: {
+          operationId: "card-conflict",
+          deckId: "deck-1",
+          versionId: "version-main",
+          expectedRevision: 2,
+          cards: [{ name: "Sol Ring", quantity: 2 }],
+          queuedAt: 1,
+        },
+      },
+    ]
+    view.rerender(screen())
+
+    expect(view.getByText("Local edit not synced")).toBeTruthy()
+    fireEvent.press(view.getByText("Review changes"))
+    expect(view.getByTestId("version-sync-conflict")).toBeTruthy()
+    expect(view.getByText("Keep which card list?")).toBeTruthy()
+    expect(view.getByText("2 cards · 1 entries")).toBeTruthy()
+    expect(view.getByText(/Your edits are still saved on this device/)).toBeTruthy()
+    fireEvent.press(view.getByText("Later"))
+    expect(mockVersionCardReapply).not.toHaveBeenCalled()
+    expect(mockVersionCardDiscard).not.toHaveBeenCalled()
+    fireEvent.press(view.getByText("Review changes"))
+    fireEvent.press(view.getByText("Keep mine"))
+    fireEvent.press(view.getByText("Review changes"))
+    fireEvent.press(view.getByTestId("discard-version-cards"))
+    expect(mockVersionCardReapply).toHaveBeenCalledWith("card-conflict")
+    expect(mockVersionCardDiscard).toHaveBeenCalledWith("card-conflict")
   })
 
   it("compares only changed fields for a rename conflict", () => {
