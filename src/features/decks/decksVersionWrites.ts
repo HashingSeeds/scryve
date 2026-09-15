@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react"
 import { randomUUID } from "expo-crypto"
 import { useConvex, type ConvexReactClient } from "convex/react"
-import type { FunctionArgs } from "convex/server"
+import type { FunctionArgs, FunctionReturnType } from "convex/server"
 import { ConvexError } from "convex/values"
 
 import { drainOutbox } from "@/features/sync/drainOutbox"
@@ -21,6 +21,7 @@ import { DeckVersionCacheRepository, type CachedVersion } from "./deckVersionsCa
 import { api } from "../../../convex/_generated/api"
 
 type VersionWriteArgs = FunctionArgs<typeof api.decks.syncVersionWrite>
+type VersionWriteResult = FunctionReturnType<typeof api.decks.syncVersionWrite>
 export type VersionCardPayload = NonNullable<VersionWriteArgs["cards"]>[number]
 
 export interface PendingVersionWrite extends DurablePendingRecord {
@@ -63,10 +64,6 @@ const permanentErrors = new Set([
   "invalid_card",
   "deck_system_mismatch",
 ])
-
-function conflictRevisionKey(ownerId: string, deploymentUrl?: string, versionId?: string) {
-  return `scryve.decks.versionConflict.v1.${scopedOwnerId(ownerId, deploymentUrl)}.${versionId}`
-}
 
 function outboxKeys(deploymentUrl?: string): DurableOutboxKeys {
   return {
@@ -147,6 +144,7 @@ function compareActions(left: PendingVersionWrite, right: PendingVersionWrite) {
 
 export class DeckVersionWriteRepository {
   private readonly outbox: DurableOutbox<PendingVersionWrite, FailedVersionWrite>
+  private readonly keys: DurableOutboxKeys
   private readonly local: DurableStringStorage
   private readonly deploymentUrl?: string
 
@@ -157,7 +155,8 @@ export class DeckVersionWriteRepository {
   ) {
     this.local = local
     this.deploymentUrl = deploymentUrl
-    this.outbox = new DurableOutbox(local, ownerId, outboxKeys(deploymentUrl), codec)
+    this.keys = outboxKeys(deploymentUrl)
+    this.outbox = new DurableOutbox(local, ownerId, this.keys, codec)
   }
 
   get cache() {
@@ -198,28 +197,19 @@ export class DeckVersionWriteRepository {
     this.outbox.dismissFailed(SCOPE, operationId)
   }
 
-  recordConflict(versionId: string, revision: number) {
-    this.local.set(
-      conflictRevisionKey(this.ownerId, this.deploymentUrl, versionId),
-      JSON.stringify(revision),
-    )
+  recordConflict(deckId: string, version: CachedVersion) {
+    this.cache.mergeVersions(deckId, [version])
   }
 
-  loadConflictRevision(versionId: string): number | undefined {
-    const value = this.local.getString(
-      conflictRevisionKey(this.ownerId, this.deploymentUrl, versionId),
-    )
-    if (!value) return undefined
-    try {
-      const revision = JSON.parse(value)
-      return Number.isSafeInteger(revision) ? (revision as number) : undefined
-    } catch {
-      return undefined
-    }
-  }
-
-  clearConflict(versionId: string) {
-    this.local.delete(conflictRevisionKey(this.ownerId, this.deploymentUrl, versionId))
+  rebasePending(versionId: string, ackRevision: number) {
+    for (const [offset, tail] of this.loadPending()
+      .filter((action) => action.versionId === versionId && action.attempts === 0)
+      .entries())
+      if (tail.expectedRevision !== ackRevision + offset)
+        this.local.set(
+          this.keys.pendingRecord(SCOPE, tail.operationId, this.ownerId),
+          JSON.stringify({ ...tail, expectedRevision: ackRevision + offset }),
+        )
   }
 }
 
@@ -307,7 +297,6 @@ export class DeckVersionWriteController {
     const result = this.repository.enqueue(action, this.snapshot.pending)
     if (!result.accepted)
       throw new Error("The offline card queue is full. Reconnect before making more changes.")
-    this.repository.cache.saveCards(versionId, action.expectedRevision + 1, action.cards)
     this.publish()
   }
 
@@ -317,7 +306,6 @@ export class DeckVersionWriteController {
     for (const entry of this.snapshot.failures)
       if (entry.action.versionId === failure.action.versionId)
         this.repository.dismissFailed(entry.action.operationId)
-    this.repository.clearConflict(failure.action.versionId)
     this.capacityBlocked = false
     this.publish()
     void this.drain()
@@ -331,12 +319,14 @@ export class DeckVersionWriteController {
     const related = this.snapshot.failures.filter(
       (entry) => entry.action.versionId === failure.action.versionId,
     )
-    const conflictRevision = this.repository.loadConflictRevision(failure.action.versionId)
-    if (conflictRevision === undefined)
-      throw new Error("This card edit cannot be replayed. Discard it and edit again.")
     const latest = related.reduce((left, right) =>
       compareActions(right.action, left.action) > 0 ? right : left,
     )
+    const conflictRevision = this.repository.cache
+      .loadVersions(latest.action.deckId)
+      .find((version) => version.versionId === failure.action.versionId)?.revision
+    if (conflictRevision === undefined)
+      throw new Error("This card edit cannot be replayed. Discard it and edit again.")
     this.enqueue(
       latest.action.deckId,
       latest.action.versionId,
@@ -344,7 +334,6 @@ export class DeckVersionWriteController {
       conflictRevision,
     )
     for (const entry of related) this.repository.dismissFailed(entry.action.operationId)
-    this.repository.clearConflict(latest.action.versionId)
     this.capacityBlocked = false
     this.publish()
     void this.drain()
@@ -377,31 +366,27 @@ export class DeckVersionWriteController {
             : { kind: "retry" as const }
         },
         send: async (action) => {
-          const result = (await this.client.mutation(api.decks.syncVersionWrite, {
-            deckId: action.deckId,
-            versionId: action.versionId,
-            operationId: action.operationId,
-            expectedRevision: action.expectedRevision,
-            cards: action.cards,
-            returnConflict: true,
-          })) as { status: "conflict"; version: CachedVersion } | { revision: number }
+          const result: VersionWriteResult = await this.client.mutation(
+            api.decks.syncVersionWrite,
+            {
+              deckId: action.deckId,
+              versionId: action.versionId,
+              operationId: action.operationId,
+              expectedRevision: action.expectedRevision,
+              cards: action.cards,
+              returnConflict: true,
+            },
+          )
           if ("status" in result) {
-            this.repository.recordConflict(action.versionId, result.version.revision)
+            this.repository.recordConflict(action.deckId, result.version)
             throw new ConvexError({
               code: "sync_conflict",
               message: DECK_VERSION_CONFLICT_REASON,
             })
           }
-          this.repository.cache.saveCards(
-            action.versionId,
-            action.expectedRevision + 1,
-            action.cards,
-          )
-          this.repository.cache.bumpVersion(
-            action.deckId,
-            action.versionId,
-            action.expectedRevision + 1,
-          )
+          this.repository.cache.saveCards(action.versionId, result.revision, action.cards)
+          this.repository.cache.bumpVersion(action.deckId, action.versionId, result.revision)
+          this.repository.rebasePending(action.versionId, result.revision)
           return { operationId: action.operationId }
         },
         shouldContinue: () => generation === this.generation && this.users > 0,

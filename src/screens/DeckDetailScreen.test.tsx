@@ -34,13 +34,14 @@ jest.mock("@/features/decks/decksSync", () => ({
     retry: jest.fn(),
   }),
 }))
+const mockVersionCacheRefresh = jest.fn()
 const mockVersionCacheState = {
   versions: [] as Array<Record<string, unknown>>,
   version: undefined as Record<string, unknown> | undefined,
   cards: undefined as Array<Record<string, unknown>> | undefined,
 }
 jest.mock("@/features/decks/deckVersionsCache", () => ({
-  useDeckVersionCache: () => mockVersionCacheState,
+  useDeckVersionCache: () => ({ ...mockVersionCacheState, refresh: mockVersionCacheRefresh }),
 }))
 jest.mock("@/features/decks/decksSyncWrites", () => ({
   DECK_CONFLICT_REASON: "Deck changed on another device. Choose which version to keep.",
@@ -263,6 +264,7 @@ describe("DeckDetailScreen", () => {
     mockVersionCardWriteState.failures = []
     mockVersionCardWriteState.capacityBlocked = false
     mockVersionCardUpdate.mockClear()
+    mockVersionCacheRefresh.mockClear()
   })
 
   it("renders cached version contents offline and queues durable card edits on save", () => {
@@ -785,6 +787,7 @@ describe("DeckDetailScreen", () => {
       deleted: false,
       updatedAt: 1,
     }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
     mockVersionCacheState.cards = [solRing]
     const screen = () => (
       <ThemeProvider initialContext="light">
@@ -823,6 +826,7 @@ describe("DeckDetailScreen", () => {
     expect(view.getByTestId("version-sync-conflict")).toBeTruthy()
     expect(view.getByText("Keep which card list?")).toBeTruthy()
     expect(view.getByText("2 cards · 1 entries")).toBeTruthy()
+    expect(view.getByText("Account copy: 2 cards · 1 entries · revision 2")).toBeTruthy()
     expect(view.getByText(/Your edits are still saved on this device/)).toBeTruthy()
     fireEvent.press(view.getByText("Later"))
     expect(mockVersionCardReapply).not.toHaveBeenCalled()
@@ -833,6 +837,51 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByTestId("discard-version-cards"))
     expect(mockVersionCardReapply).toHaveBeenCalledWith("card-conflict")
     expect(mockVersionCardDiscard).toHaveBeenCalledWith("card-conflict")
+  })
+
+  it("shows authoritative or explicit-uncached state after Keep account and restart", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 3,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f3",
+      cardCount: 2,
+      cardQuantity: 4,
+      deleted: false,
+      updatedAt: 3,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [{ ...solRing, quantity: 2, name: "Counterspell" }]
+    const screen = () => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{
+            ready: false,
+            loading: false,
+            signedIn: true,
+            ownerId: "owner-a",
+            request: jest.fn(),
+          }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    mockVersionCardWriteState.failures = []
+    mockVersionCacheState.version = { ...mockVersionCacheState.version!, revision: 4 }
+    mockVersionCacheState.cards = undefined
+    view.rerender(screen())
+
+    expect(view.getByText("Card list unavailable offline.")).toBeTruthy()
+    expect(view.queryByText("Counterspell")).toBeNull()
+    expect(mockVersionCardWriteState.failures).toEqual([])
   })
 
   it("compares only changed fields for a rename conflict", () => {

@@ -407,10 +407,14 @@ export function useDeckVersionCache(
       controller?.record(deckId, versionId, revision, cards),
     [controller, deckId],
   )
+  const refresh = useCallback(
+    () => controller?.ensure(deckId, selectedVersionId),
+    [controller, deckId, selectedVersionId],
+  )
   const snapshot = useSyncExternalStore(
     controller?.subscribe ?? noSubscribers,
     () => controller?.getSnapshot().get(deckId) ?? emptySnapshot,
     () => emptySnapshot,
   )
-  return { ...snapshot, record }
+  return { ...snapshot, record, refresh }
 }
