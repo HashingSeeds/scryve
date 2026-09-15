@@ -363,6 +363,101 @@ describe("deck version cache", () => {
     expect(repository.loadCards("version-1")).toBeUndefined()
   })
 
+  it("fences a superseded per-deck refresh so a stale tombstone/complete pull wins", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    let pageCalls = 0
+    const readCalls: string[] = []
+    let releaseStalePull: (value: unknown) => void = () => {}
+    const stalePull = new Promise((resolve) => {
+      releaseStalePull = resolve
+    })
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => {
+          pageCalls++
+          if (pageCalls === 1) return stalePull
+          return {
+            deckId,
+            page: [
+              versionRow(),
+              versionRow({ versionId: "version-2", versionNumber: 2, deleted: true, revision: 4 }),
+            ],
+            isDone: true,
+            continueCursor: null,
+          }
+        },
+        readVersion: (args: { deckId: string; versionId: string }) => {
+          readCalls.push(args.versionId)
+          return { version: versionRow({ versionId: args.versionId }), cards: [cardRow] }
+        },
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, "version-1")
+    controller.ensure(deckId, undefined)
+    await flush()
+
+    expect(repository.loadVersions(deckId).map((version) => version.versionId)).toEqual([
+      "version-1",
+    ])
+    expect(repository.loadCards("version-2")).toBeUndefined()
+
+    releaseStalePull({
+      deckId,
+      page: [versionRow(), versionRow({ versionId: "version-2", versionNumber: 2 })],
+      isDone: true,
+      continueCursor: null,
+    })
+    await flush()
+
+    expect(repository.loadVersions(deckId).map((version) => version.versionId)).toEqual([
+      "version-1",
+    ])
+    expect(repository.loadCards("version-2")).toBeUndefined()
+    expect(new Set(readCalls)).toEqual(new Set(["version-1"]))
+    stop()
+  })
+
+  it("does not re-query a selected version dropped from authoritative metadata", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    repository.mergeVersions(deckId, [
+      versionRow(),
+      versionRow({ versionId: "version-2", versionNumber: 2 }),
+    ])
+    repository.saveCards("version-2", 1, [
+      { ...cardRow, deckVersionId: "version-2" as Id<"deckVersions"> },
+    ])
+    const readCalls: string[] = []
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => ({
+          deckId,
+          page: [versionRow()],
+          isDone: true,
+          continueCursor: null,
+        }),
+        readVersion: (args: { deckId: string; versionId: string }) => {
+          readCalls.push(args.versionId)
+          return { version: versionRow({ versionId: args.versionId }), cards: [cardRow] }
+        },
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, "version-2")
+    await flush()
+
+    expect(repository.loadVersions(deckId).map((version) => version.versionId)).toEqual([
+      "version-1",
+    ])
+    expect(repository.loadCards("version-2")).toBeUndefined()
+    expect(readCalls).toEqual([])
+    stop()
+  })
+
   it("serves the latest selection after rapid A-B-A switching", async () => {
     const storage = new MemoryStorage()
     const repository = new DeckVersionCacheRepository("owner-a", storage)

@@ -176,6 +176,7 @@ export class DeckVersionCacheController {
   private snapshot = new Map<string, DeckVersionCacheSnapshot>()
   private wanted = new Map<string, string | undefined>()
   private inFlight = new Map<string, number>()
+  private decks = new Map<string, number>()
   private users = 0
   private epoch = 0
 
@@ -199,6 +200,7 @@ export class DeckVersionCacheController {
       this.epoch += 1
       this.inFlight.clear()
       this.wanted.clear()
+      this.decks.clear()
     }
   }
 
@@ -209,14 +211,17 @@ export class DeckVersionCacheController {
     this.publish(deckId)
     const key = `${deckId}:${selectedVersionId ?? ""}`
     if (this.inFlight.has(key)) return
+    const ordinal = (this.decks.get(deckId) ?? 0) + 1
+    this.decks.set(deckId, ordinal)
     this.inFlight.set(key, this.epoch)
-    void this.refresh(deckId, this.epoch, key)
+    void this.refresh(deckId, ordinal, this.epoch, key)
   }
 
   /** Drops offline-stalled reads so the next ensure() refetches after a reconnect. */
   resume(): void {
     this.epoch += 1
     this.inFlight.clear()
+    this.decks.clear()
   }
 
   /** Seeds version cards from a live detail read; never overwrites a newer cached revision. */
@@ -233,21 +238,31 @@ export class DeckVersionCacheController {
     this.publish(deckId)
   }
 
-  private async refresh(deckId: string, epoch: number, key: string): Promise<void> {
+  private superseded(deckId: string, ordinal: number, epoch: number): boolean {
+    return epoch !== this.epoch || ordinal !== this.decks.get(deckId)
+  }
+
+  private async refresh(
+    deckId: string,
+    ordinal: number,
+    epoch: number,
+    key: string,
+  ): Promise<void> {
     try {
-      const versions = await this.pullVersions(deckId, epoch)
-      if (epoch !== this.epoch) return
+      const versions = await this.pullVersions(deckId, epoch, ordinal)
+      if (this.superseded(deckId, ordinal, epoch)) return
       this.publish(deckId)
       const versionId = this.wanted.get(deckId) ?? this.latestActive(versions)?.versionId
       if (!versionId) return
       const metadata = versions.find((version) => version.versionId === versionId)
       const cached = this.repository.loadCards(versionId)
-      if (cached && (!metadata || cached.revision >= metadata.revision)) return
+      if (!metadata) return
+      if (cached && cached.revision >= metadata.revision) return
       const read: VersionRead = await this.client.query(api.decks.readVersion, {
         deckId: deckId as Id<"decks">,
         versionId: versionId as Id<"deckVersions">,
       })
-      if (epoch !== this.epoch) return
+      if (this.superseded(deckId, ordinal, epoch)) return
       if (read.version.deckId === deckId)
         this.repository.saveCards(versionId, read.version.revision, read.cards)
       this.publish(deckId)
@@ -258,7 +273,11 @@ export class DeckVersionCacheController {
     }
   }
 
-  private async pullVersions(deckId: string, epoch: number): Promise<CachedVersion[]> {
+  private async pullVersions(
+    deckId: string,
+    epoch: number,
+    ordinal: number,
+  ): Promise<CachedVersion[]> {
     const merged: CachedVersion[] = []
     let cursor: string | null = null
     for (let page = 0; page < MAX_VERSION_PAGES; page++) {
@@ -266,7 +285,7 @@ export class DeckVersionCacheController {
         deckId: deckId as Id<"decks">,
         paginationOpts: { cursor, numItems: VERSION_PAGE_SIZE },
       })
-      if (epoch !== this.epoch) return []
+      if (this.superseded(deckId, ordinal, epoch)) return []
       if (result.deckId !== deckId) throw new Error("Version list for another deck")
       merged.push(...result.page)
       if (result.isDone) return this.repository.mergeVersions(deckId, merged, true)
