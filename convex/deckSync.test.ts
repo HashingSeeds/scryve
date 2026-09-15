@@ -631,6 +631,23 @@ describe("deck version sync", () => {
     expect(stored).toMatchObject({ syncRevision: 2 })
   })
 
+  it("accepts a database deckId for a deck that also has a syncId", async () => {
+    const t = convexTest(schema, modules)
+    const owner = await synced(t, "dbid-owner")
+    const created = await owner.mutation(
+      api.decks.syncWrite,
+      writeArgs("55555555-5555-4555-8555-555555555555", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+    )
+    if ("status" in created) throw new Error("expected successful sync write")
+    const updated = await owner.mutation(
+      api.decks.syncWrite,
+      writeArgs(created.deckId, "dddddddd-dddd-4ddd-8ddd-dddddddddddd", 1, { name: "Renamed" }),
+    )
+    if ("status" in updated) throw new Error("expected successful rename on the database id")
+    expect(updated.name).toBe("Renamed")
+    expect(updated.deckId).toBe(created.deckId)
+  })
+
   it("saves cards by database deckId for decks created through syncWrite", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "version-dbid-owner")

@@ -943,7 +943,8 @@ export const syncWrite = mutation({
           .unique()
     if (
       (databaseId && !deck) ||
-      (deck && (deck.ownerUserId !== user._id || (deck.syncId ?? deck._id) !== id)) ||
+      (deck &&
+        (deck.ownerUserId !== user._id || (!databaseId && (deck.syncId ?? deck._id) !== id))) ||
       (!deck && args.deleted)
     )
       throw new ConvexError({ code: "deck_not_found", message: "Deck not found" })
