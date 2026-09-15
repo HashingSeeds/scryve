@@ -371,6 +371,7 @@ export class DeckVersionCacheController {
   recordCapacity(deckId: string, capacity: DeckVersionCapacityHint): void {
     if (this.users === 0) return
     this.repository.saveCapacity(deckId, capacity)
+    this.publish(deckId)
   }
 
   private superseded(deckId: string, ordinal: number, epoch: number): boolean {
