@@ -3,6 +3,18 @@ name: native fingerprints
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "app.json"
+      - "app.config.ts"
+      - "eas.json"
+      - "patches/**"
+      - "assets/**"
+      # verified against `eas fingerprint:generate` raw sources: package.json +
+      # pnpm-lock.yaml (node_modules contents), expoConfig (app.json +
+      # app.config.ts), eas.json, assets, and patches. babel/metro/nvmrc do not
+      # contribute to the native fingerprint.
 
 permissions:
   contents: read
@@ -36,16 +48,23 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - name: Set up EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: 22.2.0
-          token: ${{ secrets.EXPO_TOKEN }}
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Restore cached base fingerprints
+        uses: actions/cache@v4
+        with:
+          path: base-fingerprints
+          key: base-fingerprints-${{ github.event.pull_request.base.sha }}
+
+      - name: Check base fingerprint cache
+        id: base_state
+        run: |
+          count=$(find base-fingerprints -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
+          echo "need_base=$([ "$count" -eq 6 ] && echo no || echo yes)" >> "$GITHUB_OUTPUT"
+
       - name: Prepare base revision
+        if: steps.base_state.outputs.need_base == 'yes'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -57,6 +76,8 @@ jobs:
 
       - name: Check native fingerprints
         id: fingerprints
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -66,6 +87,33 @@ jobs:
           changed_inputs_file="$RUNNER_TEMP/native-fingerprint-inputs.txt"
           needs_build=false
           : > "$changed_inputs_file"
+
+          # Runs an eas command that prints a JSON document. Calls the binary
+          # shipped in the *main* workspace so it works from the base tree too
+          # (the base checkout only has its lockfile-era node_modules). eas-cli
+          # has known bugs (expo/eas-cli#3870, #3659) where human-readable log
+          # lines land on stdout before the JSON, so leading non-JSON lines
+          # are stripped before anything parses the file.
+          eas_bin="$GITHUB_WORKSPACE/node_modules/.bin/eas"
+          eas_json() {
+            local out="$1"
+            shift
+            if ! "$eas_bin" "$@" > "$out"; then
+              echo "eas $* failed (dumping file tail for diagnostics):" >&2
+              tail -c 2000 "$out" >&2 2>/dev/null || true
+              exit 1
+            fi
+            local line
+            while IFS= read -r line; do
+              if [[ "$line" == "{"* || "$line" == "["* ]]; then
+                break
+              fi
+              echo "stripped non-JSON output: $line" >&2
+            done < "$out"
+            awk 'found{print} !found && /^[{[]/{found=1; print}' "$out" > "$out.tmp" \
+              || exit 1
+            mv "$out.tmp" "$out"
+          }
 
           {
             echo "$marker"
@@ -88,35 +136,43 @@ jobs:
               matching_file="$RUNNER_TEMP/matching-${profile//:/-}-$platform.json"
               latest_file="$RUNNER_TEMP/latest-${profile//:/-}-$platform.json"
 
-              eas fingerprint:generate \
+              eas_json "$fingerprint_file" \
+                fingerprint:generate \
                 --build-profile "$profile" \
                 --platform "$platform" \
                 --json \
-                --non-interactive > "$fingerprint_file"
+                --non-interactive
               current_hash=$(jq -er '.hash' "$fingerprint_file")
 
-              (
-                cd "$RUNNER_TEMP/base"
-                eas fingerprint:generate \
-                  --build-profile "$profile" \
-                  --platform "$platform" \
-                  --json \
-                  --non-interactive
-              ) > "$base_fingerprint_file"
+              cached_base_fingerprint_file="base-fingerprints/${profile//:/-}-$platform.json"
+              if [ -f "$cached_base_fingerprint_file" ]; then
+                cp "$cached_base_fingerprint_file" "$base_fingerprint_file"
+              else
+                (
+                  cd "$RUNNER_TEMP/base"
+                  eas_json "$base_fingerprint_file" \
+                    fingerprint:generate \
+                    --build-profile "$profile" \
+                    --platform "$platform" \
+                    --json \
+                    --non-interactive
+                )
+              fi
               base_hash=$(jq -er '.hash' "$base_fingerprint_file")
 
               if [ "$current_hash" = "$base_hash" ]; then
                 continue
               fi
 
-              eas build:list \
-                --build-profile "$profile" \
-                --platform "$platform" \
-                --status finished \
-                --fingerprint-hash "$current_hash" \
-                --limit 1 \
-                --json \
-                --non-interactive > "$matching_file"
+              eas_json "$matching_file" \
+                build:list \
+                  --build-profile "$profile" \
+                  --platform "$platform" \
+                  --status finished \
+                  --fingerprint-hash "$current_hash" \
+                   --limit 1 \
+                  --json \
+                  --non-interactive
 
               if [ "$(jq 'length' "$matching_file")" -gt 0 ]; then
                 continue
@@ -138,13 +194,14 @@ jobs:
                   (.filePath // .id)
                 ' >> "$changed_inputs_file"
 
-              eas build:list \
-                --build-profile "$profile" \
-                --platform "$platform" \
-                --status finished \
-                --limit 1 \
-                --json \
-                --non-interactive > "$latest_file"
+              eas_json "$latest_file" \
+                build:list \
+                  --build-profile "$profile" \
+                  --platform "$platform" \
+                  --status finished \
+                   --limit 1 \
+                  --json \
+                  --non-interactive
 
               current_short=${current_hash:0:8}
               if [ "$(jq 'length' "$latest_file")" -eq 0 ]; then

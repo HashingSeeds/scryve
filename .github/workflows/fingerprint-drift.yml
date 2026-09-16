@@ -1,0 +1,108 @@
+name: fingerprint drift
+
+# Weekly canary: `eas fingerprint:generate` is the source of truth for which
+# project files feed a native fingerprint (the .github/workflows/fingerprints.yml
+# `paths:` trigger is a hand-maintained subset of that list). Regenerate the
+# source inventory and open a PR when it differs from the committed snapshot so
+# someone updates the hand-maintained gate.
+
+on:
+  schedule:
+    - cron: "43 4 * * 3"
+  workflow_dispatch:
+
+concurrency:
+  group: fingerprint-drift
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  drift:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: List fingerprint sources
+        id: sources
+        run: |
+          set -euo pipefail
+          for platform in ios android; do
+            pnpm exec eas fingerprint:generate \
+              --build-profile development \
+              --platform "$platform" \
+              --json \
+              --non-interactive \
+              | jq -er --arg platform "$platform" '
+                .sources | map("\($platform)|\(.type)|\(.filePath // .id)") | .[]' \
+              >> "$RUNNER_TEMP/sources.txt"
+          done
+          sort -u "$RUNNER_TEMP/sources.txt" -o "$RUNNER_TEMP/sources.txt"
+
+      - name: Compare to committed snapshot
+        id: drift
+        env:
+          BRANCH_NAME: fingerprint-sources-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          snapshot="scripts/ci/fingerprint-sources.txt"
+          fresh="$RUNNER_TEMP/sources.txt"
+          mkdir -p "$(dirname "$snapshot")"
+          if [ -f "$snapshot" ] && diff -u "$snapshot" "$fresh"; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          diff -u "$snapshot" "$fresh" -L committed -L regenerated > "$RUNNER_TEMP/diff.pat" || true
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp "$fresh" "$snapshot"
+          git add "$snapshot"
+          git commit -m "chore(ci): refresh fingerprint source snapshot"
+          git checkout -b "$BRANCH_NAME"
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push -u origin HEAD
+          echo "drift=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open update PR
+        if: steps.drift.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: fingerprint-sources-${{ github.run_id }}
+        run: |
+          diff_body=$(head -c 4000 "$RUNNER_TEMP/diff.pat" || true)
+          {
+            echo "eas fingerprint:generate started (or stopped) considering different project files this week."
+            echo
+            echo '```diff'
+            echo "$diff_body"
+            echo '```'
+            echo
+            echo "Review the diff, then update the \`paths:\` list in \`.github/workflows/fingerprints.yml\` so it still covers every entry \u2014 that trigger is a hand-maintained subset of this list."
+            echo
+            echo "Model/harness: opencode on GLM (glm-5.3-flash)"
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create \
+            --repo "${{ github.repository }}" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "chore(ci): fingerprint inputs changed" \
+            --body-file "$RUNNER_TEMP/body.md"
