@@ -598,8 +598,9 @@ export class DeckVersionWriteController {
             this.repository.rebasePending(action.versionId, result.revision)
           }
           if (action.op === "cards" || action.op === undefined) {
-            this.repository.cache.saveCards(action.versionId, result.revision, action.cards)
-            this.repository.cache.bumpVersion(action.deckId, action.versionId, result.revision)
+            const ackedVersionId = this.mappedVersion(action.versionId)
+            this.repository.cache.saveCards(ackedVersionId, result.revision, action.cards)
+            this.repository.cache.bumpVersion(action.deckId, ackedVersionId, result.revision)
             this.repository.rebasePending(action.versionId, result.revision)
           }
           return { operationId: action.operationId }
