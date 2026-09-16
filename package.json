@@ -59,6 +59,7 @@
     "@expo-google-fonts/space-grotesk": "^0.4.0",
     "@expo/dom-webview": "~57.0.1",
     "@expo/metro-runtime": "~57.0.14",
+    "@legendapp/state": "^2.1.15",
     "@sentry/react-native": "^7.11.0",
     "convex": "1.42.3",
     "date-fns": "^4.1.0",

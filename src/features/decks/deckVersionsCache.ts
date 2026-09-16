@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
+import { internal, observable, setAtPath } from "@legendapp/state"
+import type {
+  Change,
+  Observable,
+  ObservablePersistLocal,
+  PersistMetadata,
+  PersistOptionsLocal,
+} from "@legendapp/state"
+import { persistObservable } from "@legendapp/state/persist"
+import { useSelector } from "@legendapp/state/react"
 import { useConvex, useConvexConnectionState, type ConvexReactClient } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
@@ -18,7 +28,6 @@ export type StorableVersionCard = Omit<
 > &
   Partial<Pick<CachedVersionCard, "_id" | "_creationTime" | "deckVersionId">>
 
-/** Deletion support is scoped to this cache; MMKV satisfies it structurally. */
 export interface DeckVersionCacheStorage {
   getString(key: string): string | undefined
   set(key: string, value: string): void
@@ -41,6 +50,17 @@ interface StoredCards {
   schemaVersion: 1
   revision: number
   cards: StorableVersionCard[]
+}
+
+interface StoredCapacity {
+  schemaVersion: 1
+  limit: number
+  premium: boolean
+}
+
+interface StoredVersionIdMap {
+  schemaVersion: 1
+  versionId: string
 }
 
 function versionsKey(ownerId: string, deploymentUrl: string | undefined, deckId: string) {
@@ -69,15 +89,6 @@ export interface DeckVersionCapacityHint {
  * never carry `local`, so tombstone refreshes never drop a pending offline draft.
  */
 export type StoredVersion = CachedVersion & { local?: boolean }
-
-function parseJson(value: string | undefined): unknown {
-  if (!value) return null
-  try {
-    return JSON.parse(value) as unknown
-  } catch {
-    return null
-  }
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -112,6 +123,172 @@ function isCapacityHint(value: unknown): value is DeckVersionCapacityHint {
   return isRecord(value) && isCount(value.limit) && typeof value.premium === "boolean"
 }
 
+/**
+ * Persist plugin writing observable values to a string store keyed as whole JSON payloads.
+ * Keys and payloads are byte-identical with the classic repository layout, so existing
+ * installs upgrade without a migration step. One plugin instance serves all observables;
+ * the storage backend arrives per-node through persist options.
+ */
+class ObservableStringStoragePersistence implements ObservablePersistLocal {
+  private readonly cache = new Map<DeckVersionCacheStorage, Record<string, unknown>>()
+
+  private byTable(config: PersistOptionsLocal) {
+    const local = config.options.storage as DeckVersionCacheStorage
+    let table = this.cache.get(local)
+    if (!table) {
+      table = {}
+      this.cache.set(local, table)
+    }
+    return { local, table }
+  }
+
+  getTable<T>(table: string, config: PersistOptionsLocal): T {
+    const { local, table: byTable } = this.byTable(config)
+    if (!(table in byTable)) {
+      try {
+        const value = local.getString(table)
+        byTable[table] = value === undefined ? undefined : (JSON.parse(value) as unknown)
+      } catch {
+        // Treat unreadable payloads as absent; the owning flows then re-read from the server.
+        byTable[table] = undefined
+      }
+    }
+    return byTable[table] as T
+  }
+
+  set(table: string, changes: Change[], config: PersistOptionsLocal): void {
+    const { local, table: byTable } = this.byTable(config)
+    for (const { path, valueAtPath, pathTypes } of changes) {
+      if (path.length === 0) {
+        byTable[table] = internal.symbolDelete === valueAtPath ? undefined : valueAtPath
+      } else {
+        const base = (byTable[table] ?? {}) as object
+        byTable[table] = setAtPath(base, path, pathTypes, valueAtPath) as Record<string, unknown>
+      }
+    }
+    this.save(table, local, byTable)
+  }
+
+  deleteTable(table: string, config: PersistOptionsLocal): void {
+    const { local, table: byTable } = this.byTable(config)
+    delete byTable[table]
+    local.delete(table)
+  }
+
+  /** Local-only persistence needs no metadata; no-op keeps storage byte-identical. */
+  getMetadata(): PersistMetadata {
+    return {}
+  }
+
+  setMetadata(): void {}
+
+  deleteMetadata(): void {}
+
+  private save(
+    table: string,
+    local: DeckVersionCacheStorage,
+    byTable: Record<string, unknown>,
+  ): void {
+    const value = byTable[table]
+    if (value === undefined || value === internal.symbolDelete) {
+      delete byTable[table]
+      local.delete(table)
+    } else {
+      try {
+        local.set(table, JSON.stringify(value))
+      } catch (error) {
+        console.error("[deck-version-cache] failed to persist", table, error)
+      }
+    }
+  }
+}
+
+/** Shared owner identity for cache entries; key scoping lives in the key builders. */
+interface CacheContext {
+  readonly ownerId: string
+  readonly local: DeckVersionCacheStorage
+  readonly deploymentUrl?: string
+}
+
+interface NodeRegistries {
+  versionList: Map<string, Observable<StoredVersions>>
+  versionCards: Map<string, Observable<StoredCards>>
+  capacity: Map<string, Observable<StoredCapacity>>
+  versionIdMap: Map<string, Observable<StoredVersionIdMap>>
+}
+
+const nodeRegistries = new WeakMap<DeckVersionCacheStorage, NodeRegistries>()
+
+function nodesFor(context: CacheContext) {
+  let registry = nodeRegistries.get(context.local)
+  if (!registry) {
+    registry = {
+      versionList: new Map(),
+      versionCards: new Map(),
+      capacity: new Map(),
+      versionIdMap: new Map(),
+    }
+    nodeRegistries.set(context.local, registry)
+  }
+  return registry
+}
+
+// ponytail: one node per storage key, alive for the app session; evict only if profiling
+// shows long sessions over many decks pressing the memory budget
+function persistedNode<T>(
+  registry: Map<string, Observable<T>>,
+  key: string,
+  context: CacheContext,
+  init: () => unknown,
+): Observable<T> {
+  let node = registry.get(key)
+  if (!node) {
+    node = observable(init()) as Observable<T>
+    persistObservable(node, {
+      local: { name: key, options: { storage: context.local } },
+      pluginLocal: ObservableStringStoragePersistence,
+    })
+    registry.set(key, node)
+  }
+  return node
+}
+
+function versionsNode(context: CacheContext, deckId: string) {
+  return persistedNode(
+    nodesFor(context).versionList,
+    versionsKey(context.ownerId, context.deploymentUrl, deckId),
+    context,
+    () => ({}),
+  )
+}
+
+function cardsNode(context: CacheContext, versionId: string) {
+  return persistedNode(
+    nodesFor(context).versionCards,
+    cardsKey(context.ownerId, context.deploymentUrl, versionId),
+    context,
+    () => ({}),
+  )
+}
+
+function capacityNode(context: CacheContext, deckId: string) {
+  return persistedNode(
+    nodesFor(context).capacity,
+    capacityKey(context.ownerId, context.deploymentUrl, deckId),
+    context,
+    () => ({}),
+  )
+}
+
+function versionIdMapNode(context: CacheContext, provisionalId: string) {
+  return persistedNode(
+    nodesFor(context).versionIdMap,
+    versionMapKey(context.ownerId, context.deploymentUrl, provisionalId),
+    context,
+    () => ({}),
+  )
+}
+
 export class DeckVersionCacheRepository {
   constructor(
     readonly ownerId: string,
@@ -119,25 +296,26 @@ export class DeckVersionCacheRepository {
     private readonly deploymentUrl?: string,
   ) {}
 
+  private context(): CacheContext {
+    return { ownerId: this.ownerId, local: this.local, deploymentUrl: this.deploymentUrl }
+  }
+
   /** Last known server capacity for the deck guides offline creation; server stays authoritative. */
   saveCapacity(deckId: string, capacity: DeckVersionCapacityHint): void {
-    this.local.set(
-      capacityKey(this.ownerId, this.deploymentUrl, deckId),
-      JSON.stringify({ schemaVersion: 1, limit: capacity.limit, premium: capacity.premium }),
-    )
+    capacityNode(this.context(), deckId).set({
+      schemaVersion: 1,
+      limit: capacity.limit,
+      premium: capacity.premium,
+    } satisfies StoredCapacity)
   }
 
   loadCapacity(deckId: string): DeckVersionCapacityHint | undefined {
-    const value = parseJson(
-      this.local.getString(capacityKey(this.ownerId, this.deploymentUrl, deckId)),
-    )
+    const value = capacityNode(this.context(), deckId).get()
     return isCapacityHint(value) ? { limit: value.limit, premium: value.premium } : undefined
   }
 
   loadVersions(deckId: string): StoredVersion[] {
-    const value = parseJson(
-      this.local.getString(versionsKey(this.ownerId, this.deploymentUrl, deckId)),
-    )
+    const value = versionsNode(this.context(), deckId).get() as unknown
     if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.versions)) return []
     return value.versions.filter(isCachedVersion)
   }
@@ -175,19 +353,17 @@ export class DeckVersionCacheRepository {
         versions.splice(index, 1)
       }
     }
-    for (const versionId of dropped)
-      this.local.delete(cardsKey(this.ownerId, this.deploymentUrl, versionId))
-    this.local.set(
-      versionsKey(this.ownerId, this.deploymentUrl, deckId),
-      JSON.stringify({ schemaVersion: 1, versions } satisfies StoredVersions),
-    )
+    for (const versionId of dropped) cardsNode(this.context(), versionId).delete()
+    versionsNode(this.context(), deckId).set({
+      schemaVersion: 1,
+      versions: [...versions],
+    } satisfies StoredVersions)
     return versions
   }
 
+  /** Any invalid card invalidates the whole payload: reads never partially accept. */
   loadCards(versionId: string): StoredCards | undefined {
-    const value = parseJson(
-      this.local.getString(cardsKey(this.ownerId, this.deploymentUrl, versionId)),
-    )
+    const value = cardsNode(this.context(), versionId).get() as unknown
     if (
       !isRecord(value) ||
       value.schemaVersion !== 1 ||
@@ -211,7 +387,7 @@ export class DeckVersionCacheRepository {
     const existing = this.loadCards(versionId)
     if (existing && existing.revision > revision) return existing
     const stored: StoredCards = { schemaVersion: 1, revision, cards: [...cards] }
-    this.local.set(cardsKey(this.ownerId, this.deploymentUrl, versionId), JSON.stringify(stored))
+    cardsNode(this.context(), versionId).set(stored)
     return stored
   }
 
@@ -236,10 +412,10 @@ export class DeckVersionCacheRepository {
   }
 
   private replaceVersions(deckId: string, versions: readonly StoredVersion[]): void {
-    this.local.set(
-      versionsKey(this.ownerId, this.deploymentUrl, deckId),
-      JSON.stringify({ schemaVersion: 1, versions: [...versions] } satisfies StoredVersions),
-    )
+    versionsNode(this.context(), deckId).set({
+      schemaVersion: 1,
+      versions: [...versions],
+    } satisfies StoredVersions)
   }
 
   /** Registers an offline draft version so it renders before and while the create is queued. */
@@ -253,7 +429,7 @@ export class DeckVersionCacheRepository {
     const versions = this.loadVersions(deckId)
     const draft = versions.find((version) => version.versionId === provisionalId)
     const fallback = draft ? { ...confirmed, versionNumber: draft.versionNumber } : confirmed
-    this.local.delete(cardsKey(this.ownerId, this.deploymentUrl, provisionalId))
+    cardsNode(this.context(), provisionalId).delete()
     this.replaceVersions(
       deckId,
       versions.filter((version) => version.versionId !== provisionalId),
@@ -263,8 +439,8 @@ export class DeckVersionCacheRepository {
 
   /** Discards a draft version and its card payload after a failed or cancelled create. */
   discardDraft(deckId: string, provisionalId: string): void {
-    this.local.delete(cardsKey(this.ownerId, this.deploymentUrl, provisionalId))
-    this.local.delete(versionMapKey(this.ownerId, this.deploymentUrl, provisionalId))
+    cardsNode(this.context(), provisionalId).delete()
+    versionIdMapNode(this.context(), provisionalId).delete()
     this.replaceVersions(
       deckId,
       this.loadVersions(deckId).filter((version) => version.versionId !== provisionalId),
@@ -273,17 +449,15 @@ export class DeckVersionCacheRepository {
 
   /** Durable identity map from a local provisional version id to its real server id. */
   recordMapping(provisionalId: string, versionId: string): void {
-    this.local.set(
-      versionMapKey(this.ownerId, this.deploymentUrl, provisionalId),
-      JSON.stringify({ schemaVersion: 1, versionId }),
-    )
+    versionIdMapNode(this.context(), provisionalId).set({
+      schemaVersion: 1,
+      versionId,
+    } satisfies StoredVersionIdMap)
   }
 
   /** Raw local id a provisional id was acknowledged as, without needing the deck row. */
   mappedVersionId(provisionalId: string): string | undefined {
-    const value = parseJson(
-      this.local.getString(versionMapKey(this.ownerId, this.deploymentUrl, provisionalId)),
-    )
+    const value = versionIdMapNode(this.context(), provisionalId).get() as unknown
     return isRecord(value) && typeof value.versionId === "string" ? value.versionId : undefined
   }
 
@@ -301,11 +475,11 @@ const VERSION_PAGE_SIZE = 100
 const MAX_VERSION_PAGES = 10
 
 export class DeckVersionCacheController {
-  private readonly listeners = new Set<() => void>()
-  private snapshot = new Map<string, DeckVersionCacheSnapshot>()
-  private wanted = new Map<string, string | undefined>()
+  /** Tracked selection so ensure() re-renders reacting consumers immediately. */
+  private readonly wanted$ = observable({} as Record<string, string | undefined>)
   private inFlight = new Map<string, number>()
   private decks = new Map<string, number>()
+  private readonly known = new Set<string>()
   private users = 0
   private epoch = 0
 
@@ -314,13 +488,6 @@ export class DeckVersionCacheController {
     private readonly repository: DeckVersionCacheRepository,
   ) {}
 
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
-  }
-
-  getSnapshot = () => this.snapshot
-
   start(): () => void {
     this.users += 1
     return () => {
@@ -328,16 +495,32 @@ export class DeckVersionCacheController {
       if (this.users > 0) return
       this.epoch += 1
       this.inFlight.clear()
-      this.wanted.clear()
+      this.wanted$.set({})
       this.decks.clear()
     }
+  }
+
+  /** Snapshot map for the decks this controller has viewed; reads are synchronous. */
+  getSnapshot = (): Map<string, DeckVersionCacheSnapshot> =>
+    new Map([...this.known].map((deckId) => [deckId, this.snapshot(deckId)]))
+
+  /**
+   * Derived snapshot: recomputed on read, with Legend tracking every observable it touches
+   * so screens re-render through useRouterState-equivalent hooks (useSelector).
+   */
+  private wantedAt(deckId: string): string | undefined {
+    return this.wanted$.peek()[deckId]
+  }
+
+  snapshot(deckId: string): DeckVersionCacheSnapshot {
+    return this.renderSnapshot(deckId)
   }
 
   /** Publishes the cached snapshot immediately, then refreshes from the server once. */
   ensure(deckId: string, selectedVersionId: string | undefined): void {
     if (this.users === 0) return
-    this.wanted.set(deckId, selectedVersionId)
-    this.publish(deckId)
+    this.wanted$[deckId].set(selectedVersionId)
+    this.known.add(deckId)
     const key = `${deckId}:${selectedVersionId ?? ""}`
     if (this.inFlight.has(key)) return
     const ordinal = (this.decks.get(deckId) ?? 0) + 1
@@ -364,14 +547,12 @@ export class DeckVersionCacheController {
     const cached = this.repository.loadCards(versionId)
     if (cached && cached.revision >= revision) return
     this.repository.saveCards(versionId, revision, cards)
-    this.publish(deckId)
   }
 
   /** Keeps the last server-known version capacity as the offline creation hint. */
   recordCapacity(deckId: string, capacity: DeckVersionCapacityHint): void {
     if (this.users === 0) return
     this.repository.saveCapacity(deckId, capacity)
-    this.publish(deckId)
   }
 
   private superseded(deckId: string, ordinal: number, epoch: number): boolean {
@@ -387,8 +568,7 @@ export class DeckVersionCacheController {
     try {
       const versions = await this.pullVersions(deckId, epoch, ordinal)
       if (this.superseded(deckId, ordinal, epoch)) return
-      this.publish(deckId)
-      const versionId = this.wanted.get(deckId) ?? this.latestActive(versions)?.versionId
+      const versionId = this.wantedAt(deckId) ?? this.latestActive(versions)?.versionId
       if (!versionId) return
       const metadata = versions.find((version) => version.versionId === versionId)
       const cached = this.repository.loadCards(versionId)
@@ -401,7 +581,6 @@ export class DeckVersionCacheController {
       if (this.superseded(deckId, ordinal, epoch)) return
       if (read.version.deckId === deckId)
         this.repository.saveCards(versionId, read.version.revision, read.cards)
-      this.publish(deckId)
     } catch {
       // Offline: the cached snapshot published by ensure() stands.
     } finally {
@@ -441,8 +620,8 @@ export class DeckVersionCacheController {
     )
   }
 
-  private publish(deckId: string): void {
-    const selectedVersionId = this.wanted.get(deckId)
+  private renderSnapshot(deckId: string): DeckVersionCacheSnapshot {
+    const selectedVersionId = this.wantedAt(deckId)
     const versions = this.repository.loadVersions(deckId)
     const direct = selectedVersionId
       ? versions.find((candidate) => candidate.versionId === selectedVersionId)
@@ -457,15 +636,12 @@ export class DeckVersionCacheController {
         : (direct ?? mapped)
       : this.latestActive(versions)
     const cards = this.renderableCards(version)
-    const next = new Map(this.snapshot)
-    next.set(deckId, {
+    return {
       versions,
       version,
       cards,
       capacity: this.repository.loadCapacity(deckId),
-    })
-    this.snapshot = next
-    for (const listener of this.listeners) listener()
+    }
   }
 
   private renderableCards(version: CachedVersion | undefined) {
@@ -501,7 +677,6 @@ const emptySnapshot: DeckVersionCacheSnapshot = {
   cards: undefined,
   capacity: undefined,
 }
-const noSubscribers = () => () => undefined
 
 export function useDeckVersionCache(
   enabled: boolean,
@@ -536,10 +711,6 @@ export function useDeckVersionCache(
     () => controller?.ensure(deckId, selectedVersionId),
     [controller, deckId, selectedVersionId],
   )
-  const snapshot = useSyncExternalStore(
-    controller?.subscribe ?? noSubscribers,
-    () => controller?.getSnapshot().get(deckId) ?? emptySnapshot,
-    () => emptySnapshot,
-  )
+  const snapshot = useSelector(() => (controller ? controller.snapshot(deckId) : emptySnapshot))
   return { ...snapshot, record, recordCapacity, refresh }
 }
