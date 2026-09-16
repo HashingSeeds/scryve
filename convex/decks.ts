@@ -13,7 +13,12 @@ import {
   magicCatalogCardFields,
   defaultDeckFormat,
 } from "./lib/deckGames"
-import { syncedDeck, syncedDeckValidator } from "./lib/deckSync"
+import {
+  syncedDeck,
+  syncedDeckValidator,
+  syncedVersion,
+  syncedVersionValidator,
+} from "./lib/deckSync"
 import { DEFAULT_VERSION_NAME } from "./lib/deckVersions"
 import {
   deckCapacity,
@@ -139,15 +144,17 @@ function assertDeckSize(cards: DeckCardInput[], game: string) {
     })
   for (const card of cards) assertCard(card, game)
 }
-
-function fingerprint(cards: DeckCardInput[]) {
-  const canonical = cards
+function canonicalCardRows(cards: DeckCardInput[]) {
+  return cards
     .map(
       (card) =>
         `${card.section ?? card.board ?? "main"}:${card.cardId ?? card.oracleId ?? ""}:${card.printingId ?? card.providerCardId ?? card.scryfallId ?? card.originalReference ?? ""}:${card.quantity}`,
     )
     .sort()
-    .join("|")
+}
+
+function fingerprint(cards: DeckCardInput[]) {
+  const canonical = canonicalCardRows(cards).join("|")
   let hash = 2166136261
   for (let index = 0; index < canonical.length; index += 1) {
     hash ^= canonical.charCodeAt(index)
@@ -232,6 +239,7 @@ async function insertDeckVersion(
     name: assertVersionName(version.name),
     ...(version.note ? { note: assertDeckNote(version.note) } : {}),
     ...cardTotals(cards),
+    syncRevision: 1,
     createdAt: now,
     updatedAt: now,
   })
@@ -627,6 +635,24 @@ export const setFavorite = mutation({
   },
 })
 
+function projectCard(deck: Doc<"decks">, includeImages: boolean, card: Doc<"deckCards">) {
+  if (includeImages) {
+    const imageUrl =
+      deck.game === "ygo"
+        ? ygoImageUrl(card.printingId, card.providerCardId, card.cardId)
+        : undefined
+    return imageUrl
+      ? {
+          ...card,
+          imageUrl: card.imageUrl ?? imageUrl,
+          smallImageUrl: card.smallImageUrl ?? card.imageUrl ?? imageUrl,
+        }
+      : card
+  }
+  const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...textCard } = card
+  return textCard
+}
+
 export const detail = query({
   args: { deckId: v.id("decks"), versionId: v.optional(v.id("deckVersions")) },
   handler: async (ctx, args) => {
@@ -659,23 +685,7 @@ export const detail = query({
       deck: publicDeck(deck),
       versions,
       version: selected ?? null,
-      cards: cards.slice(0, MAX_DECK_CARDS).map((card) => {
-        if (includeImages) {
-          const imageUrl =
-            deck.game === "ygo"
-              ? ygoImageUrl(card.printingId, card.providerCardId, card.cardId)
-              : undefined
-          return imageUrl
-            ? {
-                ...card,
-                imageUrl: card.imageUrl ?? imageUrl,
-                smallImageUrl: card.smallImageUrl ?? card.imageUrl ?? imageUrl,
-              }
-            : card
-        }
-        const { imageUrl: _imageUrl, smallImageUrl: _smallImageUrl, ...textCard } = card
-        return textCard
-      }),
+      cards: cards.slice(0, MAX_DECK_CARDS).map((card) => projectCard(deck, includeImages, card)),
       capacity: await deckVersionCapacity(ctx, user, stored.length),
       record: analytics ? await deckRecord(ctx, deck._id) : undefined,
       analyticsLocked: !analytics,
@@ -723,7 +733,11 @@ export const saveVersion = mutation({
     )
       return target._id
     await replaceVersionCards(ctx, target._id, game, args.cards)
-    await ctx.db.patch(target._id, { ...totals, updatedAt: now })
+    await ctx.db.patch(target._id, {
+      ...totals,
+      syncRevision: (target.syncRevision ?? 0) + 1,
+      updatedAt: now,
+    })
     await ctx.db.patch(deck._id, { updatedAt: now })
     return target._id
   },
@@ -786,6 +800,7 @@ export const updateVersion = mutation({
     await ctx.db.patch(version._id, {
       ...(args.name === undefined ? {} : { name: assertVersionName(args.name) }),
       ...(note === undefined ? {} : { note }),
+      syncRevision: (version.syncRevision ?? 0) + 1,
       updatedAt: Date.now(),
     })
     return null
@@ -804,7 +819,11 @@ export const deleteVersion = mutation({
         message: "A deck needs at least one version",
       })
     const now = Date.now()
-    await ctx.db.patch(version._id, { archivedAt: now, updatedAt: now })
+    await ctx.db.patch(version._id, {
+      archivedAt: now,
+      syncRevision: (version.syncRevision ?? 0) + 1,
+      updatedAt: now,
+    })
     await ctx.db.patch(deck._id, { updatedAt: now })
     return null
   },
@@ -952,6 +971,144 @@ export const syncWrite = mutation({
       result,
     })
     return result
+  },
+})
+
+export const syncVersionWrite = mutation({
+  args: {
+    deckId: v.id("decks"),
+    versionId: v.id("deckVersions"),
+    operationId: v.string(),
+    expectedRevision: v.number(),
+    cards: v.array(cardValidator),
+    returnConflict: v.optional(v.boolean()),
+  },
+  returns: v.union(
+    syncedVersionValidator,
+    v.object({ status: v.literal("conflict"), version: syncedVersionValidator }),
+  ),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    | Infer<typeof syncedVersionValidator>
+    | { status: "conflict"; version: Infer<typeof syncedVersionValidator> }
+  > => {
+    const user = await requireUser(ctx)
+    if (!SYNC_UUID.test(args.operationId))
+      throw new ConvexError({
+        code: "invalid_operation_id",
+        message: "Operation ID must be a UUID",
+      })
+    if (
+      !Number.isSafeInteger(args.expectedRevision) ||
+      args.expectedRevision < 0 ||
+      args.expectedRevision >= Number.MAX_SAFE_INTEGER
+    )
+      throw new ConvexError({ code: "invalid_revision", message: "Invalid version revision" })
+    const operationId = args.operationId.toLowerCase()
+    const requestKey = JSON.stringify([
+      args.deckId,
+      args.versionId,
+      args.expectedRevision,
+      canonicalCards(args.cards),
+    ])
+    const receipt = await ctx.db
+      .query("deckVersionSyncReceipts")
+      .withIndex("by_owner_and_operation_id", (q) =>
+        q.eq("ownerUserId", user._id).eq("operationId", operationId),
+      )
+      .unique()
+    if (receipt) {
+      if (receipt.requestKey !== requestKey)
+        throw new ConvexError({
+          code: "sync_operation_mismatch",
+          message: "Operation ID was reused for a different change",
+        })
+      return receipt.result
+    }
+
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    assertNotArchived(deck)
+    const game = deck.game ?? DEFAULT_DECK_GAME
+    await requireReleasedCapability(ctx, game, "deckImport")
+    const version = await ctx.db.get(args.versionId)
+    if (!version || version.deckId !== deck._id)
+      throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+    if (version.archivedAt !== undefined || (version.syncRevision ?? 0) !== args.expectedRevision) {
+      if (args.returnConflict) return { status: "conflict", version: syncedVersion(version) }
+      throw new ConvexError({
+        code: "sync_conflict",
+        message: "Deck version changed on another device",
+      })
+    }
+    assertDeckSize(args.cards, game)
+    const totals = cardTotals(args.cards)
+    const existingCards = await ctx.db
+      .query("deckCards")
+      .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version._id))
+      .take(MAX_DECK_CARDS + 1)
+    const revision = (version.syncRevision ?? 0) + 1
+    if (
+      canonicalCards(existingCards.map((card) => canonicalCardFieldsWithDefaults(game, card))) ===
+      canonicalCards(args.cards.map((card) => cardFields(game, card)))
+    ) {
+      const result = syncedVersion(version)
+      await ctx.db.insert("deckVersionSyncReceipts", {
+        ownerUserId: user._id,
+        operationId,
+        requestKey,
+        result,
+      })
+      return result
+    }
+    await replaceVersionCards(ctx, version._id, game, args.cards)
+    const now = Date.now()
+    await ctx.db.patch(version._id, { ...totals, syncRevision: revision, updatedAt: now })
+    await ctx.db.patch(deck._id, { updatedAt: now })
+    const result = syncedVersion({ ...version, ...totals, syncRevision: revision, updatedAt: now })
+    await ctx.db.insert("deckVersionSyncReceipts", {
+      ownerUserId: user._id,
+      operationId,
+      requestKey,
+      result,
+    })
+    return result
+  },
+})
+export const versionsPull = query({
+  args: { deckId: v.id("decks"), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    const { numItems } = args.paginationOpts
+    if (!Number.isSafeInteger(numItems) || numItems < 1 || numItems > 100)
+      throw new ConvexError({
+        code: "invalid_page_size",
+        message: "Request 1–100 versions per page",
+      })
+    const result = await ctx.db
+      .query("deckVersions")
+      .withIndex("by_deck_and_version_number", (q) => q.eq("deckId", deck._id))
+      .paginate(args.paginationOpts)
+    return { ...result, deckId: deck._id, page: result.page.map(syncedVersion) }
+  },
+})
+export const readVersion = query({
+  args: { deckId: v.id("decks"), versionId: v.id("deckVersions") },
+  handler: async (ctx, args) => {
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    const version = await ctx.db.get(args.versionId)
+    if (!version || version.deckId !== deck._id)
+      throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+    const cards = await ctx.db
+      .query("deckCards")
+      .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version._id))
+      .take(MAX_DECK_CARDS + 1)
+    const includeImages = await capabilityReleased(ctx, deck.game ?? DEFAULT_DECK_GAME, "images")
+    return {
+      version: syncedVersion(version),
+      cards: cards.slice(0, MAX_DECK_CARDS).map((card) => projectCard(deck, includeImages, card)),
+    }
   },
 })
 
