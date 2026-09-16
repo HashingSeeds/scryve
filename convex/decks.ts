@@ -1076,6 +1076,229 @@ export const syncVersionWrite = mutation({
     return result
   },
 })
+async function versionOperationReceipt(
+  ctx: MutationCtx,
+  user: Doc<"users">,
+  operationId: string,
+  requestKey: string,
+): Promise<Infer<typeof syncedVersionValidator> | null> {
+  if (!SYNC_UUID.test(operationId))
+    throw new ConvexError({
+      code: "invalid_operation_id",
+      message: "Operation ID must be a UUID",
+    })
+  const receipt = await ctx.db
+    .query("deckVersionSyncReceipts")
+    .withIndex("by_owner_and_operation_id", (q) =>
+      q.eq("ownerUserId", user._id).eq("operationId", operationId.toLowerCase()),
+    )
+    .unique()
+  if (!receipt) return null
+  if (receipt.requestKey !== requestKey)
+    throw new ConvexError({
+      code: "sync_operation_mismatch",
+      message: "Operation ID was reused for a different change",
+    })
+  return receipt.result
+}
+
+function conflictVersion(version: Doc<"deckVersions">) {
+  return { status: "conflict" as const, version: syncedVersion(version) }
+}
+
+async function ownedStableVersion(ctx: MutationCtx, versionId: Id<"deckVersions">) {
+  const version = await ctx.db.get(versionId)
+  if (!version)
+    throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+  const { deck } = await ownedDeck(ctx, version.deckId)
+  assertNotArchived(deck)
+  return { deck, version }
+}
+
+function assertExpectedRevision(expectedRevision: number) {
+  if (
+    !Number.isSafeInteger(expectedRevision) ||
+    expectedRevision < 0 ||
+    expectedRevision >= Number.MAX_SAFE_INTEGER
+  )
+    throw new ConvexError({ code: "invalid_revision", message: "Invalid version revision" })
+}
+
+export const syncCreateVersion = mutation({
+  args: {
+    deckId: v.id("decks"),
+    operationId: v.string(),
+    name: v.string(),
+    note: v.optional(v.string()),
+    cards: v.array(cardValidator),
+  },
+  returns: syncedVersionValidator,
+  handler: async (ctx, args): Promise<Infer<typeof syncedVersionValidator>> => {
+    const user = await requireUser(ctx)
+    const requestKey = JSON.stringify([
+      "version-create",
+      args.deckId,
+      args.name,
+      args.note ?? null,
+      ...args.cards.map((card, index) => `card${index}:${canonicalCards([card])}`),
+    ])
+    const replay = await versionOperationReceipt(ctx, user, args.operationId, requestKey)
+    if (replay) return replay
+    const { deck } = await ownedDeck(ctx, args.deckId)
+    assertNotArchived(deck)
+    const game = deck.game ?? DEFAULT_DECK_GAME
+    await requireReleasedCapability(ctx, game, "deckImport")
+    assertDeckSize(args.cards, game)
+    const versions = await activeVersions(ctx, deck._id)
+    await requireVersionCapacity(ctx, user, versions.length)
+    const now = Date.now()
+    const versionNumber =
+      versions.reduce((highest, version) => Math.max(highest, version.versionNumber), 0) + 1
+    const versionId = await insertDeckVersion(
+      ctx,
+      deck._id,
+      game,
+      { versionNumber, name: args.name, ...(args.note ? { note: args.note } : {}) },
+      args.cards,
+      now,
+    )
+    await ctx.db.patch(deck._id, { updatedAt: now })
+    const version = await ctx.db.get(versionId)
+    if (!version) throw new Error("Deck version disappeared during sync")
+    const result = syncedVersion(version)
+    await ctx.db.insert("deckVersionSyncReceipts", {
+      ownerUserId: user._id,
+      operationId: args.operationId.toLowerCase(),
+      requestKey,
+      result,
+    })
+    return result
+  },
+})
+
+export const syncUpdateVersion = mutation({
+  args: {
+    versionId: v.id("deckVersions"),
+    operationId: v.string(),
+    expectedRevision: v.number(),
+    name: v.optional(v.string()),
+    note: v.optional(v.string()),
+    returnConflict: v.optional(v.boolean()),
+  },
+  returns: v.union(
+    syncedVersionValidator,
+    v.object({ status: v.literal("conflict"), version: syncedVersionValidator }),
+  ),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    | Infer<typeof syncedVersionValidator>
+    | { status: "conflict"; version: Infer<typeof syncedVersionValidator> }
+  > => {
+    const user = await requireUser(ctx)
+    assertExpectedRevision(args.expectedRevision)
+    if (args.name === undefined && args.note === undefined)
+      throw new ConvexError({
+        code: "invalid_version_update",
+        message: "Provide a name or note change",
+      })
+    const requestKey = JSON.stringify([
+      "version-update",
+      args.versionId,
+      args.expectedRevision,
+      args.name ?? null,
+      args.note ?? null,
+    ])
+    const replay = await versionOperationReceipt(ctx, user, args.operationId, requestKey)
+    if (replay) return replay
+    const { deck, version } = await ownedStableVersion(ctx, args.versionId)
+    if (version.archivedAt !== undefined || (version.syncRevision ?? 0) !== args.expectedRevision) {
+      if (args.returnConflict) return conflictVersion(version)
+      throw new ConvexError({
+        code: "sync_conflict",
+        message: "Deck version changed on another device",
+      })
+    }
+    const now = Date.now()
+    const syncRevision = (version.syncRevision ?? 0) + 1
+    await ctx.db.patch(version._id, {
+      ...(args.name === undefined ? {} : { name: assertVersionName(args.name) }),
+      ...(args.note === undefined ? {} : { note: assertDeckNote(args.note) }),
+      syncRevision,
+      updatedAt: now,
+    })
+    await ctx.db.patch(deck._id, { updatedAt: now })
+    const updated = await ctx.db.get(version._id)
+    if (!updated) throw new Error("Deck version disappeared during sync")
+    const result = syncedVersion(updated)
+    await ctx.db.insert("deckVersionSyncReceipts", {
+      ownerUserId: user._id,
+      operationId: args.operationId.toLowerCase(),
+      requestKey,
+      result,
+    })
+    return result
+  },
+})
+
+export const syncDeleteVersion = mutation({
+  args: {
+    versionId: v.id("deckVersions"),
+    operationId: v.string(),
+    expectedRevision: v.number(),
+    returnConflict: v.optional(v.boolean()),
+  },
+  returns: v.union(
+    syncedVersionValidator,
+    v.object({ status: v.literal("conflict"), version: syncedVersionValidator }),
+  ),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    | Infer<typeof syncedVersionValidator>
+    | { status: "conflict"; version: Infer<typeof syncedVersionValidator> }
+  > => {
+    const user = await requireUser(ctx)
+    assertExpectedRevision(args.expectedRevision)
+    const requestKey = JSON.stringify(["version-delete", args.versionId, args.expectedRevision])
+    const replay = await versionOperationReceipt(ctx, user, args.operationId, requestKey)
+    if (replay) return replay
+    const { deck, version } = await ownedStableVersion(ctx, args.versionId)
+    if (version.archivedAt !== undefined || (version.syncRevision ?? 0) !== args.expectedRevision) {
+      if (args.returnConflict) return conflictVersion(version)
+      throw new ConvexError({
+        code: "sync_conflict",
+        message: "Deck version changed on another device",
+      })
+    }
+    const versions = await activeVersions(ctx, deck._id)
+    if (versions.length <= 1)
+      throw new ConvexError({
+        code: "last_version",
+        message: "A deck needs at least one version",
+      })
+    const now = Date.now()
+    const syncRevision = (version.syncRevision ?? 0) + 1
+    await ctx.db.patch(version._id, { archivedAt: now, syncRevision, updatedAt: now })
+    await ctx.db.patch(deck._id, { updatedAt: now })
+    const result = syncedVersion({
+      ...version,
+      archivedAt: now,
+      syncRevision,
+      updatedAt: now,
+    })
+    await ctx.db.insert("deckVersionSyncReceipts", {
+      ownerUserId: user._id,
+      operationId: args.operationId.toLowerCase(),
+      requestKey,
+      result,
+    })
+    return result
+  },
+})
+
 export const versionsPull = query({
   args: { deckId: v.id("decks"), paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
