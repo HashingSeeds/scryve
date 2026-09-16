@@ -473,6 +473,11 @@ function ConnectedBoardRuntime({
           actions={radialActions}
           variant={menuButtonStyle}
           seatColors={players.map((player) => player.color)}
+          exitAction={
+            armedCommander
+              ? { label: "Exit commander damage", onPress: () => setArmedCommander(null) }
+              : undefined
+          }
           onToggle={() => setMenuOpen((current) => !current)}
           onClose={() => setMenuOpen(false)}
         />

@@ -128,6 +128,11 @@ export function CurrentGameScreen({
     setMenuOpen(false)
   }
 
+  function exitCommanderMode() {
+    setArmedPlayerId(null)
+    setInspectedPlayerId(null)
+  }
+
   function closePanel() {
     setLayoutPickerOpen(false)
   }
@@ -222,21 +227,21 @@ export function CurrentGameScreen({
           }
           onChange={runtime.changeLife}
         />
-        {!armedPlayerId && !inspectedPlayerId ? (
-          <GameRadialMenu
-            open={menuOpen}
-            anchor={menuAnchor}
-            compact={playerCount > 2}
-            actions={radialActions}
-            variant={menuButtonStyle}
-            seatColors={runtime.game.players.map((player) => player.color)}
-            onToggle={() => {
-              setArmedPlayerId(null)
-              setMenuOpen((current) => !current)
-            }}
-            onClose={closeMenu}
-          />
-        ) : null}
+        <GameRadialMenu
+          open={menuOpen}
+          anchor={menuAnchor}
+          compact={playerCount > 2}
+          actions={radialActions}
+          variant={menuButtonStyle}
+          seatColors={runtime.game.players.map((player) => player.color)}
+          exitAction={
+            armedPlayerId || inspectedPlayerId
+              ? { label: "Exit commander damage", onPress: exitCommanderMode }
+              : undefined
+          }
+          onToggle={() => setMenuOpen((current) => !current)}
+          onClose={closeMenu}
+        />
         {menuOpen && onDecks && onSettings && onAccount ? (
           <FloatingAppNavigation
             destinationLabel="Decks"

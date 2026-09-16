@@ -119,6 +119,35 @@ describe("GameRadialMenu", () => {
     })
   })
 
+  it("collapses into an exit button while an exit action is set", () => {
+    const onExit = jest.fn()
+    const onToggle = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <GameRadialMenu
+          open={false}
+          anchor={{ x: 0.5, y: 0.5 }}
+          actions={actions}
+          exitAction={{ label: "Exit commander damage", onPress: onExit }}
+          onToggle={onToggle}
+          onClose={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
+      "Exit commander damage",
+    )
+    expect(view.getByTestId("game-menu-button").props.accessibilityState.expanded).toBe(false)
+    expect(view.queryByTestId("layout-button")).toBeNull()
+    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+
+    expect(onExit).toHaveBeenCalledTimes(1)
+    expect(onToggle).not.toHaveBeenCalled()
+  })
+
   it("runs radial actions and closes from the dimmed board", () => {
     const onClose = jest.fn()
     const view = render(menu(true, onClose))
