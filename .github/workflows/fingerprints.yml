@@ -103,14 +103,14 @@ jobs:
               tail -c 2000 "$out" >&2 2>/dev/null || true
               exit 1
             fi
-            local line=0
+            local line
             while IFS= read -r line; do
-              if [[ "$line" == "{"* ]]; then
+              if [[ "$line" == "{"* || "$line" == "["* ]]; then
                 break
               fi
               echo "stripped non-JSON output: $line" >&2
             done < "$out"
-            awk 'found{print} !found && /^\{/{found=1; print}' "$out" > "$out.tmp" \
+            awk 'found{print} !found && /^[{[]/{found=1; print}' "$out" > "$out.tmp" \
               || exit 1
             mv "$out.tmp" "$out"
           }
