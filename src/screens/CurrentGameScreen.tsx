@@ -159,7 +159,7 @@ export function CurrentGameScreen({
     },
     {
       kind: "setup",
-      label: isFresh ? "Setup" : "New",
+      label: "Game",
       disabled: !onSetup,
       onPress: () => {
         closeMenu()

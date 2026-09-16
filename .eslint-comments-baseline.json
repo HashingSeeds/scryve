@@ -24,8 +24,21 @@
     "babel.config.js": {
       "c6a5bf7b49ff487548fe804ebbb4f8966bb974bf4a5956b34e09882eba528096": 1
     },
+    "convex/gamePublish.test.ts": {
+      "4966f815287aa33d9b9d8aa622d8bb95d4cebcfd410cc855f35b73deccb17925": 1,
+      "93957b18d12270527685b6b89ab76759cf8117269fbc4c97310312f8ece9d2fe": 1,
+      "9c8e7de06c4fd26f593e0fe50ba760194f909308c7ef6785810d45385547ce24": 1,
+      "a62412bf6600ae8dad323cc9efadbfe0eecc0f3a504eaef5b9411382f108d8a6": 1,
+      "c48bfa0dbc29cb77bf8353e31bd223521c5d18b51a6f9ce17ae60fff13a16ba6": 1
+    },
     "convex/games.ts": {
-      "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1
+      "0f8d6704aceb673cbb1880f912f121752871753897edb99abdc64dc2c2424ea6": 1,
+      "8f7a0c645a7e9ba1349218c00e4d941952a66a7d01b62af0a044c5e9dad0045a": 1,
+      "a31640bc642eefa340edf018243eafa244603f2d1369b969f727503ba8d8d7ff": 1,
+      "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1,
+      "b19d57e5d3bf79cb9f4091cc9ec0b73c0b9fca515334b13c3ccc96d46cc22dde": 1,
+      "efe483c6c8be86c35f5287e8fb2fbe3aa6c5ee759cfb17b086eb4c48dad022ce": 1,
+      "f59307fa75bd457934a1db03d27c4ee840e3d4b1ecfd62f4e421124eba150e5c": 1
     },
     "convex/lib/nameFilter.test.ts": {
       "12e45a9bc8a73fa49c2d2a631cd97efd35432f6a7d6a35144aad720f242a8522": 1,
@@ -269,6 +282,12 @@
       "ceb0afae66763c5152a030eee78d39d7694a8a668ee6ae4f51e5f5914e041e18": 1,
       "e3b4192cf7870e161cae803590883d60f7b1a7345fdc47c1fa2539048ab7aa2a": 1
     },
+    "src/components/SegmentedControl.tsx": {
+      "2c2576d15d55e7357cc785c5d6986f5b285247db8f1135d6f9c81103f3b75d33": 1
+    },
+    "src/components/SelectField.tsx": {
+      "6ea26cc6167781c639cf9bdae7d043df48e7657fc821040a461297a9c2647341": 1
+    },
     "src/components/Text.tsx": {
       "058af45ea3d7e2b28a7b03428229508de8511b971553fc892b911e38e819802f": 1,
       "334d53fc97abacd619c5b9b7989e44c26e8beac814bdad61a1a3c97ebd735ca7": 1,
@@ -335,6 +354,9 @@
       "d720704d533c1df6d76d32036a7cac6aa92ea945109b9d7cc1e2c2660b963cfb": 1,
       "f23de36da044e5faf67873b2078bff59ff71d0bf09e3b6f1e7ef65bd9b24c8a2": 1
     },
+    "src/components/ValueField.tsx": {
+      "babf822ce77c7139efa8aee9dac10463b8dbe47709f69eb0837738b9ead442ca": 1
+    },
     "src/devtools/ReactotronClient.ts": {
       "620b71469265b7ba6e6e59e9f41256c8496d2a65b566476589f9bfafda36e7ef": 1
     },
@@ -360,6 +382,12 @@
     "src/features/connected/ConnectedErrorBoundary.tsx": {
       "9d7635916369df656ca365a2adc138afc59cdfbd49d36efcbca63369d6fb96d3": 1,
       "adaf0dd26d07abfbaf141122f1cca8fca3207a8e459e1c9df246f790bdfce7d5": 1
+    },
+    "src/features/connected/localGameSnapshot.ts": {
+      "49d1234104c3fd662fd9d3184bfdc698a6747cc9b396d2becce406fa9e148d73": 1,
+      "a74ccb9c7c7c3ea9f835798bebb222c72c960f90858d6880b8fa998580cf44c6": 1,
+      "b27a12c321d9d0379dc481869345454d0b0fa15a4f896669c5d976689c01dd1e": 1,
+      "d5350f64a3392d59a4263ada9c7c26bc3a7494bd4f17b7242d3a3960d20d5b1d": 1
     },
     "src/features/connected/model.ts": {
       "0b688aed963374c0562f52c5c5c2b98d16bb8668715029852b84018cdf222d05": 1,
@@ -453,6 +481,17 @@
       "b7de8fc2071b47d6635d3d8ac1483ee8da492875b5c5938b9c94aa8e7cc9a886": 1,
       "c1084d6f03318da836c89a82e5da8cc745df3c64f78d831734eb7b8441a679a7": 1,
       "c56ec028f74f6efbaa2e5a4595ca1115fc4968cb88f1490ff656c21ac42027ad": 1
+    },
+    "src/screens/NewGameScreen.test.tsx": {
+      "1428eef93073a3e532157619b134b7e6ce0fa98e21f27d1b4f9d9eef7775ccf0": 1,
+      "92eda634eb54cd7aa74bfc77c7b67212747cb708f19c83d05c908ba8d383cfc8": 1,
+      "d3de8aef46bc98737c6e2d41f1a3e7ff0e019cbd6bd7801db4ddb2a08d2ae332": 1
+    },
+    "src/screens/NewGameScreen.tsx": {
+      "164c69b4fb1ff0caed3f6d07a46679bc947a49118a361ed3568f923b02c9cb5e": 1,
+      "3b77c080f0c2a837196babddb9d0077812ac5835b1f8cb7cb083abc9b511218b": 1,
+      "cdc795d57178e7d07b8e10505087ecf4441ae49de54ddb87df3188e44ba81f7d": 1,
+      "d3ff21c912362a596069fcd1ca1591c7f6ad89014e47289521a2e4cefbaf53c8": 1
     },
     "src/theme/colors.ts": {
       "0908db82b7643e1d786131884b03a333f385e9b985a6bfd62b5992a4c363c876": 1,

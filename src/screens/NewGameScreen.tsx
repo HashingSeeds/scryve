@@ -47,7 +47,7 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { LocalGame, LocalGameResult, NewPlayerInput } from "@/features/game/types"
+import type { LocalGame, LocalGameResult, NewPlayerInput, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -105,6 +105,16 @@ export interface NewGameScreenProps {
   onSavePlayers?: (players: NewPlayerInput[]) => void
   joinContent?: ReactNode
   onResumeConnected?: (game: ResumableGame) => void
+  /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
+  localConnect?: LocalConnectFeed
+}
+
+export interface LocalConnectFeed {
+  /** Set when the account gate has to be cleared first, mirroring `ConnectedHostFeed`. */
+  access?: { label: string; request: () => void }
+  busy?: boolean
+  error?: string
+  publish: (hostPlayerId: PlayerId) => void
 }
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
@@ -126,6 +136,7 @@ export function NewGameScreen({
   onSavePlayers,
   joinContent,
   onResumeConnected,
+  localConnect,
 }: NewGameScreenProps) {
   const {
     themed,
@@ -170,6 +181,7 @@ export function NewGameScreen({
   const [gameToExit, setGameToExit] = useState<ResumableGame>()
   const [exitingGameId, setExitingGameId] = useState<string>()
   const [connectedAction, setConnectedAction] = useState("host")
+  const [pickingHostSeat, setPickingHostSeat] = useState(false)
   const connectedMode = mode === "connected"
   const joining = connectedMode && connectedAction === "join" && Boolean(joinContent)
   const preparing = connectedMode && Boolean(connected?.status) && !connected?.ready
@@ -201,7 +213,15 @@ export function NewGameScreen({
   const busy = connectedMode && Boolean(connected?.busy)
   const localGameBlocksStart = !connectedMode && Boolean(localGame)
   const hostedGame = connectedMode ? connected?.activeGames?.find((game) => game.isHost) : undefined
+  /** Only a running local game can be handed to the server; a connected one is already there. */
+  const canConnectLocal = Boolean(localConnect) && !connectedMode && Boolean(localGame)
   const gameBlocksStart = localGameBlocksStart || Boolean(hostedGame)
+  /**
+   * A game is already running, so this screen manages it rather than creating one:
+   * the connection choice is settled and the settings that define the game are fixed.
+   * Names, appearance, and layout stay editable.
+   */
+  const hasCurrentGame = Boolean(localGame) || Boolean(hostedGame)
   const resumeGame = connectedMode && connected?.activeGames?.length === 1 ? hostedGame : undefined
   const directResume =
     localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
@@ -314,21 +334,23 @@ export function NewGameScreen({
     <View style={[themed($root), $styles.flex1]}>
       <View style={themed($setupHeader)}>
         <Header
-          title={onSavePlayers ? "Game setup" : "New game"}
+          title={hasCurrentGame ? "Game setup" : "New game"}
           leftTx="common:back"
           backgroundColor={colors.surface}
           onLeftPress={onBack}
         />
-        <SegmentedControl
-          testID="mode"
-          accessibilityLabel="Game connection"
-          segments={[
-            { id: "local", label: "On this device" },
-            { id: "connected", label: "Connected" },
-          ]}
-          selectedId={mode}
-          onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
-        />
+        {hasCurrentGame ? null : (
+          <SegmentedControl
+            testID="mode"
+            accessibilityLabel="Game connection"
+            segments={[
+              { id: "local", label: "On this device" },
+              { id: "connected", label: "Connected" },
+            ]}
+            selectedId={mode}
+            onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
+          />
+        )}
 
         {connectedMode && joinContent ? (
           <SegmentedControl
@@ -358,6 +380,7 @@ export function NewGameScreen({
                   ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
                 ]}
                 selectedId={system ?? NO_PLAY_SYSTEM}
+                disabled={hasCurrentGame}
                 onSelect={chooseSystem}
               />
               {system ? (
@@ -370,6 +393,7 @@ export function NewGameScreen({
                     label,
                     ...(blurb ? { detail: blurb } : {}),
                   }))}
+                  disabled={hasCurrentGame}
                   onSelect={chooseFormat}
                 />
               ) : null}
@@ -383,6 +407,7 @@ export function NewGameScreen({
                   value={playerCount}
                   min={PLAYER_COUNTS[0]}
                   max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
+                  disabled={hasCurrentGame}
                   onChange={choosePlayerCount}
                 />
               </View>
@@ -395,6 +420,7 @@ export function NewGameScreen({
                   max={counter.maxStartingValue}
                   longStep={counter.longPressStep}
                   step={lifeStep}
+                  disabled={hasCurrentGame}
                   onChange={setStartingLife}
                 />
               </View>
@@ -411,6 +437,7 @@ export function NewGameScreen({
                     { id: "required", label: "Required" },
                   ]}
                   selectedId={deckRequired ? "required" : "optional"}
+                  disabled={hasCurrentGame}
                   onSelect={(value) => setDeckRequired(value === "required")}
                 />
               </View>
@@ -433,6 +460,7 @@ export function NewGameScreen({
                       id: String(step),
                       label: String(step),
                     }))}
+                    disabled={hasCurrentGame}
                     onSelect={(value) => {
                       const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
                       if (next) setLifeStep(next)
@@ -497,41 +525,61 @@ export function NewGameScreen({
           </Screen>
           <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
             <View style={themed($footerContent)}>
-              <Button
-                testID={connectedMode ? "host-connected-button" : "start-game-button"}
-                text={
-                  gameBlocksStart
-                    ? "End current game…"
-                    : connectedMode
-                      ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
-                      : undefined
-                }
-                tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
-                preset="reversed"
-                style={gameBlocksStart ? themed($endCurrentButton) : undefined}
-                textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
-                disabled={
-                  localGameBlocksStart
-                    ? !onEndLocal
-                    : hostedGame
-                      ? !connected?.ready || busy
-                      : !valid || busy
-                }
-                accessibilityHint={
-                  gameBlocksStart
-                    ? "Opens the end-game prompt before you can start another game"
-                    : connectedMode
-                      ? "Creates a lobby others can join"
-                      : "Starts this local game on the current device"
-                }
-                onPress={
-                  localGameBlocksStart
-                    ? () => setEndingLocal(true)
-                    : hostedGame
-                      ? () => setGameToExit(hostedGame)
-                      : submit
-                }
-              />
+              <View style={canConnectLocal ? themed($footerActions) : undefined}>
+                <Button
+                  testID={connectedMode ? "host-connected-button" : "start-game-button"}
+                  text={
+                    gameBlocksStart
+                      ? "End current game…"
+                      : connectedMode
+                        ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
+                        : undefined
+                  }
+                  tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
+                  preset="reversed"
+                  style={[
+                    canConnectLocal && themed($footerAction),
+                    gameBlocksStart && themed($endCurrentButton),
+                  ]}
+                  textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
+                  disabled={
+                    localGameBlocksStart
+                      ? !onEndLocal
+                      : hostedGame
+                        ? !connected?.ready || busy
+                        : !valid || busy
+                  }
+                  accessibilityHint={
+                    gameBlocksStart
+                      ? "Opens the end-game prompt before you can start another game"
+                      : connectedMode
+                        ? "Creates a lobby others can join"
+                        : "Starts this local game on the current device"
+                  }
+                  onPress={
+                    localGameBlocksStart
+                      ? () => setEndingLocal(true)
+                      : hostedGame
+                        ? () => setGameToExit(hostedGame)
+                        : submit
+                  }
+                />
+                {canConnectLocal ? (
+                  <Button
+                    testID="connect-local-button"
+                    text={localConnect?.access?.label ?? "Connect"}
+                    preset="reversed"
+                    style={themed($footerAction)}
+                    disabled={localConnect?.busy}
+                    accessibilityHint="Moves this game to the cloud so others can join it"
+                    onPress={() =>
+                      localConnect?.access
+                        ? localConnect.access.request()
+                        : setPickingHostSeat(true)
+                    }
+                  />
+                ) : null}
+              </View>
               <TouchableOpacity
                 testID="setup-status"
                 accessible={Boolean(statusText)}
@@ -709,6 +757,32 @@ export function NewGameScreen({
           </View>
         </DialogCard>
       ) : null}
+      {pickingHostSeat && localGame && localConnect ? (
+        <DialogCard
+          visible
+          onClose={() => setPickingHostSeat(false)}
+          dialogTestID="host-seat-dialog"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text="Which seat is you?" />
+          <Text
+            size="xs"
+            text="The other seats stay open for players to claim with an invite."
+            style={themed($footerStatus)}
+          />
+          {localGame.players.map((player) => (
+            <Button
+              key={player.id}
+              testID={`host-seat-${player.seat + 1}`}
+              text={player.name}
+              disabled={localConnect.busy}
+              onPress={() => localConnect.publish(player.id)}
+            />
+          ))}
+          {localConnect.error ? <AlertNote text={localConnect.error} /> : null}
+          <Button text="Cancel" onPress={() => setPickingHostSeat(false)} />
+        </DialogCard>
+      ) : null}
       {endingLocal && localGame && onEndLocal ? (
         <LocalGameEndDialog
           game={localGame}
@@ -787,6 +861,11 @@ const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingHorizontal: spacing.lg,
 })
+const $footerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.xs,
+})
+const $footerAction: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $footerStatus: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 

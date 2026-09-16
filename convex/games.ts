@@ -679,7 +679,8 @@ async function claimPreparedSeat(
           .sort((left, right) => left.seat - right.seat)[0]
       : players.find((player) => player.seat === seat)
   if (held) {
-    if (seat === undefined || held.seat === seat) return { publicId: game.publicId, seat: held.seat }
+    if (seat === undefined || held.seat === seat)
+      return { publicId: game.publicId, seat: held.seat }
     throw new Error("You already hold a seat in this game")
   }
   if (seat !== undefined && !target) throw new Error("Seat not found")
