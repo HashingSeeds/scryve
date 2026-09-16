@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react"
-import type { ViewStyle } from "react-native"
+import { View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { Button } from "@/components/Button"
@@ -86,27 +86,31 @@ export default function Index() {
         backgroundColor={theme.colors.surface}
         contentContainerStyle={themed($oldGame)}
       >
-        <Text text="Continue game?" preset="heading" accessibilityRole="header" />
-        <Text text="This game has been waiting for more than 24 hours. Nothing was discarded." />
-        <Button
-          text="Continue"
-          preset="primary"
-          style={themed($primaryAction)}
-          onPress={() => setOldGameChoice("continue")}
-        />
-        <Button
-          text="End game"
-          style={themed($secondaryAction)}
-          onPress={() => setOldGameChoice("end")}
-        />
-        <Button
-          text="Abandon"
-          style={themed($secondaryAction)}
-          onPress={() => {
-            localGameRepository.clearActiveGame()
-            setDismissedGameId(activeGame.id)
-          }}
-        />
+        <View style={themed($oldGameCopy)}>
+          <Text text="Continue game?" preset="heading" accessibilityRole="header" />
+          <Text text="This game has been waiting for more than 24 hours. Nothing was discarded." />
+        </View>
+        <View style={themed($oldGameActions)}>
+          <Button
+            text="Continue"
+            preset="primary"
+            style={themed($primaryAction)}
+            onPress={() => setOldGameChoice("continue")}
+          />
+          <Button
+            text="End game"
+            style={themed($secondaryAction)}
+            onPress={() => setOldGameChoice("end")}
+          />
+          <Button
+            text="Abandon"
+            style={themed($secondaryAction)}
+            onPress={() => {
+              localGameRepository.clearActiveGame()
+              setDismissedGameId(activeGame.id)
+            }}
+          />
+        </View>
       </Screen>
     )
   }
@@ -133,13 +137,21 @@ export default function Index() {
 
 const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexGrow: 1,
-  justifyContent: "space-between",
   width: "100%",
   maxWidth: 480,
   alignSelf: "center",
-  gap: spacing.md,
   paddingHorizontal: spacing.lg,
   paddingVertical: spacing.lg,
+})
+
+const $oldGameCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexGrow: 1,
+  justifyContent: "center",
+  gap: spacing.sm,
+})
+
+const $oldGameActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.sm,
 })
 
 const $primaryAction: ThemedStyle<ViewStyle> = () => ({
