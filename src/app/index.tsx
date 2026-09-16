@@ -81,7 +81,7 @@ export default function Index() {
   if (activeGame && stale && !oldGameChoice) {
     return (
       <Screen
-        preset="fixed"
+        preset="auto"
         safeAreaEdges={["top", "bottom"]}
         backgroundColor={theme.colors.surface}
         contentContainerStyle={themed($oldGame)}
@@ -136,7 +136,7 @@ export default function Index() {
 }
 
 const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
+  flexGrow: 1,
   width: "100%",
   maxWidth: 480,
   alignSelf: "center",
@@ -145,7 +145,7 @@ const $oldGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $oldGameCopy: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
+  flexGrow: 1,
   justifyContent: "center",
   gap: spacing.sm,
 })
