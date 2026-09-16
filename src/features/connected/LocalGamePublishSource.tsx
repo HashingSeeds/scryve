@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
 import { useMutation } from "convex/react"
 
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
@@ -21,6 +21,10 @@ export interface PublishedGame {
  * Clerk-to-Convex user sync that `publishLocalGame` needs; this component only
  * publishes, and reports failures back through the feed.
  *
+ * The feed keeps a stable identity across renders because consumers report it upward
+ * from an effect: a fresh object every render would loop that effect forever. For the
+ * same reason `onPublished` must be stable at the call site.
+ *
  * Publish identifiers are generated once and reused on every retry. The mutation is
  * idempotent per `operationId`, but only while the payload behind it is unchanged,
  * so a fresh token on retry would create a second game instead of returning the first.
@@ -38,32 +42,43 @@ export function LocalGamePublishSource({
   const repository = useMemo(() => new LocalGameRepository(), [])
   const deviceId = useMemo(() => repository.getDeviceId(), [repository])
   const identifiers = useRef<ReturnType<typeof createLobbyIdentifiers>>(undefined)
+  const inFlight = useRef(false)
   const operationId = `publish_${game.id}`
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
-  async function publish(hostPlayerId: PlayerId) {
-    if (busy) return
-    try {
-      setBusy(true)
-      setError(undefined)
-      identifiers.current ??= createLobbyIdentifiers()
-      const published = await publishLocalGame(
-        buildLocalGameSnapshot({
-          game,
-          hostPlayerId,
-          operationId,
-          deviceId,
-          ...(await identifiers.current),
-        }),
-      )
-      onPublished({ publicId: published.publicId, manualCode: published.manualCode })
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not connect this game.")
-    } finally {
-      setBusy(false)
-    }
-  }
+  const publish = useCallback(
+    async (hostPlayerId: PlayerId) => {
+      if (inFlight.current) return
+      try {
+        inFlight.current = true
+        setBusy(true)
+        setError(undefined)
+        identifiers.current ??= createLobbyIdentifiers()
+        const published = await publishLocalGame(
+          buildLocalGameSnapshot({
+            game,
+            hostPlayerId,
+            operationId,
+            deviceId,
+            ...(await identifiers.current),
+          }),
+        )
+        onPublished({ publicId: published.publicId, manualCode: published.manualCode })
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Could not connect this game.")
+      } finally {
+        inFlight.current = false
+        setBusy(false)
+      }
+    },
+    [deviceId, game, onPublished, operationId, publishLocalGame],
+  )
 
-  return children({ busy, error, publish: (hostPlayerId) => void publish(hostPlayerId) })
+  const feed = useMemo<LocalConnectFeed>(
+    () => ({ busy, error, publish: (hostPlayerId) => void publish(hostPlayerId) }),
+    [busy, error, publish],
+  )
+
+  return children(feed)
 }

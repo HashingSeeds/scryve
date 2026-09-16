@@ -4,7 +4,10 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 import { CloudScreen } from "@/features/auth/CloudScreen"
 import type { CreatedLobby } from "@/features/connected/ConnectedHostSource"
 import { ConnectedSetupSource } from "@/features/connected/ConnectedSetupSource"
-import { LocalGamePublishSource } from "@/features/connected/LocalGamePublishSource"
+import {
+  LocalGamePublishSource,
+  type PublishedGame,
+} from "@/features/connected/LocalGamePublishSource"
 import {
   applyGameCommand,
   defaultCommandContext,
@@ -27,8 +30,11 @@ function openLobby(lobby: Pick<CreatedLobby, "publicId">) {
 /**
  * A published game is live from the first moment, so it opens on the board rather
  * than a lobby, and the local copy is dropped: the server owns it now.
+ *
+ * Declared at module scope so the publish source sees one stable callback: it feeds
+ * a memo whose consumer reports it upward from an effect.
  */
-function openPublishedGame(publicId: string) {
+function openPublishedGame({ publicId }: PublishedGame) {
   localGameRepository.clearActiveGame()
   router.replace({ pathname: "/connected/game/[gameId]", params: { gameId: publicId } })
 }
@@ -86,10 +92,7 @@ export default function NewLocalGameRoute() {
         <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
       ) : null}
       {connectableGame ? (
-        <LocalGamePublishSource
-          game={connectableGame}
-          onPublished={({ publicId }) => openPublishedGame(publicId)}
-        >
+        <LocalGamePublishSource game={connectableGame} onPublished={openPublishedGame}>
           {(feed) => <ReportLocalConnect feed={feed} onChange={setLocalConnect} />}
         </LocalGamePublishSource>
       ) : null}

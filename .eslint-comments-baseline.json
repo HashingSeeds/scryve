@@ -114,7 +114,7 @@
       "abc7c7005430b10d1ad37a4b72f8de0c0561fd4519f370d4f26afc5401dd168b": 1
     },
     "src/app/game/new.tsx": {
-      "46ed40cad51804fe1391802932bec4d850a908426fbc569a0e01fe0b6a828d3c": 1
+      "61d37d09549f00108a0bcfb5d37c5e0fd1e3c86108bc55a294b950601f9f13fe": 1
     },
     "src/components/AutoImage.tsx": {
       "3fc8afb297f24f4516a73520c919cf890c121fa7fd2b813b5d55c9bdb9387c81": 1,
@@ -388,7 +388,7 @@
       "adaf0dd26d07abfbaf141122f1cca8fca3207a8e459e1c9df246f790bdfce7d5": 1
     },
     "src/features/connected/LocalGamePublishSource.tsx": {
-      "6451db5be721599f528cf9ab1a1b8cbc1da4c313319b4e571f6346022b8c2871": 1
+      "0a0516f59224306b354c6943748b6b41f8fed22193ea7210578e97554e881fa6": 1
     },
     "src/features/connected/localGameSnapshot.ts": {
       "49d1234104c3fd662fd9d3184bfdc698a6747cc9b396d2becce406fa9e148d73": 1,
@@ -603,6 +603,12 @@
     "test/i18n.test.ts": {
       "c59818e94d9ba0e0fb2c9bc9104e8b85190deaf970ce853f76f70098c174fa5a": 1,
       "d75ab4a32749cb62177a159ef276d7adbc3174d095d89606b3ff3b94b93fb064": 1
+    },
+    "test/NewLocalGameRoute.test.tsx": {
+      "154af8c6482bdf9717ef95a723a11a3539972647fac4905d85ae0ddbdb96b6d2": 1,
+      "5535c6efde62c889a3b2825f201449f8316160605dea38363462a87ff98e0fa8": 1,
+      "c5697986c640d1b346074ee0cc2912bac0639f9fe859c80423419e2f96b547ee": 1,
+      "cc9c2bba9cdb2ed897a0db549fc7bff24c14568f73878ce3afeb48ca616c39c0": 1
     },
     "test/setup.ts": {
       "5bf23352864742887c67c5a7c44e41be52ddd91ca3f828ab9988729d2825d0b3": 1,

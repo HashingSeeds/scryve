@@ -9,6 +9,9 @@ import NewLocalGameRoute from "../src/app/game/new"
 
 let mockSearchParams: { mode?: string; setup?: string } = {}
 let mockConnectedFeed: Record<string, unknown> = {}
+let mockLocalConnectFeed: Record<string, unknown> = {}
+const mockPublish = jest.fn()
+let publishedReporter: ((published: { publicId: string; manualCode: string }) => void) | undefined
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -34,6 +37,28 @@ jest.mock("@/features/connected/ConnectedSetupSource", () => {
   }
 })
 
+// The feed is memoized like the real source: a fresh object per render would loop the
+// effect the route reports it through.
+jest.mock("@/features/connected/LocalGamePublishSource", () => {
+  const { memo, useMemo } = jest.requireActual<typeof import("react")>("react")
+  return {
+    LocalGamePublishSource: memo(function MockPublishSource({
+      onPublished,
+      children,
+    }: {
+      onPublished: (published: { publicId: string; manualCode: string }) => void
+      children: (feed: object) => import("react").ReactNode
+    }) {
+      publishedReporter = onPublished
+      const feed = useMemo(
+        () => ({ busy: false, publish: mockPublish, ...mockLocalConnectFeed }),
+        [],
+      )
+      return children(feed)
+    }),
+  }
+})
+
 jest.mock("@/features/auth/CloudScreen", () => ({
   CloudScreen: ({ children }: { children: (access: object) => import("react").ReactNode }) =>
     children({ ready: true, loading: false, request: jest.fn() }),
@@ -54,6 +79,8 @@ describe("new local game route", () => {
     jest.clearAllMocks()
     mockSearchParams = {}
     mockConnectedFeed = {}
+    mockLocalConnectFeed = {}
+    publishedReporter = undefined
   })
   afterEach(() => localGameRepository.clearActiveGame())
 
@@ -141,11 +168,10 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
     fireEvent.changeText(view.getByTestId("player-name-1"), "Alex")
-    fireEvent.press(view.getByTestId("starting-counter-increment"))
-    fireEvent.press(view.getByTestId("mode-connected"))
-    fireEvent.press(view.getByTestId("mode-local"))
     expect(view.getByTestId("player-name-1").props.value).toBe("Alex")
-    expect(view.getByLabelText("Life, 21")).toBeTruthy()
+    // A running game owns its rules and its mode, so both only open up once it ends.
+    expect(view.getByTestId("starting-counter-increment")).toBeDisabled()
+    expect(view.queryByTestId("mode-connected")).toBeNull()
     fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("end-game-backdrop"))
     expect(localGameRepository.loadActiveGame()?.id).toBe(game.id)
@@ -158,7 +184,11 @@ describe("new local game route", () => {
       winnerPlayerIds: [game.players.find((player) => player.seat === 1)!.id],
     })
     expect(view.queryByTestId("end-game-dialog")).toBeNull()
+    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("mode-connected"))
+    fireEvent.press(view.getByTestId("mode-local"))
     expect(view.getByTestId("player-name-1").props.value).toBe("Alex")
+    expect(view.getByLabelText("Life, 21")).toBeTruthy()
     expect(view.getByTestId("start-game-button")).toBeEnabled()
     expect(router.replace).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("start-game-button"))
@@ -262,5 +292,34 @@ describe("new local game route", () => {
     })
     fireEvent.press(view.getByTestId("mode-local"))
     expect(view.getByTestId("start-game-button")).toBeTruthy()
+  })
+
+  it("publishes the running local game under the chosen seat, then hands it to the server", () => {
+    const game = createLocalGame({
+      startingLife: 40,
+      players: [
+        { name: "One", color: "#000" },
+        { name: "Two", color: "#111" },
+      ],
+    })
+    game.players[0].life = 38
+    localGameRepository.saveActiveGame(game)
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("connect-local-button"))
+    fireEvent.press(view.getByTestId("host-seat-2"))
+    expect(mockPublish).toHaveBeenCalledWith(game.players[1].id)
+
+    publishedReporter?.({ publicId: "published-public-id", manualCode: "AB12CD" })
+    // The server owns the game once it is published, so the local copy must not linger.
+    expect(localGameRepository.loadActiveGame()).toBeNull()
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/connected/game/[gameId]",
+      params: { gameId: "published-public-id" },
+    })
   })
 })
