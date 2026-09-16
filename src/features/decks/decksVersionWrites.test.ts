@@ -307,6 +307,78 @@ describe("deck version card writes", () => {
     )
   })
 
+  it("leaves no version row in the cache when the offline queue rejects a create", () => {
+    class FullOutboxRepository extends DeckVersionWriteRepository {
+      override enqueue() {
+        return { accepted: false, reason: "record_limit" as const, pending: [] }
+      }
+    }
+    const repository = new FullOutboxRepository("owner", new MemoryStorage())
+    const controller = new DeckVersionWriteController(
+      { mutation: jest.fn() } as unknown as ConvexReactClient,
+      repository,
+    )
+    expect(() => controller.createVersion(deckId, "Offline Draft", "", [cachedRemoteCard])).toThrow(
+      /offline card queue is full/i,
+    )
+    expect(repository.cache.loadVersions(deckId)).toEqual([])
+    expect(controller.getSnapshot().pending).toEqual([])
+  })
+
+  it("lands queued card edits under the mapped server id when a created draft syncs", async () => {
+    const local = new MemoryStorage()
+    const serverVersionId = "server-1"
+    const syncedResult = (
+      revision: number,
+      cards: readonly { name: string; quantity: number }[],
+    ) => ({
+      deckId,
+      versionId: serverVersionId,
+      revision,
+      versionNumber: 2,
+      name: "Offline Draft",
+      note: "",
+      fingerprint: "f" + revision,
+      cardCount: cards.length,
+      cardQuantity: cards.reduce((total, card) => total + card.quantity, 0),
+      deleted: false,
+      updatedAt: 2 + revision,
+    })
+    const client = {
+      mutation: async (
+        _reference: unknown,
+        args: {
+          name?: string
+          cards?: readonly { name: string; quantity: number }[]
+          expectedRevision?: number
+        },
+      ) =>
+        args.expectedRevision === undefined
+          ? syncedResult(1, args.cards ?? [])
+          : syncedResult((args.expectedRevision ?? 0) + 1, args.cards ?? []),
+    } as unknown as ConvexReactClient
+    const repository = new DeckVersionWriteRepository("owner", local)
+    const controller = new DeckVersionWriteController(client, repository)
+    const stop = controller.start()
+    const provisionalId = controller.createVersion(deckId, "Offline Draft", "", [
+      { name: "Sol Ring", quantity: 1 },
+    ])
+    controller.update(deckId, provisionalId, [{ name: "Kept offline", quantity: 3 }], 1)
+    await flush()
+    stop()
+
+    expect(repository.cache.mappedVersionId(provisionalId)).toBe(serverVersionId)
+    expect(repository.cache.loadCards(provisionalId)).toBeUndefined()
+    const confirmed = repository.cache.loadCards(serverVersionId)
+    expect(confirmed).toMatchObject({ revision: 2 })
+    expect(confirmed?.cards).toEqual([{ name: "Kept offline", quantity: 3 }])
+    const versions = repository.cache.loadVersions(deckId)
+    expect(versions.find((version) => version.versionId === serverVersionId)).toMatchObject({
+      revision: 2,
+      cardCount: 1,
+    })
+  })
+
   it("keeps account-only queued writes pending and unreplayed across sessions", async () => {
     const local = new MemoryStorage()
     const mutation = jest
