@@ -11,6 +11,7 @@ import {
 import { useConvex, useConvexConnectionState, type ConvexReactClient } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
+import type { DeckCard } from "@/features/decks/deckCards"
 import { storage } from "@/utils/storage"
 
 import { scopedOwnerId } from "./decksSync"
@@ -76,6 +77,64 @@ function capacityKey(ownerId: string, deploymentUrl: string | undefined, deckId:
 
 function versionMapKey(ownerId: string, deploymentUrl: string | undefined, versionId: string) {
   return `scryve.decks.versionIdMap.v1.${scopedOwnerId(ownerId, deploymentUrl)}.${versionId}`
+}
+
+function knownCardsKey(ownerId: string, deploymentUrl: string | undefined) {
+  return `scryve.decks.knownCards.v1.${scopedOwnerId(ownerId, deploymentUrl)}`
+}
+
+/** Printable identity of a card, independent of the deck slot it was cached in. */
+function cardIdentity(
+  card: Pick<
+    DeckCard,
+    | "printingId"
+    | "providerCardId"
+    | "scryfallId"
+    | "cardId"
+    | "oracleId"
+    | "originalReference"
+    | "name"
+  >,
+) {
+  return (
+    card.printingId ??
+    card.providerCardId ??
+    card.scryfallId ??
+    card.cardId ??
+    card.oracleId ??
+    card.originalReference ??
+    card.name
+  )
+}
+
+/**
+ * A cached card is addable offline only when the server would accept it: identity beyond
+ * a bare name is present, so this row descends from a server card rather than a draft.
+ */
+function hasCompleteIdentity(card: StorableVersionCard) {
+  return Boolean(
+    card.printingId ||
+    card.providerCardId ||
+    card.scryfallId ||
+    card.cardId ||
+    card.oracleId ||
+    card.originalReference,
+  )
+}
+
+/**
+ * A fully-identified cached card this account has seen, aggregated across every deck's
+ * cached versions. Offline adds are offered only out of this index; key is the card
+ * identity (without section, so sideboard copies cover maindeck adds).
+ */
+export interface KnownCardEntry {
+  game: string | undefined
+  card: StorableVersionCard
+}
+
+interface StoredKnownCards {
+  schemaVersion: 1
+  cards: Record<string, KnownCardEntry>
 }
 
 export interface DeckVersionCapacityHint {
@@ -220,6 +279,7 @@ interface NodeRegistries {
   versionCards: Map<string, Observable<StoredCards>>
   capacity: Map<string, Observable<StoredCapacity>>
   versionIdMap: Map<string, Observable<StoredVersionIdMap>>
+  knownCards: Map<string, Observable<StoredKnownCards>>
 }
 
 const nodeRegistries = new WeakMap<DeckVersionCacheStorage, NodeRegistries>()
@@ -232,6 +292,7 @@ function nodesFor(context: CacheContext) {
       versionCards: new Map(),
       capacity: new Map(),
       versionIdMap: new Map(),
+      knownCards: new Map(),
     }
     nodeRegistries.set(context.local, registry)
   }
@@ -302,6 +363,18 @@ function versionIdMapNode(context: CacheContext, provisionalId: string) {
     () => ({}),
   )
 }
+
+function knownCardsNode(context: CacheContext) {
+  return persistedNode(
+    nodesFor(context).knownCards,
+    knownCardsKey(context.ownerId, context.deploymentUrl),
+    context,
+    () => ({ cards: {} }),
+  )
+}
+
+/** Public alias for the printing identity key challenging the known-cards index. */
+export const cachedCardIdentity = cardIdentity
 
 export class DeckVersionCacheRepository {
   constructor(
@@ -402,7 +475,36 @@ export class DeckVersionCacheRepository {
     if (existing && existing.revision > revision) return existing
     const stored: StoredCards = { schemaVersion: 1, revision, cards: [...cards] }
     cardsNode(this.context(), versionId).set(stored)
+    this.indexCards(stored.cards)
     return stored
+  }
+
+  /**
+   * Aggregates fully-identified cards into the account's known-cards index. First
+   * complete-identity entry wins per card identity; identity-poor rows (legacy payloads
+   * cached before enrichment) are never indexed, so they stay unaddable offline.
+   */
+  indexCards(cards: readonly StorableVersionCard[]): void {
+    const node = knownCardsNode(this.context())
+    const stored: StoredKnownCards = { schemaVersion: 1, cards: { ...node.peek().cards } }
+    let changed = false
+    for (const card of cards) {
+      if (!hasCompleteIdentity(card)) continue
+      const identity = cardIdentity(card)
+      if (stored.cards[identity]) continue
+      stored.cards[identity] = { game: card.game, card }
+      changed = true
+    }
+    if (changed) node.set(stored)
+  }
+
+  /** Addable cards this account already has cached, keyed by card identity. */
+  loadKnownCards(): Record<string, KnownCardEntry> {
+    const node = knownCardsNode(this.context())
+    const value = node.peek() as unknown
+    return isRecord(value) && isRecord(value.cards)
+      ? (value.cards as StoredKnownCards["cards"])
+      : {}
   }
 
   bumpVersion(deckId: string, versionId: string, revision: number): void {
@@ -664,6 +766,11 @@ export class DeckVersionCacheController {
     if (!stored || stored.revision < version.revision) return undefined
     return stored.cards
   }
+
+  /** Cards the account has fully cached, keyed by card identity. */
+  knownCards(): Record<string, KnownCardEntry> {
+    return this.repository.loadKnownCards()
+  }
 }
 
 const controllers = new WeakMap<object, Map<string, DeckVersionCacheController>>()
@@ -726,5 +833,6 @@ export function useDeckVersionCache(
     [controller, deckId, selectedVersionId],
   )
   const snapshot = useSelector(() => (controller ? controller.snapshot(deckId) : emptySnapshot))
-  return { ...snapshot, record, recordCapacity, refresh }
+  const knownCards = useSelector(() => controller?.knownCards() ?? {})
+  return { ...snapshot, knownCards, record, recordCapacity, refresh }
 }

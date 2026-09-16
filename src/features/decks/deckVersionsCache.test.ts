@@ -659,4 +659,68 @@ describe("deck version cache", () => {
     expect(repository.loadVersions(deckId)).toEqual([])
     stop()
   })
+
+  it("indexes fully identified cached cards once per identity across decks", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    const ygoCard = {
+      _id: "card-ash" as Id<"deckCards">,
+      _creationTime: 0,
+      deckVersionId: "version-2" as Id<"deckVersions">,
+      name: "Ash Blossom & Joyous Spring",
+      quantity: 3,
+      game: "ygo",
+      cardId: "14558127",
+      printingId: "14558127",
+    }
+    const secondSolRing = {
+      ...cardRow,
+      quantity: 2,
+      _id: "card-2" as Id<"deckCards">,
+      game: "mtg",
+      scryfallId: "22222222-2222-2222-2222-222222222222",
+    }
+
+    repository.saveCards("version-1", 1, [secondSolRing])
+    repository.saveCards("version-2", 1, [ygoCard])
+    await flush()
+
+    const known = repository.loadKnownCards()
+    expect(Object.keys(known).sort()).toEqual(["14558127", "22222222-2222-2222-2222-222222222222"])
+    // First complete-identity entry wins across decks; later payloads never overwrite it.
+    expect(known["14558127"]).toMatchObject({ game: "ygo", card: { quantity: 3 } })
+  })
+
+  it("keeps identity-poor legacy rows out of the offline index", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    repository.saveCards("version-1", 1, [cardRow])
+    await flush()
+
+    expect(repository.loadKnownCards()).toEqual({})
+  })
+
+  it("scopes the known-cards index by account and deployment", async () => {
+    const storage = new MemoryStorage()
+    const identified = { ...cardRow, game: "mtg", printingId: "printing-1" }
+    new DeckVersionCacheRepository("owner-a", storage).saveCards("version-1", 1, [identified])
+    new DeckVersionCacheRepository("owner-a", storage).saveCards("version-2", 1, [identified])
+    await flush()
+
+    expect(
+      Object.keys(new DeckVersionCacheRepository("owner-a", storage).loadKnownCards()),
+    ).toEqual(["printing-1"])
+    expect(
+      Object.keys(
+        new DeckVersionCacheRepository(
+          "owner-a",
+          storage,
+          "https://other.convex.cloud",
+        ).loadKnownCards(),
+      ),
+    ).toEqual([])
+    expect(
+      Object.keys(new DeckVersionCacheRepository("owner-b", storage).loadKnownCards()),
+    ).toEqual([])
+  })
 })

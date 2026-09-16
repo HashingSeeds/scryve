@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Modal, ScrollView, TouchableOpacity, View } from "react-native"
 import type { ViewStyle } from "react-native"
-import { useConvex } from "convex/react"
+import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
 import { CardImage } from "@/components/CardImage"
@@ -14,6 +14,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
 
+import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { api } from "../../../convex/_generated/api"
 import { deckSections } from "../../../convex/lib/deckGames"
@@ -25,13 +26,20 @@ export function CardSearchScreen({
   format,
   onAdd,
   onClose,
+  offlineCandidates,
 }: {
   game: string
   format: string
   onAdd: (card: GuestDeckPayload["cards"][number]) => string | undefined
   onClose: () => void
+  /**
+   * The account's fully-cached cards to search while offline. Offline adds draw from
+   * this index only — never the catalog and never a name-only candidate.
+   */
+  offlineCandidates?: KnownCardEntry[]
 }) {
   const convex = useConvex()
+  const connection = useConvexConnectionState()
   const { themed, theme } = useAppTheme()
   const sections = deckSections(game, format)
   const [section, setSection] = useState(
@@ -39,8 +47,11 @@ export function CardSearchScreen({
   )
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchCard[]>()
+  const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string>()
+
+  const offline = offlineCandidates !== undefined && connection?.isWebSocketConnected === false
 
   useEffect(() => {
     let active = true
@@ -48,6 +59,16 @@ export function CardSearchScreen({
     setMessage(undefined)
     setBusy(query.trim().length >= 2)
     if (query.trim().length < 2) return
+    if (offline) {
+      setBusy(false)
+      const wanted = query.trim().toLowerCase()
+      setResults(undefined)
+      setOfflineResults(
+        offlineCandidates.filter((entry) => entry.card.name.toLowerCase().includes(wanted)),
+      )
+      return
+    }
+    setOfflineResults(undefined)
     const timer = setTimeout(async () => {
       try {
         if (!convex) throw new Error("Card search unavailable")
@@ -69,7 +90,7 @@ export function CardSearchScreen({
       active = false
       clearTimeout(timer)
     }
-  }, [convex, game, query])
+  }, [convex, game, query, offline, offlineCandidates])
 
   function add(card: SearchCard) {
     const error = onAdd({
@@ -90,6 +111,11 @@ export function CardSearchScreen({
           }),
     })
     setMessage(error ?? `Added ${card.name}.`)
+  }
+
+  function addOffline(entry: KnownCardEntry) {
+    const error = onAdd({ ...entry.card, quantity: 1, section })
+    setMessage(error ?? `Added ${entry.card.name}.`)
   }
 
   return (
@@ -135,6 +161,28 @@ export function CardSearchScreen({
           keyboardShouldPersistTaps="handled"
         >
           {busy ? <Text size="sm" text="Searching…" /> : null}
+          {offline ? (
+            <Text size="xxs" text="You’re offline. Searching cards already in your decks." />
+          ) : null}
+          {offlineResults?.map((entry, index) => (
+            <View key={index} style={themed($result)}>
+              <View style={$name}>
+                <Text size="sm" weight="medium" text={entry.card.name} />
+                <Text size="xxs" text={`From your cached decks · ${entry.game ?? game}`} />
+              </View>
+              <TouchableOpacity
+                style={$add}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${entry.card.name} to deck`}
+                onPress={() => addOffline(entry)}
+              >
+                <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {offline && offlineResults?.length === 0 ? (
+            <Text text="No cached cards match. Cards appear here after you add them online." />
+          ) : null}
           {results?.map((card, index) => (
             <View key={index} style={themed($result)}>
               <CardImage

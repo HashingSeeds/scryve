@@ -31,7 +31,11 @@ import {
   useDeckVersionWrites,
   type PendingVersionWrite,
 } from "@/features/decks/decksVersionWrites"
-import { useDeckVersionCache } from "@/features/decks/deckVersionsCache"
+import {
+  cachedCardIdentity,
+  useDeckVersionCache,
+  type KnownCardEntry,
+} from "@/features/decks/deckVersionsCache"
 import { DeckView } from "@/features/decks/DeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useAppTheme } from "@/theme/context"
@@ -54,6 +58,8 @@ type DeckDialog =
   | "deleteDeck"
   | "discard"
   | "syncConflict"
+
+const OFFLINE_CARD_MESSAGE = "You’re offline. Cards already in your decks can be added."
 export function cardDetailsKey(card: DeckCard, game: string) {
   if (card.scryfallId) return card.scryfallId
   const identity = [
@@ -424,6 +430,14 @@ function DeckDetailContent({
       : (cachedCards ?? storedCards)
   const cardsUnavailable = !detail && cachedCards === undefined && !pendingCardWrite
   const cards = editing ? draft : displayCards
+  // Known cards from this account's cached versions, filtered to the deck's game system.
+  const offlineCandidates = useMemo(
+    () =>
+      Object.values(versionCache.knownCards).filter(
+        (entry) => entry.game === (deck?.game ?? "mtg"),
+      ),
+    [versionCache.knownCards, deck?.game],
+  )
   const writeMotion = versionWrites.pending.length + versionWrites.failures.length
   const lastWriteMotion = useRef(-1)
   const refreshVersionCache = versionCache.refresh
@@ -571,6 +585,21 @@ function DeckDetailContent({
 
   function addCard(card: DeckCard) {
     if (knownDeleted) return
+    const alreadyInDraft = draft.some((candidate) => printingKey(candidate) === printingKey(card))
+    if (!alreadyInDraft && detail === undefined) {
+      const entry = offlineCardEntry(card)
+      if (!entry) {
+        setError(OFFLINE_CARD_MESSAGE)
+        return
+      }
+      // The cached card carries the full server identity; the candidate may not.
+      card = {
+        ...entry.card,
+        quantity: card.quantity,
+        ...(card.section ? { section: card.section } : {}),
+        ...(card.board ? { board: card.board } : {}),
+      }
+    }
     setUndo(undefined)
     setDraft((current) => {
       const existing = current.find((candidate) => printingKey(candidate) === printingKey(card))
@@ -582,6 +611,16 @@ function DeckDetailContent({
           )
         : [...current, card]
     })
+  }
+
+  /**
+   * The known-cards entry an offline add may draw from, or undefined when the card is
+   * unknown. Entries must match the deck's game system, so a Magic printing never
+   * lands in a Yugioh deck.
+   */
+  function offlineCardEntry(card: DeckCard): KnownCardEntry | undefined {
+    const entry = versionCache.knownCards[cachedCardIdentity(card)]
+    return entry !== undefined && entry.game === (deck?.game ?? "mtg") ? entry : undefined
   }
 
   function removeCard(card: DeckCard) {
@@ -1097,10 +1136,11 @@ function DeckDetailContent({
           </ScrollView>
         </DialogCard>
       ) : null}
-      {adding && detail ? (
+      {adding ? (
         <CardSearchScreen
-          game={detail.deck.game}
-          format={detail.deck.format}
+          game={detail?.deck.game ?? deck.game ?? "mtg"}
+          format={detail?.deck.format ?? deck.format}
+          {...(detail ? {} : { offlineCandidates })}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
             const existing = draft.find((entry) => printingKey(entry) === printingKey(card))

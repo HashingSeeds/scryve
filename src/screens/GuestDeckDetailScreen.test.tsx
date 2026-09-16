@@ -8,7 +8,11 @@ import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
 
 const mockSearchCards = jest.fn()
 const mockConvex = { action: mockSearchCards }
-jest.mock("convex/react", () => ({ useConvex: () => mockConvex, useAction: () => mockSearchCards }))
+jest.mock("convex/react", () => ({
+  useConvex: () => mockConvex,
+  useConvexConnectionState: () => ({ isWebSocketConnected: true }),
+  useAction: () => mockSearchCards,
+}))
 
 let mockPreventRemove = false
 let mockPreventRemoveCallback:
