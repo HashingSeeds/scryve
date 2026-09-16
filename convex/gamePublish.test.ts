@@ -225,6 +225,7 @@ describe("claiming an imported seat through claimSeat", () => {
       guest.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: created.manualCode,
+        displayName: "Guest",
         deviceId: joinerDevice,
       }),
     ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
@@ -232,6 +233,9 @@ describe("claiming an imported seat through claimSeat", () => {
       publicId: created.publicId,
       deviceId: joinerDevice,
     })
+    // Claiming replaces the host's published seat name with the joiner's, but a
+    // claimed seat renders its account username and falls back to the seat label,
+    // never a self-chosen string, so this guest has no username to show.
     expect(guestView.players[1]).toEqual(
       expect.objectContaining({
         displayName: "Player 2",

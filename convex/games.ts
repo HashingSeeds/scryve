@@ -661,12 +661,14 @@ async function claimPreparedSeat(
     players,
     seat,
     deviceId,
+    displayName,
   }: {
     game: Doc<"games">
     user: Doc<"users">
     players: Doc<"gamePlayers">[]
     seat?: number
     deviceId?: string
+    displayName?: string
   },
 ) {
   const held = players.find((player) => player.userId === user._id)
@@ -686,6 +688,7 @@ async function claimPreparedSeat(
   await ctx.db.patch(target._id, {
     userId: user._id,
     ...(deviceId ? { deviceId } : {}),
+    ...(displayName ? { displayName } : {}),
     usernameAtJoin: user.username,
   })
   await ctx.db.patch(game._id, { updatedAt: Date.now() })
@@ -726,6 +729,8 @@ export const claimSeat = mutation({
       if (await isBlockedBetween(ctx, user._id, seated.userId))
         throw new Error("You cannot join a game with a player you blocked or who blocked you")
     }
+    const claimedName =
+      args.displayName === undefined ? undefined : assertDisplayName(args.displayName)
     // An active game with an unclaimed seat can only be an imported one: startGame
     // refuses to leave a lobby until every seat is claimed.
     if (game.status === "active")
@@ -735,10 +740,11 @@ export const claimSeat = mutation({
         players: existingPlayers,
         ...(args.seat === undefined ? {} : { seat: args.seat }),
         ...(args.deviceId ? { deviceId: args.deviceId } : {}),
+        ...(claimedName === undefined ? {} : { displayName: claimedName }),
       })
-    if (args.displayName === undefined || args.color === undefined)
+    if (claimedName === undefined || args.color === undefined)
       throw new Error("A display name and color are required to claim a lobby seat")
-    const displayName = assertDisplayName(args.displayName)
+    const displayName = claimedName
     const duplicate = existingPlayers.find(
       (candidate) =>
         candidate.userId === user._id &&
