@@ -42,6 +42,7 @@ export interface GameRadialMenuProps {
   onClose: () => void
   variant?: MenuButtonStyle
   seatColors?: readonly string[]
+  exitAction?: { label: string; onPress: () => void }
 }
 
 export interface RadialActionPose {
@@ -139,6 +140,7 @@ export function GameRadialMenu({
   onClose,
   variant = DEFAULT_MENU_BUTTON_STYLE,
   seatColors,
+  exitAction,
 }: GameRadialMenuProps) {
   const {
     themed,
@@ -146,17 +148,24 @@ export function GameRadialMenu({
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
-  const pentagonRotation = useSharedValue(open ? PENTAGON_OPEN_ROTATION_DEG : 0)
+  const menuOpen = open && !exitAction
+  const pentagonRotation = useSharedValue(
+    menuOpen ? PENTAGON_OPEN_ROTATION_DEG : exitAction ? -PENTAGON_OPEN_ROTATION_DEG : 0,
+  )
   const poses = getRadialActionPoses(anchor, actions.length)
 
   useEffect(() => {
-    const spinTarget = open ? PENTAGON_OPEN_ROTATION_DEG : 0
+    const spinTarget = menuOpen
+      ? PENTAGON_OPEN_ROTATION_DEG
+      : exitAction
+        ? -PENTAGON_OPEN_ROTATION_DEG
+        : 0
     pentagonRotation.value = animateFully
       ? withSpring(spinTarget, PENTAGON_SPIN_SPRING)
       : withTiming(spinTarget, {
           duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS),
         })
-  }, [animateFully, open, pentagonRotation, reducedMotion])
+  }, [animateFully, menuOpen, exitAction, pentagonRotation, reducedMotion])
 
   const pentagonSpinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${pentagonRotation.value}deg` }],
@@ -169,7 +178,7 @@ export function GameRadialMenu({
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {open ? (
+      {menuOpen ? (
         <Pressable
           testID="game-menu-backdrop"
           accessibilityRole="button"
@@ -179,7 +188,7 @@ export function GameRadialMenu({
         />
       ) : null}
 
-      {open
+      {menuOpen
         ? actions
             .slice(0, poses.length)
             .map((action, index) => (
@@ -205,11 +214,19 @@ export function GameRadialMenu({
         <Pressable
           testID="game-menu-button"
           accessibilityRole="button"
-          accessibilityLabel={open ? "Close game options" : "Game options"}
-          accessibilityHint={open ? "Collapses the game controls" : "Expands the game controls"}
-          accessibilityState={{ expanded: open }}
+          accessibilityLabel={
+            exitAction ? exitAction.label : menuOpen ? "Close game options" : "Game options"
+          }
+          accessibilityHint={
+            exitAction
+              ? undefined
+              : menuOpen
+                ? "Collapses the game controls"
+                : "Expands the game controls"
+          }
+          accessibilityState={{ expanded: menuOpen }}
           style={({ pressed }) => [themed($menuButton), pressed && $menuButtonPressed]}
-          onPress={onToggle}
+          onPress={exitAction ? exitAction.onPress : onToggle}
         >
           <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
             <GameMenuButtonShape
@@ -219,28 +236,57 @@ export function GameRadialMenu({
               seatColors={seatColors}
             />
           </Animated.View>
-          <MenuGlyph color={colors.gameMenu.anchorGlyph} open={open} />
+          <MenuGlyph
+            color={colors.gameMenu.anchorGlyph}
+            pose={menuOpen ? 1 : exitAction ? -1 : 0}
+            animateFully={animateFully}
+            reducedMotion={reducedMotion}
+          />
         </Pressable>
       </Animated.View>
     </View>
   )
 }
 
-function MenuGlyph({ color, open }: { color: string; open: boolean }) {
+const GLYPH_MORPH_SPRING = { damping: 16, stiffness: 220, mass: 0.5 } as const
+
+function MenuGlyph({
+  color,
+  pose,
+  animateFully,
+  reducedMotion,
+}: {
+  color: string
+  pose: -1 | 0 | 1
+  animateFully: boolean
+  reducedMotion: ReducedMotionPreference
+}) {
+  const morph = useSharedValue(pose)
+
+  useEffect(() => {
+    morph.value = animateFully
+      ? withSpring(pose, GLYPH_MORPH_SPRING)
+      : withTiming(pose, {
+          duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS),
+        })
+  }, [animateFully, morph, pose, reducedMotion])
+
+  const topBar = useAnimatedStyle(() => ({
+    transform: [{ translateY: 5 * Math.abs(morph.value) }, { rotate: `${45 * morph.value}deg` }],
+  }))
+  const midBar = useAnimatedStyle(() => ({
+    opacity: 1 - Math.abs(morph.value),
+    transform: [{ scaleX: 1 - 0.6 * Math.abs(morph.value) }],
+  }))
+  const bottomBar = useAnimatedStyle(() => ({
+    transform: [{ translateY: -5 * Math.abs(morph.value) }, { rotate: `${-45 * morph.value}deg` }],
+  }))
+
   return (
     <View testID="game-menu-glyph" style={$menuGlyph}>
-      {open ? (
-        <>
-          <View style={[$menuGlyphBar, { backgroundColor: color }, $closeGlyphForward]} />
-          <View style={[$menuGlyphBar, { backgroundColor: color }, $closeGlyphBackward]} />
-        </>
-      ) : (
-        <>
-          <View style={[$menuGlyphBar, { backgroundColor: color }]} />
-          <View style={[$menuGlyphBar, { backgroundColor: color }]} />
-          <View style={[$menuGlyphBar, { backgroundColor: color }]} />
-        </>
-      )}
+      <Animated.View style={[$menuGlyphBar, { backgroundColor: color }, topBar]} />
+      <Animated.View style={[$menuGlyphBar, { backgroundColor: color }, midBar]} />
+      <Animated.View style={[$menuGlyphBar, { backgroundColor: color }, bottomBar]} />
     </View>
   )
 }
@@ -344,20 +390,12 @@ const $menuGlyph: ViewStyle = {
   height: 24,
   alignItems: "center",
   justifyContent: "center",
-  gap: 4,
+  gap: 3,
 }
 const $menuGlyphBar: ViewStyle = {
   width: 16,
   height: 2,
   borderRadius: 1,
-}
-const $closeGlyphForward: ViewStyle = {
-  position: "absolute",
-  transform: [{ rotate: "45deg" }],
-}
-const $closeGlyphBackward: ViewStyle = {
-  position: "absolute",
-  transform: [{ rotate: "-45deg" }],
 }
 const $actionAnchor: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",

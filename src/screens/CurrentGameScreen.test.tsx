@@ -423,28 +423,30 @@ describe("CurrentGameScreen", () => {
       expect(view.queryByTestId("commander-stage-seat-2-1")).toBeNull()
     })
 
-    it("keeps inspection separate from assignment and clears the menu out of both", () => {
+    it("keeps inspection separate from assignment and turns the menu into an exit for both", () => {
       const view = renderGame()
       fireEvent.press(view.getByTestId("commander-inspect-seat-2"))
       expect(view.getByTestId("commander-board-seat-2")).toBeTruthy()
-      expect(view.queryByTestId("game-menu-button")).toBeNull()
-      fireEvent.press(view.getByTestId("commander-inspect-seat-3"))
+      expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
+        "Exit commander damage",
+      )
+      fireEvent.press(view.getByTestId("game-menu-button"))
       expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
+      fireEvent.press(view.getByTestId("commander-inspect-seat-3"))
       expect(view.getByTestId("commander-board-seat-3")).toBeTruthy()
       armCommander(view, 1)
       expect(view.queryByTestId("commander-board-seat-3")).toBeNull()
-      expect(view.queryByTestId("game-menu-button")).toBeNull()
+      expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
+        "Exit commander damage",
+      )
       fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
       expect(view.getByTestId("commander-total-seat-2")).toHaveTextContent("1")
       expect(view.getByTestId("commander-life-seat-2")).toHaveTextContent("39 life")
       expect(view.getByLabelText("1 commander damage from Ada, 39 life")).toBeTruthy()
       fireEvent.press(view.getByTestId("commander-done-seat-1"))
       expect(view.queryByTestId("commander-board-seat-3")).toBeNull()
-      expect(view.getByTestId("game-menu-button")).toBeTruthy()
-      fireEvent.press(view.getByTestId("commander-inspect-seat-2"))
-      fireEvent.press(view.getByTestId("commander-inspect-seat-2"))
-      expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
-      expect(view.getByTestId("game-menu-button")).toBeTruthy()
+      expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
+      expect(view.queryByTestId("layout-button")).toBeNull()
     })
 
     it("arms one commander at a time and reveals controls only on opponents", () => {
