@@ -11,9 +11,10 @@ on:
       - "eas.json"
       - "patches/**"
       - "assets/**"
-      - "babel.config.js"
-      - "metro.config.js"
-      - ".nvmrc"
+      # verified against `eas fingerprint:generate` raw sources: package.json +
+      # pnpm-lock.yaml (node_modules contents), expoConfig (app.json +
+      # app.config.ts), eas.json, assets, and patches. babel/metro/nvmrc do not
+      # contribute to the native fingerprint.
 
 permissions:
   contents: read
