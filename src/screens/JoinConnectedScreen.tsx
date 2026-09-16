@@ -61,6 +61,7 @@ export function JoinConnectedScreen({
   const { isWebSocketConnected } = useConvexConnectionState()
   const syncUser = useMutation(api.users.syncCurrent)
   const claimSeat = useMutation(api.games.claimSeat)
+  const claimableSeats = useMutation(api.games.claimableSeats)
   const deviceId = useState(() => new LocalGameRepository().getDeviceId())[0]
   const [code, setCode] = useState(initialCode)
   const [scanning, setScanning] = useState(false)
@@ -76,11 +77,13 @@ export function JoinConnectedScreen({
   })
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
+  const [openSeats, setOpenSeats] = useState<number[]>()
   const profileName = connectedProfileName(user?.username)
   const validInput = Boolean(token || normalizeManualCode(code))
+  const picking = (openSeats?.length ?? 0) > 1
   const title = token ? "Join invited lobby" : "Join with code"
 
-  async function join() {
+  async function join(seat?: number) {
     captureAnalytics("connection_attempt", { action: "join", stage: "started" })
     if (access && !access.ready) {
       captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "access" })
@@ -111,9 +114,16 @@ export function JoinConnectedScreen({
         return
       }
       failureReason = "request"
+      const seats =
+        openSeats ?? (await claimableSeats({ token, manualCode: manualCode ?? undefined })).seats
+      if (seats.length > 1 && seat === undefined) {
+        setOpenSeats(seats)
+        return
+      }
       const result = await claimSeat({
         token,
         manualCode: manualCode ?? undefined,
+        ...(seat === undefined ? {} : { seat }),
         displayName: profileName,
         color: appearance.color.toUpperCase(),
         shape: appearance.shape,
@@ -223,6 +233,25 @@ export function JoinConnectedScreen({
             <Text testID="join-username" weight="medium" text={`Joining as @${user.username}`} />
           </View>
         ) : null}
+        {picking ? (
+          <View style={themed($section)}>
+            <Text weight="medium" text="Pick your seat" />
+            <Text
+              size="xs"
+              style={themed($dimmed)}
+              text="Each open seat carries its own counters from the game already in progress."
+            />
+            {openSeats?.map((seat) => (
+              <Button
+                key={seat}
+                testID={`claim-seat-${seat}-button`}
+                text={`Seat ${seat}`}
+                disabled={busy}
+                onPress={() => void join(seat)}
+              />
+            ))}
+          </View>
+        ) : null}
         {access?.message ? <Text size="xs" text={access.message} /> : null}
         {error ? <AlertNote testID="join-error" text={error} /> : null}
         {!isWebSocketConnected ? <AlertNote text={onlineOnlyNotice("join")} /> : null}
@@ -237,6 +266,13 @@ export function JoinConnectedScreen({
         <View style={embedded ? themed($embeddedActions) : undefined}>
           <Button
             testID="claim-seat-button"
+            disabled={
+              busy ||
+              picking ||
+              Boolean(access?.loading) ||
+              (!access && !isWebSocketConnected) ||
+              !validInput
+            }
             text={
               busy
                 ? "Joining…"
@@ -244,12 +280,9 @@ export function JoinConnectedScreen({
                   ? (access.actionLabel ?? "Join game")
                   : "Join game"
             }
-            disabled={
-              busy || Boolean(access?.loading) || (!access && !isWebSocketConnected) || !validInput
-            }
             preset="reversed"
             style={embedded ? undefined : themed($primaryAction)}
-            onPress={join}
+            onPress={() => void join()}
           />
           {embedded ? <View style={$footerSpace} /> : null}
         </View>

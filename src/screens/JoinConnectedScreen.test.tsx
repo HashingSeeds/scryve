@@ -2,7 +2,12 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-
 
 import { InviteScannerScreen } from "./InviteScannerScreen"
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
-import { mockClaimSeat, resetConnectedHarness, themed } from "../../test/support/connectedHarness"
+import {
+  mockClaimableSeats,
+  mockClaimSeat,
+  resetConnectedHarness,
+  themed,
+} from "../../test/support/connectedHarness"
 
 jest.mock("@clerk/expo", () =>
   jest
@@ -153,5 +158,44 @@ describe("JoinConnectedScreen", () => {
     expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(true)
     fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
     expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(false)
+  })
+
+  it("asks which seat to take when an imported game leaves several open", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    const onJoined = jest.fn()
+    render(themed(<JoinConnectedScreen onJoined={onJoined} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+    expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(true)
+    expect(screen.queryByTestId("claim-seat-4-button")).toBeNull()
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-3-button"))
+    })
+
+    expect(mockClaimSeat).toHaveBeenCalledWith(expect.objectContaining({ seat: 3 }))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
+  })
+
+  it("claims straight away when the invite leaves nothing to choose", async () => {
+    mockClaimableSeats.mockResolvedValue({ publicId: "game-public", mode: "connected", seats: [2] })
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    expect(screen.queryByTestId("claim-seat-2-button")).toBeNull()
+    expect(mockClaimSeat).toHaveBeenCalledWith(expect.not.objectContaining({ seat: 2 }))
   })
 })

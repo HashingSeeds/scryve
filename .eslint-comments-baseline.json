@@ -33,6 +33,7 @@
     },
     "convex/games.ts": {
       "0f8d6704aceb673cbb1880f912f121752871753897edb99abdc64dc2c2424ea6": 1,
+      "56577b587581ab42f839dd083ae4b485641678db11d874b223290277010c3e31": 1,
       "8f7a0c645a7e9ba1349218c00e4d941952a66a7d01b62af0a044c5e9dad0045a": 1,
       "a31640bc642eefa340edf018243eafa244603f2d1369b969f727503ba8d8d7ff": 1,
       "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1,
@@ -111,6 +112,9 @@
     },
     "src/app/+native-intent.tsx": {
       "abc7c7005430b10d1ad37a4b72f8de0c0561fd4519f370d4f26afc5401dd168b": 1
+    },
+    "src/app/game/new.tsx": {
+      "46ed40cad51804fe1391802932bec4d850a908426fbc569a0e01fe0b6a828d3c": 1
     },
     "src/components/AutoImage.tsx": {
       "3fc8afb297f24f4516a73520c919cf890c121fa7fd2b813b5d55c9bdb9387c81": 1,
@@ -383,6 +387,9 @@
       "9d7635916369df656ca365a2adc138afc59cdfbd49d36efcbca63369d6fb96d3": 1,
       "adaf0dd26d07abfbaf141122f1cca8fca3207a8e459e1c9df246f790bdfce7d5": 1
     },
+    "src/features/connected/LocalGamePublishSource.tsx": {
+      "6451db5be721599f528cf9ab1a1b8cbc1da4c313319b4e571f6346022b8c2871": 1
+    },
     "src/features/connected/localGameSnapshot.ts": {
       "49d1234104c3fd662fd9d3184bfdc698a6747cc9b396d2becce406fa9e148d73": 1,
       "a74ccb9c7c7c3ea9f835798bebb222c72c960f90858d6880b8fa998580cf44c6": 1,
@@ -392,6 +399,7 @@
     "src/features/connected/model.ts": {
       "0b688aed963374c0562f52c5c5c2b98d16bb8668715029852b84018cdf222d05": 1,
       "30a7ce9f18b024e345eeee8413877f03554d2ecfc05dcfc3394cdf1ba5bd029e": 1,
+      "9467ae996bb9d17b8541afe71e703d256ec3f5239af45126c06498aea3043388": 1,
       "9f54adc2988b80bcd18d3d633760174db956114340d77c41cad10707d92cfe00": 1
     },
     "src/features/connected/OutboxSyncController.ts": {
@@ -473,6 +481,9 @@
     },
     "src/i18n/translate.ts": {
       "ea755fc2a1c071dd7dca50d2b21ca38c3ca18db779742961bf0ca220101ff73b": 1
+    },
+    "src/screens/ConnectedBoardScreen.tsx": {
+      "186f45b23677764a2bdc62b79fdccbdb9adbfd2079587b8e19e24015aadb7b3f": 1
     },
     "src/screens/DeckDetailScreen.tsx": {
       "132afe4f734bdd7204c595c17b05d0d14ebe64d84e9b6bfce087b25efa70b7cc": 1,

@@ -1000,6 +1000,13 @@ export const publishLocalGame = mutation({
   },
 })
 
+/**
+ * Reports which seats an invite still leaves open, without disclosing who holds the rest.
+ *
+ * Imported games pre-create every seat with the published life totals, so the joiner has
+ * to choose; a lobby creates seats on claim and answers with an empty list, which the
+ * join screen reads as "nothing to choose" and claims straight away.
+ */
 export const claimableSeats = mutation({
   args: {
     token: v.optional(v.string()),
@@ -1013,7 +1020,7 @@ export const claimableSeats = mutation({
     const game = await ctx.db.get(invite.gameId)
     if (
       !game ||
-      game.status !== "active" ||
+      (game.status !== "active" && game.status !== "lobby") ||
       !(await inviteIsCurrent(ctx, game, invite, Date.now()))
     )
       throw new Error("Invite is invalid, expired, or revoked")

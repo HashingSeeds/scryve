@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, ScrollView, useWindowDimensions, View } from "react-native"
+import { ActivityIndicator, ScrollView, Share, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
@@ -22,7 +22,10 @@ import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { readPublicCloudConfig } from "@/features/auth/config"
 import { ConnectedBoardSyncToast } from "@/features/connected/ConnectedBoardSyncToast"
+import { InviteCard } from "@/features/connected/InviteCard"
+import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
 import {
   PlayerActionsDialog,
   type ReportablePlayer,
@@ -198,6 +201,8 @@ function ConnectedBoardRuntime({
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteError, setInviteError] = useState<string>()
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
   const localRepository = useMemo(() => new LocalGameRepository(), [])
@@ -341,6 +346,30 @@ function ConnectedBoardRuntime({
     layoutVariant,
   })
   const menuAnchor = getPlayerGridMenuAnchor(players.length, gridLayout)
+
+  /**
+   * Only the host is served an invitation, and only while seats are still open, so the
+   * invite action exists exactly when there is something to hand out.
+   */
+  const invitation = active ? game.invitation : undefined
+  const inviteOrigin = readPublicCloudConfig()
+  const inviteUrl =
+    invitation && inviteOrigin.configured
+      ? buildInviteUrl(inviteOrigin.value.inviteOrigin, invitation.token)
+      : undefined
+
+  async function shareInvite() {
+    if (!invitation) return
+    try {
+      setInviteError(undefined)
+      if (inviteUrl)
+        await Share.share({ message: `Join my Scryve game: ${inviteUrl}`, url: inviteUrl })
+      else await Share.share({ message: `Join my Scryve game with code ${invitation.manualCode}` })
+    } catch (cause) {
+      setInviteError(cause instanceof Error ? cause.message : "Could not open sharing")
+    }
+  }
+
   const radialActions: RadialMenuAction[] = [
     {
       kind: "layout",
@@ -370,6 +399,19 @@ function ConnectedBoardRuntime({
         setStatusOpen(true)
       },
     },
+    ...(invitation
+      ? [
+          {
+            kind: "invite" as const,
+            label: "Invite",
+            onPress: (event?: GestureResponderEvent) => {
+              captureMenuDialogOrigin(event)
+              setMenuOpen(false)
+              setInviteOpen(true)
+            },
+          },
+        ]
+      : []),
     {
       kind: "history",
       label: "History",
@@ -392,7 +434,12 @@ function ConnectedBoardRuntime({
   ]
 
   const overlayOpen =
-    menuOpen || statusOpen || layoutPickerOpen || confirmingFinish || playerActionsOpen
+    menuOpen ||
+    statusOpen ||
+    layoutPickerOpen ||
+    confirmingFinish ||
+    playerActionsOpen ||
+    inviteOpen
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
     seat: player.seat,
@@ -501,6 +548,29 @@ function ConnectedBoardRuntime({
           }}
         />
       </View>
+
+      {inviteOpen && invitation ? (
+        <DialogCard
+          visible
+          wide
+          placement="bottom"
+          origin={menuDialogOrigin}
+          onClose={() => setInviteOpen(false)}
+          backdropTestID="invite-backdrop"
+          backdropAccessibilityLabel="Close invite"
+          dialogTestID="invite-dialog"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text="Invite players" style={themed($dialogText)} />
+          <InviteCard
+            qrPayload={buildInviteQrPayload(invitation.token, invitation.manualCode)}
+            manualCode={invitation.manualCode}
+            onShare={() => void shareInvite()}
+          />
+          {inviteError ? <AlertNote text={inviteError} /> : null}
+          <Button text="Close" onPress={() => setInviteOpen(false)} />
+        </DialogCard>
+      ) : null}
 
       {layoutPickerOpen ? (
         <DialogCard

@@ -421,6 +421,25 @@ describe("imported game invite renewal and discovery", () => {
     ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [] })
   })
 
+  it("reports a lobby as having nothing to choose so joining stays one step", async () => {
+    const t = convexTest(schema, modules)
+    const host = await signedIn(t, "lobby-host-subject", "LobbyHost")
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "plain-lobby-id-000001",
+      playerCount: 4,
+      startingLife: 20,
+      ruleset: "standard",
+      inviteToken: "p".repeat(43),
+      manualCodeCandidates: ["LOB234"],
+      hostDisplayName: "LobbyHost",
+      hostColor: "#41476E",
+    })
+    const guest = await signedIn(t, "lobby-guest-subject", "LobbyGuest")
+    await expect(
+      guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
+    ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [] })
+  })
+
   it("discovers and claims using only the invite payload, then the returned publicId", async () => {
     const t = convexTest(schema, modules)
     const { created } = await published(t)

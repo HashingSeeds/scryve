@@ -48,6 +48,13 @@ jest.mock("../../convex/_generated/api", () =>
     )
     .createGeneratedApiMock(),
 )
+jest.mock("react-native-qrcode-svg", () =>
+  jest
+    .requireActual<typeof import("../../test/support/connectedHarness")>(
+      "../../test/support/connectedHarness",
+    )
+    .createQrCodeMock(),
+)
 
 function openConnectedMenu() {
   fireEvent.press(screen.getByTestId("game-menu-button"))
@@ -751,5 +758,26 @@ describe("ConnectedBoardScreen", () => {
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
     expect(view.queryByTestId("back-from-connected-board-button")).toBeNull()
     expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
+  })
+
+  it("hands out the invite from the board only while one is on offer", () => {
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
+    expect(screen.queryByTestId("invite-button")).toBeNull()
+    fireEvent.press(screen.getByTestId("game-menu-backdrop"))
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        invitation: { token: "t".repeat(43), manualCode: "AB12CD", expiresAt: Date.now() + 60_000 },
+      },
+    }
+    screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("invite-button"))
+    expect(screen.getByTestId("invite-dialog")).toBeTruthy()
+    expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
+    expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
   })
 })
