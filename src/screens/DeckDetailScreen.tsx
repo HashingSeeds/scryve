@@ -25,6 +25,7 @@ import { cardSection, printingKey, type DeckCard } from "@/features/decks/deckCa
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
+import { useDeckVersionCache } from "@/features/decks/deckVersionsCache"
 import { DeckView } from "@/features/decks/DeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useAppTheme } from "@/theme/context"
@@ -274,6 +275,12 @@ function DeckDetailContent({
         }
       : "skip",
   )
+  const versionCache = useDeckVersionCache(
+    syncEnabled && !knownDeleted,
+    access?.ownerId,
+    deckId,
+    selectedVersionId,
+  )
   const statsAvailable = Boolean(detail)
   useFocusEffect(
     useCallback(() => {
@@ -345,8 +352,25 @@ function DeckDetailContent({
       ),
     [detail?.cards],
   )
-  const cards = editing ? draft : storedCards
-  const cardsDirty = editing && cardsChanged(draft, storedCards)
+  const cachedCards = useMemo(
+    () =>
+      detail === undefined && versionCache.cards !== undefined
+        ? mergedPrintings(
+            versionCache.cards.map(
+              ({ _id: _, _creationTime: __, deckVersionId: ___, ...card }) => card,
+            ),
+          )
+        : undefined,
+    [versionCache.cards, detail],
+  )
+  const cachedVersion = versionCache.version
+  const displayCards = storedCards.length > 0 ? storedCards : (cachedCards ?? storedCards)
+  const cards = editing ? draft : displayCards
+  const cardsUnavailable = !detail && cachedCards === undefined
+  // Cached cards render read-only so an offline save can't push stale lists to the server.
+  const editingFromCache = useRef(false)
+  const cardsCached = editing ? editingFromCache.current : cachedCards !== undefined
+  const cardsDirty = editing && !editingFromCache.current && cardsChanged(draft, displayCards)
   const noteDirty = editing && draftNote !== (deck?.note ?? "")
   const draftChanged = cardsDirty || noteDirty
   const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
@@ -362,9 +386,43 @@ function DeckDetailContent({
   )
   const version = detail?.version
   const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)
+  const cachedVersionRows = useMemo(
+    () =>
+      versionCache.versions
+        .filter((candidate) => !candidate.deleted)
+        .map((candidate) => ({
+          _id: candidate.versionId as Id<"deckVersions">,
+          versionNumber: candidate.versionNumber,
+          name: candidate.name,
+          note: candidate.note,
+          cardCount: candidate.cardCount,
+          cardQuantity: candidate.cardQuantity,
+          record: undefined,
+        })),
+    [versionCache.versions],
+  )
+  const versionRows = detail?.versions ?? cachedVersionRows
+  const activeVersionId = version?._id ?? cachedVersion?.versionId
   const canAddVersion = detail?.capacity.canCreate === true
   const canDeleteVersion = (detail?.versions.length ?? 0) > 1
   const premium = detail?.capacity.premium === true
+
+  // An edit started without an authoritative live card snapshot (offline, cached or not)
+  // re-seeds the user-uneditable card draft once live detail arrives, so a stale or empty
+  // seeded list can never be saved back to the server.
+  useEffect(() => {
+    if (!editing || !editingFromCache.current || detail === undefined) return
+    editingFromCache.current = false
+    setDraft(displayCards)
+  }, [detail, displayCards, editing])
+
+  // Keeps the persistent cache fresh with live reads so the next offline session is current.
+  useEffect(() => {
+    const liveVersion = detail?.version
+    const recordCards = versionCache.record
+    if (!detail || !liveVersion || !recordCards) return
+    recordCards(liveVersion._id, liveVersion.syncRevision ?? 0, detail.cards)
+  }, [detail, versionCache.record])
 
   usePreventRemove(draftChanged, ({ data }) => {
     setPendingNavigation(data.action)
@@ -403,7 +461,9 @@ function DeckDetailContent({
   function startEditing() {
     if (knownDeleted) return
     metadataSaveStarted.current = false
-    setDraft(storedCards)
+    // No authoritative live snapshot at edit start: pin re-seed (cached or uncached alike).
+    editingFromCache.current = detail === undefined || cachedCards !== undefined
+    setDraft(displayCards)
     setDraftNote(deck?.note ?? "")
     setDraftMetadataRevision(currentMetadataRevision)
     setUndo(undefined)
@@ -638,7 +698,8 @@ function DeckDetailContent({
         editing={editing}
         dirty={draftChanged}
         busy={busy}
-        cardsUnavailable={!detail}
+        cardsUnavailable={cardsUnavailable}
+        cardsCached={cardsCached}
         editingDisabled={knownDeleted}
         saveStatus={
           syncEnabled && access?.ownerId
@@ -867,26 +928,31 @@ function DeckDetailContent({
           onDelete={() => setDialog("deleteDeck")}
           onClose={() => setDialog("none")}
         >
-          {detail ? (
+          {detail || cachedVersionRows.length > 0 ? (
             <View style={themed($versions)}>
               <View style={themed($versionHeading)}>
                 <Text weight="bold" size="sm" text="Versions" />
-                <TouchableOpacity
-                  testID="version-picker-__new__"
-                  accessibilityRole="button"
-                  accessibilityLabel="New version"
-                  disabled={editing}
-                  onPress={startNewVersion}
-                >
-                  <Text weight="bold" size="sm" style={themed($textAction)} text="New version" />
-                </TouchableOpacity>
+                {detail ? (
+                  <TouchableOpacity
+                    testID="version-picker-__new__"
+                    accessibilityRole="button"
+                    accessibilityLabel="New version"
+                    disabled={editing}
+                    onPress={startNewVersion}
+                  >
+                    <Text weight="bold" size="sm" style={themed($textAction)} text="New version" />
+                  </TouchableOpacity>
+                ) : null}
               </View>
-              {detail.versions.map((candidate) => {
-                const selected = candidate._id === version?._id
+              {versionRows.map((candidate) => {
+                const selected = candidate._id === activeVersionId
                 const record = candidate.record
+                // Live records only; cached rows must not present unknown stats as fresh.
                 const candidateRecord = record?.games
                   ? `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ""}`
-                  : "Unplayed"
+                  : detail
+                    ? "Unplayed"
+                    : ""
                 return (
                   <TouchableOpacity
                     key={candidate._id}
@@ -923,7 +989,7 @@ function DeckDetailContent({
                         text={cardCountLabel(candidate.cardQuantity)}
                       />
                     </View>
-                    {selected ? (
+                    {selected && detail ? (
                       <TouchableOpacity
                         testID="rename-version-button"
                         accessibilityRole="button"

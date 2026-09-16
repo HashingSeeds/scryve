@@ -28,6 +28,7 @@ export function DeckView({
   busy,
   guest,
   cardsUnavailable,
+  cardsCached,
   editingDisabled,
   saveStatus,
   error,
@@ -55,6 +56,7 @@ export function DeckView({
   busy?: boolean
   guest?: boolean
   cardsUnavailable?: boolean
+  cardsCached?: boolean
   editingDisabled?: boolean
   saveStatus?: string
   error?: ReactNode
@@ -222,7 +224,7 @@ export function DeckView({
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={`${item.quantity === 1 ? "Remove" : "Decrease"} ${item.name}`}
-                  disabled={busy || cardsUnavailable || editingDisabled}
+                  disabled={busy || cardsUnavailable || cardsCached || editingDisabled}
                   style={$touch}
                   onPress={() => onDecrement(item)}
                 >
@@ -245,7 +247,13 @@ export function DeckView({
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={`Increase ${item.name}`}
-                  disabled={busy || cardsUnavailable || editingDisabled || item.quantity >= 999}
+                  disabled={
+                    busy ||
+                    cardsUnavailable ||
+                    cardsCached ||
+                    editingDisabled ||
+                    item.quantity >= 999
+                  }
                   style={$touch}
                   onPress={() => onIncrement(item)}
                 >
@@ -278,7 +286,7 @@ export function DeckView({
             testID="deck-add-cards"
             text="+ Add cards"
             onPress={onAdd}
-            disabled={busy || cardsUnavailable || editingDisabled}
+            disabled={busy || cardsUnavailable || cardsCached || editingDisabled}
             style={$primary}
             preset="primary"
           />
