@@ -127,6 +127,7 @@
     "concurrently": "^9.2.4",
     "convex-test": "0.0.54",
     "dependency-cruiser": "^17.0.2",
+    "eas-cli": "22.2.0",
     "eslint": "^8.57.0",
     "eslint-config-expo": "~57.0.2",
     "eslint-config-prettier": "^9.1.0",

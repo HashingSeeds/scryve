@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           for platform in ios android; do
-            pnpm dlx eas-cli@22.2.0 fingerprint:generate \
+            pnpm exec eas fingerprint:generate \
               --build-profile development \
               --platform "$platform" \
               --json \
