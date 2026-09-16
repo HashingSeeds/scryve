@@ -148,16 +148,17 @@ export function GameRadialMenu({
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
-  const menuOpen = open && !exitAction
+  const suppressed = !!exitAction
+  const menuOpen = open && !suppressed
   const pentagonRotation = useSharedValue(
-    menuOpen ? PENTAGON_OPEN_ROTATION_DEG : exitAction ? -PENTAGON_OPEN_ROTATION_DEG : 0,
+    menuOpen ? PENTAGON_OPEN_ROTATION_DEG : suppressed ? -PENTAGON_OPEN_ROTATION_DEG : 0,
   )
   const poses = getRadialActionPoses(anchor, actions.length)
 
   useEffect(() => {
     const spinTarget = menuOpen
       ? PENTAGON_OPEN_ROTATION_DEG
-      : exitAction
+      : suppressed
         ? -PENTAGON_OPEN_ROTATION_DEG
         : 0
     pentagonRotation.value = animateFully
@@ -165,7 +166,7 @@ export function GameRadialMenu({
       : withTiming(spinTarget, {
           duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS),
         })
-  }, [animateFully, menuOpen, exitAction, pentagonRotation, reducedMotion])
+  }, [animateFully, menuOpen, suppressed, pentagonRotation, reducedMotion])
 
   const pentagonSpinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${pentagonRotation.value}deg` }],
