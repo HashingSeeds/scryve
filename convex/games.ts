@@ -126,7 +126,10 @@ async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: 
       })
     return
   }
-  if (record.attempts >= 10) throw new Error("Too many join attempts; wait a minute and try again")
+  if (record.attempts >= 10) {
+    if (kind === "seatLookup") return ctx.db.patch(record._id, { attempts: record.attempts + 1 })
+    throw new Error("Too many join attempts; wait a minute and try again")
+  }
   await ctx.db.patch(record._id, { attempts: record.attempts + 1 })
 }
 
