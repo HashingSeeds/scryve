@@ -272,14 +272,25 @@ function DeckDetailContent({
     (deck) => deck.deckId === deckId && deck.deleted,
   )
   const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
-  const provisionalVersionIds = useRef(new Set<string>())
   const pinnedVersionTarget = useRef<
     { versionId: Id<"deckVersions">; expectedRevision: number } | undefined
   >(undefined)
   const mappedSelection =
     selectedVersionId !== undefined ? versionWrites.mappedVersion(selectedVersionId) : undefined
+  const versionCache = useDeckVersionCache(
+    syncEnabled && !knownDeleted,
+    access?.ownerId,
+    deckId,
+    mappedSelection,
+  )
+  const isProvisionalSelection =
+    selectedVersionId !== undefined &&
+    mappedSelection === selectedVersionId &&
+    versionCache.versions.some(
+      (candidate) => candidate.versionId === selectedVersionId && candidate.local,
+    )
   const queryVersionId =
-    mappedSelection === undefined || provisionalVersionIds.current.has(mappedSelection)
+    mappedSelection === undefined || isProvisionalSelection
       ? undefined
       : (mappedSelection as Id<"deckVersions">)
   const detail = useQuery(
@@ -290,12 +301,6 @@ function DeckDetailContent({
           ...(queryVersionId ? { versionId: queryVersionId } : {}),
         }
       : "skip",
-  )
-  const versionCache = useDeckVersionCache(
-    syncEnabled && !knownDeleted,
-    access?.ownerId,
-    deckId,
-    selectedVersionId,
   )
   // Keeps the server-known capacity hint so offline new-version creation has a guard.
   const recordVersionCapacity = versionCache.recordCapacity
@@ -371,8 +376,7 @@ function DeckDetailContent({
   )?.revision
 
   const cachedVersion = versionCache.version
-  const staleSelection =
-    selectedVersionId !== undefined && detail?.version?._id !== selectedVersionId
+  const staleSelection = selectedVersionId !== undefined && detail?.version?._id !== mappedSelection
   const version = staleSelection ? undefined : detail?.version
   const activeVersionId = version?._id ?? cachedVersion?.versionId
   const storedCards = useMemo(
@@ -720,7 +724,6 @@ function DeckDetailContent({
           note.trim(),
           captured ?? [],
         )
-        if (provisionalId) provisionalVersionIds.current.add(provisionalId)
         setSelectedVersionId(provisionalId as Id<"deckVersions">)
         setDialog("none")
       } catch (cause) {

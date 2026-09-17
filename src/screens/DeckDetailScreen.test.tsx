@@ -279,6 +279,11 @@ describe("DeckDetailScreen", () => {
     mockVersionCacheState.capacity = undefined
     mockVersionCardUpdate.mockClear()
     mockVersionCacheRefresh.mockClear()
+    mockMappedVersion.mockImplementation((versionId: string) => versionId)
+  })
+
+  afterEach(() => {
+    mockMappedVersion.mockImplementation((versionId: string) => versionId)
   })
 
   it("renders cached version contents offline and queues durable card edits on save", () => {
@@ -1631,8 +1636,6 @@ describe("DeckDetailScreen", () => {
     mockDetail.value = undefined
     const provisionalId = "00000000-0000-4000-8000-000000000001"
     const confirmedId = "version-confirmed"
-    mockVersionCreate.mockReturnValueOnce(provisionalId)
-    mockMappedVersion.mockImplementation((versionId: string) => versionId)
     const cachedMain = {
       deckId: "deck-1",
       versionId: "version-main",
@@ -1646,6 +1649,20 @@ describe("DeckDetailScreen", () => {
       deleted: false,
       updatedAt: 1,
     }
+    const draftRow = {
+      ...cachedMain,
+      versionId: provisionalId,
+      versionNumber: 2,
+      name: "Offline draft",
+      fingerprint: "local",
+      local: true,
+    }
+    mockVersionCreate.mockImplementationOnce(() => {
+      mockVersionCacheState.versions = [cachedMain, draftRow]
+      mockVersionCacheState.version = draftRow
+      return provisionalId
+    })
+    mockMappedVersion.mockImplementation((versionId: string) => versionId)
     mockVersionCacheState.versions = [cachedMain]
     mockVersionCacheState.version = cachedMain
     mockVersionCacheState.cards = [solRing]
@@ -1674,16 +1691,6 @@ describe("DeckDetailScreen", () => {
       expect.objectContaining({ name: "Sol Ring", quantity: 1 }),
     ])
 
-    const draftRow = {
-      ...cachedMain,
-      versionId: provisionalId,
-      versionNumber: 2,
-      name: "Offline draft",
-      fingerprint: "local",
-      local: true,
-    }
-    mockVersionCacheState.versions = [cachedMain, draftRow]
-    mockVersionCacheState.version = draftRow
     view.rerender(screen())
 
     expect(queryArgs.some((args) => args.versionId === provisionalId)).toBe(false)
@@ -1696,6 +1703,22 @@ describe("DeckDetailScreen", () => {
     view.rerender(screen())
     expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1", versionId: confirmedId })
 
-    mockMappedVersion.mockImplementation((versionId: string) => versionId)
+    const confirmedRow = {
+      ...draftRow,
+      versionId: confirmedId,
+      local: false,
+    }
+    mockVersionCacheState.versions = [cachedMain, confirmedRow]
+    mockVersionCacheState.version = confirmedRow
+    mockVersionCacheState.cards = undefined
+    mockDetail.value = {
+      ...loadedDetail,
+      version: { ...mainVersion, _id: confirmedId },
+      versions: [mainVersion, { ...sideboardVersion, _id: confirmedId }],
+      cards: [solRing],
+    }
+    view.rerender(screen())
+    expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1", versionId: confirmedId })
+    expect(view.getByText("Sol Ring")).toBeTruthy()
   })
 })
