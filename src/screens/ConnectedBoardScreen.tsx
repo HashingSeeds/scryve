@@ -433,7 +433,7 @@ function ConnectedBoardRuntime({
     },
   ]
 
-  const inviteDialogOpen = inviteOpen && invitation !== undefined
+  const inviteDialogOpen = invitation !== undefined && inviteOpen
   const overlayOpen =
     menuOpen ||
     statusOpen ||

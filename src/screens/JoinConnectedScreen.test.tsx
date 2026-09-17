@@ -186,6 +186,54 @@ describe("JoinConnectedScreen", () => {
     await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
   })
 
+  it("re-offers the remaining seats when the chosen one was taken meanwhile", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 4],
+    })
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-3-button"))
+    })
+
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+    expect(screen.getByTestId("join-error")).toHaveTextContent(
+      "That seat was just taken. Pick another seat.",
+    )
+    expect(screen.queryByTestId("claim-seat-3-button")).toBeNull()
+    expect(screen.getByTestId("claim-seat-4-button")).toBeTruthy()
+  })
+
+  it("drops the offered seats when the invite code changes", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+    expect(screen.getByTestId("claim-seat-3-button")).toBeTruthy()
+
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "EF34GH")
+    expect(screen.queryByTestId("claim-seat-3-button")).toBeNull()
+  })
+
   it("claims straight away when the invite leaves nothing to choose", async () => {
     mockClaimableSeats.mockResolvedValue({ publicId: "game-public", mode: "connected", seats: [2] })
     render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))

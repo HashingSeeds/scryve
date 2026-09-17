@@ -72,6 +72,10 @@ export function JoinConnectedScreen({
     setOpenSeats(undefined)
     onCodeChange?.(value)
   }
+  function chooseToken(value?: string) {
+    setScannedToken(value)
+    setOpenSeats(undefined)
+  }
   const [appearance] = useState<PlayerAppearance>({
     color: PLAYER_COLOR_CHOICES[0],
     shape: shapeForSeat(1),
@@ -115,8 +119,8 @@ export function JoinConnectedScreen({
         return
       }
       failureReason = "request"
-      const { seats } = await claimableSeats({ token, manualCode: manualCode ?? undefined })
-      if (seat === undefined && seats.length > 1) {
+      const seats = (await claimableSeats({ token, manualCode: manualCode ?? undefined })).seats
+      if (seats.length > 1 && seat === undefined) {
         setOpenSeats(seats)
         return
       }
@@ -160,10 +164,9 @@ export function JoinConnectedScreen({
         onCancel={() => setScanning(false)}
         onInvite={(invite) => {
           setError(undefined)
-          setOpenSeats(undefined)
-          if (invite.kind === "token") setScannedToken(invite.token)
+          if (invite.kind === "token") chooseToken(invite.token)
           else {
-            setScannedToken(undefined)
+            chooseToken(undefined)
             changeCode(invite.code)
           }
           setScanning(false)
@@ -232,13 +235,7 @@ export function JoinConnectedScreen({
           </View>
         ) : null}
         {scannedToken ? (
-          <Button
-            text="Use a different invitation"
-            onPress={() => {
-              setScannedToken(undefined)
-              setOpenSeats(undefined)
-            }}
-          />
+          <Button text="Use a different invitation" onPress={() => chooseToken(undefined)} />
         ) : null}
         {user?.username ? (
           <View style={themed($section)}>

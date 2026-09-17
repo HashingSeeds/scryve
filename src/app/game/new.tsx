@@ -137,7 +137,11 @@ export default function NewLocalGameRoute() {
         connected={connected}
         localConnect={
           connectableGame && localConnect && connectAllowed
-            ? { ...localConnect, ...(connected?.access ? { access: connected.access } : {}) }
+            ? {
+                ...localConnect,
+                ...(connected?.access ? { access: connected.access } : {}),
+                ready: Boolean(connected?.ready || connected?.access),
+              }
             : undefined
         }
         joinContent={

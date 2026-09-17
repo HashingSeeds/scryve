@@ -109,15 +109,21 @@ function assertSnapshotLife(life: number) {
     throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
 }
 
-async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string) {
+async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: "seatLookup") {
   const now = Date.now()
   const record = await ctx.db
     .query("joinAttempts")
-    .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", clerkUserId))
+    .withIndex("by_clerk_user_kind", (q) => q.eq("clerkUserId", clerkUserId).eq("kind", kind))
     .unique()
   if (!record || now - record.windowStartedAt >= 60_000) {
     if (record) await ctx.db.patch(record._id, { windowStartedAt: now, attempts: 1 })
-    else await ctx.db.insert("joinAttempts", { clerkUserId, windowStartedAt: now, attempts: 1 })
+    else
+      await ctx.db.insert("joinAttempts", {
+        clerkUserId,
+        windowStartedAt: now,
+        attempts: 1,
+        ...(kind ? { kind } : {}),
+      })
     return
   }
   if (record.attempts >= 10) throw new Error("Too many join attempts; wait a minute and try again")
@@ -1014,6 +1020,7 @@ export const claimableSeats = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    await consumeJoinAttempt(ctx, String(user.clerkUserId), "seatLookup")
     const invite = await findInvite(ctx, args)
     if (!invite) throw new Error("Invite is invalid, expired, or revoked")
     const game = await ctx.db.get(invite.gameId)

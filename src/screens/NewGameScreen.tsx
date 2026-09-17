@@ -112,6 +112,7 @@ export interface NewGameScreenProps {
 export interface LocalConnectFeed {
   /** Set when the account gate has to be cleared first, mirroring `ConnectedHostFeed`. */
   access?: { label: string; request: () => void }
+  ready?: boolean
   busy?: boolean
   error?: string
   publish: (hostPlayerId: PlayerId) => void
@@ -570,7 +571,7 @@ export function NewGameScreen({
                     text={localConnect?.access?.label ?? "Connect"}
                     preset="reversed"
                     style={themed($footerAction)}
-                    disabled={localConnect?.busy}
+                    disabled={localConnect?.busy || localConnect?.ready === false}
                     accessibilityHint="Moves this game to the cloud so others can join it"
                     onPress={() =>
                       localConnect?.access
