@@ -150,27 +150,78 @@ it("limits a deck's missing-image lookups to two concurrent actions", async () =
 })
 
 it("pauses other cards without calling the action while Scryfall is rate limited", async () => {
-  mockFallbacks.mockRejectedValue(
-    new ConvexError({
-      code: "scryfall_rate_limited",
-      message: "Scryfall requests are paused. Try again shortly.",
-      retryAfterMs: 30_000,
-    }),
-  )
-  const paused = (id: string, testID: string) => (
-    <CardImage game="mtg" cardId={id} style={style} accessibilityLabel={testID} testID={testID} />
-  )
-  const view = render(
-    <ThemeProvider initialContext="dark">{paused("paused-first", "first")}</ThemeProvider>,
-  )
-  await waitFor(() => expect(view.getByText("No image found")).toBeTruthy())
-  expect(mockFallbacks).toHaveBeenCalledTimes(1)
-  view.rerender(
-    <ThemeProvider initialContext="dark">
-      {paused("paused-first", "first")}
-      {paused("paused-second", "second")}
-    </ThemeProvider>,
-  )
-  await waitFor(() => expect(view.getAllByText("No image found")).toHaveLength(2))
-  expect(mockFallbacks).toHaveBeenCalledTimes(1)
+  jest.useFakeTimers()
+  try {
+    mockFallbacks.mockRejectedValue(
+      new ConvexError({
+        code: "scryfall_rate_limited",
+        message: "Scryfall requests are paused. Try again shortly.",
+        retryAfterMs: 30_000,
+      }),
+    )
+    const paused = (id: string, testID: string) => (
+      <CardImage game="mtg" cardId={id} style={style} accessibilityLabel={testID} testID={testID} />
+    )
+    const view = render(
+      <ThemeProvider initialContext="dark">{paused("paused-first", "first")}</ThemeProvider>,
+    )
+    await act(async () => {})
+    expect(view.getByText("No image found")).toBeTruthy()
+    expect(mockFallbacks).toHaveBeenCalledTimes(1)
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        {paused("paused-first", "first")}
+        {paused("paused-second", "second")}
+      </ThemeProvider>,
+    )
+    await act(async () => {})
+    expect(view.getAllByText("No image found")).toHaveLength(2)
+    expect(mockFallbacks).toHaveBeenCalledTimes(1)
+    mockFallbacks.mockResolvedValue(["recovered"])
+    await act(async () => {
+      jest.advanceTimersByTime(30_000)
+    })
+    expect(mockFallbacks).toHaveBeenCalledTimes(3)
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+it("retries a paused lookup after the Scryfall pause expires", async () => {
+  jest.useFakeTimers()
+  try {
+    act(() => {
+      jest.advanceTimersByTime(30_001)
+    })
+    mockFallbacks
+      .mockRejectedValueOnce(
+        new ConvexError({
+          code: "scryfall_rate_limited",
+          message: "Scryfall requests are paused. Try again shortly.",
+          retryAfterMs: 30_000,
+        }),
+      )
+      .mockResolvedValueOnce(["recovered"])
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardImage
+          game="mtg"
+          cardId="pause-retry"
+          style={style}
+          accessibilityLabel="Retry"
+          testID="retry"
+        />
+      </ThemeProvider>,
+    )
+    await act(async () => {})
+    expect(view.getByText("No image found")).toBeTruthy()
+    expect(mockFallbacks).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      jest.advanceTimersByTime(30_000)
+    })
+    expect(view.getByTestId("retry").props.source).toEqual([{ uri: "recovered" }])
+    expect(mockFallbacks).toHaveBeenCalledTimes(2)
+  } finally {
+    jest.useRealTimers()
+  }
 })

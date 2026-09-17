@@ -46,6 +46,17 @@ function publish(key: string, value: Fallback) {
   listeners.forEach((listener) => listener())
 }
 
+function publishPaused(key: string, failed: Set<string>) {
+  publish(key, { urls: [], failed, loading: false, expiresAt: scryfallPausedUntil })
+  const delay = scryfallPausedUntil - Date.now()
+  if (delay > 0)
+    setTimeout(() => {
+      const current = fallbacks.get(key)
+      if (current && current.expiresAt <= Date.now())
+        publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() })
+    }, delay)
+}
+
 export type CardImageIdentity = { game?: string; cardId?: string }
 type Props = CardImageIdentity & {
   source?: string
@@ -87,7 +98,7 @@ export function CardImage({
       if (scheduledLookups.has(key)) return
       const failed = new Set(failedUrl ? [failedUrl] : [])
       if (Date.now() < scryfallPausedUntil) {
-        publish(key, { urls: [], failed, loading: false, expiresAt: scryfallPausedUntil })
+        publishPaused(key, failed)
         return
       }
       publish(key, {
@@ -103,6 +114,10 @@ export function CardImage({
       }, 15_000)
       pendingLookups.push(async () => {
         try {
+          if (Date.now() < scryfallPausedUntil) {
+            publishPaused(key, failed)
+            return
+          }
           const urls = await client.action(api.cards.imageFallbacks, { game, cardId })
           publish(key, {
             urls: urls.filter((url) => !failed.has(url)),
@@ -111,14 +126,12 @@ export function CardImage({
             expiresAt: Date.now() + 5 * 60_000,
           })
         } catch (cause) {
-          if (convexErrorCode(cause) === "scryfall_rate_limited")
+          if (convexErrorCode(cause) === "scryfall_rate_limited") {
             scryfallPausedUntil = Date.now() + convexErrorRetryAfterMs(cause, 30_000)
-          publish(key, {
-            urls: [],
-            failed,
-            loading: false,
-            expiresAt: Math.max(Date.now() + 30_000, scryfallPausedUntil),
-          })
+            publishPaused(key, failed)
+          } else {
+            publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() + 30_000 })
+          }
         } finally {
           clearTimeout(timeout)
           scheduledLookups.delete(key)
