@@ -1,3 +1,4 @@
+import { observe } from "@legendapp/state"
 import type { ConvexReactClient } from "convex/react"
 import { getFunctionName } from "convex/server"
 
@@ -340,6 +341,38 @@ describe("deck version cache", () => {
       version: { versionId: "version-1" },
       cards: undefined,
     })
+    stop()
+  })
+
+  it("notifies reacting readers when the selected version changes", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    repository.mergeVersions(deckId, [
+      versionRow(),
+      versionRow({ versionId: "version-2", versionNumber: 2 }),
+    ])
+    repository.saveCards("version-1", 1, [cardRow])
+    repository.saveCards("version-2", 1, [
+      { ...cardRow, deckVersionId: "version-2" as Id<"deckVersions"> },
+    ])
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => {
+          throw new Error("Offline")
+        },
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, "version-1")
+    const seen: (string | undefined)[] = []
+    const dispose = observe(() => {
+      seen.push(controller.snapshot(deckId).version?.versionId)
+    })
+    controller.ensure(deckId, "version-2")
+    await flush(5)
+    expect(seen.at(-1)).toBe("version-2")
+    dispose()
     stop()
   })
 

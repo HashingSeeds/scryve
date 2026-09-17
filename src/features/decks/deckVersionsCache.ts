@@ -523,7 +523,7 @@ export class DeckVersionCacheController {
    * so screens re-render through useRouterState-equivalent hooks (useSelector).
    */
   private wantedAt(deckId: string): string | undefined {
-    return this.wanted$.peek()[deckId]
+    return this.wanted$[deckId].get()
   }
 
   snapshot(deckId: string): DeckVersionCacheSnapshot {
