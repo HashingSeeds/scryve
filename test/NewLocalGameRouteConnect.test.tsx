@@ -3,7 +3,7 @@ import { act, render } from "@testing-library/react-native"
 
 import type { ConnectedHostFeed, LocalConnectFeed } from "@/screens/NewGameScreen"
 
-import NewLocalGameRoute, { ReportLocalConnect } from "./new"
+import NewLocalGameRoute, { ReportLocalConnect } from "../src/app/game/new"
 
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn(), back: jest.fn() },
