@@ -433,6 +433,7 @@ function ConnectedBoardRuntime({
     },
   ]
 
+  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- follow-up PR: drop comment
   /**
    * A live update can withdraw the invitation while its dialog is open, so the board
    * follows the invitation rather than the flag: otherwise the dialog would vanish and

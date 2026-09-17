@@ -14,6 +14,7 @@ export interface PublishedGame {
   manualCode: string
 }
 
+// eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- follow-up PR: drop comment
 /**
  * Hands a running local game to the server so other players can join it.
  *

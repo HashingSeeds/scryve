@@ -109,6 +109,7 @@ function assertSnapshotLife(life: number) {
     throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
 }
 
+// eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- follow-up PR: drop comment
 /**
  * Spends one attempt from a user's per-minute window; the claim bucket throws once
  * it is exhausted.
