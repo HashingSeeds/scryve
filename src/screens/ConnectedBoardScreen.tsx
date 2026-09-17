@@ -433,13 +433,14 @@ function ConnectedBoardRuntime({
     },
   ]
 
+  const inviteDialogOpen = inviteOpen && invitation !== undefined
   const overlayOpen =
     menuOpen ||
     statusOpen ||
     layoutPickerOpen ||
     confirmingFinish ||
     playerActionsOpen ||
-    inviteOpen
+    inviteDialogOpen
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
     seat: player.seat,
@@ -549,7 +550,7 @@ function ConnectedBoardRuntime({
         />
       </View>
 
-      {inviteOpen && invitation ? (
+      {inviteDialogOpen && invitation ? (
         <DialogCard
           visible
           wide

@@ -421,6 +421,24 @@ describe("imported game invite renewal and discovery", () => {
     ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [] })
   })
 
+  it("leaves seat lookups out of the join rate-limit budget", async () => {
+    const t = convexTest(schema, modules)
+    const { created } = await published(t)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    for (let index = 0; index < 15; index += 1) {
+      await expect(
+        guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
+      ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [2] })
+    }
+    await expect(
+      guest.mutation(api.games.claimSeat, {
+        seat: 2,
+        manualCode: created.manualCode,
+        deviceId: joinerDevice,
+      }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+  })
+
   it("reports a lobby as having nothing to choose so joining stays one step", async () => {
     const t = convexTest(schema, modules)
     const host = await signedIn(t, "lobby-host-subject", "LobbyHost")

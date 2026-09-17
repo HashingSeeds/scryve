@@ -1014,7 +1014,6 @@ export const claimableSeats = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
-    await consumeJoinAttempt(ctx, String(user.clerkUserId))
     const invite = await findInvite(ctx, args)
     if (!invite) throw new Error("Invite is invalid, expired, or revoked")
     const game = await ctx.db.get(invite.gameId)

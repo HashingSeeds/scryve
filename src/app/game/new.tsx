@@ -39,14 +39,15 @@ function openPublishedGame({ publicId }: PublishedGame) {
   router.replace({ pathname: "/connected/game/[gameId]", params: { gameId: publicId } })
 }
 
-function ReportLocalConnect({
+export function ReportLocalConnect({
   feed,
   onChange,
 }: {
   feed: LocalConnectFeed
   onChange: (feed: LocalConnectFeed) => void
 }) {
-  useEffect(() => onChange(feed), [feed, onChange])
+  const { busy, error, publish } = feed
+  useEffect(() => onChange({ busy, error, publish }), [busy, error, publish, onChange])
   return null
 }
 
@@ -85,6 +86,7 @@ export default function NewLocalGameRoute() {
   }
 
   const connectableGame = started && mode === "local" ? activeGame : null
+  const connectAllowed = Boolean(connected?.access ?? connected?.ready)
 
   return (
     <>
@@ -134,7 +136,7 @@ export default function NewLocalGameRoute() {
         }}
         connected={connected}
         localConnect={
-          connectableGame && localConnect
+          connectableGame && localConnect && connectAllowed
             ? { ...localConnect, ...(connected?.access ? { access: connected.access } : {}) }
             : undefined
         }

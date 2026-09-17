@@ -41,7 +41,9 @@ export function LocalGamePublishSource({
   const publishLocalGame = useMutation(api.games.publishLocalGame)
   const repository = useMemo(() => new LocalGameRepository(), [])
   const deviceId = useMemo(() => repository.getDeviceId(), [repository])
-  const identifiers = useRef<ReturnType<typeof createLobbyIdentifiers>>(undefined)
+  const identifiers = useRef<Awaited<ReturnType<typeof createLobbyIdentifiers>> | undefined>(
+    undefined,
+  )
   const inFlight = useRef(false)
   const operationId = `publish_${game.id}`
   const [busy, setBusy] = useState(false)
@@ -54,14 +56,14 @@ export function LocalGamePublishSource({
         inFlight.current = true
         setBusy(true)
         setError(undefined)
-        identifiers.current ??= createLobbyIdentifiers()
+        identifiers.current ??= await createLobbyIdentifiers()
         const published = await publishLocalGame(
           buildLocalGameSnapshot({
             game,
             hostPlayerId,
             operationId,
             deviceId,
-            ...(await identifiers.current),
+            ...identifiers.current,
           }),
         )
         onPublished({ publicId: published.publicId, manualCode: published.manualCode })
