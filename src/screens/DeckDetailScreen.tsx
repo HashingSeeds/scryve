@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useFocusEffect, useNavigation } from "expo-router"
-import { useMutation, useQuery } from "convex/react"
+import { useMutation, useQuery, useConvexConnectionState } from "convex/react"
 import { usePreventRemove } from "expo-router/react-navigation"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -293,6 +293,8 @@ function DeckDetailContent({
     deckId,
     selectedVersionId,
   )
+  const connection = useConvexConnectionState()
+  const offline = connection?.isWebSocketConnected === false
   // Keeps the server-known capacity hint so offline new-version creation has a guard.
   const recordVersionCapacity = versionCache.recordCapacity
   useEffect(() => {
@@ -586,7 +588,7 @@ function DeckDetailContent({
   function addCard(card: DeckCard) {
     if (knownDeleted) return
     const alreadyInDraft = draft.some((candidate) => printingKey(candidate) === printingKey(card))
-    if (!alreadyInDraft && detail === undefined) {
+    if (!alreadyInDraft && offline) {
       const entry = offlineCardEntry(card)
       if (!entry) {
         setError(OFFLINE_CARD_MESSAGE)

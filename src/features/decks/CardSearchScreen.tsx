@@ -56,6 +56,7 @@ export function CardSearchScreen({
   useEffect(() => {
     let active = true
     setResults(undefined)
+    setOfflineResults(undefined)
     setMessage(undefined)
     setBusy(query.trim().length >= 2)
     if (query.trim().length < 2) return

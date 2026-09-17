@@ -501,7 +501,7 @@ export class DeckVersionCacheRepository {
   /** Addable cards this account already has cached, keyed by card identity. */
   loadKnownCards(): Record<string, KnownCardEntry> {
     const node = knownCardsNode(this.context())
-    const value = node.peek() as unknown
+    const value = node.get() as unknown
     return isRecord(value) && isRecord(value.cards)
       ? (value.cards as StoredKnownCards["cards"])
       : {}
