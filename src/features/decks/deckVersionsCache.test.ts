@@ -1,3 +1,4 @@
+import { observe } from "@legendapp/state"
 import type { ConvexReactClient } from "convex/react"
 import { getFunctionName } from "convex/server"
 
@@ -187,8 +188,12 @@ describe("deck version cache", () => {
 
   it("treats a corrupted payload as uncached so a same-revision refetch repairs it", async () => {
     const storage = new MemoryStorage()
+    // Seed the payload raw, so the external corruption below lands before the cache hydrates.
+    storage.set(
+      "scryve.decks.versionCards.v1.owner-a.version-1",
+      JSON.stringify({ schemaVersion: 1, revision: 1, cards: [{ name: "Sol Ring", quantity: 1 }] }),
+    )
     const repository = new DeckVersionCacheRepository("owner-a", storage)
-    repository.saveCards("version-1", 1, [cardRow])
     repository.mergeVersions(deckId, [versionRow()])
     storage.set(
       "scryve.decks.versionCards.v1.owner-a.version-1",
@@ -336,6 +341,38 @@ describe("deck version cache", () => {
       version: { versionId: "version-1" },
       cards: undefined,
     })
+    stop()
+  })
+
+  it("notifies reacting readers when the selected version changes", async () => {
+    const storage = new MemoryStorage()
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    repository.mergeVersions(deckId, [
+      versionRow(),
+      versionRow({ versionId: "version-2", versionNumber: 2 }),
+    ])
+    repository.saveCards("version-1", 1, [cardRow])
+    repository.saveCards("version-2", 1, [
+      { ...cardRow, deckVersionId: "version-2" as Id<"deckVersions"> },
+    ])
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => {
+          throw new Error("Offline")
+        },
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.ensure(deckId, "version-1")
+    const seen: (string | undefined)[] = []
+    const dispose = observe(() => {
+      seen.push(controller.snapshot(deckId).version?.versionId)
+    })
+    controller.ensure(deckId, "version-2")
+    await flush(5)
+    expect(seen.at(-1)).toBe("version-2")
+    dispose()
     stop()
   })
 
