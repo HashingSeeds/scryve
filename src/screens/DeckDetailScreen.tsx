@@ -1140,7 +1140,7 @@ function DeckDetailContent({
         <CardSearchScreen
           game={detail?.deck.game ?? deck.game ?? "mtg"}
           format={detail?.deck.format ?? deck.format}
-          {...(detail ? {} : { offlineCandidates })}
+          offlineCandidates={offlineCandidates}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
             const existing = draft.find((entry) => printingKey(entry) === printingKey(card))

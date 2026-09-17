@@ -802,6 +802,42 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByLabelText("Add Ash Blossom & Joyous Spring to deck")).toBeNull()
   })
 
+  it("offers cached-candidate search on warm disconnect after detail loads", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = {
+      ...loadedDetail,
+      version: mainVersion,
+      capacity: { used: 2, limit: 5, premium: true, canCreate: true },
+    }
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.knownCards = {
+      "printing-333": {
+        game: "mtg",
+        card: {
+          _id: "card-mindstone",
+          _creationTime: 0,
+          deckVersionId: "version-sideboard",
+          game: "mtg",
+          cardId: "catalog-333",
+          printingId: "printing-333",
+          identityNamespace: "scryfall-oracle",
+          name: "Mind Stone",
+          quantity: 2,
+          section: "sideboard",
+        },
+      },
+    }
+    const view = renderDetail(offlineAccess)
+
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByTestId("deck-add-cards"))
+    expect(view.getByText("You’re offline. Searching cards already in your decks.")).toBeTruthy()
+    fireEvent.changeText(view.getByTestId("card-search-input"), "Mind")
+    expect(view.getByLabelText("Add Mind Stone to deck")).toBeTruthy()
+  })
+
   it("records stats again when the screen regains focus", () => {
     const view = renderDetail()
     expect(mockCaptureAnalytics).toHaveBeenCalledTimes(1)
