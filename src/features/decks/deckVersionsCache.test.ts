@@ -616,6 +616,46 @@ describe("deck version cache", () => {
     stop()
   })
 
+  it("indexes warm cached cards when record() hits a same-or-newer revision", () => {
+    const storage = new MemoryStorage()
+    storage.set(
+      "scryve.decks.versionCards.v1.owner-a.version-1",
+      JSON.stringify({
+        schemaVersion: 1,
+        revision: 2,
+        cards: [
+          {
+            ...cardRow,
+            game: "mtg",
+            printingId: "printing-1",
+          },
+        ],
+      }),
+    )
+    const repository = new DeckVersionCacheRepository("owner-a", storage)
+    expect(repository.loadCards("version-1")).toMatchObject({ revision: 2 })
+    expect(repository.loadKnownCards()).toEqual({})
+
+    const controller = new DeckVersionCacheController(
+      fakeClient({
+        versionsPull: () => {
+          throw new Error("Offline")
+        },
+      }),
+      repository,
+    )
+    const stop = controller.start()
+    controller.record(deckId, "version-1", 2, [{ ...cardRow, name: "Live" }])
+    expect(repository.loadKnownCards()).toMatchObject({
+      "printing-1": { game: "mtg", card: { name: "Sol Ring" } },
+    })
+    expect(repository.loadCards("version-1")).toMatchObject({
+      revision: 2,
+      cards: [{ printingId: "printing-1" }],
+    })
+    stop()
+  })
+
   it("republishes the persisted capacity hint once detail supplies it", () => {
     const storage = new MemoryStorage()
     const repository = new DeckVersionCacheRepository("owner-a", storage)

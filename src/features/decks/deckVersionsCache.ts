@@ -661,7 +661,10 @@ export class DeckVersionCacheController {
   ): void {
     if (this.users === 0) return
     const cached = this.repository.loadCards(versionId)
-    if (cached && cached.revision >= revision) return
+    if (cached && cached.revision >= revision) {
+      this.repository.indexCards(cached.cards)
+      return
+    }
     this.repository.saveCards(versionId, revision, cards)
   }
 
