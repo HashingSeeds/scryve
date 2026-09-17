@@ -1,4 +1,5 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { ConvexError } from "convex/values"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -146,4 +147,30 @@ it("limits a deck's missing-image lookups to two concurrent actions", async () =
   expect(view.getAllByText("No image found")).toHaveLength(8)
   expect(initialPeak).toBeLessThanOrEqual(2)
   expect(peak).toBeLessThanOrEqual(2)
+})
+
+it("pauses other cards without calling the action while Scryfall is rate limited", async () => {
+  mockFallbacks.mockRejectedValue(
+    new ConvexError({
+      code: "scryfall_rate_limited",
+      message: "Scryfall requests are paused. Try again shortly.",
+      retryAfterMs: 30_000,
+    }),
+  )
+  const paused = (id: string, testID: string) => (
+    <CardImage game="mtg" cardId={id} style={style} accessibilityLabel={testID} testID={testID} />
+  )
+  const view = render(
+    <ThemeProvider initialContext="dark">{paused("paused-first", "first")}</ThemeProvider>,
+  )
+  await waitFor(() => expect(view.getByText("No image found")).toBeTruthy())
+  expect(mockFallbacks).toHaveBeenCalledTimes(1)
+  view.rerender(
+    <ThemeProvider initialContext="dark">
+      {paused("paused-first", "first")}
+      {paused("paused-second", "second")}
+    </ThemeProvider>,
+  )
+  await waitFor(() => expect(view.getAllByText("No image found")).toHaveLength(2))
+  expect(mockFallbacks).toHaveBeenCalledTimes(1)
 })

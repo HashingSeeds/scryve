@@ -6,6 +6,7 @@ import { useConvex } from "convex/react"
 
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
+import { convexErrorCode, convexErrorRetryAfterMs } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 
@@ -19,6 +20,7 @@ const fallbacks = new Map<string, Fallback>()
 const scheduledLookups = new Set<string>()
 const pendingLookups: Array<() => Promise<void>> = []
 let runningLookups = 0
+let scryfallPausedUntil = 0
 
 function drainLookups() {
   while (runningLookups < 2 && pendingLookups.length) {
@@ -84,6 +86,10 @@ export function CardImage({
       }
       if (scheduledLookups.has(key)) return
       const failed = new Set(failedUrl ? [failedUrl] : [])
+      if (Date.now() < scryfallPausedUntil) {
+        publish(key, { urls: [], failed, loading: false, expiresAt: scryfallPausedUntil })
+        return
+      }
       publish(key, {
         urls: [],
         failed,
@@ -104,8 +110,15 @@ export function CardImage({
             loading: false,
             expiresAt: Date.now() + 5 * 60_000,
           })
-        } catch {
-          publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() + 30_000 })
+        } catch (cause) {
+          if (convexErrorCode(cause) === "scryfall_rate_limited")
+            scryfallPausedUntil = Date.now() + convexErrorRetryAfterMs(cause, 30_000)
+          publish(key, {
+            urls: [],
+            failed,
+            loading: false,
+            expiresAt: Math.max(Date.now() + 30_000, scryfallPausedUntil),
+          })
         } finally {
           clearTimeout(timeout)
           scheduledLookups.delete(key)

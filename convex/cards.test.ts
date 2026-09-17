@@ -227,7 +227,7 @@ describe("image fallback candidates", () => {
   afterEach(() => jest.restoreAllMocks())
 
   it.each(["Card", "Printing"])(
-    "includes Scryfall status and card ID when %s lookup fails",
+    "pauses Scryfall lookups with a typed error when %s lookup is rate limited",
     async (lookup) => {
       const id = "11111111-1111-1111-1111-111111111111"
       const fetchSpy = jest.spyOn(global, "fetch")
@@ -235,15 +235,51 @@ describe("image fallback candidates", () => {
       fetchSpy.mockImplementationOnce(() => response({ object: "error" }, 429))
       const t = convexTest(schema, modules)
       registerRateLimiter(t)
-      await expect(t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id })).rejects.toThrow(
-        `${lookup} lookup failed (Scryfall HTTP 429, card ${id})`,
-      )
+      await expect(
+        t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id }),
+      ).rejects.toMatchObject({
+        data: { code: "scryfall_rate_limited", retryAfterMs: 30_000 },
+      })
       await expect(
         t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id }),
       ).rejects.toMatchObject({ data: { code: "scryfall_rate_limited" } })
       expect(fetchSpy).toHaveBeenCalledTimes(lookup === "Printing" ? 2 : 1)
     },
   )
+
+  it("reports a failed lookup as unavailable without pausing Scryfall", async () => {
+    const id = "11111111-1111-1111-1111-111111111111"
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(() => response({ object: "error" }, 500))
+      .mockImplementationOnce(() => response({ oracle_id: id }))
+      .mockImplementationOnce(() =>
+        response({
+          data: [
+            {
+              id: "alternate",
+              oracle_id: id,
+              name: "Same card",
+              image_uris: { normal: "working" },
+            },
+          ],
+        }),
+      )
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await expect(
+      t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id }),
+    ).rejects.toMatchObject({
+      data: {
+        code: "scryfall_unavailable",
+        message: `Card lookup failed (Scryfall HTTP 500, card ${id})`,
+      },
+    })
+    expect(await t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id })).toEqual([
+      "working",
+    ])
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
 
   it("finds Magic artwork by oracle identity without changing the stored printing", async () => {
     const id = "11111111-1111-1111-1111-111111111111"
