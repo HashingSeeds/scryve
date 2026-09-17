@@ -278,20 +278,35 @@ function DeckDetailContent({
     (deck) => deck.deckId === deckId && deck.deleted,
   )
   const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
+  const pinnedVersionTarget = useRef<
+    { versionId: Id<"deckVersions">; expectedRevision: number } | undefined
+  >(undefined)
+  const mappedSelection =
+    selectedVersionId !== undefined ? versionWrites.mappedVersion(selectedVersionId) : undefined
+  const versionCache = useDeckVersionCache(
+    syncEnabled && !knownDeleted,
+    access?.ownerId,
+    deckId,
+    mappedSelection,
+  )
+  const isProvisionalSelection =
+    selectedVersionId !== undefined &&
+    mappedSelection === selectedVersionId &&
+    versionCache.versions.some(
+      (candidate) => candidate.versionId === selectedVersionId && candidate.local,
+    )
+  const queryVersionId =
+    mappedSelection === undefined || isProvisionalSelection
+      ? undefined
+      : (mappedSelection as Id<"deckVersions">)
   const detail = useQuery(
     api.decks.detail,
     (access?.ready ?? true) && !knownDeleted
       ? {
           deckId: deckId as Id<"decks">,
-          ...(selectedVersionId ? { versionId: selectedVersionId } : {}),
+          ...(queryVersionId ? { versionId: queryVersionId } : {}),
         }
       : "skip",
-  )
-  const versionCache = useDeckVersionCache(
-    syncEnabled && !knownDeleted,
-    access?.ownerId,
-    deckId,
-    selectedVersionId,
   )
   const connection = useConvexConnectionState()
   const offline = connection?.isWebSocketConnected === false
@@ -369,8 +384,7 @@ function DeckDetailContent({
   )?.revision
 
   const cachedVersion = versionCache.version
-  const staleSelection =
-    selectedVersionId !== undefined && detail?.version?._id !== selectedVersionId
+  const staleSelection = selectedVersionId !== undefined && detail?.version?._id !== mappedSelection
   const version = staleSelection ? undefined : detail?.version
   const activeVersionId = version?._id ?? cachedVersion?.versionId
   const storedCards = useMemo(
@@ -557,9 +571,19 @@ function DeckDetailContent({
     }
   }
 
+  function pinVersionTarget() {
+    pinnedVersionTarget.current = versionTarget ? { ...versionTarget } : undefined
+  }
+
+  function pinnedRevisionFor(versionId: string | undefined) {
+    const pinned = pinnedVersionTarget.current
+    return pinned && pinned.versionId === versionId ? pinned.expectedRevision : undefined
+  }
+
   function startEditing() {
     if (knownDeleted) return
     metadataSaveStarted.current = false
+    pinVersionTarget()
     editingFromCache.current = detail === undefined && !versionTarget
     editingBase.current = displayCards
     setDraft(displayCards)
@@ -669,18 +693,14 @@ function DeckDetailContent({
       }
       return
     }
-    const queueCard = cardsDirty && canQueueCards && Boolean(versionTarget)
+    const cardTarget = pinnedVersionTarget.current ?? versionTarget
+    const queueCard = cardsDirty && canQueueCards && Boolean(cardTarget)
     const queueNote = noteDirty && canQueueMetadata && draftMetadataRevision !== undefined
     if (queueCard || (noteDirty && queueNote && !cardsDirty)) {
       try {
         setError(undefined)
-        if (queueCard && versionTarget)
-          versionWrites.update(
-            deckId,
-            versionTarget.versionId,
-            draft,
-            versionTarget.expectedRevision,
-          )
+        if (queueCard && cardTarget)
+          versionWrites.update(deckId, cardTarget.versionId, draft, cardTarget.expectedRevision)
         if (queueNote) metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
         if (noteDirty && !queueNote)
           await updateDeck({ deckId: deckId as Id<"decks">, note: draftNote })
@@ -775,7 +795,7 @@ function DeckDetailContent({
           deckId,
           activeVersionId as Id<"deckVersions">,
           { name, note },
-          versionTarget?.expectedRevision ?? 0,
+          pinnedRevisionFor(activeVersionId) ?? versionTarget?.expectedRevision ?? 0,
         )
         setDialog("none")
       } catch (cause) {
@@ -792,6 +812,7 @@ function DeckDetailContent({
 
   function startDeleteVersion() {
     setError(undefined)
+    if (!editing) pinVersionTarget()
     setDialog("deleteVersion")
   }
 
@@ -799,7 +820,7 @@ function DeckDetailContent({
     const versionId =
       version?._id ?? (activeVersionSummary ? (activeVersionId as Id<"deckVersions">) : undefined)
     if (!versionId) return
-    const expectedRevision = versionTarget?.expectedRevision ?? 0
+    const expectedRevision = pinnedRevisionFor(versionId) ?? versionTarget?.expectedRevision ?? 0
     if (canQueueVersionLifecycle) {
       try {
         versionWrites.deleteVersion(deckId, versionId, expectedRevision)
@@ -1292,7 +1313,10 @@ function DeckDetailContent({
                       <TouchableOpacity
                         testID="rename-version-button"
                         accessibilityRole="button"
-                        onPress={() => setDialog("renameVersion")}
+                        onPress={() => {
+                          if (!editing) pinVersionTarget()
+                          setDialog("renameVersion")
+                        }}
                       >
                         <Text size="lg" text="•••" />
                       </TouchableOpacity>

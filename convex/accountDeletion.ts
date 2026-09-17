@@ -480,6 +480,24 @@ export const processUserLinkedData = internalMutation({
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }
+      const completionReceipts = await ctx.db
+        .query("gameCompletionReceipts")
+        .withIndex("by_host_and_operation_id", (q) => q.eq("hostUserId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (completionReceipts.length) {
+        for (const receipt of completionReceipts) await ctx.db.delete(receipt._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      const publishReceipts = await ctx.db
+        .query("gamePublishReceipts")
+        .withIndex("by_owner_and_operation_id", (q) => q.eq("ownerUserId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (publishReceipts.length) {
+        for (const receipt of publishReceipts) await ctx.db.delete(receipt._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
       await ctx.scheduler.runAfter(0, internal.accountDeletion.processDecks, args)
     } catch (cause) {
       await recordFailure(

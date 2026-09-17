@@ -294,6 +294,11 @@ describe("DeckDetailScreen", () => {
     mockConnectionState.isWebSocketConnected = true
     mockVersionCardUpdate.mockClear()
     mockVersionCacheRefresh.mockClear()
+    mockMappedVersion.mockImplementation((versionId: string) => versionId)
+  })
+
+  afterEach(() => {
+    mockMappedVersion.mockImplementation((versionId: string) => versionId)
   })
 
   it("renders cached version contents offline and queues durable card edits on save", () => {
@@ -1790,5 +1795,139 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("This deck may have been deleted.")).toBeTruthy()
     expect(view.queryByTestId("retry-deck-detail")).toBeNull()
     consoleError.mockRestore()
+  })
+
+  it("pins the card revision at edit start so a mid-edit remote revision is not overwritten", () => {
+    mockDeckSyncState.enabled = true
+    const access = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    const screen = () => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} access={access} />
+      </ThemeProvider>
+    )
+    mockDetail.value = {
+      ...loadedDetail,
+      version: { ...mainVersion, syncRevision: 5 },
+      cards: [solRing],
+    }
+    const view = render(screen())
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByLabelText("Increase Sol Ring"))
+
+    mockDetail.value = {
+      ...loadedDetail,
+      version: { ...mainVersion, syncRevision: 6 },
+      cards: [solRing],
+    }
+    view.rerender(screen())
+
+    fireEvent.press(view.getByTestId("save-version-button"))
+    expect(mockVersionCardUpdate).toHaveBeenCalledTimes(1)
+    expect(mockVersionCardUpdate).toHaveBeenCalledWith(
+      "deck-1",
+      "version-main",
+      [expect.objectContaining({ name: "Sol Ring", quantity: 2 })],
+      5,
+    )
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+  })
+
+  it("queries without the provisional version id until the offline create is acknowledged", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = undefined
+    const provisionalId = "00000000-0000-4000-8000-000000000001"
+    const confirmedId = "version-confirmed"
+    const cachedMain = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 1,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    const draftRow = {
+      ...cachedMain,
+      versionId: provisionalId,
+      versionNumber: 2,
+      name: "Offline draft",
+      fingerprint: "local",
+      local: true,
+    }
+    mockVersionCreate.mockImplementationOnce(() => {
+      mockVersionCacheState.versions = [cachedMain, draftRow]
+      mockVersionCacheState.version = draftRow
+      return provisionalId
+    })
+    mockMappedVersion.mockImplementation((versionId: string) => versionId)
+    mockVersionCacheState.versions = [cachedMain]
+    mockVersionCacheState.version = cachedMain
+    mockVersionCacheState.cards = [solRing]
+    mockVersionCacheState.capacity = { limit: 5, premium: true }
+    const access = {
+      ready: true,
+      loading: false,
+      signedIn: true,
+      ownerId: "owner-a",
+      request: jest.fn(),
+    }
+    const screen = () => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen deckId="deck-1" onBack={jest.fn()} access={access} />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1" })
+
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    fireEvent.press(view.getByTestId("version-picker-__new__"))
+    fireEvent.changeText(view.getByTestId("version-name-input"), "Offline draft")
+    fireEvent.press(view.getByTestId("version-submit"))
+
+    expect(mockVersionCreate).toHaveBeenCalledWith("deck-1", "Offline draft", "", [
+      expect.objectContaining({ name: "Sol Ring", quantity: 1 }),
+    ])
+
+    view.rerender(screen())
+
+    expect(queryArgs.some((args) => args.versionId === provisionalId)).toBe(false)
+    expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1" })
+    expect(view.getByText("Sol Ring")).toBeTruthy()
+
+    mockMappedVersion.mockImplementation((versionId: string) =>
+      versionId === provisionalId ? confirmedId : versionId,
+    )
+    view.rerender(screen())
+    expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1", versionId: confirmedId })
+
+    const confirmedRow = {
+      ...draftRow,
+      versionId: confirmedId,
+      local: false,
+    }
+    mockVersionCacheState.versions = [cachedMain, confirmedRow]
+    mockVersionCacheState.version = confirmedRow
+    mockVersionCacheState.cards = undefined
+    mockDetail.value = {
+      ...loadedDetail,
+      version: { ...mainVersion, _id: confirmedId },
+      versions: [mainVersion, { ...sideboardVersion, _id: confirmedId }],
+      cards: [solRing],
+    }
+    view.rerender(screen())
+    expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1", versionId: confirmedId })
+    expect(view.getByText("Sol Ring")).toBeTruthy()
   })
 })

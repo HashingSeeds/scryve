@@ -168,6 +168,17 @@ module.exports = {
         dependencyTypes: ["npm-peer"],
       },
     },
+    {
+      name: "no-tests-in-router-root",
+      comment:
+        "Expo Router publishes every module under src/app as a navigable route, so a test file " +
+        "left there ships to users. Keep tests next to the code they cover, outside src/app.",
+      severity: "error",
+      from: {
+        path: "^src/app/.+\\.(spec|test)\\.(js|mjs|cjs|ts|tsx)$",
+      },
+      to: {},
+    },
   ],
   options: {
     doNotFollow: {
