@@ -14,6 +14,21 @@ export interface PublishedGame {
   manualCode: string
 }
 
+/**
+ * Hands a running local game to the server so other players can join it.
+ *
+ * Mount this alongside `ConnectedSetupSource`, which owns the account gate and the
+ * Clerk-to-Convex user sync that `publishLocalGame` needs; this component only
+ * publishes, and reports failures back through the feed.
+ *
+ * The feed keeps a stable identity across renders because consumers report it upward
+ * from an effect: a fresh object every render would loop that effect forever. For the
+ * same reason `onPublished` must be stable at the call site.
+ *
+ * Publish identifiers are generated once and reused on every retry. The mutation is
+ * idempotent per `operationId`, but only while the payload behind it is unchanged,
+ * so a fresh token on retry would create a second game instead of returning the first.
+ */
 export function LocalGamePublishSource({
   game,
   onPublished,

@@ -112,6 +112,10 @@ export interface NewGameScreenProps {
 export interface LocalConnectFeed {
   /** Set when the account gate has to be cleared first, mirroring `ConnectedHostFeed`. */
   access?: { label: string; request: () => void }
+  /**
+   * False while the session is still being checked. Until it settles there is no way to
+   * tell a signed-in host from one who needs the gate, so publishing has to wait.
+   */
   ready?: boolean
   busy?: boolean
   error?: string

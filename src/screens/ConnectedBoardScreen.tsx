@@ -433,6 +433,11 @@ function ConnectedBoardRuntime({
     },
   ]
 
+  /**
+   * A live update can withdraw the invitation while its dialog is open, so the board
+   * follows the invitation rather than the flag: otherwise the dialog would vanish and
+   * leave the grid disabled behind a backdrop nobody can dismiss.
+   */
   const inviteDialogOpen = invitation !== undefined && inviteOpen
   const overlayOpen =
     menuOpen ||
