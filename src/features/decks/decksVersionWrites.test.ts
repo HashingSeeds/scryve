@@ -379,6 +379,60 @@ describe("deck version card writes", () => {
     })
   })
 
+  it("reapplies a conflicted tail after its offline create mapped to the server id", async () => {
+    const local = new MemoryStorage()
+    const serverVersionId = "server-1"
+    const syncedResult = (revision: number) => ({
+      deckId,
+      versionId: serverVersionId,
+      revision,
+      versionNumber: 2,
+      name: "Offline Draft",
+      note: "",
+      fingerprint: "f" + revision,
+      cardCount: 1,
+      cardQuantity: 3,
+      deleted: false,
+      updatedAt: 2 + revision,
+    })
+    const sent: Array<{ versionId?: string; expectedRevision?: number }> = []
+    const client = {
+      mutation: jest.fn(async (_reference: unknown, args: { expectedRevision?: number }) => {
+        sent.push(args)
+        if (sent.length === 1) return syncedResult(1)
+        if (sent.length === 2) return { status: "conflict" as const, version: syncedResult(4) }
+        return syncedResult(5)
+      }),
+    } as unknown as ConvexReactClient
+    const repository = new DeckVersionWriteRepository("owner", local)
+    const controller = new DeckVersionWriteController(client, repository)
+    const stop = controller.start()
+    const provisionalId = controller.createVersion(deckId, "Offline Draft", "", [
+      { name: "Sol Ring", quantity: 1 },
+    ])
+    controller.update(deckId, provisionalId, [{ name: "Kept offline", quantity: 3 }], 1)
+    await flush()
+
+    expect(repository.cache.mappedVersionId(provisionalId)).toBe(serverVersionId)
+    expect(controller.getSnapshot()).toMatchObject({
+      pending: [],
+      failures: [{ reason: DECK_VERSION_CONFLICT_REASON }],
+    })
+
+    const failedId = controller.getSnapshot().failures[0].action.operationId
+    expect(() => controller.reapplyFailure(failedId)).not.toThrow()
+    expect(controller.getSnapshot().pending[0]).toMatchObject({
+      versionId: provisionalId,
+      expectedRevision: 4,
+    })
+    await flush()
+
+    expect(sent[2]).toMatchObject({ versionId: serverVersionId, expectedRevision: 4 })
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+    expect(repository.cache.loadCards(serverVersionId)).toMatchObject({ revision: 5 })
+    stop()
+  })
+
   it("keeps account-only queued writes pending and unreplayed across sessions", async () => {
     const local = new MemoryStorage()
     const mutation = jest

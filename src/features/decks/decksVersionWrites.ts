@@ -455,9 +455,11 @@ export class DeckVersionWriteController {
     const latest = related.reduce((left, right) =>
       compareActions(right.action, left.action) > 0 ? right : left,
     )
+    const lookupVersionId =
+      this.repository.cache.mappedVersionId(failure.action.versionId) ?? failure.action.versionId
     const conflictRevision = this.repository.cache
       .loadVersions(latest.action.deckId)
-      .find((version) => version.versionId === failure.action.versionId)?.revision
+      .find((version) => version.versionId === lookupVersionId)?.revision
     if (latest.action.op === "create") {
       this.enqueue(latest.action.deckId, latest.action.versionId, latest.action.cards, 0, {
         op: "create",
