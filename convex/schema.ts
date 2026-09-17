@@ -132,11 +132,6 @@ export default defineSchema({
     .index("by_manual_code", ["manualCode"])
     .index("by_game", ["gameId"]),
 
-  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- follow-up PR: drop comment
-  /**
-   * One rate-limit window per user per `kind`. Rows written before seat lookups existed
-   * carry no `kind`, which is the claim bucket's own key, so they keep counting as they did.
-   */
   joinAttempts: defineTable({
     clerkUserId: v.string(),
     windowStartedAt: v.number(),

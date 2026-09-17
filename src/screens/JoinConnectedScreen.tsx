@@ -67,11 +67,6 @@ export function JoinConnectedScreen({
   const [scanning, setScanning] = useState(false)
   const [scannedToken, setScannedToken] = useState<string>()
   const token = scannedToken ?? inviteToken
-  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- follow-up PR: drop comment
-  /**
-   * Open seats belong to one invitation, so pointing at a different one drops them
-   * rather than offering seat numbers the new game may not even have.
-   */
   function changeCode(value: string) {
     setCode(value)
     setOpenSeats(undefined)
@@ -124,12 +119,6 @@ export function JoinConnectedScreen({
         return
       }
       failureReason = "request"
-      // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- follow-up PR: drop comment
-      /**
-       * Seats are re-read on every attempt: someone else can take the one being offered
-       * between the picker appearing and a choice being made, and a stale list would send
-       * that seat anyway.
-       */
       const seats = (await claimableSeats({ token, manualCode: manualCode ?? undefined })).seats
       if (seats.length > 1 && seat === undefined) {
         setOpenSeats(seats)

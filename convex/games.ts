@@ -109,14 +109,6 @@ function assertSnapshotLife(life: number) {
     throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
 }
 
-// eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- follow-up PR: drop comment
-/**
- * Spends one attempt from a user's per-minute window; the claim bucket throws once
- * it is exhausted.
- *
- * Seat lookups count in their own window: a lookup is the prelude to a claim, so sharing
- * the claim's window would let a joiner clear the lookup only to be refused the seat.
- */
 async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: "seatLookup") {
   const now = Date.now()
   const record = await ctx.db
