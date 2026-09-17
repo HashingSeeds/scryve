@@ -545,7 +545,7 @@ export function NewGameScreen({
                   textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
                   disabled={
                     localGameBlocksStart
-                      ? !onEndLocal
+                      ? !onEndLocal || Boolean(localConnect?.busy)
                       : hostedGame
                         ? !connected?.ready || busy
                         : !valid || busy
