@@ -2118,11 +2118,11 @@ packages:
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
   '@legendapp/state@3.0.0-beta.48':
-    resolution: {integrity: sha512-7/8Rgg7m38eznupr36QJeSkrtbhVxaRtQvRMjdBigSm+HW3ZIFgMtUX1DqZ2hJxbPqqAJamw5s+TLs8dRstUNw==}
+    resolution: {integrity: sha512-aa7vpUSoBHnXQhYf2x/10C0w1EiesegRhR7LuxnIcEPyZzZyuSF2mevf1jphlh0zzqwIJm9QxnsayDNn8/kwcA==}
     peerDependencies:
-      react: '>=16.8.0'
+      expo-sqlite: ^15.0.0
     peerDependenciesMeta:
-      react:
+      expo-sqlite:
         optional: true
 
   '@napi-rs/wasm-runtime@1.1.6':
@@ -11037,8 +11037,8 @@ snapshots:
   '@legendapp/state@3.0.0-beta.48(react@19.2.3)':
     dependencies:
       use-sync-external-store: 1.6.0(react@19.2.3)
-    optionalDependencies:
-      react: 19.2.3
+    transitivePeerDependencies:
+      - react
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
