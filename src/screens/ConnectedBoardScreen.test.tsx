@@ -433,6 +433,59 @@ describe("ConnectedBoardScreen", () => {
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
   })
 
+  it("navigates to the connected summary after finishing with a result", async () => {
+    jest.useFakeTimers()
+    try {
+      const onGameEnded = jest.fn()
+      connectedHarness.runtime = {
+        ...connectedHarness.runtime,
+        projection: { ...connectedHarness.runtime.projection, isHost: true },
+      }
+      render(themed(<ConnectedBoardScreen publicId="game-public" onGameEnded={onGameEnded} />))
+      openConnectedFinish()
+      fireEvent.press(screen.getByText("Ada"))
+      fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+
+      await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+      act(() => jest.runAllTimers())
+      expect(onGameEnded).toHaveBeenCalledWith("game-public")
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("navigates back to fresh connected setup after abandoning without a result", async () => {
+    jest.useFakeTimers()
+    try {
+      const onGameEnded = jest.fn()
+      const onGameAbandoned = jest.fn()
+      connectedHarness.runtime = {
+        ...connectedHarness.runtime,
+        projection: { ...connectedHarness.runtime.projection, isHost: true },
+      }
+      render(
+        themed(
+          <ConnectedBoardScreen
+            publicId="game-public"
+            onGameEnded={onGameEnded}
+            onGameAbandoned={onGameAbandoned}
+          />,
+        ),
+      )
+      openConnectedFinish()
+      fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+
+      await waitFor(() => expect(mockRuntimeAbandon).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+      act(() => jest.runAllTimers())
+      expect(onGameAbandoned).toHaveBeenCalledTimes(1)
+      expect(onGameEnded).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("submits connected finish only once while the mutation is pending", async () => {
     let resolveFinish: (finished: boolean) => void = () => undefined
     mockFinish.mockReturnValueOnce(
