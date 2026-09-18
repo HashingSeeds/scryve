@@ -10,7 +10,7 @@ const SCRYFALL_HEADERS = {
   "User-Agent": "ScryveDeckBuilder/1.0 (https://scryve.sow.care)",
 }
 
-const SCRYFALL_RATE_LIMIT_BLOCK_MS = 30_000
+export const SCRYFALL_RATE_LIMIT_BLOCK_MS = 30_000
 
 type ScryfallRequestOptions = {
   method?: "GET" | "POST"

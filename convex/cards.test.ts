@@ -227,7 +227,7 @@ describe("image fallback candidates", () => {
   afterEach(() => jest.restoreAllMocks())
 
   it.each(["Card", "Printing"])(
-    "includes Scryfall status and card ID when %s lookup fails",
+    "pauses Scryfall lookups with a typed error when %s lookup is rate limited",
     async (lookup) => {
       const id = "11111111-1111-1111-1111-111111111111"
       const fetchSpy = jest.spyOn(global, "fetch")
@@ -235,15 +235,51 @@ describe("image fallback candidates", () => {
       fetchSpy.mockImplementationOnce(() => response({ object: "error" }, 429))
       const t = convexTest(schema, modules)
       registerRateLimiter(t)
-      await expect(t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id })).rejects.toThrow(
-        `${lookup} lookup failed (Scryfall HTTP 429, card ${id})`,
-      )
+      await expect(
+        t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id }),
+      ).rejects.toMatchObject({
+        data: { code: "scryfall_rate_limited", retryAfterMs: 30_000 },
+      })
       await expect(
         t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id }),
       ).rejects.toMatchObject({ data: { code: "scryfall_rate_limited" } })
       expect(fetchSpy).toHaveBeenCalledTimes(lookup === "Printing" ? 2 : 1)
     },
   )
+
+  it("reports a failed lookup as unavailable without pausing Scryfall", async () => {
+    const id = "11111111-1111-1111-1111-111111111111"
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementationOnce(() => response({ object: "error" }, 500))
+      .mockImplementationOnce(() => response({ oracle_id: id }))
+      .mockImplementationOnce(() =>
+        response({
+          data: [
+            {
+              id: "alternate",
+              oracle_id: id,
+              name: "Same card",
+              image_uris: { normal: "working" },
+            },
+          ],
+        }),
+      )
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await expect(
+      t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id }),
+    ).rejects.toMatchObject({
+      data: {
+        code: "scryfall_unavailable",
+        message: `Card lookup failed (Scryfall HTTP 500, card ${id})`,
+      },
+    })
+    expect(await t.action(api.cards.imageFallbacks, { game: "mtg", cardId: id })).toEqual([
+      "working",
+    ])
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
 
   it("finds Magic artwork by oracle identity without changing the stored printing", async () => {
     const id = "11111111-1111-1111-1111-111111111111"
@@ -468,4 +504,78 @@ it("keeps catalog capability restrictions for guest searches", async () => {
   await expect(
     t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
   ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
+})
+
+describe("card details batch", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("serves cached reference and catalog details without provider calls", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected fetch"))
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    const scryfallId = "22222222-2222-2222-2222-222222222222"
+    await t.mutation(internal.cards.cache, {
+      scryfallId,
+      oracleId: "11111111-1111-1111-1111-111111111111",
+      name: "Sol Ring",
+      oracleText: "{T}: Add {C}{C}.",
+      typeLine: "Artifact",
+      setName: "Commander",
+    })
+    const card = { ...rushCards[0], game: "ygo" as const }
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: [card] })
+    expect(
+      await t.query(api.cards.detailsBatch, {
+        game: "mtg",
+        items: [
+          { key: "mtg:sol-ring", scryfallId },
+          { key: "mtg:missing", scryfallId: "33333333-3333-3333-3333-333333333333" },
+        ],
+      }),
+    ).toEqual([
+      {
+        key: "mtg:sol-ring",
+        details: { oracleText: "{T}: Add {C}{C}.", typeLine: "Artifact", setName: "Commander" },
+      },
+    ])
+    expect(
+      await t.query(api.cards.detailsBatch, {
+        game: "ygo",
+        items: [{ key: "ygo:rush", catalogCardId: card.cardId }],
+      }),
+    ).toEqual([
+      {
+        key: "ygo:rush",
+        details: expect.objectContaining({ typeLine: expect.any(String) }),
+      },
+    ])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it("keeps catalog capability restrictions for batched details", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await t.mutation(internal.integrationManifest.setCapabilityOverride, {
+      game: "pokemon",
+      capability: "cardCatalog",
+      release: "disabled",
+    })
+    await expect(
+      t.query(api.cards.detailsBatch, {
+        game: "pokemon",
+        items: [{ key: "pokemon:charizard", catalogCardId: "base1-4" }],
+      }),
+    ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
+  })
+
+  it("rejects oversize detail batches", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await expect(
+      t.query(api.cards.detailsBatch, {
+        game: "mtg",
+        items: Array.from({ length: 401 }, (_, index) => ({ key: `mtg:${index}` })),
+      }),
+    ).rejects.toMatchObject({ data: { code: "details_batch_too_large" } })
+  })
 })

@@ -212,41 +212,42 @@ export function NewGameScreen({
     ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
     : validLife && nameValidation.valid && !localGame
   const busy = connectedMode && Boolean(connected?.busy)
-  const localGameBlocksStart = !connectedMode && Boolean(localGame)
-  const hostedGame = connectedMode ? connected?.activeGames?.find((game) => game.isHost) : undefined
+  const connectedGames = connected?.activeGames ?? []
+  const localGameBlocksStart = Boolean(localGame)
+  const connectedBlocksLocal =
+    !connectedMode && Boolean(connected?.ready) && connectedGames.length > 0
+  const hostedGame = connectedMode ? connectedGames.find((game) => game.isHost) : undefined
+  const singleBlockingConnected =
+    connectedBlocksLocal && connectedGames.length === 1 ? connectedGames[0] : undefined
+  const gameBlocksStart = localGameBlocksStart || connectedBlocksLocal || Boolean(hostedGame)
+  const resumeGame = connectedMode && connectedGames.length === 1 ? hostedGame : undefined
   const hostedResumable =
-    connectedMode || !onResumeConnected
-      ? undefined
-      : connected?.activeGames?.find((game) => game.isHost)
+    connectedMode || !onResumeConnected ? undefined : connectedGames.find((game) => game.isHost)
   /** Only a running local game can be handed to the server; a connected one is already there. */
-  const canConnectLocal = Boolean(localConnect) && !connectedMode && Boolean(localGame)
-  const gameBlocksStart = localGameBlocksStart || Boolean(hostedGame)
-  /**
-   * A game is already running, so this screen manages it rather than creating one:
-   * the connection choice is settled and the settings that define the game are fixed.
-   * Names, appearance, and layout stay editable.
-   */
-  const hasCurrentGame = Boolean(localGame) || Boolean(hostedGame)
-  const resumeGame = connectedMode && connected?.activeGames?.length === 1 ? hostedGame : undefined
+  const canConnectLocal = Boolean(localConnect) && !connectedMode && localGameBlocksStart
   const directResume =
     localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
 
   const hasStatusDetails = connectedMode
-    ? Boolean(connected?.activeGames?.length || connected?.blockedReason || connected?.error)
-    : Boolean(localGame)
+    ? Boolean(connectedGames.length || connected?.blockedReason || connected?.error)
+    : Boolean(localGame) || connectedBlocksLocal
   const statusText = connectedMode
     ? directResume
       ? "Resume current game"
       : (connected?.error ??
         connected?.blockedReason ??
-        (connected?.activeGames?.length
+        (connectedGames.length
           ? "Games in progress"
           : preparing && showPreparation
             ? connected?.status
             : ""))
     : localGame
       ? "Resume current game"
-      : ""
+      : connectedBlocksLocal
+        ? singleBlockingConnected
+          ? "Resume current game"
+          : "Games in progress"
+        : ""
 
   function submit() {
     if (!valid || busy) return
@@ -339,23 +340,21 @@ export function NewGameScreen({
     <View style={[themed($root), $styles.flex1]}>
       <View style={themed($setupHeader)}>
         <Header
-          title={hasCurrentGame ? "Game setup" : "New game"}
+          title={onSavePlayers ? "Game setup" : "New game"}
           leftTx="common:back"
           backgroundColor={colors.surface}
           onLeftPress={onBack}
         />
-        {hasCurrentGame ? null : (
-          <SegmentedControl
-            testID="mode"
-            accessibilityLabel="Game connection"
-            segments={[
-              { id: "local", label: "On this device" },
-              { id: "connected", label: "Connected" },
-            ]}
-            selectedId={mode}
-            onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
-          />
-        )}
+        <SegmentedControl
+          testID="mode"
+          accessibilityLabel="Game connection"
+          segments={[
+            { id: "local", label: "On this device" },
+            { id: "connected", label: "Connected" },
+          ]}
+          selectedId={mode}
+          onSelect={(value) => onModeChange(value === "connected" ? "connected" : "local")}
+        />
 
         {connectedMode && joinContent ? (
           <SegmentedControl
@@ -394,7 +393,6 @@ export function NewGameScreen({
                   ...PLAY_SYSTEM_LIST.map(({ id, shortLabel }) => ({ id, label: shortLabel })),
                 ]}
                 selectedId={system ?? NO_PLAY_SYSTEM}
-                disabled={hasCurrentGame}
                 onSelect={chooseSystem}
               />
               {system ? (
@@ -407,7 +405,6 @@ export function NewGameScreen({
                     label,
                     ...(blurb ? { detail: blurb } : {}),
                   }))}
-                  disabled={hasCurrentGame}
                   onSelect={chooseFormat}
                 />
               ) : null}
@@ -421,7 +418,6 @@ export function NewGameScreen({
                   value={playerCount}
                   min={PLAYER_COUNTS[0]}
                   max={PLAYER_COUNTS[PLAYER_COUNTS.length - 1]}
-                  disabled={hasCurrentGame}
                   onChange={choosePlayerCount}
                 />
               </View>
@@ -434,7 +430,6 @@ export function NewGameScreen({
                   max={counter.maxStartingValue}
                   longStep={counter.longPressStep}
                   step={lifeStep}
-                  disabled={hasCurrentGame}
                   onChange={setStartingLife}
                 />
               </View>
@@ -451,7 +446,6 @@ export function NewGameScreen({
                     { id: "required", label: "Required" },
                   ]}
                   selectedId={deckRequired ? "required" : "optional"}
-                  disabled={hasCurrentGame}
                   onSelect={(value) => setDeckRequired(value === "required")}
                 />
               </View>
@@ -474,7 +468,6 @@ export function NewGameScreen({
                       id: String(step),
                       label: String(step),
                     }))}
-                    disabled={hasCurrentGame}
                     onSelect={(value) => {
                       const next = LIFE_STEP_OPTIONS.find((step) => String(step) === value)
                       if (next) setLifeStep(next)
@@ -561,7 +554,9 @@ export function NewGameScreen({
                       ? !onEndLocal || Boolean(localConnect?.busy)
                       : hostedGame
                         ? !connected?.ready || busy
-                        : !valid || busy
+                        : connectedBlocksLocal
+                          ? !connected?.exitGame || busy
+                          : !valid || busy
                   }
                   accessibilityHint={
                     gameBlocksStart
@@ -575,7 +570,11 @@ export function NewGameScreen({
                       ? () => setEndingLocal(true)
                       : hostedGame
                         ? () => setGameToExit(hostedGame)
-                        : submit
+                        : singleBlockingConnected
+                          ? () => setGameToExit(singleBlockingConnected)
+                          : connectedBlocksLocal
+                            ? () => setShowStatus(true)
+                            : submit
                   }
                 />
                 {canConnectLocal ? (
@@ -616,7 +615,9 @@ export function NewGameScreen({
                     ? onResumeLocal
                     : directResume && resumeGame
                       ? () => onResumeConnected?.(resumeGame)
-                      : () => setShowStatus(true)
+                      : singleBlockingConnected && onResumeConnected
+                        ? () => onResumeConnected(singleBlockingConnected)
+                        : () => setShowStatus(true)
                 }
               >
                 <Text
@@ -677,10 +678,10 @@ export function NewGameScreen({
             <Button text="Retry connection" onPress={connected.retry} />
           ) : null}
 
-          {connectedMode && connected?.activeGames?.length ? (
+          {connectedGames.length ? (
             <View style={themed($section)}>
               <Text text="Your connected games" preset="subheading" accessibilityRole="header" />
-              {connected.activeGames.map((game) => (
+              {connectedGames.map((game) => (
                 <View key={game.publicId} style={themed($connectedGame)}>
                   <ConnectedGameRow
                     game={game}
@@ -690,8 +691,8 @@ export function NewGameScreen({
                   <TouchableOpacity
                     testID={`${game.isHost ? "end" : "leave"}-connected-${game.publicId}`}
                     accessibilityRole="button"
-                    disabled={busy || !connected.ready}
-                    accessibilityState={{ disabled: busy || !connected.ready }}
+                    disabled={busy || !connected?.ready}
+                    accessibilityState={{ disabled: busy || !connected?.ready }}
                     style={themed($localEndAction)}
                     onPress={() => {
                       setShowStatus(false)
@@ -705,16 +706,16 @@ export function NewGameScreen({
                   </TouchableOpacity>
                 </View>
               ))}
-              {connected.exitError ? (
+              {connected?.exitError ? (
                 <Text
                   accessibilityRole="alert"
                   style={themed($footerNote)}
                   text={connected.exitError}
                 />
               ) : null}
-              {connected.activeGamesNextPage?.status === "available" ? (
+              {connected?.activeGamesNextPage?.status === "available" ? (
                 <Button text="Load more" onPress={connected.activeGamesNextPage.load} />
-              ) : connected.activeGamesNextPage?.status === "loading" ? (
+              ) : connected?.activeGamesNextPage?.status === "loading" ? (
                 <Text size="xs" style={themed($footerStatus)} text="Loading more games…" />
               ) : null}
             </View>

@@ -15,3 +15,11 @@ export function convexErrorMessage(cause: unknown, fallback: string) {
 export function convexErrorCode(cause: unknown) {
   return convexErrorField(cause, "code")
 }
+
+export function convexErrorRetryAfterMs(cause: unknown, fallbackMs = 0) {
+  if (!(cause instanceof ConvexError)) return fallbackMs
+  const data: unknown = cause.data
+  if (typeof data !== "object" || data === null) return fallbackMs
+  const value = (data as Record<string, unknown>).retryAfterMs
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallbackMs
+}

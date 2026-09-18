@@ -17,6 +17,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
 import { connectedProfileName } from "@/features/connected/useConnectedProfile"
+import { hasLocalGameStarted } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -96,7 +97,17 @@ export function JoinConnectedScreen({
       return
     }
     const startedAt = Date.now()
-    let failureReason: "profile" | "request" = "profile"
+    let failureReason: "profile" | "request" | "local-active" = "profile"
+    const activeLocal = new LocalGameRepository().loadActiveGame()
+    if (activeLocal && hasLocalGameStarted(activeLocal)) {
+      captureAnalytics("connection_attempt", {
+        action: "join",
+        stage: "failed",
+        reason: "local-active",
+      })
+      setError("Finish or abandon your active local game before joining a connected game.")
+      return
+    }
     if (!isWebSocketConnected) {
       captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "offline" })
       setError(onlineOnlyNotice("join"))

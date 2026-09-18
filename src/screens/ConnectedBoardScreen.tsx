@@ -227,7 +227,7 @@ function ConnectedBoardRuntime({
   const finishSubmitInFlight = useRef(false)
   const [abandonedOpen, setAbandonedOpen] = useState(false)
   const navigatedTerminal = useRef(false)
-  const terminalStatus = runtime.status === "loading" ? undefined : runtime.projection.status
+  const terminalStatus = runtime.status === "ready" ? runtime.projection.status : undefined
   useEffect(() => {
     if (terminalStatus === "finished") {
       if (navigatedTerminal.current) return
@@ -238,7 +238,7 @@ function ConnectedBoardRuntime({
     }
   }, [terminalStatus, onGameEnded, publicId])
   useStoreReview(
-    runtime.status !== "loading" &&
+    runtime.status === "ready" &&
       runtime.projection.status === "finished" &&
       !menuOpen &&
       !statusOpen &&
@@ -268,6 +268,13 @@ function ConnectedBoardRuntime({
     return (
       <ConnectedBoardShell
         state={{ status: "loading", message: "Loading connected board…" }}
+        onBack={onBack}
+      />
+    )
+  if (runtime.status === "unavailable")
+    return (
+      <ConnectedBoardShell
+        state={{ status: "unavailable", message: runtime.message }}
         onBack={onBack}
       />
     )

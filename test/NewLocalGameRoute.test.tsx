@@ -168,10 +168,11 @@ describe("new local game route", () => {
       </ThemeProvider>,
     )
     fireEvent.changeText(view.getByTestId("player-name-1"), "Alex")
+    fireEvent.press(view.getByTestId("starting-counter-increment"))
+    fireEvent.press(view.getByTestId("mode-connected"))
+    fireEvent.press(view.getByTestId("mode-local"))
     expect(view.getByTestId("player-name-1").props.value).toBe("Alex")
-    // A running game owns its rules and its mode, so both only open up once it ends.
-    expect(view.getByTestId("starting-counter-increment")).toBeDisabled()
-    expect(view.queryByTestId("mode-connected")).toBeNull()
+    expect(view.getByLabelText("Life, 21")).toBeTruthy()
     fireEvent.press(view.getByTestId("start-game-button"))
     fireEvent.press(view.getByTestId("end-game-backdrop"))
     expect(localGameRepository.loadActiveGame()?.id).toBe(game.id)
@@ -184,11 +185,7 @@ describe("new local game route", () => {
       winnerPlayerIds: [game.players.find((player) => player.seat === 1)!.id],
     })
     expect(view.queryByTestId("end-game-dialog")).toBeNull()
-    fireEvent.press(view.getByTestId("starting-counter-increment"))
-    fireEvent.press(view.getByTestId("mode-connected"))
-    fireEvent.press(view.getByTestId("mode-local"))
     expect(view.getByTestId("player-name-1").props.value).toBe("Alex")
-    expect(view.getByLabelText("Life, 21")).toBeTruthy()
     expect(view.getByTestId("start-game-button")).toBeEnabled()
     expect(router.replace).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("start-game-button"))

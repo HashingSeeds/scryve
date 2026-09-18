@@ -78,6 +78,21 @@ function openConnectedFinish() {
 describe("ConnectedBoardScreen", () => {
   beforeEach(resetConnectedHarness)
 
+  it("renders the unavailable shell with a back door when the board cannot hydrate offline", () => {
+    const onBack = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      status: "unavailable",
+      message: "This board is not saved on this device. Reconnect to load it.",
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    expect(screen.getByTestId("connected-board-unavailable-status").props.accessibilityLabel).toBe(
+      connectedHarness.runtime.message,
+    )
+    fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalled()
+  })
+
   it("enables only the signed-in player's accessible controls", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(
@@ -423,6 +438,59 @@ describe("ConnectedBoardScreen", () => {
     await waitFor(() => expect(mockRuntimeAbandon).toHaveBeenCalledTimes(1))
     expect(mockFinish).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+  })
+
+  it("navigates to the connected summary after finishing with a result", async () => {
+    jest.useFakeTimers()
+    try {
+      const onGameEnded = jest.fn()
+      connectedHarness.runtime = {
+        ...connectedHarness.runtime,
+        projection: { ...connectedHarness.runtime.projection, isHost: true },
+      }
+      render(themed(<ConnectedBoardScreen publicId="game-public" onGameEnded={onGameEnded} />))
+      openConnectedFinish()
+      fireEvent.press(screen.getByText("Ada"))
+      fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+
+      await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+      act(() => jest.runAllTimers())
+      expect(onGameEnded).toHaveBeenCalledWith("game-public")
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("navigates back to fresh connected setup after abandoning without a result", async () => {
+    jest.useFakeTimers()
+    try {
+      const onGameEnded = jest.fn()
+      const onGameAbandoned = jest.fn()
+      connectedHarness.runtime = {
+        ...connectedHarness.runtime,
+        projection: { ...connectedHarness.runtime.projection, isHost: true },
+      }
+      render(
+        themed(
+          <ConnectedBoardScreen
+            publicId="game-public"
+            onGameEnded={onGameEnded}
+            onGameAbandoned={onGameAbandoned}
+          />,
+        ),
+      )
+      openConnectedFinish()
+      fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+
+      await waitFor(() => expect(mockRuntimeAbandon).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+      act(() => jest.runAllTimers())
+      expect(onGameAbandoned).toHaveBeenCalledTimes(1)
+      expect(onGameEnded).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it("submits connected finish only once while the mutation is pending", async () => {

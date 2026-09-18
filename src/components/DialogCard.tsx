@@ -38,8 +38,6 @@ export interface DialogCardProps {
 const ENTRANCE_START_SCALE = 0.5
 const ENTRANCE_SPRING = { damping: 16, stiffness: 200, mass: 0.7 } as const
 
-const claimTouchesSoTheBackdropNeverSeesThem = () => true
-
 export function DialogCard({
   visible,
   onClose,
@@ -133,7 +131,6 @@ export function DialogCard({
               entranceStyle,
             ]}
             onLayout={launchFromOrigin}
-            onStartShouldSetResponder={claimTouchesSoTheBackdropNeverSeesThem}
           >
             {children}
           </Animated.View>

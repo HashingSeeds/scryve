@@ -6,7 +6,11 @@ import { remotePage } from "@/features/async/remoteState"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
-import { ConnectedGameRepository } from "@/features/connected/persistence"
+import {
+  connectedDeploymentScope,
+  ConnectedGameRepository,
+  subscribeResumeIndex,
+} from "@/features/connected/persistence"
 import {
   useConnectedProfile,
   type ConnectedProfileState,
@@ -54,6 +58,12 @@ export function ConnectedHostSource({
   )
 }
 
+function readResumeGamesOnRevision(
+  repository: ConnectedGameRepository,
+  revision: number,
+): ResumableGame[] {
+  return revision >= 0 ? repository.loadResumeIndex() : []
+}
 function ConnectedHostQuerySource({
   connectedProfile,
   onLobbyCreated,
@@ -68,9 +78,19 @@ function ConnectedHostQuerySource({
   const localRepository = useMemo(() => new LocalGameRepository(), [])
   const deviceId = useMemo(() => localRepository.getDeviceId(), [localRepository])
   const connectedUserId = connectedProfile.profile?.userId
-  const migrationRepository = useMemo(
-    () => (connectedUserId ? new ConnectedGameRepository(undefined, connectedUserId) : null),
+  const resumeRepository = useMemo(
+    () =>
+      new ConnectedGameRepository(
+        undefined,
+        connectedUserId ?? "anonymous",
+        {},
+        connectedDeploymentScope(),
+      ),
     [connectedUserId],
+  )
+  const migrationRepository = useMemo(
+    () => (connectedUserId ? resumeRepository : null),
+    [resumeRepository, connectedUserId],
   )
   const migrateMemberships = useMutation(api.games.migrateMyGameMemberships)
   const leaveGame = useMutation(api.games.leaveMyGame)
@@ -82,7 +102,10 @@ function ConnectedHostQuerySource({
   const activeGames = usePaginatedQuery(api.games.activeConnectedGames, ready ? {} : "skip", {
     initialNumItems: 10,
   })
-  const activeGamesState = ready ? remotePage(activeGames, 10) : { status: "loading" as const }
+  const activeGamesState = useMemo(
+    () => (ready ? remotePage(activeGames, 10) : { status: "loading" as const }),
+    [ready, activeGames],
+  )
   const hasHostedGame =
     activeGamesState.status === "ready" && activeGamesState.items.some((game) => game.isHost)
   const preparationStatus =
@@ -113,6 +136,23 @@ function ConnectedHostQuerySource({
       cancelled = true
     }
   }, [migrateMemberships, migrationRepository, ready])
+
+  useEffect(() => {
+    if (!connectedUserId || activeGamesState.status !== "ready") return
+    resumeRepository.syncResumeIndex(
+      activeGamesState.items as readonly ResumableGame[],
+      activeGamesState.nextPage.status === "exhausted",
+    )
+  }, [connectedUserId, resumeRepository, activeGamesState])
+  const [resumeIndexRevision, refreshResumeIndex] = useState(0)
+  useEffect(() => {
+    refreshResumeIndex((revision) => revision + 1)
+    return subscribeResumeIndex(() => refreshResumeIndex((revision) => revision + 1))
+  }, [resumeRepository])
+  const cachedResumeGames = useMemo(
+    () => readResumeGamesOnRevision(resumeRepository, resumeIndexRevision),
+    [resumeRepository, resumeIndexRevision],
+  )
 
   async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
     captureAnalytics("connection_attempt", { action: "create", stage: "started" })
@@ -184,6 +224,7 @@ function ConnectedHostQuerySource({
       setExitError(undefined)
       if (game.isHost) await abandonGame({ publicId: game.publicId })
       else await leaveGame({ publicId: game.publicId, deviceId })
+      resumeRepository.removeResumeEntry(game.publicId)
       return true
     } catch (cause) {
       setExitError(cause instanceof Error ? cause.message : "Could not update this game.")
@@ -215,7 +256,9 @@ function ConnectedHostQuerySource({
           activeGames: activeGamesState.items as readonly ResumableGame[],
           activeGamesNextPage: activeGamesState.nextPage,
         }
-      : {}),
+      : cachedResumeGames.length
+        ? { activeGames: cachedResumeGames }
+        : {}),
     host: (setup) => void host(setup),
     exitGame,
   })
