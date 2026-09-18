@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react"
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { CloudScreen } from "@/features/auth/CloudScreen"
+import type { ResumableGame } from "@/features/connected/connectedCopy"
 import type { CreatedLobby } from "@/features/connected/ConnectedHostSource"
 import { ConnectedSetupSource } from "@/features/connected/ConnectedSetupSource"
 import {
   LocalGamePublishSource,
   type PublishedGame,
 } from "@/features/connected/LocalGamePublishSource"
+import { loadNewestResumeGame } from "@/features/connected/persistence"
 import {
   applyGameCommand,
   defaultCommandContext,
@@ -90,6 +92,28 @@ export default function NewLocalGameRoute() {
   const connectableGame = started && mode === "local" ? activeGame : null
   const connectAllowed = Boolean(connected?.access ?? connected?.ready)
 
+  function resumeConnected(game: ResumableGame) {
+    router.replace({
+      pathname: game.status === "lobby" ? "/connected/lobby/[gameId]" : "/connected/game/[gameId]",
+      params: { gameId: game.publicId },
+    })
+  }
+
+  function goBack() {
+    const local = localGameRepository.loadActiveGame()
+    const startedLocal = local && hasLocalGameStarted(local) ? local : null
+    const newest = loadNewestResumeGame()
+    if (newest && newest.updatedAt > (startedLocal?.updatedAt ?? 0)) {
+      resumeConnected(newest)
+      return
+    }
+    if (startedLocal) {
+      router.replace("/game/current")
+      return
+    }
+    router.back()
+  }
+
   return (
     <>
       <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
@@ -115,7 +139,7 @@ export default function NewLocalGameRoute() {
             : undefined
         }
         onModeChange={setMode}
-        onBack={() => router.back()}
+        onBack={goBack}
         onStartLocal={(players, startingLife, setup) => {
           const current = localGameRepository.loadActiveGame()
           if (current && hasLocalGameStarted(current)) {
@@ -154,13 +178,7 @@ export default function NewLocalGameRoute() {
             )}
           </CloudScreen>
         }
-        onResumeConnected={(game) =>
-          router.replace({
-            pathname:
-              game.status === "lobby" ? "/connected/lobby/[gameId]" : "/connected/game/[gameId]",
-            params: { gameId: game.publicId },
-          })
-        }
+        onResumeConnected={resumeConnected}
       />
     </>
   )

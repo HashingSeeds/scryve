@@ -427,10 +427,10 @@ function ConnectedBoardRuntime({
     {
       kind: "setup",
       label: "Setup",
-      onPress: (event) => {
-        captureMenuDialogOrigin(event)
+      disabled: !onBack,
+      onPress: () => {
         setMenuOpen(false)
-        setStatusOpen(true)
+        onBack?.()
       },
     },
     {
@@ -442,30 +442,16 @@ function ConnectedBoardRuntime({
         onHistory?.()
       },
     },
-    ...(invitation
-      ? [
-          {
-            kind: "invite" as const,
-            label: "Invite",
-            onPress: (event?: GestureResponderEvent) => {
-              captureMenuDialogOrigin(event)
-              setMenuOpen(false)
-              setInviteOpen(true)
-            },
-          },
-        ]
-      : [
-          {
-            kind: "end-game" as const,
-            label: "End",
-            disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
-            onPress: (event?: GestureResponderEvent) => {
-              captureMenuDialogOrigin(event)
-              setMenuOpen(false)
-              setConfirmingFinish(true)
-            },
-          },
-        ]),
+    {
+      kind: "end-game",
+      label: "End",
+      disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
+      onPress: (event) => {
+        captureMenuDialogOrigin(event)
+        setMenuOpen(false)
+        setConfirmingFinish(true)
+      },
+    },
   ]
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
@@ -706,16 +692,6 @@ function ConnectedBoardRuntime({
               <Text accessibilityRole="alert" text={finishBlockedReason} />
             ) : null}
           </ScrollView>
-          {active && game.isHost ? (
-            <Button
-              text="End game…"
-              onPress={() => {
-                setStatusOpen(false)
-                setConfirmingFinish(true)
-              }}
-            />
-          ) : null}
-          {onBack ? <Button text="Back to setup" onPress={onBack} /> : null}
           <Button text="Close" onPress={() => setStatusOpen(false)} />
         </DialogCard>
       ) : null}
@@ -726,6 +702,14 @@ function ConnectedBoardRuntime({
           players={reportablePlayers}
           origin={menuDialogOrigin}
           onClose={() => setPlayerActionsOpen(false)}
+          onInvite={
+            invitation
+              ? () => {
+                  setPlayerActionsOpen(false)
+                  setInviteOpen(true)
+                }
+              : undefined
+          }
         />
       ) : null}
 

@@ -1,6 +1,8 @@
 import { router } from "expo-router"
 import { fireEvent, render } from "@testing-library/react-native"
 
+import { Header } from "@/components/Header"
+import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { createLocalGame } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
@@ -10,8 +12,16 @@ import NewLocalGameRoute from "../src/app/game/new"
 let mockSearchParams: { mode?: string; setup?: string } = {}
 let mockConnectedFeed: Record<string, unknown> = {}
 let mockLocalConnectFeed: Record<string, unknown> = {}
+let mockNewestResumeGame: ResumableGame | null = null
 const mockPublish = jest.fn()
 let publishedReporter: ((published: { publicId: string; manualCode: string }) => void) | undefined
+
+jest.mock("@/features/connected/persistence", () => {
+  const actual = jest.requireActual<typeof import("@/features/connected/persistence")>(
+    "@/features/connected/persistence",
+  )
+  return { ...actual, loadNewestResumeGame: () => mockNewestResumeGame }
+})
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -80,6 +90,7 @@ describe("new local game route", () => {
     mockSearchParams = {}
     mockConnectedFeed = {}
     mockLocalConnectFeed = {}
+    mockNewestResumeGame = null
     publishedReporter = undefined
   })
   afterEach(() => localGameRepository.clearActiveGame())
@@ -343,5 +354,67 @@ describe("new local game route", () => {
       pathname: "/connected/game/[gameId]",
       params: { gameId: "published-public-id", invite: "1" },
     })
+  })
+
+  it("sends setup Back to the running local game instead of leaving it behind", () => {
+    const game = createLocalGame({
+      startingLife: 20,
+      players: [
+        { name: "One", color: "#000" },
+        { name: "Two", color: "#111" },
+      ],
+    })
+    game.players[0].life = 19
+    localGameRepository.saveActiveGame(game)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+    view.UNSAFE_getByType(Header).props.onLeftPress()
+    expect(router.replace).toHaveBeenCalledWith("/game/current")
+    expect(router.back).not.toHaveBeenCalled()
+  })
+
+  it("sends setup Back to a newer connected game before the local one", () => {
+    const game = createLocalGame({
+      startingLife: 20,
+      players: [
+        { name: "One", color: "#000" },
+        { name: "Two", color: "#111" },
+      ],
+    })
+    game.players[0].life = 19
+    localGameRepository.saveActiveGame(game)
+    mockNewestResumeGame = {
+      publicId: "resume-live",
+      status: "active",
+      isHost: true,
+      playerCount: 2,
+      ruleset: "commander",
+      updatedAt: Date.now() + 60_000,
+    }
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+    view.UNSAFE_getByType(Header).props.onLeftPress()
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/connected/game/[gameId]",
+      params: { gameId: "resume-live" },
+    })
+    expect(router.back).not.toHaveBeenCalled()
+  })
+
+  it("sends setup Back out when no game is running", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+    view.UNSAFE_getByType(Header).props.onLeftPress()
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
   })
 })
