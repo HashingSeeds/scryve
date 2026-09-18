@@ -1,6 +1,7 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { Header } from "@/components/Header"
+import { clearCardDetails } from "@/features/decks/cardDetailsCache"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
 
@@ -71,6 +72,7 @@ function renderScreen(onBack = jest.fn()) {
 }
 
 beforeEach(() => {
+  clearCardDetails()
   mockSearchCards.mockReset()
   mockPreventRemove = false
   mockPreventRemoveCallback = undefined

@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 
+import { saveCardDetails } from "./cardDetailsCache"
 import { useCardDetails } from "./useCardDetails"
 
 const mockLookup = jest.fn()
@@ -49,4 +50,26 @@ test("skips the live lookup while offline with an honest message", async () => {
   } finally {
     mockConnectionState.isWebSocketConnected = true
   }
+})
+
+test("serves warmed details from storage without fetching", async () => {
+  saveCardDetails({ "warmed-key": { oracleText: "Warmed text" } })
+  mockLookup.mockClear()
+  const { result } = renderHook(() =>
+    useCardDetails({ detailKey: "warmed-key", name: "Warmed", scryfallId: "warmed-id" }),
+  )
+  await waitFor(() => expect(result.current.details?.oracleText).toBe("Warmed text"))
+  expect(result.current.detailsError).toBeUndefined()
+  expect(mockLookup).not.toHaveBeenCalled()
+})
+
+test("serves warmed details from storage without fetching", async () => {
+  saveCardDetails({ "warmed-key": { oracleText: "Warmed text" } })
+  mockLookup.mockClear()
+  const { result } = renderHook(() =>
+    useCardDetails({ detailKey: "warmed-key", name: "Warmed", scryfallId: "warmed-id" }),
+  )
+  await waitFor(() => expect(result.current.details?.oracleText).toBe("Warmed text"))
+  expect(result.current.detailsError).toBeUndefined()
+  expect(mockLookup).not.toHaveBeenCalled()
 })

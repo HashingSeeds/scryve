@@ -1,10 +1,12 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
+import { clearCardDetails } from "@/features/decks/cardDetailsCache"
+import { cardDetailsKey } from "@/features/decks/deckCards"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 
-import { cardDetailsKey, DeckDetailScreen } from "./DeckDetailScreen"
+import { DeckDetailScreen } from "./DeckDetailScreen"
 
 let mockFocused = true
 const mockCaptureAnalytics = jest.fn()
@@ -266,6 +268,7 @@ describe("DeckDetailScreen", () => {
   } as Parameters<typeof DeckDetailScreen>[0]["access"]
 
   beforeEach(() => {
+    clearCardDetails()
     mockFocused = true
     jest.clearAllMocks()
     queryArgs.length = 0

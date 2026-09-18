@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useFocusEffect, useNavigation } from "expo-router"
-import { useMutation, useQuery, useConvexConnectionState } from "convex/react"
+import { useConvex, useMutation, useQuery, useConvexConnectionState } from "convex/react"
 import { usePreventRemove } from "expo-router/react-navigation"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -20,8 +20,9 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import { cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
+import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
@@ -60,17 +61,6 @@ type DeckDialog =
   | "syncConflict"
 
 const OFFLINE_CARD_MESSAGE = "You’re offline. Cards already in your decks can be added."
-export function cardDetailsKey(card: DeckCard, game: string) {
-  if (card.scryfallId) return card.scryfallId
-  const identity = [
-    card.cardId,
-    card.printingId,
-    card.providerCardId,
-    card.originalReference,
-    card.name,
-  ].find(Boolean)
-  return `${game}:${identity ?? "unknown"}:${card.originalReference ?? ""}`
-}
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
@@ -270,6 +260,7 @@ function DeckDetailContent({
 }: DeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
   const navigation = useNavigation()
+  const client = useConvex()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const synced = useDeckSync(syncEnabled, access?.ownerId)
   const metadataWrites = useDeckMetadataWrites(syncEnabled, access?.ownerId)
@@ -536,6 +527,17 @@ function DeckDetailContent({
     if (!detail || !liveVersion || !recordCards) return
     recordCards(liveVersion._id, liveVersion.syncRevision ?? 0, detail.cards)
   }, [detail, versionCache.record])
+
+  useEffect(() => {
+    const liveVersion = detail?.version
+    if (!detail || !liveVersion || !client) return
+    void prefetchCardDetails(client, {
+      game: detail.deck.game,
+      versionId: liveVersion._id,
+      revision: liveVersion.syncRevision ?? 0,
+      cards: detail.cards,
+    })
+  }, [detail, client])
 
   usePreventRemove(draftChanged, ({ data }) => {
     setPendingNavigation(data.action)
