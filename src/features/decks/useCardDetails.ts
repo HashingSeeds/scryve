@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useAction } from "convex/react"
+import { useAction, useConvexConnectionState } from "convex/react"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { convexErrorMessage } from "@/utils/convexError"
@@ -20,6 +20,8 @@ export function useCardDetails(card?: CardLookup) {
   const byId = useAction(api.cards.byId)
   const byCatalogId = useAction(api.cards.byCatalogId)
   const byPokemonReference = useAction(api.cards.byPokemonReference)
+  const connection = useConvexConnectionState()
+  const offline = connection?.isWebSocketConnected === false
   const [detailsByKey, setDetailsByKey] = useState<Record<string, FocusedCardDetails>>({})
   const [failure, setFailure] = useState<{ key: string; message: string }>()
   const { detailKey, name, game = "mtg", scryfallId, catalogCardId, originalReference } = card ?? {}
@@ -29,6 +31,11 @@ export function useCardDetails(card?: CardLookup) {
     setFailure(undefined)
     async function load() {
       if (!detailKey || !name || detailsByKey[detailKey]) return
+      if (offline) {
+        if (active)
+          setFailure({ key: detailKey, message: "You're offline. Showing saved card info." })
+        return
+      }
       try {
         const details = scryfallId
           ? await byId({ scryfallId })
@@ -56,6 +63,7 @@ export function useCardDetails(card?: CardLookup) {
     detailKey,
     name,
     game,
+    offline,
     scryfallId,
     catalogCardId,
     originalReference,

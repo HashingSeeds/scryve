@@ -3,7 +3,11 @@ import { act, renderHook, waitFor } from "@testing-library/react-native"
 import { useCardDetails } from "./useCardDetails"
 
 const mockLookup = jest.fn()
-jest.mock("convex/react", () => ({ useAction: () => mockLookup }))
+const mockConnectionState = { isWebSocketConnected: true }
+jest.mock("convex/react", () => ({
+  useAction: () => mockLookup,
+  useConvexConnectionState: () => mockConnectionState,
+}))
 
 test("ignores a previous card's late response and reuses successful lookups", async () => {
   let finishFirst!: (details: { oracleText: string }) => void
@@ -28,4 +32,21 @@ test("ignores a previous card's late response and reuses successful lookups", as
   rerender({ card: second })
   expect(result.current.details?.oracleText).toBe("Second card text")
   expect(mockLookup).toHaveBeenCalledTimes(2)
+})
+
+test("skips the live lookup while offline with an honest message", async () => {
+  mockConnectionState.isWebSocketConnected = false
+  try {
+    mockLookup.mockClear()
+    const { result } = renderHook(() =>
+      useCardDetails({ detailKey: "offline", name: "Sol Ring", scryfallId: "sol-ring" }),
+    )
+    await waitFor(() =>
+      expect(result.current.detailsError).toBe("You're offline. Showing saved card info."),
+    )
+    expect(result.current.details).toBeUndefined()
+    expect(mockLookup).not.toHaveBeenCalled()
+  } finally {
+    mockConnectionState.isWebSocketConnected = true
+  }
 })

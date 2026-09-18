@@ -1175,10 +1175,10 @@ function DeckDetailContent({
         />
       ) : null}
 
-      {focusedCard && detail ? (
+      {focusedCard ? (
         <CardFocusDialog
           card={{
-            game: detail.deck.game,
+            game: detail?.deck.game ?? deck.game ?? focusedCard.game ?? "mtg",
             cardId:
               focusedCard.scryfallId ??
               focusedCard.cardId ??

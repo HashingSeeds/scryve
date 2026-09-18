@@ -354,6 +354,37 @@ describe("DeckDetailScreen", () => {
     expect(mockSaveVersion).not.toHaveBeenCalled()
   })
 
+  it("opens the cached card detail while offline", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = undefined
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [solRing]
+    const view = renderDetail(offlineAccess)
+
+    expect(view.queryByTestId("card-focus-dialog")).toBeNull()
+    fireEvent.press(view.getByTestId("deck-card-row-main:22222222-2222-2222-2222-222222222222"))
+    expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
+    expect(within(view.getByTestId("card-focus-dialog")).getByText("Sol Ring")).toBeTruthy()
+    expect(view.getByText("You're offline. Showing saved card info.")).toBeTruthy()
+    expect(mockCardById).not.toHaveBeenCalled()
+  })
+
   it("keeps a pending card write scoped to the selected version across a switch", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
