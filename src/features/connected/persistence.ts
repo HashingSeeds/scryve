@@ -276,6 +276,26 @@ function filteredResumeBound(games: Array<ResumableGame | null>): ResumableGame[
     .slice(0, RESUME_INDEX_LIMIT)
 }
 
+function parseResumeIndex(stored: unknown): ResumableGame[] {
+  if (!isRecord(stored) || stored.schemaVersion !== 1 || !Array.isArray(stored.games)) return []
+  return filteredResumeBound(stored.games.map(parseResumeEntry))
+}
+
+export function loadNewestResumeGame(
+  storage: ConnectedStringStorage = mmkvStorage,
+  deployment = connectedDeploymentScope(),
+): ResumableGame | null {
+  const prefix = `count.connected.resume.v1.${deployment}.`
+  let newest: ResumableGame | null = null
+  for (const key of storage.getAllKeys()) {
+    if (!key.startsWith(prefix)) continue
+    for (const game of parseResumeIndex(parseJson(storage.getString(key)))) {
+      if (!newest || game.updatedAt > newest.updatedAt) newest = game
+    }
+  }
+  return newest
+}
+
 const resumeIndexListeners = new Set<() => void>()
 
 export function subscribeResumeIndex(listener: () => void): () => void {
@@ -350,11 +370,9 @@ export class ConnectedGameRepository {
 
   loadResumeIndex(): ResumableGame[] {
     if (this.ownerId === "anonymous") return []
-    const stored = parseJson(
-      this.storage.getString(CONNECTED_KEYS.resumeIndex(this.ownerId, this.deployment)),
+    return parseResumeIndex(
+      parseJson(this.storage.getString(CONNECTED_KEYS.resumeIndex(this.ownerId, this.deployment))),
     )
-    if (!isRecord(stored) || stored.schemaVersion !== 1 || !Array.isArray(stored.games)) return []
-    return filteredResumeBound(stored.games.map(parseResumeEntry))
   }
 
   removeResumeEntry(gameId: string): void {

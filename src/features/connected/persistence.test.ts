@@ -1,6 +1,11 @@
 import type { ResumableGame } from "./connectedCopy"
 import type { ConnectedProjection, PendingLifeAction } from "./model"
-import { CONNECTED_KEYS, ConnectedGameRepository, RESUME_INDEX_LIMIT } from "./persistence"
+import {
+  CONNECTED_KEYS,
+  ConnectedGameRepository,
+  RESUME_INDEX_LIMIT,
+  loadNewestResumeGame,
+} from "./persistence"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
 
 class MemoryStorage {
@@ -658,6 +663,31 @@ describe("connected resume index", () => {
       "small-ibis-123.convex.cloud",
     )
     expect(repository.loadResumeIndex()).toEqual([])
+  })
+
+  it("finds the newest resume across accounts and deployments stay separate", () => {
+    const storage = new MemoryStorage()
+    const deployment = "small-ibis-123.convex.cloud"
+    new ConnectedGameRepository(storage, "user-1", {}, deployment).syncResumeIndex(
+      [resumeEntry("game-older", 1)],
+      true,
+    )
+    new ConnectedGameRepository(storage, "user-2", {}, deployment).syncResumeIndex(
+      [resumeEntry("game-newer", 9)],
+      true,
+    )
+    new ConnectedGameRepository(storage, "user-1", {}, "other.convex.cloud").syncResumeIndex(
+      [resumeEntry("game-other-deployment", 50)],
+      true,
+    )
+    expect(loadNewestResumeGame(storage, deployment)).toMatchObject({
+      publicId: "game-newer",
+      updatedAt: 9,
+    })
+    expect(loadNewestResumeGame(storage, "other.convex.cloud")).toMatchObject({
+      publicId: "game-other-deployment",
+    })
+    expect(loadNewestResumeGame(storage, "missing.convex.cloud")).toBeNull()
   })
 
   it("removes a single entry without touching the rest and ignores anonymous writes", () => {
