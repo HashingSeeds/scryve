@@ -72,8 +72,9 @@ type RuntimeActionEvent = {
 }
 
 export type MockConnectedRuntime = {
-  status: "loading" | "ready"
+  status: "loading" | "ready" | "unavailable"
   source: "cache" | "remote"
+  message?: string
   projection: {
     schemaVersion: 1
     publicId: string

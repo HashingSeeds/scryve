@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
@@ -7,6 +7,7 @@ import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { loadNewestResumeGame, subscribeResumeIndex } from "@/features/connected/persistence"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
@@ -33,6 +34,21 @@ function createPreparedGame(value: string | undefined) {
   }
 }
 
+function readResumeRedirectOnRevision(
+  localUpdatedAt: number | undefined,
+  destination: string | undefined,
+  prepared: string | undefined,
+  revision: number,
+) {
+  if (revision < 0 || destination === "play" || prepared) return null
+  const newest = loadNewestResumeGame()
+  if (!newest || newest.updatedAt <= (localUpdatedAt ?? 0)) return null
+  return {
+    pathname: newest.status === "lobby" ? "/connected/lobby/[gameId]" : "/connected/game/[gameId]",
+    params: { gameId: newest.publicId },
+  } as const
+}
+
 export default function Index() {
   const { prepared, destination } = useLocalSearchParams<{
     prepared?: string
@@ -51,6 +67,16 @@ export default function Index() {
     }, []),
   )
   const activeGame = loadedGame?.id === dismissedGameId ? null : loadedGame
+  const [resumeRevision, bumpResumeRevision] = useState(0)
+  useEffect(() => {
+    bumpResumeRevision((revision) => revision + 1)
+    return subscribeResumeIndex(() => bumpResumeRevision((revision) => revision + 1))
+  }, [])
+  const resumeRedirect = useMemo(
+    () =>
+      readResumeRedirectOnRevision(activeGame?.updatedAt, destination, prepared, resumeRevision),
+    [destination, prepared, activeGame?.updatedAt, resumeRevision],
+  )
   const freshGame = useMemo(() => {
     const preparedGame = createPreparedGame(prepared)
     if (preparedGame) return preparedGame
@@ -73,6 +99,8 @@ export default function Index() {
 
   const started = activeGame !== null && hasLocalGameStarted(activeGame)
   const stale = activeGame && started ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
+
+  if (resumeRedirect) return <Redirect href={resumeRedirect} />
 
   if (destination !== "play" && (!activeGame || stale) && settings.launchDestination === "decks") {
     return <Redirect href="/connected/decks" />

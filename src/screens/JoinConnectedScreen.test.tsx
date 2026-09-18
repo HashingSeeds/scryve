@@ -1,5 +1,14 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
+import {
+  applyGameCommand,
+  asActorId,
+  asDeviceId,
+  asOperationId,
+  createLocalGame,
+} from "@/features/game/domain"
+import { localGameRepository } from "@/features/game/localPersistence"
+
 import { InviteScannerScreen } from "./InviteScannerScreen"
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
 import { mockClaimSeat, resetConnectedHarness, themed } from "../../test/support/connectedHarness"
@@ -153,5 +162,42 @@ describe("JoinConnectedScreen", () => {
     expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(true)
     fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
     expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(false)
+  })
+
+  it("refuses to join while a started local game is active", async () => {
+    const fresh = createLocalGame({
+      players: [
+        { name: "Player 1", color: "#FF0000" },
+        { name: "Player 2", color: "#0000FF" },
+      ],
+      startingLife: 20,
+    })
+    const started = applyGameCommand(
+      fresh,
+      { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+      {
+        actorId: asActorId("local"),
+        deviceId: asDeviceId("device"),
+        now: () => Date.now(),
+        operationId: () => asOperationId("op-1"),
+      },
+    )
+    localGameRepository.saveActiveGame(started)
+    try {
+      const onJoined = jest.fn()
+      render(themed(<JoinConnectedScreen initialCode="AB12CD" onJoined={onJoined} />))
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            "Finish or abandon your active local game before joining a connected game.",
+          ),
+        ).toBeTruthy(),
+      )
+      expect(mockClaimSeat).not.toHaveBeenCalled()
+      expect(onJoined).not.toHaveBeenCalled()
+    } finally {
+      localGameRepository.clearActiveGame()
+    }
   })
 })
