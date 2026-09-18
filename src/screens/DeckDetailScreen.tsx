@@ -939,6 +939,11 @@ function DeckDetailContent({
         cardsUnavailable={cardsUnavailable}
         cardsCached={cardsCached}
         canAddOffline={offlineCandidates.length > 0}
+        addOfflineNote={
+          offline && cardsCached && offlineCandidates.length === 0
+            ? "No offline cards yet. Open cards online and they'll be available here."
+            : undefined
+        }
         editingDisabled={knownDeleted}
         saveStatus={
           syncEnabled && access?.ownerId

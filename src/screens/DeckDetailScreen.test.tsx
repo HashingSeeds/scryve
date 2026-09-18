@@ -308,6 +308,7 @@ describe("DeckDetailScreen", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
     mockMetadataWriteState.metadata = [cachedMetadata]
+    mockConnectionState.isWebSocketConnected = false
     mockVersionCacheState.version = {
       deckId: "deck-1",
       versionId: "version-main",
@@ -343,6 +344,9 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("1×")).toBeTruthy()
     expect(view.queryByText("Card list unavailable offline.")).toBeNull()
     expect(view.getByTestId("deck-add-cards")).toBeDisabled()
+    expect(
+      view.getByText("No offline cards yet. Open cards online and they'll be available here."),
+    ).toBeTruthy()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     expect(view.getByLabelText("Increase Sol Ring")).toBeEnabled()
     expect(view.getByLabelText("Remove Sol Ring")).toBeEnabled()
@@ -721,6 +725,9 @@ describe("DeckDetailScreen", () => {
     const view = renderDetail(offlineAccess)
 
     expect(view.getByTestId("deck-add-cards")).toBeEnabled()
+    expect(
+      view.queryByText("No offline cards yet. Open cards online and they'll be available here."),
+    ).toBeNull()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     fireEvent.press(view.getByTestId("deck-add-cards"))
     fireEvent.changeText(view.getByTestId("card-search-input"), "Mind")

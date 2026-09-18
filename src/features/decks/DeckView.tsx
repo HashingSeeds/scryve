@@ -30,6 +30,7 @@ export function DeckView({
   cardsUnavailable,
   cardsCached,
   canAddOffline,
+  addOfflineNote,
   editingDisabled,
   saveStatus,
   error,
@@ -59,6 +60,7 @@ export function DeckView({
   cardsUnavailable?: boolean
   cardsCached?: boolean
   canAddOffline?: boolean
+  addOfflineNote?: string
   editingDisabled?: boolean
   saveStatus?: string
   error?: ReactNode
@@ -295,6 +297,9 @@ export function DeckView({
             preset="primary"
           />
         </View>
+        {addOfflineNote ? (
+          <Text size="xxs" style={[themed($dim), $addNote]} text={addOfflineNote} />
+        ) : null}
       </BottomActionBar>
     </>
   )
@@ -375,3 +380,4 @@ const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
 })
 const $primary: ViewStyle = { flex: 2, minHeight: 44 }
+const $addNote: TextStyle = { textAlign: "center" }
