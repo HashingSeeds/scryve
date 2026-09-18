@@ -214,6 +214,10 @@ export function NewGameScreen({
   const busy = connectedMode && Boolean(connected?.busy)
   const localGameBlocksStart = !connectedMode && Boolean(localGame)
   const hostedGame = connectedMode ? connected?.activeGames?.find((game) => game.isHost) : undefined
+  const hostedResumable =
+    connectedMode || !onResumeConnected
+      ? undefined
+      : connected?.activeGames?.find((game) => game.isHost)
   /** Only a running local game can be handed to the server; a connected one is already there. */
   const canConnectLocal = Boolean(localConnect) && !connectedMode && Boolean(localGame)
   const gameBlocksStart = localGameBlocksStart || Boolean(hostedGame)
@@ -371,6 +375,15 @@ export function NewGameScreen({
       ) : (
         <>
           <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
+            {hostedResumable ? (
+              <View style={themed($section)}>
+                <Button
+                  testID="resume-hosted-connected-button"
+                  text="Resume hosted game"
+                  onPress={() => onResumeConnected?.(hostedResumable)}
+                />
+              </View>
+            ) : null}
             <View style={themed($section)}>
               <Text text="System" preset="subheading" accessibilityRole="header" />
               <SegmentedControl

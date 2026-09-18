@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, Share, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -51,6 +51,9 @@ import { isPlayerMarkShape } from "../../convex/lib/appearance"
 
 type ConnectedBoardScreenProps = {
   publicId: string
+  initialInviteOpen?: boolean
+  onGameEnded?: (publicId: string) => void
+  onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
   onDecks?: () => void
@@ -171,6 +174,9 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
 
 function ConnectedBoardRuntime({
   publicId,
+  initialInviteOpen,
+  onGameEnded,
+  onGameAbandoned,
   onBack,
   onHistory,
   onDecks,
@@ -180,6 +186,9 @@ function ConnectedBoardRuntime({
   ownerId,
 }: {
   publicId: string
+  initialInviteOpen?: boolean
+  onGameEnded?: (publicId: string) => void
+  onGameAbandoned?: () => void
   onBack?: () => void
   onHistory?: () => void
   onDecks?: () => void
@@ -201,7 +210,7 @@ function ConnectedBoardRuntime({
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
-  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(initialInviteOpen ?? false)
   const [inviteError, setInviteError] = useState<string>()
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
@@ -216,6 +225,18 @@ function ConnectedBoardRuntime({
     staged: Partial<Record<PlayerId, number>>
   } | null>(null)
   const finishSubmitInFlight = useRef(false)
+  const [abandonedOpen, setAbandonedOpen] = useState(false)
+  const navigatedTerminal = useRef(false)
+  const terminalStatus = runtime.status === "loading" ? undefined : runtime.projection.status
+  useEffect(() => {
+    if (terminalStatus === "finished") {
+      if (navigatedTerminal.current) return
+      navigatedTerminal.current = true
+      onGameEnded?.(publicId)
+    } else if (terminalStatus === "abandoned" && !navigatedTerminal.current) {
+      setAbandonedOpen(true)
+    }
+  }, [terminalStatus, onGameEnded, publicId])
   useStoreReview(
     runtime.status !== "loading" &&
       runtime.projection.status === "finished" &&
@@ -370,6 +391,12 @@ function ConnectedBoardRuntime({
     }
   }
 
+  function leaveAbandonedGame() {
+    setAbandonedOpen(false)
+    if (onGameAbandoned) onGameAbandoned()
+    else onBack?.()
+  }
+
   const radialActions: RadialMenuAction[] = [
     {
       kind: "layout",
@@ -399,6 +426,15 @@ function ConnectedBoardRuntime({
         setStatusOpen(true)
       },
     },
+    {
+      kind: "history",
+      label: "History",
+      disabled: !onHistory,
+      onPress: () => {
+        setMenuOpen(false)
+        onHistory?.()
+      },
+    },
     ...(invitation
       ? [
           {
@@ -411,26 +447,18 @@ function ConnectedBoardRuntime({
             },
           },
         ]
-      : []),
-    {
-      kind: "history",
-      label: "History",
-      disabled: !onHistory,
-      onPress: () => {
-        setMenuOpen(false)
-        onHistory?.()
-      },
-    },
-    {
-      kind: "end-game",
-      label: "End",
-      disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
-      onPress: (event) => {
-        captureMenuDialogOrigin(event)
-        setMenuOpen(false)
-        setConfirmingFinish(true)
-      },
-    },
+      : [
+          {
+            kind: "end-game" as const,
+            label: "End",
+            disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
+            onPress: (event?: GestureResponderEvent) => {
+              captureMenuDialogOrigin(event)
+              setMenuOpen(false)
+              setConfirmingFinish(true)
+            },
+          },
+        ]),
   ]
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
@@ -440,7 +468,8 @@ function ConnectedBoardRuntime({
     layoutPickerOpen ||
     confirmingFinish ||
     playerActionsOpen ||
-    inviteDialogOpen
+    inviteDialogOpen ||
+    abandonedOpen
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
     seat: player.seat,
@@ -683,6 +712,28 @@ function ConnectedBoardRuntime({
         />
       ) : null}
 
+      {abandonedOpen ? (
+        <DialogCard
+          visible
+          onClose={() => setAbandonedOpen(false)}
+          origin={menuDialogOrigin}
+          backdropTestID="abandoned-game-backdrop"
+          backdropAccessibilityLabel="Dismiss game ended notice"
+          dialogTestID="abandoned-game-dialog"
+          dialogAccessibilityRole="alert"
+          wide
+          style={themed($boardDialog)}
+        >
+          <Text text="Game ended" preset="subheading" style={themed($dialogText)} />
+          <Text
+            size="xs"
+            text="The host ended this game. Its board stays read-only."
+            style={themed($muted)}
+          />
+          <Button text="Leave" onPress={leaveAbandonedGame} />
+        </DialogCard>
+      ) : null}
+
       {confirmingFinish ? (
         <DialogCard
           visible
@@ -761,14 +812,24 @@ function ConnectedBoardRuntime({
                 if (finishSubmitInFlight.current) return
                 finishSubmitInFlight.current = true
                 try {
-                  const ended = finishResultSelected
+                  const withResult = finishResultSelected
+                  const ended = withResult
                     ? await runtime.finish(
                         winnerPlayerIds.length > 0
                           ? { kind: "win" as const, winnerPlayerIds }
                           : { kind: "draw" as const },
                       )
                     : await runtime.abandon()
-                  if (ended) setConfirmingFinish(false)
+                  if (!ended) return
+                  setConfirmingFinish(false)
+                  navigatedTerminal.current = true
+                  if (withResult) {
+                    if (onGameEnded) setTimeout(() => onGameEnded(publicId), 0)
+                  } else if (onGameAbandoned) {
+                    setTimeout(onGameAbandoned, 0)
+                  } else if (onGameEnded) {
+                    setTimeout(() => onGameEnded(publicId), 0)
+                  }
                 } finally {
                   finishSubmitInFlight.current = false
                 }

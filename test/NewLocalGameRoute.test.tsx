@@ -294,6 +294,31 @@ describe("new local game route", () => {
     expect(view.getByTestId("start-game-button")).toBeTruthy()
   })
 
+  it("surfaces a hosted live game while setting up locally", () => {
+    mockConnectedFeed = {
+      activeGames: [
+        {
+          publicId: "hosted-live",
+          status: "active",
+          isHost: true,
+          playerCount: 2,
+          ruleset: "commander",
+          updatedAt: Date.now(),
+        },
+      ],
+    }
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("resume-hosted-connected-button"))
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/connected/game/[gameId]",
+      params: { gameId: "hosted-live" },
+    })
+  })
+
   it("publishes the running local game under the chosen seat, then hands it to the server", () => {
     const game = createLocalGame({
       startingLife: 40,
@@ -319,7 +344,7 @@ describe("new local game route", () => {
     expect(localGameRepository.loadActiveGame()).toBeNull()
     expect(router.replace).toHaveBeenCalledWith({
       pathname: "/connected/game/[gameId]",
-      params: { gameId: "published-public-id" },
+      params: { gameId: "published-public-id", invite: "1" },
     })
   })
 })

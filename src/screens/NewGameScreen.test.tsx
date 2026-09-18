@@ -205,6 +205,31 @@ describe("NewGameScreen", () => {
     ).toBeNull()
   })
 
+  it("surfaces a hosted live game in local setup only", () => {
+    const onResumeConnected = jest.fn()
+    const hosted = {
+      publicId: "hosted-game",
+      status: "active" as const,
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: 1,
+    }
+    const local = setup({
+      connected: { ...readyHost, activeGames: [hosted] },
+      onResumeConnected,
+    })
+    fireEvent.press(local.getByTestId("resume-hosted-connected-button"))
+    expect(onResumeConnected).toHaveBeenCalledWith(hosted)
+
+    const connected = setup({
+      mode: "connected",
+      connected: { ...readyHost, activeGames: [hosted] },
+      onResumeConnected,
+    })
+    expect(connected.queryByTestId("resume-hosted-connected-button")).toBeNull()
+  })
+
   it("offers ending the current game before starting, freezing setup until it ends", () => {
     const onResumeLocal = jest.fn()
     const onEndLocal = jest.fn()

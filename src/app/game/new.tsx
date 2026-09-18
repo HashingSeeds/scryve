@@ -36,7 +36,10 @@ function openLobby(lobby: Pick<CreatedLobby, "publicId">) {
  */
 function openPublishedGame({ publicId }: PublishedGame) {
   localGameRepository.clearActiveGame()
-  router.replace({ pathname: "/connected/game/[gameId]", params: { gameId: publicId } })
+  router.replace({
+    pathname: "/connected/game/[gameId]",
+    params: { gameId: publicId, invite: "1" },
+  })
 }
 
 export function ReportLocalConnect({
@@ -54,7 +57,6 @@ export function ReportLocalConnect({
 export default function NewLocalGameRoute() {
   const params = useLocalSearchParams<{ mode?: string; setup?: string }>()
   const [mode, setMode] = useState<NewGameMode>(params.mode === "connected" ? "connected" : "local")
-  const [connectedEnabled, setConnectedEnabled] = useState(mode === "connected")
   const [joinCode, setJoinCode] = useState("")
   const [connected, setConnected] = useState<ConnectedHostFeed>()
   const [localConnect, setLocalConnect] = useState<LocalConnectFeed>()
@@ -90,9 +92,7 @@ export default function NewLocalGameRoute() {
 
   return (
     <>
-      {connectedEnabled || connectableGame ? (
-        <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
-      ) : null}
+      <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
       {connectableGame ? (
         <LocalGamePublishSource game={connectableGame} onPublished={openPublishedGame}>
           {(feed) => <ReportLocalConnect feed={feed} onChange={setLocalConnect} />}
@@ -114,10 +114,7 @@ export default function NewLocalGameRoute() {
               }
             : undefined
         }
-        onModeChange={(next) => {
-          if (next === "connected") setConnectedEnabled(true)
-          setMode(next)
-        }}
+        onModeChange={setMode}
         onBack={() => router.back()}
         onStartLocal={(players, startingLife, setup) => {
           const current = localGameRepository.loadActiveGame()

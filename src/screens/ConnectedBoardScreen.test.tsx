@@ -775,9 +775,23 @@ describe("ConnectedBoardScreen", () => {
     }
     screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
+    expect(screen.queryByTestId("end-game-button")).toBeNull()
     fireEvent.press(screen.getByTestId("invite-button"))
     expect(screen.getByTestId("invite-dialog")).toBeTruthy()
     expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
+    expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
+  })
+
+  it("reveals the invite on arrival when asked, so a fresh publish can hand out the code", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        invitation: { token: "t".repeat(43), manualCode: "AB12CD", expiresAt: Date.now() + 60_000 },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" initialInviteOpen />))
+    expect(screen.getByTestId("invite-dialog")).toBeTruthy()
     expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
   })
 
@@ -802,5 +816,38 @@ describe("ConnectedBoardScreen", () => {
     screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.queryByTestId("invite-dialog")).toBeNull()
     expect(screen.getByTestId("life-seat-1-1").props.accessibilityState.disabled).toBe(false)
+    openConnectedMenu()
+    expect(screen.queryByTestId("invite-button")).toBeNull()
+    expect(screen.getByTestId("end-game-button")).toBeTruthy()
+  })
+
+  it("takes a finished board to its summary without a second trip", () => {
+    const onGameEnded = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, status: "finished" },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" onGameEnded={onGameEnded} />))
+    expect(onGameEnded).toHaveBeenCalledTimes(1)
+    expect(onGameEnded).toHaveBeenCalledWith("game-public")
+    screen.rerender(
+      themed(<ConnectedBoardScreen publicId="game-public" onGameEnded={onGameEnded} />),
+    )
+    expect(onGameEnded).toHaveBeenCalledTimes(1)
+  })
+
+  it("offers the way out when the host ends the game elsewhere", () => {
+    const onGameAbandoned = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, status: "abandoned" },
+    }
+    render(
+      themed(<ConnectedBoardScreen publicId="game-public" onGameAbandoned={onGameAbandoned} />),
+    )
+    expect(screen.getByTestId("abandoned-game-dialog")).toBeTruthy()
+    fireEvent.press(screen.getByText("Leave"))
+    expect(onGameAbandoned).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
   })
 })
