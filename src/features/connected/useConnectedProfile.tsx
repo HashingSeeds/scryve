@@ -21,6 +21,7 @@ interface ConnectedProfileDetails {
   userId: string
   displayName: string
   avatarUrl?: string
+  username?: string
 }
 
 interface ConnectedProfileBase {
@@ -62,18 +63,27 @@ function profilesMatch(left: SyncedProfile | undefined, right: SyncedProfile) {
   return (
     left?.userId === right.userId &&
     left.displayName === right.displayName &&
-    left.avatarUrl === right.avatarUrl
+    left.avatarUrl === right.avatarUrl &&
+    left.username === right.username
   )
 }
 
 function syncProfile(
   profile: SyncedProfile,
-  syncCurrent: (args: { displayName: string; avatarUrl?: string }) => Promise<unknown>,
+  syncCurrent: (args: {
+    displayName: string
+    avatarUrl?: string
+    username?: string
+  }) => Promise<unknown>,
 ) {
   if (inFlightSync && profilesMatch(inFlightSync.profile, profile)) return inFlightSync.promise
   const request = {
     profile,
-    promise: syncCurrent({ displayName: profile.displayName, avatarUrl: profile.avatarUrl }),
+    promise: syncCurrent({
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      username: profile.username,
+    }),
   }
   inFlightSync = request
   const clearRequest = () => {
@@ -109,6 +119,7 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
             userId: user.id,
             displayName: connectedProfileName(user.username),
             avatarUrl: user.imageUrl,
+            username: user.username ?? undefined,
           }
         : undefined,
     [user?.id, user?.imageUrl, user?.username],

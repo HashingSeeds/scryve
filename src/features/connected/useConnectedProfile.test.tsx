@@ -13,7 +13,10 @@ let mockSocketConnected = true
 let mockConvexAuthenticated = true
 let mockConvexLoading = false
 let mockConvexRefreshing = false
-const mockSyncCurrent = jest.fn<Promise<string>, [{ displayName: string; avatarUrl?: string }]>()
+const mockSyncCurrent = jest.fn<
+  Promise<string>,
+  [{ displayName: string; avatarUrl?: string; username?: string }]
+>()
 
 jest.mock("@clerk/expo", () => ({
   useUser: () => ({
@@ -107,6 +110,7 @@ describe("useConnectedProfile", () => {
     expect(mockSyncCurrent).toHaveBeenCalledWith({
       displayName: "ada_lovelace",
       avatarUrl: "https://example.test/user-a.png",
+      username: "ada_lovelace",
     })
   })
 

@@ -889,6 +889,68 @@ describe("connected game lifecycle and API hardening", () => {
     ).resolves.toBeDefined()
   })
 
+  it("shows synced account usernames on the projection instead of seat labels", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await lobby(t)
+    const joiner = t.withIdentity({ subject: "named-joiner" })
+    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner", username: "joiner_cool" })
+    await joiner.mutation(api.games.claimSeat, {
+      manualCode: "ABC234",
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+    const projection = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: "device-host-0001",
+    })
+    expect(projection.players.map((player) => player.displayName)).toEqual([
+      "Player 1",
+      "joiner_cool",
+    ])
+
+    await joiner.mutation(api.users.syncCurrent, {
+      displayName: "Joiner",
+      username: "joiner_renamed",
+    })
+    const renamed = await host.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: "device-host-0001",
+    })
+    expect(renamed.players.map((player) => player.displayName)).toEqual([
+      "Player 1",
+      "joiner_renamed",
+    ])
+  })
+
+  it("ignores conflicting or invalid usernames without failing the sync", async () => {
+    const t = convexTest(schema, modules)
+    const joiner = t.withIdentity({ subject: "taken-joiner" })
+    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner", username: "taken_name" })
+    const squatter = t.withIdentity({ subject: "squatter" })
+    await expect(
+      squatter.mutation(api.users.syncCurrent, { displayName: "Squatter", username: "TAKEN_name" }),
+    ).resolves.toBeDefined()
+    await expect(
+      squatter.mutation(api.users.syncCurrent, { displayName: "Squatter", username: "ab" }),
+    ).resolves.toBeDefined()
+    const created = await squatter.mutation(api.games.createLobby, {
+      publicId: "squatter-lobby-123456",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      inviteToken: token,
+      manualCodeCandidates: ["ZZZ234"],
+      hostDisplayName: "Squatter",
+      hostColor: "#7C3AED",
+      deviceId: "device-squatter-1",
+    })
+    const projection = await squatter.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: "device-squatter-1",
+    })
+    expect(projection.players.map((player) => player.displayName)).toEqual(["Player 1"])
+  })
+
   it("reports only joinable invites and rotates the current invite atomically", async () => {
     const t = convexTest(schema, modules)
     const { host, created } = await lobby(t)

@@ -84,27 +84,60 @@ export const syncFromClerk = internalMutation({
   },
 })
 
+async function usernameForSync(
+  ctx: MutationCtx,
+  username: string | undefined,
+  clerkUserId: string,
+): Promise<string | undefined> {
+  if (!username) return undefined
+  let value: string
+  try {
+    value = assertUsername(username)
+  } catch {
+    return undefined
+  }
+  const conflicting = await ctx.db
+    .query("users")
+    .withIndex("by_username_normalized", (q) =>
+      q.eq("usernameNormalized", normalizeUsername(value)),
+    )
+    .unique()
+  if (conflicting && conflicting.clerkUserId !== clerkUserId) return undefined
+  return value
+}
+
 export const syncCurrent = mutation({
-  args: { displayName: v.string(), avatarUrl: v.optional(v.string()) },
+  args: {
+    displayName: v.string(),
+    avatarUrl: v.optional(v.string()),
+    username: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
     if (await hasAccountDeletion(ctx, identity.subject))
       throw new Error("Account deletion is in progress")
     const displayName = assertDisplayName(args.displayName)
     const avatarUrl = assertAvatarUrl(args.avatarUrl)
+    const username = await usernameForSync(ctx, args.username, identity.subject)
     const now = Date.now()
     const existing = await ctx.db
       .query("users")
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
       .unique()
     if (existing) {
-      await ctx.db.patch(existing._id, { displayName, avatarUrl, updatedAt: now })
+      await ctx.db.patch(existing._id, {
+        displayName,
+        avatarUrl,
+        ...(username ? { username, usernameNormalized: normalizeUsername(username) } : {}),
+        updatedAt: now,
+      })
       return existing._id
     }
     return ctx.db.insert("users", {
       clerkUserId: identity.subject,
       displayName,
       avatarUrl,
+      ...(username ? { username, usernameNormalized: normalizeUsername(username) } : {}),
       membershipMigrationVersion: MEMBERSHIP_MIGRATION_VERSION,
       createdAt: now,
       updatedAt: now,

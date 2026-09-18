@@ -103,7 +103,11 @@ export function JoinConnectedScreen({
         setError("Enter a valid invitation code.")
         return
       }
-      await syncUser({ displayName: profileName, avatarUrl: user?.imageUrl })
+      await syncUser({
+        displayName: profileName,
+        avatarUrl: user?.imageUrl,
+        username: user?.username ?? undefined,
+      })
       const manualCode = token ? undefined : normalizeManualCode(code)
       if (!token && !manualCode) {
         captureAnalytics("connection_attempt", { action: "join", stage: "failed", reason: "input" })
