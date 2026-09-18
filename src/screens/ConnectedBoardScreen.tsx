@@ -54,6 +54,8 @@ type ConnectedBoardScreenProps = {
   onSettings?: () => void
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
+  onGameEnded?: (publicId: string) => void
+  onGameAbandoned?: () => void
 }
 
 type ConnectedBoardShellState =
@@ -174,6 +176,8 @@ function ConnectedBoardRuntime({
   onSettings,
   onAccount,
   accountLabel,
+  onGameEnded,
+  onGameAbandoned,
   ownerId,
 }: {
   publicId: string
@@ -183,6 +187,8 @@ function ConnectedBoardRuntime({
   onSettings?: () => void
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
+  onGameEnded?: (publicId: string) => void
+  onGameAbandoned?: () => void
   ownerId: string
 }) {
   useKeepAwake("count-connected-game")
@@ -690,14 +696,23 @@ function ConnectedBoardRuntime({
                 if (finishSubmitInFlight.current) return
                 finishSubmitInFlight.current = true
                 try {
-                  const ended = finishResultSelected
+                  const withResult = finishResultSelected
+                  const ended = withResult
                     ? await runtime.finish(
                         winnerPlayerIds.length > 0
                           ? { kind: "win" as const, winnerPlayerIds }
                           : { kind: "draw" as const },
                       )
                     : await runtime.abandon()
-                  if (ended) setConfirmingFinish(false)
+                  if (!ended) return
+                  setConfirmingFinish(false)
+                  if (withResult) {
+                    if (onGameEnded) setTimeout(() => onGameEnded(publicId), 0)
+                  } else if (onGameAbandoned) {
+                    setTimeout(onGameAbandoned, 0)
+                  } else if (onGameEnded) {
+                    setTimeout(() => onGameEnded(publicId), 0)
+                  }
                 } finally {
                   finishSubmitInFlight.current = false
                 }

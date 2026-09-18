@@ -21,6 +21,13 @@ export default function ConnectedGameRoute() {
         onSettings={() => router.push("/settings")}
         accountLabel={auth.isSignedIn ? "Account" : "Sign in"}
         onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}
+        onGameEnded={(publicId) =>
+          router.replace({
+            pathname: "/history/[gameId]",
+            params: { gameId: publicId, source: "connected" },
+          })
+        }
+        onGameAbandoned={() => router.replace("/game/new?mode=connected")}
       />
     </ConnectedGate>
   )
