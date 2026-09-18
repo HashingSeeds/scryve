@@ -288,7 +288,7 @@ export function loadNewestResumeGame(
   const prefix = `count.connected.resume.v1.${deployment}.`
   let newest: ResumableGame | null = null
   for (const key of storage.getAllKeys()) {
-    if (!key.startsWith(prefix)) continue
+    if (!key.startsWith(prefix) || !/^\d+:/.test(key.slice(prefix.length))) continue
     for (const game of parseResumeIndex(parseJson(storage.getString(key)))) {
       if (!newest || game.updatedAt > newest.updatedAt) newest = game
     }

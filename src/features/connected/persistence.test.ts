@@ -680,6 +680,13 @@ describe("connected resume index", () => {
       [resumeEntry("game-other-deployment", 50)],
       true,
     )
+    storage.set(
+      `count.connected.resume.v1.${deployment}.evil.6:user-3`,
+      JSON.stringify({
+        schemaVersion: 1,
+        games: [{ ...resumeEntry("game-evil", 99) }],
+      }),
+    )
     expect(loadNewestResumeGame(storage, deployment)).toMatchObject({
       publicId: "game-newer",
       updatedAt: 9,
