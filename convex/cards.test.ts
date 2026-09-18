@@ -505,3 +505,77 @@ it("keeps catalog capability restrictions for guest searches", async () => {
     t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
   ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
 })
+
+describe("card details batch", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("serves cached reference and catalog details without provider calls", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected fetch"))
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    const scryfallId = "22222222-2222-2222-2222-222222222222"
+    await t.mutation(internal.cards.cache, {
+      scryfallId,
+      oracleId: "11111111-1111-1111-1111-111111111111",
+      name: "Sol Ring",
+      oracleText: "{T}: Add {C}{C}.",
+      typeLine: "Artifact",
+      setName: "Commander",
+    })
+    const card = { ...rushCards[0], game: "ygo" as const }
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: [card] })
+    expect(
+      await t.query(api.cards.detailsBatch, {
+        game: "mtg",
+        items: [
+          { key: "mtg:sol-ring", scryfallId },
+          { key: "mtg:missing", scryfallId: "33333333-3333-3333-3333-333333333333" },
+        ],
+      }),
+    ).toEqual([
+      {
+        key: "mtg:sol-ring",
+        details: { oracleText: "{T}: Add {C}{C}.", typeLine: "Artifact", setName: "Commander" },
+      },
+    ])
+    expect(
+      await t.query(api.cards.detailsBatch, {
+        game: "ygo",
+        items: [{ key: "ygo:rush", catalogCardId: card.cardId }],
+      }),
+    ).toEqual([
+      {
+        key: "ygo:rush",
+        details: expect.objectContaining({ typeLine: expect.any(String) }),
+      },
+    ])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it("keeps catalog capability restrictions for batched details", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await t.mutation(internal.integrationManifest.setCapabilityOverride, {
+      game: "pokemon",
+      capability: "cardCatalog",
+      release: "disabled",
+    })
+    await expect(
+      t.query(api.cards.detailsBatch, {
+        game: "pokemon",
+        items: [{ key: "pokemon:charizard", catalogCardId: "base1-4" }],
+      }),
+    ).rejects.toMatchObject({ data: { code: "capability_unavailable" } })
+  })
+
+  it("rejects oversize detail batches", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await expect(
+      t.query(api.cards.detailsBatch, {
+        game: "mtg",
+        items: Array.from({ length: 401 }, (_, index) => ({ key: `mtg:${index}` })),
+      }),
+    ).rejects.toMatchObject({ data: { code: "details_batch_too_large" } })
+  })
+})

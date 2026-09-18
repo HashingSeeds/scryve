@@ -1,6 +1,7 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { Header } from "@/components/Header"
+import { clearCardDetails } from "@/features/decks/cardDetailsCache"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
 
@@ -8,7 +9,11 @@ import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
 
 const mockSearchCards = jest.fn()
 const mockConvex = { action: mockSearchCards }
-jest.mock("convex/react", () => ({ useConvex: () => mockConvex, useAction: () => mockSearchCards }))
+jest.mock("convex/react", () => ({
+  useConvex: () => mockConvex,
+  useConvexConnectionState: () => ({ isWebSocketConnected: true }),
+  useAction: () => mockSearchCards,
+}))
 
 let mockPreventRemove = false
 let mockPreventRemoveCallback:
@@ -67,6 +72,7 @@ function renderScreen(onBack = jest.fn()) {
 }
 
 beforeEach(() => {
+  clearCardDetails()
   mockSearchCards.mockReset()
   mockPreventRemove = false
   mockPreventRemoveCallback = undefined

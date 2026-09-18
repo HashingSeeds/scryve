@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
-import { useAction } from "convex/react"
+import { useAction, useConvexConnectionState } from "convex/react"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { convexErrorMessage } from "@/utils/convexError"
 
+import { loadCardDetails, readCardDetail, saveCardDetails } from "./cardDetailsCache"
 import { catalogCardDetails } from "./cardFocus"
 import { api } from "../../../convex/_generated/api"
 
@@ -20,7 +21,11 @@ export function useCardDetails(card?: CardLookup) {
   const byId = useAction(api.cards.byId)
   const byCatalogId = useAction(api.cards.byCatalogId)
   const byPokemonReference = useAction(api.cards.byPokemonReference)
-  const [detailsByKey, setDetailsByKey] = useState<Record<string, FocusedCardDetails>>({})
+  const connection = useConvexConnectionState()
+  const offline = connection?.isWebSocketConnected === false
+  const [detailsByKey, setDetailsByKey] = useState<Record<string, FocusedCardDetails>>(() =>
+    loadCardDetails(),
+  )
   const [failure, setFailure] = useState<{ key: string; message: string }>()
   const { detailKey, name, game = "mtg", scryfallId, catalogCardId, originalReference } = card ?? {}
 
@@ -28,7 +33,18 @@ export function useCardDetails(card?: CardLookup) {
     let active = true
     setFailure(undefined)
     async function load() {
-      if (!detailKey || !name || detailsByKey[detailKey]) return
+      if (!detailKey || !name) return
+      const warmed = detailsByKey[detailKey] ?? readCardDetail(detailKey)
+      if (warmed) {
+        if (active && !detailsByKey[detailKey])
+          setDetailsByKey((current) => ({ ...current, [detailKey]: warmed }))
+        return
+      }
+      if (offline) {
+        if (active)
+          setFailure({ key: detailKey, message: "You're offline. Showing saved card info." })
+        return
+      }
       try {
         const details = scryfallId
           ? await byId({ scryfallId })
@@ -38,8 +54,10 @@ export function useCardDetails(card?: CardLookup) {
               ? catalogCardDetails(await byPokemonReference({ name, originalReference }))
               : undefined
         if (!active) return
-        if (details) setDetailsByKey((current) => ({ ...current, [detailKey]: details }))
-        else setFailure({ key: detailKey, message: "No additional card details are available." })
+        if (details) {
+          saveCardDetails({ [detailKey]: details })
+          setDetailsByKey((current) => ({ ...current, [detailKey]: details }))
+        } else setFailure({ key: detailKey, message: "No additional card details are available." })
       } catch (cause) {
         if (active)
           setFailure({
@@ -56,6 +74,7 @@ export function useCardDetails(card?: CardLookup) {
     detailKey,
     name,
     game,
+    offline,
     scryfallId,
     catalogCardId,
     originalReference,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useFocusEffect, useNavigation } from "expo-router"
-import { useMutation, useQuery } from "convex/react"
+import { useConvex, useMutation, useQuery, useConvexConnectionState } from "convex/react"
 import { usePreventRemove } from "expo-router/react-navigation"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -20,8 +20,9 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import { cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
+import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
@@ -31,7 +32,11 @@ import {
   useDeckVersionWrites,
   type PendingVersionWrite,
 } from "@/features/decks/decksVersionWrites"
-import { useDeckVersionCache } from "@/features/decks/deckVersionsCache"
+import {
+  cachedCardIdentity,
+  useDeckVersionCache,
+  type KnownCardEntry,
+} from "@/features/decks/deckVersionsCache"
 import { DeckView } from "@/features/decks/DeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useAppTheme } from "@/theme/context"
@@ -54,17 +59,8 @@ type DeckDialog =
   | "deleteDeck"
   | "discard"
   | "syncConflict"
-export function cardDetailsKey(card: DeckCard, game: string) {
-  if (card.scryfallId) return card.scryfallId
-  const identity = [
-    card.cardId,
-    card.printingId,
-    card.providerCardId,
-    card.originalReference,
-    card.name,
-  ].find(Boolean)
-  return `${game}:${identity ?? "unknown"}:${card.originalReference ?? ""}`
-}
+
+const OFFLINE_CARD_MESSAGE = "You’re offline. Cards already in your decks can be added."
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
@@ -264,6 +260,7 @@ function DeckDetailContent({
 }: DeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
   const navigation = useNavigation()
+  const client = useConvex()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const synced = useDeckSync(syncEnabled, access?.ownerId)
   const metadataWrites = useDeckMetadataWrites(syncEnabled, access?.ownerId)
@@ -302,6 +299,8 @@ function DeckDetailContent({
         }
       : "skip",
   )
+  const connection = useConvexConnectionState()
+  const offline = connection?.isWebSocketConnected === false
   // Keeps the server-known capacity hint so offline new-version creation has a guard.
   const recordVersionCapacity = versionCache.recordCapacity
   useEffect(() => {
@@ -438,6 +437,14 @@ function DeckDetailContent({
       : (cachedCards ?? storedCards)
   const cardsUnavailable = !detail && cachedCards === undefined && !pendingCardWrite
   const cards = editing ? draft : displayCards
+  // Known cards from this account's cached versions, filtered to the deck's game system.
+  const offlineCandidates = useMemo(
+    () =>
+      Object.values(versionCache.knownCards).filter(
+        (entry) => entry.game === (deck?.game ?? "mtg"),
+      ),
+    [versionCache.knownCards, deck?.game],
+  )
   const writeMotion = versionWrites.pending.length + versionWrites.failures.length
   const lastWriteMotion = useRef(-1)
   const refreshVersionCache = versionCache.refresh
@@ -521,6 +528,17 @@ function DeckDetailContent({
     recordCards(liveVersion._id, liveVersion.syncRevision ?? 0, detail.cards)
   }, [detail, versionCache.record])
 
+  useEffect(() => {
+    const liveVersion = detail?.version
+    if (!detail || !liveVersion || !client) return
+    void prefetchCardDetails(client, {
+      game: detail.deck.game,
+      versionId: liveVersion._id,
+      revision: liveVersion.syncRevision ?? 0,
+      cards: detail.cards,
+    })
+  }, [detail, client])
+
   usePreventRemove(draftChanged, ({ data }) => {
     setPendingNavigation(data.action)
     setDialog("discard")
@@ -595,6 +613,21 @@ function DeckDetailContent({
 
   function addCard(card: DeckCard) {
     if (knownDeleted) return
+    const alreadyInDraft = draft.some((candidate) => printingKey(candidate) === printingKey(card))
+    if (!alreadyInDraft && offline) {
+      const entry = offlineCardEntry(card)
+      if (!entry) {
+        setError(OFFLINE_CARD_MESSAGE)
+        return
+      }
+      // The cached card carries the full server identity; the candidate may not.
+      card = {
+        ...entry.card,
+        quantity: card.quantity,
+        ...(card.section ? { section: card.section } : {}),
+        ...(card.board ? { board: card.board } : {}),
+      }
+    }
     setUndo(undefined)
     setDraft((current) => {
       const existing = current.find((candidate) => printingKey(candidate) === printingKey(card))
@@ -606,6 +639,16 @@ function DeckDetailContent({
           )
         : [...current, card]
     })
+  }
+
+  /**
+   * The known-cards entry an offline add may draw from, or undefined when the card is
+   * unknown. Entries must match the deck's game system, so a Magic printing never
+   * lands in a Yugioh deck.
+   */
+  function offlineCardEntry(card: DeckCard): KnownCardEntry | undefined {
+    const entry = versionCache.knownCards[cachedCardIdentity(card)]
+    return entry !== undefined && entry.game === (deck?.game ?? "mtg") ? entry : undefined
   }
 
   function removeCard(card: DeckCard) {
@@ -895,6 +938,12 @@ function DeckDetailContent({
         busy={busy}
         cardsUnavailable={cardsUnavailable}
         cardsCached={cardsCached}
+        canAddOffline={offlineCandidates.length > 0}
+        addOfflineNote={
+          offline && cardsCached && offlineCandidates.length === 0
+            ? "No offline cards yet. Open cards online and they'll be available here."
+            : undefined
+        }
         editingDisabled={knownDeleted}
         saveStatus={
           syncEnabled && access?.ownerId
@@ -1118,10 +1167,11 @@ function DeckDetailContent({
           </ScrollView>
         </DialogCard>
       ) : null}
-      {adding && detail ? (
+      {adding ? (
         <CardSearchScreen
-          game={detail.deck.game}
-          format={detail.deck.format}
+          game={detail?.deck.game ?? deck.game ?? "mtg"}
+          format={detail?.deck.format ?? deck.format}
+          offlineCandidates={offlineCandidates}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
             const existing = draft.find((entry) => printingKey(entry) === printingKey(card))
@@ -1133,10 +1183,10 @@ function DeckDetailContent({
         />
       ) : null}
 
-      {focusedCard && detail ? (
+      {focusedCard ? (
         <CardFocusDialog
           card={{
-            game: detail.deck.game,
+            game: detail?.deck.game ?? deck.game ?? focusedCard.game ?? "mtg",
             cardId:
               focusedCard.scryfallId ??
               focusedCard.cardId ??
