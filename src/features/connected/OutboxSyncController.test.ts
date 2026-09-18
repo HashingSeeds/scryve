@@ -643,7 +643,7 @@ describe("outbox sync controller", () => {
     expect(repository.loadProjection("game-public")?.status).toBe("active")
   })
 
-  it("skips resume-index writes for membership-identical projections", () => {
+  it("rewrites the resume row when only its activity timestamp advances", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(
       storage,
@@ -652,15 +652,17 @@ describe("outbox sync controller", () => {
       "small-ibis-123.convex.cloud",
     )
     const persistSpy = jest.spyOn(storage, "set")
+    const resumeWrites = () =>
+      persistSpy.mock.calls.filter(([key]) => String(key).includes("resume")).length
     const { controller } = harness({ repository })
     controller.onRemoteProjection(projection(1, 20))
-    const writesAfterFirst = persistSpy.mock.calls.filter(([key]) =>
-      String(key).includes("resume"),
-    ).length
-    expect(writesAfterFirst).toBe(1)
+    expect(resumeWrites()).toBe(1)
 
-    controller.onRemoteProjection(projection(2, 19))
-    controller.onRemoteProjection(projection(3, 18))
-    expect(persistSpy.mock.calls.filter(([key]) => String(key).includes("resume"))).toHaveLength(1)
+    controller.onRemoteProjection(projection(1, 20))
+    expect(resumeWrites()).toBe(1)
+
+    controller.onRemoteProjection(projection(2, 20))
+    expect(resumeWrites()).toBe(2)
+    expect(repository.loadResumeIndex()[0]?.updatedAt).toBe(3)
   })
 })

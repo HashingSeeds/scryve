@@ -310,5 +310,6 @@ export function resumeEntrySignature(entry: ResumableGame): string {
     entry.format ?? "",
     entry.deckRequired ? "deck" : "",
     entry.startingLife ?? "",
+    entry.updatedAt,
   ].join("|")
 }
