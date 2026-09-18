@@ -1,4 +1,4 @@
-import type { ReactElement } from "react"
+import { useMemo, type ReactElement } from "react"
 import Svg, {
   ClipPath,
   Defs,
@@ -288,7 +288,8 @@ function PrismShape({
   seatColors?: readonly string[]
 }): ReactElement {
   const palette = seatColors && seatColors.length > 0 ? seatColors : PLAYER_COLORS
-  const wedges = buildSweepWedges(palette)
+  const paletteKey = palette.join("|")
+  const wedges = useMemo(() => buildSweepWedges(paletteKey.split("|")), [paletteKey])
   return (
     <>
       <Defs>

@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { memo, useEffect } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
@@ -131,7 +131,7 @@ export function getRadialActionStart(pose: RadialActionPose): { x: number; y: nu
   }
 }
 
-export function GameRadialMenu({
+export const GameRadialMenu = memo(function GameRadialMenu({
   open,
   anchor,
   compact,
@@ -189,19 +189,16 @@ export function GameRadialMenu({
         />
       ) : null}
 
-      {menuOpen
-        ? actions
-            .slice(0, poses.length)
-            .map((action, index) => (
-              <RadialAction
-                key={action.kind}
-                action={action}
-                anchorStyle={anchorStyle}
-                pose={poses[index]}
-                reducedMotion={reducedMotion}
-              />
-            ))
-        : null}
+      {actions.slice(0, poses.length).map((action, index) => (
+        <RadialAction
+          key={action.kind}
+          action={action}
+          anchorStyle={anchorStyle}
+          pose={poses[index]}
+          reducedMotion={reducedMotion}
+          open={menuOpen}
+        />
+      ))}
 
       <Animated.View
         testID="game-menu-anchor"
@@ -247,7 +244,7 @@ export function GameRadialMenu({
       </Animated.View>
     </View>
   )
-}
+})
 
 const GLYPH_MORPH_SPRING = { damping: 16, stiffness: 220, mass: 0.5 } as const
 
@@ -297,11 +294,13 @@ function RadialAction({
   anchorStyle,
   pose,
   reducedMotion,
+  open,
 }: {
   action: RadialMenuAction
   anchorStyle: ViewStyle
   pose: RadialActionPose
   reducedMotion: ReducedMotionPreference
+  open: boolean
 }) {
   const {
     themed,
@@ -314,10 +313,16 @@ function RadialAction({
   const start = getRadialActionStart(pose)
 
   useEffect(() => {
+    if (!open) {
+      arrive.value = 0
+      return
+    }
     arrive.value = animateFully
       ? withDelay(pose.delayMs, withSpring(1, ACTION_POSE_SPRING))
-      : withTiming(1, { duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS) })
-  }, [animateFully, arrive, pose.delayMs, reducedMotion])
+      : withTiming(1, {
+          duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS),
+        })
+  }, [animateFully, arrive, open, pose.delayMs, reducedMotion])
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: arrive.value,
@@ -330,9 +335,13 @@ function RadialAction({
   }))
 
   return (
-    <Animated.View style={[themed($actionAnchor), anchorStyle, animatedStyle]}>
+    <Animated.View
+      style={[themed($actionAnchor), anchorStyle, animatedStyle]}
+      pointerEvents={open ? "auto" : "none"}
+      aria-hidden={!open}
+    >
       <Pressable
-        testID={`${action.kind}-button`}
+        testID={open ? `${action.kind}-button` : undefined}
         disabled={action.disabled}
         accessibilityRole="button"
         accessibilityLabel={action.label}

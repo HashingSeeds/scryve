@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -79,6 +79,9 @@ export function CurrentGameScreen({
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
 
+  const runtimeRef = useRef(runtime)
+  runtimeRef.current = runtime
+
   function toggleSword(player: GamePlayer) {
     setInspectedPlayerId(null)
     setArmedPlayerId((current) => (current === player.id ? null : player.id))
@@ -89,22 +92,29 @@ export function CurrentGameScreen({
     runtime.assignCommanderDamage(armedPlayerId, target.id, step)
   }
 
-  function captureMenuDialogOrigin(event?: GestureResponderEvent) {
+  const captureMenuDialogOrigin = useCallback((event?: GestureResponderEvent) => {
     setMenuDialogOrigin(
       event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
     )
-  }
+  }, [])
   const playerCount = runtime.game.players.length
   const layoutVariant = runtime.game.layout ?? "auto"
   const layoutOptions = getPlayerGridLayoutOptions(playerCount)
-  const gridLayout = getPlayerGridLayout({
-    playerCount,
-    width,
-    height,
-    fontScale,
-    layoutVariant,
-  })
-  const menuAnchor = getPlayerGridMenuAnchor(playerCount, gridLayout)
+  const gridLayout = useMemo(
+    () =>
+      getPlayerGridLayout({
+        playerCount,
+        width,
+        height,
+        fontScale,
+        layoutVariant,
+      }),
+    [playerCount, width, height, fontScale, layoutVariant],
+  )
+  const menuAnchor = useMemo(
+    () => getPlayerGridMenuAnchor(playerCount, gridLayout),
+    [playerCount, gridLayout],
+  )
 
   function confirmEnd(result: LocalGameResult) {
     const ended = runtime.finish(result, endSource)
@@ -119,81 +129,113 @@ export function CurrentGameScreen({
     setTimeout(onGameAbandoned, 0)
   }
 
-  function showEndConfirmation() {
+  const showEndConfirmation = useCallback(() => {
     setMenuOpen(false)
     setEndSource("game_menu")
-  }
+  }, [])
 
-  function closeMenu() {
+  const closeMenu = useCallback(() => {
     setMenuOpen(false)
-  }
+  }, [])
 
-  function exitCommanderMode() {
+  const toggleMenu = useCallback(() => {
+    setMenuOpen((current) => !current)
+  }, [])
+
+  const undoAndCloseMenu = useCallback(() => {
+    runtimeRef.current.undo()
+    setMenuOpen(false)
+  }, [])
+
+  const exitCommanderMode = useCallback(() => {
     setArmedPlayerId(null)
     setInspectedPlayerId(null)
-  }
+  }, [])
 
   function closePanel() {
     setLayoutPickerOpen(false)
   }
 
-  const radialActions: readonly RadialMenuAction[] = [
-    {
-      kind: "layout",
-      label: "Layout",
-      disabled: layoutOptions.length < 2,
-      onPress: (event) => {
-        captureMenuDialogOrigin(event)
-        setMenuOpen(false)
-        setLayoutPickerOpen(true)
-      },
-    },
-    {
-      kind: "undo",
-      label: "Undo",
-      disabled: !runtime.canUndo,
-      onPress: () => {
-        runtime.undo()
-        closeMenu()
-      },
-    },
-    {
-      kind: "setup",
-      label: isFresh ? "Setup" : "New",
-      disabled: !onSetup,
-      onPress: () => {
-        closeMenu()
-        onSetup?.()
-      },
-    },
-    {
-      kind: "history",
-      label: "History",
-      disabled: !onHistory,
-      onPress: () => {
-        closeMenu()
-        onHistory?.()
-      },
-    },
-    isFresh
-      ? {
-          kind: "connect",
-          label: "Connect",
-          disabled: !onConnect,
-          onPress: () => {
-            closeMenu()
-            onConnect?.()
-          },
-        }
-      : {
-          kind: "end-game",
-          label: "End",
-          onPress: (event) => {
-            captureMenuDialogOrigin(event)
-            showEndConfirmation()
-          },
+  const radialActions: readonly RadialMenuAction[] = useMemo(
+    () => [
+      {
+        kind: "layout",
+        label: "Layout",
+        disabled: layoutOptions.length < 2,
+        onPress: (event) => {
+          captureMenuDialogOrigin(event)
+          setMenuOpen(false)
+          setLayoutPickerOpen(true)
         },
-  ]
+      },
+      {
+        kind: "undo",
+        label: "Undo",
+        disabled: !runtime.canUndo,
+        onPress: undoAndCloseMenu,
+      },
+      {
+        kind: "setup",
+        label: isFresh ? "Setup" : "New",
+        disabled: !onSetup,
+        onPress: () => {
+          closeMenu()
+          onSetup?.()
+        },
+      },
+      {
+        kind: "history",
+        label: "History",
+        disabled: !onHistory,
+        onPress: () => {
+          closeMenu()
+          onHistory?.()
+        },
+      },
+      isFresh
+        ? {
+            kind: "connect",
+            label: "Connect",
+            disabled: !onConnect,
+            onPress: () => {
+              closeMenu()
+              onConnect?.()
+            },
+          }
+        : {
+            kind: "end-game",
+            label: "End",
+            onPress: (event) => {
+              captureMenuDialogOrigin(event)
+              showEndConfirmation()
+            },
+          },
+    ],
+    [
+      captureMenuDialogOrigin,
+      closeMenu,
+      isFresh,
+      layoutOptions.length,
+      onConnect,
+      onHistory,
+      onSetup,
+      runtime.canUndo,
+      showEndConfirmation,
+      undoAndCloseMenu,
+    ],
+  )
+
+  const seatColors = useMemo(
+    () => runtime.game.players.map((player) => player.color),
+    [runtime.game.players],
+  )
+  const exitAction = useMemo(
+    () =>
+      armedPlayerId || inspectedPlayerId
+        ? { label: "Exit commander damage", onPress: exitCommanderMode }
+        : undefined,
+    [armedPlayerId, inspectedPlayerId, exitCommanderMode],
+  )
 
   return (
     <Screen
@@ -233,13 +275,9 @@ export function CurrentGameScreen({
           compact={playerCount > 2}
           actions={radialActions}
           variant={menuButtonStyle}
-          seatColors={runtime.game.players.map((player) => player.color)}
-          exitAction={
-            armedPlayerId || inspectedPlayerId
-              ? { label: "Exit commander damage", onPress: exitCommanderMode }
-              : undefined
-          }
-          onToggle={() => setMenuOpen((current) => !current)}
+          seatColors={seatColors}
+          exitAction={exitAction}
+          onToggle={toggleMenu}
           onClose={closeMenu}
         />
         {menuOpen && onDecks && onSettings && onAccount ? (
