@@ -1,10 +1,12 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
+import { clearCardDetails } from "@/features/decks/cardDetailsCache"
+import { cardDetailsKey } from "@/features/decks/deckCards"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
 
-import { cardDetailsKey, DeckDetailScreen } from "./DeckDetailScreen"
+import { DeckDetailScreen } from "./DeckDetailScreen"
 
 let mockFocused = true
 const mockCaptureAnalytics = jest.fn()
@@ -40,8 +42,10 @@ const mockVersionCacheState = {
   version: undefined as Record<string, unknown> | undefined,
   cards: undefined as Array<Record<string, unknown>> | undefined,
   capacity: undefined as Record<string, unknown> | undefined,
+  knownCards: {} as Record<string, unknown>,
 }
 jest.mock("@/features/decks/deckVersionsCache", () => ({
+  cachedCardIdentity: (card: { printingId?: string; name: string }) => card.printingId ?? card.name,
   useDeckVersionCache: () => ({
     ...mockVersionCacheState,
     refresh: mockVersionCacheRefresh,
@@ -180,8 +184,11 @@ const mockDetail = {
   error: undefined as Error | undefined,
 }
 
+const mockConnectionState = { isWebSocketConnected: true }
+
 jest.mock("convex/react", () => ({
   useConvex: () => undefined,
+  useConvexConnectionState: () => mockConnectionState,
   useQuery: (_reference: string, args: Record<string, unknown> | "skip") => {
     if (args === "skip") return undefined
     queryArgs.push(args)
@@ -252,7 +259,16 @@ function renderDetail(access?: Parameters<typeof DeckDetailScreen>[0]["access"])
 }
 
 describe("DeckDetailScreen", () => {
+  const offlineAccess = {
+    ready: true,
+    loading: false,
+    signedIn: true,
+    ownerId: "owner-a",
+    request: jest.fn(),
+  } as Parameters<typeof DeckDetailScreen>[0]["access"]
+
   beforeEach(() => {
+    clearCardDetails()
     mockFocused = true
     jest.clearAllMocks()
     queryArgs.length = 0
@@ -277,6 +293,8 @@ describe("DeckDetailScreen", () => {
     mockVersionCardWriteState.failures = []
     mockVersionCardWriteState.capacityBlocked = false
     mockVersionCacheState.capacity = undefined
+    mockVersionCacheState.knownCards = {}
+    mockConnectionState.isWebSocketConnected = true
     mockVersionCardUpdate.mockClear()
     mockVersionCacheRefresh.mockClear()
     mockMappedVersion.mockImplementation((versionId: string) => versionId)
@@ -290,6 +308,7 @@ describe("DeckDetailScreen", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
     mockMetadataWriteState.metadata = [cachedMetadata]
+    mockConnectionState.isWebSocketConnected = false
     mockVersionCacheState.version = {
       deckId: "deck-1",
       versionId: "version-main",
@@ -325,6 +344,9 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("1×")).toBeTruthy()
     expect(view.queryByText("Card list unavailable offline.")).toBeNull()
     expect(view.getByTestId("deck-add-cards")).toBeDisabled()
+    expect(
+      view.getByText("No offline cards yet. Open cards online and they'll be available here."),
+    ).toBeTruthy()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     expect(view.getByLabelText("Increase Sol Ring")).toBeEnabled()
     expect(view.getByLabelText("Remove Sol Ring")).toBeEnabled()
@@ -337,6 +359,37 @@ describe("DeckDetailScreen", () => {
       2,
     )
     expect(mockSaveVersion).not.toHaveBeenCalled()
+  })
+
+  it("opens the cached card detail while offline", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = undefined
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [solRing]
+    const view = renderDetail(offlineAccess)
+
+    expect(view.queryByTestId("card-focus-dialog")).toBeNull()
+    fireEvent.press(view.getByTestId("deck-card-row-main:22222222-2222-2222-2222-222222222222"))
+    expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
+    expect(within(view.getByTestId("card-focus-dialog")).getByText("Sol Ring")).toBeTruthy()
+    expect(view.getByText("You're offline. Showing saved card info.")).toBeTruthy()
+    expect(mockCardById).not.toHaveBeenCalled()
   })
 
   it("keeps a pending card write scoped to the selected version across a switch", () => {
@@ -631,7 +684,205 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByText("Unsaved changes")).toBeNull()
     expect(view.getByTestId("save-version-button")).toBeDisabled()
     expect(mockSaveVersion).not.toHaveBeenCalled()
-    expect(view.getByLabelText("Increase Sol Ring")).not.toBeDisabled()
+  })
+
+  it("adds an offline cache-known card through the offline search results", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = undefined
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [solRing]
+    const mindStone = {
+      _id: "card-mindstone",
+      _creationTime: 0,
+      deckVersionId: "version-sideboard",
+      game: "mtg",
+      cardId: "catalog-333",
+      printingId: "printing-333",
+      identityNamespace: "scryfall-oracle",
+      name: "Mind Stone",
+      quantity: 2,
+      section: "sideboard",
+    }
+    mockVersionCacheState.knownCards = {
+      "printing-333": { game: "mtg", card: mindStone },
+    }
+    const view = renderDetail(offlineAccess)
+
+    expect(view.getByTestId("deck-add-cards")).toBeEnabled()
+    expect(
+      view.queryByText("No offline cards yet. Open cards online and they'll be available here."),
+    ).toBeNull()
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByTestId("deck-add-cards"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "Mind")
+    const added = view.getByLabelText("Add Mind Stone to deck")
+    fireEvent.press(added)
+    expect(view.getByText("Added Mind Stone.")).toBeTruthy()
+    fireEvent.press(view.getByTestId("save-version-button"))
+    expect(mockVersionCardUpdate).toHaveBeenCalledWith(
+      "deck-1",
+      "version-main",
+      expect.arrayContaining([expect.objectContaining({ name: "Mind Stone" })]),
+      2,
+    )
+    const queued = mockVersionCardUpdate.mock.calls[0][2] as Array<Record<string, unknown>>
+    expect(queued.map((card) => card.name)).toContain("Mind Stone")
+    expect(queued.find((card) => card.name === "Mind Stone")).toMatchObject({
+      printingId: "printing-333",
+      game: "mtg",
+      section: "main",
+    })
+  })
+
+  it("blocks an offline add of an unknown card with an honest affordance", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = undefined
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [solRing]
+    mockVersionCacheState.knownCards = {
+      "printing-333": {
+        game: "mtg",
+        card: {
+          _id: "card-mindstone",
+          _creationTime: 0,
+          deckVersionId: "version-sideboard",
+          game: "mtg",
+          cardId: "catalog-333",
+          printingId: "printing-333",
+          identityNamespace: "scryfall-oracle",
+          name: "Mind Stone",
+          quantity: 2,
+          section: "sideboard",
+        },
+      },
+    }
+    const view = renderDetail(offlineAccess)
+
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByTestId("deck-add-cards"))
+    expect(view.getByText("You’re offline. Searching cards already in your decks.")).toBeTruthy()
+    fireEvent.changeText(view.getByTestId("card-search-input"), "Lightning Bolt")
+    expect(
+      view.getByText("No cached cards match. Cards appear here after you add them online."),
+    ).toBeTruthy()
+    expect(view.queryByLabelText("Add Lightning Bolt to deck")).toBeNull()
+    expect(mockVersionCardUpdate).not.toHaveBeenCalled()
+  })
+
+  it("keeps another game system's cached cards out of the offline add candidates", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = undefined
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 1,
+      cardQuantity: 1,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [solRing]
+    mockVersionCacheState.knownCards = {
+      "printing-ygo": {
+        game: "ygo",
+        card: {
+          _id: "card-ash",
+          _creationTime: 0,
+          deckVersionId: "version-ygo",
+          game: "ygo",
+          cardId: "14558127",
+          printingId: "14558127",
+          name: "Ash Blossom & Joyous Spring",
+          quantity: 3,
+          section: "main",
+        },
+      },
+    }
+    const view = renderDetail(offlineAccess)
+
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByTestId("deck-add-cards"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "Ash")
+    expect(
+      view.getByText("No cached cards match. Cards appear here after you add them online."),
+    ).toBeTruthy()
+    expect(view.queryByLabelText("Add Ash Blossom & Joyous Spring to deck")).toBeNull()
+  })
+
+  it("offers cached-candidate search on warm disconnect after detail loads", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = {
+      ...loadedDetail,
+      version: mainVersion,
+      capacity: { used: 2, limit: 5, premium: true, canCreate: true },
+    }
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.knownCards = {
+      "printing-333": {
+        game: "mtg",
+        card: {
+          _id: "card-mindstone",
+          _creationTime: 0,
+          deckVersionId: "version-sideboard",
+          game: "mtg",
+          cardId: "catalog-333",
+          printingId: "printing-333",
+          identityNamespace: "scryfall-oracle",
+          name: "Mind Stone",
+          quantity: 2,
+          section: "sideboard",
+        },
+      },
+    }
+    const view = renderDetail(offlineAccess)
+
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByTestId("deck-add-cards"))
+    expect(view.getByText("You’re offline. Searching cards already in your decks.")).toBeTruthy()
+    fireEvent.changeText(view.getByTestId("card-search-input"), "Mind")
+    expect(view.getByLabelText("Add Mind Stone to deck")).toBeTruthy()
   })
 
   it("records stats again when the screen regains focus", () => {

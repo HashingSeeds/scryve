@@ -199,29 +199,38 @@ export function NewGameScreen({
     ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
     : validLife && nameValidation.valid && !localGame
   const busy = connectedMode && Boolean(connected?.busy)
-  const localGameBlocksStart = !connectedMode && Boolean(localGame)
-  const hostedGame = connectedMode ? connected?.activeGames?.find((game) => game.isHost) : undefined
-  const gameBlocksStart = localGameBlocksStart || Boolean(hostedGame)
-  const resumeGame = connectedMode && connected?.activeGames?.length === 1 ? hostedGame : undefined
+  const connectedGames = connected?.activeGames ?? []
+  const localGameBlocksStart = Boolean(localGame)
+  const connectedBlocksLocal =
+    !connectedMode && Boolean(connected?.ready) && connectedGames.length > 0
+  const hostedGame = connectedMode ? connectedGames.find((game) => game.isHost) : undefined
+  const singleBlockingConnected =
+    connectedBlocksLocal && connectedGames.length === 1 ? connectedGames[0] : undefined
+  const gameBlocksStart = localGameBlocksStart || connectedBlocksLocal || Boolean(hostedGame)
+  const resumeGame = connectedMode && connectedGames.length === 1 ? hostedGame : undefined
   const directResume =
     localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
 
   const hasStatusDetails = connectedMode
-    ? Boolean(connected?.activeGames?.length || connected?.blockedReason || connected?.error)
-    : Boolean(localGame)
+    ? Boolean(connectedGames.length || connected?.blockedReason || connected?.error)
+    : Boolean(localGame) || connectedBlocksLocal
   const statusText = connectedMode
     ? directResume
       ? "Resume current game"
       : (connected?.error ??
         connected?.blockedReason ??
-        (connected?.activeGames?.length
+        (connectedGames.length
           ? "Games in progress"
           : preparing && showPreparation
             ? connected?.status
             : ""))
     : localGame
       ? "Resume current game"
-      : ""
+      : connectedBlocksLocal
+        ? singleBlockingConnected
+          ? "Resume current game"
+          : "Games in progress"
+        : ""
 
   function submit() {
     if (!valid || busy) return
@@ -515,7 +524,9 @@ export function NewGameScreen({
                     ? !onEndLocal
                     : hostedGame
                       ? !connected?.ready || busy
-                      : !valid || busy
+                      : connectedBlocksLocal
+                        ? !connected?.exitGame || busy
+                        : !valid || busy
                 }
                 accessibilityHint={
                   gameBlocksStart
@@ -529,7 +540,11 @@ export function NewGameScreen({
                     ? () => setEndingLocal(true)
                     : hostedGame
                       ? () => setGameToExit(hostedGame)
-                      : submit
+                      : singleBlockingConnected
+                        ? () => setGameToExit(singleBlockingConnected)
+                        : connectedBlocksLocal
+                          ? () => setShowStatus(true)
+                          : submit
                 }
               />
               <TouchableOpacity
@@ -554,7 +569,9 @@ export function NewGameScreen({
                     ? onResumeLocal
                     : directResume && resumeGame
                       ? () => onResumeConnected?.(resumeGame)
-                      : () => setShowStatus(true)
+                      : singleBlockingConnected && onResumeConnected
+                        ? () => onResumeConnected(singleBlockingConnected)
+                        : () => setShowStatus(true)
                 }
               >
                 <Text
@@ -615,10 +632,10 @@ export function NewGameScreen({
             <Button text="Retry connection" onPress={connected.retry} />
           ) : null}
 
-          {connectedMode && connected?.activeGames?.length ? (
+          {connectedGames.length ? (
             <View style={themed($section)}>
               <Text text="Your connected games" preset="subheading" accessibilityRole="header" />
-              {connected.activeGames.map((game) => (
+              {connectedGames.map((game) => (
                 <View key={game.publicId} style={themed($connectedGame)}>
                   <ConnectedGameRow
                     game={game}
@@ -628,8 +645,8 @@ export function NewGameScreen({
                   <TouchableOpacity
                     testID={`${game.isHost ? "end" : "leave"}-connected-${game.publicId}`}
                     accessibilityRole="button"
-                    disabled={busy || !connected.ready}
-                    accessibilityState={{ disabled: busy || !connected.ready }}
+                    disabled={busy || !connected?.ready}
+                    accessibilityState={{ disabled: busy || !connected?.ready }}
                     style={themed($localEndAction)}
                     onPress={() => {
                       setShowStatus(false)
@@ -643,16 +660,16 @@ export function NewGameScreen({
                   </TouchableOpacity>
                 </View>
               ))}
-              {connected.exitError ? (
+              {connected?.exitError ? (
                 <Text
                   accessibilityRole="alert"
                   style={themed($footerNote)}
                   text={connected.exitError}
                 />
               ) : null}
-              {connected.activeGamesNextPage?.status === "available" ? (
+              {connected?.activeGamesNextPage?.status === "available" ? (
                 <Button text="Load more" onPress={connected.activeGamesNextPage.load} />
-              ) : connected.activeGamesNextPage?.status === "loading" ? (
+              ) : connected?.activeGamesNextPage?.status === "loading" ? (
                 <Text size="xs" style={themed($footerStatus)} text="Loading more games…" />
               ) : null}
             </View>

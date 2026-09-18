@@ -1,3 +1,4 @@
+import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { NO_PLAY_SYSTEM, playSystemId, type PlaySystemId } from "@/features/game/playSystems"
 import type {
   ActorId,
@@ -281,4 +282,34 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     ...(commanderDamage ? { commanderDamage } : {}),
     players,
   }
+}
+
+export function toResumableEntry(projection: ConnectedProjection): ResumableGame | null {
+  if (projection.status === "finished" || projection.status === "abandoned") return null
+  return {
+    publicId: projection.publicId,
+    status: projection.status,
+    isHost: projection.isHost,
+    playerCount: projection.playerCount,
+    ruleset: projection.ruleset,
+    updatedAt: projection.serverUpdatedAt,
+    ...(projection.system ? { system: projection.system } : {}),
+    ...(projection.format ? { format: projection.format } : {}),
+    ...(projection.deckRequired ? { deckRequired: true } : {}),
+    ...(projection.startingLife ? { startingLife: projection.startingLife } : {}),
+  }
+}
+
+export function resumeEntrySignature(entry: ResumableGame): string {
+  return [
+    entry.status,
+    entry.isHost,
+    entry.playerCount,
+    entry.ruleset,
+    entry.system ?? "",
+    entry.format ?? "",
+    entry.deckRequired ? "deck" : "",
+    entry.startingLife ?? "",
+    entry.updatedAt,
+  ].join("|")
 }

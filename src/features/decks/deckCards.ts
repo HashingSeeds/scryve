@@ -33,6 +33,18 @@ export function printingKey(card: DeckCard) {
   return `${cardSection(card)}:${identity}`
 }
 
+export function cardDetailsKey(card: DeckCard, game: string) {
+  if (card.scryfallId) return card.scryfallId
+  const identity = [
+    card.cardId,
+    card.printingId,
+    card.providerCardId,
+    card.originalReference,
+    card.name,
+  ].find(Boolean)
+  return `${game}:${identity ?? "unknown"}:${card.originalReference ?? ""}`
+}
+
 export function groupedCards(
   cards: DeckCard[],
   sections: readonly { id: string; label: string }[],
