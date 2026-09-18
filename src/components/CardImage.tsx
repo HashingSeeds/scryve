@@ -6,6 +6,7 @@ import { useConvex } from "convex/react"
 
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
+import { convexErrorCode, convexErrorRetryAfterMs } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 
@@ -19,6 +20,7 @@ const fallbacks = new Map<string, Fallback>()
 const scheduledLookups = new Set<string>()
 const pendingLookups: Array<() => Promise<void>> = []
 let runningLookups = 0
+let scryfallPausedUntil = 0
 
 function drainLookups() {
   while (runningLookups < 2 && pendingLookups.length) {
@@ -42,6 +44,17 @@ function publish(key: string, value: Fallback) {
   fallbacks.set(key, value)
   if (fallbacks.size > 200) fallbacks.delete(fallbacks.keys().next().value!)
   listeners.forEach((listener) => listener())
+}
+
+function publishPaused(key: string, failed: Set<string>) {
+  publish(key, { urls: [], failed, loading: false, expiresAt: scryfallPausedUntil })
+  const delay = scryfallPausedUntil - Date.now()
+  if (delay > 0)
+    setTimeout(() => {
+      const current = fallbacks.get(key)
+      if (current && current.expiresAt <= Date.now())
+        publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() })
+    }, delay)
 }
 
 export type CardImageIdentity = { game?: string; cardId?: string }
@@ -84,6 +97,10 @@ export function CardImage({
       }
       if (scheduledLookups.has(key)) return
       const failed = new Set(failedUrl ? [failedUrl] : [])
+      if (Date.now() < scryfallPausedUntil) {
+        publishPaused(key, failed)
+        return
+      }
       publish(key, {
         urls: [],
         failed,
@@ -97,6 +114,10 @@ export function CardImage({
       }, 15_000)
       pendingLookups.push(async () => {
         try {
+          if (Date.now() < scryfallPausedUntil) {
+            publishPaused(key, failed)
+            return
+          }
           const urls = await client.action(api.cards.imageFallbacks, { game, cardId })
           publish(key, {
             urls: urls.filter((url) => !failed.has(url)),
@@ -104,8 +125,13 @@ export function CardImage({
             loading: false,
             expiresAt: Date.now() + 5 * 60_000,
           })
-        } catch {
-          publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() + 30_000 })
+        } catch (cause) {
+          if (convexErrorCode(cause) === "scryfall_rate_limited") {
+            scryfallPausedUntil = Date.now() + convexErrorRetryAfterMs(cause, 30_000)
+            publishPaused(key, failed)
+          } else {
+            publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() + 30_000 })
+          }
         } finally {
           clearTimeout(timeout)
           scheduledLookups.delete(key)
