@@ -194,7 +194,13 @@ export function DeckView({
             ) : cardsUnavailable ? (
               <Text style={themed($notes)} text="Card list unavailable offline." />
             ) : cards.length === 0 ? (
-              <Text style={themed($notes)} text="No cards yet. Add your first card below." />
+              <Text
+                style={themed($notes)}
+                text={addOfflineNote ?? "No cards yet. Add your first card below."}
+              />
+            ) : null}
+            {addOfflineNote && tab === "cards" && cards.length > 0 ? (
+              <Text style={themed($notes)} text={addOfflineNote} />
             ) : null}
           </>
         }
@@ -297,9 +303,6 @@ export function DeckView({
             preset="primary"
           />
         </View>
-        {addOfflineNote ? (
-          <Text size="xxs" style={[themed($dim), $addNote]} text={addOfflineNote} />
-        ) : null}
       </BottomActionBar>
     </>
   )
@@ -380,4 +383,3 @@ const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
 })
 const $primary: ViewStyle = { flex: 2, minHeight: 44 }
-const $addNote: TextStyle = { textAlign: "center" }
