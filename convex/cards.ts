@@ -375,10 +375,11 @@ export const detailsBatch = query({
     const found: { key: string; details: CardDetails }[] = []
     for (const item of args.items) {
       if (!item.key) continue
-      if (item.scryfallId) {
+      const scryfallId = item.scryfallId
+      if (scryfallId) {
         const cached = await ctx.db
           .query("cardReferences")
-          .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", item.scryfallId))
+          .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", scryfallId))
           .unique()
         if (cached && isCompleteReference(cached)) {
           const reference = toCardReference(cached)
