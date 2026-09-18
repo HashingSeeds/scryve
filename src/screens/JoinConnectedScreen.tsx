@@ -106,7 +106,7 @@ export function JoinConnectedScreen({
       await syncUser({
         displayName: profileName,
         avatarUrl: user?.imageUrl,
-        username: user?.username ?? undefined,
+        username: user?.username ?? "",
       })
       const manualCode = token ? undefined : normalizeManualCode(code)
       if (!token && !manualCode) {

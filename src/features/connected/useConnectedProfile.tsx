@@ -119,7 +119,7 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
             userId: user.id,
             displayName: connectedProfileName(user.username),
             avatarUrl: user.imageUrl,
-            username: user.username ?? undefined,
+            username: user.username ?? "",
           }
         : undefined,
     [user?.id, user?.imageUrl, user?.username],

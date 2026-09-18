@@ -84,17 +84,20 @@ export const syncFromClerk = internalMutation({
   },
 })
 
+type UsernameSync = { action: "store"; username: string } | { action: "clear" } | { action: "keep" }
+
 async function usernameForSync(
   ctx: MutationCtx,
   username: string | undefined,
   clerkUserId: string,
-): Promise<string | undefined> {
-  if (!username) return undefined
+): Promise<UsernameSync> {
+  if (username === undefined) return { action: "keep" }
+  if (username === "") return { action: "clear" }
   let value: string
   try {
     value = assertUsername(username)
   } catch {
-    return undefined
+    return { action: "keep" }
   }
   const conflicting = await ctx.db
     .query("users")
@@ -102,8 +105,8 @@ async function usernameForSync(
       q.eq("usernameNormalized", normalizeUsername(value)),
     )
     .unique()
-  if (conflicting && conflicting.clerkUserId !== clerkUserId) return undefined
-  return value
+  if (conflicting && conflicting.clerkUserId !== clerkUserId) return { action: "keep" }
+  return { action: "store", username: value }
 }
 
 export const syncCurrent = mutation({
@@ -118,7 +121,16 @@ export const syncCurrent = mutation({
       throw new Error("Account deletion is in progress")
     const displayName = assertDisplayName(args.displayName)
     const avatarUrl = assertAvatarUrl(args.avatarUrl)
-    const username = await usernameForSync(ctx, args.username, identity.subject)
+    const usernameSync = await usernameForSync(ctx, args.username, identity.subject)
+    const usernamePatch =
+      usernameSync.action === "store"
+        ? {
+            username: usernameSync.username,
+            usernameNormalized: normalizeUsername(usernameSync.username),
+          }
+        : usernameSync.action === "clear"
+          ? { username: undefined, usernameNormalized: undefined }
+          : {}
     const now = Date.now()
     const existing = await ctx.db
       .query("users")
@@ -128,7 +140,7 @@ export const syncCurrent = mutation({
       await ctx.db.patch(existing._id, {
         displayName,
         avatarUrl,
-        ...(username ? { username, usernameNormalized: normalizeUsername(username) } : {}),
+        ...usernamePatch,
         updatedAt: now,
       })
       return existing._id
@@ -137,7 +149,7 @@ export const syncCurrent = mutation({
       clerkUserId: identity.subject,
       displayName,
       avatarUrl,
-      ...(username ? { username, usernameNormalized: normalizeUsername(username) } : {}),
+      ...usernamePatch,
       membershipMigrationVersion: MEMBERSHIP_MIGRATION_VERSION,
       createdAt: now,
       updatedAt: now,
