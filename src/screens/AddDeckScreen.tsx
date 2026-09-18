@@ -4,7 +4,6 @@ import { Linking, ScrollView, TouchableOpacity, View } from "react-native"
 import { type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
-import { ConvexError } from "convex/values"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -15,6 +14,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { DeckListSkeleton } from "@/components/DeckLoadingState"
 import { Header } from "@/components/Header"
 import { LoadingProgress } from "@/components/LoadingProgress"
+import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
@@ -31,7 +31,7 @@ import { useGuestDeckImport } from "@/features/decks/useGuestDeckImport"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
-import { convexErrorMessage } from "@/utils/convexError"
+import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
@@ -301,8 +301,12 @@ export function AddDeckScreen({
   const [resolvedPrecon, setResolvedPrecon] = useState<ResolvedPreconstructedDeck>()
   const [previewLoading, setPreviewLoading] = useState(false)
   const [focusedPreviewCard, setFocusedPreviewCard] = useState<FocusedPreviewCard>()
-  const { detailsByKey: previewDetailsByKey, detailsError: previewDetailsError } =
-    useCardDetails(focusedPreviewCard)
+  const {
+    detailsByKey: previewDetailsByKey,
+    detailsError: previewDetailsError,
+    detailsRetryAfterMs: previewDetailsRetryAfterMs,
+    retryDetails: retryPreviewDetails,
+  } = useCardDetails(focusedPreviewCard)
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [saveAttempted, setSaveAttempted] = useState(false)
@@ -329,8 +333,7 @@ export function AddDeckScreen({
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string>()
   const [previewError, setPreviewError] = useState<string>()
-  const [previewRetryAt, setPreviewRetryAt] = useState<number>()
-  const [previewRetrySeconds, setPreviewRetrySeconds] = useState(0)
+  const [previewRetryAfterMs, setPreviewRetryAfterMs] = useState<number>()
   const searchToken = useRef(0)
   const previewToken = useRef(0)
   useEffect(
@@ -395,7 +398,7 @@ export function AddDeckScreen({
 
   function chooseGame(next: string) {
     previewToken.current += 1
-    setPreviewRetryAt(undefined)
+    setPreviewRetryAfterMs(undefined)
     const nextFormat = defaultDeckFormat(next)
     setGame(next, nextFormat)
     setDeckFormat(nextFormat)
@@ -520,7 +523,7 @@ export function AddDeckScreen({
         setResolvedPrecon(undefined)
         setError(undefined)
         setPreviewError(undefined)
-        setPreviewRetryAt(undefined)
+        setPreviewRetryAfterMs(undefined)
         setPreviewLoading(true)
         const outline = await previewPreconstructed({ fileName: deck.fileName })
         if (previewToken.current !== token) return
@@ -530,20 +533,7 @@ export function AddDeckScreen({
       } catch (cause) {
         if (previewToken.current === token) {
           setPreviewError(convexErrorMessage(cause, "Could not load this deck"))
-          const data: unknown = cause instanceof ConvexError ? cause.data : undefined
-          if (
-            typeof data === "object" &&
-            data !== null &&
-            "code" in data &&
-            data.code === "scryfall_rate_limited" &&
-            "retryAfterMs" in data &&
-            typeof data.retryAfterMs === "number" &&
-            Number.isFinite(data.retryAfterMs) &&
-            data.retryAfterMs > 0
-          ) {
-            setPreviewRetryAt(Date.now() + data.retryAfterMs)
-            setPreviewRetrySeconds(Math.ceil(data.retryAfterMs / 1000))
-          }
+          setPreviewRetryAfterMs(convexRetryAfterMs(cause))
         }
       } finally {
         if (previewToken.current === token) setPreviewLoading(false)
@@ -552,27 +542,9 @@ export function AddDeckScreen({
     [previewPreconstructed, resolvePreconstructed],
   )
 
-  useEffect(() => {
-    if (previewRetryAt === undefined || !selectedPrecon) return
-    const deadline = previewRetryAt
-    const deck = selectedPrecon
-    let timer: ReturnType<typeof setTimeout>
-    function tick() {
-      const remaining = deadline - Date.now()
-      if (remaining <= 0) {
-        void previewPrecon(deck, true)
-        return
-      }
-      setPreviewRetrySeconds(Math.ceil(remaining / 1000))
-      timer = setTimeout(tick, Math.min(1000, remaining))
-    }
-    tick()
-    return () => clearTimeout(timer)
-  }, [previewRetryAt, selectedPrecon, previewPrecon])
-
   function closePreview() {
     previewToken.current += 1
-    setPreviewRetryAt(undefined)
+    setPreviewRetryAfterMs(undefined)
     setSelectedPrecon(undefined)
     setPreconOutline(undefined)
     setResolvedPrecon(undefined)
@@ -754,6 +726,8 @@ export function AddDeckScreen({
       }}
       details={previewDetailsByKey[focusedPreviewCard.detailKey]}
       detailsError={previewDetailsError}
+      detailsRetryAfterMs={previewDetailsRetryAfterMs}
+      onRetryDetails={retryPreviewDetails}
       onClose={() => setFocusedPreviewCard(undefined)}
     />
   ) : null
@@ -1057,18 +1031,13 @@ export function AddDeckScreen({
             />
           </View>
 
-          {previewError ? (
-            <View style={themed($inlineStatus)}>
-              <AlertNote text={previewError} />
-              <Button
-                testID="retry-precon-preview"
-                text={
-                  previewRetryAt === undefined ? "Retry" : `Retrying in ${previewRetrySeconds}s`
-                }
-                disabled={previewRetryAt !== undefined}
-                onPress={() => void previewPrecon(selectedPrecon, true)}
-              />
-            </View>
+          {previewError && selectedPrecon ? (
+            <RetryableError
+              message={previewError}
+              retryAfterMs={previewRetryAfterMs}
+              onRetry={() => void previewPrecon(selectedPrecon, true)}
+              testID="retry-precon-preview"
+            />
           ) : null}
           {!guestMode && access?.message ? (
             <Button text={access.actionLabel ?? access.message} onPress={access.request} />

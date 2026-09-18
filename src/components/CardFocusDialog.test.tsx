@@ -71,6 +71,30 @@ describe("CardFocusDialog", () => {
     expect(failed.onIncrement).toHaveBeenCalledTimes(1)
   })
 
+  it("retries failed details with the shared countdown UI", () => {
+    jest.useFakeTimers()
+    try {
+      const onRetryDetails = jest.fn()
+      const view = renderDialog({
+        details: undefined,
+        detailsError: "Scryfall requests are paused. Try again shortly.",
+        detailsRetryAfterMs: 3000,
+        onRetryDetails,
+      })
+      expect(view.getByText("Retrying in 3s")).toBeTruthy()
+      expect(view.getByTestId("retry-card-details")).toBeDisabled()
+      view.unmount()
+      const manual = renderDialog({
+        details: undefined,
+        detailsError: "Could not load card details",
+        onRetryDetails,
+      })
+      fireEvent.press(manual.getByTestId("retry-card-details"))
+      expect(onRetryDetails).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
   it("falls back to a no-image placeholder when the printing has no image", () => {
     const view = renderDialog({ card: { ...card, imageUrl: undefined } })
     expect(view.queryByTestId("card-focus-image")).toBeNull()

@@ -458,7 +458,7 @@ function DeckDetailContent({
   const noteDirty = editing && draftNote !== (deck?.note ?? "")
   const draftChanged = cardsDirty || noteDirty
   const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
-  const { details, detailsError } = useCardDetails(
+  const { details, detailsError, detailsRetryAfterMs, retryDetails } = useCardDetails(
     focusedCard
       ? {
           ...focusedCard,
@@ -1150,6 +1150,8 @@ function DeckDetailContent({
           }}
           details={details}
           detailsError={detailsError}
+          detailsRetryAfterMs={detailsRetryAfterMs}
+          onRetryDetails={retryDetails}
           {...(editing
             ? {
                 onIncrement: () => addCard(focusedCard),
