@@ -1,6 +1,8 @@
+import { StyleSheet } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
+import { darkTheme } from "@/theme/theme"
 
 import { SegmentedControl } from "./SegmentedControl"
 
@@ -46,5 +48,15 @@ describe("SegmentedControl", () => {
   it("shows every segment at once so the choices need no discovery", () => {
     const { view } = renderControl("mtg")
     for (const { label } of SEGMENTS) expect(view.getByText(label)).toBeTruthy()
+  })
+
+  it("marks the selected segment with the accent even without the sliding thumb", () => {
+    const { view } = renderControl("mtg")
+    expect(StyleSheet.flatten(view.getByTestId("system-mtg").props.style)).toMatchObject({
+      backgroundColor: darkTheme.colors.tint,
+    })
+    expect(
+      StyleSheet.flatten(view.getByTestId("system-none").props.style).backgroundColor,
+    ).toBeUndefined()
   })
 })

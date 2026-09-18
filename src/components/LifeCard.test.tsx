@@ -158,10 +158,10 @@ describe("LifeCard", () => {
     expect(view.queryByTestId("life-delta-seat-1")).toBeNull()
   })
 
-  it("uses a visual player mark while keeping the name available to assistive technology", () => {
+  it("uses a visual player mark alongside a visible name pill", () => {
     const view = renderCard(20)
 
-    expect(view.queryByText("Ada")).toBeNull()
+    expect(view.getByTestId("player-name-seat-1")).toHaveTextContent("Ada")
     const marker = view.getByTestId("player-mark-seat-1", { includeHiddenElements: true })
     expect(marker).toBeTruthy()
     expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
@@ -529,6 +529,42 @@ describe("LifeCard", () => {
       true,
     )
     expect(view.getByText("Enter a whole number from 1 to 999999.")).toBeTruthy()
+  })
+
+  it("removes steppers from a view-only card instead of dimming them", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Grace"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          ownership="unowned"
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.queryByTestId("life-seat-1-1")).toBeNull()
+    expect(view.queryByTestId("life-seat-1--1")).toBeNull()
+    expect(view.getByTestId("life-total-seat-1")).toBeTruthy()
+  })
+
+  it("shows the player name as plain text under the life total", () => {
+    const view = renderCard(40)
+    const name = view.getByTestId("player-name-seat-1")
+    expect(name).toHaveTextContent("Ada")
+    expect(StyleSheet.flatten(name.props.style)).toMatchObject({ color: "#FFFFFF" })
+    expect(StyleSheet.flatten(name.props.style).backgroundColor).toBeUndefined()
+  })
+
+  it("spans the under-total column full width so names truncate late", () => {
+    const view = renderCard(20)
+    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
+      left: 0,
+      right: 0,
+      top: "50%",
+    })
+    expect(view.getByTestId("player-name-seat-1")).toHaveTextContent("Ada")
   })
 
   it("mounts no commander board unless the game asks for one", () => {

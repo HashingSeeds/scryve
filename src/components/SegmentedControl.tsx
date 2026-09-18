@@ -88,7 +88,10 @@ export function SegmentedControl({
             testID={testID ? `${testID}-${segment.id}` : undefined}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            style={themed($segment)}
+            style={[
+              themed($segment),
+              selected && { backgroundColor: accent, borderRadius: CHOICE_RADIUS - TRACK_INSET },
+            ]}
             onPress={() => select(segment.id)}
           >
             <Text

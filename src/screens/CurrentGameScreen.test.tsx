@@ -125,7 +125,7 @@ describe("CurrentGameScreen", () => {
     )
 
     expect(view.getByTestId("game-menu-button")).toBeTruthy()
-    expect(view.queryByText("Grace")).toBeNull()
+    expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
     expect(view.queryByTestId("undo-button")).toBeNull()
     expect(view.queryByTestId("home-button")).toBeNull()
