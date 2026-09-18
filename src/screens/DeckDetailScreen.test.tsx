@@ -720,6 +720,7 @@ describe("DeckDetailScreen", () => {
     }
     const view = renderDetail(offlineAccess)
 
+    expect(view.getByTestId("deck-add-cards")).toBeEnabled()
     fireEvent.press(view.getByTestId("edit-deck-button"))
     fireEvent.press(view.getByTestId("deck-add-cards"))
     fireEvent.changeText(view.getByTestId("card-search-input"), "Mind")

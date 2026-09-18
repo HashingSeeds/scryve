@@ -938,6 +938,7 @@ function DeckDetailContent({
         busy={busy}
         cardsUnavailable={cardsUnavailable}
         cardsCached={cardsCached}
+        canAddOffline={offlineCandidates.length > 0}
         editingDisabled={knownDeleted}
         saveStatus={
           syncEnabled && access?.ownerId
