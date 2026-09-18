@@ -918,4 +918,30 @@ describe("ConnectedBoardScreen", () => {
     expect(onGameAbandoned).toHaveBeenCalledTimes(1)
     expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
   })
+
+  it("ends the game from the status dialog while invite holds the menu slot", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        isHost: true,
+        invitation: { token: "t".repeat(43), manualCode: "AB12CD", expiresAt: Date.now() + 60_000 },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
+    expect(screen.queryByTestId("end-game-button")).toBeNull()
+    fireEvent.press(screen.getByTestId("setup-button"))
+    fireEvent.press(screen.getByText("End game…"))
+    expect(screen.getByTestId("connected-finish-confirmation")).toBeTruthy()
+  })
+
+  it("offers the way back to setup from the status dialog, without a host end action", () => {
+    const onBack = jest.fn()
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    openConnectedStatus()
+    expect(screen.queryByText("End game…")).toBeNull()
+    fireEvent.press(screen.getByText("Back to setup"))
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
 })

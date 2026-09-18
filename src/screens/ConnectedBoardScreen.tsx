@@ -706,6 +706,16 @@ function ConnectedBoardRuntime({
               <Text accessibilityRole="alert" text={finishBlockedReason} />
             ) : null}
           </ScrollView>
+          {active && game.isHost ? (
+            <Button
+              text="End game…"
+              onPress={() => {
+                setStatusOpen(false)
+                setConfirmingFinish(true)
+              }}
+            />
+          ) : null}
+          {onBack ? <Button text="Back to setup" onPress={onBack} /> : null}
           <Button text="Close" onPress={() => setStatusOpen(false)} />
         </DialogCard>
       ) : null}
