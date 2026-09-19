@@ -45,6 +45,7 @@ import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { isGameUnavailableError } from "@/utils/convexError"
 import { useStoreReview } from "@/utils/useStoreReview"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
@@ -161,9 +162,13 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   return (
     <ConvexQueryBoundary
       resetKey={runtimeKey}
-      fallback={({ retry }) => (
+      fallback={({ error, retry }) => (
         <ConnectedBoardShell
-          state={{ status: "unavailable", message: "Connected board unavailable", retry }}
+          state={
+            isGameUnavailableError(error)
+              ? { status: "unavailable", message: "This game no longer exists." }
+              : { status: "unavailable", message: "Connected board unavailable", retry }
+          }
           onBack={props.onBack}
         />
       )}

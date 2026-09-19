@@ -44,7 +44,7 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics, captureGame } from "@/utils/analytics"
-import { convexErrorMessage } from "@/utils/convexError"
+import { convexErrorMessage, isGameUnavailableError } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
@@ -85,11 +85,15 @@ export function ConnectedLobbyScreen({
   return (
     <ConvexQueryBoundary
       resetKey={publicId}
-      fallback={({ retry }) => (
+      fallback={({ error, retry }) => (
         <LobbyStatusScreen
-          message="This lobby is unavailable."
+          message={
+            isGameUnavailableError(error)
+              ? "This game no longer exists."
+              : "This lobby is unavailable."
+          }
           error
-          retry={retry}
+          {...(isGameUnavailableError(error) ? {} : { retry })}
           onBack={onBack}
         />
       )}

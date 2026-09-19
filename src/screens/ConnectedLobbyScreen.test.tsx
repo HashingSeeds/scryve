@@ -669,4 +669,28 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByTestId("connected-lobby-leave-confirmation")).toBeTruthy()
     expect(onLeft).not.toHaveBeenCalled()
   })
+
+  it("leaves a missing lobby without offering a futile retry", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    const convexReact = jest.requireMock("convex/react") as {
+      useQuery: (...args: unknown[]) => unknown
+    }
+    const spy = jest.spyOn(convexReact, "useQuery").mockImplementation(() => {
+      throw new Error(
+        "[CONVEX Q(games:lobbyProjection)] Server Error Uncaught Error: Game unavailable Called by client",
+      )
+    })
+    try {
+      render(
+        themed(
+          <ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} onBack={jest.fn()} />,
+        ),
+      )
+      expect(screen.getByText("This game no longer exists.")).toBeTruthy()
+      expect(screen.queryByTestId("retry-lobby-button")).toBeNull()
+    } finally {
+      spy.mockRestore()
+      consoleError.mockRestore()
+    }
+  })
 })

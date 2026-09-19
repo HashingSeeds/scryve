@@ -788,7 +788,7 @@ describe("ConnectedBoardScreen", () => {
     const onBack = jest.fn()
     let unavailable = true
     mockUseConnectedGame.mockImplementation(() => {
-      if (unavailable) throw new Error("Game unavailable")
+      if (unavailable) throw new Error("Network unavailable")
       return connectedHarness.runtime
     })
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
@@ -808,6 +808,25 @@ describe("ConnectedBoardScreen", () => {
     expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
     expect(view.queryByTestId("connected-board-unavailable-status")).toBeNull()
     consoleError.mockRestore()
+  })
+
+  it("leaves a missing game without offering a futile retry", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    const onBack = jest.fn()
+    mockUseConnectedGame.mockImplementation(() => {
+      throw new Error(
+        "[CONVEX Q(games:lobbyProjection)] Server Error Uncaught Error: Game unavailable Called by client",
+      )
+    })
+    try {
+      render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+      expect(screen.getByText("This game no longer exists.")).toBeTruthy()
+      expect(screen.queryByTestId("retry-connected-board-button")).toBeNull()
+      fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
+      expect(onBack).toHaveBeenCalledTimes(1)
+    } finally {
+      consoleError.mockRestore()
+    }
   })
 
   it("offers a way back to local play when the Clerk session is signed out", () => {
