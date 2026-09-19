@@ -119,6 +119,7 @@ export function LifeCard({
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
   const frozen = disabled || eliminated
+  const inspectDisabled = disabled && ownership !== "unowned"
   const counter = playSystemRules(system).counter
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
@@ -379,19 +380,29 @@ export function LifeCard({
               ]}
             />
           </Pressable>
-          {statusLabel ? (
+          <View
+            testID={`life-status-layer-seat-${seatNumber}`}
+            pointerEvents="none"
+            style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
+          >
             <View
-              testID={`life-status-layer-seat-${seatNumber}`}
-              pointerEvents="none"
-              style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
+              testID={`life-status-seat-${seatNumber}`}
+              style={[
+                themed(compact ? $compactStatusPosition : $statusPosition),
+                { marginTop: statusTopOffset },
+              ]}
             >
-              <View
-                testID={`life-status-seat-${seatNumber}`}
-                style={[
-                  themed(compact ? $compactStatusPosition : $statusPosition),
-                  { marginTop: statusTopOffset },
-                ]}
-              >
+              <Text
+                testID={`player-name-seat-${seatNumber}`}
+                text={displayName}
+                accessible={false}
+                size="xs"
+                weight="medium"
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={[themed($name), { color: foreground }]}
+              />
+              {statusLabel ? (
                 <Text
                   text={statusLabel}
                   weight="bold"
@@ -400,9 +411,9 @@ export function LifeCard({
                   numberOfLines={1}
                   style={[themed($status), { color: foreground }]}
                 />
-              </View>
+              ) : null}
             </View>
-          ) : null}
+          </View>
         </View>
       </View>
       {commanderDamage && commanderOverviewOpen && !commanderCardMode ? (
@@ -484,7 +495,7 @@ export function LifeCard({
           mode={commanderCardMode}
           life={localCommander ? life : undefined}
         />
-      ) : !commanderOverviewOpen ? (
+      ) : !commanderOverviewOpen && ownership !== "unowned" ? (
         <LifeControls
           playerName={displayName}
           seatNumber={seatNumber}
@@ -529,8 +540,8 @@ export function LifeCard({
             testID={`commander-inspect-seat-${seatNumber}`}
             accessibilityRole="button"
             accessibilityLabel={`${commanderOverviewOpen ? "Close" : "Show"} commander damage for ${identity}`}
-            accessibilityState={{ expanded: commanderOverviewOpen, disabled: !!disabled }}
-            disabled={disabled}
+            accessibilityState={{ expanded: commanderOverviewOpen, disabled: !!inspectDisabled }}
+            disabled={inspectDisabled}
             onPress={commanderDamage.inspection.onToggle}
             style={themed($commanderToolbarButton)}
           >
@@ -644,6 +655,11 @@ const $mark: ThemedStyle<ViewStyle> = () => ({
 })
 const $markHitTarget: ThemedStyle<ViewStyle> = () => ({ position: "absolute", zIndex: 10 })
 
+const $name: ThemedStyle<TextStyle> = () => ({
+  maxWidth: "80%",
+  textAlign: "center",
+})
+
 export function getPlayerMarkCorner(rotation: LifeCardContentRotation, padding: number): ViewStyle {
   if (rotation === 90) return { left: padding, bottom: padding }
   if (rotation === -90) return { right: padding, top: padding }
@@ -681,17 +697,21 @@ const $statusLayer: ThemedStyle<ViewStyle> = () => ({
 const $statusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
   top: "50%",
+  left: 0,
+  right: 0,
   marginTop: LIFE_TARGET_SIZE / 2 + spacing.xxs,
-  flexDirection: "row",
+  flexDirection: "column",
   alignItems: "center",
-  gap: spacing.xxs,
+  gap: spacing.xxxs,
 })
 
 const $compactStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   top: "50%",
+  left: 0,
+  right: 0,
   marginTop: COMPACT_LIFE_TARGET_SIZE / 2 + spacing.xxxs,
   position: "absolute",
-  flexDirection: "row",
+  flexDirection: "column",
   alignItems: "center",
   gap: spacing.xxxs,
 })

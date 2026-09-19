@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, Share, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -26,14 +26,14 @@ import { readPublicCloudConfig } from "@/features/auth/config"
 import { ConnectedBoardSyncToast } from "@/features/connected/ConnectedBoardSyncToast"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
+import type { ConnectedPlayerProjection } from "@/features/connected/model"
 import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
   PlayerActionsDialog,
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
-import { useConnectedGame } from "@/features/connected/useConnectedGame"
+import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
-import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
@@ -189,6 +189,38 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   )
 }
 
+export function connectedBoardLayoutVariant(playerCount: number): PlayerGridLayoutVariant {
+  if (playerCount === 3) return "featured-last"
+  if (playerCount === 4 || playerCount >= 6) return "tabletop"
+  return "auto"
+}
+
+type ConnectedBoardReadyProps = {
+  publicId: string
+  initialInviteOpen?: boolean
+  onBack?: () => void
+  onSetup?: () => void
+  onHistory?: () => void
+  onDecks?: () => void
+  onSettings?: () => void
+  onAccount?: () => void
+  accountLabel?: "Account" | "Sign in"
+  onGameEnded?: (publicId: string) => void
+  onGameAbandoned?: () => void
+  runtime: Extract<ConnectedGameRuntime, { status: "ready" }>
+}
+
+function toBoardPlayer(player: ConnectedPlayerProjection): GamePlayer {
+  return {
+    id: asPlayerId(player.playerId),
+    name: player.displayName,
+    color: player.color,
+    ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
+    life: player.currentLife,
+    seat: player.seat,
+  }
+}
+
 function ConnectedBoardRuntime({
   publicId,
   initialInviteOpen,
@@ -217,13 +249,59 @@ function ConnectedBoardRuntime({
   ownerId: string
 }) {
   useKeepAwake("count-connected-game")
+  const runtime = useConnectedGame(publicId, ownerId)
+  if (runtime.status === "loading")
+    return (
+      <ConnectedBoardShell
+        state={{ status: "loading", message: "Loading connected board…" }}
+        onBack={onBack}
+      />
+    )
+  if (runtime.status === "unavailable")
+    return (
+      <ConnectedBoardShell
+        state={{ status: "unavailable", message: runtime.message }}
+        onBack={onBack}
+      />
+    )
+  return (
+    <ConnectedBoardReady
+      publicId={publicId}
+      initialInviteOpen={initialInviteOpen}
+      onBack={onBack}
+      onSetup={onSetup}
+      onHistory={onHistory}
+      onDecks={onDecks}
+      onSettings={onSettings}
+      onAccount={onAccount}
+      accountLabel={accountLabel}
+      onGameEnded={onGameEnded}
+      onGameAbandoned={onGameAbandoned}
+      runtime={runtime}
+    />
+  )
+}
+
+function ConnectedBoardReady({
+  publicId,
+  initialInviteOpen,
+  onBack,
+  onSetup,
+  onHistory,
+  onDecks,
+  onSettings,
+  onAccount,
+  accountLabel,
+  onGameEnded,
+  onGameAbandoned,
+  runtime,
+}: ConnectedBoardReadyProps) {
   const menuButtonStyle = useMenuButtonStyle()
   const {
     themed,
     theme: { colors },
   } = useAppTheme()
   const { width, height, fontScale } = useWindowDimensions()
-  const runtime = useConnectedGame(publicId, ownerId)
   const [menuOpen, setMenuOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
@@ -233,7 +311,6 @@ function ConnectedBoardRuntime({
   const [inviteError, setInviteError] = useState<string>()
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
-  const localRepository = useMemo(() => new LocalGameRepository(), [])
   const [layoutSelection, setLayoutSelection] = useState<{
     playerCount: number
     layout: PlayerGridLayoutVariant
@@ -243,6 +320,7 @@ function ConnectedBoardRuntime({
     playerId: PlayerId
     staged: Partial<Record<PlayerId, number>>
   } | null>(null)
+  const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const finishSubmitInFlight = useRef(false)
   const [abandonedOpen, setAbandonedOpen] = useState(false)
   const navigatedTerminal = useRef(false)
@@ -257,8 +335,7 @@ function ConnectedBoardRuntime({
     }
   }, [terminalStatus, onGameEnded, publicId])
   useStoreReview(
-    runtime.status === "ready" &&
-      runtime.projection.status === "finished" &&
+    runtime.projection.status === "finished" &&
       !menuOpen &&
       !statusOpen &&
       !layoutPickerOpen &&
@@ -278,25 +355,21 @@ function ConnectedBoardRuntime({
     setDrawSelected((current) => !current)
   }
 
-  function captureMenuDialogOrigin(event?: GestureResponderEvent) {
+  const captureMenuDialogOrigin = useCallback((event?: GestureResponderEvent) => {
     setMenuDialogOrigin(
       event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
     )
-  }
-  if (runtime.status === "loading")
-    return (
-      <ConnectedBoardShell
-        state={{ status: "loading", message: "Loading connected board…" }}
-        onBack={onBack}
-      />
-    )
-  if (runtime.status === "unavailable")
-    return (
-      <ConnectedBoardShell
-        state={{ status: "unavailable", message: runtime.message }}
-        onBack={onBack}
-      />
-    )
+  }, [])
+  const toggleMenu = useCallback(() => {
+    setMenuOpen((current) => !current)
+  }, [])
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false)
+  }, [])
+  const exitCommanderDamage = useCallback(() => {
+    setArmedCommander(null)
+    setInspectedPlayerId(null)
+  }, [])
 
   const game = runtime.projection
   const system = game.system
@@ -304,18 +377,24 @@ function ConnectedBoardRuntime({
   const active = game.status === "active"
   const finished = game.status === "finished"
 
-  const players: GamePlayer[] = game.players.map((player) => ({
-    id: asPlayerId(player.playerId),
-    name: player.displayName,
-    color: player.color,
-    ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
-    life: player.currentLife,
-    seat: player.seat,
-  }))
+  const controlled = useMemo(
+    () =>
+      new Set(
+        game.players.filter((player) => player.controlledByMe).map((player) => player.playerId),
+      ),
+    [game.players],
+  )
+  const players: GamePlayer[] = useMemo(
+    () => [
+      ...game.players.filter((player) => !controlled.has(player.playerId)).map(toBoardPlayer),
+      ...game.players.filter((player) => controlled.has(player.playerId)).map(toBoardPlayer),
+    ],
+    [controlled, game.players],
+  )
   const layoutVariant =
     layoutSelection?.playerCount === players.length
       ? layoutSelection.layout
-      : localRepository.loadLayoutPreference(players.length)
+      : connectedBoardLayoutVariant(players.length)
   const commanderDamageEnabled =
     supportsCommanderDamage(system, game.format || game.ruleset) &&
     game.commanderDamage !== undefined
@@ -342,6 +421,7 @@ function ConnectedBoardRuntime({
     ) as Record<PlayerId, number>
   function toggleCommanderSword(player: GamePlayer) {
     if (!active || runtime.connectionStatus !== "connected" || !controlled.has(player.id)) return
+    setInspectedPlayerId(null)
     if (armedCommander?.playerId === player.id) {
       sendCommanderDamage()
       return
@@ -370,10 +450,8 @@ function ConnectedBoardRuntime({
     if (!changes.length) return
     runtime.submitCommanderDamage(armedCommander.playerId, changes)
     setArmedCommander(null)
+    setInspectedPlayerId(null)
   }
-  const controlled = new Set(
-    game.players.filter((player) => player.controlledByMe).map((player) => player.playerId),
-  )
   const finishResultSelected = winnerPlayerIds.length > 0 || drawSelected
 
   const finishBlockedReason =
@@ -385,14 +463,21 @@ function ConnectedBoardRuntime({
           ? `Review failed ${counter.label} changes before finishing.`
           : undefined
   const layoutOptions = getPlayerGridLayoutOptions(players.length)
-  const gridLayout = getPlayerGridLayout({
-    playerCount: players.length,
-    width,
-    height,
-    fontScale,
-    layoutVariant,
-  })
-  const menuAnchor = getPlayerGridMenuAnchor(players.length, gridLayout)
+  const gridLayout = useMemo(
+    () =>
+      getPlayerGridLayout({
+        playerCount: players.length,
+        width,
+        height,
+        fontScale,
+        layoutVariant,
+      }),
+    [players.length, width, height, fontScale, layoutVariant],
+  )
+  const menuAnchor = useMemo(
+    () => getPlayerGridMenuAnchor(players.length, gridLayout),
+    [players.length, gridLayout],
+  )
 
   /**
    * Only the host is served an invitation, and only while seats are still open, so the
@@ -423,55 +508,73 @@ function ConnectedBoardRuntime({
     else onBack?.()
   }
 
-  const radialActions: RadialMenuAction[] = [
-    {
-      kind: "layout",
-      label: "Layout",
-      disabled: layoutOptions.length < 2,
-      onPress: (event) => {
-        captureMenuDialogOrigin(event)
-        setMenuOpen(false)
-        setLayoutPickerOpen(true)
+  const radialActions: RadialMenuAction[] = useMemo(
+    () => [
+      {
+        kind: "layout",
+        label: "Layout",
+        disabled: layoutOptions.length < 2,
+        onPress: (event) => {
+          captureMenuDialogOrigin(event)
+          setMenuOpen(false)
+          setLayoutPickerOpen(true)
+        },
       },
-    },
-    {
-      kind: "players",
-      label: "Players",
-      onPress: (event) => {
-        captureMenuDialogOrigin(event)
-        setMenuOpen(false)
-        setPlayerActionsOpen(true)
+      {
+        kind: "players",
+        label: "Players",
+        onPress: (event) => {
+          captureMenuDialogOrigin(event)
+          setMenuOpen(false)
+          setPlayerActionsOpen(true)
+        },
       },
-    },
-    {
-      kind: "setup",
-      label: "Setup",
-      disabled: !onSetup,
-      onPress: () => {
-        setMenuOpen(false)
-        onSetup?.()
+      {
+        kind: "setup",
+        label: "Setup",
+        disabled: !onSetup,
+        onPress: () => {
+          setMenuOpen(false)
+          onSetup?.()
+        },
       },
-    },
-    {
-      kind: "history",
-      label: "History",
-      disabled: !onHistory,
-      onPress: () => {
-        setMenuOpen(false)
-        onHistory?.()
+      {
+        kind: "history",
+        label: "History",
+        disabled: !onHistory,
+        onPress: () => {
+          setMenuOpen(false)
+          onHistory?.()
+        },
       },
-    },
-    {
-      kind: "end-game",
-      label: "End",
-      disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
-      onPress: (event) => {
-        captureMenuDialogOrigin(event)
-        setMenuOpen(false)
-        setConfirmingFinish(true)
+      {
+        kind: "end-game",
+        label: "End",
+        disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
+        onPress: (event) => {
+          captureMenuDialogOrigin(event)
+          setMenuOpen(false)
+          setConfirmingFinish(true)
+        },
       },
-    },
-  ]
+    ],
+    [
+      active,
+      captureMenuDialogOrigin,
+      finishBlockedReason,
+      game.isHost,
+      layoutOptions.length,
+      onHistory,
+      onSetup,
+      runtime.finishing,
+    ],
+  )
+  const seatColors = useMemo(() => players.map((player) => player.color), [players])
+  const exitAction = useMemo(
+    () =>
+      armedCommander ? { label: "Exit commander damage", onPress: exitCommanderDamage } : undefined,
+    [armedCommander, exitCommanderDamage],
+  )
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
   const overlayOpen =
@@ -528,6 +631,7 @@ function ConnectedBoardRuntime({
               ? {
                   incomingFor: incomingCommanderDamage,
                   armedPlayerId: armedCommander?.playerId ?? null,
+                  inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
                   staging: {
                     stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
                     stagedTargets: armedCommander
@@ -561,14 +665,10 @@ function ConnectedBoardRuntime({
           compact={players.length > 2}
           actions={radialActions}
           variant={menuButtonStyle}
-          seatColors={players.map((player) => player.color)}
-          exitAction={
-            armedCommander
-              ? { label: "Exit commander damage", onPress: () => setArmedCommander(null) }
-              : undefined
-          }
-          onToggle={() => setMenuOpen((current) => !current)}
-          onClose={() => setMenuOpen(false)}
+          seatColors={seatColors}
+          exitAction={exitAction}
+          onToggle={toggleMenu}
+          onClose={closeMenu}
         />
         {menuOpen && onDecks && onSettings && onAccount ? (
           <FloatingAppNavigation
@@ -632,7 +732,6 @@ function ConnectedBoardRuntime({
             value={layoutVariant}
             testID="connected-layout"
             onChange={(layout) => {
-              localRepository.saveLayoutPreference(players.length, layout)
               setLayoutSelection({ playerCount: players.length, layout })
               setLayoutPickerOpen(false)
             }}
