@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, ScrollView, useWindowDimensions, View } from "react-native"
+import { ActivityIndicator, ScrollView, Share, useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
@@ -22,8 +22,12 @@ import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { readPublicCloudConfig } from "@/features/auth/config"
 import { ConnectedBoardSyncToast } from "@/features/connected/ConnectedBoardSyncToast"
+import { InviteCard } from "@/features/connected/InviteCard"
+import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
 import type { ConnectedPlayerProjection } from "@/features/connected/model"
+import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
   PlayerActionsDialog,
   type ReportablePlayer,
@@ -42,20 +46,23 @@ import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { isGameUnavailableError } from "@/utils/convexError"
 import { useStoreReview } from "@/utils/useStoreReview"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
 
 type ConnectedBoardScreenProps = {
   publicId: string
+  initialInviteOpen?: boolean
+  onGameEnded?: (publicId: string) => void
+  onGameAbandoned?: () => void
+  onSetup?: () => void
   onBack?: () => void
   onHistory?: () => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
-  onGameEnded?: (publicId: string) => void
-  onGameAbandoned?: () => void
 }
 
 type ConnectedBoardShellState =
@@ -156,12 +163,26 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   return (
     <ConvexQueryBoundary
       resetKey={runtimeKey}
-      fallback={({ retry }) => (
-        <ConnectedBoardShell
-          state={{ status: "unavailable", message: "Connected board unavailable", retry }}
-          onBack={props.onBack}
-        />
-      )}
+      fallback={({ error, retry }) => {
+        const gone = isGameUnavailableError(error)
+        return (
+          <ConnectedBoardShell
+            state={
+              gone
+                ? { status: "unavailable", message: "This game no longer exists." }
+                : { status: "unavailable", message: "Connected board unavailable", retry }
+            }
+            onBack={
+              props.onBack
+                ? () => {
+                    if (gone) removeResumeEntryEverywhere(props.publicId)
+                    props.onBack?.()
+                  }
+                : undefined
+            }
+          />
+        )
+      }}
     >
       <ConnectedBoardRuntime key={runtimeKey} {...props} ownerId={ownerId} />
     </ConvexQueryBoundary>
@@ -176,7 +197,9 @@ export function connectedBoardLayoutVariant(playerCount: number): PlayerGridLayo
 
 type ConnectedBoardReadyProps = {
   publicId: string
+  initialInviteOpen?: boolean
   onBack?: () => void
+  onSetup?: () => void
   onHistory?: () => void
   onDecks?: () => void
   onSettings?: () => void
@@ -200,25 +223,29 @@ function toBoardPlayer(player: ConnectedPlayerProjection): GamePlayer {
 
 function ConnectedBoardRuntime({
   publicId,
+  initialInviteOpen,
+  onGameEnded,
+  onGameAbandoned,
+  onSetup,
   onBack,
   onHistory,
   onDecks,
   onSettings,
   onAccount,
   accountLabel,
-  onGameEnded,
-  onGameAbandoned,
   ownerId,
 }: {
   publicId: string
+  initialInviteOpen?: boolean
+  onGameEnded?: (publicId: string) => void
+  onGameAbandoned?: () => void
+  onSetup?: () => void
   onBack?: () => void
   onHistory?: () => void
   onDecks?: () => void
   onSettings?: () => void
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
-  onGameEnded?: (publicId: string) => void
-  onGameAbandoned?: () => void
   ownerId: string
 }) {
   useKeepAwake("count-connected-game")
@@ -240,7 +267,9 @@ function ConnectedBoardRuntime({
   return (
     <ConnectedBoardReady
       publicId={publicId}
+      initialInviteOpen={initialInviteOpen}
       onBack={onBack}
+      onSetup={onSetup}
       onHistory={onHistory}
       onDecks={onDecks}
       onSettings={onSettings}
@@ -255,6 +284,9 @@ function ConnectedBoardRuntime({
 
 function ConnectedBoardReady({
   publicId,
+  initialInviteOpen,
+  onBack,
+  onSetup,
   onHistory,
   onDecks,
   onSettings,
@@ -275,6 +307,8 @@ function ConnectedBoardReady({
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(initialInviteOpen ?? false)
+  const [inviteError, setInviteError] = useState<string>()
   const [winnerPlayerIds, setWinnerPlayerIds] = useState<string[]>([])
   const [drawSelected, setDrawSelected] = useState(false)
   const [layoutSelection, setLayoutSelection] = useState<{
@@ -288,6 +322,18 @@ function ConnectedBoardReady({
   } | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const finishSubmitInFlight = useRef(false)
+  const [abandonedOpen, setAbandonedOpen] = useState(false)
+  const navigatedTerminal = useRef(false)
+  const terminalStatus = runtime.status === "ready" ? runtime.projection.status : undefined
+  useEffect(() => {
+    if (terminalStatus === "finished") {
+      if (navigatedTerminal.current) return
+      navigatedTerminal.current = true
+      onGameEnded?.(publicId)
+    } else if (terminalStatus === "abandoned" && !navigatedTerminal.current) {
+      setAbandonedOpen(true)
+    }
+  }, [terminalStatus, onGameEnded, publicId])
   useStoreReview(
     runtime.projection.status === "finished" &&
       !menuOpen &&
@@ -432,6 +478,36 @@ function ConnectedBoardReady({
     () => getPlayerGridMenuAnchor(players.length, gridLayout),
     [players.length, gridLayout],
   )
+
+  /**
+   * Only the host is served an invitation, and only while seats are still open, so the
+   * invite action exists exactly when there is something to hand out.
+   */
+  const invitation = active ? game.invitation : undefined
+  const inviteOrigin = readPublicCloudConfig()
+  const inviteUrl =
+    invitation && inviteOrigin.configured
+      ? buildInviteUrl(inviteOrigin.value.inviteOrigin, invitation.token)
+      : undefined
+
+  async function shareInvite() {
+    if (!invitation) return
+    try {
+      setInviteError(undefined)
+      if (inviteUrl)
+        await Share.share({ message: `Join my Scryve game: ${inviteUrl}`, url: inviteUrl })
+      else await Share.share({ message: `Join my Scryve game with code ${invitation.manualCode}` })
+    } catch (cause) {
+      setInviteError(cause instanceof Error ? cause.message : "Could not open sharing")
+    }
+  }
+
+  function leaveAbandonedGame() {
+    setAbandonedOpen(false)
+    if (onGameAbandoned) onGameAbandoned()
+    else onBack?.()
+  }
+
   const radialActions: RadialMenuAction[] = useMemo(
     () => [
       {
@@ -456,10 +532,10 @@ function ConnectedBoardReady({
       {
         kind: "setup",
         label: "Setup",
-        onPress: (event) => {
-          captureMenuDialogOrigin(event)
+        disabled: !onSetup,
+        onPress: () => {
           setMenuOpen(false)
-          setStatusOpen(true)
+          onSetup?.()
         },
       },
       {
@@ -489,6 +565,7 @@ function ConnectedBoardReady({
       game.isHost,
       layoutOptions.length,
       onHistory,
+      onSetup,
       runtime.finishing,
     ],
   )
@@ -499,8 +576,15 @@ function ConnectedBoardReady({
     [armedCommander, exitCommanderDamage],
   )
 
+  const inviteDialogOpen = invitation !== undefined && inviteOpen
   const overlayOpen =
-    menuOpen || statusOpen || layoutPickerOpen || confirmingFinish || playerActionsOpen
+    menuOpen ||
+    statusOpen ||
+    layoutPickerOpen ||
+    confirmingFinish ||
+    playerActionsOpen ||
+    inviteDialogOpen ||
+    abandonedOpen
   const reportablePlayers: ReportablePlayer[] = game.players.map((player) => ({
     playerId: player.playerId,
     seat: player.seat,
@@ -606,6 +690,29 @@ function ConnectedBoardReady({
           }}
         />
       </View>
+
+      {inviteDialogOpen && invitation ? (
+        <DialogCard
+          visible
+          wide
+          placement="bottom"
+          origin={menuDialogOrigin}
+          onClose={() => setInviteOpen(false)}
+          backdropTestID="invite-backdrop"
+          backdropAccessibilityLabel="Close invite"
+          dialogTestID="invite-dialog"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text="Invite players" style={themed($dialogText)} />
+          <InviteCard
+            qrPayload={buildInviteQrPayload(invitation.token, invitation.manualCode)}
+            manualCode={invitation.manualCode}
+            onShare={() => void shareInvite()}
+          />
+          {inviteError ? <AlertNote text={inviteError} /> : null}
+          <Button text="Close" onPress={() => setInviteOpen(false)} />
+        </DialogCard>
+      ) : null}
 
       {layoutPickerOpen ? (
         <DialogCard
@@ -713,7 +820,37 @@ function ConnectedBoardReady({
           players={reportablePlayers}
           origin={menuDialogOrigin}
           onClose={() => setPlayerActionsOpen(false)}
+          onInvite={
+            invitation
+              ? () => {
+                  setPlayerActionsOpen(false)
+                  setInviteOpen(true)
+                }
+              : undefined
+          }
         />
+      ) : null}
+
+      {abandonedOpen ? (
+        <DialogCard
+          visible
+          onClose={() => setAbandonedOpen(false)}
+          origin={menuDialogOrigin}
+          backdropTestID="abandoned-game-backdrop"
+          backdropAccessibilityLabel="Dismiss game ended notice"
+          dialogTestID="abandoned-game-dialog"
+          dialogAccessibilityRole="alert"
+          wide
+          style={themed($boardDialog)}
+        >
+          <Text text="Game ended" preset="subheading" style={themed($dialogText)} />
+          <Text
+            size="xs"
+            text="The host ended this game. Its board stays read-only."
+            style={themed($muted)}
+          />
+          <Button text="Leave" onPress={leaveAbandonedGame} />
+        </DialogCard>
       ) : null}
 
       {confirmingFinish ? (
@@ -804,6 +941,7 @@ function ConnectedBoardReady({
                     : await runtime.abandon()
                   if (!ended) return
                   setConfirmingFinish(false)
+                  navigatedTerminal.current = true
                   if (withResult) {
                     if (onGameEnded) setTimeout(() => onGameEnded(publicId), 0)
                   } else if (onGameAbandoned) {

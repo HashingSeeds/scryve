@@ -47,7 +47,7 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { LocalGame, LocalGameResult, NewPlayerInput } from "@/features/game/types"
+import type { LocalGame, LocalGameResult, NewPlayerInput, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -105,6 +105,17 @@ export interface NewGameScreenProps {
   onSavePlayers?: (players: NewPlayerInput[]) => void
   joinContent?: ReactNode
   onResumeConnected?: (game: ResumableGame) => void
+  /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
+  localConnect?: LocalConnectFeed
+}
+
+export interface LocalConnectFeed {
+  /** Set when the account gate has to be cleared first, mirroring `ConnectedHostFeed`. */
+  access?: { label: string; request: () => void }
+  ready?: boolean
+  busy?: boolean
+  error?: string
+  publish: (hostPlayerId: PlayerId) => void
 }
 
 const PLAYER_COUNTS = [2, 3, 4, 5, 6]
@@ -126,6 +137,7 @@ export function NewGameScreen({
   onSavePlayers,
   joinContent,
   onResumeConnected,
+  localConnect,
 }: NewGameScreenProps) {
   const {
     themed,
@@ -170,6 +182,7 @@ export function NewGameScreen({
   const [gameToExit, setGameToExit] = useState<ResumableGame>()
   const [exitingGameId, setExitingGameId] = useState<string>()
   const [connectedAction, setConnectedAction] = useState("host")
+  const [pickingHostSeat, setPickingHostSeat] = useState(false)
   const connectedMode = mode === "connected"
   const joining = connectedMode && connectedAction === "join" && Boolean(joinContent)
   const preparing = connectedMode && Boolean(connected?.status) && !connected?.ready
@@ -208,6 +221,10 @@ export function NewGameScreen({
     connectedBlocksLocal && connectedGames.length === 1 ? connectedGames[0] : undefined
   const gameBlocksStart = localGameBlocksStart || connectedBlocksLocal || Boolean(hostedGame)
   const resumeGame = connectedMode && connectedGames.length === 1 ? hostedGame : undefined
+  const hostedResumable =
+    connectedMode || !onResumeConnected ? undefined : connectedGames.find((game) => game.isHost)
+  /** Only a running local game can be handed to the server; a connected one is already there. */
+  const canConnectLocal = Boolean(localConnect) && !connectedMode && localGameBlocksStart
   const directResume =
     localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
 
@@ -357,6 +374,15 @@ export function NewGameScreen({
       ) : (
         <>
           <Screen preset="scroll" contentInset="standard" contentContainerStyle={themed($form)}>
+            {hostedResumable ? (
+              <View style={themed($section)}>
+                <Button
+                  testID="resume-hosted-connected-button"
+                  text="Resume hosted game"
+                  onPress={() => onResumeConnected?.(hostedResumable)}
+                />
+              </View>
+            ) : null}
             <View style={themed($section)}>
               <Text text="System" preset="subheading" accessibilityRole="header" />
               <SegmentedControl
@@ -506,47 +532,67 @@ export function NewGameScreen({
           </Screen>
           <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
             <View style={themed($footerContent)}>
-              <Button
-                testID={connectedMode ? "host-connected-button" : "start-game-button"}
-                text={
-                  gameBlocksStart
-                    ? "End current game…"
-                    : connectedMode
-                      ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
-                      : undefined
-                }
-                tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
-                preset="reversed"
-                style={gameBlocksStart ? themed($endCurrentButton) : undefined}
-                textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
-                disabled={
-                  localGameBlocksStart
-                    ? !onEndLocal
-                    : hostedGame
-                      ? !connected?.ready || busy
-                      : connectedBlocksLocal
-                        ? !connected?.exitGame || busy
-                        : !valid || busy
-                }
-                accessibilityHint={
-                  gameBlocksStart
-                    ? "Opens the end-game prompt before you can start another game"
-                    : connectedMode
-                      ? "Creates a lobby others can join"
-                      : "Starts this local game on the current device"
-                }
-                onPress={
-                  localGameBlocksStart
-                    ? () => setEndingLocal(true)
-                    : hostedGame
-                      ? () => setGameToExit(hostedGame)
-                      : singleBlockingConnected
-                        ? () => setGameToExit(singleBlockingConnected)
+              <View style={canConnectLocal ? themed($footerActions) : undefined}>
+                <Button
+                  testID={connectedMode ? "host-connected-button" : "start-game-button"}
+                  text={
+                    gameBlocksStart
+                      ? "End current game…"
+                      : connectedMode
+                        ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
+                        : undefined
+                  }
+                  tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
+                  preset="reversed"
+                  style={[
+                    canConnectLocal && themed($footerAction),
+                    gameBlocksStart && themed($endCurrentButton),
+                  ]}
+                  textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
+                  disabled={
+                    localGameBlocksStart
+                      ? !onEndLocal || Boolean(localConnect?.busy)
+                      : hostedGame
+                        ? !connected?.ready || busy
                         : connectedBlocksLocal
-                          ? () => setShowStatus(true)
-                          : submit
-                }
-              />
+                          ? !connected?.exitGame || busy
+                          : !valid || busy
+                  }
+                  accessibilityHint={
+                    gameBlocksStart
+                      ? "Opens the end-game prompt before you can start another game"
+                      : connectedMode
+                        ? "Creates a lobby others can join"
+                        : "Starts this local game on the current device"
+                  }
+                  onPress={
+                    localGameBlocksStart
+                      ? () => setEndingLocal(true)
+                      : hostedGame
+                        ? () => setGameToExit(hostedGame)
+                        : singleBlockingConnected
+                          ? () => setGameToExit(singleBlockingConnected)
+                          : connectedBlocksLocal
+                            ? () => setShowStatus(true)
+                            : submit
+                  }
+                />
+                {canConnectLocal ? (
+                  <Button
+                    testID="connect-local-button"
+                    text={localConnect?.access?.label ?? "Connect"}
+                    preset="reversed"
+                    style={themed($footerAction)}
+                    disabled={localConnect?.busy || localConnect?.ready === false}
+                    accessibilityHint="Moves this game to the cloud so others can join it"
+                    onPress={() =>
+                      localConnect?.access
+                        ? localConnect.access.request()
+                        : setPickingHostSeat(true)
+                    }
+                  />
+                ) : null}
+              </View>
               <TouchableOpacity
                 testID="setup-status"
                 accessible={Boolean(statusText)}
@@ -726,6 +772,32 @@ export function NewGameScreen({
           </View>
         </DialogCard>
       ) : null}
+      {pickingHostSeat && localGame && localConnect ? (
+        <DialogCard
+          visible
+          onClose={() => setPickingHostSeat(false)}
+          dialogTestID="host-seat-dialog"
+          accessibilityViewIsModal
+        >
+          <Text preset="subheading" text="Which seat is you?" />
+          <Text
+            size="xs"
+            text="The other seats stay open for players to claim with an invite."
+            style={themed($footerStatus)}
+          />
+          {localGame.players.map((player) => (
+            <Button
+              key={player.id}
+              testID={`host-seat-${player.seat + 1}`}
+              text={player.name}
+              disabled={localConnect.busy}
+              onPress={() => localConnect.publish(player.id)}
+            />
+          ))}
+          {localConnect.error ? <AlertNote text={localConnect.error} /> : null}
+          <Button text="Cancel" onPress={() => setPickingHostSeat(false)} />
+        </DialogCard>
+      ) : null}
       {endingLocal && localGame && onEndLocal ? (
         <LocalGameEndDialog
           game={localGame}
@@ -804,6 +876,11 @@ const $footerContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
   paddingHorizontal: spacing.lg,
 })
+const $footerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.xs,
+})
+const $footerAction: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $footerStatus: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 

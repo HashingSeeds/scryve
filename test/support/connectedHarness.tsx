@@ -87,6 +87,7 @@ export type MockConnectedRuntime = {
     serverUpdatedAt: number
     recentOperationIds: string[]
     commanderDamage?: LobbyProjection["commanderDamage"]
+    invitation?: { token: string; manualCode: string; expiresAt: number }
     players: RuntimePlayer[]
   }
   pending: Array<{ event: RuntimeActionEvent }>
@@ -104,6 +105,11 @@ export type MockConnectedRuntime = {
 }
 
 export const mockClaimSeat = jest.fn(async () => ({ publicId: "game-public", seat: 2 }))
+export const mockClaimableSeats = jest.fn(async () => ({
+  publicId: "game-public",
+  mode: "connected",
+  seats: [] as number[],
+}))
 export const mockSyncUser = jest.fn(async () => "user")
 export const mockStart = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockLeave = jest.fn(async () => ({ publicId: "game-public", left: true }))
@@ -143,7 +149,7 @@ function defaultProjection(): LobbyProjection {
 }
 
 function defaultRuntime(): MockConnectedRuntime {
-  const projection = defaultProjection()
+  const { invitation: _lobbyInvitation, ...projection } = defaultProjection()
   return {
     status: "ready",
     source: "remote",
@@ -225,6 +231,9 @@ export const mockUseConnectedGame = jest.fn(
 export function resetConnectedHarness() {
   jest.clearAllMocks()
   mockClaimSeat.mockReset().mockResolvedValue({ publicId: "game-public", seat: 2 })
+  mockClaimableSeats
+    .mockReset()
+    .mockResolvedValue({ publicId: "game-public", mode: "connected", seats: [] })
   mockSyncUser.mockReset().mockResolvedValue("user")
   mockStart.mockReset().mockResolvedValue({ publicId: "game-public" })
   mockLeave.mockReset().mockResolvedValue({ publicId: "game-public", left: true })
@@ -290,6 +299,7 @@ export function createConvexReactMock() {
     }),
     useMutation: (reference: unknown) => {
       const name = String(reference)
+      if (name.includes("claimableSeats")) return mockClaimableSeats
       if (name.includes("claimSeat")) return mockClaimSeat
       if (name.includes("startGame")) return mockStart
       if (name.includes("leaveMyGame")) return mockLeave
@@ -358,6 +368,7 @@ export const connectedApi = {
   users: { syncCurrent: "users.syncCurrent" },
   games: {
     claimSeat: "games.claimSeat",
+    claimableSeats: "games.claimableSeats",
     startGame: "games.startGame",
     leaveMyGame: "games.leaveMyGame",
     abandonGame: "games.abandonGame",

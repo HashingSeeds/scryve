@@ -60,6 +60,19 @@ function setup(overrides: Partial<NewGameScreenProps> = {}) {
   )
 }
 
+/** A two-player local game in progress, which puts the setup screen in its managing state. */
+function runningLocalGame() {
+  return createLocalGame({
+    players: [
+      { name: "Ada", color: "#FF0000" },
+      { name: "Grace", color: "#0000FF" },
+    ],
+    startingLife: 20,
+    system: "mtg",
+    format: "commander",
+  })
+}
+
 const readyHost: ConnectedHostFeed = {
   ready: true,
   busy: false,
@@ -135,6 +148,66 @@ describe("NewGameScreen", () => {
     expect(props.onResumeConnected).toHaveBeenCalledWith(
       expect.objectContaining({ publicId: "arriving" }),
     )
+  })
+
+  it("publishes the running local game under the seat the host picks", () => {
+    const publish = jest.fn()
+    const localGame = runningLocalGame()
+    const view = setup({ localGame, localConnect: { publish } })
+
+    fireEvent.press(view.getByTestId("connect-local-button"))
+    fireEvent.press(view.getByTestId("host-seat-2"))
+
+    expect(publish).toHaveBeenCalledWith(localGame.players[1].id)
+  })
+
+  it("sends a signed-out host to the account gate instead of the seat picker", () => {
+    const publish = jest.fn()
+    const request = jest.fn()
+    const view = setup({
+      localGame: runningLocalGame(),
+      localConnect: { publish, access: { label: "Sign in to host", request } },
+    })
+
+    fireEvent.press(view.getByText("Sign in to host"))
+
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(view.queryByTestId("host-seat-dialog")).toBeNull()
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it("hides the connect action without a local game to connect", () => {
+    expect(
+      setup({ localConnect: { publish: jest.fn() } }).queryByTestId("connect-local-button"),
+    ).toBeNull()
+    expect(
+      setup({ localGame: runningLocalGame() }).queryByTestId("connect-local-button"),
+    ).toBeNull()
+  })
+
+  it("surfaces a hosted live game in local setup only", () => {
+    const onResumeConnected = jest.fn()
+    const hosted = {
+      publicId: "hosted-game",
+      status: "active" as const,
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: 1,
+    }
+    const local = setup({
+      connected: { ...readyHost, activeGames: [hosted] },
+      onResumeConnected,
+    })
+    fireEvent.press(local.getByTestId("resume-hosted-connected-button"))
+    expect(onResumeConnected).toHaveBeenCalledWith(hosted)
+
+    const connected = setup({
+      mode: "connected",
+      connected: { ...readyHost, activeGames: [hosted] },
+      onResumeConnected,
+    })
+    expect(connected.queryByTestId("resume-hosted-connected-button")).toBeNull()
   })
 
   it("offers ending the current game before starting, preserving setup", () => {

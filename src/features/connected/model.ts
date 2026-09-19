@@ -98,6 +98,8 @@ export interface ConnectedProjection {
   recentOperationIds: string[]
   /** Optional so projections from before commander damage remain readable. */
   commanderDamage?: ConnectedCommanderDamageProjection
+  /** Only the host sees this, and only while the invite is still usable. */
+  invitation?: { token: string; manualCode: string; expiresAt: number }
   players: ConnectedPlayerProjection[]
 }
 
@@ -191,6 +193,22 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       controlledByMe: player.controlledByMe,
     })
   }
+  const invitationValue = value.invitation
+  let invitation: ConnectedProjection["invitation"]
+  if (isRecord(invitationValue)) {
+    if (
+      typeof invitationValue.token !== "string" ||
+      typeof invitationValue.manualCode !== "string" ||
+      typeof invitationValue.expiresAt !== "number" ||
+      !Number.isFinite(invitationValue.expiresAt)
+    )
+      return null
+    invitation = {
+      token: invitationValue.token,
+      manualCode: invitationValue.manualCode,
+      expiresAt: invitationValue.expiresAt,
+    }
+  }
   const commanderDamageValue = value.commanderDamage
   let commanderDamage: ConnectedCommanderDamageProjection | undefined
   if (commanderDamageValue !== undefined) {
@@ -280,6 +298,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       .filter((operationId: unknown): operationId is string => typeof operationId === "string")
       .slice(0, CONNECTED_RECENT_OPERATION_LIMIT),
     ...(commanderDamage ? { commanderDamage } : {}),
+    ...(invitation ? { invitation } : {}),
     players,
   }
 }

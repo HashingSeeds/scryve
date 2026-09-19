@@ -23,6 +23,8 @@ export interface SelectFieldProps {
   placeholder?: string
   clearLabel?: string
   testID?: string
+  /** Shows the current choice but refuses to open the menu. */
+  disabled?: boolean
   onSelect: (id?: string) => void
 }
 
@@ -61,6 +63,7 @@ export function SelectField({
   placeholder = "None",
   clearLabel,
   testID,
+  disabled = false,
   onSelect,
 }: SelectFieldProps) {
   const {
@@ -115,8 +118,13 @@ export function SelectField({
         accessibilityRole="button"
         accessibilityLabel={`${label}, ${selected?.label ?? placeholder}`}
         accessibilityHint={`Opens the ${label.toLowerCase()} choices`}
-        accessibilityState={{ expanded: open }}
-        style={({ pressed }) => [themed($trigger), pressed && themed($triggerPressed)]}
+        accessibilityState={{ expanded: open, disabled }}
+        disabled={disabled}
+        style={({ pressed }) => [
+          themed($trigger),
+          pressed && themed($triggerPressed),
+          disabled && $dimmed,
+        ]}
         onPress={show}
       >
         <View style={themed($triggerText)}>
@@ -255,6 +263,7 @@ const $menuFallback: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   maxHeight: MIN_MENU_HEIGHT * 2,
 })
 const $menuClip: ViewStyle = { borderRadius: CHOICE_RADIUS - 1, overflow: "hidden" }
+const $dimmed: ViewStyle = { opacity: 0.5 }
 const $menuContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingVertical: spacing.xxs })
 const $optionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,

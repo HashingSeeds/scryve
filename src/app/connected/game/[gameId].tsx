@@ -5,7 +5,7 @@ import { ConnectedGate } from "@/features/connected/ConnectedGate"
 import { ConnectedBoardScreen } from "@/screens/ConnectedBoardScreen"
 
 export default function ConnectedGameRoute() {
-  const { gameId } = useLocalSearchParams<{ gameId: string }>()
+  const { gameId, invite } = useLocalSearchParams<{ gameId: string; invite?: string }>()
   const auth = useAuthAccess()
   return (
     <ConnectedGate
@@ -15,12 +15,7 @@ export default function ConnectedGameRoute() {
     >
       <ConnectedBoardScreen
         publicId={gameId}
-        onBack={() => router.replace("/game/new?mode=connected")}
-        onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
-        onDecks={() => router.push("/connected/decks")}
-        onSettings={() => router.push("/settings")}
-        accountLabel={auth.isSignedIn ? "Account" : "Sign in"}
-        onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}
+        initialInviteOpen={invite === "1"}
         onGameEnded={(publicId) =>
           router.replace({
             pathname: "/history/[gameId]",
@@ -28,6 +23,13 @@ export default function ConnectedGameRoute() {
           })
         }
         onGameAbandoned={() => router.replace("/game/new?mode=connected")}
+        onSetup={() => router.push("/game/new?mode=connected")}
+        onBack={() => router.replace("/game/new?mode=connected")}
+        onHistory={() => router.push({ pathname: "/history", params: { source: "connected" } })}
+        onDecks={() => router.push("/connected/decks")}
+        onSettings={() => router.push("/settings")}
+        accountLabel={auth.isSignedIn ? "Account" : "Sign in"}
+        onAccount={() => (auth.isSignedIn ? router.push("/account") : auth.openAuth())}
       />
     </ConnectedGate>
   )
