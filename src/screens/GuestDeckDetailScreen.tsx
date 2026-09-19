@@ -61,7 +61,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const focusedCard =
     focusedIndex === undefined ? undefined : (draft ?? stored?.deck)?.cards[focusedIndex]
   const focusedGame = (draft ?? stored?.deck)?.game ?? DEFAULT_DECK_GAME
-  const { details, detailsError } = useCardDetails(
+  const { details, detailsError, detailsRetryAfterMs, retryDetails } = useCardDetails(
     focusedCard
       ? {
           ...focusedCard,
@@ -312,6 +312,8 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
           }}
           details={details}
           detailsError={detailsError}
+          detailsRetryAfterMs={detailsRetryAfterMs}
+          onRetryDetails={retryDetails}
           onClose={() => setFocusedIndex(undefined)}
           {...(editing
             ? {

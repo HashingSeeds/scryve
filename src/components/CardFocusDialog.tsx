@@ -6,6 +6,7 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { DialogCard } from "@/components/DialogCard"
+import { RetryableError } from "@/components/RetryableError"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -33,6 +34,8 @@ export interface CardFocusDialogProps {
   card: FocusedCard
   details?: FocusedCardDetails
   detailsError?: string
+  detailsRetryAfterMs?: number
+  onRetryDetails?: () => void
   onIncrement?: () => void
   onDecrement?: () => void
   onClose: () => void
@@ -58,6 +61,8 @@ export function CardFocusDialog({
   card,
   details,
   detailsError,
+  detailsRetryAfterMs,
+  onRetryDetails,
   onIncrement,
   onDecrement,
   onClose,
@@ -120,7 +125,18 @@ export function CardFocusDialog({
           {!details && !detailsError ? (
             <Text size="sm" style={themed($dimText)} text="Loading details…" />
           ) : null}
-          {detailsError ? <AlertNote text={detailsError} /> : null}
+          {detailsError ? (
+            onRetryDetails ? (
+              <RetryableError
+                message={detailsError}
+                retryAfterMs={detailsRetryAfterMs}
+                onRetry={onRetryDetails}
+                testID="retry-card-details"
+              />
+            ) : (
+              <AlertNote text={detailsError} />
+            )
+          ) : null}
         </View>
       </ScrollView>
       <View testID="card-focus-quantity" style={themed($quantityRow)}>

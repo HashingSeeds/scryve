@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAction, useConvexConnectionState } from "convex/react"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
-import { convexErrorMessage } from "@/utils/convexError"
+import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 
 import { loadCardDetails, readCardDetail, saveCardDetails } from "./cardDetailsCache"
 import { catalogCardDetails } from "./cardFocus"
@@ -26,8 +26,14 @@ export function useCardDetails(card?: CardLookup) {
   const [detailsByKey, setDetailsByKey] = useState<Record<string, FocusedCardDetails>>(() =>
     loadCardDetails(),
   )
-  const [failure, setFailure] = useState<{ key: string; message: string }>()
+  const [failure, setFailure] = useState<{ key: string; message: string; retryAfterMs?: number }>()
+  const [attempt, setAttempt] = useState(0)
   const { detailKey, name, game = "mtg", scryfallId, catalogCardId, originalReference } = card ?? {}
+
+  const retryDetails = useCallback(() => {
+    setFailure(undefined)
+    setAttempt((current) => current + 1)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -63,6 +69,7 @@ export function useCardDetails(card?: CardLookup) {
           setFailure({
             key: detailKey,
             message: convexErrorMessage(cause, "Could not load card details"),
+            retryAfterMs: convexRetryAfterMs(cause),
           })
       }
     }
@@ -82,11 +89,15 @@ export function useCardDetails(card?: CardLookup) {
     byCatalogId,
     byPokemonReference,
     detailsByKey,
+    attempt,
   ])
 
+  const activeFailure = failure?.key === detailKey ? failure : undefined
   return {
     detailsByKey,
     details: detailKey ? detailsByKey[detailKey] : undefined,
-    detailsError: failure?.key === detailKey ? failure?.message : undefined,
+    detailsError: activeFailure?.message,
+    detailsRetryAfterMs: activeFailure?.retryAfterMs,
+    retryDetails,
   }
 }

@@ -16,6 +16,14 @@ export function convexErrorCode(cause: unknown) {
   return convexErrorField(cause, "code")
 }
 
+export function convexRetryAfterMs(cause: unknown) {
+  if (!(cause instanceof ConvexError)) return undefined
+  const data: unknown = cause.data
+  if (typeof data !== "object" || data === null) return undefined
+  const value = (data as Record<string, unknown>).retryAfterMs
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
 export function convexErrorRetryAfterMs(cause: unknown, fallbackMs = 0) {
   if (!(cause instanceof ConvexError)) return fallbackMs
   const data: unknown = cause.data
