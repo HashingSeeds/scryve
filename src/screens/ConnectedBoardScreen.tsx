@@ -54,6 +54,7 @@ type ConnectedBoardScreenProps = {
   initialInviteOpen?: boolean
   onGameEnded?: (publicId: string) => void
   onGameAbandoned?: () => void
+  onSetup?: () => void
   onBack?: () => void
   onHistory?: () => void
   onDecks?: () => void
@@ -177,6 +178,7 @@ function ConnectedBoardRuntime({
   initialInviteOpen,
   onGameEnded,
   onGameAbandoned,
+  onSetup,
   onBack,
   onHistory,
   onDecks,
@@ -189,6 +191,7 @@ function ConnectedBoardRuntime({
   initialInviteOpen?: boolean
   onGameEnded?: (publicId: string) => void
   onGameAbandoned?: () => void
+  onSetup?: () => void
   onBack?: () => void
   onHistory?: () => void
   onDecks?: () => void
@@ -427,10 +430,10 @@ function ConnectedBoardRuntime({
     {
       kind: "setup",
       label: "Setup",
-      disabled: !onBack,
+      disabled: !onSetup,
       onPress: () => {
         setMenuOpen(false)
-        onBack?.()
+        onSetup?.()
       },
     },
     {

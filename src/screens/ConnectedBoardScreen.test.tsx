@@ -946,10 +946,10 @@ describe("ConnectedBoardScreen", () => {
   })
 
   it("takes setup back to the setup screen like the local board", () => {
-    const onBack = jest.fn()
-    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    const onSetup = jest.fn()
+    render(themed(<ConnectedBoardScreen publicId="game-public" onSetup={onSetup} />))
     openConnectedMenu()
     fireEvent.press(screen.getByTestId("setup-button"))
-    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(onSetup).toHaveBeenCalledTimes(1)
   })
 })
