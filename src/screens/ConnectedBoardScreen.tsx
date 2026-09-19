@@ -26,6 +26,7 @@ import { readPublicCloudConfig } from "@/features/auth/config"
 import { ConnectedBoardSyncToast } from "@/features/connected/ConnectedBoardSyncToast"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
+import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
   PlayerActionsDialog,
   type ReportablePlayer,
@@ -162,16 +163,26 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   return (
     <ConvexQueryBoundary
       resetKey={runtimeKey}
-      fallback={({ error, retry }) => (
-        <ConnectedBoardShell
-          state={
-            isGameUnavailableError(error)
-              ? { status: "unavailable", message: "This game no longer exists." }
-              : { status: "unavailable", message: "Connected board unavailable", retry }
-          }
-          onBack={props.onBack}
-        />
-      )}
+      fallback={({ error, retry }) => {
+        const gone = isGameUnavailableError(error)
+        return (
+          <ConnectedBoardShell
+            state={
+              gone
+                ? { status: "unavailable", message: "This game no longer exists." }
+                : { status: "unavailable", message: "Connected board unavailable", retry }
+            }
+            onBack={
+              props.onBack
+                ? () => {
+                    if (gone) removeResumeEntryEverywhere(props.publicId)
+                    props.onBack?.()
+                  }
+                : undefined
+            }
+          />
+        )
+      }}
     >
       <ConnectedBoardRuntime key={runtimeKey} {...props} ownerId={ownerId} />
     </ConvexQueryBoundary>

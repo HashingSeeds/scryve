@@ -296,6 +296,24 @@ export function loadNewestResumeGame(
   return newest
 }
 
+export function removeResumeEntryEverywhere(
+  publicId: string,
+  storage: ConnectedStringStorage = mmkvStorage,
+  deployment = connectedDeploymentScope(),
+): void {
+  const prefix = `count.connected.resume.v1.${deployment}.`
+  for (const key of storage.getAllKeys()) {
+    if (!key.startsWith(prefix) || !/^\d+:/.test(key.slice(prefix.length))) continue
+    const remaining = parseResumeIndex(parseJson(storage.getString(key))).filter(
+      (game) => game.publicId !== publicId,
+    )
+    const serialized = JSON.stringify({ schemaVersion: 1, games: remaining } as const)
+    if (storage.getString(key) === serialized) continue
+    storage.set(key, serialized)
+    notifyResumeIndexChanged()
+  }
+}
+
 const resumeIndexListeners = new Set<() => void>()
 
 export function subscribeResumeIndex(listener: () => void): () => void {

@@ -5,6 +5,8 @@ import {
   ConnectedGameRepository,
   RESUME_INDEX_LIMIT,
   loadNewestResumeGame,
+  removeResumeEntryEverywhere,
+  subscribeResumeIndex,
 } from "./persistence"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
 
@@ -715,5 +717,32 @@ describe("connected resume index", () => {
     expect(
       new ConnectedGameRepository(storage, "user-1", {}, deployment).loadResumeIndex(),
     ).toHaveLength(1)
+  })
+
+  it("sweeps one game from every cached resume index without touching other deployments", () => {
+    const storage = new MemoryStorage()
+    const deployment = "small-ibis-123.convex.cloud"
+    new ConnectedGameRepository(storage, "user-1", {}, deployment).syncResumeIndex(
+      [resumeEntry("game-gone", 10), resumeEntry("game-kept", 5)],
+      true,
+    )
+    new ConnectedGameRepository(storage, "user-2", {}, deployment).syncResumeIndex(
+      [resumeEntry("game-gone", 7)],
+      true,
+    )
+    new ConnectedGameRepository(storage, "user-1", {}, "other.convex.cloud").syncResumeIndex(
+      [resumeEntry("game-gone", 9)],
+      true,
+    )
+    const listener = jest.fn()
+    const unsubscribe = subscribeResumeIndex(listener)
+    try {
+      removeResumeEntryEverywhere("game-gone", storage, deployment)
+      expect(loadNewestResumeGame(storage, deployment)?.publicId).toBe("game-kept")
+      expect(loadNewestResumeGame(storage, "other.convex.cloud")?.publicId).toBe("game-gone")
+      expect(listener).toHaveBeenCalled()
+    } finally {
+      unsubscribe()
+    }
   })
 })

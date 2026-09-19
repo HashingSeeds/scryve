@@ -2,6 +2,12 @@ import { Dimensions, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 
+import {
+  ConnectedGameRepository,
+  connectedDeploymentScope,
+  loadNewestResumeGame,
+} from "@/features/connected/persistence"
+
 import { ConnectedBoardScreen } from "./ConnectedBoardScreen"
 import {
   connectedHarness,
@@ -818,11 +824,31 @@ describe("ConnectedBoardScreen", () => {
         "[CONVEX Q(games:lobbyProjection)] Server Error Uncaught Error: Game unavailable Called by client",
       )
     })
+    new ConnectedGameRepository(
+      undefined,
+      "user-1",
+      {},
+      connectedDeploymentScope(),
+    ).syncResumeIndex(
+      [
+        {
+          publicId: "game-public",
+          status: "active",
+          isHost: true,
+          playerCount: 2,
+          ruleset: "standard",
+          updatedAt: 1,
+        },
+      ],
+      true,
+    )
     try {
       render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
       expect(screen.getByText("This game no longer exists.")).toBeTruthy()
       expect(screen.queryByTestId("retry-connected-board-button")).toBeNull()
+      expect(loadNewestResumeGame()?.publicId).toBe("game-public")
       fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
+      expect(loadNewestResumeGame()).toBeNull()
       expect(onBack).toHaveBeenCalledTimes(1)
     } finally {
       consoleError.mockRestore()

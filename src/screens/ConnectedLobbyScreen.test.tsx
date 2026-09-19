@@ -2,7 +2,13 @@ import { Share } from "react-native"
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
+import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
+import {
+  ConnectedGameRepository,
+  connectedDeploymentScope,
+  loadNewestResumeGame,
+} from "@/features/connected/persistence"
 
 import { ConnectedLobbyScreen } from "./ConnectedLobbyScreen"
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
@@ -680,14 +686,35 @@ describe("ConnectedLobbyScreen", () => {
         "[CONVEX Q(games:lobbyProjection)] Server Error Uncaught Error: Game unavailable Called by client",
       )
     })
+    new ConnectedGameRepository(
+      undefined,
+      "user-1",
+      {},
+      connectedDeploymentScope(),
+    ).syncResumeIndex(
+      [
+        {
+          publicId: "game-public",
+          status: "lobby",
+          isHost: true,
+          playerCount: 2,
+          ruleset: "standard",
+          updatedAt: 1,
+        },
+      ],
+      true,
+    )
     try {
-      render(
+      const view = render(
         themed(
           <ConnectedLobbyScreen publicId="game-public" onStarted={jest.fn()} onBack={jest.fn()} />,
         ),
       )
       expect(screen.getByText("This game no longer exists.")).toBeTruthy()
       expect(screen.queryByTestId("retry-lobby-button")).toBeNull()
+      expect(loadNewestResumeGame()?.publicId).toBe("game-public")
+      view.UNSAFE_getByType(Header).props.onLeftPress()
+      expect(loadNewestResumeGame()).toBeNull()
     } finally {
       spy.mockRestore()
       consoleError.mockRestore()
