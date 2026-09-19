@@ -34,6 +34,7 @@ import {
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
 import { LobbySeatList, type LobbyDeckState } from "@/features/connected/LobbySeatList"
+import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
   PlayerActionsDialog,
   type ReportablePlayer,
@@ -44,7 +45,7 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics, captureGame } from "@/utils/analytics"
-import { convexErrorMessage } from "@/utils/convexError"
+import { convexErrorMessage, isGameUnavailableError } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
@@ -85,14 +86,24 @@ export function ConnectedLobbyScreen({
   return (
     <ConvexQueryBoundary
       resetKey={publicId}
-      fallback={({ retry }) => (
-        <LobbyStatusScreen
-          message="This lobby is unavailable."
-          error
-          retry={retry}
-          onBack={onBack}
-        />
-      )}
+      fallback={({ error, retry }) => {
+        const gone = isGameUnavailableError(error)
+        return (
+          <LobbyStatusScreen
+            message={gone ? "This game no longer exists." : "This lobby is unavailable."}
+            error
+            {...(gone ? {} : { retry })}
+            onBack={
+              onBack
+                ? () => {
+                    if (gone) removeResumeEntryEverywhere(publicId)
+                    onBack()
+                  }
+                : undefined
+            }
+          />
+        )
+      }}
     >
       <ConnectedLobbyContent
         publicId={publicId}

@@ -1,9 +1,13 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { CloudScreen } from "@/features/auth/CloudScreen"
 import type { CreatedLobby } from "@/features/connected/ConnectedHostSource"
 import { ConnectedSetupSource } from "@/features/connected/ConnectedSetupSource"
+import {
+  LocalGamePublishSource,
+  type PublishedGame,
+} from "@/features/connected/LocalGamePublishSource"
 import {
   applyGameCommand,
   defaultCommandContext,
@@ -12,10 +16,42 @@ import {
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { LocalGameResult } from "@/features/game/types"
 import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
-import { NewGameScreen, type ConnectedHostFeed, type NewGameMode } from "@/screens/NewGameScreen"
+import {
+  NewGameScreen,
+  type ConnectedHostFeed,
+  type LocalConnectFeed,
+  type NewGameMode,
+} from "@/screens/NewGameScreen"
 
 function openLobby(lobby: Pick<CreatedLobby, "publicId">) {
   router.replace({ pathname: "/connected/lobby/[gameId]", params: { gameId: lobby.publicId } })
+}
+
+/**
+ * A published game is live from the first moment, so it opens on the board rather
+ * than a lobby, and the local copy is dropped: the server owns it now.
+ *
+ * Declared at module scope so the publish source sees one stable callback: it feeds
+ * a memo whose consumer reports it upward from an effect.
+ */
+function openPublishedGame({ publicId }: PublishedGame) {
+  localGameRepository.clearActiveGame()
+  router.replace({
+    pathname: "/connected/game/[gameId]",
+    params: { gameId: publicId, invite: "1" },
+  })
+}
+
+export function ReportLocalConnect({
+  feed,
+  onChange,
+}: {
+  feed: LocalConnectFeed
+  onChange: (feed: LocalConnectFeed) => void
+}) {
+  const { busy, error, publish } = feed
+  useEffect(() => onChange({ busy, error, publish }), [busy, error, publish, onChange])
+  return null
 }
 
 export default function NewLocalGameRoute() {
@@ -23,6 +59,7 @@ export default function NewLocalGameRoute() {
   const [mode, setMode] = useState<NewGameMode>(params.mode === "connected" ? "connected" : "local")
   const [joinCode, setJoinCode] = useState("")
   const [connected, setConnected] = useState<ConnectedHostFeed>()
+  const [localConnect, setLocalConnect] = useState<LocalConnectFeed>()
   const [activeGame, setActiveGame] = useState(() => localGameRepository.loadActiveGame())
   const [defaults] = useState(() => localGameRepository.loadSettings())
   const [initialGame] = useState(activeGame ?? undefined)
@@ -50,9 +87,17 @@ export default function NewLocalGameRoute() {
     setActiveGame(null)
   }
 
+  const connectableGame = started && mode === "local" ? activeGame : null
+  const connectAllowed = Boolean(connected?.access ?? connected?.ready)
+
   return (
     <>
       <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
+      {connectableGame ? (
+        <LocalGamePublishSource game={connectableGame} onPublished={openPublishedGame}>
+          {(feed) => <ReportLocalConnect feed={feed} onChange={setLocalConnect} />}
+        </LocalGamePublishSource>
+      ) : null}
       <NewGameScreen
         defaults={defaults}
         mode={mode}
@@ -87,6 +132,15 @@ export default function NewLocalGameRoute() {
           })
         }}
         connected={connected}
+        localConnect={
+          connectableGame && localConnect && connectAllowed
+            ? {
+                ...localConnect,
+                ...(connected?.access ? { access: connected.access } : {}),
+                ready: Boolean(connected?.ready || connected?.access),
+              }
+            : undefined
+        }
         joinContent={
           <CloudScreen multiplayer onBack={() => setMode("local")}>
             {(access) => (

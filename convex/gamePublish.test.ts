@@ -216,16 +216,16 @@ describe("publishLocalGame", () => {
   })
 })
 
-describe("claimImportedSeat", () => {
+describe("claiming an imported seat through claimSeat", () => {
   it("claims an unclaimed imported seat without resetting state and transfers authority", async () => {
     const t = convexTest(schema, modules)
     const { host, created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     await expect(
-      guest.mutation(api.games.claimImportedSeat, {
-        publicId: created.publicId,
+      guest.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: created.manualCode,
+        displayName: "Guest",
         deviceId: joinerDevice,
       }),
     ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
@@ -233,6 +233,9 @@ describe("claimImportedSeat", () => {
       publicId: created.publicId,
       deviceId: joinerDevice,
     })
+    // Claiming replaces the host's published seat name with the joiner's, but a
+    // claimed seat renders its account username and falls back to the seat label,
+    // never a self-chosen string, so this guest has no username to show.
     expect(guestView.players[1]).toEqual(
       expect.objectContaining({
         displayName: "Player 2",
@@ -261,8 +264,7 @@ describe("claimImportedSeat", () => {
       }),
     ).rejects.toThrow("Seat-owner permission required")
     await expect(
-      guest.mutation(api.games.claimImportedSeat, {
-        publicId: created.publicId,
+      guest.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: created.manualCode,
       }),
@@ -297,23 +299,20 @@ describe("claimImportedSeat", () => {
     const t = convexTest(schema, modules)
     const { host, created } = await published(t)
     const guestTwo = await signedIn(t, "guest-two-subject", "GuestTwo")
-    await guestTwo.mutation(api.games.claimImportedSeat, {
-      publicId: created.publicId,
+    await guestTwo.mutation(api.games.claimSeat, {
       seat: 2,
       manualCode: created.manualCode,
       deviceId: hostDevice,
     })
     const stranger = await signedIn(t, "stranger-subject", "Stranger")
     await expect(
-      stranger.mutation(api.games.claimImportedSeat, {
-        publicId: created.publicId,
+      stranger.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: created.manualCode,
       }),
     ).rejects.toThrow("Seat already claimed")
     await expect(
-      stranger.mutation(api.games.claimImportedSeat, {
-        publicId: created.publicId,
+      stranger.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: "ZZZ999",
       }),
@@ -331,17 +330,21 @@ describe("claimImportedSeat", () => {
       hostColor: "#41476E",
     })
     await expect(
-      stranger.mutation(api.games.claimImportedSeat, {
-        publicId: legacy.publicId,
+      stranger.mutation(api.games.claimSeat, {
         seat: 2,
         token: "l".repeat(43),
       }),
-    ).rejects.toThrow("Invite is invalid, expired, or revoked")
-    await stranger.mutation(api.games.claimSeat, {
-      manualCode: "LEG234",
-      displayName: "Stranger",
-      color: "#39755C",
-    })
+    ).rejects.toThrow("A display name and color are required to claim a lobby seat")
+    // A lobby claim auto-assigns the lowest free seat; `seat` is an imported-game
+    // concept and must not let a joiner pick their seat in a normal lobby.
+    await expect(
+      stranger.mutation(api.games.claimSeat, {
+        seat: 6,
+        manualCode: "LEG234",
+        displayName: "Stranger",
+        color: "#39755C",
+      }),
+    ).resolves.toEqual({ publicId: legacy.publicId, seat: 2 })
     await legacyHost.mutation(api.games.startGame, { publicId: legacy.publicId })
     await expect(
       stranger.mutation(api.games.resolveInvite, { manualCode: "LEG234" }),
@@ -379,8 +382,7 @@ describe("imported game invite renewal and discovery", () => {
       guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
     ).rejects.toThrow("Invite is invalid, expired, or revoked")
     await expect(
-      guest.mutation(api.games.claimImportedSeat, {
-        publicId: created.publicId,
+      guest.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: created.manualCode,
       }),
@@ -389,8 +391,7 @@ describe("imported game invite renewal and discovery", () => {
       guest.mutation(api.games.claimableSeats, { manualCode: renewed.manualCode }),
     ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [2] })
     await expect(
-      guest.mutation(api.games.claimImportedSeat, {
-        publicId: created.publicId,
+      guest.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: renewed.manualCode,
         deviceId: joinerDevice,
@@ -411,11 +412,47 @@ describe("imported game invite renewal and discovery", () => {
     await expect(
       guest.mutation(api.games.claimableSeats, { manualCode: "ZZZ999" }),
     ).rejects.toThrow("Invite is invalid, expired, or revoked")
-    await guest.mutation(api.games.claimImportedSeat, {
-      publicId: created.publicId,
+    await guest.mutation(api.games.claimSeat, {
       seat: 2,
       manualCode: created.manualCode,
     })
+    await expect(
+      guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
+    ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [] })
+  })
+
+  it("leaves seat lookups out of the join rate-limit budget", async () => {
+    const t = convexTest(schema, modules)
+    const { created } = await published(t)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    for (let index = 0; index < 15; index += 1) {
+      await expect(
+        guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
+      ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [2] })
+    }
+    await expect(
+      guest.mutation(api.games.claimSeat, {
+        seat: 2,
+        manualCode: created.manualCode,
+        deviceId: joinerDevice,
+      }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+  })
+
+  it("reports a lobby as having nothing to choose so joining stays one step", async () => {
+    const t = convexTest(schema, modules)
+    const host = await signedIn(t, "lobby-host-subject", "LobbyHost")
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "plain-lobby-id-000001",
+      playerCount: 4,
+      startingLife: 20,
+      ruleset: "standard",
+      inviteToken: "p".repeat(43),
+      manualCodeCandidates: ["LOB234"],
+      hostDisplayName: "LobbyHost",
+      hostColor: "#41476E",
+    })
+    const guest = await signedIn(t, "lobby-guest-subject", "LobbyGuest")
     await expect(
       guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
     ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [] })
@@ -430,8 +467,7 @@ describe("imported game invite renewal and discovery", () => {
     })
     expect(byCode).toEqual({ publicId: created.publicId, mode: "connected", seats: [2] })
     await expect(
-      guest.mutation(api.games.claimImportedSeat, {
-        publicId: byCode.publicId,
+      guest.mutation(api.games.claimSeat, {
         seat: byCode.seats[0],
         manualCode: created.manualCode,
         deviceId: joinerDevice,
@@ -452,8 +488,7 @@ describe("imported game invite renewal and discovery", () => {
     const byToken = await other.mutation(api.games.claimableSeats, { token: "u".repeat(43) })
     expect(byToken).toEqual({ publicId: second.publicId, mode: "connected", seats: [2] })
     await expect(
-      other.mutation(api.games.claimImportedSeat, {
-        publicId: byToken.publicId,
+      other.mutation(api.games.claimSeat, {
         seat: byToken.seats[0],
         token: "u".repeat(43),
       }),
@@ -487,8 +522,7 @@ describe("imported game invite renewal and discovery", () => {
       guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
     ).rejects.toThrow("You cannot join a game with a player you blocked or who blocked you")
     await expect(
-      guest.mutation(api.games.claimImportedSeat, {
-        publicId: created.publicId,
+      guest.mutation(api.games.claimSeat, {
         seat: 2,
         manualCode: created.manualCode,
       }),
@@ -530,15 +564,13 @@ describe("imported game invite renewal and discovery", () => {
       ],
     })
     const guest = await signedIn(t, "guest-subject", "Guest")
-    await guest.mutation(api.games.claimImportedSeat, {
-      publicId: created.publicId,
+    await guest.mutation(api.games.claimSeat, {
       seat: 2,
       manualCode: created.manualCode,
       deviceId: joinerDevice,
     })
     await expect(
-      guest.mutation(api.games.claimImportedSeat, {
-        publicId: created.publicId,
+      guest.mutation(api.games.claimSeat, {
         seat: 3,
         manualCode: created.manualCode,
         deviceId: "device-third-0003",
@@ -559,8 +591,7 @@ describe("imported game invite renewal and discovery", () => {
     }
     await host.mutation(api.games.changeLife, write)
     const guest = await signedIn(t, "guest-subject", "Guest")
-    await guest.mutation(api.games.claimImportedSeat, {
-      publicId: created.publicId,
+    await guest.mutation(api.games.claimSeat, {
       seat: 2,
       manualCode: created.manualCode,
       deviceId: joinerDevice,

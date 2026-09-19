@@ -9,6 +9,9 @@ import NewLocalGameRoute from "../src/app/game/new"
 
 let mockSearchParams: { mode?: string; setup?: string } = {}
 let mockConnectedFeed: Record<string, unknown> = {}
+let mockLocalConnectFeed: Record<string, unknown> = {}
+const mockPublish = jest.fn()
+let publishedReporter: ((published: { publicId: string; manualCode: string }) => void) | undefined
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -34,6 +37,28 @@ jest.mock("@/features/connected/ConnectedSetupSource", () => {
   }
 })
 
+// The feed is memoized like the real source: a fresh object per render would loop the
+// effect the route reports it through.
+jest.mock("@/features/connected/LocalGamePublishSource", () => {
+  const { memo, useMemo } = jest.requireActual<typeof import("react")>("react")
+  return {
+    LocalGamePublishSource: memo(function MockPublishSource({
+      onPublished,
+      children,
+    }: {
+      onPublished: (published: { publicId: string; manualCode: string }) => void
+      children: (feed: object) => import("react").ReactNode
+    }) {
+      publishedReporter = onPublished
+      const feed = useMemo(
+        () => ({ busy: false, publish: mockPublish, ...mockLocalConnectFeed }),
+        [],
+      )
+      return children(feed)
+    }),
+  }
+})
+
 jest.mock("@/features/auth/CloudScreen", () => ({
   CloudScreen: ({ children }: { children: (access: object) => import("react").ReactNode }) =>
     children({ ready: true, loading: false, request: jest.fn() }),
@@ -54,6 +79,8 @@ describe("new local game route", () => {
     jest.clearAllMocks()
     mockSearchParams = {}
     mockConnectedFeed = {}
+    mockLocalConnectFeed = {}
+    publishedReporter = undefined
   })
   afterEach(() => localGameRepository.clearActiveGame())
 
@@ -262,5 +289,59 @@ describe("new local game route", () => {
     })
     fireEvent.press(view.getByTestId("mode-local"))
     expect(view.getByTestId("start-game-button")).toBeTruthy()
+  })
+
+  it("surfaces a hosted live game while setting up locally", () => {
+    mockConnectedFeed = {
+      activeGames: [
+        {
+          publicId: "hosted-live",
+          status: "active",
+          isHost: true,
+          playerCount: 2,
+          ruleset: "commander",
+          updatedAt: Date.now(),
+        },
+      ],
+    }
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("resume-hosted-connected-button"))
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/connected/game/[gameId]",
+      params: { gameId: "hosted-live" },
+    })
+  })
+
+  it("publishes the running local game under the chosen seat, then hands it to the server", () => {
+    const game = createLocalGame({
+      startingLife: 40,
+      players: [
+        { name: "One", color: "#000" },
+        { name: "Two", color: "#111" },
+      ],
+    })
+    game.players[0].life = 38
+    localGameRepository.saveActiveGame(game)
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("connect-local-button"))
+    fireEvent.press(view.getByTestId("host-seat-2"))
+    expect(mockPublish).toHaveBeenCalledWith(game.players[1].id)
+
+    publishedReporter?.({ publicId: "published-public-id", manualCode: "AB12CD" })
+    // The server owns the game once it is published, so the local copy must not linger.
+    expect(localGameRepository.loadActiveGame()).toBeNull()
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/connected/game/[gameId]",
+      params: { gameId: "published-public-id", invite: "1" },
+    })
   })
 })

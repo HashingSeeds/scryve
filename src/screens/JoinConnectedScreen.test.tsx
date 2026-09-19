@@ -11,7 +11,12 @@ import { localGameRepository } from "@/features/game/localPersistence"
 
 import { InviteScannerScreen } from "./InviteScannerScreen"
 import { JoinConnectedScreen } from "./JoinConnectedScreen"
-import { mockClaimSeat, resetConnectedHarness, themed } from "../../test/support/connectedHarness"
+import {
+  mockClaimableSeats,
+  mockClaimSeat,
+  resetConnectedHarness,
+  themed,
+} from "../../test/support/connectedHarness"
 
 jest.mock("@clerk/expo", () =>
   jest
@@ -162,6 +167,174 @@ describe("JoinConnectedScreen", () => {
     expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(true)
     fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
     expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(false)
+  })
+
+  it("asks which seat to take when an imported game leaves several open", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    const onJoined = jest.fn()
+    render(themed(<JoinConnectedScreen onJoined={onJoined} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+    expect(screen.getByTestId("claim-seat-button").props.accessibilityState.disabled).toBe(true)
+    expect(screen.queryByTestId("claim-seat-4-button")).toBeNull()
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-3-button"))
+    })
+
+    expect(mockClaimSeat).toHaveBeenCalledWith(expect.objectContaining({ seat: 3 }))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
+  })
+
+  it("re-offers the remaining seats when the chosen one was taken meanwhile", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 4],
+    })
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-3-button"))
+    })
+
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+    expect(screen.getByTestId("join-error")).toHaveTextContent(
+      "That seat was just taken. Pick another seat.",
+    )
+    expect(screen.queryByTestId("claim-seat-3-button")).toBeNull()
+    expect(screen.getByTestId("claim-seat-4-button")).toBeTruthy()
+  })
+
+  it("drops the offered seats when the invite code changes", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+    expect(screen.getByTestId("claim-seat-3-button")).toBeTruthy()
+
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "EF34GH")
+    expect(screen.queryByTestId("claim-seat-3-button")).toBeNull()
+  })
+
+  it("claims straight away when the invite leaves nothing to choose", async () => {
+    mockClaimableSeats.mockResolvedValue({ publicId: "game-public", mode: "connected", seats: [2] })
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    expect(screen.queryByTestId("claim-seat-2-button")).toBeNull()
+    expect(mockClaimSeat).toHaveBeenCalledWith(expect.not.objectContaining({ seat: 2 }))
+  })
+
+  it("re-checks open seats on every attempt and rejects a seat taken meanwhile", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    const onJoined = jest.fn()
+    render(themed(<JoinConnectedScreen onJoined={onJoined} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+    expect(screen.getByTestId("claim-seat-3-button")).toBeTruthy()
+
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2],
+    })
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-3-button"))
+    })
+
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+    expect(screen.getByTestId("join-error")).toHaveTextContent(
+      "That seat was just taken. Pick another seat.",
+    )
+    expect(screen.queryByTestId("claim-seat-3-button")).toBeNull()
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+    expect(mockClaimSeat).toHaveBeenCalledWith(expect.not.objectContaining({ seat: 3 }))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith("game-public"))
+  })
+
+  it("drops the seat picker when the invite code changes", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+    expect(screen.getByTestId("claim-seat-2-button")).toBeTruthy()
+
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "XY34ZW")
+    expect(screen.queryByTestId("claim-seat-2-button")).toBeNull()
+    expect(screen.queryByTestId("claim-seat-3-button")).toBeNull()
+    expect(screen.getByTestId("claim-seat-button")).toBeEnabled()
+  })
+
+  it("drops the seat picker when the scanned invitation is cleared", async () => {
+    mockClaimableSeats.mockResolvedValue({
+      publicId: "game-public",
+      mode: "connected",
+      seats: [2, 3],
+    })
+    const view = render(themed(<JoinConnectedScreen embedded onJoined={jest.fn()} />))
+    fireEvent.press(view.getByTestId("scan-invite-button"))
+    act(() =>
+      view
+        .UNSAFE_getByType(InviteScannerScreen)
+        .props.onInvite({ kind: "token", token: "a".repeat(43) }),
+    )
+
+    await act(async () => {
+      fireEvent.press(view.getByTestId("claim-seat-button"))
+    })
+    expect(view.getByTestId("claim-seat-2-button")).toBeTruthy()
+
+    fireEvent.press(view.getByText("Use a different invitation"))
+    expect(view.queryByTestId("claim-seat-2-button")).toBeNull()
+    expect(view.queryByTestId("claim-seat-3-button")).toBeNull()
   })
 
   it("refuses to join while a started local game is active", async () => {

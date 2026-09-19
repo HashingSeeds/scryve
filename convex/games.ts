@@ -109,18 +109,27 @@ function assertSnapshotLife(life: number) {
     throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
 }
 
-async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string) {
+async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: "seatLookup") {
   const now = Date.now()
   const record = await ctx.db
     .query("joinAttempts")
-    .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", clerkUserId))
+    .withIndex("by_clerk_user_kind", (q) => q.eq("clerkUserId", clerkUserId).eq("kind", kind))
     .unique()
   if (!record || now - record.windowStartedAt >= 60_000) {
     if (record) await ctx.db.patch(record._id, { windowStartedAt: now, attempts: 1 })
-    else await ctx.db.insert("joinAttempts", { clerkUserId, windowStartedAt: now, attempts: 1 })
+    else
+      await ctx.db.insert("joinAttempts", {
+        clerkUserId,
+        windowStartedAt: now,
+        attempts: 1,
+        ...(kind ? { kind } : {}),
+      })
     return
   }
-  if (record.attempts >= 10) throw new Error("Too many join attempts; wait a minute and try again")
+  if (record.attempts >= 10) {
+    if (kind === "seatLookup") return ctx.db.patch(record._id, { attempts: record.attempts + 1 })
+    throw new Error("Too many join attempts; wait a minute and try again")
+  }
   await ctx.db.patch(record._id, { attempts: record.attempts + 1 })
 }
 
@@ -644,26 +653,85 @@ export const resolveInvite = mutation({
   },
 })
 
+/**
+ * Attaches an account to a seat an imported game already created.
+ *
+ * Imported seats carry the published local game's life totals and appearance, so
+ * claiming patches identity onto the existing row rather than inserting a new one
+ * and never touches `currentLife`. Unlike a lobby claim, an account may hold only
+ * one imported seat regardless of device. Omitting `seat` takes the lowest
+ * unclaimed one, which is how clients that predate seat selection join.
+ */
+async function claimPreparedSeat(
+  ctx: MutationCtx,
+  {
+    game,
+    user,
+    players,
+    seat,
+    deviceId,
+    displayName,
+  }: {
+    game: Doc<"games">
+    user: Doc<"users">
+    players: Doc<"gamePlayers">[]
+    seat?: number
+    deviceId?: string
+    displayName?: string
+  },
+) {
+  const held = players.find((player) => player.userId === user._id)
+  const target =
+    seat === undefined
+      ? players
+          .filter((player) => player.userId === undefined)
+          .sort((left, right) => left.seat - right.seat)[0]
+      : players.find((player) => player.seat === seat)
+  if (held) {
+    if (seat === undefined || held.seat === seat)
+      return { publicId: game.publicId, seat: held.seat }
+    throw new Error("You already hold a seat in this game")
+  }
+  if (seat !== undefined && !target) throw new Error("Seat not found")
+  if (!target) throw new Error("Game is full")
+  if (target.userId !== undefined) throw new Error("Seat already claimed")
+  await ctx.db.patch(target._id, {
+    userId: user._id,
+    ...(deviceId ? { deviceId } : {}),
+    ...(displayName ? { displayName } : {}),
+    usernameAtJoin: user.username,
+  })
+  await ctx.db.patch(game._id, { updatedAt: Date.now() })
+  return { publicId: game.publicId, seat: target.seat }
+}
+
 export const claimSeat = mutation({
   args: {
     token: v.optional(v.string()),
     manualCode: v.optional(v.string()),
-    displayName: v.string(),
-    color: v.string(),
+    /** Required for a lobby claim. Imported seats keep the name the host gave them. */
+    displayName: v.optional(v.string()),
+    /** Required for a lobby claim. Imported seats keep their published appearance. */
+    color: v.optional(v.string()),
     shape: v.optional(v.string()),
     deviceId: v.optional(v.string()),
+    /** Imported games only: which existing seat to take. Lowest unclaimed when omitted. */
+    seat: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
     await consumeJoinAttempt(ctx, String(user.clerkUserId))
-    assertAllowedColor(args.color)
+    if (args.color !== undefined) assertAllowedColor(args.color)
     if (args.shape !== undefined) assertAllowedShape(args.shape)
     if (args.deviceId) assertDeviceId(args.deviceId)
-    const displayName = assertDisplayName(args.displayName)
     const invite = await findInvite(ctx, args)
     if (!invite) throw new Error("Invite is invalid, expired, or revoked")
     const game = await ctx.db.get(invite.gameId)
-    if (!game || game.status !== "lobby" || !(await inviteIsCurrent(ctx, game, invite, Date.now())))
+    if (
+      !game ||
+      (game.status !== "lobby" && game.status !== "active") ||
+      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+    )
       throw new Error("Invite is invalid, expired, or revoked")
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
@@ -671,6 +739,22 @@ export const claimSeat = mutation({
       if (await isBlockedBetween(ctx, user._id, seated.userId))
         throw new Error("You cannot join a game with a player you blocked or who blocked you")
     }
+    const claimedName =
+      args.displayName === undefined ? undefined : assertDisplayName(args.displayName)
+    // An active game with an unclaimed seat can only be an imported one: startGame
+    // refuses to leave a lobby until every seat is claimed.
+    if (game.status === "active")
+      return await claimPreparedSeat(ctx, {
+        game,
+        user,
+        players: existingPlayers,
+        ...(args.seat === undefined ? {} : { seat: args.seat }),
+        ...(args.deviceId ? { deviceId: args.deviceId } : {}),
+        ...(claimedName === undefined ? {} : { displayName: claimedName }),
+      })
+    if (claimedName === undefined || args.color === undefined)
+      throw new Error("A display name and color are required to claim a lobby seat")
+    const displayName = claimedName
     const duplicate = existingPlayers.find(
       (candidate) =>
         candidate.userId === user._id &&
@@ -925,6 +1009,13 @@ export const publishLocalGame = mutation({
   },
 })
 
+/**
+ * Reports which seats an invite still leaves open, without disclosing who holds the rest.
+ *
+ * Imported games pre-create every seat with the published life totals, so the joiner has
+ * to choose; a lobby creates seats on claim and answers with an empty list, which the
+ * join screen reads as "nothing to choose" and claims straight away.
+ */
 export const claimableSeats = mutation({
   args: {
     token: v.optional(v.string()),
@@ -932,13 +1023,13 @@ export const claimableSeats = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
-    await consumeJoinAttempt(ctx, String(user.clerkUserId))
+    await consumeJoinAttempt(ctx, String(user.clerkUserId), "seatLookup")
     const invite = await findInvite(ctx, args)
     if (!invite) throw new Error("Invite is invalid, expired, or revoked")
     const game = await ctx.db.get(invite.gameId)
     if (
       !game ||
-      game.status !== "active" ||
+      (game.status !== "active" && game.status !== "lobby") ||
       !(await inviteIsCurrent(ctx, game, invite, Date.now()))
     )
       throw new Error("Invite is invalid, expired, or revoked")
@@ -956,52 +1047,6 @@ export const claimableSeats = mutation({
         .map((player) => player.seat)
         .sort((left, right) => left - right),
     }
-  },
-})
-
-export const claimImportedSeat = mutation({
-  args: {
-    publicId: v.string(),
-    seat: v.number(),
-    token: v.optional(v.string()),
-    manualCode: v.optional(v.string()),
-    deviceId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx)
-    await consumeJoinAttempt(ctx, String(user.clerkUserId))
-    if (args.deviceId) assertDeviceId(args.deviceId)
-    const invite = await findInvite(ctx, args)
-    if (!invite) throw new Error("Invite is invalid, expired, or revoked")
-    const game = await ctx.db.get(invite.gameId)
-    if (
-      !game ||
-      game.publicId !== args.publicId ||
-      game.status !== "active" ||
-      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
-    )
-      throw new Error("Invite is invalid, expired, or revoked")
-    const players = await playersForGame(ctx, game._id)
-    for (const seated of players) {
-      if (!seated.userId || seated.userId === user._id) continue
-      if (await isBlockedBetween(ctx, user._id, seated.userId))
-        throw new Error("You cannot join a game with a player you blocked or who blocked you")
-    }
-    const target = players.find((player) => player.seat === args.seat)
-    if (!target) throw new Error("Seat not found")
-    if (target.userId === user._id) return { publicId: game.publicId, seat: target.seat }
-    const heldSeat = players.find(
-      (player) => player.seat !== target.seat && player.userId === user._id,
-    )
-    if (heldSeat) throw new Error("You already hold a seat in this game")
-    if (target.userId !== undefined) throw new Error("Seat already claimed")
-    await ctx.db.patch(target._id, {
-      userId: user._id,
-      ...(args.deviceId ? { deviceId: args.deviceId } : {}),
-      usernameAtJoin: user.username,
-    })
-    await ctx.db.patch(game._id, { updatedAt: Date.now() })
-    return { publicId: game.publicId, seat: target.seat }
   },
 })
 

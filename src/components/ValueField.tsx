@@ -18,6 +18,8 @@ export interface ValueFieldProps {
   step?: number
   longStep?: number
   testID?: string
+  /** Shows the current value but refuses both steppers. */
+  disabled?: boolean
   onChange: (next: number) => void
 }
 
@@ -34,6 +36,7 @@ export function ValueField({
   step = 1,
   longStep,
   testID,
+  disabled = false,
   onChange,
 }: ValueFieldProps) {
   const {
@@ -61,7 +64,7 @@ export function ValueField({
   }
 
   return (
-    <View style={themed($field)}>
+    <View style={[themed($field), disabled && $dimmed]}>
       <Animated.View pointerEvents="none" style={[themed($readout), $pulse]}>
         <Text
           text={String(value)}
@@ -78,44 +81,47 @@ export function ValueField({
       </Animated.View>
       <Text pointerEvents="none" text={label} style={themed($caption)} />
       <View style={themed($zones)}>
-        {ZONES.map(({ direction, glyph, word }) => (
-          <Pressable
-            key={direction}
-            testID={testID ? `${testID}-${direction < 0 ? "decrement" : "increment"}` : undefined}
-            accessibilityRole="button"
-            accessibilityLabel={`${word} ${label} by ${step}`}
-            accessibilityHint={longStep ? `Long press to change it by ${longStep}.` : undefined}
-            disabled={direction < 0 ? value <= min : value >= max}
-            accessibilityState={{ disabled: direction < 0 ? value <= min : value >= max }}
-            delayLongPress={450}
-            onPressIn={() => {
-              longPressDirection.current = null
-            }}
-            onLongPress={() => {
-              longPressDirection.current = direction
-              apply(direction, longStep ?? step)
-            }}
-            onPress={() => {
-              if (longPressDirection.current === direction) {
+        {ZONES.map(({ direction, glyph, word }) => {
+          const atBound = disabled || (direction < 0 ? value <= min : value >= max)
+          return (
+            <Pressable
+              key={direction}
+              testID={testID ? `${testID}-${direction < 0 ? "decrement" : "increment"}` : undefined}
+              accessibilityRole="button"
+              accessibilityLabel={`${word} ${label} by ${step}`}
+              accessibilityHint={longStep ? `Long press to change it by ${longStep}.` : undefined}
+              disabled={atBound}
+              accessibilityState={{ disabled: atBound }}
+              delayLongPress={450}
+              onPressIn={() => {
                 longPressDirection.current = null
-                return
-              }
-              apply(direction, step)
-            }}
-            style={({ pressed }) => [
-              themed($zone),
-              direction < 0 ? themed($zoneLeft) : themed($zoneRight),
-              pressed && { backgroundColor: overlayTint(colors.text, 0.14) },
-            ]}
-          >
-            <Text
-              text={glyph}
-              maxFontSizeMultiplier={1.3}
-              numberOfLines={1}
-              style={themed($glyph)}
-            />
-          </Pressable>
-        ))}
+              }}
+              onLongPress={() => {
+                longPressDirection.current = direction
+                apply(direction, longStep ?? step)
+              }}
+              onPress={() => {
+                if (longPressDirection.current === direction) {
+                  longPressDirection.current = null
+                  return
+                }
+                apply(direction, step)
+              }}
+              style={({ pressed }) => [
+                themed($zone),
+                direction < 0 ? themed($zoneLeft) : themed($zoneRight),
+                pressed && { backgroundColor: overlayTint(colors.text, 0.14) },
+              ]}
+            >
+              <Text
+                text={glyph}
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={themed($glyph)}
+              />
+            </Pressable>
+          )
+        })}
       </View>
     </View>
   )
@@ -159,6 +165,7 @@ const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "center",
   paddingHorizontal: spacing.md,
 })
+const $dimmed: ViewStyle = { opacity: 0.5 }
 const $zoneLeft: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-start" })
 const $zoneRight: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-end" })
 const $glyph: ThemedStyle<TextStyle> = ({ colors }) => ({
