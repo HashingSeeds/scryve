@@ -16,7 +16,7 @@ const values = {
   mode: ["local", "connected"],
   action: ["create", "join"],
   stage: ["started", "succeeded", "failed"],
-  reason: ["offline", "access", "profile", "input", "request", "unknown"],
+  reason: ["offline", "access", "profile", "input", "request", "local-active", "unknown"],
   feature: ["library", "saved", "assigned"],
   surface: ["history", "deck"],
   end_source: ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"],

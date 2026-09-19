@@ -139,6 +139,7 @@ const mockListMine: {
 
 jest.mock("convex/react", () => ({
   useConvex: () => undefined,
+  useConvexConnectionState: () => ({ isWebSocketConnected: true }),
   useQuery: (reference: string) => {
     if (reference === "deckCatalogs.detail") return mockCatalogDetail.value
     if (mockListMine.error) throw mockListMine.error

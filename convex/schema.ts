@@ -136,7 +136,10 @@ export default defineSchema({
     clerkUserId: v.string(),
     windowStartedAt: v.number(),
     attempts: v.number(),
-  }).index("by_clerk_user", ["clerkUserId"]),
+    kind: v.optional(v.literal("seatLookup")),
+  })
+    .index("by_clerk_user", ["clerkUserId"])
+    .index("by_clerk_user_kind", ["clerkUserId", "kind"]),
 
   gamePublishReceipts: defineTable({
     ownerUserId: v.id("users"),

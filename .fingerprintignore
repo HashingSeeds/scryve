@@ -1,2 +1,6 @@
 # Gradle output generated inside Sentry's nested Android module
 **/node_modules/@sentry/react-native/android/expo-handler/build/**/*
+# Pure-JS Apple plist parser used only by Expo/EAS CLI tooling.
+# Never ships in the app binary; lockfile re-resolution churns it and
+# that churn must not invalidate OTA updates on production builds.
+**/node_modules/bplist-parser/**/*

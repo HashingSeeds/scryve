@@ -125,7 +125,7 @@ describe("CurrentGameScreen", () => {
     )
 
     expect(view.getByTestId("game-menu-button")).toBeTruthy()
-    expect(view.queryByText("Grace")).toBeNull()
+    expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
     expect(view.queryByTestId("undo-button")).toBeNull()
     expect(view.queryByTestId("home-button")).toBeNull()
@@ -155,14 +155,14 @@ describe("CurrentGameScreen", () => {
     )
 
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.getByTestId("setup-button")).toHaveTextContent("Setup")
+    expect(view.getByTestId("setup-button")).toHaveTextContent("Game")
     expect(view.getByTestId("connect-button")).toBeTruthy()
     expect(view.queryByTestId("end-game-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("life-seat-1-1"))
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.getByTestId("setup-button")).toHaveTextContent("New")
+    expect(view.getByTestId("setup-button")).toHaveTextContent("Game")
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.queryByTestId("connect-button")).toBeNull()
   })

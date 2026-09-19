@@ -29,6 +29,8 @@ export function DeckView({
   guest,
   cardsUnavailable,
   cardsCached,
+  canAddOffline,
+  addOfflineNote,
   editingDisabled,
   saveStatus,
   error,
@@ -57,6 +59,8 @@ export function DeckView({
   guest?: boolean
   cardsUnavailable?: boolean
   cardsCached?: boolean
+  canAddOffline?: boolean
+  addOfflineNote?: string
   editingDisabled?: boolean
   saveStatus?: string
   error?: ReactNode
@@ -190,7 +194,13 @@ export function DeckView({
             ) : cardsUnavailable ? (
               <Text style={themed($notes)} text="Card list unavailable offline." />
             ) : cards.length === 0 ? (
-              <Text style={themed($notes)} text="No cards yet. Add your first card below." />
+              <Text
+                style={themed($notes)}
+                text={addOfflineNote ?? "No cards yet. Add your first card below."}
+              />
+            ) : null}
+            {addOfflineNote && tab === "cards" && cards.length > 0 ? (
+              <Text style={themed($notes)} text={addOfflineNote} />
             ) : null}
           </>
         }
@@ -286,7 +296,9 @@ export function DeckView({
             testID="deck-add-cards"
             text="+ Add cards"
             onPress={onAdd}
-            disabled={busy || cardsUnavailable || cardsCached || editingDisabled}
+            disabled={
+              busy || cardsUnavailable || editingDisabled || (cardsCached && !canAddOffline)
+            }
             style={$primary}
             preset="primary"
           />

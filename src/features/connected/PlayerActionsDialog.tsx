@@ -46,11 +46,13 @@ export function PlayerActionsDialog({
   players,
   origin,
   onClose,
+  onInvite,
 }: {
   publicId: string
   players: ReportablePlayer[]
   origin?: DialogOrigin
   onClose: () => void
+  onInvite?: () => void
 }) {
   const { themed } = useAppTheme()
   const report = useMutation(api.moderation.reportPlayer)
@@ -166,6 +168,9 @@ export function PlayerActionsDialog({
             style={themed($muted)}
             text="Report a name you find offensive, or block a player to stop being seated with them."
           />
+          {onInvite ? (
+            <Button testID="invite-from-players-button" text="Invite" onPress={onInvite} />
+          ) : null}
           {error ? (
             <Text testID="player-actions-error" accessibilityRole="alert" text={error} />
           ) : null}

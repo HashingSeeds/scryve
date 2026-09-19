@@ -21,6 +21,8 @@ export interface SegmentedControlProps {
   selectedId: string
   accessibilityLabel?: string
   testID?: string
+  /** Renders the current selection without allowing a change. */
+  disabled?: boolean
   onSelect: (id: string) => void
 }
 
@@ -33,6 +35,7 @@ export function SegmentedControl({
   selectedId,
   accessibilityLabel,
   testID,
+  disabled = false,
   onSelect,
 }: SegmentedControlProps) {
   const {
@@ -61,7 +64,7 @@ export function SegmentedControl({
   }, [offset, reducedMotion, segmentWidth, selectedIndex])
 
   function select(id: string) {
-    if (id !== selectedId) onSelect(id)
+    if (!disabled && id !== selectedId) onSelect(id)
   }
 
   const $thumb = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }))
@@ -71,7 +74,7 @@ export function SegmentedControl({
       testID={testID}
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
-      style={themed($track)}
+      style={[themed($track), disabled ? $dimmed : undefined]}
       onLayout={measureTrack}
     >
       {segmentWidth > 0 ? (
@@ -87,8 +90,12 @@ export function SegmentedControl({
             key={segment.id}
             testID={testID ? `${testID}-${segment.id}` : undefined}
             accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            style={themed($segment)}
+            accessibilityState={{ selected, disabled }}
+            disabled={disabled}
+            style={[
+              themed($segment),
+              selected && { backgroundColor: accent, borderRadius: CHOICE_RADIUS - TRACK_INSET },
+            ]}
             onPress={() => select(segment.id)}
           >
             <Text
@@ -132,3 +139,4 @@ const $segment: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xxs,
 })
 const $segmentLabel: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
+const $dimmed: ViewStyle = { opacity: 0.5 }

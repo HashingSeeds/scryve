@@ -587,11 +587,11 @@ export const finalizeAppData = internalMutation({
   handler: async (ctx, args) => {
     const request = await ctx.db.get(args.requestId)
     if (!request || request.status !== "processing" || !request.userId) return null
-    const attemptRecord = await ctx.db
+    const attemptRecords = await ctx.db
       .query("joinAttempts")
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", request.clerkUserId))
-      .unique()
-    if (attemptRecord) await ctx.db.delete(attemptRecord._id)
+      .collect()
+    for (const attemptRecord of attemptRecords) await ctx.db.delete(attemptRecord._id)
     const user = await ctx.db.get(request.userId)
     if (user) await ctx.db.delete(user._id)
     const updatedAt = Date.now()

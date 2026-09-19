@@ -889,6 +889,86 @@ describe("connected game lifecycle and API hardening", () => {
     ).resolves.toBeDefined()
   })
 
+  it("shows synced account usernames on the projection instead of seat labels", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await lobby(t)
+    const joiner = t.withIdentity({ subject: "named-joiner" })
+    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner", username: "joiner_cool" })
+    await joiner.mutation(api.games.claimSeat, {
+      manualCode: "ABC234",
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+    const board = (publicId: string) =>
+      host.query(api.games.lobbyProjection, { publicId, deviceId: "device-host-0001" })
+    const names = async () =>
+      (await board(created.publicId)).players.map((player) => player.displayName)
+    expect(await names()).toEqual(["Player 1", "joiner_cool"])
+
+    await joiner.mutation(api.users.syncCurrent, {
+      displayName: "Joiner",
+      username: "joiner_renamed",
+    })
+    expect(await names()).toEqual(["Player 1", "joiner_renamed"])
+
+    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner" })
+    expect(await names()).toEqual(["Player 1", "joiner_renamed"])
+
+    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner", username: "" })
+    expect(await names()).toEqual(["Player 1", "joiner_cool"])
+
+    const newcomer = t.withIdentity({ subject: "newcomer-subject" })
+    await newcomer.mutation(api.users.syncCurrent, {
+      displayName: "Newcomer",
+      username: "Joiner_Renamed",
+    })
+    const freed = await newcomer.mutation(api.games.createLobby, {
+      publicId: "freed-name-lobby-123456",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      inviteToken: "u".repeat(43),
+      manualCodeCandidates: ["NEW234"],
+      hostDisplayName: "Newcomer",
+      hostColor: "#7C3AED",
+      deviceId: "device-newcomer-1",
+    })
+    const freedProjection = await newcomer.query(api.games.lobbyProjection, {
+      publicId: freed.publicId,
+      deviceId: "device-newcomer-1",
+    })
+    expect(freedProjection.players.map((player) => player.displayName)).toEqual(["Joiner_Renamed"])
+  })
+
+  it("ignores conflicting or invalid usernames without failing the sync", async () => {
+    const t = convexTest(schema, modules)
+    const joiner = t.withIdentity({ subject: "taken-joiner" })
+    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner", username: "taken_name" })
+    const squatter = t.withIdentity({ subject: "squatter" })
+    await expect(
+      squatter.mutation(api.users.syncCurrent, { displayName: "Squatter", username: "TAKEN_name" }),
+    ).resolves.toBeDefined()
+    await expect(
+      squatter.mutation(api.users.syncCurrent, { displayName: "Squatter", username: "ab" }),
+    ).resolves.toBeDefined()
+    const created = await squatter.mutation(api.games.createLobby, {
+      publicId: "squatter-lobby-123456",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      inviteToken: token,
+      manualCodeCandidates: ["ZZZ234"],
+      hostDisplayName: "Squatter",
+      hostColor: "#7C3AED",
+      deviceId: "device-squatter-1",
+    })
+    const projection = await squatter.query(api.games.lobbyProjection, {
+      publicId: created.publicId,
+      deviceId: "device-squatter-1",
+    })
+    expect(projection.players.map((player) => player.displayName)).toEqual(["Player 1"])
+  })
+
   it("reports only joinable invites and rotates the current invite atomically", async () => {
     const t = convexTest(schema, modules)
     const { host, created } = await lobby(t)

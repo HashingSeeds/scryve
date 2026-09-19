@@ -84,6 +84,7 @@ export const colors = {
       "setup": "#D6A85F",
       "history": "#D98CB9",
       "connect": "#70C7BC",
+      "invite": "#8CC2E0",
       "end-game": palette.destructive500,
     } satisfies Record<GameMenuActionKind, string>,
   },

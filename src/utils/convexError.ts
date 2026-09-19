@@ -23,3 +23,15 @@ export function convexRetryAfterMs(cause: unknown) {
   const value = (data as Record<string, unknown>).retryAfterMs
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined
 }
+
+export function convexErrorRetryAfterMs(cause: unknown, fallbackMs = 0) {
+  if (!(cause instanceof ConvexError)) return fallbackMs
+  const data: unknown = cause.data
+  if (typeof data !== "object" || data === null) return fallbackMs
+  const value = (data as Record<string, unknown>).retryAfterMs
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallbackMs
+}
+
+export function isGameUnavailableError(cause: unknown) {
+  return cause instanceof Error && cause.message.includes("Game unavailable")
+}

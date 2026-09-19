@@ -24,8 +24,22 @@
     "babel.config.js": {
       "c6a5bf7b49ff487548fe804ebbb4f8966bb974bf4a5956b34e09882eba528096": 1
     },
+    "convex/gamePublish.test.ts": {
+      "4966f815287aa33d9b9d8aa622d8bb95d4cebcfd410cc855f35b73deccb17925": 1,
+      "93957b18d12270527685b6b89ab76759cf8117269fbc4c97310312f8ece9d2fe": 1,
+      "9c8e7de06c4fd26f593e0fe50ba760194f909308c7ef6785810d45385547ce24": 1,
+      "a62412bf6600ae8dad323cc9efadbfe0eecc0f3a504eaef5b9411382f108d8a6": 1,
+      "c48bfa0dbc29cb77bf8353e31bd223521c5d18b51a6f9ce17ae60fff13a16ba6": 1
+    },
     "convex/games.ts": {
-      "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1
+      "0f8d6704aceb673cbb1880f912f121752871753897edb99abdc64dc2c2424ea6": 1,
+      "56577b587581ab42f839dd083ae4b485641678db11d874b223290277010c3e31": 1,
+      "8f7a0c645a7e9ba1349218c00e4d941952a66a7d01b62af0a044c5e9dad0045a": 1,
+      "a31640bc642eefa340edf018243eafa244603f2d1369b969f727503ba8d8d7ff": 1,
+      "a42f5969dfbba8dc0ba45065eecd684cbd697f7971b645ec7bed9406fb8587bb": 1,
+      "b19d57e5d3bf79cb9f4091cc9ec0b73c0b9fca515334b13c3ccc96d46cc22dde": 1,
+      "efe483c6c8be86c35f5287e8fb2fbe3aa6c5ee759cfb17b086eb4c48dad022ce": 1,
+      "f59307fa75bd457934a1db03d27c4ee840e3d4b1ecfd62f4e421124eba150e5c": 1
     },
     "convex/lib/nameFilter.test.ts": {
       "12e45a9bc8a73fa49c2d2a631cd97efd35432f6a7d6a35144aad720f242a8522": 1,
@@ -98,6 +112,9 @@
     },
     "src/app/+native-intent.tsx": {
       "abc7c7005430b10d1ad37a4b72f8de0c0561fd4519f370d4f26afc5401dd168b": 1
+    },
+    "src/app/game/new.tsx": {
+      "61d37d09549f00108a0bcfb5d37c5e0fd1e3c86108bc55a294b950601f9f13fe": 1
     },
     "src/components/AutoImage.tsx": {
       "3fc8afb297f24f4516a73520c919cf890c121fa7fd2b813b5d55c9bdb9387c81": 1,
@@ -269,6 +286,12 @@
       "ceb0afae66763c5152a030eee78d39d7694a8a668ee6ae4f51e5f5914e041e18": 1,
       "e3b4192cf7870e161cae803590883d60f7b1a7345fdc47c1fa2539048ab7aa2a": 1
     },
+    "src/components/SegmentedControl.tsx": {
+      "2c2576d15d55e7357cc785c5d6986f5b285247db8f1135d6f9c81103f3b75d33": 1
+    },
+    "src/components/SelectField.tsx": {
+      "6ea26cc6167781c639cf9bdae7d043df48e7657fc821040a461297a9c2647341": 1
+    },
     "src/components/Text.tsx": {
       "058af45ea3d7e2b28a7b03428229508de8511b971553fc892b911e38e819802f": 1,
       "334d53fc97abacd619c5b9b7989e44c26e8beac814bdad61a1a3c97ebd735ca7": 1,
@@ -335,6 +358,9 @@
       "d720704d533c1df6d76d32036a7cac6aa92ea945109b9d7cc1e2c2660b963cfb": 1,
       "f23de36da044e5faf67873b2078bff59ff71d0bf09e3b6f1e7ef65bd9b24c8a2": 1
     },
+    "src/components/ValueField.tsx": {
+      "babf822ce77c7139efa8aee9dac10463b8dbe47709f69eb0837738b9ead442ca": 1
+    },
     "src/devtools/ReactotronClient.ts": {
       "620b71469265b7ba6e6e59e9f41256c8496d2a65b566476589f9bfafda36e7ef": 1
     },
@@ -361,9 +387,19 @@
       "9d7635916369df656ca365a2adc138afc59cdfbd49d36efcbca63369d6fb96d3": 1,
       "adaf0dd26d07abfbaf141122f1cca8fca3207a8e459e1c9df246f790bdfce7d5": 1
     },
+    "src/features/connected/LocalGamePublishSource.tsx": {
+      "0a0516f59224306b354c6943748b6b41f8fed22193ea7210578e97554e881fa6": 1
+    },
+    "src/features/connected/localGameSnapshot.ts": {
+      "49d1234104c3fd662fd9d3184bfdc698a6747cc9b396d2becce406fa9e148d73": 1,
+      "a74ccb9c7c7c3ea9f835798bebb222c72c960f90858d6880b8fa998580cf44c6": 1,
+      "b27a12c321d9d0379dc481869345454d0b0fa15a4f896669c5d976689c01dd1e": 1,
+      "d5350f64a3392d59a4263ada9c7c26bc3a7494bd4f17b7242d3a3960d20d5b1d": 1
+    },
     "src/features/connected/model.ts": {
       "0b688aed963374c0562f52c5c5c2b98d16bb8668715029852b84018cdf222d05": 1,
       "30a7ce9f18b024e345eeee8413877f03554d2ecfc05dcfc3394cdf1ba5bd029e": 1,
+      "9467ae996bb9d17b8541afe71e703d256ec3f5239af45126c06498aea3043388": 1,
       "9f54adc2988b80bcd18d3d633760174db956114340d77c41cad10707d92cfe00": 1
     },
     "src/features/connected/OutboxSyncController.ts": {
@@ -396,7 +432,8 @@
       "6db032fa97c6aac29cf1e0e4480abd404bd615175bab83721dad5753a9f741ae": 1,
       "74e66dd2c98aa4e2823a3e9ed913699c6772174f4ca5355680ec1266ab9adfc8": 1,
       "89b64d26f9901cb4261debf2d67777b971db632392c182a06ba1c0dbbb55c15e": 1,
-      "b5435a835a79cdf2bf0481ae1a2968d278ef90fb0171da5b7e71e5e5d5e4a43d": 1
+      "b5435a835a79cdf2bf0481ae1a2968d278ef90fb0171da5b7e71e5e5d5e4a43d": 1,
+      "de8ec14f0d54eb1b27eee9d01bb2d8e27d45ac464d0d4c543a4f51d15ff77356": 1
     },
     "src/features/decks/deckVersionsCache.ts": {
       "101e0dc0750ed4c3986f6f8a138f81bad64a34a9dd87ab33ed813f87e487bd59": 1,
@@ -429,7 +466,14 @@
       "dc5ea139d7e488083ddad35232ba517ce30407d8d4f3a4a99de958a7238e98c5": 1,
       "e9ad1777a373986b45361c6b3f10dc49adf9e40266b005f6beb4e013f386b920": 1,
       "ebfc7753e0018e6f177f36c4b07fea6ed126acffe97f7010cc7e0a67f5b39b99": 1,
-      "fb8edcddce205e6a36f751d188ede8416c066260f10f68282c41df2a58bf9a5b": 1
+      "fb8edcddce205e6a36f751d188ede8416c066260f10f68282c41df2a58bf9a5b": 1,
+      "c7f61180a91a27db8fa2deefff1abeaaa1b3c5d5deb3c8d18113c404b2e9bffc": 1,
+      "6b025fc54ccc5078f8abec444ef7f0ec0acf271db91e1b87bcb8385bca2931b9": 1,
+      "bc37c2daa38ce903da47ffcb80485141bb3d23bc0f0a20699a48aedd6ff4458f": 1,
+      "56145d3d7f506c9a1ba63a9590a2fad9f787960d88d983d17c26a266f18498ee": 1,
+      "9e6e95dd836af7785d31f32167b1d2499c71ced8f3789c796dd5e0d3c40677fb": 1,
+      "4180ae5f86406e37434e01d875faa9df6b2dd8480b412f606e186817823ebcf8": 1,
+      "ec1b8dd681feb158c467267746690fd03d9ca4f6479da69cfb7c201fc9efcb93": 1
     },
     "src/features/legal/LegalConsentGate.tsx": {
       "e63352e063deaf97db321b02bf35054ca662227ce4623027857263097d88b1b1": 1,
@@ -446,13 +490,30 @@
     "src/i18n/translate.ts": {
       "ea755fc2a1c071dd7dca50d2b21ca38c3ca18db779742961bf0ca220101ff73b": 1
     },
+    "src/screens/ConnectedBoardScreen.tsx": {
+      "186f45b23677764a2bdc62b79fdccbdb9adbfd2079587b8e19e24015aadb7b3f": 1
+    },
     "src/screens/DeckDetailScreen.tsx": {
       "132afe4f734bdd7204c595c17b05d0d14ebe64d84e9b6bfce087b25efa70b7cc": 1,
       "4232b876e641a999726635faeadfa768036d1de877eebde71ca85d86701d59c9": 1,
       "6538b2beb769d6d2ed530e502017b7d0fef9be32421e3626dfdf2edb418bed1a": 1,
       "b7de8fc2071b47d6635d3d8ac1483ee8da492875b5c5938b9c94aa8e7cc9a886": 1,
       "c1084d6f03318da836c89a82e5da8cc745df3c64f78d831734eb7b8441a679a7": 1,
-      "c56ec028f74f6efbaa2e5a4595ca1115fc4968cb88f1490ff656c21ac42027ad": 1
+      "c56ec028f74f6efbaa2e5a4595ca1115fc4968cb88f1490ff656c21ac42027ad": 1,
+      "10a6abe3eb103772c2070f47c28d76a6b41d74e37d4f4175359f68aaa74c77ee": 1,
+      "3704efbb2afff6a97319ce0a2c57fcda6dd335049bed017bed24969eb317d4d7": 1,
+      "4014f21fdec44e562b92dade753f22212dfbb1ccec265c812c85987987a0560c": 1
+    },
+    "src/screens/NewGameScreen.test.tsx": {
+      "1428eef93073a3e532157619b134b7e6ce0fa98e21f27d1b4f9d9eef7775ccf0": 1,
+      "92eda634eb54cd7aa74bfc77c7b67212747cb708f19c83d05c908ba8d383cfc8": 1,
+      "d3de8aef46bc98737c6e2d41f1a3e7ff0e019cbd6bd7801db4ddb2a08d2ae332": 1
+    },
+    "src/screens/NewGameScreen.tsx": {
+      "164c69b4fb1ff0caed3f6d07a46679bc947a49118a361ed3568f923b02c9cb5e": 1,
+      "3b77c080f0c2a837196babddb9d0077812ac5835b1f8cb7cb083abc9b511218b": 1,
+      "cdc795d57178e7d07b8e10505087ecf4441ae49de54ddb87df3188e44ba81f7d": 1,
+      "d3ff21c912362a596069fcd1ca1591c7f6ad89014e47289521a2e4cefbaf53c8": 1
     },
     "src/theme/colors.ts": {
       "0908db82b7643e1d786131884b03a333f385e9b985a6bfd62b5992a4c363c876": 1,
@@ -554,6 +615,12 @@
       "c59818e94d9ba0e0fb2c9bc9104e8b85190deaf970ce853f76f70098c174fa5a": 1,
       "d75ab4a32749cb62177a159ef276d7adbc3174d095d89606b3ff3b94b93fb064": 1
     },
+    "test/NewLocalGameRoute.test.tsx": {
+      "154af8c6482bdf9717ef95a723a11a3539972647fac4905d85ae0ddbdb96b6d2": 1,
+      "5535c6efde62c889a3b2825f201449f8316160605dea38363462a87ff98e0fa8": 1,
+      "c5697986c640d1b346074ee0cc2912bac0639f9fe859c80423419e2f96b547ee": 1,
+      "cc9c2bba9cdb2ed897a0db549fc7bff24c14568f73878ce3afeb48ca616c39c0": 1
+    },
     "test/setup.ts": {
       "5bf23352864742887c67c5a7c44e41be52ddd91ca3f828ab9988729d2825d0b3": 1,
       "6b1ac3e8571977ee83eb48791ef18b8940ef8c15ecc21cfa2aad5a06c0ce5ba9": 1,
@@ -563,6 +630,9 @@
       "2f0b5ba4e55f87248522e5f58b86d5e617ed2d5bf3b1d3c320919d3b0ddc001f": 1,
       "3bbd33a7ae0a6aa938869bb3592d5d05a8017575d14b664850c4f3751523aaf7": 1,
       "8e7109a049da556334afbad83fe8d3d2fe2d44c505cc197d80bf81603ff692e3": 1
+    },
+    "src/features/decks/CardSearchScreen.tsx": {
+      "70884aa2b23a4e48855778fe43b07382a74e2dcdeb9f8f88a36480590a9545a2": 1
     }
   }
 }

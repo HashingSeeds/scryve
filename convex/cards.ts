@@ -1,9 +1,9 @@
-import { ConvexError, v } from "convex/values"
+import { ConvexError, v, type Infer } from "convex/values"
 
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
 import type { ActionCtx, MutationCtx } from "./_generated/server"
-import { action, internalMutation, internalQuery } from "./_generated/server"
+import { action, internalMutation, internalQuery, query } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { cardImageCandidates } from "./lib/cardImageFallback"
 import { deckRateLimiter } from "./lib/deckRateLimits"
@@ -11,7 +11,7 @@ import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { pokemonCardById, pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
 import { cardsByYgoIds, searchYgo } from "./lib/games/yugioh"
-import { assertGameSystem, type GameSystemId } from "./lib/integrations"
+import { assertGameSystem, requireReleasedCapability, type GameSystemId } from "./lib/integrations"
 import {
   type CardReference,
   fetchScryfall,
@@ -337,6 +337,95 @@ export const byId = action({
       })
     await ctx.runMutation(internal.cards.cache, card)
     return card
+  },
+})
+
+const cardDetailsValidator = v.object({
+  imageUrl: v.optional(v.string()),
+  smallImageUrl: v.optional(v.string()),
+  manaCost: v.optional(v.string()),
+  typeLine: v.optional(v.string()),
+  oracleText: v.optional(v.string()),
+  setName: v.optional(v.string()),
+  collectorNumber: v.optional(v.string()),
+  rarity: v.optional(v.string()),
+})
+
+type CardDetails = Infer<typeof cardDetailsValidator>
+
+const MAX_DETAILS_BATCH = 400
+
+const detailsBatchItemValidator = v.object({
+  key: v.string(),
+  scryfallId: v.optional(v.string()),
+  catalogCardId: v.optional(v.string()),
+})
+
+export const detailsBatch = query({
+  args: { game: v.string(), items: v.array(detailsBatchItemValidator) },
+  returns: v.array(v.object({ key: v.string(), details: cardDetailsValidator })),
+  handler: async (ctx, args) => {
+    const game = assertGameSystem(args.game)
+    await requireReleasedCapability(ctx, game, "cardCatalog")
+    if (args.items.length > MAX_DETAILS_BATCH)
+      throw new ConvexError({
+        code: "details_batch_too_large",
+        message: "Too many cards requested at once",
+      })
+    const found: { key: string; details: CardDetails }[] = []
+    for (const item of args.items) {
+      if (!item.key) continue
+      const scryfallId = item.scryfallId
+      if (scryfallId) {
+        const cached = await ctx.db
+          .query("cardReferences")
+          .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", scryfallId))
+          .unique()
+        if (cached && isCompleteReference(cached)) {
+          const reference = toCardReference(cached)
+          found.push({
+            key: item.key,
+            details: {
+              ...(reference.imageUrl !== undefined ? { imageUrl: reference.imageUrl } : {}),
+              ...(reference.smallImageUrl !== undefined
+                ? { smallImageUrl: reference.smallImageUrl }
+                : {}),
+              ...(reference.manaCost !== undefined ? { manaCost: reference.manaCost } : {}),
+              ...(reference.typeLine !== undefined ? { typeLine: reference.typeLine } : {}),
+              ...(reference.oracleText !== undefined ? { oracleText: reference.oracleText } : {}),
+              ...(reference.setName !== undefined ? { setName: reference.setName } : {}),
+              ...(reference.collectorNumber !== undefined
+                ? { collectorNumber: reference.collectorNumber }
+                : {}),
+              ...(reference.rarity !== undefined ? { rarity: reference.rarity } : {}),
+            },
+          })
+        }
+        continue
+      }
+      if (item.catalogCardId) {
+        const cached: CatalogCard | null = await ctx.runQuery(internal.cardCatalog.lookupCached, {
+          game,
+          cardId: item.catalogCardId,
+        })
+        if (!cached) continue
+        found.push({
+          key: item.key,
+          details: {
+            ...(cached.imageUrl !== undefined ? { imageUrl: cached.imageUrl } : {}),
+            ...(cached.smallImageUrl !== undefined ? { smallImageUrl: cached.smallImageUrl } : {}),
+            ...(cached.typeLabel !== undefined ? { typeLine: cached.typeLabel } : {}),
+            ...(cached.text !== undefined ? { oracleText: cached.text } : {}),
+            ...(cached.setCode !== undefined ? { setName: cached.setCode } : {}),
+            ...(cached.collectorNumber !== undefined
+              ? { collectorNumber: cached.collectorNumber }
+              : {}),
+            ...(cached.rarity !== undefined ? { rarity: cached.rarity } : {}),
+          },
+        })
+      }
+    }
+    return found
   },
 })
 

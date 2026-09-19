@@ -1,6 +1,12 @@
 import { Dimensions, StyleSheet } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native"
+
+import {
+  ConnectedGameRepository,
+  connectedDeploymentScope,
+  loadNewestResumeGame,
+} from "@/features/connected/persistence"
 
 import { ConnectedBoardScreen } from "./ConnectedBoardScreen"
 import {
@@ -48,6 +54,13 @@ jest.mock("../../convex/_generated/api", () =>
     )
     .createGeneratedApiMock(),
 )
+jest.mock("react-native-qrcode-svg", () =>
+  jest
+    .requireActual<typeof import("../../test/support/connectedHarness")>(
+      "../../test/support/connectedHarness",
+    )
+    .createQrCodeMock(),
+)
 
 function openConnectedMenu() {
   fireEvent.press(screen.getByTestId("game-menu-button"))
@@ -58,9 +71,8 @@ function openConnectedPlayers() {
   fireEvent.press(screen.getByTestId("players-button"))
 }
 
-function openConnectedStatus() {
-  openConnectedMenu()
-  fireEvent.press(screen.getByTestId("setup-button"))
+function reviewSyncIssues() {
+  fireEvent.press(screen.getByTestId("review-connected-sync-button"))
 }
 
 function openConnectedFinish() {
@@ -71,23 +83,59 @@ function openConnectedFinish() {
 describe("ConnectedBoardScreen", () => {
   beforeEach(resetConnectedHarness)
 
-  it("enables only the signed-in player's accessible controls", () => {
+  it("renders the unavailable shell with a back door when the board cannot hydrate offline", () => {
+    const onBack = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      status: "unavailable",
+      message: "This board is not saved on this device. Reconnect to load it.",
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+    expect(screen.getByTestId("connected-board-unavailable-status").props.accessibilityLabel).toBe(
+      connectedHarness.runtime.message,
+    )
+    fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
+    expect(onBack).toHaveBeenCalled()
+  })
+
+  it("pins the signed-in player's card to the bottom without opponent steppers", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(
       StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style),
     ).toMatchObject({ flex: 1, width: "100%" })
     expect(screen.queryByTestId("connected-game-board-scroll")).toBeNull()
-    const ownedAddOne = screen.getByTestId("life-seat-1-1")
-    const viewOnlyAddOne = screen.getByTestId("life-seat-2-1")
+    expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
+    expect(screen.queryByTestId("life-seat-1--1")).toBeNull()
+    const ownedAddOne = screen.getByTestId("life-seat-2-1")
     expect(ownedAddOne.props.accessibilityState.disabled).toBe(false)
-    expect(ownedAddOne.props.accessibilityLabel).toBe("Seat 1, Ada, add 1 life")
-    expect(viewOnlyAddOne.props.accessibilityState.disabled).toBe(true)
+    expect(ownedAddOne.props.accessibilityLabel).toBe("Seat 2, Ada, add 1 life")
     expect(screen.queryByText("Your seat")).toBeNull()
     expect(screen.queryByText("View only")).toBeNull()
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("Your seat")
+    expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).toContain("Your seat")
+    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("View only")
     fireEvent.press(ownedAddOne)
     expect(mockChangeLife).toHaveBeenCalledWith("player-1", 1)
     expect(useKeepAwake).toHaveBeenCalledWith("count-connected-game")
+  })
+
+  it("defaults the connected board to a bottom-focus layout with your seat last", () => {
+    const players = Array.from({ length: 4 }, (_, index) => ({
+      playerId: `player-${index + 1}`,
+      seat: index + 1,
+      displayName: `Player ${index + 1}`,
+      color: index % 2 === 0 ? "#7C3AED" : "#2563EB",
+      currentLife: 40,
+      pendingDelta: 0,
+      controlledByMe: index === 2,
+    }))
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, playerCount: 4, players },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.getByTestId("life-card-seat-4").props.accessibilityLabel).toContain("Your seat")
+    openConnectedMenu()
+    expect(screen.getByTestId("layout-button")).toBeTruthy()
   })
 
   it("lets the attacking seat stage commander damage against several defenders", async () => {
@@ -100,10 +148,9 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-mark-seat-1"))
-    fireEvent.press(screen.getByTestId("commander-sword-seat-1"))
-    fireEvent.press(screen.getByTestId("commander-stage-seat-2-1"))
-    fireEvent.press(screen.getByTestId("commander-send-seat-1"))
+    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-stage-seat-1-1"))
+    fireEvent.press(screen.getByTestId("commander-send-seat-2"))
 
     await waitFor(() =>
       expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
@@ -126,17 +173,50 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-mark-seat-1"))
-    fireEvent.press(screen.getByTestId("commander-sword-seat-1"))
+    fireEvent.press(screen.getByTestId("commander-mark-seat-2"))
     for (let press = 0; press < 5; press += 1)
-      fireEvent.press(screen.getByTestId("commander-stage-seat-2-1"))
-    fireEvent.press(screen.getByTestId("commander-send-seat-1"))
+      fireEvent.press(screen.getByTestId("commander-stage-seat-1-1"))
+    fireEvent.press(screen.getByTestId("commander-send-seat-2"))
 
     await waitFor(() =>
       expect(mockSubmitCommanderDamage).toHaveBeenCalledWith("player-1", [
         { toPlayerId: "player-2", delta: 2 },
       ]),
     )
+  })
+
+  it("opens the named commander board from the toolbar on your own seat", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.queryByTestId("commander-overview-seat-2")).toBeNull()
+
+    fireEvent.press(screen.getByTestId("commander-inspect-seat-2"))
+    expect(screen.getByTestId("commander-overview-seat-2")).toBeTruthy()
+    expect(screen.getByTestId("commander-cell-seat-2-player-1")).toBeTruthy()
+
+    fireEvent.press(screen.getByTestId("commander-inspect-seat-2"))
+    expect(screen.queryByTestId("commander-overview-seat-2")).toBeNull()
+  })
+
+  it("lets you inspect an opponent board without arming from it", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+    fireEvent.press(screen.getByTestId("commander-inspect-seat-1"))
+    expect(screen.getByTestId("commander-overview-seat-1")).toBeTruthy()
+    expect(screen.getByTestId("commander-mark-seat-1").props.accessibilityState.disabled).toBe(true)
   })
 
   it("lets the defending seat confirm a claim from the bubble under its board", () => {
@@ -158,10 +238,10 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-confirm-seat-1-claim-1"))
+    fireEvent.press(screen.getByTestId("commander-confirm-seat-2-claim-1"))
     expect(mockResolveCommanderDamageClaim).toHaveBeenCalledWith(claim, true)
 
-    fireEvent.press(screen.getByTestId("commander-decline-seat-1-claim-1"))
+    fireEvent.press(screen.getByTestId("commander-decline-seat-2-claim-1"))
     expect(mockResolveCommanderDamageClaim).toHaveBeenCalledWith(claim, false)
   })
 
@@ -270,8 +350,8 @@ describe("ConnectedBoardScreen", () => {
 
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("Ada")
-    expect(screen.getByTestId("life-seat-1-1").props.accessibilityState.disabled).toBe(false)
+    expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).toContain("Ada")
+    expect(screen.getByTestId("life-seat-2-1").props.accessibilityState.disabled).toBe(false)
     expect(screen.getByText("1 change queued")).toBeTruthy()
     expect(
       StyleSheet.flatten(screen.getByTestId("connected-sync-toast-layer").props.style),
@@ -287,6 +367,12 @@ describe("ConnectedBoardScreen", () => {
         status: "finished",
         eventSequence: 12,
       },
+      failed: [
+        {
+          action: { event: { operationId: "operation-9", delta: 5 } },
+          reason: "Game is not active",
+        },
+      ],
     }
     render(
       themed(
@@ -294,14 +380,11 @@ describe("ConnectedBoardScreen", () => {
       ),
     )
     expect(screen.getByTestId("connected-game-board")).toBeTruthy()
-    openConnectedStatus()
+    reviewSyncIssues()
     expect(screen.getByText("Connected summary")).toBeTruthy()
     expect(screen.getByText("12 life changes accepted · final")).toBeTruthy()
-    expect(
-      [1, 2].every(
-        (seat) => screen.getByTestId(`life-seat-${seat}-1`).props.accessibilityState.disabled,
-      ),
-    ).toBe(true)
+    expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
+    expect(screen.getByTestId("life-seat-2-1").props.accessibilityState.disabled).toBe(true)
     expect(screen.queryByTestId("end-game-button")).toBeNull()
     fireEvent.press(screen.getByText("Close"))
     openConnectedMenu()
@@ -311,6 +394,12 @@ describe("ConnectedBoardScreen", () => {
   })
 
   it("falls back to ruleset and singular counter copy for legacy projections", () => {
+    const failed = [
+      {
+        action: { event: { operationId: "operation-9", delta: 5 } },
+        reason: "Game is not active",
+      },
+    ]
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       projection: {
@@ -319,18 +408,20 @@ describe("ConnectedBoardScreen", () => {
         ruleset: "commander",
         eventSequence: 1,
       } as typeof connectedHarness.runtime.projection,
+      failed,
     }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    openConnectedStatus()
+    reviewSyncIssues()
     expect(screen.getByText("Commander · starts with 40 life")).toBeTruthy()
     fireEvent.press(screen.getByText("Close"))
 
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       projection: { ...connectedHarness.runtime.projection, status: "finished" },
+      failed,
     }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    openConnectedStatus()
+    reviewSyncIssues()
     expect(screen.getByText("1 life change accepted · final")).toBeTruthy()
     view.unmount()
   })
@@ -398,7 +489,7 @@ describe("ConnectedBoardScreen", () => {
     expect(mockFinish).not.toHaveBeenCalled()
 
     openConnectedFinish()
-    fireEvent.press(screen.getByText("Ada"))
+    fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
@@ -418,6 +509,59 @@ describe("ConnectedBoardScreen", () => {
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
   })
 
+  it("navigates to the connected summary after finishing with a result", async () => {
+    jest.useFakeTimers()
+    try {
+      const onGameEnded = jest.fn()
+      connectedHarness.runtime = {
+        ...connectedHarness.runtime,
+        projection: { ...connectedHarness.runtime.projection, isHost: true },
+      }
+      render(themed(<ConnectedBoardScreen publicId="game-public" onGameEnded={onGameEnded} />))
+      openConnectedFinish()
+      fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
+      fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+
+      await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+      act(() => jest.runAllTimers())
+      expect(onGameEnded).toHaveBeenCalledWith("game-public")
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("navigates back to fresh connected setup after abandoning without a result", async () => {
+    jest.useFakeTimers()
+    try {
+      const onGameEnded = jest.fn()
+      const onGameAbandoned = jest.fn()
+      connectedHarness.runtime = {
+        ...connectedHarness.runtime,
+        projection: { ...connectedHarness.runtime.projection, isHost: true },
+      }
+      render(
+        themed(
+          <ConnectedBoardScreen
+            publicId="game-public"
+            onGameEnded={onGameEnded}
+            onGameAbandoned={onGameAbandoned}
+          />,
+        ),
+      )
+      openConnectedFinish()
+      fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+
+      await waitFor(() => expect(mockRuntimeAbandon).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+      act(() => jest.runAllTimers())
+      expect(onGameAbandoned).toHaveBeenCalledTimes(1)
+      expect(onGameEnded).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("submits connected finish only once while the mutation is pending", async () => {
     let resolveFinish: (finished: boolean) => void = () => undefined
     mockFinish.mockReturnValueOnce(
@@ -431,7 +575,7 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedFinish()
-    fireEvent.press(screen.getByText("Ada"))
+    fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     expect(mockFinish).toHaveBeenCalledTimes(1)
@@ -441,15 +585,23 @@ describe("ConnectedBoardScreen", () => {
   })
 
   it("keeps connected finish unavailable while offline or life changes are pending", () => {
+    const failed = [
+      {
+        action: { event: { operationId: "operation-9", delta: 5 } },
+        reason: "Game is not active",
+      },
+    ]
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       connectionStatus: "offline",
       projection: { ...connectedHarness.runtime.projection, isHost: true },
+      failed,
     }
     const offline = render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
     expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
-    fireEvent.press(screen.getByTestId("setup-button"))
+    fireEvent.press(screen.getByTestId("game-menu-backdrop"))
+    reviewSyncIssues()
     expect(screen.getByText(/Reconnect before finishing/i)).toBeTruthy()
     offline.unmount()
 
@@ -460,11 +612,13 @@ describe("ConnectedBoardScreen", () => {
         { event: { type: "life.changed", operationId: "operation-1", playerId: "player-1" } },
       ],
       projection: { ...connectedHarness.runtime.projection, isHost: true },
+      failed,
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
     expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
-    fireEvent.press(screen.getByTestId("setup-button"))
+    fireEvent.press(screen.getByTestId("game-menu-backdrop"))
+    reviewSyncIssues()
     expect(screen.getByText(/Wait for 1 pending change/i)).toBeTruthy()
     expect(screen.getByText("1 pending")).toBeTruthy()
   })
@@ -494,7 +648,7 @@ describe("ConnectedBoardScreen", () => {
 
     expect(screen.getByText(/game:abandon/)).toBeTruthy()
 
-    fireEvent.press(screen.getByText("Ada"))
+    fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
 
     expect(screen.getByText(/game:finish/)).toBeTruthy()
     expect(screen.queryByText(/game:abandon/)).toBeNull()
@@ -513,7 +667,7 @@ describe("ConnectedBoardScreen", () => {
     )
     mockFinish.mockResolvedValueOnce(false)
     openConnectedFinish()
-    fireEvent.press(screen.getByText("Ada"))
+    fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
     fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
     await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
     expect(screen.getByTestId("connected-finish-confirmation")).toBeTruthy()
@@ -537,13 +691,20 @@ describe("ConnectedBoardScreen", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       projection: { ...connectedHarness.runtime.projection, status: "lobby", isHost: true },
+      failed: [
+        {
+          action: { event: { operationId: "operation-9", delta: 5 } },
+          reason: "Game is not active",
+        },
+      ],
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    const addOne = [1, 2].map((seat) => screen.getByTestId(`life-seat-${seat}-1`))
-    expect(addOne.every((control) => control.props.accessibilityState.disabled)).toBe(true)
-    fireEvent.press(addOne[0])
+    const ownedAddOne = screen.getByTestId("life-seat-2-1")
+    expect(ownedAddOne.props.accessibilityState.disabled).toBe(true)
+    expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
+    fireEvent.press(ownedAddOne)
     expect(mockChangeLife).not.toHaveBeenCalled()
-    openConnectedStatus()
+    reviewSyncIssues()
     expect(screen.getByText("This game is lobby and is read-only on the board.")).toBeTruthy()
     fireEvent.press(screen.getByText("Close"))
     openConnectedMenu()
@@ -567,10 +728,10 @@ describe("ConnectedBoardScreen", () => {
       }
     })
     const view = render(themed(<ConnectedBoardScreen publicId="game-a" />))
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("game-a")
+    expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).toContain("game-a")
     view.rerender(themed(<ConnectedBoardScreen publicId="game-b" />))
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).not.toContain("game-a")
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("game-b")
+    expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).not.toContain("game-a")
+    expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).toContain("game-b")
   })
 
   it("withholds account-A cache until account B has its own ready projection", () => {
@@ -591,7 +752,7 @@ describe("ConnectedBoardScreen", () => {
       }
     })
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("user-a")
+    expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).toContain("user-a")
     connectedHarness.userId = "user-b"
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.queryByText("user-a")).toBeNull()
@@ -601,7 +762,7 @@ describe("ConnectedBoardScreen", () => {
 
     userBReady = true
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByTestId("life-card-seat-1").props.accessibilityLabel).toContain("user-b")
+    expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).toContain("user-b")
   })
 
   it("uses a neutral full-board surface while the first projection has no seat metadata", () => {
@@ -621,17 +782,20 @@ describe("ConnectedBoardScreen", () => {
       StyleSheet.flatten(screen.getByTestId("connected-board-status-layer").props.style),
     ).toMatchObject({ position: "absolute" })
     expect(screen.getByText("Loading connected board…")).toBeTruthy()
-    expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
+    expect(screen.queryByTestId("life-seat-2-1")).toBeNull()
 
     connectedHarness.runtime = { ...connectedHarness.runtime, status: "ready" }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.queryByTestId("connected-board-shell")).toBeNull()
-    expect(screen.getByTestId("life-seat-1-1")).toBeTruthy()
+    expect(screen.getByTestId("life-seat-2-1")).toBeTruthy()
   })
 
-  it.each([5, 6])(
+  it.each([
+    [5, 2],
+    [6, 4],
+  ])(
     "keeps the outer board geometry stable when a %i-player projection arrives",
-    (playerCount) => {
+    (playerCount, expectedRows) => {
       const originalWindow = Dimensions.get("window")
       const originalScreen = Dimensions.get("screen")
       try {
@@ -668,7 +832,10 @@ describe("ConnectedBoardScreen", () => {
         expect(screen.getByTestId("player-grid").props.accessibilityLabel).toBe(
           `${playerCount} player life grid`,
         )
-        expect(screen.getAllByTestId(/^player-grid-row-/)).toHaveLength(2)
+        expect(screen.getAllByTestId(/^player-grid-row-/)).toHaveLength(expectedRows)
+        expect(
+          screen.getByTestId(`life-card-seat-${playerCount}`).props.accessibilityLabel,
+        ).toContain("Your seat")
         expect(StyleSheet.flatten(screen.getByTestId("connected-game-board").props.style)).toEqual(
           loadingBoardStyle,
         )
@@ -684,7 +851,7 @@ describe("ConnectedBoardScreen", () => {
     const onBack = jest.fn()
     let unavailable = true
     mockUseConnectedGame.mockImplementation(() => {
-      if (unavailable) throw new Error("Game unavailable")
+      if (unavailable) throw new Error("Network unavailable")
       return connectedHarness.runtime
     })
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
@@ -701,9 +868,48 @@ describe("ConnectedBoardScreen", () => {
 
     unavailable = false
     fireEvent.press(view.getByTestId("retry-connected-board-button"))
-    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
+    expect(view.getByTestId("life-seat-2-1")).toBeTruthy()
     expect(view.queryByTestId("connected-board-unavailable-status")).toBeNull()
     consoleError.mockRestore()
+  })
+
+  it("leaves a missing game without offering a futile retry", () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined)
+    const onBack = jest.fn()
+    mockUseConnectedGame.mockImplementation(() => {
+      throw new Error(
+        "[CONVEX Q(games:lobbyProjection)] Server Error Uncaught Error: Game unavailable Called by client",
+      )
+    })
+    new ConnectedGameRepository(
+      undefined,
+      "user-1",
+      {},
+      connectedDeploymentScope(),
+    ).syncResumeIndex(
+      [
+        {
+          publicId: "game-public",
+          status: "active",
+          isHost: true,
+          playerCount: 2,
+          ruleset: "standard",
+          updatedAt: 1,
+        },
+      ],
+      true,
+    )
+    try {
+      render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
+      expect(screen.getByText("This game no longer exists.")).toBeTruthy()
+      expect(screen.queryByTestId("retry-connected-board-button")).toBeNull()
+      expect(loadNewestResumeGame()?.publicId).toBe("game-public")
+      fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
+      expect(loadNewestResumeGame()).toBeNull()
+      expect(onBack).toHaveBeenCalledTimes(1)
+    } finally {
+      consoleError.mockRestore()
+    }
   })
 
   it("offers a way back to local play when the Clerk session is signed out", () => {
@@ -731,7 +937,7 @@ describe("ConnectedBoardScreen", () => {
       StyleSheet.flatten(screen.getByTestId("connected-board-status-layer").props.style),
     ).toMatchObject({ position: "absolute" })
     expect(mockUseConnectedGame).not.toHaveBeenCalled()
-    expect(screen.queryByTestId("life-seat-1-1")).toBeNull()
+    expect(screen.queryByTestId("life-seat-2-1")).toBeNull()
     expect(screen.getByTestId("back-from-connected-board-button")).toBeTruthy()
     connectedHarness.userLoaded = true
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
@@ -750,6 +956,102 @@ describe("ConnectedBoardScreen", () => {
     connectedHarness.runtime = { ...connectedHarness.runtime, status: "ready" }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
     expect(view.queryByTestId("back-from-connected-board-button")).toBeNull()
-    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
+    expect(view.getByTestId("life-seat-2-1")).toBeTruthy()
+  })
+
+  it("hands out the invite from the players dialog only while one is on offer", () => {
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedPlayers()
+    expect(screen.queryByTestId("invite-from-players-button")).toBeNull()
+    fireEvent.press(screen.getByText("Close"))
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        invitation: { token: "t".repeat(43), manualCode: "AB12CD", expiresAt: Date.now() + 60_000 },
+      },
+    }
+    screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
+    expect(screen.getByTestId("end-game-button")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("game-menu-backdrop"))
+    openConnectedPlayers()
+    fireEvent.press(screen.getByTestId("invite-from-players-button"))
+    expect(screen.getByTestId("invite-dialog")).toBeTruthy()
+    expect(screen.getByTestId("invite-qr").props.children).toBe("scryve://join/AB12CD")
+    expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
+  })
+
+  it("reveals the invite on arrival when asked, so a fresh publish can hand out the code", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        invitation: { token: "t".repeat(43), manualCode: "AB12CD", expiresAt: Date.now() + 60_000 },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" initialInviteOpen />))
+    expect(screen.getByTestId("invite-dialog")).toBeTruthy()
+    expect(screen.getByText("Scan to join or enter code AB12CD.")).toBeTruthy()
+  })
+
+  it("releases the board when the invitation disappears with the dialog open", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        invitation: { token: "t".repeat(43), manualCode: "AB12CD", expiresAt: Date.now() + 60_000 },
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" initialInviteOpen />))
+    expect(screen.getByTestId("invite-dialog")).toBeTruthy()
+    expect(screen.getByTestId("life-seat-2-1").props.accessibilityState.disabled).toBe(true)
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, invitation: undefined },
+    }
+    screen.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+    expect(screen.queryByTestId("invite-dialog")).toBeNull()
+    expect(screen.getByTestId("life-seat-2-1").props.accessibilityState.disabled).toBe(false)
+  })
+
+  it("takes a finished board to its summary without a second trip", () => {
+    const onGameEnded = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, status: "finished" },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" onGameEnded={onGameEnded} />))
+    expect(onGameEnded).toHaveBeenCalledTimes(1)
+    expect(onGameEnded).toHaveBeenCalledWith("game-public")
+    screen.rerender(
+      themed(<ConnectedBoardScreen publicId="game-public" onGameEnded={onGameEnded} />),
+    )
+    expect(onGameEnded).toHaveBeenCalledTimes(1)
+  })
+
+  it("offers the way out when the host ends the game elsewhere", () => {
+    const onGameAbandoned = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, status: "abandoned" },
+    }
+    render(
+      themed(<ConnectedBoardScreen publicId="game-public" onGameAbandoned={onGameAbandoned} />),
+    )
+    expect(screen.getByTestId("abandoned-game-dialog")).toBeTruthy()
+    fireEvent.press(screen.getByText("Leave"))
+    expect(onGameAbandoned).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId("abandoned-game-dialog")).toBeNull()
+  })
+
+  it("takes setup back to the setup screen like the local board", () => {
+    const onSetup = jest.fn()
+    render(themed(<ConnectedBoardScreen publicId="game-public" onSetup={onSetup} />))
+    openConnectedMenu()
+    fireEvent.press(screen.getByTestId("setup-button"))
+    expect(onSetup).toHaveBeenCalledTimes(1)
   })
 })

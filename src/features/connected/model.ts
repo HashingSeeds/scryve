@@ -1,3 +1,4 @@
+import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { NO_PLAY_SYSTEM, playSystemId, type PlaySystemId } from "@/features/game/playSystems"
 import type {
   ActorId,
@@ -97,6 +98,8 @@ export interface ConnectedProjection {
   recentOperationIds: string[]
   /** Optional so projections from before commander damage remain readable. */
   commanderDamage?: ConnectedCommanderDamageProjection
+  /** Only the host sees this, and only while the invite is still usable. */
+  invitation?: { token: string; manualCode: string; expiresAt: number }
   players: ConnectedPlayerProjection[]
 }
 
@@ -190,6 +193,22 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       controlledByMe: player.controlledByMe,
     })
   }
+  const invitationValue = value.invitation
+  let invitation: ConnectedProjection["invitation"]
+  if (isRecord(invitationValue)) {
+    if (
+      typeof invitationValue.token !== "string" ||
+      typeof invitationValue.manualCode !== "string" ||
+      typeof invitationValue.expiresAt !== "number" ||
+      !Number.isFinite(invitationValue.expiresAt)
+    )
+      return null
+    invitation = {
+      token: invitationValue.token,
+      manualCode: invitationValue.manualCode,
+      expiresAt: invitationValue.expiresAt,
+    }
+  }
   const commanderDamageValue = value.commanderDamage
   let commanderDamage: ConnectedCommanderDamageProjection | undefined
   if (commanderDamageValue !== undefined) {
@@ -279,6 +298,37 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       .filter((operationId: unknown): operationId is string => typeof operationId === "string")
       .slice(0, CONNECTED_RECENT_OPERATION_LIMIT),
     ...(commanderDamage ? { commanderDamage } : {}),
+    ...(invitation ? { invitation } : {}),
     players,
   }
+}
+
+export function toResumableEntry(projection: ConnectedProjection): ResumableGame | null {
+  if (projection.status === "finished" || projection.status === "abandoned") return null
+  return {
+    publicId: projection.publicId,
+    status: projection.status,
+    isHost: projection.isHost,
+    playerCount: projection.playerCount,
+    ruleset: projection.ruleset,
+    updatedAt: projection.serverUpdatedAt,
+    ...(projection.system ? { system: projection.system } : {}),
+    ...(projection.format ? { format: projection.format } : {}),
+    ...(projection.deckRequired ? { deckRequired: true } : {}),
+    ...(projection.startingLife ? { startingLife: projection.startingLife } : {}),
+  }
+}
+
+export function resumeEntrySignature(entry: ResumableGame): string {
+  return [
+    entry.status,
+    entry.isHost,
+    entry.playerCount,
+    entry.ruleset,
+    entry.system ?? "",
+    entry.format ?? "",
+    entry.deckRequired ? "deck" : "",
+    entry.startingLife ?? "",
+    entry.updatedAt,
+  ].join("|")
 }

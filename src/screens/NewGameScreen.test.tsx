@@ -60,6 +60,19 @@ function setup(overrides: Partial<NewGameScreenProps> = {}) {
   )
 }
 
+/** A two-player local game in progress, which puts the setup screen in its managing state. */
+function runningLocalGame() {
+  return createLocalGame({
+    players: [
+      { name: "Ada", color: "#FF0000" },
+      { name: "Grace", color: "#0000FF" },
+    ],
+    startingLife: 20,
+    system: "mtg",
+    format: "commander",
+  })
+}
+
 const readyHost: ConnectedHostFeed = {
   ready: true,
   busy: false,
@@ -135,6 +148,66 @@ describe("NewGameScreen", () => {
     expect(props.onResumeConnected).toHaveBeenCalledWith(
       expect.objectContaining({ publicId: "arriving" }),
     )
+  })
+
+  it("publishes the running local game under the seat the host picks", () => {
+    const publish = jest.fn()
+    const localGame = runningLocalGame()
+    const view = setup({ localGame, localConnect: { publish } })
+
+    fireEvent.press(view.getByTestId("connect-local-button"))
+    fireEvent.press(view.getByTestId("host-seat-2"))
+
+    expect(publish).toHaveBeenCalledWith(localGame.players[1].id)
+  })
+
+  it("sends a signed-out host to the account gate instead of the seat picker", () => {
+    const publish = jest.fn()
+    const request = jest.fn()
+    const view = setup({
+      localGame: runningLocalGame(),
+      localConnect: { publish, access: { label: "Sign in to host", request } },
+    })
+
+    fireEvent.press(view.getByText("Sign in to host"))
+
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(view.queryByTestId("host-seat-dialog")).toBeNull()
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it("hides the connect action without a local game to connect", () => {
+    expect(
+      setup({ localConnect: { publish: jest.fn() } }).queryByTestId("connect-local-button"),
+    ).toBeNull()
+    expect(
+      setup({ localGame: runningLocalGame() }).queryByTestId("connect-local-button"),
+    ).toBeNull()
+  })
+
+  it("surfaces a hosted live game in local setup only", () => {
+    const onResumeConnected = jest.fn()
+    const hosted = {
+      publicId: "hosted-game",
+      status: "active" as const,
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: 1,
+    }
+    const local = setup({
+      connected: { ...readyHost, activeGames: [hosted] },
+      onResumeConnected,
+    })
+    fireEvent.press(local.getByTestId("resume-hosted-connected-button"))
+    expect(onResumeConnected).toHaveBeenCalledWith(hosted)
+
+    const connected = setup({
+      mode: "connected",
+      connected: { ...readyHost, activeGames: [hosted] },
+      onResumeConnected,
+    })
+    expect(connected.queryByTestId("resume-hosted-connected-button")).toBeNull()
   })
 
   it("offers ending the current game before starting, preserving setup", () => {
@@ -512,10 +585,14 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("connected-action-join")).toBeEnabled()
     fireEvent.press(view.getByTestId("player-count-increment"))
     fireEvent.press(view.getByTestId("connected-action-join"))
+    expect(view.getByTestId("connected-action-join").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("connected-action-host").props.accessibilityState.selected).toBe(false)
     expect(view.getByTestId("manual-code-input")).toBeTruthy()
     expect(view.queryByTestId("play-system")).toBeNull()
     expect(view.queryByTestId("deck-requirement")).toBeNull()
     fireEvent.press(view.getByTestId("connected-action-host"))
+    expect(view.getByTestId("connected-action-host").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("connected-action-join").props.accessibilityState.selected).toBe(false)
     expect(view.getByLabelText("Seats, 3")).toBeTruthy()
     fireEvent.press(view.getByTestId("setup-status"))
     fireEvent.press(view.getByTestId("resume-connected-resume-game"))
@@ -565,6 +642,67 @@ describe("NewGameScreen", () => {
     expect(view.getByText("Host lobby")).toBeTruthy()
     fireEvent.press(view.getByTestId("host-connected-button"))
     expect(host).toHaveBeenCalledWith(expect.objectContaining({ playerCount: 3 }))
+  })
+
+  it("blocks hosting while a local game is active and ends it explicitly", () => {
+    const host = jest.fn()
+    const onEndLocal = jest.fn()
+    const localGame = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000" },
+        { name: "Grace", color: "#0000FF" },
+      ],
+      startingLife: 20,
+    })
+    const view = render(
+      themed(
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="connected"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={jest.fn()}
+          localGame={localGame}
+          onEndLocal={onEndLocal}
+          connected={{ ...readyHost, host }}
+        />,
+      ),
+    )
+    expect(view.getByText("End current game…")).toBeTruthy()
+    fireEvent.press(view.getByTestId("host-connected-button"))
+    expect(host).not.toHaveBeenCalled()
+    expect(view.getByTestId("end-game-dialog")).toBeTruthy()
+    fireEvent.press(view.getByTestId("end-game-result-draw"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    expect(onEndLocal).toHaveBeenCalledWith({ kind: "draw" })
+  })
+
+  it("blocks starting local while a connected game is live and exits it explicitly", async () => {
+    const onStartLocal = jest.fn()
+    const onResumeConnected = jest.fn()
+    const exitGame = jest.fn(async () => true)
+    const game = {
+      publicId: "live-connected",
+      status: "active" as const,
+      isHost: false,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: 1,
+    }
+    const view = setup({
+      connected: { ...readyHost, exitGame, activeGames: [game] },
+      onStartLocal,
+      onResumeConnected,
+    })
+    expect(view.getByText("End current game…")).toBeTruthy()
+    fireEvent.press(view.getByTestId("setup-status"))
+    expect(onResumeConnected).toHaveBeenCalledWith(game)
+
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(onStartLocal).not.toHaveBeenCalled()
+    expect(view.getByTestId("connected-game-exit-confirmation")).toBeTruthy()
+    fireEvent.press(view.getByTestId("confirm-connected-game-exit"))
+    await waitFor(() => expect(exitGame).toHaveBeenCalledWith(game))
   })
 
   it("confirms host end and participant leave actions without changing setup", async () => {

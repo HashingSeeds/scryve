@@ -3,6 +3,8 @@ import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { CHOICE_RADIUS } from "@/components/ChoiceButton"
+import type { ResumableGame } from "@/features/connected/connectedCopy"
+import { ConnectedGameRepository, connectedDeploymentScope } from "@/features/connected/persistence"
 import {
   applyGameCommand,
   asActorId,
@@ -18,7 +20,9 @@ import { darkTheme } from "@/theme/theme"
 import Index from "../src/app/index"
 
 const mockOpenAuth = jest.fn()
+const mockRedirect = jest.fn()
 const mockFocusEffects: (() => void)[] = []
+let mockSearchParams: Record<string, string> = {}
 
 function refocusAfter(mutate: () => void) {
   act(() => {
@@ -29,23 +33,47 @@ function refocusAfter(mutate: () => void) {
 
 jest.mock("expo-router", () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockSearchParams,
   useFocusEffect: (effect: () => void) => {
     mockFocusEffects.push(effect)
     require("react").useEffect(effect, [effect])
   },
-  Redirect: () => null,
+  Redirect: (props: unknown) => {
+    mockRedirect(props)
+    return null
+  },
 }))
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ isSignedIn: false, openAuth: mockOpenAuth }),
 }))
+
+const RESUME_OWNER = "resume-test-user"
+const RESUME_PUBLIC_IDS = ["resume-newer", "resume-older", "resume-lobby"] as const
+
+function resumeRepository() {
+  return new ConnectedGameRepository(undefined, RESUME_OWNER, {}, connectedDeploymentScope())
+}
+
+function seedResume(game: ResumableGame) {
+  resumeRepository().syncResumeIndex([game], true)
+}
+
+function clearResume() {
+  const repository = resumeRepository()
+  for (const publicId of RESUME_PUBLIC_IDS) repository.removeResumeEntry(publicId)
+}
 
 describe("shipping index route", () => {
   beforeEach(() => {
     localGameRepository.clearActiveGame()
     localGameRepository.saveSettings(DEFAULT_LOCAL_SETTINGS)
     mockFocusEffects.length = 0
+    mockSearchParams = {}
+    jest.clearAllMocks()
+    clearResume()
   })
+
+  afterEach(clearResume)
 
   it("launches directly into an ephemeral play mat", () => {
     const view = render(
@@ -140,6 +168,139 @@ describe("shipping index route", () => {
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("connect-button"))
     expect(router.push).toHaveBeenCalledWith("/game/new?mode=connected")
+  })
+
+  function seedStartedLocal(updatedAt: number) {
+    const fresh = createLocalGame({
+      players: [
+        { name: "Player 1", color: PLAYER_COLORS[0] },
+        { name: "Player 2", color: PLAYER_COLORS[1] },
+      ],
+      startingLife: 20,
+    })
+    const started = applyGameCommand(
+      fresh,
+      { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+      {
+        actorId: asActorId("local"),
+        deviceId: asDeviceId("device"),
+        now: () => Date.now(),
+        operationId: () => asOperationId("op-1"),
+      },
+    )
+    localGameRepository.saveActiveGame({ ...started, updatedAt })
+  }
+
+  function renderIndex() {
+    return render(
+      <ThemeProvider initialContext="light">
+        <Index />
+      </ThemeProvider>,
+    )
+  }
+
+  it("resumes the connected board when its resume is newer than the local game", () => {
+    const now = Date.now()
+    seedStartedLocal(now - 60_000)
+    seedResume({
+      publicId: "resume-newer",
+      status: "active",
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: now,
+    })
+
+    const view = renderIndex()
+
+    expect(view.queryByTestId("game-board")).toBeNull()
+    expect(mockRedirect).toHaveBeenCalledWith({
+      href: {
+        pathname: "/connected/game/[gameId]",
+        params: { gameId: "resume-newer" },
+      },
+    })
+  })
+
+  it("sends a lobby resume to the lobby instead of the board", () => {
+    seedResume({
+      publicId: "resume-lobby",
+      status: "lobby",
+      isHost: false,
+      playerCount: 3,
+      ruleset: "standard",
+      updatedAt: Date.now(),
+    })
+
+    renderIndex()
+
+    expect(mockRedirect).toHaveBeenCalledWith({
+      href: {
+        pathname: "/connected/lobby/[gameId]",
+        params: { gameId: "resume-lobby" },
+      },
+    })
+  })
+
+  it("keeps the local game when it is newer than the connected resume", () => {
+    const now = Date.now()
+    seedStartedLocal(now)
+    seedResume({
+      publicId: "resume-older",
+      status: "active",
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: now - 60_000,
+    })
+
+    const view = renderIndex()
+
+    expect(mockRedirect).not.toHaveBeenCalled()
+    expect(view.getByTestId("game-board")).toBeTruthy()
+  })
+
+  it("redirects when a newer connected resume lands while play is open", () => {
+    const now = Date.now()
+    seedStartedLocal(now)
+    const view = renderIndex()
+    expect(view.getByTestId("game-board")).toBeTruthy()
+    expect(mockRedirect).not.toHaveBeenCalled()
+
+    act(() => {
+      seedResume({
+        publicId: "resume-newer",
+        status: "active",
+        isHost: true,
+        playerCount: 2,
+        ruleset: "standard",
+        updatedAt: now + 60_000,
+      })
+    })
+
+    expect(mockRedirect).toHaveBeenCalledWith({
+      href: {
+        pathname: "/connected/game/[gameId]",
+        params: { gameId: "resume-newer" },
+      },
+    })
+  })
+
+  it("never redirects explicit play intent", () => {
+    mockSearchParams = { destination: "play" }
+    seedResume({
+      publicId: "resume-newer",
+      status: "active",
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: Date.now(),
+    })
+
+    const view = renderIndex()
+
+    expect(mockRedirect).not.toHaveBeenCalled()
+    expect(view.getByTestId("game-board")).toBeTruthy()
   })
 
   it.each(["light", "dark"] as const)(
