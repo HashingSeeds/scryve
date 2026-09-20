@@ -1,3 +1,4 @@
+import { Platform } from "react-native"
 import * as Sentry from "@sentry/react-native"
 
 import { initObservability } from "@/utils/observability"
@@ -8,6 +9,7 @@ jest.mock("@sentry/react-native", () => ({
   setTags: jest.fn(),
   addBreadcrumb: jest.fn(),
   mobileReplayIntegration: jest.fn(() => ({ type: "mobileReplay" })),
+  browserReplayIntegration: jest.fn(() => ({ type: "browserReplay" })),
   feedbackIntegration: jest.fn(() => ({ type: "feedback" })),
 }))
 
@@ -44,10 +46,16 @@ describe("observability initialization", () => {
   })
 
   afterEach(() => {
+    jest.restoreAllMocks()
     setTelemetryAdapter()
   })
 
-  it("calls Sentry.init with correct configuration", () => {
+  it.each([
+    ["ios", 0],
+    ["android", 1],
+    ["web", 1],
+  ] as const)("configures error replay for %s", (platform, errorReplaySampleRate) => {
+    jest.replaceProperty(Platform, "OS", platform)
     initObservability()
 
     expect(Sentry.init).toHaveBeenCalledWith(
@@ -55,7 +63,11 @@ describe("observability initialization", () => {
         sendDefaultPii: false,
         enableLogs: false,
         replaysSessionSampleRate: 0,
-        replaysOnErrorSampleRate: 1,
+        replaysOnErrorSampleRate: errorReplaySampleRate,
+        integrations: [
+          { type: platform === "web" ? "browserReplay" : "mobileReplay" },
+          { type: "feedback" },
+        ],
       }),
     )
   })

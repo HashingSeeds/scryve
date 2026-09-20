@@ -30,7 +30,7 @@ export function initObservability(
     sendDefaultPii: false,
     enableLogs: false,
     replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 1,
+    replaysOnErrorSampleRate: Platform.OS === "ios" ? 0 : 1,
     integrations: [
       ...(Platform.OS === "web"
         ? [
