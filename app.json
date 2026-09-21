@@ -29,6 +29,7 @@
     "icon": "./assets/images/app-icon-ios.png",
     "supportsTablet": true,
     "infoPlist": {
+      "UIViewControllerBasedStatusBarAppearance": true,
       "NSCameraUsageDescription": "Scan Scryve game invitation QR codes. Scryve does not capture, store, or upload images.",
       "ITSAppUsesNonExemptEncryption": false
     },

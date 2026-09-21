@@ -271,6 +271,12 @@ export function Screen(props: ScreenProps) {
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
 
+  const iosBarsAreViewControllerDriven = isIos
+  const barsStyle = iosBarsAreViewControllerDriven
+    ? undefined
+    : systemBarStyle || (themeContext === "dark" ? "light" : "dark")
+  const barsHidden = iosBarsAreViewControllerDriven ? undefined : SystemBarsProps?.hidden
+
   return (
     <View
       style={[
@@ -279,10 +285,7 @@ export function Screen(props: ScreenProps) {
         $containerInsets,
       ]}
     >
-      <SystemBars
-        style={systemBarStyle || (themeContext === "dark" ? "light" : "dark")}
-        {...SystemBarsProps}
-      />
+      <SystemBars style={barsStyle} hidden={barsHidden} />
 
       {props.header ? (
         <Header

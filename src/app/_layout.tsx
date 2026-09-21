@@ -2,7 +2,7 @@ import "react-native-url-polyfill/auto"
 
 import { useCallback, useEffect, useState } from "react"
 import { AppMetrics, ObserveRoot } from "expo-observe"
-import { Slot, SplashScreen, type ErrorBoundaryProps } from "expo-router"
+import { SplashScreen, Stack, type ErrorBoundaryProps } from "expo-router"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
@@ -62,7 +62,11 @@ function Root() {
           <KeyboardProvider>
             <LegalConsentGate onResolved={resolveConsent}>
               <AccountDeletionSessionGuard />
-              <Slot />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" options={{ statusBarHidden: true }} />
+                <Stack.Screen name="game/current" options={{ statusBarHidden: true }} />
+                <Stack.Screen name="connected/game/[gameId]" options={{ statusBarHidden: true }} />
+              </Stack>
             </LegalConsentGate>
           </KeyboardProvider>
         </SafeAreaProvider>

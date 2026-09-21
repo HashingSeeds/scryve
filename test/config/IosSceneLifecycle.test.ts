@@ -19,6 +19,9 @@ it("generates the scene lifecycle required to launch on iOS 27", () => {
 
   expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: "" })
   const config = JSON.parse(result.stdout)
+  const viewControllerBasedStatusBarAppearance =
+    config._internal.modResults.ios.infoPlist.UIViewControllerBasedStatusBarAppearance
+  expect(viewControllerBasedStatusBarAppearance).toEqual(true)
   expect(config._internal.modResults.ios.infoPlist.UIApplicationSceneManifest).toEqual({
     UIApplicationSupportsMultipleScenes: false,
     UISceneConfigurations: {
