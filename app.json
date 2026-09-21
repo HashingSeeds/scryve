@@ -29,6 +29,10 @@
     "icon": "./assets/images/app-icon-ios.png",
     "supportsTablet": true,
     "infoPlist": {
+      // YES so the game board can hide the status bar per-screen through its
+      // view controller (required now that iOS 27 mandates the scene lifecycle,
+      // where the legacy app-wide hide call is ignored).
+      "UIViewControllerBasedStatusBarAppearance": true,
       "NSCameraUsageDescription": "Scan Scryve game invitation QR codes. Scryve does not capture, store, or upload images.",
       "ITSAppUsesNonExemptEncryption": false
     },
