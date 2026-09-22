@@ -1187,7 +1187,13 @@ export function AddDeckScreen({
             ) : searchError ? (
               <View style={themed($inlineStatus)}>
                 <AlertNote text={searchError} />
-                <Button text="Retry" onPress={() => void runCatalogSearch(preconQuery)} />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={themed($plainAction)}
+                  onPress={() => void runCatalogSearch(preconQuery)}
+                >
+                  <Text text="Retry" style={themed($textAction)} />
+                </TouchableOpacity>
               </View>
             ) : catalogDecks.length === 0 &&
               precons.length === 0 &&
@@ -1208,11 +1214,14 @@ export function AddDeckScreen({
                         : "Could not refresh decks. Saved results remain available."
                   }
                 />
-                <Button
-                  text="Check again"
+                <TouchableOpacity
+                  accessibilityRole="button"
                   disabled={searching}
+                  style={[themed($plainAction), searching && themed($previewImportButtonDisabled)]}
                   onPress={() => void runCatalogSearch(preconQuery)}
-                />
+                >
+                  <Text text="Check again" style={themed($textAction)} />
+                </TouchableOpacity>
               </View>
             ) : null}
             {precons.map((deck) => (
