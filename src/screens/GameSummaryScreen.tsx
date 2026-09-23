@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 
@@ -23,6 +23,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { claimSecondGameHelp } from "@/utils/storeReview"
 import { useStoreReview } from "@/utils/useStoreReview"
 
 import type {
@@ -37,6 +38,8 @@ export interface GameSummaryScreenProps {
   summary: GameSummaryState
   timeline: SummaryTimelineState
   onBack: () => void
+  gameId?: string
+  onOpenSupport?: () => void
   moderation?: { publicId: string; viewerPlayerIds: string[] }
 }
 
@@ -180,12 +183,23 @@ export function GameSummaryScreen({
   summary,
   timeline,
   onBack,
+  gameId,
+  onOpenSupport,
   moderation,
 }: GameSummaryScreenProps) {
   const { theme, themed } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const helpGameId =
+    summary.status === "ready" && summary.value?.status === "finished" && gameId
+      ? `${summary.value.source}:${gameId}`
+      : undefined
+
+  useEffect(() => {
+    if (helpGameId) setShowHelp(claimSecondGameHelp(helpGameId))
+  }, [helpGameId])
 
   useStoreReview(
     summary.status === "ready" &&
@@ -421,6 +435,27 @@ export function GameSummaryScreen({
           )
         ) : null}
       </ScrollView>
+      {showHelp && onOpenSupport ? (
+        <View testID="second-game-help" style={themed($helpBar)}>
+          <Text text="Having trouble?" weight="medium" size="sm" style={$styles.flex1} />
+          <Button
+            testID="second-game-get-help"
+            text="Open Help"
+            preset="reversed"
+            style={themed($helpBarButton)}
+            onPress={() => {
+              setShowHelp(false)
+              onOpenSupport()
+            }}
+          />
+          <Button
+            testID="second-game-dismiss"
+            text="Dismiss"
+            style={themed($helpBarButton)}
+            onPress={() => setShowHelp(false)}
+          />
+        </View>
+      ) : null}
       {playerActionsOpen && moderation ? (
         <PlayerActionsDialog
           publicId={moderation.publicId}
@@ -529,6 +564,20 @@ const $reportAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.sm,
   minHeight: 44,
 })
+const $helpBar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+  width: "100%",
+  maxWidth: 680,
+  alignSelf: "center",
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.xs,
+  borderTopWidth: 1,
+  borderTopColor: colors.separator,
+  backgroundColor: colors.background,
+})
+const $helpBarButton: ThemedStyle<ViewStyle> = () => ({ minHeight: 44, paddingVertical: 0 })
 const $footnote: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.textDim,
   marginTop: spacing.xs,

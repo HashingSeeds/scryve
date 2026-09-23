@@ -21,6 +21,9 @@ export default function SupportRoute() {
         onEmailSupport={() =>
           void Linking.openURL("mailto:support@sow.care?subject=Scryve%20Support")
         }
+        onReportBug={() =>
+          void Linking.openURL("mailto:support@sow.care?subject=Scryve%20Bug%20Report")
+        }
         onOpenPrivacy={() => router.push("/privacy")}
         onOpenTerms={() => router.push("/terms")}
         onOpenLicenseAgreement={

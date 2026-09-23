@@ -5,6 +5,8 @@ import { asPlayerId } from "@/features/game/domain"
 import { counterChangeLabel } from "@/features/game/playSystems"
 import type { GameEvent, LocalGame } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
+import { storage } from "@/utils/storage"
+import { recordReviewCompletion } from "@/utils/storeReview"
 
 import type { ConnectedSummaryDocument } from "./gameSummary"
 import {
@@ -110,6 +112,37 @@ function renderLocal(game = localGame(), eventsTruncated = false) {
 }
 
 describe("game summary", () => {
+  it("offers help after the second game and opens the existing support screen", () => {
+    storage.clearAll()
+    recordReviewCompletion("local:first")
+    recordReviewCompletion("local:game-1")
+    const onOpenSupport = jest.fn()
+    const model = localSummaryModel(localGame())
+    const view = render(
+      themed(
+        <GameSummaryScreen
+          gameId="game-1"
+          onOpenSupport={onOpenSupport}
+          summary={{ status: "ready", value: model }}
+          timeline={{ status: "unavailable" }}
+          onBack={jest.fn()}
+        />,
+      ),
+    )
+
+    expect(view.getByTestId("second-game-help")).toBeTruthy()
+    expect(view.getByText("Having trouble?")).toBeTruthy()
+    expect(view.queryByTestId("second-game-help-details")).toBeNull()
+    fireEvent.press(view.getByText("Open Help"))
+    expect(onOpenSupport).toHaveBeenCalledTimes(1)
+    expect(view.queryByText("Having trouble?")).toBeNull()
+    view.unmount()
+
+    renderLocal()
+    expect(screen.queryByText("Having trouble?")).toBeNull()
+    storage.clearAll()
+  })
+
   it("uses the system's singular lowercase counter noun in change metadata", () => {
     expect(counterChangeLabel("ygo", 1)).toBe("1 life point change")
     expect(counterChangeLabel("ygo", -1)).toBe("-1 life point change")

@@ -24,6 +24,8 @@ export default function GameSummaryRoute() {
               summary={{ status: "unavailable", retry }}
               timeline={{ status: "unavailable" }}
               onBack={onBack}
+              gameId={gameId}
+              onOpenSupport={() => router.push("/support")}
             />
           )}
         >
@@ -33,6 +35,8 @@ export default function GameSummaryRoute() {
                 summary={summary}
                 timeline={timeline}
                 onBack={onBack}
+                gameId={gameId}
+                onOpenSupport={() => router.push("/support")}
                 moderation={{ publicId: gameId, viewerPlayerIds }}
               />
             )}
@@ -57,6 +61,8 @@ export default function GameSummaryRoute() {
           : { status: "unavailable" }
       }
       onBack={onBack}
+      gameId={typeof gameId === "string" ? gameId : undefined}
+      onOpenSupport={() => router.push("/support")}
     />
   )
 }
