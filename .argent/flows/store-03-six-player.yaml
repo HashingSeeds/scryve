@@ -1,9 +1,10 @@
 # Six-player pod, the densest board.
-# Assumes the legal consent gate is already accepted (see _store-prep.md)
-# and that no local game is active.
+# Goldie runs this first after reinstalling the app, which clears consent.
 steps:
-  - launch: com.sowinghope.count
-  - await: { idle: true }
+  - launch: com.sowinghope.count.preview
+  - await: { visible: { id: accept-legal-button } }
+  - tap: { id: accept-legal-button }
+  - await: { visible: { id: player-grid } }
   - tap: { id: game-menu-button }
   - await: { idle: true }
   - tap: { id: setup-button }

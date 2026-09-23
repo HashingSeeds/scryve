@@ -1,6 +1,6 @@
 # Segment 1: the board as you find it on launch.
 steps:
-  - launch: com.sowinghope.count
+  - launch: com.sowinghope.count.preview
   - await: { visible: { id: player-grid } }
   - await: { idle: true }
   - wait: 1200

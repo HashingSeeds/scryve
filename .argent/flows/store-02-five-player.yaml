@@ -1,16 +1,19 @@
 # Five-player pod.
-# Assumes the legal consent gate is already accepted (see _store-prep.md)
-# and that no local game is active.
+# Continues from store-01's active two-player game.
 steps:
-  - launch: com.sowinghope.count
+  - launch: com.sowinghope.count.preview
   - await: { idle: true }
   - tap: { id: game-menu-button }
   - await: { idle: true }
   - tap: { id: setup-button }
+  - await: { visible: { text: Game setup } }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: abandon-game-button } }
+  - tap: { id: abandon-game-button }
   - await: { visible: { text: New game } }
-  - tap: { id: player-count-increment }
-  - tap: { id: player-count-increment }
-  - tap: { id: player-count-increment }
   - await: { idle: true }
   - tap: { id: start-game-button }
   - await: { visible: { id: player-grid } }

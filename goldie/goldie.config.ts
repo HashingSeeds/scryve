@@ -9,15 +9,18 @@
  * no exclamation, no marketing inflation.
  */
 
-const APP_ROOT = "/Users/mcc/code/scryve"
+import { fileURLToPath } from "node:url"
+
+const APP_ROOT = fileURLToPath(new URL("..", import.meta.url))
 
 const config = {
   appRoot: APP_ROOT,
-  // Release simulator build produced by:
-  //   xcodebuild -workspace ios/Scryve.xcworkspace -scheme Scryve \
-  //     -configuration Release -sdk iphonesimulator -derivedDataPath /tmp/scryve-dd
-  appPath: "/tmp/scryve-dd/Build/Products/Release-iphonesimulator/Scryve.app",
-  bundleId: "com.sowinghope.count",
+  // Release simulator build: prebuild with APP_VARIANT=preview, load
+  // .env.development, set EXPO_PUBLIC_CONVEX_URL to
+  // https://store-assets-test.convex.cloud, and build
+  // ScryvePreview with SENTRY_DISABLE_AUTO_UPLOAD=true.
+  appPath: "/tmp/scryve-store-assets-dd/Build/Products/Release-iphonesimulator/ScryvePreview.app",
+  bundleId: "com.sowinghope.count.preview",
 
   devices: ["iphone-6.9"],
   locales: ["en-US"],
@@ -45,7 +48,7 @@ const config = {
     price: "Free",
     description: {
       "en-US":
-        "Scryve keeps life totals for the whole table on one device. Start a local game in two taps, with no account and no network.\n\nUp to six players share a single clear board. Every seat has its own controls, so anyone can count their own life without passing the phone around.",
+        "Scryve keeps life totals for the whole table on one device. Start a local game in seconds, with no account and no network.\n\nUp to six players share a single clear board. Every seat has its own controls, so anyone can count their own life without passing the phone around.",
     },
   },
 
@@ -62,14 +65,14 @@ const config = {
       id: "two-player",
       flow: "store-01-two-player",
       headline: { "en-US": "Life totals, without the fuss" },
-      subhead: { "en-US": "Start a local game in two taps." },
+      subhead: { "en-US": "Start a local game in seconds." },
     },
     {
       kind: "screenshot",
-      id: "new-game",
-      flow: "store-05-new-game",
-      headline: { "en-US": "Set up once, play all night" },
-      subhead: { "en-US": "Player count, starting life, names, and colors." },
+      id: "five-player",
+      flow: "store-02-five-player",
+      headline: { "en-US": "No account. No network." },
+      subhead: { "en-US": "Local play works wherever you play." },
     },
     {
       kind: "screenshot",
@@ -80,10 +83,10 @@ const config = {
     },
     {
       kind: "screenshot",
-      id: "five-player",
-      flow: "store-02-five-player",
-      headline: { "en-US": "No account. No network." },
-      subhead: { "en-US": "Local play works wherever you play." },
+      id: "new-game",
+      flow: "store-05-new-game",
+      headline: { "en-US": "Set up once, play all night" },
+      subhead: { "en-US": "Player count, starting life, names, and colors." },
     },
     {
       kind: "preview",

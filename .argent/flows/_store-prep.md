@@ -1,13 +1,6 @@
 # Store capture prerequisite
 
-These `store-*` flows assume the legal consent gate has already been accepted on
-the capture simulator. Argent flows are deterministic and cannot branch, so the
-gate cannot be handled conditionally inside a flow.
-
-One-time, per simulator, before the first capture run:
-
-    agent-device open com.sowinghope.count --platform ios
-    # accept "Before you start" -> accept-legal-button
-    agent-device close
-
-Any flow here then starts from a launched, consented app with no active game.
+Goldie reinstalls the preview app before each capture, clearing its data.
+Run `store-03-six-player` first. It accepts the legal gate and starts a local
+game. Continue with `store-01-two-player`, `store-02-five-player`,
+`store-04-six-player-controls`, and `store-05-new-game` on that installation.

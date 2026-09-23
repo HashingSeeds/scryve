@@ -1,12 +1,19 @@
 # Two players, the default local game.
-# Assumes the legal consent gate is already accepted (see _store-prep.md)
-# and that no local game is active.
+# Continues from store-03's active six-player game.
 steps:
-  - launch: com.sowinghope.count
+  - launch: com.sowinghope.count.preview
   - await: { idle: true }
   - tap: { id: game-menu-button }
   - await: { idle: true }
   - tap: { id: setup-button }
+  - await: { visible: { text: Game setup } }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: player-count-decrement }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: abandon-game-button } }
+  - tap: { id: abandon-game-button }
   - await: { visible: { text: New game } }
   - await: { idle: true }
   - tap: { id: start-game-button }

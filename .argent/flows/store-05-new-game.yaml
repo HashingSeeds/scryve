@@ -1,9 +1,13 @@
-# The setup screen: player count, starting life, per-player names and colors.
+# The setup screen after store-04's active five-player game.
 steps:
-  - launch: com.sowinghope.count
+  - launch: com.sowinghope.count.preview
   - await: { idle: true }
   - tap: { id: game-menu-button }
-  - await: { idle: true }
+  - await: { visible: { id: setup-button } }
   - tap: { id: setup-button }
+  - await: { visible: { text: Game setup } }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: abandon-game-button } }
+  - tap: { id: abandon-game-button }
   - await: { visible: { text: New game } }
   - await: { idle: true }
