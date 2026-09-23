@@ -2,9 +2,8 @@ import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { Modal } from "react-native"
 import { useUser } from "@clerk/expo"
 
-import { Button } from "@/components/Button"
+import { EmptyState } from "@/components/EmptyState"
 import { Screen } from "@/components/Screen"
-import { Text } from "@/components/Text"
 import { BackendGate } from "@/features/connected/ConnectedGate"
 import {
   ConnectedProfileProvider,
@@ -103,11 +102,14 @@ export function CloudScreen({
   const auth = useAuthAccess()
   if (!auth.configured)
     return (
-      <Screen preset="auto" safeAreaEdges={["bottom"]} contentInset="standard">
-        <Text
-          text={auth.configurationMessage ?? "Connected features are unavailable in this build."}
+      <Screen preset="auto" safeAreaEdges={["top", "bottom"]} contentInset="standard">
+        <EmptyState
+          imageSource={null}
+          heading="Connected features unavailable"
+          content={auth.configurationMessage ?? "Local play remains available."}
+          button="Back"
+          buttonOnPress={onBack}
         />
-        <Button text="Back" onPress={onBack} />
       </Screen>
     )
   return (

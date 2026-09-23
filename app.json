@@ -40,10 +40,6 @@
         {
           "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
           "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
-        },
-        {
-          "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-          "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
         }
       ]
     }
@@ -63,6 +59,7 @@
       "expo-camera",
       {
         "cameraPermission": "Scan Scryve game invitation QR codes. Scryve does not capture, store, or upload images.",
+        "microphonePermission": false,
         "recordAudioAndroid": false,
         "barcodeScannerEnabled": true
       }

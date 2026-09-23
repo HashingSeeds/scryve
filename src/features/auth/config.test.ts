@@ -4,7 +4,10 @@ describe("public cloud configuration", () => {
   it("degrades actionably when credentials are absent", () => {
     const result = validatePublicCloudConfig({})
     expect(result.configured).toBe(false)
-    if (!result.configured) expect(result.message).toContain("Local play remains available")
+    if (!result.configured) {
+      expect(result.message).toContain("Local play remains available")
+      expect(result.message).not.toContain("EXPO_PUBLIC_")
+    }
   })
 
   it("rejects secret/non-HTTPS-shaped values and accepts public configuration", () => {
