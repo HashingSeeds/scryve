@@ -16,7 +16,7 @@ import {
 const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024
 
 async function pickScreenshot(): Promise<SupportScreenshot | null> {
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 })
+  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 })
   if (result.canceled || !result.assets[0]) return null
   const asset = result.assets[0]
   if (asset.fileSize && asset.fileSize > MAX_SCREENSHOT_BYTES)

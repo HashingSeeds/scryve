@@ -5,6 +5,43 @@ import { ThemeProvider } from "@/theme/context"
 import { SupportScreen } from "./SupportScreen"
 
 describe("SupportScreen", () => {
+  it("waits for a selected screenshot before sending", async () => {
+    const screenshot = {
+      uri: "file:///screenshot.png",
+      filename: "screenshot.png",
+      contentType: "image/png",
+      data: new Uint8Array([1]),
+    }
+    let finishPicking!: (value: typeof screenshot) => void
+    const onPickScreenshot = jest.fn(
+      () => new Promise<typeof screenshot>((resolve) => (finishPicking = resolve)),
+    )
+    const onSubmitFeedback = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SupportScreen
+          onBack={jest.fn()}
+          onEmailSupport={jest.fn()}
+          onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={onPickScreenshot}
+          onOpenPrivacy={jest.fn()}
+          onOpenTerms={jest.fn()}
+          onOpenCookiePolicy={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.changeText(view.getByPlaceholderText("What happened? What did you expect?"), "Broken")
+    fireEvent.press(view.getByText("Add screenshot"))
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).not.toHaveBeenCalled()
+
+    finishPicking(screenshot)
+    await waitFor(() => expect(view.getByText("Remove screenshot")).toBeTruthy())
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).toHaveBeenCalledWith({ kind: "bug", message: "Broken", screenshot })
+  })
+
   it("includes an optional screenshot and lets the player remove it", async () => {
     const screenshot = {
       uri: "file:///screenshot.png",

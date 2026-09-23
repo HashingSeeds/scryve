@@ -91,6 +91,7 @@ export function SupportScreen({
   const [message, setMessage] = useState("")
   const [email, setEmail] = useState("")
   const [screenshot, setScreenshot] = useState<SupportScreenshot | null>(null)
+  const [pickingScreenshot, setPickingScreenshot] = useState(false)
   const [status, setStatus] = useState("")
   const messageLabel = kind === "bug" ? "What happened?" : "How can we help?"
   const emailLabel = kind === "bug" ? "Email for a reply (optional)" : "Email for a reply"
@@ -98,7 +99,7 @@ export function SupportScreen({
   const canSubmit = !!message.trim() && (kind === "bug" ? !email.trim() || emailValid : emailValid)
 
   function submitFeedback() {
-    if (!canSubmit) return
+    if (!canSubmit || pickingScreenshot) return
     try {
       onSubmitFeedback({
         kind,
@@ -115,6 +116,7 @@ export function SupportScreen({
   }
 
   async function pickScreenshot() {
+    setPickingScreenshot(true)
     try {
       const picked = await onPickScreenshot()
       if (picked) {
@@ -123,6 +125,8 @@ export function SupportScreen({
       }
     } catch {
       setStatus("Could not add that screenshot. Try another image.")
+    } finally {
+      setPickingScreenshot(false)
     }
   }
 
@@ -203,14 +207,23 @@ export function SupportScreen({
               <Button text="Remove screenshot" onPress={() => setScreenshot(null)} />
             </View>
           ) : (
-            <Button text="Add screenshot" onPress={() => void pickScreenshot()} />
+            <Button
+              text="Add screenshot"
+              disabled={pickingScreenshot}
+              onPress={() => void pickScreenshot()}
+            />
           )}
           <Text
-            text="Sends your message, email if provided, app version, build, platform, and any screenshot you add to Sentry. No replay is attached."
+            text="Sends your message, email if provided, app version, build, platform, and any screenshot you add to Sentry."
             size="xs"
             style={themed($muted)}
           />
-          <Button text="Send" preset="reversed" disabled={!canSubmit} onPress={submitFeedback} />
+          <Button
+            text="Send"
+            preset="reversed"
+            disabled={!canSubmit || pickingScreenshot}
+            onPress={submitFeedback}
+          />
           {status ? <Text text={status} accessibilityRole="alert" size="xs" /> : null}
           <Text text="Prefer email?" size="xs" style={themed($muted)} />
           <Button text="Email support" onPress={onEmailSupport} />
@@ -321,7 +334,7 @@ const $subtitle: ThemedStyle<TextStyle> = ({ colors }) => ({
 
 const $contact: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $screenshot: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $screenshotPreview: ImageStyle = { width: 120, height: 120, resizeMode: "contain" }
+const $screenshotPreview: ImageStyle = { width: 160, height: 280, resizeMode: "contain" }
 
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $steps: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })
