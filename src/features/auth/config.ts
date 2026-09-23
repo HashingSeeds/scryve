@@ -38,15 +38,10 @@ export function validatePublicCloudConfig(
   const CLERK_KEY = env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()
   const CONVEX_URL = env.EXPO_PUBLIC_CONVEX_URL?.trim()
   const INVITE_ORIGIN = normalizeHttpsOrigin(env.EXPO_PUBLIC_INVITE_ORIGIN)
-  const missing: string[] = []
-  if (!isClerkPublishableKey(CLERK_KEY)) missing.push("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY")
-  if (!isHttpsUrl(CONVEX_URL)) missing.push("EXPO_PUBLIC_CONVEX_URL")
-  if (!INVITE_ORIGIN) missing.push("EXPO_PUBLIC_INVITE_ORIGIN")
-
-  if (missing.length > 0) {
+  if (!isClerkPublishableKey(CLERK_KEY) || !isHttpsUrl(CONVEX_URL) || !INVITE_ORIGIN) {
     return {
       configured: false,
-      message: `Connected play needs valid public configuration: ${missing.join(", ")}. Local play remains available.`,
+      message: "Connected features are unavailable in this build. Local play remains available.",
     }
   }
 
