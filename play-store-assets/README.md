@@ -1,6 +1,6 @@
 # Google Play visual assets
 
-The phone and 7-inch assets were captured from the production Android bundle. The 10-inch assets were captured from the current development app on an Android 16 emulator at 1,440 × 2,560 pixels and 320 dpi. All were visually reviewed before packaging.
+The phone assets were made with Goldie from an offline preview release APK. The 7-inch assets were captured from the production Android bundle. The 10-inch assets were captured from the current development app on an Android 16 emulator at 1,440 × 2,560 pixels and 320 dpi. All were visually reviewed before packaging.
 
 ## Upload inventory
 
@@ -12,13 +12,41 @@ The phone and 7-inch assets were captured from the production Android bundle. Th
 | 7-inch tablet screenshots | `tablet-7-inch/*.png` | 1,080 × 1,920 (9:16) |
 | 10-inch tablet screenshots | `tablet-10-inch/*.png` | 1,440 × 2,560 (9:16) |
 
-All files are PNGs and are comfortably below the Google Play file-size limits. The feature graphic and 10-inch screenshots are opaque RGB PNGs.
+All files are PNGs and are comfortably below the Google Play file-size limits. The feature graphic, phone, and 10-inch screenshots are opaque RGB PNGs.
+
+## Goldie phone captures
+
+`goldie/google-play.config.ts` defines the five phone scenes, copy, and layout. Its `play-store-*` Argent flows reinstall the preview APK before each scene. Goldie currently supports Google Play phone screenshots; the tablet screenshots and feature graphic remain separate assets.
+
+Use a dedicated Pixel 9 Pro or Pixel 10 Pro Android emulator (1,280 × 2,856), with its network disabled. On an x86_64 emulator, build an isolated preview APK from the repo root (set `ANDROID_HOME` to the installed SDK first):
+
+```bash
+APP_VARIANT=preview pnpm exec expo prebuild --platform android --no-install
+(cd android && APP_VARIANT=preview CONVEX_DEPLOYMENT=dev:offline \
+  EXPO_PUBLIC_CONVEX_URL=https://offline.invalid \
+  EXPO_PUBLIC_CONVEX_SITE_URL=https://offline.invalid \
+  EXPO_PUBLIC_INVITE_ORIGIN=https://offline.invalid \
+  SENTRY_DISABLE_AUTO_UPLOAD=true \
+  ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64)
+```
+
+Then run Goldie:
+
+```bash
+GOLDIE_CONFIG=$PWD/goldie/google-play.config.ts GOLDIE_ARGENT_BIN=$PWD/goldie/argent-android-capture.sh npx -y goldie@0.3.1 doctor
+GOLDIE_CONFIG=$PWD/goldie/google-play.config.ts GOLDIE_ARGENT_BIN=$PWD/goldie/argent-android-capture.sh npx -y goldie@0.3.1 capture
+GOLDIE_CONFIG=$PWD/goldie/google-play.config.ts npx -y goldie@0.3.1 frame
+GOLDIE_CONFIG=$PWD/goldie/google-play.config.ts npx -y goldie@0.3.1 manifest
+GOLDIE_CONFIG=$PWD/goldie/google-play.config.ts npx -y goldie@0.3.1 verify
+```
+
+The small Argent wrapper uses `adb screencap` only for the final full-resolution Android PNG; Argent 0.22.1 currently rejects this emulator's full-resolution pixel buffer. Goldie still runs every flow and renders and verifies the assets. Copy the verified files from `goldie/out/screenshots/pixel-10-pro/en-US/` into `play-store-assets/phone/` for upload.
 
 ## Notes
 
 - The app icon is a Scryve-specific mark based on the app's four-player board, controls, and production color palette. The launcher, adaptive Android, iOS, and web icon assets now use this mark; it will appear in the next application build.
 - Video is optional and is not included. A public or unlisted, ad-free, non-age-restricted YouTube upload is still needed if a promo video is desired.
-- Reproducible Maestro capture flows live in `.maestro/store-assets/`.
-- The final screenshot sets prioritize live 2-, 5-, and 6-player boards. The phone set also includes the six-player controls overlay; the 10-inch set includes the new-game screen.
+- The tablet capture flows live in `.maestro/store-assets/`.
+- The final screenshot sets prioritize live 2-, 5-, and 6-player boards. The Goldie phone set also includes new-game setup and the six-player controls overlay; the 10-inch set includes the new-game screen.
 - Before submission, compare the 10-inch screenshots with the release build to confirm the same UI is shipped.
 - Captures rejected during visual QA are retained in `working/` and are not intended for upload.
