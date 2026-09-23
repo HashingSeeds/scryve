@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 
@@ -23,6 +23,7 @@ import { translate } from "@/i18n/translate"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
+import { claimSecondGameHelp } from "@/utils/storeReview"
 import { useStoreReview } from "@/utils/useStoreReview"
 
 import type {
@@ -37,6 +38,8 @@ export interface GameSummaryScreenProps {
   summary: GameSummaryState
   timeline: SummaryTimelineState
   onBack: () => void
+  gameId?: string
+  onOpenSupport?: () => void
   moderation?: { publicId: string; viewerPlayerIds: string[] }
 }
 
@@ -180,12 +183,23 @@ export function GameSummaryScreen({
   summary,
   timeline,
   onBack,
+  gameId,
+  onOpenSupport,
   moderation,
 }: GameSummaryScreenProps) {
   const { theme, themed } = useAppTheme()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [playerActionsOpen, setPlayerActionsOpen] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const helpGameId =
+    summary.status === "ready" && summary.value?.status === "finished" && gameId
+      ? `${summary.value.source}:${gameId}`
+      : undefined
+
+  useEffect(() => {
+    if (helpGameId) setShowHelp(claimSecondGameHelp(helpGameId))
+  }, [helpGameId])
 
   useStoreReview(
     summary.status === "ready" &&
@@ -299,6 +313,35 @@ export function GameSummaryScreen({
             style={themed($reportAction)}
             onPress={() => setPlayerActionsOpen(true)}
           />
+        ) : null}
+
+        {showHelp && onOpenSupport ? (
+          <View testID="second-game-help" style={themed($help)}>
+            <Text text="Something not working?" weight="bold" size="md" />
+            <Text
+              text="Report a bug or contact support. Find Help & support in Settings anytime."
+              size="xs"
+              style={themed($muted)}
+            />
+            <View style={themed($helpActions)}>
+              <Button
+                testID="second-game-get-help"
+                text="Get help"
+                preset="reversed"
+                style={themed($helpButton)}
+                onPress={() => {
+                  setShowHelp(false)
+                  onOpenSupport()
+                }}
+              />
+              <Button
+                testID="second-game-dismiss"
+                text="Dismiss"
+                style={themed($helpButton)}
+                onPress={() => setShowHelp(false)}
+              />
+            </View>
+          </View>
         ) : null}
 
         <TouchableOpacity
@@ -529,6 +572,18 @@ const $reportAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.sm,
   minHeight: 44,
 })
+const $help: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  gap: spacing.xs,
+  marginTop: spacing.lg,
+  paddingTop: spacing.md,
+  borderTopWidth: 1,
+  borderTopColor: colors.separator,
+})
+const $helpActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.sm,
+})
+const $helpButton: ThemedStyle<ViewStyle> = () => ({ flex: 1, minHeight: 44 })
 const $footnote: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.textDim,
   marginTop: spacing.xs,

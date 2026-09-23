@@ -49,6 +49,7 @@ const FAQS = [
 export interface SupportScreenProps {
   onBack: () => void
   onEmailSupport: () => void
+  onReportBug: () => void
   onOpenPrivacy: () => void
   onOpenTerms: () => void
   onOpenLicenseAgreement?: () => void
@@ -59,6 +60,7 @@ export interface SupportScreenProps {
 export function SupportScreen({
   onBack,
   onEmailSupport,
+  onReportBug,
   onOpenPrivacy,
   onOpenTerms,
   onOpenLicenseAgreement,
@@ -91,6 +93,7 @@ export function SupportScreen({
             text="Email us and we’ll usually respond within two business days."
             style={themed($muted)}
           />
+          <Button text="Report a bug" style={themed($emailButton)} onPress={onReportBug} />
           <Button
             text="Email support"
             preset="reversed"

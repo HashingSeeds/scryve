@@ -2,6 +2,7 @@ import { storage } from "@/utils/storage"
 
 const GAMES_KEY = "scryve.review.completedGames.v1"
 const REQUESTED_KEY = "scryve.review.requested.v1"
+const HELP_SHOWN_KEY = "scryve.help.secondGameShown.v1"
 const MIN_GAMES = 5
 
 export function recordReviewCompletion(gameId: string) {
@@ -16,6 +17,18 @@ export function recordReviewCompletion(gameId: string) {
 function completedGames(): string[] {
   const value: unknown = JSON.parse(storage.getString(GAMES_KEY) ?? "[]")
   return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []
+}
+
+export function claimSecondGameHelp(gameId: string) {
+  try {
+    if (storage.getBoolean(HELP_SHOWN_KEY)) return false
+    const games = completedGames()
+    if (games.length !== 2 || games[1] !== gameId) return false
+    storage.set(HELP_SHOWN_KEY, true)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function requestStoreReview(isStillOnSummary: () => boolean) {

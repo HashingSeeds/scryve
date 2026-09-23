@@ -7,6 +7,7 @@ import { SupportScreen } from "./SupportScreen"
 describe("SupportScreen", () => {
   it("renders help content and exposes support actions", () => {
     const onEmailSupport = jest.fn()
+    const onReportBug = jest.fn()
     const onOpenPrivacy = jest.fn()
     const onOpenTerms = jest.fn()
     const onOpenCookiePolicy = jest.fn()
@@ -15,6 +16,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={onEmailSupport}
+          onReportBug={onReportBug}
           onOpenPrivacy={onOpenPrivacy}
           onOpenTerms={onOpenTerms}
           onOpenCookiePolicy={onOpenCookiePolicy}
@@ -27,10 +29,12 @@ describe("SupportScreen", () => {
     expect(view.getByText("Start a game")).toBeTruthy()
     expect(view.getByText("Restore Scryve Pro")).toBeTruthy()
     fireEvent.press(view.getByText("Email support"))
+    fireEvent.press(view.getByText("Report a bug"))
     fireEvent.press(view.getByText("Privacy Policy"))
     fireEvent.press(view.getByText("Terms of Use"))
     fireEvent.press(view.getByText("Cookie Policy"))
     expect(onEmailSupport).toHaveBeenCalledTimes(1)
+    expect(onReportBug).toHaveBeenCalledTimes(1)
     expect(onOpenPrivacy).toHaveBeenCalledTimes(1)
     expect(onOpenTerms).toHaveBeenCalledTimes(1)
     expect(onOpenCookiePolicy).toHaveBeenCalledTimes(1)
@@ -42,6 +46,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onReportBug={jest.fn()}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenCookiePolicy={jest.fn()}
@@ -59,6 +64,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onReportBug={jest.fn()}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenCookiePolicy={jest.fn()}
@@ -76,6 +82,7 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
+          onReportBug={jest.fn()}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenLicenseAgreement={onOpenLicenseAgreement}

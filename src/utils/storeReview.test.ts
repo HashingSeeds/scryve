@@ -2,7 +2,7 @@ import * as StoreReview from "expo-store-review"
 
 import { storage } from "@/utils/storage"
 
-import { recordReviewCompletion, requestStoreReview } from "./storeReview"
+import { claimSecondGameHelp, recordReviewCompletion, requestStoreReview } from "./storeReview"
 
 jest.mock("expo-store-review", () => ({
   isAvailableAsync: jest.fn(async () => true),
@@ -19,6 +19,15 @@ beforeEach(() => {
 function completeFiveGames() {
   for (let index = 0; index < 5; index++) recordReviewCompletion(`local:${index}`)
 }
+
+it("shows help only for the second distinct completed game, once", () => {
+  recordReviewCompletion("local:first")
+  expect(claimSecondGameHelp("local:first")).toBe(false)
+  recordReviewCompletion("local:second")
+  expect(claimSecondGameHelp("local:first")).toBe(false)
+  expect(claimSecondGameHelp("local:second")).toBe(true)
+  expect(claimSecondGameHelp("local:second")).toBe(false)
+})
 
 it("requires five distinct completions and persists one attempt across further games", async () => {
   recordReviewCompletion("local:0")
