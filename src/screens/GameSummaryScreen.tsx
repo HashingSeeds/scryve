@@ -436,34 +436,36 @@ export function GameSummaryScreen({
         ) : null}
 
         {showHelp && onOpenSupport ? (
-          <View testID="second-game-help" style={themed($help)}>
-            <Text text="Something not working?" weight="bold" size="md" />
+          <View testID="second-game-help-details" style={themed($helpDetails)}>
             <Text
-              text="Report a bug or contact support. Find Help & support in Settings anytime."
+              text="Report a bug or contact support from Settings > Help & support anytime."
               size="xs"
               style={themed($muted)}
             />
-            <View style={themed($helpActions)}>
-              <Button
-                testID="second-game-get-help"
-                text="Get help"
-                preset="reversed"
-                style={themed($helpButton)}
-                onPress={() => {
-                  setShowHelp(false)
-                  onOpenSupport()
-                }}
-              />
-              <Button
-                testID="second-game-dismiss"
-                text="Dismiss"
-                style={themed($helpButton)}
-                onPress={() => setShowHelp(false)}
-              />
-            </View>
           </View>
         ) : null}
       </ScrollView>
+      {showHelp && onOpenSupport ? (
+        <View testID="second-game-help" style={themed($helpBar)}>
+          <Text text="Need help?" weight="medium" size="sm" style={$styles.flex1} />
+          <Button
+            testID="second-game-get-help"
+            text="Get help"
+            preset="reversed"
+            style={themed($helpBarButton)}
+            onPress={() => {
+              setShowHelp(false)
+              onOpenSupport()
+            }}
+          />
+          <Button
+            testID="second-game-dismiss"
+            text="Dismiss"
+            style={themed($helpBarButton)}
+            onPress={() => setShowHelp(false)}
+          />
+        </View>
+      ) : null}
       {playerActionsOpen && moderation ? (
         <PlayerActionsDialog
           publicId={moderation.publicId}
@@ -572,18 +574,26 @@ const $reportAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.sm,
   minHeight: 44,
 })
-const $help: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  gap: spacing.xs,
+const $helpDetails: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   marginTop: spacing.lg,
   paddingTop: spacing.md,
   borderTopWidth: 1,
   borderTopColor: colors.separator,
 })
-const $helpActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $helpBar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
-  gap: spacing.sm,
+  alignItems: "center",
+  gap: spacing.xs,
+  width: "100%",
+  maxWidth: 680,
+  alignSelf: "center",
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.xs,
+  borderTopWidth: 1,
+  borderTopColor: colors.separator,
+  backgroundColor: colors.background,
 })
-const $helpButton: ThemedStyle<ViewStyle> = () => ({ flex: 1, minHeight: 44 })
+const $helpBarButton: ThemedStyle<ViewStyle> = () => ({ minHeight: 44, paddingVertical: 0 })
 const $footnote: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
   color: colors.textDim,
   marginTop: spacing.xs,

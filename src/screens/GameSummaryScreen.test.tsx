@@ -130,15 +130,16 @@ describe("game summary", () => {
       ),
     )
 
-    expect(view.getByText("Something not working?")).toBeTruthy()
-    expect(view.getByText(/Find Help & support in Settings anytime/)).toBeTruthy()
+    expect(view.getByTestId("second-game-help")).toBeTruthy()
+    expect(view.getByText("Need help?")).toBeTruthy()
+    expect(view.getByText(/Settings > Help & support anytime/)).toBeTruthy()
     fireEvent.press(view.getByText("Get help"))
     expect(onOpenSupport).toHaveBeenCalledTimes(1)
-    expect(view.queryByText("Something not working?")).toBeNull()
+    expect(view.queryByText("Need help?")).toBeNull()
     view.unmount()
 
     renderLocal()
-    expect(screen.queryByText("Something not working?")).toBeNull()
+    expect(screen.queryByText("Need help?")).toBeNull()
     storage.clearAll()
   })
 
