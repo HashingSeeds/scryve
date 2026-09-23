@@ -124,7 +124,6 @@ describe("SupportScreen", () => {
       view.getByPlaceholderText("Tell us what you need help with"),
       "Restore purchase",
     )
-    expect(view.getByLabelText("How can we help?")).toBeTruthy()
     fireEvent.press(view.getByText("Send"))
     expect(onSubmitFeedback).not.toHaveBeenCalled()
     fireEvent.changeText(view.getByPlaceholderText("you@example.com"), "player@@example.com")
@@ -134,7 +133,6 @@ describe("SupportScreen", () => {
     fireEvent.press(view.getByText("Send"))
     expect(onSubmitFeedback).not.toHaveBeenCalled()
     fireEvent.changeText(view.getByPlaceholderText("you@example.com"), "player@example.com")
-    expect(view.getByLabelText("Email for a reply")).toBeTruthy()
     fireEvent.press(view.getByText("Send"))
     expect(onSubmitFeedback).toHaveBeenCalledWith({
       kind: "help",

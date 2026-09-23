@@ -135,7 +135,6 @@ export function SupportScreen({
           />
           <TextField
             label={messageLabel}
-            accessibilityLabel={messageLabel}
             placeholder={
               kind === "bug"
                 ? "What happened? What did you expect?"
@@ -150,7 +149,6 @@ export function SupportScreen({
           />
           <TextField
             label={emailLabel}
-            accessibilityLabel={emailLabel}
             placeholder="you@example.com"
             keyboardType="email-address"
             autoCapitalize="none"
