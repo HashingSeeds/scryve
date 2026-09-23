@@ -434,23 +434,13 @@ export function GameSummaryScreen({
             </View>
           )
         ) : null}
-
-        {showHelp && onOpenSupport ? (
-          <View testID="second-game-help-details" style={themed($helpDetails)}>
-            <Text
-              text="Report a bug or contact support from Settings > Help & support anytime."
-              size="xs"
-              style={themed($muted)}
-            />
-          </View>
-        ) : null}
       </ScrollView>
       {showHelp && onOpenSupport ? (
         <View testID="second-game-help" style={themed($helpBar)}>
-          <Text text="Need help?" weight="medium" size="sm" style={$styles.flex1} />
+          <Text text="Having trouble?" weight="medium" size="sm" style={$styles.flex1} />
           <Button
             testID="second-game-get-help"
-            text="Get help"
+            text="Open Help"
             preset="reversed"
             style={themed($helpBarButton)}
             onPress={() => {
@@ -573,12 +563,6 @@ const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim 
 const $reportAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.sm,
   minHeight: 44,
-})
-const $helpDetails: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  marginTop: spacing.lg,
-  paddingTop: spacing.md,
-  borderTopWidth: 1,
-  borderTopColor: colors.separator,
 })
 const $helpBar: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   flexDirection: "row",
