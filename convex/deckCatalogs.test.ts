@@ -413,7 +413,8 @@ it("paginates within one format and preserves cached access during a refresh lim
   })
   const args = { game: "ygo", format: "advanced", query: "" }
   const first = await t.action(api.deckCatalogs.browse, args)
-  expect(first.status).toBe("rate_limited")
+  expect(first.status).toBe("refreshing")
+  expect(first.retryAfterMs).toEqual(expect.any(Number))
   expect(first.decks).toHaveLength(30)
   expect(first.cursor).not.toBeNull()
   const second = await t.action(api.deckCatalogs.browse, { ...args, cursor: first.cursor! })

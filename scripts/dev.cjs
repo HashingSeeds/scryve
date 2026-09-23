@@ -27,7 +27,9 @@ for (const stream of [convex.stdout, convex.stderr]) {
   })
 }
 
-const expo = spawn(localBin("expo"), ["start", "--dev-client"], {
+// Every variant registers the shared `exp+count` dev-client scheme, so a QR code
+// using it can open the preview build. Only the dev build owns `scryve-dev`.
+const expo = spawn(localBin("expo"), ["start", "--dev-client", "--scheme", "scryve-dev"], {
   stdio: "inherit",
   env: { ...process.env, APP_VARIANT: "development" },
 })
