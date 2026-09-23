@@ -19,7 +19,6 @@
     "convex:dev:raw": "convex dev",
     "convex:deploy": "convex deploy",
     "convex:deploy:preview": "CONVEX_DEPLOY_KEY=\"$(sed -n 's/^CONVEX_DEPLOY_KEY=//p' .env.preview)\"; [ -n \"$CONVEX_DEPLOY_KEY\" ] || { echo \"CONVEX_DEPLOY_KEY not set in .env.preview\" >&2; exit 1; }; export CONVEX_DEPLOY_KEY; convex deploy --preview-name \"$(git branch --show-current)\" --cmd-url-env-var-name EXPO_PUBLIC_CONVEX_URL --cmd \"node scripts/write-preview-url.cjs\"",
-    "start:preview": "set -a && . ./.env.local && set +a && env APP_VARIANT=development npx expo start --dev-client --scheme scryve-dev",
     "prebuild:clean": "expo prebuild --clean",
     "compile": "pnpm run compile:app && pnpm run compile:test",
     "compile:app": "tsc --noEmit -p . --pretty",
