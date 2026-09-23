@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
@@ -7,7 +7,8 @@ import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { loadNewestResumeGame, subscribeResumeIndex } from "@/features/connected/persistence"
+import type { ResumableGame } from "@/features/connected/connectedCopy"
+import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
@@ -34,14 +35,13 @@ function createPreparedGame(value: string | undefined) {
   }
 }
 
-function readResumeRedirectOnRevision(
+function resumeRedirectFor(
   localUpdatedAt: number | undefined,
   destination: string | undefined,
   prepared: string | undefined,
-  revision: number,
+  newest: ResumableGame | null,
 ) {
-  if (revision < 0 || destination === "play" || prepared) return null
-  const newest = loadNewestResumeGame()
+  if (destination === "play" || prepared) return null
   if (!newest || newest.updatedAt <= (localUpdatedAt ?? 0)) return null
   return {
     pathname: newest.status === "lobby" ? "/connected/lobby/[gameId]" : "/connected/game/[gameId]",
@@ -67,15 +67,12 @@ export default function Index() {
     }, []),
   )
   const activeGame = loadedGame?.id === dismissedGameId ? null : loadedGame
-  const [resumeRevision, bumpResumeRevision] = useState(0)
-  useEffect(() => {
-    bumpResumeRevision((revision) => revision + 1)
-    return subscribeResumeIndex(() => bumpResumeRevision((revision) => revision + 1))
-  }, [])
-  const resumeRedirect = useMemo(
-    () =>
-      readResumeRedirectOnRevision(activeGame?.updatedAt, destination, prepared, resumeRevision),
-    [destination, prepared, activeGame?.updatedAt, resumeRevision],
+  const newestResumeGame = useNewestResumeGame()
+  const resumeRedirect = resumeRedirectFor(
+    activeGame?.updatedAt,
+    destination,
+    prepared,
+    newestResumeGame,
   )
   const freshGame = useMemo(() => {
     const preparedGame = createPreparedGame(prepared)

@@ -73,7 +73,7 @@ describe("shipping index route", () => {
     clearResume()
   })
 
-  afterEach(clearResume)
+  afterEach(() => act(clearResume))
 
   it("launches directly into an ephemeral play mat", () => {
     const view = render(

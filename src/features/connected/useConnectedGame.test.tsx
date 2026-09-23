@@ -60,8 +60,7 @@ const mockRepository = {
   fail: jest.fn(),
   dismissFailed: jest.fn(),
   cleanupTerminalGame: jest.fn(),
-  syncResumeIndex: jest.fn(),
-  removeResumeEntry: jest.fn(),
+  createResumeObserver: jest.fn(() => jest.fn()),
 }
 
 jest.mock("./drainOutbox", () => ({

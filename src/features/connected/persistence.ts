@@ -314,7 +314,10 @@ export function removeResumeEntryEverywhere(
   }
 }
 
+let resumeIndexRevision = 0
 const resumeIndexListeners = new Set<() => void>()
+
+export const getResumeIndexRevision = () => resumeIndexRevision
 
 export function subscribeResumeIndex(listener: () => void): () => void {
   resumeIndexListeners.add(listener)
@@ -324,7 +327,38 @@ export function subscribeResumeIndex(listener: () => void): () => void {
 }
 
 function notifyResumeIndexChanged(): void {
+  resumeIndexRevision += 1
   for (const listener of [...resumeIndexListeners]) listener()
+}
+
+function toResumableEntry(projection: ConnectedProjection): ResumableGame | null {
+  if (projection.status === "finished" || projection.status === "abandoned") return null
+  return {
+    publicId: projection.publicId,
+    status: projection.status,
+    isHost: projection.isHost,
+    playerCount: projection.playerCount,
+    ruleset: projection.ruleset,
+    updatedAt: projection.serverUpdatedAt,
+    ...(projection.system ? { system: projection.system } : {}),
+    ...(projection.format ? { format: projection.format } : {}),
+    ...(projection.deckRequired ? { deckRequired: true } : {}),
+    ...(projection.startingLife ? { startingLife: projection.startingLife } : {}),
+  }
+}
+
+function resumeEntrySignature(entry: ResumableGame): string {
+  return [
+    entry.status,
+    entry.isHost,
+    entry.playerCount,
+    entry.ruleset,
+    entry.system ?? "",
+    entry.format ?? "",
+    entry.deckRequired ? "deck" : "",
+    entry.startingLife ?? "",
+    entry.updatedAt,
+  ].join("|")
 }
 
 const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
@@ -369,6 +403,21 @@ export class ConnectedGameRepository {
       return null
     }
     return projection
+  }
+
+  createResumeObserver() {
+    let lastSignature: string | undefined
+    return (projection: ConnectedProjection) => {
+      const entry = toResumableEntry(projection)
+      if (!entry) {
+        this.removeResumeEntry(projection.publicId)
+        return
+      }
+      const signature = resumeEntrySignature(entry)
+      if (lastSignature === signature) return
+      this.syncResumeIndex([entry], false)
+      lastSignature = signature
+    }
   }
 
   syncResumeIndex(games: readonly ResumableGame[], exhaustedPageSet: boolean): void {
