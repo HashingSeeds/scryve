@@ -14,7 +14,7 @@ onFlowStart:
     id: "game-menu-button"
 - tapOn:
     id: "connect-button"
-- assertVisible: ".*Connected play needs valid public configuration:.*Local play remains available.*"
+- assertVisible: ".*Connected features are unavailable in this build.*Local play remains available.*"
 - tapOn: "Back"
 - assertVisible:
     id: "player-grid"
