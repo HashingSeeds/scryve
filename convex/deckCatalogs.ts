@@ -633,12 +633,12 @@ async function browseDecks(
     format,
     background,
   })
-  if (!result.ok)
-    return {
-      ...cached,
-      status: health?.status === "unavailable" ? "unavailable" : "rate_limited",
-      retryAfterMs: result.retryAfter,
-    }
+  if (!result.ok) {
+    if (health?.status === "unavailable")
+      return { ...cached, status: "unavailable", retryAfterMs: result.retryAfter }
+    if (background) return { ...cached, status: "refreshing", retryAfterMs: result.retryAfter }
+    return { ...cached, status: "rate_limited", retryAfterMs: result.retryAfter }
+  }
   if (background)
     return { ...cached, status: health?.status === "unavailable" ? "unavailable" : "refreshing" }
   const refreshed = await refreshFeed(ctx, game, format)
