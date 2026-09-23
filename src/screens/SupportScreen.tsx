@@ -1,6 +1,6 @@
 import { useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
+import { Image, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { ListItem } from "@/components/ListItem"
@@ -53,12 +53,21 @@ export type SupportFeedback = {
   kind: "bug" | "help"
   message: string
   email?: string
+  screenshot?: SupportScreenshot
+}
+
+export type SupportScreenshot = {
+  uri: string
+  filename: string
+  contentType: string
+  data: Uint8Array
 }
 
 export interface SupportScreenProps {
   onBack: () => void
   onEmailSupport: () => void
   onSubmitFeedback: (feedback: SupportFeedback) => void
+  onPickScreenshot: () => Promise<SupportScreenshot | null>
   onOpenPrivacy: () => void
   onOpenTerms: () => void
   onOpenLicenseAgreement?: () => void
@@ -70,6 +79,7 @@ export function SupportScreen({
   onBack,
   onEmailSupport,
   onSubmitFeedback,
+  onPickScreenshot,
   onOpenPrivacy,
   onOpenTerms,
   onOpenLicenseAgreement,
@@ -80,6 +90,7 @@ export function SupportScreen({
   const [kind, setKind] = useState<SupportFeedback["kind"]>("bug")
   const [message, setMessage] = useState("")
   const [email, setEmail] = useState("")
+  const [screenshot, setScreenshot] = useState<SupportScreenshot | null>(null)
   const [status, setStatus] = useState("")
   const messageLabel = kind === "bug" ? "What happened?" : "How can we help?"
   const emailLabel = kind === "bug" ? "Email for a reply (optional)" : "Email for a reply"
@@ -93,11 +104,25 @@ export function SupportScreen({
         kind,
         message: message.trim(),
         ...(email.trim() ? { email: email.trim() } : {}),
+        ...(screenshot ? { screenshot } : {}),
       })
       setMessage("")
+      setScreenshot(null)
       setStatus("Feedback queued. If you are offline, it will send when you reconnect.")
     } catch {
       setStatus("Could not save your message. Try again or email us.")
+    }
+  }
+
+  async function pickScreenshot() {
+    try {
+      const picked = await onPickScreenshot()
+      if (picked) {
+        setScreenshot(picked)
+        setStatus("")
+      }
+    } catch {
+      setStatus("Could not add that screenshot. Try another image.")
     }
   }
 
@@ -168,8 +193,20 @@ export function SupportScreen({
               style={themed($muted)}
             />
           ) : null}
+          {screenshot ? (
+            <View style={themed($screenshot)}>
+              <Image
+                source={{ uri: screenshot.uri }}
+                style={$screenshotPreview}
+                accessibilityLabel="Selected screenshot"
+              />
+              <Button text="Remove screenshot" onPress={() => setScreenshot(null)} />
+            </View>
+          ) : (
+            <Button text="Add screenshot" onPress={() => void pickScreenshot()} />
+          )}
           <Text
-            text="Sends your message, email if provided, app version, build, and platform to Sentry. No screenshot or replay is attached."
+            text="Sends your message, email if provided, app version, build, platform, and any screenshot you add to Sentry. No replay is attached."
             size="xs"
             style={themed($muted)}
           />
@@ -283,6 +320,8 @@ const $subtitle: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 
 const $contact: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
+const $screenshot: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $screenshotPreview: ImageStyle = { width: 120, height: 120, resizeMode: "contain" }
 
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $steps: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })

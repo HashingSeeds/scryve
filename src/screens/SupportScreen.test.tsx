@@ -1,10 +1,48 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
 import { SupportScreen } from "./SupportScreen"
 
 describe("SupportScreen", () => {
+  it("includes an optional screenshot and lets the player remove it", async () => {
+    const screenshot = {
+      uri: "file:///screenshot.png",
+      filename: "screenshot.png",
+      contentType: "image/png",
+      data: new Uint8Array([1, 2, 3]),
+    }
+    const onSubmitFeedback = jest.fn().mockImplementationOnce(() => {
+      throw new Error("Sentry unavailable")
+    })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SupportScreen
+          onBack={jest.fn()}
+          onEmailSupport={jest.fn()}
+          onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={jest.fn(async () => screenshot)}
+          onOpenPrivacy={jest.fn()}
+          onOpenTerms={jest.fn()}
+          onOpenCookiePolicy={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByText("Add screenshot"))
+    await waitFor(() => expect(view.getByText("Remove screenshot")).toBeTruthy())
+    fireEvent.changeText(view.getByPlaceholderText("What happened? What did you expect?"), "Broken")
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).toHaveBeenCalledWith({ kind: "bug", message: "Broken", screenshot })
+    expect(view.getByText("Remove screenshot")).toBeTruthy()
+    fireEvent.press(view.getByText("Send"))
+
+    fireEvent.press(view.getByText("Add screenshot"))
+    await waitFor(() => expect(view.getByText("Remove screenshot")).toBeTruthy())
+    fireEvent.press(view.getByText("Remove screenshot"))
+    expect(view.getByText("Add screenshot")).toBeTruthy()
+  })
+
   it("renders help content and exposes support actions", () => {
     const onEmailSupport = jest.fn()
     const onSubmitFeedback = jest.fn()
@@ -17,6 +55,7 @@ describe("SupportScreen", () => {
           onBack={jest.fn()}
           onEmailSupport={onEmailSupport}
           onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={onOpenPrivacy}
           onOpenTerms={onOpenTerms}
           onOpenCookiePolicy={onOpenCookiePolicy}
@@ -54,6 +93,7 @@ describe("SupportScreen", () => {
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
           onSubmitFeedback={jest.fn()}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenCookiePolicy={jest.fn()}
@@ -72,6 +112,7 @@ describe("SupportScreen", () => {
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
           onSubmitFeedback={jest.fn()}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenCookiePolicy={jest.fn()}
@@ -90,6 +131,7 @@ describe("SupportScreen", () => {
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
           onSubmitFeedback={jest.fn()}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenLicenseAgreement={onOpenLicenseAgreement}
@@ -112,6 +154,7 @@ describe("SupportScreen", () => {
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
           onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenCookiePolicy={jest.fn()}

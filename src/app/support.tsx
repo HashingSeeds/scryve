@@ -1,14 +1,40 @@
 import { Linking, Platform } from "react-native"
 import * as Application from "expo-application"
 import Constants from "expo-constants"
+import * as ImagePicker from "expo-image-picker"
 import { router } from "expo-router"
 import * as Sentry from "@sentry/react-native"
 import Head from "expo-router/head"
 
 import { APPLE_STANDARD_EULA_URL } from "@/content/legalLinks"
-import { SupportScreen, type SupportFeedback } from "@/screens/SupportScreen"
+import {
+  SupportScreen,
+  type SupportFeedback,
+  type SupportScreenshot,
+} from "@/screens/SupportScreen"
 
-function submitFeedback({ kind, message, email }: SupportFeedback) {
+const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024
+
+async function pickScreenshot(): Promise<SupportScreenshot | null> {
+  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 })
+  if (result.canceled || !result.assets[0]) return null
+  const asset = result.assets[0]
+  if (asset.fileSize && asset.fileSize > MAX_SCREENSHOT_BYTES)
+    throw new Error("Screenshot too large")
+  const data =
+    Platform.OS === "web"
+      ? new Uint8Array(await (await fetch(asset.uri)).arrayBuffer())
+      : await Sentry.getDataFromUri(asset.uri)
+  if (!data || data.length > MAX_SCREENSHOT_BYTES) throw new Error("Screenshot unavailable")
+  return {
+    uri: asset.uri,
+    filename: asset.fileName ?? "screenshot.jpg",
+    contentType: asset.mimeType ?? "image/jpeg",
+    data,
+  }
+}
+
+function submitFeedback({ kind, message, email, screenshot }: SupportFeedback) {
   if (!Sentry.getClient()) throw new Error("Sentry is unavailable")
   Sentry.captureFeedback(
     {
@@ -22,7 +48,20 @@ function submitFeedback({ kind, message, email }: SupportFeedback) {
         build: Application.nativeBuildVersion ?? "unknown",
       },
     },
-    { includeReplay: false },
+    {
+      includeReplay: false,
+      ...(screenshot
+        ? {
+            attachments: [
+              {
+                filename: screenshot.filename,
+                contentType: screenshot.contentType,
+                data: screenshot.data,
+              },
+            ],
+          }
+        : {}),
+    },
   )
 }
 
@@ -44,6 +83,7 @@ export default function SupportRoute() {
           void Linking.openURL("mailto:support@sowinghope.how?subject=Scryve%20Support")
         }
         onSubmitFeedback={submitFeedback}
+        onPickScreenshot={pickScreenshot}
         onOpenPrivacy={() => router.push("/privacy")}
         onOpenTerms={() => router.push("/terms")}
         onOpenLicenseAgreement={
