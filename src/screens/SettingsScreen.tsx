@@ -276,7 +276,7 @@ export function SettingsScreen({
           testID="analytics-switch"
           disabled={!analyticsConfigured() && !sharing}
           label="Share usage with Scryve"
-          helper="Off by default. Anonymous usage stats to improve Scryve. Details in Privacy Policy."
+          helper="Off by default. Shares usage with a random ID that isn't linked to your account. Details in Privacy Policy."
           value={sharing}
           onValueChange={(value) => {
             const saved = setAnalyticsEnabled(value)
@@ -366,7 +366,7 @@ export function SettingsScreen({
               <Text
                 size="xs"
                 style={themed($muted)}
-                text="Include this ID when requesting analytics deletion at privacy@sowinghope.how."
+                text="This ID helps us find your usage data. To ask us to delete it, email the ID to privacy@sowinghope.how."
               />
             </>
           ) : null}
