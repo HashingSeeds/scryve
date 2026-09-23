@@ -1,0 +1,22 @@
+# Six-player pod, the densest board.
+# Assumes the legal consent gate is already accepted (see _store-prep.md)
+# and that no local game is active.
+steps:
+  - launch: com.sowinghope.count
+  - await: { idle: true }
+  - tap: { id: game-menu-button }
+  - await: { idle: true }
+  - tap: { id: setup-button }
+  - await: { visible: { text: New game } }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - tap: { id: player-count-increment }
+  - await: { idle: true }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - await: { idle: true }
+  - echo: Nudge two seats off the starting total so the board is not all equal.
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: life-seat-2--1 }
+  - await: { idle: true }

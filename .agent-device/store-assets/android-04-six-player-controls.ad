@@ -1,0 +1,13 @@
+context platform=android
+env APP_ID=com.sowinghope.count
+env OUT=./store-shots
+
+# Six-player board with the radial game menu open.
+# Run android-03-six-player.ad first; this resumes that game.
+open ${APP_ID} --relaunch
+wait 1500
+wait "id=player-grid" 8000
+click "id=game-menu-button" --settle
+wait 800
+screenshot ${OUT}/android-04-six-player-controls.png
+close

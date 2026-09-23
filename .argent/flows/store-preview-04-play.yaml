@@ -1,0 +1,12 @@
+# Segment 4: count life, the thing the app is for.
+executionPrerequisite: Segment 3 left a fresh four-player board.
+steps:
+  - tap: { id: life-seat-1--1 }
+  - wait: 450
+  - tap: { id: life-seat-1--1 }
+  - wait: 450
+  - tap: { id: life-seat-3-1 }
+  - wait: 450
+  - tap: { id: life-seat-2--1 }
+  - await: { idle: true }
+  - wait: 1500

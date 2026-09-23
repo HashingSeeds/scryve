@@ -1,0 +1,14 @@
+# Segment 2: open the menu and size the pod.
+executionPrerequisite: Segment 1 left the app on the local board with no active game.
+steps:
+  - tap: { id: game-menu-button }
+  - await: { idle: true }
+  - wait: 700
+  - tap: { id: setup-button }
+  - await: { visible: { text: New game } }
+  - wait: 900
+  - tap: { id: player-count-increment }
+  - wait: 500
+  - tap: { id: player-count-increment }
+  - await: { idle: true }
+  - wait: 900

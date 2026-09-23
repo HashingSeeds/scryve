@@ -1,0 +1,9 @@
+# The setup screen: player count, starting life, per-player names and colors.
+steps:
+  - launch: com.sowinghope.count
+  - await: { idle: true }
+  - tap: { id: game-menu-button }
+  - await: { idle: true }
+  - tap: { id: setup-button }
+  - await: { visible: { text: New game } }
+  - await: { idle: true }

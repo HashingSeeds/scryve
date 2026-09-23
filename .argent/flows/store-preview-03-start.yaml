@@ -1,0 +1,7 @@
+# Segment 3: start the game and let the board draw.
+executionPrerequisite: Segment 2 left the setup screen on a four-player game.
+steps:
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - await: { idle: true }
+  - wait: 1400

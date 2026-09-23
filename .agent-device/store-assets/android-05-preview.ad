@@ -1,0 +1,33 @@
+context platform=android
+env APP_ID=com.sowinghope.count
+env OUT=./store-video
+
+# Play Store promo video source: one continuous take of setting up and
+# counting a four-player game. Trim/join downstream; YouTube is the Play
+# Store's delivery path for promo video.
+open ${APP_ID} --relaunch
+wait 1500
+record start ${OUT}/android-preview.mp4 --scope device --hide-touches
+wait 1200
+click "id=game-menu-button" --settle
+wait 700
+click "id=setup-button" --settle
+wait text "New game" 8000
+wait 900
+click "id=player-count-increment" --settle
+wait 500
+click "id=player-count-increment" --settle
+wait 900
+click "id=start-game-button" --settle
+wait "id=player-grid" 8000
+wait 1400
+click "id=life-seat-1--1" --settle
+wait 450
+click "id=life-seat-1--1" --settle
+wait 450
+click "id=life-seat-3-1" --settle
+wait 450
+click "id=life-seat-2--1" --settle
+wait 1800
+record stop
+close

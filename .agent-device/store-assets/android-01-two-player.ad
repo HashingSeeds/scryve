@@ -1,0 +1,17 @@
+context platform=android
+env APP_ID=com.sowinghope.count
+env OUT=./store-shots
+
+# 2-player board. Assumes the legal consent gate is already accepted.
+open ${APP_ID} --relaunch
+wait 1500
+click "id=game-menu-button" --settle
+click "id=setup-button" --settle
+wait text "New game" 8000
+click "id=start-game-button" --settle
+wait "id=player-grid" 8000
+click "id=life-seat-1-1" --settle
+click "id=life-seat-2--1" --settle
+wait 800
+screenshot ${OUT}/android-01-two-player.png
+close

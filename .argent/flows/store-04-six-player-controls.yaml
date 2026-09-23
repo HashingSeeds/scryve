@@ -1,0 +1,10 @@
+# Six-player board with the radial game menu open, showing the per-game controls.
+# Continues from a six-player board; run store-03 first or let goldie replay
+# this flow from a launch of its own.
+steps:
+  - launch: com.sowinghope.count
+  - await: { idle: true }
+  - echo: Resume the active six-player game left by store-03.
+  - await: { visible: { id: player-grid } }
+  - tap: { id: game-menu-button }
+  - await: { idle: true }

@@ -119,3 +119,9 @@ build-*.tar.gz
 
 # Local wrangler state and temp output
 .wrangler/
+
+# goldie store-asset output
+goldie/out/
+.agent-device/store-assets/artifacts/
+.agent-device/store-assets/store-shots/
+.agent-device/store-assets/store-video/
