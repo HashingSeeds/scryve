@@ -81,7 +81,9 @@ export function SupportScreen({
   const [message, setMessage] = useState("")
   const [email, setEmail] = useState("")
   const [status, setStatus] = useState("")
-  const emailValid = /^\S+@\S+\.\S+$/.test(email.trim())
+  const messageLabel = kind === "bug" ? "What happened?" : "How can we help?"
+  const emailLabel = kind === "bug" ? "Email for a reply (optional)" : "Email for a reply"
+  const emailValid = /^[^\s@]+@(?:[^\s@.]+\.)+[^\s@.]+$/.test(email.trim())
   const canSubmit = !!message.trim() && (kind === "bug" ? !email.trim() || emailValid : emailValid)
 
   function submitFeedback() {
@@ -93,7 +95,7 @@ export function SupportScreen({
         ...(email.trim() ? { email: email.trim() } : {}),
       })
       setMessage("")
-      setStatus("Saved. If you are offline, it will send when you reconnect.")
+      setStatus("Feedback queued. If you are offline, it will send when you reconnect.")
     } catch {
       setStatus("Could not save your message. Try again or email us.")
     }
@@ -132,7 +134,8 @@ export function SupportScreen({
             }}
           />
           <TextField
-            label={kind === "bug" ? "What happened?" : "How can we help?"}
+            label={messageLabel}
+            accessibilityLabel={messageLabel}
             placeholder={
               kind === "bug"
                 ? "What happened? What did you expect?"
@@ -146,7 +149,8 @@ export function SupportScreen({
             }}
           />
           <TextField
-            label={kind === "bug" ? "Email for a reply (optional)" : "Email for a reply"}
+            label={emailLabel}
+            accessibilityLabel={emailLabel}
             placeholder="you@example.com"
             keyboardType="email-address"
             autoCapitalize="none"

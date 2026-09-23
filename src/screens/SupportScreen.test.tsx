@@ -35,7 +35,7 @@ describe("SupportScreen", () => {
     fireEvent.press(view.getByText("Send"))
     expect(onSubmitFeedback).toHaveBeenCalledWith({ kind: "bug", message: "Life total reset" })
     expect(
-      view.getByText("Saved. If you are offline, it will send when you reconnect."),
+      view.getByText("Feedback queued. If you are offline, it will send when you reconnect."),
     ).toBeTruthy()
     fireEvent.press(view.getByText("Email support"))
     fireEvent.press(view.getByText("Privacy Policy"))
@@ -124,9 +124,17 @@ describe("SupportScreen", () => {
       view.getByPlaceholderText("Tell us what you need help with"),
       "Restore purchase",
     )
+    expect(view.getByLabelText("How can we help?")).toBeTruthy()
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).not.toHaveBeenCalled()
+    fireEvent.changeText(view.getByPlaceholderText("you@example.com"), "player@@example.com")
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).not.toHaveBeenCalled()
+    fireEvent.changeText(view.getByPlaceholderText("you@example.com"), "player@example..com")
     fireEvent.press(view.getByText("Send"))
     expect(onSubmitFeedback).not.toHaveBeenCalled()
     fireEvent.changeText(view.getByPlaceholderText("you@example.com"), "player@example.com")
+    expect(view.getByLabelText("Email for a reply")).toBeTruthy()
     fireEvent.press(view.getByText("Send"))
     expect(onSubmitFeedback).toHaveBeenCalledWith({
       kind: "help",
