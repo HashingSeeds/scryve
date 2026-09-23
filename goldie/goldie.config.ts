@@ -39,7 +39,7 @@ const config = {
 
   store: {
     name: "Scryve",
-    subtitle: { "en-US": "Life counter for TCG tables" },
+    subtitle: { "en-US": "Local & connected life counter" },
     developer: "Sowing Hope",
     category: "Utilities",
     rating: 5,
@@ -48,7 +48,7 @@ const config = {
     price: "Free",
     description: {
       "en-US":
-        "Scryve keeps life totals for the whole table on one device. Start a local game in seconds, with no account and no network.\n\nUp to six players share a single clear board. Every seat has its own controls, so anyone can count their own life without passing the phone around.",
+        "Scryve keeps life totals for the whole table. Start a local game in seconds on one device, with no account or network.\n\nFor connected play, host a game or join one on your own device. Life totals stay in sync across the table.\n\nUp to six players share a single clear board. Every seat has its own controls, so anyone can count their own life without passing the phone around.",
     },
   },
 
@@ -85,8 +85,8 @@ const config = {
       kind: "screenshot",
       id: "new-game",
       flow: "store-05-new-game",
-      headline: { "en-US": "Set up once, play all night" },
-      subhead: { "en-US": "Player count, starting life, names, and colors." },
+      headline: { "en-US": "Local or connected" },
+      subhead: { "en-US": "One device for the table, or a game across devices." },
     },
     {
       kind: "preview",
