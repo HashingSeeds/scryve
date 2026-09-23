@@ -1,10 +1,13 @@
-import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { useState } from "react"
+import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
+import { Image, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { ListItem } from "@/components/ListItem"
 import { Screen } from "@/components/Screen"
+import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
+import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -37,7 +40,7 @@ const FAQS = [
   {
     question: "Having trouble with a game?",
     answer:
-      "Restart Scryve and try again. If the problem continues, email us with your device model, operating-system version, and a short description of what happened.",
+      "Restart Scryve and try again. If the problem continues, report it here with a short description of what happened.",
   },
   {
     question: "Account or privacy questions",
@@ -46,10 +49,25 @@ const FAQS = [
   },
 ]
 
+export type SupportFeedback = {
+  kind: "bug" | "help"
+  message: string
+  email?: string
+  screenshot?: SupportScreenshot
+}
+
+export type SupportScreenshot = {
+  uri: string
+  filename: string
+  contentType: string
+  data: Uint8Array
+}
+
 export interface SupportScreenProps {
   onBack: () => void
   onEmailSupport: () => void
-  onReportBug: () => void
+  onSubmitFeedback: (feedback: SupportFeedback) => void
+  onPickScreenshot: () => Promise<SupportScreenshot | null>
   onOpenPrivacy: () => void
   onOpenTerms: () => void
   onOpenLicenseAgreement?: () => void
@@ -60,7 +78,8 @@ export interface SupportScreenProps {
 export function SupportScreen({
   onBack,
   onEmailSupport,
-  onReportBug,
+  onSubmitFeedback,
+  onPickScreenshot,
   onOpenPrivacy,
   onOpenTerms,
   onOpenLicenseAgreement,
@@ -68,6 +87,48 @@ export function SupportScreen({
   appVersion,
 }: SupportScreenProps) {
   const { themed } = useAppTheme()
+  const [kind, setKind] = useState<SupportFeedback["kind"]>("bug")
+  const [message, setMessage] = useState("")
+  const [email, setEmail] = useState("")
+  const [screenshot, setScreenshot] = useState<SupportScreenshot | null>(null)
+  const [pickingScreenshot, setPickingScreenshot] = useState(false)
+  const [status, setStatus] = useState("")
+  const messageLabel = kind === "bug" ? "What happened?" : "How can we help?"
+  const emailLabel = kind === "bug" ? "Email for a reply (optional)" : "Email for a reply"
+  const emailValid = /^[^\s@]+@(?:[^\s@.]+\.)+[^\s@.]+$/.test(email.trim())
+  const canSubmit = !!message.trim() && (kind === "bug" ? !email.trim() || emailValid : emailValid)
+
+  function submitFeedback() {
+    if (!canSubmit || pickingScreenshot) return
+    try {
+      onSubmitFeedback({
+        kind,
+        message: message.trim(),
+        ...(email.trim() ? { email: email.trim() } : {}),
+        ...(screenshot ? { screenshot } : {}),
+      })
+      setMessage("")
+      setScreenshot(null)
+      setStatus("Feedback queued. If you are offline, it will send when you reconnect.")
+    } catch {
+      setStatus("Could not save your message. Try again or email us.")
+    }
+  }
+
+  async function pickScreenshot() {
+    setPickingScreenshot(true)
+    try {
+      const picked = await onPickScreenshot()
+      if (picked) {
+        setScreenshot(picked)
+        setStatus("")
+      }
+    } catch {
+      setStatus("Could not add that screenshot. Try another image.")
+    } finally {
+      setPickingScreenshot(false)
+    }
+  }
 
   return (
     <Screen
@@ -82,29 +143,90 @@ export function SupportScreen({
           <Text text="SCRYVE" preset="formLabel" style={themed($eyebrow)} />
           <Text text="Help" preset="heading" accessibilityRole="header" style={themed($title)} />
           <Text
-            text="Answers about games, accounts, and Scryve Pro — and a direct line to us when you need one."
+            text="Answers about games, accounts, and Scryve Pro. Send us a message when you need help."
             style={themed($subtitle)}
           />
         </View>
 
-        <View style={themed($contactCard)}>
-          <Text text="Contact support" preset="subheading" accessibilityRole="header" />
-          <Text
-            text="Email us and we’ll usually respond within two business days."
-            style={themed($muted)}
+        <View style={themed($contact)}>
+          <Text text="Contact us" preset="subheading" accessibilityRole="header" />
+          <SegmentedControl
+            segments={[
+              { id: "bug", label: "Report a problem" },
+              { id: "help", label: "Ask for help" },
+            ]}
+            selectedId={kind}
+            accessibilityLabel="Contact reason"
+            onSelect={(id) => {
+              setKind(id === "help" ? "help" : "bug")
+              setStatus("")
+            }}
           />
-          <Button text="Report a bug" style={themed($emailButton)} onPress={onReportBug} />
-          <Button
-            text="Email support"
-            preset="reversed"
-            style={themed($emailButton)}
-            onPress={onEmailSupport}
+          <TextField
+            label={messageLabel}
+            placeholder={
+              kind === "bug"
+                ? "What happened? What did you expect?"
+                : "Tell us what you need help with"
+            }
+            multiline
+            value={message}
+            onChangeText={(value) => {
+              setMessage(value)
+              setStatus("")
+            }}
           />
+          <TextField
+            label={emailLabel}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            value={email}
+            onChangeText={(value) => {
+              setEmail(value)
+              setStatus("")
+            }}
+            status={email.trim() && !emailValid ? "error" : undefined}
+            helper={email.trim() && !emailValid ? "Enter a valid email address." : undefined}
+          />
+          {kind === "help" ? (
+            <Text
+              text="We usually reply within two business days."
+              size="xs"
+              style={themed($muted)}
+            />
+          ) : null}
+          {screenshot ? (
+            <View style={themed($screenshot)}>
+              <Image
+                source={{ uri: screenshot.uri }}
+                style={$screenshotPreview}
+                accessibilityLabel="Selected screenshot"
+              />
+              <Button text="Remove screenshot" onPress={() => setScreenshot(null)} />
+            </View>
+          ) : (
+            <Button
+              text="Add screenshot"
+              disabled={pickingScreenshot}
+              onPress={() => void pickScreenshot()}
+            />
+          )}
           <Text
-            text="Telling us your device model and what you were doing helps us answer on the first reply."
+            text="Sends your message, email if provided, app version, build, platform, and any screenshot you add to Sentry."
             size="xs"
             style={themed($muted)}
           />
+          <Button
+            text="Send"
+            preset="reversed"
+            disabled={!canSubmit || pickingScreenshot}
+            onPress={submitFeedback}
+          />
+          {status ? <Text text={status} accessibilityRole="alert" size="xs" /> : null}
+          <Text text="Prefer email?" size="xs" style={themed($muted)} />
+          <Button text="Email support" onPress={onEmailSupport} />
         </View>
 
         <View style={themed($section)}>
@@ -210,19 +332,9 @@ const $subtitle: ThemedStyle<TextStyle> = ({ colors }) => ({
   lineHeight: 25,
 })
 
-const $contactCard: ThemedStyle<ViewStyle> = ({ colors, isDark, spacing }) => ({
-  gap: spacing.sm,
-  padding: spacing.lg,
-  borderWidth: 1,
-  borderRadius: spacing.md,
-  borderColor: colors.tint,
-  backgroundColor: isDark ? colors.palette.neutral300 : colors.palette.neutral100,
-})
-const $emailButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 52,
-  borderRadius: spacing.sm,
-  marginTop: spacing.xxs,
-})
+const $contact: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
+const $screenshot: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $screenshotPreview: ImageStyle = { width: 160, height: 280, resizeMode: "contain" }
 
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $steps: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })

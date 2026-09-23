@@ -79,6 +79,14 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
       plugins.push(plugin)
     }
   }
+  plugins.push([
+    "expo-image-picker",
+    {
+      photosPermission: "Allow Scryve to attach a screenshot you choose to a support request.",
+      cameraPermission: false,
+      microphonePermission: false,
+    },
+  ])
 
   const normalizedInviteOrigin = normalizeHttpsOrigin(process.env.EXPO_PUBLIC_INVITE_ORIGIN)
   const inviteUrl = normalizedInviteOrigin ? new URL(normalizedInviteOrigin) : undefined

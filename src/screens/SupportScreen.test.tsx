@@ -1,13 +1,88 @@
-import { fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
 import { SupportScreen } from "./SupportScreen"
 
 describe("SupportScreen", () => {
+  it("waits for a selected screenshot before sending", async () => {
+    const screenshot = {
+      uri: "file:///screenshot.png",
+      filename: "screenshot.png",
+      contentType: "image/png",
+      data: new Uint8Array([1]),
+    }
+    let finishPicking!: (value: typeof screenshot) => void
+    const onPickScreenshot = jest.fn(
+      () => new Promise<typeof screenshot>((resolve) => (finishPicking = resolve)),
+    )
+    const onSubmitFeedback = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SupportScreen
+          onBack={jest.fn()}
+          onEmailSupport={jest.fn()}
+          onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={onPickScreenshot}
+          onOpenPrivacy={jest.fn()}
+          onOpenTerms={jest.fn()}
+          onOpenCookiePolicy={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.changeText(view.getByPlaceholderText("What happened? What did you expect?"), "Broken")
+    fireEvent.press(view.getByText("Add screenshot"))
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).not.toHaveBeenCalled()
+
+    finishPicking(screenshot)
+    await waitFor(() => expect(view.getByText("Remove screenshot")).toBeTruthy())
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).toHaveBeenCalledWith({ kind: "bug", message: "Broken", screenshot })
+  })
+
+  it("includes an optional screenshot and lets the player remove it", async () => {
+    const screenshot = {
+      uri: "file:///screenshot.png",
+      filename: "screenshot.png",
+      contentType: "image/png",
+      data: new Uint8Array([1, 2, 3]),
+    }
+    const onSubmitFeedback = jest.fn().mockImplementationOnce(() => {
+      throw new Error("Sentry unavailable")
+    })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SupportScreen
+          onBack={jest.fn()}
+          onEmailSupport={jest.fn()}
+          onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={jest.fn(async () => screenshot)}
+          onOpenPrivacy={jest.fn()}
+          onOpenTerms={jest.fn()}
+          onOpenCookiePolicy={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByText("Add screenshot"))
+    await waitFor(() => expect(view.getByText("Remove screenshot")).toBeTruthy())
+    fireEvent.changeText(view.getByPlaceholderText("What happened? What did you expect?"), "Broken")
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).toHaveBeenCalledWith({ kind: "bug", message: "Broken", screenshot })
+    expect(view.getByText("Remove screenshot")).toBeTruthy()
+    fireEvent.press(view.getByText("Send"))
+
+    fireEvent.press(view.getByText("Add screenshot"))
+    await waitFor(() => expect(view.getByText("Remove screenshot")).toBeTruthy())
+    fireEvent.press(view.getByText("Remove screenshot"))
+    expect(view.getByText("Add screenshot")).toBeTruthy()
+  })
+
   it("renders help content and exposes support actions", () => {
     const onEmailSupport = jest.fn()
-    const onReportBug = jest.fn()
+    const onSubmitFeedback = jest.fn()
     const onOpenPrivacy = jest.fn()
     const onOpenTerms = jest.fn()
     const onOpenCookiePolicy = jest.fn()
@@ -16,7 +91,8 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={onEmailSupport}
-          onReportBug={onReportBug}
+          onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={onOpenPrivacy}
           onOpenTerms={onOpenTerms}
           onOpenCookiePolicy={onOpenCookiePolicy}
@@ -28,13 +104,20 @@ describe("SupportScreen", () => {
     expect(view.getByText("Frequently asked questions")).toBeTruthy()
     expect(view.getByText("Start a game")).toBeTruthy()
     expect(view.getByText("Restore Scryve Pro")).toBeTruthy()
+    fireEvent.changeText(
+      view.getByPlaceholderText("What happened? What did you expect?"),
+      "Life total reset",
+    )
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).toHaveBeenCalledWith({ kind: "bug", message: "Life total reset" })
+    expect(
+      view.getByText("Feedback queued. If you are offline, it will send when you reconnect."),
+    ).toBeTruthy()
     fireEvent.press(view.getByText("Email support"))
-    fireEvent.press(view.getByText("Report a bug"))
     fireEvent.press(view.getByText("Privacy Policy"))
     fireEvent.press(view.getByText("Terms of Use"))
     fireEvent.press(view.getByText("Cookie Policy"))
     expect(onEmailSupport).toHaveBeenCalledTimes(1)
-    expect(onReportBug).toHaveBeenCalledTimes(1)
     expect(onOpenPrivacy).toHaveBeenCalledTimes(1)
     expect(onOpenTerms).toHaveBeenCalledTimes(1)
     expect(onOpenCookiePolicy).toHaveBeenCalledTimes(1)
@@ -46,7 +129,8 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
-          onReportBug={jest.fn()}
+          onSubmitFeedback={jest.fn()}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenCookiePolicy={jest.fn()}
@@ -64,7 +148,8 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
-          onReportBug={jest.fn()}
+          onSubmitFeedback={jest.fn()}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenCookiePolicy={jest.fn()}
@@ -82,7 +167,8 @@ describe("SupportScreen", () => {
         <SupportScreen
           onBack={jest.fn()}
           onEmailSupport={jest.fn()}
-          onReportBug={jest.fn()}
+          onSubmitFeedback={jest.fn()}
+          onPickScreenshot={jest.fn(async () => null)}
           onOpenPrivacy={jest.fn()}
           onOpenTerms={jest.fn()}
           onOpenLicenseAgreement={onOpenLicenseAgreement}
@@ -93,5 +179,47 @@ describe("SupportScreen", () => {
 
     fireEvent.press(view.getByText("License Agreement"))
     expect(onOpenLicenseAgreement).toHaveBeenCalledTimes(1)
+  })
+
+  it("requires a reply address for help and keeps the message after a failed save", () => {
+    const onSubmitFeedback = jest.fn(() => {
+      throw new Error("Unavailable")
+    })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SupportScreen
+          onBack={jest.fn()}
+          onEmailSupport={jest.fn()}
+          onSubmitFeedback={onSubmitFeedback}
+          onPickScreenshot={jest.fn(async () => null)}
+          onOpenPrivacy={jest.fn()}
+          onOpenTerms={jest.fn()}
+          onOpenCookiePolicy={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByText("Ask for help"))
+    fireEvent.changeText(
+      view.getByPlaceholderText("Tell us what you need help with"),
+      "Restore purchase",
+    )
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).not.toHaveBeenCalled()
+    fireEvent.changeText(view.getByPlaceholderText("you@example.com"), "player@@example.com")
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).not.toHaveBeenCalled()
+    fireEvent.changeText(view.getByPlaceholderText("you@example.com"), "player@example..com")
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).not.toHaveBeenCalled()
+    fireEvent.changeText(view.getByPlaceholderText("you@example.com"), "player@example.com")
+    fireEvent.press(view.getByText("Send"))
+    expect(onSubmitFeedback).toHaveBeenCalledWith({
+      kind: "help",
+      message: "Restore purchase",
+      email: "player@example.com",
+    })
+    expect(view.getByText("Could not save your message. Try again or email us.")).toBeTruthy()
+    expect(view.getByDisplayValue("Restore purchase")).toBeTruthy()
   })
 })
