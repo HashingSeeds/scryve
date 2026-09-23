@@ -315,35 +315,6 @@ export function GameSummaryScreen({
           />
         ) : null}
 
-        {showHelp && onOpenSupport ? (
-          <View testID="second-game-help" style={themed($help)}>
-            <Text text="Something not working?" weight="bold" size="md" />
-            <Text
-              text="Report a bug or contact support. Find Help & support in Settings anytime."
-              size="xs"
-              style={themed($muted)}
-            />
-            <View style={themed($helpActions)}>
-              <Button
-                testID="second-game-get-help"
-                text="Get help"
-                preset="reversed"
-                style={themed($helpButton)}
-                onPress={() => {
-                  setShowHelp(false)
-                  onOpenSupport()
-                }}
-              />
-              <Button
-                testID="second-game-dismiss"
-                text="Dismiss"
-                style={themed($helpButton)}
-                onPress={() => setShowHelp(false)}
-              />
-            </View>
-          </View>
-        ) : null}
-
         <TouchableOpacity
           testID="summary-timeline-toggle"
           accessibilityRole="button"
@@ -462,6 +433,35 @@ export function GameSummaryScreen({
               />
             </View>
           )
+        ) : null}
+
+        {showHelp && onOpenSupport ? (
+          <View testID="second-game-help" style={themed($help)}>
+            <Text text="Something not working?" weight="bold" size="md" />
+            <Text
+              text="Report a bug or contact support. Find Help & support in Settings anytime."
+              size="xs"
+              style={themed($muted)}
+            />
+            <View style={themed($helpActions)}>
+              <Button
+                testID="second-game-get-help"
+                text="Get help"
+                preset="reversed"
+                style={themed($helpButton)}
+                onPress={() => {
+                  setShowHelp(false)
+                  onOpenSupport()
+                }}
+              />
+              <Button
+                testID="second-game-dismiss"
+                text="Dismiss"
+                style={themed($helpButton)}
+                onPress={() => setShowHelp(false)}
+              />
+            </View>
+          </View>
         ) : null}
       </ScrollView>
       {playerActionsOpen && moderation ? (
