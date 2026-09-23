@@ -1,0 +1,18 @@
+diff --git a/ios/UIViewController+RNScreens.mm b/ios/UIViewController+RNScreens.mm
+index 52850a93fde26c753ba8f017bf193bb25aa96099..74d9d52eec4021146218fdacad211df4d04ddc1f 100644
+--- a/ios/UIViewController+RNScreens.mm
++++ b/ios/UIViewController+RNScreens.mm
+@@ -65,6 +65,13 @@
+   if ([lastViewController conformsToProtocol:@protocol(RNSViewControllerDelegate)]) {
+     return lastViewController;
+   }
++  // Scryve patch: expo-dev-launcher (Debug builds) inserts a plain container VC between the
++  // window root and the screens stack. Look through one such container so status bar and
++  // other window traits still reach the active screen.
++  UIViewController *nestedViewController = [[lastViewController childViewControllers] lastObject];
++  if ([nestedViewController conformsToProtocol:@protocol(RNSViewControllerDelegate)]) {
++    return nestedViewController;
++  }
+   return nil;
+ }
+ 
