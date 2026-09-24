@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url"
 import ios from "./goldie.config.ts"
 
 const appRoot = fileURLToPath(new URL("../", import.meta.url))
+const localScenes = ios.scenes
+  .filter((scene) => scene.kind === "screenshot" && scene.id !== "five-player")
+  .map((scene) => ({ ...scene, flow: `play-${scene.flow}` }))
 
 export default {
   ...ios,
@@ -20,7 +23,23 @@ export default {
     copyHeightRatio: 0.24,
     deviceWidthRatio: 0.84,
   },
-  scenes: ios.scenes
-    .filter((scene) => scene.kind === "screenshot")
-    .map((scene) => ({ ...scene, flow: `play-${scene.flow}` })),
+  store: {
+    ...ios.store,
+    subtitle: { "en-US": "TCG life totals, together" },
+    description: {
+      "en-US":
+        "Scryve keeps life totals clear for the whole table. Start a local game in two taps, with no account or network. Up to six players share one board, with controls for every seat.\n\nFor connected play, host a game or join one from another device. Share an invite or enter a code so everyone can follow the same game.",
+    },
+  },
+  scenes: [
+    ...localScenes.slice(0, 2),
+    {
+      kind: "screenshot",
+      id: "connected-play",
+      flow: "play-store-06-connected",
+      headline: { "en-US": "Play together, across devices" },
+      subhead: { "en-US": "Host a game or join with a code." },
+    },
+    ...localScenes.slice(2),
+  ],
 }
