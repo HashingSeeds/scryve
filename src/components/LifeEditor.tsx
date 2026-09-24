@@ -213,7 +213,6 @@ export function LifeEditor({
             >
               <Text
                 text={deltaLabel(preview - start.current.life)}
-                weight="bold"
                 size={compact ? "lg" : "xl"}
                 style={{ color: theme.colors.board.background }}
               />
