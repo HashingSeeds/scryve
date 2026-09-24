@@ -1,0 +1,16 @@
+{
+  "background": "#0B0B0D",
+  "frame": "17-pro-silver",
+  "fontFamily": "-apple-system, \"SF Pro Display\", system-ui, sans-serif",
+  "order": [
+    "six-player",
+    "connected-play",
+    "new-game",
+    "deck",
+    "history",
+    "controls"
+  ],
+  "template": "editorial",
+  "layout": "classic",
+  "screenOnly": false
+}

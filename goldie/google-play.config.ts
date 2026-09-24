@@ -5,7 +5,7 @@ import ios from "./goldie.config.ts"
 
 const appRoot = fileURLToPath(new URL("../", import.meta.url))
 const localScenes = ios.scenes
-  .filter((scene) => scene.kind === "screenshot" && scene.id !== "five-player")
+  .filter((scene) => scene.kind === "screenshot" && scene.id !== "new-game")
   .map((scene) => ({ ...scene, flow: `play-${scene.flow}` }))
 
 export default {
@@ -32,14 +32,14 @@ export default {
     },
   },
   scenes: [
-    ...localScenes.slice(0, 2),
+    localScenes[0],
     {
       kind: "screenshot",
       id: "connected-play",
       flow: "play-store-06-connected",
-      headline: { "en-US": "Play together, across devices" },
-      subhead: { "en-US": "Host a game or join with a code." },
+      headline: { "en-US": "Connected when you want." },
+      subhead: { "en-US": "Host a game. Friends join with a code." },
     },
-    ...localScenes.slice(2),
+    ...localScenes.slice(1),
   ],
 }

@@ -1,0 +1,24 @@
+# Show a named deck ready to create without an account.
+steps:
+  - launch: com.sowinghope.count.preview
+  - tool: reinstall-app
+    args:
+      bundleId: com.sowinghope.count.preview
+      appPath: android/app/build/outputs/apk/release/app-release.apk
+  - launch: com.sowinghope.count.preview
+  - await: { visible: { id: accept-legal-button } }
+  - tap: { id: accept-legal-button }
+  - await: { visible: { id: player-grid } }
+  - tap: { id: game-menu-button }
+  - tap: { text: Decks }
+  - await: { visible: { text: Add deck } }
+  - tap: { text: Add deck }
+  - await: { visible: { text: Deck details } }
+  - tap: { text: Empty }
+  - tap: { id: deck-name-input }
+  - tool: keyboard
+    args: { text: Weekend Commander }
+  - tool: keyboard
+    args: { key: enter }
+  - await: { visible: { text: Create deck } }
+  - await: { idle: true }

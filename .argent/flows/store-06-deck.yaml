@@ -1,4 +1,4 @@
-# Six-player board with game options open.
+# Show a named deck ready to create without an account.
 steps:
   - launch: com.sowinghope.count.preview
   - tool: reinstall-app
@@ -10,14 +10,15 @@ steps:
   - tap: { id: accept-legal-button }
   - await: { visible: { id: player-grid } }
   - tap: { id: game-menu-button }
-  - tap: { id: setup-button }
-  - await: { visible: { text: New game } }
-  - tap: { id: player-count-increment }
-  - tap: { id: player-count-increment }
-  - tap: { id: player-count-increment }
-  - tap: { id: player-count-increment }
-  - tap: { id: start-game-button }
-  - await: { visible: { id: player-grid } }
-  - tap: { id: life-seat-1-1 }
-  - tap: { id: game-menu-button }
+  - tap: { text: Decks }
+  - await: { visible: { text: Add deck } }
+  - tap: { text: Add deck }
+  - await: { visible: { text: Deck details } }
+  - tap: { text: Empty }
+  - tap: { id: deck-name-input }
+  - tool: keyboard
+    args: { text: Weekend Commander }
+  - tool: keyboard
+    args: { key: enter }
+  - await: { visible: { text: Create deck } }
   - await: { idle: true }

@@ -1,0 +1,65 @@
+# Two finished local games make a readable history without cloud data.
+steps:
+  - launch: com.sowinghope.count.preview
+  - tool: reinstall-app
+    args:
+      bundleId: com.sowinghope.count.preview
+      appPath: android/app/build/outputs/apk/release/app-release.apk
+  - launch: com.sowinghope.count.preview
+  - await: { visible: { id: accept-legal-button } }
+  - tap: { id: accept-legal-button }
+  - await: { visible: { id: player-grid } }
+  - tap: { id: game-menu-button }
+  - tap: { id: setup-button }
+  - await: { visible: { text: New game } }
+  - tap: { text: Magic }
+  - tap: { id: player-name-1 }
+  - tool: keyboard
+    args: { text: Avery }
+  - tool: keyboard
+    args: { key: enter }
+  - tap: { id: player-name-2 }
+  - tool: keyboard
+    args: { text: Jordan }
+  - tool: keyboard
+    args: { key: enter }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - tap: { id: life-seat-1-1 }
+  - tap: { id: game-menu-button }
+  - tap: { text: End }
+  - await: { visible: { text: Who won? } }
+  - tap: { id: end-game-winner-0 }
+  - tap: { id: confirm-end-game-button }
+  - await: { visible: { text: Finished } }
+  - tap: { text: Back }
+  - await: { visible: { id: player-grid } }
+  - tap: { id: game-menu-button }
+  - tap: { id: setup-button }
+  - await: { visible: { text: New game } }
+  - tap: { text: Pokémon }
+  - tap: { id: player-name-1 }
+  - tool: keyboard
+    args: { text: Riley }
+  - tool: keyboard
+    args: { key: enter }
+  - tap: { id: player-name-2 }
+  - tool: keyboard
+    args: { text: Morgan }
+  - tool: keyboard
+    args: { key: enter }
+  - tap: { id: start-game-button }
+  - await: { visible: { id: player-grid } }
+  - tap: { id: life-seat-2--1 }
+  - tap: { id: game-menu-button }
+  - tap: { text: End }
+  - await: { visible: { text: Who won? } }
+  - tap: { id: end-game-result-draw }
+  - tap: { id: confirm-end-game-button }
+  - await: { visible: { text: Finished } }
+  - tap: { text: Back }
+  - await: { visible: { id: player-grid } }
+  - tap: { id: game-menu-button }
+  - tap: { text: History }
+  - await: { visible: { text: History } }
+  - await: { idle: true }

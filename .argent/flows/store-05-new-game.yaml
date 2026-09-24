@@ -1,13 +1,15 @@
-# The setup screen after store-04's active five-player game.
+# The local and connected choices before starting a game.
 steps:
   - launch: com.sowinghope.count.preview
-  - await: { idle: true }
+  - tool: reinstall-app
+    args:
+      bundleId: com.sowinghope.count.preview
+      appPath: /tmp/scryve-store-assets-dd/Build/Products/Release-iphonesimulator/ScryvePreview.app
+  - launch: com.sowinghope.count.preview
+  - await: { visible: { id: accept-legal-button } }
+  - tap: { id: accept-legal-button }
+  - await: { visible: { id: player-grid } }
   - tap: { id: game-menu-button }
-  - await: { visible: { id: setup-button } }
   - tap: { id: setup-button }
-  - await: { visible: { text: Game setup } }
-  - tap: { id: start-game-button }
-  - await: { visible: { id: abandon-game-button } }
-  - tap: { id: abandon-game-button }
   - await: { visible: { text: New game } }
   - await: { idle: true }
