@@ -40,12 +40,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # expo doctor flags eas-cli as a project dependency, so CI installs a pinned global copy.
+      - name: Install EAS CLI
+        run: npm install -g eas-cli@22.2.0
+
       - name: List fingerprint sources
         id: sources
         run: |
           set -euo pipefail
           for platform in ios android; do
-            pnpm exec eas fingerprint:generate \
+            eas fingerprint:generate \
               --build-profile development \
               --platform "$platform" \
               --json \

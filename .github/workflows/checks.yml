@@ -95,7 +95,7 @@ jobs:
         run: pnpm compile
 
       - name: Validate dependency boundaries
-        run: pnpm depcruise
+        run: pnpm deps:check
 
       - name: Restore Jest cache
         uses: actions/cache@v4
