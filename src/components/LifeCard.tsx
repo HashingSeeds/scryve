@@ -228,9 +228,11 @@ export function LifeCard({
     cardPadding -
     21 -
     (statusLabel ? spacing.xxxs + 18 : 0)
-  const showStatus = statusEdgeInset === 0 || (statusEdgeLength > 0 && availableStatusOffset >= 0)
+  const showStatus = statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0
   const statusTopOffset =
-    statusEdgeInset > 0 ? Math.min(defaultStatusOffset, availableStatusOffset) : defaultStatusOffset
+    statusEdgeInset > 0 && statusEdgeLength > 0
+      ? Math.min(defaultStatusOffset, availableStatusOffset)
+      : defaultStatusOffset
 
   useEffect(() => {
     if (frozen) {
