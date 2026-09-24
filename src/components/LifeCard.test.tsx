@@ -399,18 +399,10 @@ describe("LifeCard", () => {
     expect(caption.color).toBe("#FFFFFF")
   })
 
-  it("closes the life editor without saving once the card freezes", () => {
-    const onChange = jest.fn()
-    const unfrozen = (
-      <ThemeProvider initialContext="light">
-        <LifeCard playerName="Ada" seatNumber={1} life={20} color="#41476E" onChange={onChange} />
-      </ThemeProvider>
-    )
-    const view = render(unfrozen)
-    fireEvent(view.getByTestId("life-total-button-seat-1"), "longPress")
-    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "37")
-    expect(view.getByTestId("life-editor-dialog-seat-1")).toBeTruthy()
-
+  it("closes the life editor when the card freezes", () => {
+    const view = render(interactiveCard(20, jest.fn()))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
     view.rerender(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -419,13 +411,11 @@ describe("LifeCard", () => {
           life={20}
           color="#41476E"
           eliminated
-          onChange={onChange}
+          onChange={jest.fn()}
         />
       </ThemeProvider>,
     )
-
-    expect(view.queryByTestId("life-editor-dialog-seat-1")).toBeNull()
-    expect(onChange).not.toHaveBeenCalled()
+    expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
   })
 
   it("keeps the marker cornered instead of clamping it into a cramped card", () => {
@@ -476,59 +466,87 @@ describe("LifeCard", () => {
     expect(view.getByText("−")).toBeTruthy()
   })
 
-  it("uses a circular life target to set a new total", () => {
-    const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
-    const target = view.getByTestId("life-total-button-seat-1")
-
-    expect(StyleSheet.flatten(target.props.style)).toMatchObject({
-      width: 200,
-      height: 200,
-      borderRadius: 100,
-    })
-    expect(StyleSheet.flatten(target.props.style).borderWidth).toBeUndefined()
+  it("lets the control zones handle touches at the life total", () => {
+    const view = render(interactiveCard(20, jest.fn()))
+    expect(view.queryByTestId("life-total-button-seat-1")).toBeNull()
     expect(StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style)).toMatchObject({
-      position: "absolute",
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
       justifyContent: "center",
     })
-    expect(view.getByTestId("life-total-seat-1").props.adjustsFontSizeToFit).toBeUndefined()
-    fireEvent(target, "longPress")
-    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "37")
-    fireEvent.press(view.getByTestId("life-editor-apply-seat-1"))
-
-    expect(onChange).toHaveBeenCalledWith(17)
-    expect(view.queryByTestId("life-editor-dialog-seat-1")).toBeNull()
+    expect(view.getByTestId("life-readout-seat-1").props.pointerEvents).toBe("none")
   })
 
-  it.each([
-    ["life-seat-1-1", "8", 8, "Add life"],
-    ["life-seat-1--1", "6", -6, "Subtract life"],
-  ])("opens custom amount editing from a long press on %s", (testID, value, delta, title) => {
+  it("opens the seat editor from either control long press", () => {
+    const view = render(interactiveCard(20, jest.fn()))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Close life controls"))
+    fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+  })
+
+  it("uses Magic quick amounts", () => {
     const onChange = jest.fn()
     const view = render(interactiveCard(20, onChange))
-
-    fireEvent(view.getByTestId(testID), "longPress")
-    expect(view.getAllByText(title)).toHaveLength(2)
-    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), value)
-    fireEvent.press(view.getByTestId("life-editor-apply-seat-1"))
-
-    expect(onChange).toHaveBeenCalledWith(delta)
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    fireEvent.press(view.getByTestId("life-editor-step-1--5"))
+    expect(onChange).toHaveBeenCalledWith(-5)
+    expect(view.getByText("15")).toBeTruthy()
   })
 
-  it("rejects zero for add and subtract amounts", () => {
-    const view = render(interactiveCard(20, jest.fn()))
-
+  it("scrubs Magic life one point per step without applying twice", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
-    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "0")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 105, pageY: 100 } })
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(1)
+    expect(view.getByText("21")).toBeTruthy()
+  })
 
-    expect(view.getByTestId("life-editor-apply-seat-1").props.accessibilityState.disabled).toBe(
-      true,
+  it("keeps scrubbing while held at the end and stops on release", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 200, pageY: 100 } })
+    act(() => jest.advanceTimersByTime(350 + 3 * 110))
+    expect(view.getByText("+23")).toBeTruthy()
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(23)
+    act(() => jest.advanceTimersByTime(1000))
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
+  it("uses Yu-Gi-Oh! quick amounts and 100 point scrub steps", () => {
+    const onChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={8000}
+          color="#41476E"
+          system="ygo"
+          onChange={onChange}
+        />
+      </ThemeProvider>,
     )
-    expect(view.getByText("Enter a whole number from 1 to 999999.")).toBeTruthy()
+    fireEvent(view.getByTestId("life-seat-1-100"), "longPress")
+    fireEvent.press(view.getByTestId("life-editor-step-1--50"))
+    expect(onChange).toHaveBeenCalledWith(-50)
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 105, pageY: 100 } })
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenLastCalledWith(100)
   })
 
   it("removes steppers from a view-only card instead of dimming them", () => {

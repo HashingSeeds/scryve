@@ -19,7 +19,7 @@ describe("LifeControls", () => {
       const label = view.getByText(delta === -1 ? "−" : "+")
       expect(button.props.accessibilityRole).toBe("button")
       expect(button.props.accessibilityLabel).toContain("Seat 1, Ada")
-      expect(button.props.accessibilityHint).toContain("Long press to enter a custom amount")
+      expect(button.props.accessibilityHint).toContain("Long press for more controls")
       expect(label.props.maxFontSizeMultiplier).toBe(1.3)
       expect(label.props.adjustsFontSizeToFit).toBeUndefined()
       expect(label.props.numberOfLines).toBe(1)
@@ -78,7 +78,7 @@ describe("LifeControls", () => {
 
     expect(subtract.props.accessibilityLabel).toContain("subtract 100 Life Points")
     expect(onChange).toHaveBeenCalledWith(-100)
-    expect(onLongChange).toHaveBeenCalledWith(-1, 1000)
+    expect(onLongChange).toHaveBeenCalledWith(-1)
   })
 
   it("uses the change amount saved on the game", () => {

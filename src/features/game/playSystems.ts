@@ -18,6 +18,8 @@ export type CounterRules = {
   presets: readonly number[]
   tapStep: number
   longPressStep?: number
+  quickAdjustments: readonly [number, number]
+  scrubStep: number
   direction: "open" | "down"
   maxStartingValue: number
 }
@@ -48,6 +50,8 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
       defaultValue: 20,
       presets: [20, 30, 40],
       tapStep: 1,
+      quickAdjustments: [10, 5],
+      scrubStep: 1,
       direction: "open",
       maxStartingValue: 999,
     },
@@ -65,6 +69,8 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
       defaultValue: 8000,
       presets: [8000],
       tapStep: 100,
+      quickAdjustments: [1000, 50],
+      scrubStep: 100,
       longPressStep: 1000,
       direction: "open",
       maxStartingValue: 999_999,
@@ -83,6 +89,8 @@ const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
       defaultValue: 6,
       presets: [6],
       tapStep: 1,
+      quickAdjustments: [2, 1],
+      scrubStep: 1,
       direction: "down",
       maxStartingValue: 99,
     },
@@ -102,6 +110,8 @@ const GENERIC_PLAY_RULES = {
     defaultValue: 20,
     presets: [],
     tapStep: 1,
+    quickAdjustments: [10, 5],
+    scrubStep: 1,
     longPressStep: undefined,
     direction: "open",
     maxStartingValue: 999,

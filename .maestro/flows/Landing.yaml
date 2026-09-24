@@ -10,24 +10,10 @@ onFlowStart:
     id: "player-grid"
 - longPressOn:
     id: "life-seat-1--1"
-- assertVisible: "Subtract life"
 - tapOn:
-    id: "life-editor-input-seat-1"
-- inputText: "5"
-# the number pad's Done accessory overlaps the apply button and submits the
-# editor itself, so use it when present and fall back to the apply button.
-- runFlow:
-    when:
-      visible: "Done"
-    commands:
-      - tapOn: "Done"
-- runFlow:
-    when:
-      visible:
-        id: "life-editor-apply-seat-1"
-    commands:
-      - tapOn:
-          id: "life-editor-apply-seat-1"
+    id: "life-editor-step-1--5"
+- tapOn:
+    id: "life-editor-close-seat-1"
 - assertVisible: "Seat 1, Player 1, 15 life"
 - tapOn:
     id: "game-menu-button"
