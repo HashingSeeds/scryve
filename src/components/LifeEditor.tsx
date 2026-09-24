@@ -184,7 +184,13 @@ export function LifeEditor({
   const headerPosition = lifeEditorHeaderPosition(rotation, contentInsets, menuCorner, compact)
   const titleWidth =
     menuEdgeCenter === HEADER_EDGES[rotation].top && editorWidth > 0
-      ? Math.max(0, editorWidth / 2 - (compact ? 35 : 40) - (compact ? 12 : 20))
+      ? Math.max(
+          0,
+          editorWidth / 2 -
+            (compact ? 35 : 40) -
+            (compact ? 12 : 20) -
+            safe[HEADER_EDGES[rotation].left],
+        )
       : undefined
 
   useEffect(() => {

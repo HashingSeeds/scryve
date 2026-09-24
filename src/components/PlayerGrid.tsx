@@ -397,6 +397,7 @@ function fallbackMenuAt(
 ): { corner?: LifeCardMenuCorner; edgeCenter?: LifeCardMenuEdge } | undefined {
   if (rows.length === 1 && rows[0].length === 2)
     return row === 0 ? { edgeCenter: column === 0 ? "right" : "left" } : undefined
+  if (rows.length === 1) return undefined
   if (row !== boundary - 1 && row !== boundary) return undefined
   const upper = row === boundary - 1
   const count = rows[row].length

@@ -536,6 +536,29 @@ describe("LifeCard", () => {
     })
   })
 
+  it("accounts for the bottom safe area beside a landscape center menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="A long player name"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={-90}
+          contentInsets={{ top: 0, bottom: 21, left: 0, right: 0 }}
+          menuEdgeCenter="left"
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 400, height: 300 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const title = StyleSheet.flatten(view.getByTestId("life-editor-title-seat-1").props.style)
+    expect(title.maxWidth).toBe(300 / 2 - 40 - 20 - 21)
+  })
+
   it.each(PLAYER_COLORS)("keeps the life editor visibly tied to seat color %s", (color) => {
     const view = render(
       <ThemeProvider initialContext="dark">

@@ -166,6 +166,24 @@ describe("PlayerGrid", () => {
     Dimensions.set({ window })
   })
 
+  it("keeps the full title width for a center seat in three-player landscape", () => {
+    const window = Dimensions.get("window")
+    Dimensions.set({ window: { width: 844, height: 390, scale: 3, fontScale: 1 } })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(3)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+      nativeEvent: { layout: { width: 280, height: 390 } },
+    })
+    fireEvent(view.getByTestId("life-seat-2-1"), "longPress")
+    const title = StyleSheet.flatten(view.getByTestId("life-editor-title-seat-2").props.style)
+    expect(title.maxWidth).toBeUndefined()
+    view.unmount()
+    Dimensions.set({ window })
+  })
+
   it("clears the centered menu at both corners of a three-player row", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
