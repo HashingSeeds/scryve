@@ -1,10 +1,10 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
-import { asPlayerId } from "@/features/game/domain"
+import { asPlayerId, PLAYER_COLORS } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
-import { accessibleForeground } from "@/utils/colorContrast"
+import { accessibleForeground, relativeLuminance } from "@/utils/colorContrast"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
@@ -482,6 +482,23 @@ describe("LifeCard", () => {
     fireEvent.press(view.getByLabelText("Close life controls"))
     fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+  })
+
+  it.each(PLAYER_COLORS)("keeps the life editor visibly tied to seat color %s", (color) => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard playerName="Ada" seatNumber={1} life={20} color={color} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const editor = view.getByTestId("life-editor-seat-1")
+    const editorColor = StyleSheet.flatten(editor.props.style).backgroundColor as string
+    expect(relativeLuminance(editorColor)).toBeLessThan(relativeLuminance(color) * 0.4)
+    expect(view.getByText("Ada · life").props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ color: accessibleForeground(editorColor) }),
+      ]),
+    )
   })
 
   it("uses Magic quick amounts", () => {

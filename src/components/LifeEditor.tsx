@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
+import Animated, {
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
+import { accessibleForeground } from "@/utils/colorContrast"
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
+import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { Text } from "./Text"
 
@@ -24,6 +32,7 @@ type Props = {
   playerName: string
   life: number
   system?: PlaySystemId
+  color: string
   rotation: LifeCardContentRotation
   cardWidth: number
   cardHeight: number
@@ -36,6 +45,7 @@ export function LifeEditor({
   playerName,
   life,
   system,
+  color,
   rotation,
   cardWidth,
   cardHeight,
@@ -43,6 +53,9 @@ export function LifeEditor({
   onClose,
 }: Props) {
   const { theme } = useAppTheme()
+  const reducedMotion = useReducedMotion()
+  const editorColor = mixColorsInLinearLight(color, "#000000", 0.7)
+  const ink = accessibleForeground(editorColor)
   const { quickAdjustments, scrubStep, label } = playSystemRules(system).counter
   const [preview, setPreview] = useState(life)
   const [dragging, setDragging] = useState(false)
@@ -65,7 +78,6 @@ export function LifeEditor({
       },
     ],
   }))
-  const ink = theme.colors.board.text
   const steps = Math.max(
     -SCRUB_STEPS,
     Math.min(SCRUB_STEPS, Math.round((preview - start.current.life) / scrubStep)),
@@ -156,15 +168,16 @@ export function LifeEditor({
   }
 
   return (
-    <View
+    <Animated.View
       testID={`life-editor-seat-${seatNumber}`}
       accessibilityViewIsModal
+      entering={reducedMotion === false ? FadeIn.duration(180) : undefined}
       style={[
         styles.overlay,
         compact && styles.compactOverlay,
         rotatedBounds,
         {
-          backgroundColor: theme.colors.board.background,
+          backgroundColor: editorColor,
           transform: [{ rotate: `${rotation}deg` }],
         },
       ]}
@@ -214,7 +227,7 @@ export function LifeEditor({
               <Text
                 text={deltaLabel(preview - start.current.life)}
                 size={compact ? "lg" : "xl"}
-                style={{ color: theme.colors.board.background }}
+                style={{ color: editorColor }}
               />
             </View>
             <View
@@ -310,7 +323,7 @@ export function LifeEditor({
           </Pressable>
         ))}
       </View>
-    </View>
+    </Animated.View>
   )
 }
 
@@ -367,7 +380,7 @@ const styles = StyleSheet.create({
     padding: 12,
     zIndex: 20,
   },
-  scrubArea: { height: 112, justifyContent: "flex-end", width: "100%" },
+  scrubArea: { height: 112, justifyContent: "flex-end", width: "90%" },
   thumb: {
     borderRadius: 18,
     height: 36,

@@ -526,6 +526,7 @@ export function LifeCard({
           playerName={displayName}
           life={life}
           system={system}
+          color={color}
           rotation={contentRotation}
           cardWidth={cardSize.width}
           cardHeight={cardSize.height}
