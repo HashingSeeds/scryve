@@ -46,8 +46,8 @@ function lifeEditorHeaderPosition(
 ): ViewStyle {
   const safe = insets ?? { top: 0, bottom: 0, left: 0, right: 0 }
   const edges = HEADER_EDGES[rotation]
-  const edgeInset = compact ? 16 : 24
-  const menuInset = compact ? 44 : 52
+  const edgeInset = compact ? 12 : 20
+  const menuInset = compact ? 36 : 44
   return {
     top: (compact ? 12 : 16) + safe[edges.top],
     left: Math.max(edgeInset + safe[edges.left], menuCorner === edges.start ? menuInset : 0),
@@ -270,8 +270,17 @@ export function LifeEditor({
           accessibilityLabel="Close life controls"
           onPress={closeEditor}
           hitSlop={12}
+          style={styles.closeButton}
         >
-          <Text text="×" style={[styles.close, { color: ink }]} />
+          <View
+            style={[styles.closeStroke, { backgroundColor: ink, transform: [{ rotate: "45deg" }] }]}
+          />
+          <View
+            style={[
+              styles.closeStroke,
+              { backgroundColor: ink, transform: [{ rotate: "-45deg" }] },
+            ]}
+          />
         </Pressable>
       </View>
       <Animated.View
@@ -424,7 +433,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 42,
   },
-  actions: { alignSelf: "stretch", flexDirection: "row", gap: 5, marginHorizontal: 12 },
+  actions: { alignSelf: "stretch", flexDirection: "row", gap: 5, marginHorizontal: 8 },
   balloon: {
     alignItems: "center",
     bottom: 66,
@@ -446,9 +455,10 @@ const styles = StyleSheet.create({
     width: 0,
   },
   center: { alignSelf: "center", height: 14, position: "absolute", width: 2 },
-  close: { fontSize: 30, lineHeight: 32 },
+  closeButton: { alignItems: "center", height: 32, justifyContent: "center", width: 32 },
+  closeStroke: { borderRadius: 1, height: 2, position: "absolute", width: 20 },
   compactAction: { minHeight: 36 },
-  compactActions: { marginHorizontal: 10 },
+  compactActions: { marginHorizontal: 6 },
   compactBalloon: { bottom: 42 },
   compactBalloonBody: { paddingVertical: 4 },
   compactOverlay: { gap: 4, padding: 6 },

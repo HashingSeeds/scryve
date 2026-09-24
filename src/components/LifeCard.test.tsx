@@ -485,10 +485,10 @@ describe("LifeCard", () => {
   })
 
   it.each([
-    { rotation: 0, menuCorner: "topLeft", top: 66, left: 52, right: 44 },
-    { rotation: 90, menuCorner: "topRight", top: 36, left: 74, right: 54 },
-    { rotation: -90, menuCorner: "topLeft", top: 26, left: 54, right: 74 },
-    { rotation: 180, menuCorner: "bottomRight", top: 46, left: 52, right: 34 },
+    { rotation: 0, menuCorner: "topLeft", top: 66, left: 44, right: 40 },
+    { rotation: 90, menuCorner: "topRight", top: 36, left: 70, right: 50 },
+    { rotation: -90, menuCorner: "topLeft", top: 26, left: 50, right: 70 },
+    { rotation: 180, menuCorner: "bottomRight", top: 46, left: 44, right: 30 },
   ] as const)("keeps the $rotation° editor header clear of the menu and safe area", (entry) => {
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -527,6 +527,13 @@ describe("LifeCard", () => {
     const header = StyleSheet.flatten(view.getByTestId("life-editor-header-seat-1").props.style)
     const actions = StyleSheet.flatten(view.getByTestId("life-editor-actions-seat-1").props.style)
     expect(header.left).toBe(overlay.padding + actions.marginHorizontal)
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-editor-close-seat-1").props.style),
+    ).toMatchObject({
+      alignItems: "center",
+      justifyContent: "center",
+      height: 32,
+    })
   })
 
   it.each(PLAYER_COLORS)("keeps the life editor visibly tied to seat color %s", (color) => {
