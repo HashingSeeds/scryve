@@ -1,6 +1,6 @@
 # Google Play visual assets
 
-The phone assets were made with Goldie from an offline preview release APK. The 7-inch assets were captured from the production Android bundle. The 10-inch assets were captured from the current development app on an Android 16 emulator at 1,440 × 2,560 pixels and 320 dpi. All were visually reviewed before packaging.
+The phone and 7-inch tablet assets were captured with Goldie from isolated preview release builds. The 10-inch assets were captured from the current development app on an Android 16 emulator at 1,440 × 2,560 pixels and 320 dpi. All were visually reviewed before packaging.
 
 ## Upload inventory
 
@@ -9,14 +9,14 @@ The phone assets were made with Goldie from an offline preview release APK. The 
 | App icon | `app-icon/app-icon-512.png` | 512 × 512 |
 | Feature graphic | `feature-graphic/feature-graphic-1024x500.png` | 1,024 × 500 |
 | Phone screenshots | `phone/*.png` | 1,080 × 1,920 (9:16) |
-| 7-inch tablet screenshots | `tablet-7-inch/*.png` | 1,080 × 1,920 (9:16) |
+| 7-inch tablet screenshots | `tablet-7-inch/*.png` (5) | 1,080 × 1,920 (9:16) |
 | 10-inch tablet screenshots | `tablet-10-inch/*.png` | 1,440 × 2,560 (9:16) |
 
-All files are PNGs and are comfortably below the Google Play file-size limits. The feature graphic, phone, and 10-inch screenshots are opaque RGB PNGs.
+All files are PNGs and are comfortably below the Google Play file-size limits. The feature graphic and all screenshots are opaque RGB PNGs.
 
 ## Goldie phone captures
 
-`goldie/google-play.config.ts` defines five phone scenes: six-player board, connected setup, Abzan Armor deck detail, history, and game controls. Goldie renders the opener as two images, so `phone/` contains six PNGs. The tablet screenshots and feature graphic remain separate assets.
+`goldie/google-play.config.ts` defines five phone scenes: six-player board, connected setup, Abzan Armor deck detail, history, and game controls. Goldie renders the opener as two images, so `phone/` contains six PNGs. The 10-inch screenshots and feature graphic remain separate assets.
 
 Use a dedicated Pixel 9 Pro or Pixel 10 Pro Android emulator (1,280 × 2,856), with its network disabled. On an x86_64 emulator, build an isolated preview APK from the repo root (set `ANDROID_HOME` to the installed SDK first):
 
@@ -42,11 +42,22 @@ GOLDIE_CONFIG=$PWD/goldie/google-play.config.ts npx -y goldie@0.3.1 verify
 
 The current raw captures are in `goldie/out/raw/pixel-10-pro/`. They were taken with `adb screencap` while navigating the isolated emulator because Argent 0.22.1 could not drive taps on it. The `play-store-*` flows record the intended scenes for a later rerun. Goldie framed and verified the PNGs in `goldie/out/screenshots/pixel-10-pro/en-US/`; those verified files are copied into `play-store-assets/phone/` for upload.
 
+## Goldie 7-inch tablet captures
+
+`goldie/tablet-7/config.ts` replays five existing Android flows on the dedicated `Scryve_Goldie_Tablet_7` emulator. It uses a Nexus 7 hardware profile at 1,080 × 1,920 and 280 dpi, which keeps a tablet-sized logical width and meets Google Play's portrait screenshot guidance. Goldie 0.3.1 has only an Android phone device key, so this emulator identifies as `pixel_10_pro` for capture routing. Use the raw screenshots, not Goldie's phone frame, for the tablet upload.
+
+```bash
+GOLDIE_CONFIG=$PWD/goldie/tablet-7/config.ts GOLDIE_ARGENT_BIN=$PWD/goldie/argent-android-capture.sh npx -y goldie@0.3.1 doctor
+GOLDIE_CONFIG=$PWD/goldie/tablet-7/config.ts GOLDIE_ARGENT_BIN=$PWD/goldie/argent-android-capture.sh npx -y goldie@0.3.1 capture
+```
+
+The capture files are in `goldie/tablet-7/out/raw/pixel-10-pro/`. Export them as opaque RGB PNGs to `tablet-7-inch/` in the order defined by the config. The first-run Android full-screen tip must be dismissed before capture; on this dedicated emulator, `settings put secure immersive_mode_confirmations confirmed` keeps it from covering the screenshots.
+
 ## Notes
 
 - The app icon is a Scryve-specific mark based on the app's four-player board, controls, and production color palette. The launcher, adaptive Android, iOS, and web icon assets now use this mark; it will appear in the next application build.
 - Video is optional and is not included. A public or unlisted, ad-free, non-age-restricted YouTube upload is still needed if a promo video is desired.
-- The tablet capture flows live in `.maestro/store-assets/`.
+- The 10-inch tablet capture flows live in `.maestro/store-assets/`.
 - The phone set shows the six-player board, connected setup, Abzan Armor deck detail, populated local history, and the six-player controls overlay. The 10-inch set includes the new-game screen.
 - The deck capture uses a temporary local guest-deck seed with the official 100-card [Abzan Armor list](https://magic.wizards.com/en/news/announcements/tarkir-dragonstorm-commander-decklists). The seed is absent from the shipped app; the deck flow expects it in the isolated capture build.
 - Before submission, compare the 10-inch screenshots with the release build to confirm the same UI is shipped.

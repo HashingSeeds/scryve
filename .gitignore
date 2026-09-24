@@ -122,6 +122,7 @@ build-*.tar.gz
 
 # goldie store-asset output
 goldie/out/
+goldie/tablet-7/out/
 .agent-device/store-assets/artifacts/
 .agent-device/store-assets/store-shots/
 .agent-device/store-assets/store-video/

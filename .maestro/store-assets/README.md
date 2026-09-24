@@ -15,7 +15,7 @@ The capture suite prioritizes the in-game board at three representative player c
 Run these against a dedicated emulator, always passing its ID explicitly:
 
 ```bash
-# Phone and 7-inch upload assets: 1080 × 1920
+# Phone upload assets: 1080 × 1920
 adb -s emulator-5554 shell wm size 1080x1920
 adb -s emulator-5554 shell wm density 420
 
@@ -33,6 +33,8 @@ adb -s emulator-5554 shell wm density reset
 ```
 
 The 10-inch set was verified at 320 dpi with visible life totals on the five- and six-player boards. The extra new-game screenshot was captured manually from the same emulator profile.
+
+The refreshed 7-inch set uses the Goldie flow in `goldie/tablet-7/config.ts` on a separate tablet emulator; see `play-store-assets/README.md`.
 
 ## Apple in-app purchase review screenshot
 
