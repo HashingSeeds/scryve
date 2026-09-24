@@ -222,17 +222,15 @@ export function LifeCard({
   const statusEdgeInset = contentInsets?.[statusEdge] ?? 0
   const statusEdgeLength = Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height
   const defaultStatusOffset = lifeTargetSize / 2 + (compact ? spacing.xxxs : spacing.xxs)
+  const availableStatusOffset =
+    statusEdgeLength / 2 -
+    statusEdgeInset -
+    cardPadding -
+    21 -
+    (statusLabel ? spacing.xxxs + 18 : 0)
+  const showStatus = statusEdgeInset === 0 || (statusEdgeLength > 0 && availableStatusOffset >= 0)
   const statusTopOffset =
-    statusEdgeInset > 0 && statusEdgeLength > 0
-      ? Math.min(
-          defaultStatusOffset,
-          statusEdgeLength / 2 -
-            statusEdgeInset -
-            cardPadding -
-            21 -
-            (statusLabel ? spacing.xxxs + 18 : 0),
-        )
-      : defaultStatusOffset
+    statusEdgeInset > 0 ? Math.min(defaultStatusOffset, availableStatusOffset) : defaultStatusOffset
 
   useEffect(() => {
     if (frozen) {
@@ -338,7 +336,7 @@ export function LifeCard({
           <Text
             testID={`life-total-seat-${seatNumber}`}
             text={String(life)}
-            accessible={false}
+            accessible
             accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
             accessibilityLiveRegion="polite"
             maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
@@ -358,34 +356,36 @@ export function LifeCard({
             pointerEvents="none"
             style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
           >
-            <View
-              testID={`life-status-seat-${seatNumber}`}
-              style={[
-                themed(compact ? $compactStatusPosition : $statusPosition),
-                { marginTop: statusTopOffset },
-              ]}
-            >
-              <Text
-                testID={`player-name-seat-${seatNumber}`}
-                text={displayName}
-                accessible={false}
-                size="xs"
-                weight="medium"
-                maxFontSizeMultiplier={1.3}
-                numberOfLines={1}
-                style={[themed($name), { color: foreground }]}
-              />
-              {statusLabel ? (
+            {showStatus ? (
+              <View
+                testID={`life-status-seat-${seatNumber}`}
+                style={[
+                  themed(compact ? $compactStatusPosition : $statusPosition),
+                  { marginTop: statusTopOffset },
+                ]}
+              >
                 <Text
-                  text={statusLabel}
-                  weight="bold"
-                  size="xxs"
+                  testID={`player-name-seat-${seatNumber}`}
+                  text={displayName}
+                  accessible={false}
+                  size="xs"
+                  weight="medium"
                   maxFontSizeMultiplier={1.3}
                   numberOfLines={1}
-                  style={[themed($status), { color: foreground }]}
+                  style={[themed($name), { color: foreground }]}
                 />
-              ) : null}
-            </View>
+                {statusLabel ? (
+                  <Text
+                    text={statusLabel}
+                    weight="bold"
+                    size="xxs"
+                    maxFontSizeMultiplier={1.3}
+                    numberOfLines={1}
+                    style={[themed($status), { color: foreground }]}
+                  />
+                ) : null}
+              </View>
+            ) : null}
           </View>
         </View>
       </View>

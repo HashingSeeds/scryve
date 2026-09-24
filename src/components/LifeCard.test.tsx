@@ -480,6 +480,7 @@ describe("LifeCard", () => {
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
     fireEvent.press(view.getByLabelText("Close life controls"))
+    expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
     fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
   })
@@ -743,6 +744,28 @@ describe("LifeCard", () => {
     const status = StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)
     expect(readout.paddingTop).toBe(59)
     expect(status.marginTop).toBeLessThan(187 / 2 - 59 - 21)
+  })
+
+  it("hides the status when a short card cannot fit it below the notch", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Player 1"
+          seatNumber={1}
+          life={20}
+          color="#B85636"
+          compact
+          contentRotation={180}
+          contentInsets={{ top: 59, bottom: 0, left: 0, right: 0 }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 150 } },
+    })
+    expect(view.queryByTestId("life-status-seat-1")).toBeNull()
+    expect(view.getByTestId("life-total-seat-1").props.accessible).toBe(true)
   })
 
   it("spans the under-total column full width so names truncate late", () => {
