@@ -4,22 +4,20 @@ import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Path, Rect } from "react-native-svg"
 
-import { MAX_LIFE_DELTA } from "@/features/game/domain"
-import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
+import { counterValueLabel, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
-import { Button } from "./Button"
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
   CommanderDamageCardControls,
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
-import { DialogCard, $dialogActions, $dialogButton } from "./DialogCard"
-import { LifeControls, overlayTint } from "./LifeControls"
+import { LifeControls } from "./LifeControls"
+import { LifeEditor } from "./LifeEditor"
 import {
   COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
@@ -35,15 +33,15 @@ import {
   PLAYER_MARK_SIZE,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
+  type LifeCardMenuCorner,
+  type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
-import { TextField } from "./TextField"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
 const DELTA_VISIBLE_MS = 1800
 const COMMANDER_OVERVIEW_MS = 220
-type LifeEditMode = "add" | "subtract" | "set"
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
 
@@ -78,6 +76,8 @@ export interface LifeCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
   lifeFontSize?: number
   system?: PlaySystemId
   lifeStep?: number
@@ -99,6 +99,8 @@ export function LifeCard({
   compact,
   contentRotation = 0,
   contentInsets,
+  menuCorner,
+  menuEdgeCenter,
   lifeFontSize,
   system,
   lifeStep,
@@ -120,7 +122,6 @@ export function LifeCard({
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
   const frozen = disabled || eliminated
   const inspectDisabled = disabled && ownership !== "unowned"
-  const counter = playSystemRules(system).counter
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
@@ -128,7 +129,6 @@ export function LifeCard({
   const identity = `Seat ${seatNumber}, ${displayName}`
   const markSize = compact ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
-  const lifeTargetRadius = lifeTargetSize / 2
   const resolvedLifeFontSize =
     lifeFontSize ??
     Math.min(
@@ -153,8 +153,7 @@ export function LifeCard({
     reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [recentDelta, setRecentDelta] = useState(0)
-  const [editMode, setEditMode] = useState<LifeEditMode | null>(null)
-  const [editValue, setEditValue] = useState("")
+  const [editorOpen, setEditorOpen] = useState(false)
   const previousLife = useRef(life)
   const deltaTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -212,36 +211,32 @@ export function LifeCard({
             onChange: (step) => commanderDamage.onStage?.(step),
           }
         : undefined
-  const statusTopOffset = lifeTargetRadius + (compact ? spacing.xxxs : spacing.xxs)
-  const parsedValue = Number(editValue)
-  const isWholeNumber = editValue.trim() !== "" && Number.isInteger(parsedValue)
-  const requestedDelta =
-    editMode === "add" ? parsedValue : editMode === "subtract" ? -parsedValue : parsedValue - life
-  const validEdit =
-    isWholeNumber &&
-    (editMode === "set" || parsedValue > 0) &&
-    (requestedDelta === 0 || (Math.abs(requestedDelta) <= MAX_LIFE_DELTA && requestedDelta !== 0))
-
-  function openEditor(mode: LifeEditMode) {
-    setEditMode(mode)
-    setEditValue(mode === "set" ? String(life) : "")
-  }
-
-  function closeEditor() {
-    setEditMode(null)
-    setEditValue("")
-  }
-
-  function applyEdit() {
-    if (frozen || !validEdit) return
-    if (requestedDelta !== 0) onChange(requestedDelta)
-    closeEditor()
-  }
+  const statusEdge =
+    contentRotation === 180
+      ? "top"
+      : contentRotation === 90
+        ? "left"
+        : contentRotation === -90
+          ? "right"
+          : "bottom"
+  const statusEdgeInset = contentInsets?.[statusEdge] ?? 0
+  const statusEdgeLength = Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height
+  const defaultStatusOffset = lifeTargetSize / 2 + (compact ? spacing.xxxs : spacing.xxs)
+  const availableStatusOffset =
+    statusEdgeLength / 2 -
+    statusEdgeInset -
+    cardPadding -
+    21 -
+    (statusLabel ? spacing.xxxs + 18 : 0)
+  const showStatus = statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0
+  const statusTopOffset =
+    statusEdgeInset > 0 && statusEdgeLength > 0
+      ? Math.min(defaultStatusOffset, availableStatusOffset)
+      : defaultStatusOffset
 
   useEffect(() => {
     if (frozen) {
-      setEditMode(null)
-      setEditValue("")
+      setEditorOpen(false)
     }
   }, [frozen])
 
@@ -264,13 +259,6 @@ export function LifeCard({
     setCommanderOverviewOpen(false)
     commanderDamage?.onPressSword?.()
   }
-
-  const editTitle =
-    editMode === "add"
-      ? `Add ${counter.label}`
-      : editMode === "subtract"
-        ? `Subtract ${counter.label}`
-        : `Set ${counter.label}`
 
   return (
     <View
@@ -331,8 +319,8 @@ export function LifeCard({
       >
         <View
           testID={`life-readout-seat-${seatNumber}`}
-          pointerEvents="box-none"
-          style={themed($readout)}
+          pointerEvents="none"
+          style={[themed($readout), safeContentStyle]}
         >
           {eliminated ? (
             <View
@@ -347,72 +335,59 @@ export function LifeCard({
               />
             </View>
           ) : null}
-          <Pressable
-            testID={`life-total-button-seat-${seatNumber}`}
-            disabled={frozen}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !!frozen }}
+          <Text
+            testID={`life-total-seat-${seatNumber}`}
+            text={String(life)}
+            accessible
             accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
-            accessibilityHint={`Long press to set ${counter.label} to a new number`}
-            delayLongPress={450}
-            onLongPress={() => openEditor("set")}
-            style={({ pressed }) => [
-              themed(compact ? $compactLifeButton : $lifeButton),
-              pressed && !frozen && { backgroundColor: overlayTint(foreground, 0.14) },
+            accessibilityLiveRegion="polite"
+            maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
+            numberOfLines={1}
+            style={[
+              themed($life),
+              {
+                fontSize: resolvedLifeFontSize,
+                lineHeight: getLifeLineHeight(resolvedLifeFontSize),
+              },
+              contentRotationStyle,
+              { color: foreground },
             ]}
-          >
-            <Text
-              testID={`life-total-seat-${seatNumber}`}
-              text={String(life)}
-              accessible={false}
-              accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
-              accessibilityLiveRegion="polite"
-              maxFontSizeMultiplier={LIFE_MAX_FONT_SCALE}
-              numberOfLines={1}
-              style={[
-                themed($life),
-                {
-                  fontSize: resolvedLifeFontSize,
-                  lineHeight: getLifeLineHeight(resolvedLifeFontSize),
-                },
-                contentRotationStyle,
-                { color: foreground },
-              ]}
-            />
-          </Pressable>
+          />
           <View
             testID={`life-status-layer-seat-${seatNumber}`}
             pointerEvents="none"
             style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
           >
-            <View
-              testID={`life-status-seat-${seatNumber}`}
-              style={[
-                themed(compact ? $compactStatusPosition : $statusPosition),
-                { marginTop: statusTopOffset },
-              ]}
-            >
-              <Text
-                testID={`player-name-seat-${seatNumber}`}
-                text={displayName}
-                accessible={false}
-                size="xs"
-                weight="medium"
-                maxFontSizeMultiplier={1.3}
-                numberOfLines={1}
-                style={[themed($name), { color: foreground }]}
-              />
-              {statusLabel ? (
+            {showStatus ? (
+              <View
+                testID={`life-status-seat-${seatNumber}`}
+                style={[
+                  themed(compact ? $compactStatusPosition : $statusPosition),
+                  { marginTop: statusTopOffset },
+                ]}
+              >
                 <Text
-                  text={statusLabel}
-                  weight="bold"
-                  size="xxs"
+                  testID={`player-name-seat-${seatNumber}`}
+                  text={displayName}
+                  accessible={false}
+                  size="xs"
+                  weight="medium"
                   maxFontSizeMultiplier={1.3}
                   numberOfLines={1}
-                  style={[themed($status), { color: foreground }]}
+                  style={[themed($name), { color: foreground }]}
                 />
-              ) : null}
-            </View>
+                {statusLabel ? (
+                  <Text
+                    text={statusLabel}
+                    weight="bold"
+                    size="xxs"
+                    maxFontSizeMultiplier={1.3}
+                    numberOfLines={1}
+                    style={[themed($status), { color: foreground }]}
+                  />
+                ) : null}
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -507,10 +482,7 @@ export function LifeCard({
           lifeStep={lifeStep}
           recentDelta={recentDelta}
           onChange={onChange}
-          onLongChange={(direction, amount) => {
-            if (amount) onChange(direction * amount)
-            else openEditor(direction > 0 ? "add" : "subtract")
-          }}
+          onLongChange={() => setEditorOpen(true)}
         />
       ) : null}
       {commanderDamage && !localCommander && !commanderCardMode && !commanderOverviewOpen ? (
@@ -577,47 +549,23 @@ export function LifeCard({
           </Pressable>
         </View>
       ) : null}
-      {editMode ? (
-        <DialogCard
-          visible
-          onClose={closeEditor}
-          backdropTestID={`life-editor-backdrop-seat-${seatNumber}`}
-          backdropAccessibilityLabel={`Cancel ${counter.label} edit`}
-          dialogTestID={`life-editor-dialog-seat-${seatNumber}`}
-          accessibilityViewIsModal
-        >
-          <Text text={editTitle} preset="subheading" style={themed($dialogTitle)} />
-          <TextField
-            testID={`life-editor-input-seat-${seatNumber}`}
-            autoFocus
-            selectTextOnFocus
-            label={editMode === "set" ? `New ${counter.label} total` : "Amount"}
-            value={editValue}
-            keyboardType={editMode === "set" ? "numbers-and-punctuation" : "number-pad"}
-            returnKeyType="done"
-            status={editValue && !validEdit ? "error" : undefined}
-            helper={
-              editValue && !validEdit
-                ? editMode === "set"
-                  ? `Enter a whole number within ${MAX_LIFE_DELTA} of the current total.`
-                  : `Enter a whole number from 1 to ${MAX_LIFE_DELTA}.`
-                : undefined
-            }
-            onChangeText={setEditValue}
-            onSubmitEditing={applyEdit}
-          />
-          <View style={themed($dialogActions)}>
-            <Button text="Cancel" style={themed($dialogButton)} onPress={closeEditor} />
-            <Button
-              testID={`life-editor-apply-seat-${seatNumber}`}
-              text={editMode === "set" ? `Set ${counter.label}` : editTitle}
-              preset="reversed"
-              disabled={!validEdit}
-              style={themed($dialogButton)}
-              onPress={applyEdit}
-            />
-          </View>
-        </DialogCard>
+      {editorOpen ? (
+        <LifeEditor
+          seatNumber={seatNumber}
+          playerName={displayName}
+          life={life}
+          sourceFontSize={resolvedLifeFontSize}
+          system={system}
+          color={color}
+          rotation={contentRotation}
+          cardWidth={cardSize.width}
+          cardHeight={cardSize.height}
+          contentInsets={contentInsets}
+          menuCorner={menuCorner}
+          menuEdgeCenter={menuEdgeCenter}
+          onChange={onChange}
+          onClose={() => setEditorOpen(false)}
+        />
       ) : null}
     </View>
   )
@@ -671,22 +619,6 @@ const $life: ThemedStyle<TextStyle> = () => ({
   width: "100%",
   textAlign: "center",
   fontVariant: ["tabular-nums"],
-})
-
-const $lifeButton: ThemedStyle<ViewStyle> = () => ({
-  width: LIFE_TARGET_SIZE,
-  height: LIFE_TARGET_SIZE,
-  borderRadius: LIFE_TARGET_SIZE / 2,
-  alignItems: "center",
-  justifyContent: "center",
-})
-
-const $compactLifeButton: ThemedStyle<ViewStyle> = () => ({
-  width: COMPACT_LIFE_TARGET_SIZE,
-  height: COMPACT_LIFE_TARGET_SIZE,
-  borderRadius: COMPACT_LIFE_TARGET_SIZE / 2,
-  alignItems: "center",
-  justifyContent: "center",
 })
 
 const $statusLayer: ThemedStyle<ViewStyle> = () => ({
@@ -762,7 +694,6 @@ const $eliminatedMark: ThemedStyle<TextStyle> = () => ({
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
-const $dialogTitle: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
 
 function commanderToolbarEdge(
   rotation: LifeCardContentRotation,

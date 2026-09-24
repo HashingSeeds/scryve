@@ -25,7 +25,7 @@ export interface LifeControlsProps {
   lifeStep?: number
   recentDelta?: number
   onChange: (delta: LifeDelta) => void
-  onLongChange?: (direction: -1 | 1, amount?: number) => void
+  onLongChange?: (direction: -1 | 1) => void
   style?: StyleProp<ViewStyle>
 }
 
@@ -105,17 +105,11 @@ export function LifeControls({
               accessibilityRole="button"
               accessibilityState={{ disabled: !!disabled }}
               accessibilityLabel={labelFor(delta)}
-              accessibilityHint={
-                counter.longPressStep
-                  ? `Tap to change ${identity}'s ${counter.label} by ${delta}. Long press to change it by ${direction * counter.longPressStep}.`
-                  : `Tap to change ${identity}'s ${counter.label} by ${delta}. Long press to enter a custom amount.`
-              }
+              accessibilityHint={`Tap to change ${identity}'s ${counter.label} by ${delta}. Long press for more controls.`}
               accessibilityActions={[
                 {
                   name: "longpress",
-                  label: counter.longPressStep
-                    ? labelFor(direction * counter.longPressStep)
-                    : `${identity}, ${direction > 0 ? "add" : "subtract"} a custom amount`,
+                  label: `${identity}, more ${counter.label} controls`,
                 },
               ]}
               style={({ pressed }) => [
@@ -133,11 +127,10 @@ export function LifeControls({
               }}
               onLongPress={() => {
                 longPressHandled.current = direction
-                onLongChange?.(direction, counter.longPressStep)
+                onLongChange?.(direction)
               }}
               onAccessibilityAction={({ nativeEvent }) => {
-                if (nativeEvent.actionName === "longpress")
-                  onLongChange?.(direction, counter.longPressStep)
+                if (nativeEvent.actionName === "longpress") onLongChange?.(direction)
               }}
               onPress={() => {
                 if (longPressHandled.current === direction) {

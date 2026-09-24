@@ -63,6 +63,32 @@ describe("PlayerGrid", () => {
     expect(measuredOpacity).toBe(1)
   })
 
+  it("keeps one card's life font size when another total gains a digit", () => {
+    const initialPlayers = players(2)
+    initialPlayers[1].life = 999
+    const onChange = jest.fn()
+    const renderGrid = (currentPlayers: typeof initialPlayers) => (
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={currentPlayers} onChange={onChange} />
+      </ThemeProvider>
+    )
+    const view = render(renderGrid(initialPlayers))
+    fireEvent(view.getByTestId("player-grid"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 690 } },
+    })
+    const fontSize = (seat: number) =>
+      StyleSheet.flatten(view.getByTestId(`life-total-seat-${seat}`).props.style).fontSize as number
+    const firstBefore = fontSize(1)
+    const secondBefore = fontSize(2)
+
+    view.rerender(renderGrid([initialPlayers[0], { ...initialPlayers[1], life: 1000 }]))
+
+    expect(fontSize(1)).toBe(firstBefore)
+    expect(fontSize(2)).toBeLessThan(secondBefore)
+    view.unmount()
+    jest.clearAllMocks()
+  })
+
   it.each([2, 3, 4, 5, 6])(
     "renders every card and four controls in a %i-player layout",
     (count) => {
@@ -92,6 +118,84 @@ describe("PlayerGrid", () => {
       paddingHorizontal: 0,
       paddingBottom: 0,
     })
+  })
+
+  it("moves middle-row editor headers away from the center game menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(5)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-3-1"), "longPress")
+    fireEvent(view.getByTestId("life-seat-4-1"), "longPress")
+    const header = (seat: number) =>
+      StyleSheet.flatten(view.getByTestId(`life-editor-header-seat-${seat}`).props.style)
+    expect(header(3).left).toBeGreaterThanOrEqual(44)
+    expect(header(4).right).toBeGreaterThanOrEqual(44)
+  })
+
+  it("keeps a long two-player editor name clear of the centered menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(2)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 400 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const title = StyleSheet.flatten(view.getByTestId("life-editor-title-seat-1").props.style)
+    expect(title.maxWidth).toBeLessThanOrEqual(390 / 2 - 40)
+  })
+
+  it("keeps landscape two-player editor names clear of the centered menu", () => {
+    const window = Dimensions.get("window")
+    Dimensions.set({ window: { width: 844, height: 390, scale: 3, fontScale: 1 } })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(2)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 420, height: 390 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const title = StyleSheet.flatten(view.getByTestId("life-editor-title-seat-1").props.style)
+    expect(title.maxWidth).toBeLessThanOrEqual(390 / 2 - 40)
+    view.unmount()
+    Dimensions.set({ window })
+  })
+
+  it("keeps the full title width for a center seat in three-player landscape", () => {
+    const window = Dimensions.get("window")
+    Dimensions.set({ window: { width: 844, height: 390, scale: 3, fontScale: 1 } })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(3)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-2"), "layout", {
+      nativeEvent: { layout: { width: 280, height: 390 } },
+    })
+    fireEvent(view.getByTestId("life-seat-2-1"), "longPress")
+    const title = StyleSheet.flatten(view.getByTestId("life-editor-title-seat-2").props.style)
+    expect(title.maxWidth).toBeUndefined()
+    view.unmount()
+    Dimensions.set({ window })
+  })
+
+  it("clears the centered menu at both corners of a three-player row", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(3)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-2-1"), "longPress")
+    fireEvent(view.getByTestId("life-seat-3-1"), "longPress")
+    const header = (seat: number) =>
+      StyleSheet.flatten(view.getByTestId(`life-editor-header-seat-${seat}`).props.style)
+    expect(header(2).left).toBeGreaterThanOrEqual(44)
+    expect(header(3).right).toBeGreaterThanOrEqual(44)
   })
 
   it("squares only the corners that meet the device's rounded screen corners", () => {
@@ -337,7 +441,7 @@ describe("PlayerGrid", () => {
       }
     })
 
-    it("keeps every seat on one shared size so the board reads as a scoreboard", () => {
+    it("gives paired seats equal cell width in the three-player layout", () => {
       const layout = getPlayerGridLayout({ playerCount: 3, width: 390, height: 844 })
       const { cellWidth } = getCellSize({ board, layout, gap: 4 })
       expect(layout.layout).toBe("three-featured")

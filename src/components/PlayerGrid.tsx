@@ -22,6 +22,8 @@ import {
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
   type LifeCardContentRotation,
+  type LifeCardMenuCorner,
+  type LifeCardMenuEdge,
 } from "./playerCardTypes"
 
 export interface CommanderDamageGridBinding {
@@ -90,14 +92,14 @@ export function PlayerGrid({
     fontScale,
     layoutVariant,
   })
-  const lifeFontSize = getLifeFontSize({
-    ...getCellSize({ board, layout, gap: spacing.xxs }),
-    digits: Math.max(...players.map((player) => String(player.life).length)),
+  const cellSize = getCellSize({ board, layout, gap: spacing.xxs })
+  const lifeFontSizeInput = {
+    ...cellSize,
     fontScale,
     targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
     sidewaysGlyphReserve:
       2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs),
-  })
+  }
 
   function measureBoard(event: LayoutChangeEvent) {
     const { width: boardWidth, height: boardHeight } = event.nativeEvent.layout
@@ -109,6 +111,8 @@ export function PlayerGrid({
   }
 
   const rows = getPlayerGridRows(players.length, layout)
+  const menuJunction = getFourCardMenuJunction(rows)
+  const fallbackMenuBoundary = menuJunction ? null : getCentralMenuBoundary(rows, layout)
   const boardSeats = commanderDamage
     ? commanderBoardSeats(
         rows,
@@ -121,7 +125,11 @@ export function PlayerGrid({
       testID="player-grid"
       accessibilityLabel={`${players.length} player ${counter.label} grid`}
       onLayout={measureBoard}
-      style={[themed($grid), style, lifeFontSize === undefined && $unmeasured]}
+      style={[
+        themed($grid),
+        style,
+        (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
+      ]}
     >
       {rows.map((row, rowIndex) => (
         <View
@@ -168,6 +176,12 @@ export function PlayerGrid({
               left: columnIndex === 0 ? insets.left : 0,
               right: columnIndex === row.length - 1 ? insets.right : 0,
             }
+            const fallbackMenu =
+              fallbackMenuBoundary === null
+                ? undefined
+                : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
+            const menuCorner =
+              menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
             return (
               <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={themed($cell)}>
                 <LifeCard
@@ -179,7 +193,12 @@ export function PlayerGrid({
                   compact={layout.compact}
                   contentRotation={contentRotation}
                   contentInsets={contentInsets}
-                  lifeFontSize={lifeFontSize}
+                  menuCorner={menuCorner}
+                  menuEdgeCenter={fallbackMenu?.edgeCenter}
+                  lifeFontSize={getLifeFontSize({
+                    ...lifeFontSizeInput,
+                    digits: String(player.life).length,
+                  })}
                   system={system}
                   lifeStep={lifeStep}
                   disabled={disabled || playerDisabled}
@@ -314,6 +333,32 @@ export function getPlayerGridMenuAnchor(
     cumulativeFlex += flex
     return cumulativeFlex / totalRowFlex
   })
+  const junction = getFourCardMenuJunction(rows)
+  if (junction)
+    return {
+      x: junction.column / junction.columnCount,
+      y: boundaryPositions[junction.boundary - 1],
+    }
+  return { x: 0.5, y: boundaryPositions[getCentralMenuBoundary(rows, layout) - 1] ?? 0.5 }
+}
+
+function getCentralMenuBoundary(
+  rows: (number | null)[][],
+  layout: ReturnType<typeof getPlayerGridLayout>,
+) {
+  const flexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
+  const total = flexes.reduce((sum, flex) => sum + flex, 0)
+  let position = 0
+  let nearest = { boundary: 1, distance: Infinity }
+  for (let index = 0; index < rows.length - 1; index += 1) {
+    position += flexes[index] / total
+    const distance = Math.abs(position - 0.5)
+    if (distance < nearest.distance) nearest = { boundary: index + 1, distance }
+  }
+  return nearest.boundary
+}
+
+function getFourCardMenuJunction(rows: (number | null)[][]) {
   for (let boundary = rows.length - 1; boundary > 0; boundary -= 1) {
     const upper = rows[boundary - 1]
     const lower = rows[boundary]
@@ -325,17 +370,42 @@ export function getPlayerGridMenuAnchor(
         lower[column - 1],
         lower[column],
       ].every((seat) => seat !== null && seat !== undefined)
-      if (fourCardsMeet) return { x: column / columnCount, y: boundaryPositions[boundary - 1] }
+      if (fourCardsMeet) return { boundary, column, columnCount }
     }
   }
-  const nearestCentralBoundary = boundaryPositions.reduce<number | undefined>(
-    (nearest, position) =>
-      nearest === undefined || Math.abs(position - 0.5) < Math.abs(nearest - 0.5)
-        ? position
-        : nearest,
-    undefined,
-  )
-  return { x: 0.5, y: nearestCentralBoundary ?? 0.5 }
+  return null
+}
+
+function menuCornerAt(
+  junction: ReturnType<typeof getFourCardMenuJunction>,
+  row: number,
+  column: number,
+): LifeCardMenuCorner | undefined {
+  if (!junction) return undefined
+  if (row === junction.boundary - 1 && column === junction.column - 1) return "bottomRight"
+  if (row === junction.boundary - 1 && column === junction.column) return "bottomLeft"
+  if (row === junction.boundary && column === junction.column - 1) return "topRight"
+  if (row === junction.boundary && column === junction.column) return "topLeft"
+  return undefined
+}
+
+function fallbackMenuAt(
+  rows: (number | null)[][],
+  boundary: number,
+  row: number,
+  column: number,
+): { corner?: LifeCardMenuCorner; edgeCenter?: LifeCardMenuEdge } | undefined {
+  if (rows.length === 1 && rows[0].length === 2)
+    return row === 0 ? { edgeCenter: column === 0 ? "right" : "left" } : undefined
+  if (rows.length === 1) return undefined
+  if (row !== boundary - 1 && row !== boundary) return undefined
+  const upper = row === boundary - 1
+  const count = rows[row].length
+  const middle = Math.floor(count / 2)
+  if (count % 2) return column === middle ? { edgeCenter: upper ? "bottom" : "top" } : undefined
+  if (column === middle - 1) return { corner: upper ? "bottomRight" : "topRight" }
+  if (column === middle) return { corner: upper ? "bottomLeft" : "topLeft" }
+  return undefined
 }
 
 export function getPlayerGridRowFlex(

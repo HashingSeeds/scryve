@@ -1,10 +1,10 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
-import { asPlayerId } from "@/features/game/domain"
+import { asPlayerId, PLAYER_COLORS } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
-import { accessibleForeground } from "@/utils/colorContrast"
+import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
@@ -399,18 +399,10 @@ describe("LifeCard", () => {
     expect(caption.color).toBe("#FFFFFF")
   })
 
-  it("closes the life editor without saving once the card freezes", () => {
-    const onChange = jest.fn()
-    const unfrozen = (
-      <ThemeProvider initialContext="light">
-        <LifeCard playerName="Ada" seatNumber={1} life={20} color="#41476E" onChange={onChange} />
-      </ThemeProvider>
-    )
-    const view = render(unfrozen)
-    fireEvent(view.getByTestId("life-total-button-seat-1"), "longPress")
-    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "37")
-    expect(view.getByTestId("life-editor-dialog-seat-1")).toBeTruthy()
-
+  it("closes the life editor when the card freezes", () => {
+    const view = render(interactiveCard(20, jest.fn()))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
     view.rerender(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -419,13 +411,11 @@ describe("LifeCard", () => {
           life={20}
           color="#41476E"
           eliminated
-          onChange={onChange}
+          onChange={jest.fn()}
         />
       </ThemeProvider>,
     )
-
-    expect(view.queryByTestId("life-editor-dialog-seat-1")).toBeNull()
-    expect(onChange).not.toHaveBeenCalled()
+    expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
   })
 
   it("keeps the marker cornered instead of clamping it into a cramped card", () => {
@@ -476,59 +466,234 @@ describe("LifeCard", () => {
     expect(view.getByText("−")).toBeTruthy()
   })
 
-  it("uses a circular life target to set a new total", () => {
-    const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
-    const target = view.getByTestId("life-total-button-seat-1")
-
-    expect(StyleSheet.flatten(target.props.style)).toMatchObject({
-      width: 200,
-      height: 200,
-      borderRadius: 100,
-    })
-    expect(StyleSheet.flatten(target.props.style).borderWidth).toBeUndefined()
+  it("lets the control zones handle touches at the life total", () => {
+    const view = render(interactiveCard(20, jest.fn()))
+    expect(view.queryByTestId("life-total-button-seat-1")).toBeNull()
     expect(StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style)).toMatchObject({
-      position: "absolute",
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
       justifyContent: "center",
     })
-    expect(view.getByTestId("life-total-seat-1").props.adjustsFontSizeToFit).toBeUndefined()
-    fireEvent(target, "longPress")
-    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "37")
-    fireEvent.press(view.getByTestId("life-editor-apply-seat-1"))
+    expect(view.getByTestId("life-readout-seat-1").props.pointerEvents).toBe("none")
+  })
 
-    expect(onChange).toHaveBeenCalledWith(17)
-    expect(view.queryByTestId("life-editor-dialog-seat-1")).toBeNull()
+  it("opens the seat editor from either control long press", () => {
+    const view = render(interactiveCard(20, jest.fn()))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Close life controls"))
+    expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
+    fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
   })
 
   it.each([
-    ["life-seat-1-1", "8", 8, "Add life"],
-    ["life-seat-1--1", "6", -6, "Subtract life"],
-  ])("opens custom amount editing from a long press on %s", (testID, value, delta, title) => {
-    const onChange = jest.fn()
-    const view = render(interactiveCard(20, onChange))
-
-    fireEvent(view.getByTestId(testID), "longPress")
-    expect(view.getAllByText(title)).toHaveLength(2)
-    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), value)
-    fireEvent.press(view.getByTestId("life-editor-apply-seat-1"))
-
-    expect(onChange).toHaveBeenCalledWith(delta)
+    { rotation: 0, menuCorner: "topLeft", top: 66, left: 44, right: 40 },
+    { rotation: 90, menuCorner: "topRight", top: 36, left: 70, right: 50 },
+    { rotation: -90, menuCorner: "topLeft", top: 26, left: 50, right: 70 },
+    { rotation: 180, menuCorner: "bottomRight", top: 46, left: 44, right: 30 },
+  ] as const)("keeps the $rotation° editor header clear of the menu and safe area", (entry) => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={entry.rotation}
+          contentInsets={{ top: 50, bottom: 30, left: 10, right: 20 }}
+          menuCorner={entry.menuCorner}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 400, height: 300 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-editor-header-seat-1").props.style),
+    ).toMatchObject({
+      top: entry.top,
+      left: entry.left,
+      right: entry.right,
+    })
   })
 
-  it("rejects zero for add and subtract amounts", () => {
+  it("aligns a compact editor title with its quick actions", () => {
     const view = render(interactiveCard(20, jest.fn()))
-
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 200, height: 300 } },
+    })
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
-    fireEvent.changeText(view.getByTestId("life-editor-input-seat-1"), "0")
+    const overlay = StyleSheet.flatten(view.getByTestId("life-editor-seat-1").props.style)
+    const header = StyleSheet.flatten(view.getByTestId("life-editor-header-seat-1").props.style)
+    const actions = StyleSheet.flatten(view.getByTestId("life-editor-actions-seat-1").props.style)
+    expect(header.left).toBe(overlay.padding + actions.marginHorizontal)
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-editor-close-seat-1").props.style),
+    ).toMatchObject({
+      alignItems: "center",
+      justifyContent: "center",
+      height: 32,
+    })
+  })
 
-    expect(view.getByTestId("life-editor-apply-seat-1").props.accessibilityState.disabled).toBe(
-      true,
+  it("accounts for the bottom safe area beside a landscape center menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="A long player name"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={-90}
+          contentInsets={{ top: 0, bottom: 21, left: 0, right: 0 }}
+          menuEdgeCenter="left"
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
     )
-    expect(view.getByText("Enter a whole number from 1 to 999999.")).toBeTruthy()
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 400, height: 300 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const title = StyleSheet.flatten(view.getByTestId("life-editor-title-seat-1").props.style)
+    expect(title.maxWidth).toBe(300 / 2 - 40 - 20 - 21)
+  })
+
+  it.each(PLAYER_COLORS)("keeps the life editor visibly tied to seat color %s", (color) => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard playerName="Ada" seatNumber={1} life={20} color={color} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const editor = view.getByTestId("life-editor-seat-1")
+    const editorColor = StyleSheet.flatten(editor.props.style).backgroundColor as string
+    expect(relativeLuminance(editorColor)).toBeLessThan(relativeLuminance(color) * 0.25)
+    expect(contrastRatio("#FFFFFF", editorColor)).toBeGreaterThan(7)
+    const title = view.getByTestId("life-editor-title-seat-1")
+    expect(title.props.children).toBe("Ada")
+    expect(title.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ color: accessibleForeground(editorColor) }),
+      ]),
+    )
+  })
+
+  it("uses Magic quick amounts", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    fireEvent.press(view.getByTestId("life-editor-step-1--5"))
+    expect(onChange).toHaveBeenCalledWith(-5)
+    expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("20")
+    view.rerender(interactiveCard(15, onChange))
+    expect(view.getByText("15")).toBeTruthy()
+  })
+
+  it("scrubs Magic life one point per step without applying twice", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 105, pageY: 100 } })
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(1)
+    expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("20")
+    view.rerender(interactiveCard(21, onChange))
+    expect(view.getByText("21")).toBeTruthy()
+  })
+
+  it("keeps the drag delta when the saved life changes mid-drag", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 125, pageY: 100 } })
+    expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("25")
+    view.rerender(interactiveCard(30, onChange))
+    expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("35")
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenCalledWith(5)
+    expect(view.getByTestId("life-editor-value-seat-1")).toHaveTextContent("30")
+  })
+
+  it("keeps scrubbing while held at the end and stops on release", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 200, pageY: 100 } })
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-editor-balloon-pointer-seat-1").props.style),
+    ).toMatchObject({ borderTopWidth: 10, borderLeftWidth: 8, borderRightWidth: 8 })
+    act(() => jest.advanceTimersByTime(350 + 3 * 110))
+    expect(view.getByText("+23")).toBeTruthy()
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 190, pageY: 100 } })
+    expect(view.getByText("+21")).toBeTruthy()
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(21)
+    act(() => jest.advanceTimersByTime(1000))
+    expect(onChange).toHaveBeenCalledTimes(1)
+  })
+
+  it("uses Yu-Gi-Oh! quick amounts and 100 point scrub steps", () => {
+    const onChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={8000}
+          color="#41476E"
+          system="ygo"
+          onChange={onChange}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-1-100"), "longPress")
+    fireEvent.press(view.getByTestId("life-editor-step-1--50"))
+    expect(onChange).toHaveBeenCalledWith(-50)
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 101, pageY: 100 } })
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenLastCalledWith(100)
+  })
+
+  it.each([-1, 1])("scrubs Yu-Gi-Oh! by %i × 8,000 at the slider end", (direction) => {
+    const onChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={8000}
+          color="#41476E"
+          system="ygo"
+          onChange={onChange}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-1-100"), "longPress")
+    expect(view.getByTestId("life-editor-title-seat-1").props.children).toBe("Ada")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", {
+      nativeEvent: { pageX: 100 + direction * 100, pageY: 100 },
+    })
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenCalledWith(direction * 8000)
   })
 
   it("removes steppers from a view-only card instead of dimming them", () => {
@@ -555,6 +720,52 @@ describe("LifeCard", () => {
     expect(name).toHaveTextContent("Ada")
     expect(StyleSheet.flatten(name.props.style)).toMatchObject({ color: "#FFFFFF" })
     expect(StyleSheet.flatten(name.props.style).backgroundColor).toBeUndefined()
+  })
+
+  it("keeps the top opponent name below the notch", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Player 1"
+          seatNumber={1}
+          life={20}
+          color="#B85636"
+          compact
+          contentRotation={180}
+          contentInsets={{ top: 59, bottom: 0, left: 0, right: 0 }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 187 } },
+    })
+    const readout = StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style)
+    const status = StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)
+    expect(readout.paddingTop).toBe(59)
+    expect(status.marginTop).toBeLessThan(187 / 2 - 59 - 21)
+  })
+
+  it("hides the status when a short card cannot fit it below the notch", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Player 1"
+          seatNumber={1}
+          life={20}
+          color="#B85636"
+          compact
+          contentRotation={180}
+          contentInsets={{ top: 59, bottom: 0, left: 0, right: 0 }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 150 } },
+    })
+    expect(view.queryByTestId("life-status-seat-1")).toBeNull()
+    expect(view.getByTestId("life-total-seat-1").props.accessible).toBe(true)
   })
 
   it("spans the under-total column full width so names truncate late", () => {
