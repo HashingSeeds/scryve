@@ -208,7 +208,28 @@ export function LifeCard({
             onChange: (step) => commanderDamage.onStage?.(step),
           }
         : undefined
-  const statusTopOffset = lifeTargetSize / 2 + (compact ? spacing.xxxs : spacing.xxs)
+  const statusEdge =
+    contentRotation === 180
+      ? "top"
+      : contentRotation === 90
+        ? "left"
+        : contentRotation === -90
+          ? "right"
+          : "bottom"
+  const statusEdgeInset = contentInsets?.[statusEdge] ?? 0
+  const statusEdgeLength = Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height
+  const defaultStatusOffset = lifeTargetSize / 2 + (compact ? spacing.xxxs : spacing.xxs)
+  const statusTopOffset =
+    statusEdgeInset > 0 && statusEdgeLength > 0
+      ? Math.min(
+          defaultStatusOffset,
+          statusEdgeLength / 2 -
+            statusEdgeInset -
+            cardPadding -
+            21 -
+            (statusLabel ? spacing.xxxs + 18 : 0),
+        )
+      : defaultStatusOffset
 
   useEffect(() => {
     if (frozen) {
@@ -296,7 +317,7 @@ export function LifeCard({
         <View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={themed($readout)}
+          style={[themed($readout), safeContentStyle]}
         >
           {eliminated ? (
             <View

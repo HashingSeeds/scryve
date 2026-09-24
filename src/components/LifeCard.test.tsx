@@ -676,6 +676,30 @@ describe("LifeCard", () => {
     expect(StyleSheet.flatten(name.props.style).backgroundColor).toBeUndefined()
   })
 
+  it("keeps the top opponent name below the notch", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Player 1"
+          seatNumber={1}
+          life={20}
+          color="#B85636"
+          compact
+          contentRotation={180}
+          contentInsets={{ top: 59, bottom: 0, left: 0, right: 0 }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 187 } },
+    })
+    const readout = StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style)
+    const status = StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)
+    expect(readout.paddingTop).toBe(59)
+    expect(status.marginTop).toBeLessThan(187 / 2 - 59 - 21)
+  })
+
   it("spans the under-total column full width so names truncate late", () => {
     const view = renderCard(20)
     expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
