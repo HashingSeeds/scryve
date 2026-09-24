@@ -4,7 +4,7 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import { asPlayerId, PLAYER_COLORS } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
-import { accessibleForeground, relativeLuminance } from "@/utils/colorContrast"
+import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
@@ -493,7 +493,8 @@ describe("LifeCard", () => {
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
     const editor = view.getByTestId("life-editor-seat-1")
     const editorColor = StyleSheet.flatten(editor.props.style).backgroundColor as string
-    expect(relativeLuminance(editorColor)).toBeLessThan(relativeLuminance(color) * 0.4)
+    expect(relativeLuminance(editorColor)).toBeLessThan(relativeLuminance(color) * 0.25)
+    expect(contrastRatio("#FFFFFF", editorColor)).toBeGreaterThan(7)
     expect(view.getByText("Ada · life").props.style).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ color: accessibleForeground(editorColor) }),

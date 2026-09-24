@@ -54,7 +54,7 @@ export function LifeEditor({
 }: Props) {
   const { theme } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  const editorColor = mixColorsInLinearLight(color, "#000000", 0.7)
+  const editorColor = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(editorColor)
   const { quickAdjustments, scrubStep, label } = playSystemRules(system).counter
   const [preview, setPreview] = useState(life)
@@ -182,7 +182,7 @@ export function LifeEditor({
         },
       ]}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, compact && styles.compactHeader]}>
         <Text
           text={`${playerName} · ${label}`}
           weight="bold"
@@ -361,6 +361,7 @@ const styles = StyleSheet.create({
   compactAction: { minHeight: 36 },
   compactBalloon: { bottom: 42 },
   compactBalloonBody: { paddingVertical: 4 },
+  compactHeader: { left: 6, right: 6, top: 6 },
   compactOverlay: { gap: 4, padding: 6 },
   compactScrubArea: { height: 72 },
   compactThumb: { borderRadius: 15, height: 30, transform: [{ translateX: -15 }], width: 30 },
@@ -370,7 +371,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    width: "100%",
+    left: 12,
+    position: "absolute",
+    right: 12,
+    top: 12,
   },
   overlay: {
     ...StyleSheet.absoluteFill,
