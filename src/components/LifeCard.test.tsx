@@ -484,6 +484,39 @@ describe("LifeCard", () => {
     expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
   })
 
+  it.each([
+    { rotation: 0, menuCorner: "topLeft", top: 66, left: 72, right: 52 },
+    { rotation: 90, menuCorner: "topRight", top: 36, left: 82, right: 62 },
+    { rotation: -90, menuCorner: "topLeft", top: 26, left: 62, right: 82 },
+    { rotation: 180, menuCorner: "bottomRight", top: 46, left: 72, right: 42 },
+  ] as const)("keeps the $rotation° editor header clear of the menu and safe area", (entry) => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={entry.rotation}
+          contentInsets={{ top: 50, bottom: 30, left: 10, right: 20 }}
+          menuCorner={entry.menuCorner}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 400, height: 300 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-editor-header-seat-1").props.style),
+    ).toMatchObject({
+      top: entry.top,
+      left: entry.left,
+      right: entry.right,
+    })
+  })
+
   it.each(PLAYER_COLORS)("keeps the life editor visibly tied to seat color %s", (color) => {
     const view = render(
       <ThemeProvider initialContext="dark">

@@ -120,6 +120,20 @@ describe("PlayerGrid", () => {
     })
   })
 
+  it("moves middle-row editor headers away from the center game menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(5)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-3-1"), "longPress")
+    fireEvent(view.getByTestId("life-seat-4-1"), "longPress")
+    const header = (seat: number) =>
+      StyleSheet.flatten(view.getByTestId(`life-editor-header-seat-${seat}`).props.style)
+    expect(header(3).left).toBeGreaterThanOrEqual(64)
+    expect(header(4).right).toBeGreaterThanOrEqual(64)
+  })
+
   it("squares only the corners that meet the device's rounded screen corners", () => {
     const view = render(
       <ThemeProvider initialContext="light">

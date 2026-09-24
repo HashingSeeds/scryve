@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
-  FadeIn,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -16,15 +16,42 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
-import type { LifeCardContentRotation } from "./playerCardTypes"
+import type {
+  LifeCardContentInsets,
+  LifeCardContentRotation,
+  LifeCardMenuCorner,
+} from "./playerCardTypes"
 import { Text } from "./Text"
 
 const EDGE_DELAY_MS = 350
 const EDGE_REPEAT_MS = 110
 const BALLOON_SPRING = { damping: 30, stiffness: 340, mass: 0.7 }
+const HEADER_EDGES = {
+  0: { top: "top", left: "left", right: "right", start: "topLeft", end: "topRight" },
+  90: { top: "right", left: "top", right: "bottom", start: "topRight", end: "bottomRight" },
+  [-90]: { top: "left", left: "bottom", right: "top", start: "bottomLeft", end: "topLeft" },
+  180: { top: "bottom", left: "right", right: "left", start: "bottomRight", end: "bottomLeft" },
+} as const
 
 function deltaLabel(delta: number) {
   return `${delta > 0 ? "+" : ""}${delta}`
+}
+
+function lifeEditorHeaderPosition(
+  rotation: LifeCardContentRotation,
+  insets: LifeCardContentInsets | undefined,
+  menuCorner: LifeCardMenuCorner | undefined,
+  compact: boolean,
+): ViewStyle {
+  const safe = insets ?? { top: 0, bottom: 0, left: 0, right: 0 }
+  const edges = HEADER_EDGES[rotation]
+  const edgeInset = compact ? 18 : 32
+  const menuInset = compact ? 64 : 72
+  return {
+    top: (compact ? 12 : 16) + safe[edges.top],
+    left: Math.max(edgeInset + safe[edges.left], menuCorner === edges.start ? menuInset : 0),
+    right: Math.max(edgeInset + safe[edges.right], menuCorner === edges.end ? menuInset : 0),
+  }
 }
 
 type Props = {
@@ -37,6 +64,8 @@ type Props = {
   rotation: LifeCardContentRotation
   cardWidth: number
   cardHeight: number
+  contentInsets?: LifeCardContentInsets
+  menuCorner?: LifeCardMenuCorner
   onChange: (delta: number) => void
   onClose: () => void
 }
@@ -51,6 +80,8 @@ export function LifeEditor({
   rotation,
   cardWidth,
   cardHeight,
+  contentInsets,
+  menuCorner,
   onChange,
   onClose,
 }: Props) {
@@ -61,6 +92,7 @@ export function LifeEditor({
   const { quickAdjustments, scrubStep, scrubSteps, label } = playSystemRules(system).counter
   const [preview, setPreview] = useState(life)
   const [dragging, setDragging] = useState(false)
+  const [closing, setClosing] = useState(false)
   const start = useRef({ x: 0, y: 0, life })
   const draft = useRef(life)
   const [trackWidth, setTrackWidth] = useState(1)
@@ -72,7 +104,9 @@ export function LifeEditor({
   const balloonX = useSharedValue(0)
   const thumbX = useSharedValue(0)
   const valueProgress = useSharedValue(reducedMotion === false ? 0 : 1)
+  const overlayOpacity = useSharedValue(reducedMotion === false ? 0 : 1)
   const [valueCenter, setValueCenter] = useState<number | null>(null)
+  const overlayStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }))
   const balloonStyle = useAnimatedStyle(() => ({
     left: balloonX.value,
     transform: [
@@ -122,6 +156,7 @@ export function LifeEditor({
         bottom: undefined,
       }
     : undefined
+  const headerPosition = lifeEditorHeaderPosition(rotation, contentInsets, menuCorner, compact)
 
   useEffect(() => {
     draft.current = life
@@ -135,9 +170,14 @@ export function LifeEditor({
   }, [balloonTarget, balloonX, dragging, thumbTarget, thumbX])
 
   useEffect(() => {
-    if (valueCenter === null) return
+    if (valueCenter === null || closing) return
     valueProgress.value = withTiming(1, { duration: reducedMotion === false ? 220 : 0 })
-  }, [reducedMotion, valueCenter, valueProgress])
+  }, [closing, reducedMotion, valueCenter, valueProgress])
+
+  useEffect(() => {
+    if (closing) return
+    overlayOpacity.value = withTiming(1, { duration: reducedMotion === false ? 180 : 0 })
+  }, [closing, overlayOpacity, reducedMotion])
 
   useEffect(() => () => stopEdge(), [])
 
@@ -185,11 +225,22 @@ export function LifeEditor({
     setPreview(draft.current)
   }
 
+  function closeEditor() {
+    if (closing) return
+    setClosing(true)
+    stopEdge()
+    if (reducedMotion !== false || valueCenter === null) return onClose()
+    overlayOpacity.value = withTiming(0, { duration: 220 })
+    valueProgress.value = withTiming(0, { duration: 220 }, (finished) => {
+      if (finished) runOnJS(onClose)()
+    })
+  }
+
   return (
     <Animated.View
       testID={`life-editor-seat-${seatNumber}`}
       accessibilityViewIsModal
-      entering={reducedMotion === false ? FadeIn.duration(180) : undefined}
+      pointerEvents={closing ? "box-only" : "auto"}
       style={[
         styles.overlay,
         compact && styles.compactOverlay,
@@ -198,9 +249,13 @@ export function LifeEditor({
           backgroundColor: editorColor,
           transform: [{ rotate: `${rotation}deg` }],
         },
+        overlayStyle,
       ]}
     >
-      <View style={[styles.header, compact && styles.compactHeader]}>
+      <View
+        testID={`life-editor-header-seat-${seatNumber}`}
+        style={[styles.header, headerPosition]}
+      >
         <Text
           testID={`life-editor-title-seat-${seatNumber}`}
           text={playerName}
@@ -212,7 +267,7 @@ export function LifeEditor({
           testID={`life-editor-close-seat-${seatNumber}`}
           accessibilityRole="button"
           accessibilityLabel="Close life controls"
-          onPress={onClose}
+          onPress={closeEditor}
           hitSlop={12}
         >
           <Text text="×" style={[styles.close, { color: ink }]} />
@@ -391,7 +446,6 @@ const styles = StyleSheet.create({
   compactAction: { minHeight: 36 },
   compactBalloon: { bottom: 42 },
   compactBalloonBody: { paddingVertical: 4 },
-  compactHeader: { left: 6, right: 6, top: 6 },
   compactOverlay: { gap: 4, padding: 6 },
   compactScrubArea: { height: 72 },
   compactThumb: { borderRadius: 15, height: 30, transform: [{ translateX: -15 }], width: 30 },
@@ -401,10 +455,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    left: 12,
     position: "absolute",
-    right: 12,
-    top: 12,
   },
   overlay: {
     ...StyleSheet.absoluteFill,

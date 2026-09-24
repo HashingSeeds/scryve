@@ -33,6 +33,7 @@ import {
   PLAYER_MARK_SIZE,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
+  type LifeCardMenuCorner,
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
@@ -74,6 +75,7 @@ export interface LifeCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  menuCorner?: LifeCardMenuCorner
   lifeFontSize?: number
   system?: PlaySystemId
   lifeStep?: number
@@ -95,6 +97,7 @@ export function LifeCard({
   compact,
   contentRotation = 0,
   contentInsets,
+  menuCorner,
   lifeFontSize,
   system,
   lifeStep,
@@ -531,6 +534,8 @@ export function LifeCard({
           rotation={contentRotation}
           cardWidth={cardSize.width}
           cardHeight={cardSize.height}
+          contentInsets={contentInsets}
+          menuCorner={menuCorner}
           onChange={onChange}
           onClose={() => setEditorOpen(false)}
         />

@@ -1,4 +1,5 @@
 export type LifeCardContentRotation = -90 | 0 | 90 | 180
+export type LifeCardMenuCorner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight"
 
 export interface LifeCardContentInsets {
   top: number

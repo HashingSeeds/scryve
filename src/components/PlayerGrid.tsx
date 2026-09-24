@@ -22,6 +22,7 @@ import {
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
   type LifeCardContentRotation,
+  type LifeCardMenuCorner,
 } from "./playerCardTypes"
 
 export interface CommanderDamageGridBinding {
@@ -109,6 +110,7 @@ export function PlayerGrid({
   }
 
   const rows = getPlayerGridRows(players.length, layout)
+  const menuJunction = getFourCardMenuJunction(rows)
   const boardSeats = commanderDamage
     ? commanderBoardSeats(
         rows,
@@ -172,6 +174,7 @@ export function PlayerGrid({
               left: columnIndex === 0 ? insets.left : 0,
               right: columnIndex === row.length - 1 ? insets.right : 0,
             }
+            const menuCorner = menuCornerAt(menuJunction, rowIndex, columnIndex)
             return (
               <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={themed($cell)}>
                 <LifeCard
@@ -183,6 +186,7 @@ export function PlayerGrid({
                   compact={layout.compact}
                   contentRotation={contentRotation}
                   contentInsets={contentInsets}
+                  menuCorner={menuCorner}
                   lifeFontSize={getLifeFontSize({
                     ...lifeFontSizeInput,
                     digits: String(player.life).length,
@@ -321,6 +325,23 @@ export function getPlayerGridMenuAnchor(
     cumulativeFlex += flex
     return cumulativeFlex / totalRowFlex
   })
+  const junction = getFourCardMenuJunction(rows)
+  if (junction)
+    return {
+      x: junction.column / junction.columnCount,
+      y: boundaryPositions[junction.boundary - 1],
+    }
+  const nearestCentralBoundary = boundaryPositions.reduce<number | undefined>(
+    (nearest, position) =>
+      nearest === undefined || Math.abs(position - 0.5) < Math.abs(nearest - 0.5)
+        ? position
+        : nearest,
+    undefined,
+  )
+  return { x: 0.5, y: nearestCentralBoundary ?? 0.5 }
+}
+
+function getFourCardMenuJunction(rows: (number | null)[][]) {
   for (let boundary = rows.length - 1; boundary > 0; boundary -= 1) {
     const upper = rows[boundary - 1]
     const lower = rows[boundary]
@@ -332,17 +353,23 @@ export function getPlayerGridMenuAnchor(
         lower[column - 1],
         lower[column],
       ].every((seat) => seat !== null && seat !== undefined)
-      if (fourCardsMeet) return { x: column / columnCount, y: boundaryPositions[boundary - 1] }
+      if (fourCardsMeet) return { boundary, column, columnCount }
     }
   }
-  const nearestCentralBoundary = boundaryPositions.reduce<number | undefined>(
-    (nearest, position) =>
-      nearest === undefined || Math.abs(position - 0.5) < Math.abs(nearest - 0.5)
-        ? position
-        : nearest,
-    undefined,
-  )
-  return { x: 0.5, y: nearestCentralBoundary ?? 0.5 }
+  return null
+}
+
+function menuCornerAt(
+  junction: ReturnType<typeof getFourCardMenuJunction>,
+  row: number,
+  column: number,
+): LifeCardMenuCorner | undefined {
+  if (!junction) return undefined
+  if (row === junction.boundary - 1 && column === junction.column - 1) return "bottomRight"
+  if (row === junction.boundary - 1 && column === junction.column) return "bottomLeft"
+  if (row === junction.boundary && column === junction.column - 1) return "topRight"
+  if (row === junction.boundary && column === junction.column) return "topLeft"
+  return undefined
 }
 
 export function getPlayerGridRowFlex(
