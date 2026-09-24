@@ -1,4 +1,5 @@
 # Segment 1: the board as you find it on launch.
+# After capture, trim the first 2 seconds of preview-open.mp4 before Goldie preview to skip the simulator launch transition.
 steps:
   - launch: com.sowinghope.count.preview
   - await: { visible: { id: player-grid } }
