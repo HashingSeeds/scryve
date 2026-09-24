@@ -18,7 +18,6 @@ import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { Text } from "./Text"
 
-const SCRUB_STEPS = 20
 const EDGE_DELAY_MS = 350
 const EDGE_REPEAT_MS = 110
 const BALLOON_SPRING = { damping: 30, stiffness: 340, mass: 0.7 }
@@ -56,7 +55,7 @@ export function LifeEditor({
   const reducedMotion = useReducedMotion()
   const editorColor = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(editorColor)
-  const { quickAdjustments, scrubStep, label } = playSystemRules(system).counter
+  const { quickAdjustments, scrubStep, scrubSteps, label } = playSystemRules(system).counter
   const [preview, setPreview] = useState(life)
   const [dragging, setDragging] = useState(false)
   const start = useRef({ x: 0, y: 0, life })
@@ -79,19 +78,19 @@ export function LifeEditor({
     ],
   }))
   const steps = Math.max(
-    -SCRUB_STEPS,
-    Math.min(SCRUB_STEPS, Math.round((preview - start.current.life) / scrubStep)),
+    -scrubSteps,
+    Math.min(scrubSteps, Math.round((preview - start.current.life) / scrubStep)),
   )
   const compact = Math.min(cardWidth, cardHeight) > 0 && Math.min(cardWidth, cardHeight) < 220
-  const thumbLeft = `${50 + (steps / SCRUB_STEPS) * 50}%` as const
+  const thumbLeft = `${50 + (steps / scrubSteps) * 50}%` as const
   const trackInset = compact ? 10 : 18
   const balloonTarget =
     trackInset +
     Math.max(
       balloonWidth / 2,
-      Math.min(trackWidth - balloonWidth / 2, trackWidth * (0.5 + steps / (2 * SCRUB_STEPS))),
+      Math.min(trackWidth - balloonWidth / 2, trackWidth * (0.5 + steps / (2 * scrubSteps))),
     )
-  const thumbTarget = trackInset + trackWidth * (0.5 + steps / (2 * SCRUB_STEPS))
+  const thumbTarget = trackInset + trackWidth * (0.5 + steps / (2 * scrubSteps))
   const actions = [
     -quickAdjustments[0],
     -quickAdjustments[1],
@@ -160,9 +159,9 @@ export function LifeEditor({
     const dx = event.nativeEvent.pageX - start.current.x
     const dy = event.nativeEvent.pageY - start.current.y
     const distance = rotation === 180 ? -dx : rotation === 90 ? dy : rotation === -90 ? -dy : dx
-    const rawSteps = Math.round((distance / Math.max(trackWidth / 2, 1)) * SCRUB_STEPS)
-    const clampedSteps = Math.max(-SCRUB_STEPS, Math.min(SCRUB_STEPS, rawSteps))
-    holdEdge(rawSteps >= SCRUB_STEPS ? 1 : rawSteps <= -SCRUB_STEPS ? -1 : 0)
+    const rawSteps = Math.round((distance / Math.max(trackWidth / 2, 1)) * scrubSteps)
+    const clampedSteps = Math.max(-scrubSteps, Math.min(scrubSteps, rawSteps))
+    holdEdge(rawSteps >= scrubSteps ? 1 : rawSteps <= -scrubSteps ? -1 : 0)
     draft.current = start.current.life + clampedSteps * scrubStep + edgeExtra.current
     setPreview(draft.current)
   }
@@ -184,7 +183,8 @@ export function LifeEditor({
     >
       <View style={[styles.header, compact && styles.compactHeader]}>
         <Text
-          text={`${playerName} · ${label}`}
+          testID={`life-editor-title-seat-${seatNumber}`}
+          text={playerName}
           weight="bold"
           numberOfLines={1}
           style={[styles.title, { color: ink }]}

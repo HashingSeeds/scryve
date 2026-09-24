@@ -495,7 +495,9 @@ describe("LifeCard", () => {
     const editorColor = StyleSheet.flatten(editor.props.style).backgroundColor as string
     expect(relativeLuminance(editorColor)).toBeLessThan(relativeLuminance(color) * 0.25)
     expect(contrastRatio("#FFFFFF", editorColor)).toBeGreaterThan(7)
-    expect(view.getByText("Ada · life").props.style).toEqual(
+    const title = view.getByTestId("life-editor-title-seat-1")
+    expect(title.props.children).toBe("Ada")
+    expect(title.props.style).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ color: accessibleForeground(editorColor) }),
       ]),
@@ -565,9 +567,35 @@ describe("LifeCard", () => {
     const slider = view.getByTestId("life-editor-slider-seat-1")
     fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
     fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
-    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 105, pageY: 100 } })
+    fireEvent(slider, "responderMove", { nativeEvent: { pageX: 101, pageY: 100 } })
     fireEvent(slider, "responderRelease")
     expect(onChange).toHaveBeenLastCalledWith(100)
+  })
+
+  it.each([-1, 1])("scrubs Yu-Gi-Oh! by %i × 8,000 at the slider end", (direction) => {
+    const onChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={8000}
+          color="#41476E"
+          system="ygo"
+          onChange={onChange}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-1-100"), "longPress")
+    expect(view.getByTestId("life-editor-title-seat-1").props.children).toBe("Ada")
+    const slider = view.getByTestId("life-editor-slider-seat-1")
+    fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+    fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+    fireEvent(slider, "responderMove", {
+      nativeEvent: { pageX: 100 + direction * 100, pageY: 100 },
+    })
+    fireEvent(slider, "responderRelease")
+    expect(onChange).toHaveBeenCalledWith(direction * 8000)
   })
 
   it("removes steppers from a view-only card instead of dimming them", () => {
