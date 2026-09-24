@@ -16,7 +16,7 @@ All files are PNGs and are comfortably below the Google Play file-size limits. T
 
 ## Goldie phone captures
 
-`goldie/google-play.config.ts` defines five phone scenes: six-player board, connected setup, deck creation, history, and game controls. Goldie renders the opener as two images, so `phone/` contains six PNGs. The tablet screenshots and feature graphic remain separate assets.
+`goldie/google-play.config.ts` defines five phone scenes: six-player board, connected setup, Abzan Armor deck detail, history, and game controls. Goldie renders the opener as two images, so `phone/` contains six PNGs. The tablet screenshots and feature graphic remain separate assets.
 
 Use a dedicated Pixel 9 Pro or Pixel 10 Pro Android emulator (1,280 × 2,856), with its network disabled. On an x86_64 emulator, build an isolated preview APK from the repo root (set `ANDROID_HOME` to the installed SDK first):
 
@@ -47,6 +47,7 @@ The current raw captures are in `goldie/out/raw/pixel-10-pro/`. They were taken 
 - The app icon is a Scryve-specific mark based on the app's four-player board, controls, and production color palette. The launcher, adaptive Android, iOS, and web icon assets now use this mark; it will appear in the next application build.
 - Video is optional and is not included. A public or unlisted, ad-free, non-age-restricted YouTube upload is still needed if a promo video is desired.
 - The tablet capture flows live in `.maestro/store-assets/`.
-- The phone set shows the six-player board, connected setup, deck creation, populated local history, and the six-player controls overlay. The 10-inch set includes the new-game screen.
+- The phone set shows the six-player board, connected setup, Abzan Armor deck detail, populated local history, and the six-player controls overlay. The 10-inch set includes the new-game screen.
+- The deck capture uses a temporary local guest-deck seed with the official 100-card [Abzan Armor list](https://magic.wizards.com/en/news/announcements/tarkir-dragonstorm-commander-decklists). The seed is absent from the shipped app; the deck flow expects it in the isolated capture build.
 - Before submission, compare the 10-inch screenshots with the release build to confirm the same UI is shipped.
 - Captures rejected during visual QA are retained in `working/` and are not intended for upload.

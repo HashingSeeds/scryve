@@ -1,4 +1,4 @@
-# Show a named deck ready to create without an account.
+# Show the Abzan Armor guest deck from the store capture build.
 steps:
   - launch: com.sowinghope.count.preview
   - tool: reinstall-app
@@ -11,14 +11,7 @@ steps:
   - await: { visible: { id: player-grid } }
   - tap: { id: game-menu-button }
   - tap: { text: Decks }
-  - await: { visible: { text: Add deck } }
-  - tap: { text: Add deck }
-  - await: { visible: { text: Deck details } }
-  - tap: { text: Empty }
-  - tap: { id: deck-name-input }
-  - tool: keyboard
-    args: { text: Weekend Commander }
-  - tool: keyboard
-    args: { key: enter }
-  - await: { visible: { text: Create deck } }
+  - await: { visible: { text: Abzan Armor } }
+  - tap: { text: Abzan Armor }
+  - await: { visible: { text: Felothar the Steadfast } }
   - await: { idle: true }

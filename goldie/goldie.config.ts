@@ -71,8 +71,8 @@ const config = {
       kind: "screenshot",
       id: "deck",
       flow: "store-06-deck",
-      headline: { "en-US": "Build your deck." },
-      subhead: { "en-US": "Choose a system and format, then make it yours." },
+      headline: { "en-US": "Your deck, card for card." },
+      subhead: { "en-US": "Keep the full list close at hand." },
     },
     {
       kind: "screenshot",
