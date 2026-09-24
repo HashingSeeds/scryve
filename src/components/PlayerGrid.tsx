@@ -90,14 +90,14 @@ export function PlayerGrid({
     fontScale,
     layoutVariant,
   })
-  const lifeFontSize = getLifeFontSize({
-    ...getCellSize({ board, layout, gap: spacing.xxs }),
-    digits: Math.max(...players.map((player) => String(player.life).length)),
+  const cellSize = getCellSize({ board, layout, gap: spacing.xxs })
+  const lifeFontSizeInput = {
+    ...cellSize,
     fontScale,
     targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
     sidewaysGlyphReserve:
       2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs),
-  })
+  }
 
   function measureBoard(event: LayoutChangeEvent) {
     const { width: boardWidth, height: boardHeight } = event.nativeEvent.layout
@@ -121,7 +121,11 @@ export function PlayerGrid({
       testID="player-grid"
       accessibilityLabel={`${players.length} player ${counter.label} grid`}
       onLayout={measureBoard}
-      style={[themed($grid), style, lifeFontSize === undefined && $unmeasured]}
+      style={[
+        themed($grid),
+        style,
+        (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
+      ]}
     >
       {rows.map((row, rowIndex) => (
         <View
@@ -179,7 +183,10 @@ export function PlayerGrid({
                   compact={layout.compact}
                   contentRotation={contentRotation}
                   contentInsets={contentInsets}
-                  lifeFontSize={lifeFontSize}
+                  lifeFontSize={getLifeFontSize({
+                    ...lifeFontSizeInput,
+                    digits: String(player.life).length,
+                  })}
                   system={system}
                   lifeStep={lifeStep}
                   disabled={disabled || playerDisabled}

@@ -525,6 +525,7 @@ export function LifeCard({
           seatNumber={seatNumber}
           playerName={displayName}
           life={life}
+          sourceFontSize={resolvedLifeFontSize}
           system={system}
           color={color}
           rotation={contentRotation}

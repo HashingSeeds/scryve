@@ -63,6 +63,32 @@ describe("PlayerGrid", () => {
     expect(measuredOpacity).toBe(1)
   })
 
+  it("keeps one card's life font size when another total gains a digit", () => {
+    const initialPlayers = players(2)
+    initialPlayers[1].life = 999
+    const onChange = jest.fn()
+    const renderGrid = (currentPlayers: typeof initialPlayers) => (
+      <ThemeProvider initialContext="light">
+        <PlayerGrid players={currentPlayers} onChange={onChange} />
+      </ThemeProvider>
+    )
+    const view = render(renderGrid(initialPlayers))
+    fireEvent(view.getByTestId("player-grid"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 690 } },
+    })
+    const fontSize = (seat: number) =>
+      StyleSheet.flatten(view.getByTestId(`life-total-seat-${seat}`).props.style).fontSize as number
+    const firstBefore = fontSize(1)
+    const secondBefore = fontSize(2)
+
+    view.rerender(renderGrid([initialPlayers[0], { ...initialPlayers[1], life: 1000 }]))
+
+    expect(fontSize(1)).toBe(firstBefore)
+    expect(fontSize(2)).toBeLessThan(secondBefore)
+    view.unmount()
+    jest.clearAllMocks()
+  })
+
   it.each([2, 3, 4, 5, 6])(
     "renders every card and four controls in a %i-player layout",
     (count) => {
@@ -337,7 +363,7 @@ describe("PlayerGrid", () => {
       }
     })
 
-    it("keeps every seat on one shared size so the board reads as a scoreboard", () => {
+    it("gives paired seats equal cell width in the three-player layout", () => {
       const layout = getPlayerGridLayout({ playerCount: 3, width: 390, height: 844 })
       const { cellWidth } = getCellSize({ board, layout, gap: 4 })
       expect(layout.layout).toBe("three-featured")

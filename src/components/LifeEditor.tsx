@@ -6,6 +6,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated"
 
 import { MAX_LIFE_DELTA } from "@/features/game/domain"
@@ -30,6 +31,7 @@ type Props = {
   seatNumber: number
   playerName: string
   life: number
+  sourceFontSize: number
   system?: PlaySystemId
   color: string
   rotation: LifeCardContentRotation
@@ -43,6 +45,7 @@ export function LifeEditor({
   seatNumber,
   playerName,
   life,
+  sourceFontSize,
   system,
   color,
   rotation,
@@ -68,6 +71,8 @@ export function LifeEditor({
   const edgeRepeat = useRef<ReturnType<typeof setInterval> | null>(null)
   const balloonX = useSharedValue(0)
   const thumbX = useSharedValue(0)
+  const valueProgress = useSharedValue(reducedMotion === false ? 0 : 1)
+  const [valueCenter, setValueCenter] = useState<number | null>(null)
   const balloonStyle = useAnimatedStyle(() => ({
     left: balloonX.value,
     transform: [
@@ -98,6 +103,15 @@ export function LifeEditor({
     quickAdjustments[0],
   ]
   const sideways = Math.abs(rotation) === 90 && cardWidth > 0 && cardHeight > 0
+  const editorHeight = sideways ? cardWidth : cardHeight
+  const valueFontSize = compact ? styles.compactValue.fontSize : styles.value.fontSize
+  const valueStyle = useAnimatedStyle(() => ({
+    opacity: valueCenter === null ? 0 : 1,
+    transform: [
+      { translateY: (editorHeight / 2 - (valueCenter ?? 0)) * (1 - valueProgress.value) },
+      { scale: 1 + (sourceFontSize / valueFontSize - 1) * (1 - valueProgress.value) },
+    ],
+  }))
   const rotatedBounds: ViewStyle | undefined = sideways
     ? {
         width: cardHeight,
@@ -119,6 +133,11 @@ export function LifeEditor({
     thumbX.value = thumbTarget
     balloonX.value = dragging ? withSpring(balloonTarget, BALLOON_SPRING) : balloonTarget
   }, [balloonTarget, balloonX, dragging, thumbTarget, thumbX])
+
+  useEffect(() => {
+    if (valueCenter === null) return
+    valueProgress.value = withTiming(1, { duration: reducedMotion === false ? 220 : 0 })
+  }, [reducedMotion, valueCenter, valueProgress])
 
   useEffect(() => () => stopEdge(), [])
 
@@ -199,11 +218,22 @@ export function LifeEditor({
           <Text text="×" style={[styles.close, { color: ink }]} />
         </Pressable>
       </View>
-      <Text
-        text={String(preview)}
-        accessibilityLiveRegion="polite"
-        style={[styles.value, compact && styles.compactValue, { color: ink }]}
-      />
+      <Animated.View
+        testID={`life-editor-value-seat-${seatNumber}`}
+        onLayout={(event) =>
+          setValueCenter(
+            (current) =>
+              current ?? event.nativeEvent.layout.y + event.nativeEvent.layout.height / 2,
+          )
+        }
+        style={valueStyle}
+      >
+        <Text
+          text={String(preview)}
+          accessibilityLiveRegion="polite"
+          style={[styles.value, compact && styles.compactValue, { color: ink }]}
+        />
+      </Animated.View>
       <View
         style={[
           styles.scrubArea,
