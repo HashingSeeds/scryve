@@ -66,7 +66,7 @@ const ACTION_STAGGER_MS = 35
 const ACTION_START_DISTANCE = 40
 const ACTION_START_SCALE = 0.5
 const ACTION_START_ROTATION_LAG_DEG = 25
-const ACTION_POSE_SPRING = { damping: 13, stiffness: 210, mass: 0.8 } as const
+const ACTION_POSE_SPRING = { damping: 18, stiffness: 260, mass: 0.8 } as const
 const PENTAGON_SPIN_SPRING = {
   damping: 18,
   stiffness: 220,
@@ -415,16 +415,12 @@ const $actionAnchor: ThemedStyle<ViewStyle> = () => ({
   marginLeft: -ACTION_WIDTH / 2,
   marginTop: -ACTION_HEIGHT / 2,
 })
-const $action: ThemedStyle<ViewStyle> = ({ colors }) => ({
+const $action: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
   paddingHorizontal: 12,
   borderRadius: ACTION_HEIGHT / 2,
-  shadowColor: colors.gameMenu.shadow,
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.35,
-  shadowRadius: 7,
   elevation: 12,
 })
 const $actionText: ThemedStyle<TextStyle> = () => ({
