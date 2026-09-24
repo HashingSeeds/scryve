@@ -21,6 +21,7 @@ import type {
   LifeCardContentInsets,
   LifeCardContentRotation,
   LifeCardMenuCorner,
+  LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { Text } from "./Text"
 
@@ -67,6 +68,7 @@ type Props = {
   cardHeight: number
   contentInsets?: LifeCardContentInsets
   menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
   onChange: (delta: number) => void
   onClose: () => void
 }
@@ -83,6 +85,7 @@ export function LifeEditor({
   cardHeight,
   contentInsets,
   menuCorner,
+  menuEdgeCenter,
   onChange,
   onClose,
 }: Props) {
@@ -138,6 +141,7 @@ export function LifeEditor({
     quickAdjustments[0],
   ]
   const sideways = Math.abs(rotation) === 90 && cardWidth > 0 && cardHeight > 0
+  const editorWidth = sideways ? cardHeight : cardWidth
   const editorHeight = sideways ? cardWidth : cardHeight
   const valueFontSize = compact ? styles.compactValue.fontSize : styles.value.fontSize
   const safe = contentInsets ?? { top: 0, bottom: 0, left: 0, right: 0 }
@@ -178,12 +182,18 @@ export function LifeEditor({
       }
     : undefined
   const headerPosition = lifeEditorHeaderPosition(rotation, contentInsets, menuCorner, compact)
+  const titleWidth =
+    menuEdgeCenter === HEADER_EDGES[rotation].top && editorWidth > 0
+      ? Math.max(0, editorWidth / 2 - (compact ? 35 : 40) - (compact ? 12 : 20))
+      : undefined
 
   useEffect(() => {
+    const dragDelta = dragging ? draft.current - start.current.life : 0
     draft.current = life
     start.current.life = life
-    setPreview(life)
-  }, [life])
+    if (dragging) draft.current += dragDelta
+    setPreview(draft.current)
+  }, [dragging, life])
 
   useEffect(() => {
     thumbX.value = thumbTarget
@@ -213,7 +223,6 @@ export function LifeEditor({
   function holdEdge(direction: number) {
     if (direction === edgeDirection.current) return
     stopEdge()
-    edgeExtra.current = 0
     if (!direction) return
     edgeDirection.current = direction
     edgeDelay.current = setTimeout(() => {
@@ -230,9 +239,6 @@ export function LifeEditor({
   function apply(delta: number) {
     if (!delta || Math.abs(delta) > MAX_LIFE_DELTA) return
     onChange(delta)
-    draft.current += delta
-    start.current.life = draft.current
-    setPreview(draft.current)
   }
 
   function drag(event: GestureResponderEvent) {
@@ -282,7 +288,7 @@ export function LifeEditor({
           text={playerName}
           weight="bold"
           numberOfLines={1}
-          style={[styles.title, { color: ink }]}
+          style={[styles.title, { color: ink, maxWidth: titleWidth }]}
         />
         <Pressable
           testID={`life-editor-close-seat-${seatNumber}`}
@@ -384,10 +390,11 @@ export function LifeEditor({
             stopEdge()
             setDragging(false)
             const delta = draft.current - start.current.life
+            draft.current = life
+            setPreview(life)
             if (delta && Math.abs(delta) <= MAX_LIFE_DELTA) {
               onChange(delta)
-              start.current.life = draft.current
-            } else setPreview(start.current.life)
+            }
           }}
           onResponderTerminate={() => {
             stopEdge()

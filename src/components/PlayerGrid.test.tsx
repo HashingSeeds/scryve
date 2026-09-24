@@ -134,6 +134,52 @@ describe("PlayerGrid", () => {
     expect(header(4).right).toBeGreaterThanOrEqual(44)
   })
 
+  it("keeps a long two-player editor name clear of the centered menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(2)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 390, height: 400 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const title = StyleSheet.flatten(view.getByTestId("life-editor-title-seat-1").props.style)
+    expect(title.maxWidth).toBeLessThanOrEqual(390 / 2 - 40)
+  })
+
+  it("keeps landscape two-player editor names clear of the centered menu", () => {
+    const window = Dimensions.get("window")
+    Dimensions.set({ window: { width: 844, height: 390, scale: 3, fontScale: 1 } })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(2)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 420, height: 390 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const title = StyleSheet.flatten(view.getByTestId("life-editor-title-seat-1").props.style)
+    expect(title.maxWidth).toBeLessThanOrEqual(390 / 2 - 40)
+    view.unmount()
+    Dimensions.set({ window })
+  })
+
+  it("clears the centered menu at both corners of a three-player row", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <PlayerGrid players={players(3)} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-seat-2-1"), "longPress")
+    fireEvent(view.getByTestId("life-seat-3-1"), "longPress")
+    const header = (seat: number) =>
+      StyleSheet.flatten(view.getByTestId(`life-editor-header-seat-${seat}`).props.style)
+    expect(header(2).left).toBeGreaterThanOrEqual(44)
+    expect(header(3).right).toBeGreaterThanOrEqual(44)
+  })
+
   it("squares only the corners that meet the device's rounded screen corners", () => {
     const view = render(
       <ThemeProvider initialContext="light">

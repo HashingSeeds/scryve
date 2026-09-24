@@ -34,6 +34,7 @@ import {
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardMenuCorner,
+  type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
@@ -76,6 +77,7 @@ export interface LifeCardProps {
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
   menuCorner?: LifeCardMenuCorner
+  menuEdgeCenter?: LifeCardMenuEdge
   lifeFontSize?: number
   system?: PlaySystemId
   lifeStep?: number
@@ -98,6 +100,7 @@ export function LifeCard({
   contentRotation = 0,
   contentInsets,
   menuCorner,
+  menuEdgeCenter,
   lifeFontSize,
   system,
   lifeStep,
@@ -557,6 +560,7 @@ export function LifeCard({
           cardHeight={cardSize.height}
           contentInsets={contentInsets}
           menuCorner={menuCorner}
+          menuEdgeCenter={menuEdgeCenter}
           onChange={onChange}
           onClose={() => setEditorOpen(false)}
         />
