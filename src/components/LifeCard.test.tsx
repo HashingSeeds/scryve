@@ -515,6 +515,9 @@ describe("LifeCard", () => {
     fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
     fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
     fireEvent(slider, "responderMove", { nativeEvent: { pageX: 200, pageY: 100 } })
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-editor-balloon-pointer-seat-1").props.style),
+    ).toMatchObject({ borderTopWidth: 10, borderLeftWidth: 8, borderRightWidth: 8 })
     act(() => jest.advanceTimersByTime(350 + 3 * 110))
     expect(view.getByText("+23")).toBeTruthy()
     fireEvent(slider, "responderRelease")

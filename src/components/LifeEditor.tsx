@@ -13,7 +13,7 @@ import { Text } from "./Text"
 const SCRUB_STEPS = 20
 const EDGE_DELAY_MS = 350
 const EDGE_REPEAT_MS = 110
-const BALLOON_SPRING = { damping: 28, stiffness: 260, mass: 0.8 }
+const BALLOON_SPRING = { damping: 30, stiffness: 340, mass: 0.7 }
 
 function deltaLabel(delta: number) {
   return `${delta > 0 ? "+" : ""}${delta}`
@@ -49,12 +49,22 @@ export function LifeEditor({
   const start = useRef({ x: 0, y: 0, life })
   const draft = useRef(life)
   const [trackWidth, setTrackWidth] = useState(1)
+  const [balloonWidth, setBalloonWidth] = useState(56)
   const edgeDirection = useRef(0)
   const edgeExtra = useRef(0)
   const edgeDelay = useRef<ReturnType<typeof setTimeout> | null>(null)
   const edgeRepeat = useRef<ReturnType<typeof setInterval> | null>(null)
   const balloonX = useSharedValue(0)
-  const balloonStyle = useAnimatedStyle(() => ({ left: balloonX.value }))
+  const thumbX = useSharedValue(0)
+  const balloonStyle = useAnimatedStyle(() => ({
+    left: balloonX.value,
+    transform: [
+      { translateX: -balloonWidth / 2 },
+      {
+        rotate: `${Math.max(-0.12, Math.min(0.12, Math.atan2(balloonX.value - thumbX.value, 100)))}rad`,
+      },
+    ],
+  }))
   const ink = theme.colors.board.text
   const steps = Math.max(
     -SCRUB_STEPS,
@@ -65,7 +75,11 @@ export function LifeEditor({
   const trackInset = compact ? 10 : 18
   const balloonTarget =
     trackInset +
-    Math.max(32, Math.min(trackWidth - 32, trackWidth * (0.5 + steps / (2 * SCRUB_STEPS))))
+    Math.max(
+      balloonWidth / 2,
+      Math.min(trackWidth - balloonWidth / 2, trackWidth * (0.5 + steps / (2 * SCRUB_STEPS))),
+    )
+  const thumbTarget = trackInset + trackWidth * (0.5 + steps / (2 * SCRUB_STEPS))
   const actions = [
     -quickAdjustments[0],
     -quickAdjustments[1],
@@ -91,8 +105,9 @@ export function LifeEditor({
   }, [life])
 
   useEffect(() => {
-    balloonX.value = withSpring(balloonTarget, BALLOON_SPRING)
-  }, [balloonTarget, balloonX])
+    thumbX.value = thumbTarget
+    balloonX.value = dragging ? withSpring(balloonTarget, BALLOON_SPRING) : balloonTarget
+  }, [balloonTarget, balloonX, dragging, thumbTarget, thumbX])
 
   useEffect(() => () => stopEdge(), [])
 
@@ -185,18 +200,34 @@ export function LifeEditor({
       >
         {dragging ? (
           <Animated.View
-            style={[
-              styles.balloon,
-              compact && styles.compactBalloon,
-              { backgroundColor: theme.colors.tint },
-              balloonStyle,
-            ]}
+            style={[styles.balloon, compact && styles.compactBalloon, balloonStyle]}
             pointerEvents="none"
+            onLayout={(event) => setBalloonWidth(event.nativeEvent.layout.width)}
           >
-            <Text
-              text={deltaLabel(preview - start.current.life)}
-              weight="bold"
-              style={{ color: theme.colors.board.background }}
+            <View
+              style={[
+                styles.balloonBody,
+                compact && styles.compactBalloonBody,
+                { backgroundColor: theme.colors.tint },
+              ]}
+            >
+              <Text
+                text={deltaLabel(preview - start.current.life)}
+                weight="bold"
+                size={compact ? "lg" : "xl"}
+                style={{ color: theme.colors.board.background }}
+              />
+            </View>
+            <View
+              testID={`life-editor-balloon-pointer-seat-${seatNumber}`}
+              style={[
+                styles.balloonPointer,
+                {
+                  borderLeftColor: theme.colors.transparent,
+                  borderRightColor: theme.colors.transparent,
+                  borderTopColor: theme.colors.tint,
+                },
+              ]}
             />
           </Animated.View>
         ) : null}
@@ -295,18 +326,29 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: 5, width: "100%" },
   balloon: {
     alignItems: "center",
-    borderRadius: 12,
-    bottom: 76,
-    minWidth: 64,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    bottom: 66,
+    minWidth: 56,
     position: "absolute",
-    transform: [{ translateX: -32 }],
+  },
+  balloonBody: {
+    alignItems: "center",
+    borderRadius: 16,
+    minWidth: 56,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+  },
+  balloonPointer: {
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 10,
+    height: 0,
+    width: 0,
   },
   center: { alignSelf: "center", height: 14, position: "absolute", width: 2 },
   close: { fontSize: 30, lineHeight: 32 },
   compactAction: { minHeight: 36 },
-  compactBalloon: { bottom: 50, paddingVertical: 4 },
+  compactBalloon: { bottom: 42 },
+  compactBalloonBody: { paddingVertical: 4 },
   compactOverlay: { gap: 4, padding: 6 },
   compactScrubArea: { height: 72 },
   compactThumb: { borderRadius: 15, height: 30, transform: [{ translateX: -15 }], width: 30 },
