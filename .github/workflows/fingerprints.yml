@@ -51,6 +51,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # expo doctor flags eas-cli as a project dependency, so CI installs a pinned global copy.
+      - name: Install EAS CLI
+        run: npm install -g eas-cli@22.2.0
+
       - name: Restore cached base fingerprints
         uses: actions/cache@v4
         with:
@@ -88,17 +92,15 @@ jobs:
           needs_build=false
           : > "$changed_inputs_file"
 
-          # Runs an eas command that prints a JSON document. Calls the binary
-          # shipped in the *main* workspace so it works from the base tree too
-          # (the base checkout only has its lockfile-era node_modules). eas-cli
+          # Runs an eas command that prints a JSON document. Uses the global
+          # pinned eas so it works from the base tree too. eas-cli
           # has known bugs (expo/eas-cli#3870, #3659) where human-readable log
           # lines land on stdout before the JSON, so leading non-JSON lines
           # are stripped before anything parses the file.
-          eas_bin="$GITHUB_WORKSPACE/node_modules/.bin/eas"
           eas_json() {
             local out="$1"
             shift
-            if ! "$eas_bin" "$@" > "$out"; then
+            if ! eas "$@" > "$out"; then
               echo "eas $* failed (dumping file tail for diagnostics):" >&2
               tail -c 2000 "$out" >&2 2>/dev/null || true
               exit 1
