@@ -485,10 +485,10 @@ describe("LifeCard", () => {
   })
 
   it.each([
-    { rotation: 0, menuCorner: "topLeft", top: 66, left: 72, right: 52 },
-    { rotation: 90, menuCorner: "topRight", top: 36, left: 82, right: 62 },
-    { rotation: -90, menuCorner: "topLeft", top: 26, left: 62, right: 82 },
-    { rotation: 180, menuCorner: "bottomRight", top: 46, left: 72, right: 42 },
+    { rotation: 0, menuCorner: "topLeft", top: 66, left: 52, right: 44 },
+    { rotation: 90, menuCorner: "topRight", top: 36, left: 74, right: 54 },
+    { rotation: -90, menuCorner: "topLeft", top: 26, left: 54, right: 74 },
+    { rotation: 180, menuCorner: "bottomRight", top: 46, left: 52, right: 34 },
   ] as const)("keeps the $rotation° editor header clear of the menu and safe area", (entry) => {
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -515,6 +515,18 @@ describe("LifeCard", () => {
       left: entry.left,
       right: entry.right,
     })
+  })
+
+  it("aligns a compact editor title with its quick actions", () => {
+    const view = render(interactiveCard(20, jest.fn()))
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 200, height: 300 } },
+    })
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    const overlay = StyleSheet.flatten(view.getByTestId("life-editor-seat-1").props.style)
+    const header = StyleSheet.flatten(view.getByTestId("life-editor-header-seat-1").props.style)
+    const actions = StyleSheet.flatten(view.getByTestId("life-editor-actions-seat-1").props.style)
+    expect(header.left).toBe(overlay.padding + actions.marginHorizontal)
   })
 
   it.each(PLAYER_COLORS)("keeps the life editor visibly tied to seat color %s", (color) => {

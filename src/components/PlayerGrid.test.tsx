@@ -130,8 +130,8 @@ describe("PlayerGrid", () => {
     fireEvent(view.getByTestId("life-seat-4-1"), "longPress")
     const header = (seat: number) =>
       StyleSheet.flatten(view.getByTestId(`life-editor-header-seat-${seat}`).props.style)
-    expect(header(3).left).toBeGreaterThanOrEqual(64)
-    expect(header(4).right).toBeGreaterThanOrEqual(64)
+    expect(header(3).left).toBeGreaterThanOrEqual(52)
+    expect(header(4).right).toBeGreaterThanOrEqual(52)
   })
 
   it("squares only the corners that meet the device's rounded screen corners", () => {

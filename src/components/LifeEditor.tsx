@@ -5,6 +5,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
 } from "react-native-reanimated"
@@ -45,8 +46,8 @@ function lifeEditorHeaderPosition(
 ): ViewStyle {
   const safe = insets ?? { top: 0, bottom: 0, left: 0, right: 0 }
   const edges = HEADER_EDGES[rotation]
-  const edgeInset = compact ? 18 : 32
-  const menuInset = compact ? 64 : 72
+  const edgeInset = compact ? 16 : 24
+  const menuInset = compact ? 44 : 52
   return {
     top: (compact ? 12 : 16) + safe[edges.top],
     left: Math.max(edgeInset + safe[edges.left], menuCorner === edges.start ? menuInset : 0),
@@ -230,7 +231,7 @@ export function LifeEditor({
     setClosing(true)
     stopEdge()
     if (reducedMotion !== false || valueCenter === null) return onClose()
-    overlayOpacity.value = withTiming(0, { duration: 220 })
+    overlayOpacity.value = withDelay(150, withTiming(0, { duration: 70 }))
     valueProgress.value = withTiming(0, { duration: 220 }, (finished) => {
       if (finished) runOnJS(onClose)()
     })
@@ -385,7 +386,10 @@ export function LifeEditor({
           />
         </View>
       </View>
-      <View style={styles.actions}>
+      <View
+        testID={`life-editor-actions-seat-${seatNumber}`}
+        style={[styles.actions, compact && styles.compactActions]}
+      >
         {actions.map((amount) => (
           <Pressable
             key={amount}
@@ -420,7 +424,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 42,
   },
-  actions: { flexDirection: "row", gap: 5, width: "100%" },
+  actions: { alignSelf: "stretch", flexDirection: "row", gap: 5, marginHorizontal: 12 },
   balloon: {
     alignItems: "center",
     bottom: 66,
@@ -444,6 +448,7 @@ const styles = StyleSheet.create({
   center: { alignSelf: "center", height: 14, position: "absolute", width: 2 },
   close: { fontSize: 30, lineHeight: 32 },
   compactAction: { minHeight: 36 },
+  compactActions: { marginHorizontal: 10 },
   compactBalloon: { bottom: 42 },
   compactBalloonBody: { paddingVertical: 4 },
   compactOverlay: { gap: 4, padding: 6 },
