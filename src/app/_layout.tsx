@@ -63,9 +63,18 @@ function Root() {
             <LegalConsentGate onResolved={resolveConsent}>
               <AccountDeletionSessionGuard />
               <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="index" options={{ statusBarHidden: true }} />
-                <Stack.Screen name="game/current" options={{ statusBarHidden: true }} />
-                <Stack.Screen name="connected/game/[gameId]" options={{ statusBarHidden: true }} />
+                <Stack.Screen
+                  name="index"
+                  options={{ statusBarHidden: true, gestureEnabled: false }}
+                />
+                <Stack.Screen
+                  name="game/current"
+                  options={{ statusBarHidden: true, gestureEnabled: false }}
+                />
+                <Stack.Screen
+                  name="connected/game/[gameId]"
+                  options={{ statusBarHidden: true, gestureEnabled: false }}
+                />
               </Stack>
             </LegalConsentGate>
           </KeyboardProvider>
