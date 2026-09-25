@@ -503,12 +503,12 @@ export function LifeCard({
           ]}
         />
       ) : null}
-      {commanderDamage?.inspection && commanderDamage.players && !commanderCardMode ? (
+      {commanderDamage?.inspection && !commanderCardMode ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
           ownerPlayerId={commanderDamage.ownerPlayerId}
-          players={commanderDamage.players}
+          players={commanderDamage.players ?? []}
           incoming={commanderDamage.incoming}
           shape={shape}
           color={color}

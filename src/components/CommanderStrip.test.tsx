@@ -47,4 +47,34 @@ describe("CommanderStrip", () => {
     expect(onToggle).toHaveBeenCalledTimes(1)
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
+
+  it("keeps the inspect and assign controls when player metadata is absent", () => {
+    const onToggle = jest.fn()
+    const onPressSword = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CommanderStrip
+          seatNumber={1}
+          identity="Seat 1, Ada"
+          ownerPlayerId={players[0].id}
+          players={[]}
+          incoming={{}}
+          color={players[0].color}
+          foreground="#FFFFFF"
+          contentRotation={0}
+          open={false}
+          onToggle={onToggle}
+          onPressSword={onPressSword}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.getByTestId("commander-inspect-seat-1").props.accessibilityLabel).toBe(
+      "Show commander damage for Seat 1, Ada, no commander damage",
+    )
+    fireEvent.press(view.getByTestId("commander-inspect-seat-1"))
+    fireEvent.press(view.getByTestId("commander-mark-seat-1"))
+    expect(onToggle).toHaveBeenCalledTimes(1)
+    expect(onPressSword).toHaveBeenCalledTimes(1)
+  })
 })
