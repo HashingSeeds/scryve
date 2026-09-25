@@ -40,55 +40,38 @@ function renderStrip(props: Partial<CommanderStripProps> = {}) {
 }
 
 describe("CommanderStrip", () => {
-  it("shows each opponent's damage without opening the grid", () => {
-    const onToggle = jest.fn()
+  it("collapses to the assign sword until someone deals damage", () => {
     const onPressSword = jest.fn()
-    const view = renderStrip({ incoming: { [players[1].id]: 21 }, onToggle, onPressSword })
+    const view = renderStrip({ onPressSword })
 
-    expect(view.getByTestId("commander-own-seat-1")).toBeTruthy()
-    expect(view.getByTestId(`commander-pip-seat-1-${players[1].id}`)).toHaveTextContent("21")
-    expect(view.getByTestId(`commander-pip-seat-1-${players[2].id}`)).not.toHaveTextContent("0")
-
-    const inspect = view.getByTestId("commander-inspect-seat-1")
-    expect(inspect.props.accessibilityLabel).toBe(
-      "Show commander damage for Seat 1, Ada, 21 from Bo",
-    )
-    fireEvent.press(inspect)
+    expect(view.queryByTestId("commander-map-seat-1")).toBeNull()
     fireEvent.press(view.getByTestId("commander-mark-seat-1"))
-    expect(onToggle).toHaveBeenCalledTimes(1)
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
-  it("lays opponents out in the board's rows", () => {
-    const view = renderStrip()
-    const rows = view
-      .getByTestId("commander-inspect-seat-1")
-      .children.filter((child) => typeof child !== "string")
-      .map((row) => [
-        ...new Set(
-          row
-            .findAll((node) => typeof node.props?.testID === "string")
-            .map((node) => node.props.testID as string)
-            .filter((testID) => testID.startsWith("commander-")),
-        ),
-      ])
-      .filter((row) => row.length > 0)
-
-    expect(rows).toEqual([
-      ["commander-own-seat-1", `commander-pip-seat-1-${players[1].id}`],
-      [`commander-pip-seat-1-${players[2].id}`],
-    ])
-  })
-
-  it("keeps the inspect and assign controls when player metadata is absent", () => {
+  it("maps damage to board positions and opens the grid from a damage disc", () => {
     const onToggle = jest.fn()
     const onPressSword = jest.fn()
-    const view = renderStrip({ players: [], onToggle, onPressSword })
+    const view = renderStrip({ incoming: { [players[2].id]: 21 }, onToggle, onPressSword })
 
-    expect(view.getByTestId("commander-inspect-seat-1").props.accessibilityLabel).toBe(
-      "Show commander damage for Seat 1, Ada, no commander damage",
+    const rows = view.getByTestId("commander-map-seat-1").children.map((row) =>
+      typeof row === "string"
+        ? []
+        : [
+            ...new Set(
+              row
+                .findAll((node) => typeof node.props?.testID === "string")
+                .map((node) => node.props.testID as string)
+                .filter((testID) => testID.startsWith("commander-")),
+            ),
+          ],
     )
-    fireEvent.press(view.getByTestId("commander-inspect-seat-1"))
+    expect(rows).toEqual([["commander-mark-seat-1"], [`commander-pip-seat-1-${players[2].id}`]])
+
+    const pip = view.getByTestId(`commander-pip-seat-1-${players[2].id}`)
+    expect(pip).toHaveTextContent("21")
+    expect(pip.props.accessibilityLabel).toBe("Show commander damage for Seat 1, Ada, 21 from Cy")
+    fireEvent.press(pip)
     fireEvent.press(view.getByTestId("commander-mark-seat-1"))
     expect(onToggle).toHaveBeenCalledTimes(1)
     expect(onPressSword).toHaveBeenCalledTimes(1)

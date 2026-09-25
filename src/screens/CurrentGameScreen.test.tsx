@@ -425,17 +425,7 @@ describe("CurrentGameScreen", () => {
 
     it("keeps inspection separate from assignment and turns the menu into an exit for both", () => {
       const view = renderGame()
-      fireEvent.press(view.getByTestId("commander-inspect-seat-2"))
-      expect(view.getByTestId("commander-board-seat-2")).toBeTruthy()
-      expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
-        "Exit commander damage",
-      )
-      fireEvent.press(view.getByTestId("game-menu-button"))
-      expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
-      fireEvent.press(view.getByTestId("commander-inspect-seat-3"))
-      expect(view.getByTestId("commander-board-seat-3")).toBeTruthy()
       armCommander(view, 1)
-      expect(view.queryByTestId("commander-board-seat-3")).toBeNull()
       expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
         "Exit commander damage",
       )
@@ -444,7 +434,19 @@ describe("CurrentGameScreen", () => {
       expect(view.getByTestId("commander-life-seat-2")).toHaveTextContent("39 life")
       expect(view.getByLabelText("1 commander damage from Ada, 39 life")).toBeTruthy()
       fireEvent.press(view.getByTestId("commander-done-seat-1"))
-      expect(view.queryByTestId("commander-board-seat-3")).toBeNull()
+      expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
+
+      fireEvent.press(view.getByTestId(/^commander-pip-seat-2-/))
+      expect(view.getByTestId("commander-board-seat-2")).toBeTruthy()
+      expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
+        "Exit commander damage",
+      )
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
+      fireEvent.press(view.getByTestId(/^commander-pip-seat-2-/))
+      armCommander(view, 3)
+      expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
+      fireEvent.press(view.getByTestId("commander-done-seat-3"))
       expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
       expect(view.queryByTestId("layout-button")).toBeNull()
     })
