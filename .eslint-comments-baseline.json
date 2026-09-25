@@ -635,8 +635,10 @@
       "70884aa2b23a4e48855778fe43b07382a74e2dcdeb9f8f88a36480590a9545a2": 1
     },
     "src/features/sync/outboxController.ts": {
-      "6b1cf50e9303ba9dc27da1e7aa3b2fb8ddac56376fdb8470606801c4211b1dd3": 1,
-      "b3259c90c0fd4b97a595959fdb5fe4ef92b54693b24c205cf80179357475b594": 1
+      "03977268e2f734839aa733c61b8f93d21ff8635ac28214febd6f702239b34cb4": 1
+    },
+    "src/features/sync/snapshotStore.ts": {
+      "c7058862fee27c295a63692ad3151cb93a43fd91621ab733e3d691543aa7c087": 1
     }
   }
 }

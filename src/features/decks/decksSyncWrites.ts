@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react"
+import { useEffect, useMemo } from "react"
 import { randomUUID } from "expo-crypto"
+import { useValue } from "@legendapp/state/react"
 import { useConvex, type ConvexReactClient } from "convex/react"
 import type { FunctionArgs } from "convex/server"
 import { ConvexError } from "convex/values"
@@ -228,6 +229,10 @@ export class DeckMetadataWriteController {
     })
   }
 
+  get state$() {
+    return this.outbox.state$
+  }
+
   get subscribe() {
     return this.outbox.subscribe
   }
@@ -448,11 +453,7 @@ export function useDeckMetadataWrites(enabled: boolean, ownerId?: string) {
     [client, enabled, ownerId],
   )
   useEffect(() => controller?.start(), [controller])
-  const snapshot = useSyncExternalStore(
-    controller?.subscribe ?? (() => () => undefined),
-    controller?.getSnapshot ?? (() => emptySnapshot),
-    controller?.getSnapshot ?? (() => emptySnapshot),
-  )
+  const snapshot = useValue(() => controller?.state$.get() ?? emptySnapshot)
   return {
     ...snapshot,
     update: (deckId: string, patch: DeckMetadataPatch, expectedRevision?: number) =>
