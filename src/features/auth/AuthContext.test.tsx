@@ -53,6 +53,9 @@ jest.mock("convex/react", () => ({
 jest.mock("@/features/billing/RevenueCatContext", () => ({
   RevenueCatProvider: ({ children }: { children: ReactNode }) => children,
 }))
+jest.mock("@/features/billing/RevenueCatSyncSession", () => ({
+  RevenueCatSyncSession: () => null,
+}))
 
 function Harness() {
   const auth = useAuthAccess()

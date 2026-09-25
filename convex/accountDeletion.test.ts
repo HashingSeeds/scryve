@@ -488,7 +488,17 @@ describe("account deletion", () => {
 
   it("accepts deletion for a Clerk identity that has no Scryve projection", async () => {
     const t = convexTest(schema, modules)
-    const actor = t.withIdentity({ subject: "clerk-only-user" })
+    const clerkUserId = "clerk-only-user"
+    const actor = t.withIdentity({ subject: clerkUserId })
+    await t.run((ctx) =>
+      ctx.db.insert("revenueCatCustomerStates", {
+        appUserId: clerkUserId,
+        enabled: true,
+        environment: "PRODUCTION",
+        observedAt: 1,
+        updatedAt: 1,
+      }),
+    )
     const result = await actor.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
       confirmation: "DELETE",
     })
@@ -500,6 +510,12 @@ describe("account deletion", () => {
       status: "identity_pending",
       receiptToken: result.receiptToken,
     })
+    await t.mutation(internal.accountDeletion.complete, { requestId: result.requestId })
+
+    expect(await t.run((ctx) => ctx.db.query("revenueCatCustomerStates").collect())).toEqual([])
+    await expect(
+      t.query(api.accountDeletion.deletionReceipt, { receiptToken: result.receiptToken }),
+    ).resolves.toMatchObject({ status: "completed" })
   })
 
   it("ignores delayed profile webhooks during and after deletion, including retries", async () => {
