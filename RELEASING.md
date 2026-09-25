@@ -40,6 +40,66 @@ sentry-release:
 
 Production Convex deploys are an explicit release step (`npx convex deploy` against production), performed before publishing the client update or binary that depends on them. Never an incidental side effect of local development. Convex schema and function changes must follow the compatibility rules in AGENTS.md.
 
+## Scryve Pro rollout
+
+RevenueCat owns purchase status. Convex verifies it through the subscriber API and
+updates all Pro features together, including the legacy `unlimited_decks` flag.
+Existing clients keep their current API contracts and cached offline access.
+
+1. In RevenueCat, attach every Pro store product to the exact entitlement identifier
+   `Count Pro`. Configure the `default` offering with `$rc_monthly`, `$rc_annual`, and
+   `$rc_lifetime` packages and make it the default offering. Store product identifiers
+   must match the stores; the package identifiers above are RevenueCat identifiers.
+   Configure its paywall and Customer Center for the app's existing billing UI.
+2. In each Convex deployment's Settings → Environment Variables, set
+   `REVENUECAT_SECRET_API_KEY` to a RevenueCat key that can read v1 subscriber info
+   (the Test Store SDK key works for QA; a v1 secret API key also works),
+   `REVENUECAT_WEBHOOK_AUTH` to a random secret header value such as `Bearer <secret>`,
+   and `REVENUECAT_ENVIRONMENT` to `SANDBOX` for isolated testing or `PRODUCTION`
+   for production. The default is `PRODUCTION`. Never expose these secrets through
+   `EXPO_PUBLIC_*` variables.
+3. Deploy schema expansion checkpoint `29ebb4b` first: the new
+   `revenueCatCustomerStates` and `revenueCatWebhookEvents` tables and their indexes.
+   Preserve this checkpoint when merging. Then deploy the backend code
+   before releasing the client. No existing fields or functions are removed.
+   Follow the explicit Convex release procedure above; configuring environment
+   variables or merging code does not deploy the backend.
+4. In RevenueCat → Integrations → Webhooks, add a configuration pointing to
+   `https://<deployment>.convex.site/revenuecat/webhooks`. Set its Authorization
+   header to the **exact** `REVENUECAT_WEBHOOK_AUTH` value, including `Bearer ` if
+   used. Select all event types and the relevant apps. Use separate configurations
+   for the sandbox and production URLs, each filtered to its matching environment.
+   Webhooks are included in RevenueCat's current Pro plan, which starts free up to
+   $2,500 in monthly tracked revenue, then charges 1% under its published pricing.
+   Some legacy free plans exclude webhooks; check the account's actual plan before
+   changing the integration. See [RevenueCat pricing](https://www.revenuecat.com/pricing).
+5. Clerk needs no new premium claims or billing configuration. Keep the existing
+   Convex integration with audience `convex`, the matching `CLERK_FRONTEND_API_URL`,
+   and the `user.created` / `user.updated` webhook at `/clerk/webhooks`. RevenueCat's
+   app user ID must remain the Clerk user ID, as the app already configures it.
+6. Verify an isolated sandbox purchase, restore, renewal, cancellation before expiry,
+   expiration, and transfer. Check `entitlements.current` and deck capacity as well
+   as the device paywall. Send the same webhook twice and confirm no duplicate
+   grants. A dashboard test event checks delivery and authorization only; it does
+   not prove entitlement sync.
+7. Publish the client after backend verification. It checks existing subscribers
+   when billing and the signed-in profile are ready, after purchase or restore,
+   and after reconnect. Older clients gain server access through webhooks; for an
+   existing subscriber without a new event, resend a historical webhook from
+   RevenueCat to reconcile their current status.
+
+The endpoint waits for a bounded RevenueCat fetch and the atomic database update
+before acknowledging delivery. Failed fetches return non-200 so RevenueCat retries.
+If retries are exhausted, repair the configuration and use RevenueCat's Retry
+action. A cancellation preserves access until RevenueCat's entitlement expires,
+including an active billing grace period. Sandbox transactions never grant access
+on the production backend.
+
+Setup references: [RevenueCat webhooks](https://www.revenuecat.com/docs/integrations/webhooks),
+[entitlements](https://www.revenuecat.com/docs/getting-started/entitlements),
+[offerings](https://www.revenuecat.com/docs/offerings/overview), and
+[REST API v1](https://www.revenuecat.com/docs/api-v1).
+
 ## Deck sync rollout
 
 1. Deploy schema expansion checkpoint `cc26f1873b5826cd41def31d68bc5f21772b580c` first. It adds optional deck sync fields, the receipt table, and the staged `decks.by_owner_and_sync_id` index. Wait for that index to finish backfilling before deploying the subsequent backend commit that activates and queries it. Preserve both commits when merging the backend PR.

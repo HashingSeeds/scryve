@@ -15,6 +15,7 @@ import {
   MEMBERSHIP_MIGRATION_VERSION,
   normalizeUsername,
 } from "./lib/policy"
+import { applyStoredRevenueCatState } from "./lib/revenueCat"
 
 /**
  * The username that reaches Convex comes from Clerk, so the filter has to run here rather than in
@@ -70,6 +71,7 @@ export const syncFromClerk = internalMutation({
       await ctx.db.patch(existing._id, value)
       // Re-checked on every sync, not just at signup: a rename in Clerk's own UI arrives here.
       await enforceUsernameFilter(ctx, existing._id, username)
+      await applyStoredRevenueCatState(ctx, existing)
       return existing._id
     }
     const userId = await ctx.db.insert("users", {
@@ -80,6 +82,8 @@ export const syncFromClerk = internalMutation({
       createdAt: now,
     })
     await enforceUsernameFilter(ctx, userId, username)
+    const user = await ctx.db.get(userId)
+    if (user) await applyStoredRevenueCatState(ctx, user)
     return userId
   },
 })
@@ -143,9 +147,10 @@ export const syncCurrent = mutation({
         ...usernamePatch,
         updatedAt: now,
       })
+      await applyStoredRevenueCatState(ctx, existing)
       return existing._id
     }
-    return ctx.db.insert("users", {
+    const userId = await ctx.db.insert("users", {
       clerkUserId: identity.subject,
       displayName,
       avatarUrl,
@@ -154,5 +159,8 @@ export const syncCurrent = mutation({
       createdAt: now,
       updatedAt: now,
     })
+    const user = await ctx.db.get(userId)
+    if (user) await applyStoredRevenueCatState(ctx, user)
+    return userId
   },
 })
