@@ -646,6 +646,11 @@ export const complete = internalMutation({
     const request = await ctx.db.get(args.requestId)
     if (request) {
       const now = Date.now()
+      const revenueCatState = await ctx.db
+        .query("revenueCatCustomerStates")
+        .withIndex("by_app_user_id", (q) => q.eq("appUserId", request.clerkUserId))
+        .unique()
+      if (revenueCatState) await ctx.db.delete(revenueCatState._id)
       const receipt = request.receiptId ? await ctx.db.get(request.receiptId) : null
       const receiptId =
         receipt?._id ??

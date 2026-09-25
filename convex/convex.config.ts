@@ -6,6 +6,9 @@ const app = defineApp({
   env: {
     CLERK_SECRET_KEY: v.optional(v.string()),
     CLERK_WEBHOOK_SIGNING_SECRET: v.optional(v.string()),
+    REVENUECAT_SECRET_API_KEY: v.optional(v.string()),
+    REVENUECAT_WEBHOOK_AUTH: v.optional(v.string()),
+    REVENUECAT_ENVIRONMENT: v.optional(v.string()),
     RESEND_API_KEY: v.optional(v.string()),
     MODERATION_ALERT_TO: v.optional(v.string()),
     MODERATION_ALERT_FROM: v.optional(v.string()),
