@@ -7,21 +7,22 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
+import type { CommanderBoardSeat } from "./commanderDamageLayout"
 import { overlayTint } from "./LifeControls"
 import type { LifeCardContentRotation } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
-const CENTERED_NAME_HALF_WIDTH = 48
-const PIP = { length: 38, depth: 26 }
-const COMPACT_PIP = { length: 30, depth: 22 }
+const DISC_SIZE = 24
+const COMPACT_DISC_SIZE = 20
 
 export interface CommanderStripProps {
   seatNumber: number
   identity: string
   ownerPlayerId: PlayerId
   players: readonly GamePlayer[]
+  seats: readonly CommanderBoardSeat[]
   incoming: Record<PlayerId, number>
   shape?: PlayerMarkShape
   color: string
@@ -33,7 +34,6 @@ export interface CommanderStripProps {
   inspectDisabled?: boolean
   onToggle: () => void
   onPressSword: () => void
-  edgeLength?: number
 }
 
 export function CommanderStrip({
@@ -41,6 +41,7 @@ export function CommanderStrip({
   identity,
   ownerPlayerId,
   players,
+  seats,
   incoming,
   shape,
   color,
@@ -52,40 +53,29 @@ export function CommanderStrip({
   inspectDisabled,
   onToggle,
   onPressSword,
-  edgeLength,
 }: CommanderStripProps) {
   const {
     themed,
     theme: { spacing },
   } = useAppTheme()
-  const opponents = players
-    .map((player, index) => ({ player, seat: index + 1, total: incoming[player.id] ?? 0 }))
-    .filter(({ player }) => player.id !== ownerPlayerId)
-  const dealt = opponents.filter(({ total }) => total > 0)
+  const disc = compact ? COMPACT_DISC_SIZE : DISC_SIZE
+  const glyphRotation: ViewStyle = { transform: [{ rotate: `${contentRotation}deg` }] }
+  const dealt = players.filter(({ id }) => id !== ownerPlayerId && (incoming[id] ?? 0) > 0)
   const summary = dealt.length
-    ? dealt.map(({ player, total }) => `${total} from ${player.name}`).join(", ")
+    ? dealt.map(({ id, name }) => `${incoming[id]} from ${name}`).join(", ")
     : "no commander damage"
-  const sideways = Math.abs(contentRotation) === 90
-  const pip = compact ? COMPACT_PIP : PIP
-  const pipFrame = (length: number) => ({
-    box: sideways ? { width: pip.depth, height: length } : { width: length, height: pip.depth },
-    content: {
-      width: length,
-      height: pip.depth,
-      left: sideways ? (pip.depth - length) / 2 : 0,
-      top: sideways ? (length - pip.depth) / 2 : 0,
-      transform: [{ rotate: `${contentRotation}deg` }],
-    },
-  })
-  const direction = stripDirection(contentRotation)
-  const pipRun = edgeLength
-    ? Math.max(edgeLength / 2 - CENTERED_NAME_HALF_WIDTH - spacing.xs, pip.depth)
-    : undefined
+  const boardRows = Array.from(new Set(seats.map(({ row }) => row)))
+    .sort((a, b) => a - b)
+    .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
 
   return (
     <View
       testID={`commander-strip-seat-${seatNumber}`}
-      style={[themed($strip), stripEdge(contentRotation, spacing.xs), { flexDirection: direction }]}
+      style={[
+        themed($strip),
+        stripEdge(contentRotation, spacing.xs),
+        { flexDirection: stripDirection(contentRotation) },
+      ]}
     >
       <Pressable
         testID={`commander-inspect-seat-${seatNumber}`}
@@ -96,48 +86,74 @@ export function CommanderStrip({
         hitSlop={8}
         onPress={onToggle}
         style={({ pressed }) => [
-          themed($pips),
-          { flexDirection: direction },
-          pipRun !== undefined && (sideways ? { maxHeight: pipRun } : { maxWidth: pipRun }),
+          themed($map),
           open && { backgroundColor: overlayTint(foreground, 0.24) },
           pressed && { backgroundColor: overlayTint(foreground, 0.32) },
         ]}
       >
-        {opponents.map(({ player, seat, total }) => {
-          const lethal = total >= COMMANDER_LETHAL_DAMAGE
-          const frame = pipFrame(total > 0 ? pip.length : pip.depth)
-          return (
-            <View
-              key={player.id}
-              testID={`commander-pip-seat-${seatNumber}-${player.id}`}
-              style={[frame.box, total === 0 && themed($idlePip)]}
-            >
-              <View style={[themed($pipContent), frame.content]}>
+        {boardRows.map((row, rowIndex) => (
+          <View key={rowIndex} style={themed($mapRow)}>
+            {row.map(({ playerId }) => {
+              const playerIndex = players.findIndex(({ id }) => id === playerId)
+              const player = players[playerIndex]
+              if (!player) return null
+              if (playerId === ownerPlayerId)
+                return (
+                  <View
+                    key={playerId}
+                    testID={`commander-own-seat-${seatNumber}`}
+                    style={[
+                      themed($ownDisc),
+                      { width: disc, height: disc, borderColor: overlayTint(foreground, 0.6) },
+                    ]}
+                  />
+                )
+              const total = incoming[playerId] ?? 0
+              const ink = accessibleForeground(player.color)
+              return (
                 <View
+                  key={playerId}
+                  testID={`commander-pip-seat-${seatNumber}-${playerId}`}
                   style={[
-                    themed($chip),
-                    { backgroundColor: player.color, borderColor: overlayTint(foreground, 0.5) },
+                    themed($disc),
+                    {
+                      width: disc,
+                      height: disc,
+                      backgroundColor: player.color,
+                      borderColor: overlayTint(foreground, 0.5),
+                    },
+                    total === 0 && themed($idleDisc),
+                    total >= COMMANDER_LETHAL_DAMAGE && [
+                      themed($lethalDisc),
+                      { borderColor: foreground },
+                    ],
                   ]}
                 >
-                  <PlayerMark
-                    seatNumber={seat}
-                    shape={player.shape}
-                    color={accessibleForeground(player.color)}
-                    size={11}
-                  />
+                  {total > 0 ? (
+                    <Text
+                      text={String(total)}
+                      weight="bold"
+                      maxFontSizeMultiplier={1}
+                      style={[
+                        themed(compact ? $compactCount : $count),
+                        { color: ink },
+                        glyphRotation,
+                      ]}
+                    />
+                  ) : (
+                    <PlayerMark
+                      seatNumber={playerIndex + 1}
+                      shape={player.shape}
+                      color={ink}
+                      rotation={contentRotation}
+                      size={Math.round(disc * 0.5)}
+                    />
+                  )}
                 </View>
-                {total > 0 ? (
-                  <Text
-                    text={String(total)}
-                    weight={lethal ? "bold" : "medium"}
-                    maxFontSizeMultiplier={1}
-                    style={[themed($count), { color: foreground }, lethal && themed($lethalCount)]}
-                  />
-                ) : null}
-              </View>
-            </View>
-          )
-        })}
+              )
+            })}
+          </View>
+        ))}
       </Pressable>
       <Pressable
         testID={`commander-mark-seat-${seatNumber}`}
@@ -183,41 +199,46 @@ const $strip: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
 })
 
-const $pips: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexShrink: 1,
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: spacing.xxs,
+const $map: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xxxs,
   padding: spacing.xxs,
   borderRadius: spacing.xs,
 })
 
-const $idlePip: ThemedStyle<ViewStyle> = () => ({ opacity: 0.45 })
-
-const $pipContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
+const $mapRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
-  alignItems: "center",
   justifyContent: "center",
   gap: spacing.xxxs,
 })
 
-const $chip: ThemedStyle<ViewStyle> = () => ({
-  width: 18,
-  height: 18,
-  borderRadius: 9,
+const $disc: ThemedStyle<ViewStyle> = () => ({
+  borderRadius: 999,
   borderWidth: 1,
   alignItems: "center",
   justifyContent: "center",
 })
 
+const $ownDisc: ThemedStyle<ViewStyle> = () => ({
+  borderRadius: 999,
+  borderWidth: 1,
+  borderStyle: "dashed",
+})
+
+const $lethalDisc: ThemedStyle<ViewStyle> = () => ({ borderWidth: 2 })
+
+const $idleDisc: ThemedStyle<ViewStyle> = () => ({ opacity: 0.45 })
+
 const $count: ThemedStyle<TextStyle> = () => ({
-  fontSize: 16,
-  lineHeight: 20,
+  fontSize: 13,
+  lineHeight: 16,
   fontVariant: ["tabular-nums"],
 })
 
-const $lethalCount: ThemedStyle<TextStyle> = () => ({ textDecorationLine: "underline" })
+const $compactCount: ThemedStyle<TextStyle> = () => ({
+  fontSize: 11,
+  lineHeight: 14,
+  fontVariant: ["tabular-nums"],
+})
 
 const $sword: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexShrink: 0,

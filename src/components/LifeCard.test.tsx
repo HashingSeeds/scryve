@@ -92,11 +92,19 @@ describe("LifeCard", () => {
         )
         expect(
           StyleSheet.flatten(view.getByTestId("commander-card-mode-seat-1").props.style),
-        ).toMatchObject({
-          backgroundColor: darkTheme.colors.transparent,
-          borderRadius: radius,
-          borderWidth: 0,
-        })
+        ).toMatchObject(
+          armedPlayerId === commanderIds[0]
+            ? {
+                backgroundColor: darkTheme.colors.board.background,
+                borderColor: color,
+                borderRadius: radius,
+              }
+            : {
+                backgroundColor: darkTheme.colors.transparent,
+                borderRadius: radius,
+                borderWidth: 0,
+              },
+        )
       }
     },
   )

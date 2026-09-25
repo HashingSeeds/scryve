@@ -198,6 +198,7 @@ export function LifeCard({
           kind: "source",
           playerName: displayName,
           submitLabel: commanderDamage.armBar ? "Send" : "Done",
+          mark: { color, shape, seatNumber },
           submitDisabled: commanderDamage.armBar?.stagedTargets === 0,
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
           onCancel: commanderDamage.armBar?.onCancel,
@@ -509,6 +510,7 @@ export function LifeCard({
           identity={identity}
           ownerPlayerId={commanderDamage.ownerPlayerId}
           players={commanderDamage.players ?? []}
+          seats={commanderDamage.seats}
           incoming={commanderDamage.incoming}
           shape={shape}
           color={color}
@@ -520,7 +522,6 @@ export function LifeCard({
           inspectDisabled={inspectDisabled}
           onToggle={commanderDamage.inspection.onToggle}
           onPressSword={beginCommanderAssignment}
-          edgeLength={Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width}
         />
       ) : null}
       {editorOpen ? (
