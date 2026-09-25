@@ -13,6 +13,7 @@ import {
   type DurablePendingRecord,
   type DurableStringStorage,
 } from "@/features/sync/durableOutbox"
+import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
 import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
@@ -198,16 +199,9 @@ export class DeckSyncWriteRepository {
 }
 
 export class DeckMetadataWriteController {
-  private readonly listeners = new Set<() => void>()
-  private snapshot: DeckSyncWriteSnapshot
-  private users = 0
-  private capacityBlocked = false
-  private draining = false
-  private drainAgain = false
-  private generation = 0
-  private stopReads: (() => void) | undefined
+  private readonly outbox: OutboxController<DeckSyncWriteSnapshot>
   private unsubscribeReads: (() => void) | undefined
-  private retryTimer: ReturnType<typeof setTimeout> | undefined
+  private stopReads: (() => void) | undefined
 
   constructor(
     private readonly client: Pick<ConvexReactClient, "mutation">,
@@ -215,42 +209,47 @@ export class DeckMetadataWriteController {
     private readonly now: () => number = Date.now,
     private readonly reads?: DeckSyncController,
   ) {
-    this.snapshot = this.buildSnapshot()
+    this.outbox = createOutboxController({
+      snapshot: ({ capacityBlocked }) => this.buildSnapshot(capacityBlocked),
+      drain: (shouldContinue) => this.drainOnce(shouldContinue),
+      retryDelay: (result) =>
+        Math.min(60_000, RETRY_DELAY_MS * 2 ** Math.min(result.pending[0]?.attempts ?? 0, 5)),
+      onResult: () => this.outbox.publish(),
+      onStart: () => {
+        this.unsubscribeReads = this.reads?.subscribe(() => this.outbox.publish())
+        this.stopReads = this.reads?.start()
+      },
+      onStop: () => {
+        this.unsubscribeReads?.()
+        this.stopReads?.()
+        this.unsubscribeReads = undefined
+        this.stopReads = undefined
+      },
+    })
   }
 
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+  get subscribe() {
+    return this.outbox.subscribe
   }
 
-  getSnapshot = () => this.snapshot
+  get getSnapshot() {
+    return this.outbox.getSnapshot
+  }
+
+  private get snapshot() {
+    return this.outbox.getSnapshot()
+  }
 
   start(): () => void {
-    this.users += 1
-    if (this.users === 1) {
-      this.generation += 1
-      this.unsubscribeReads = this.reads?.subscribe(() => this.publish())
-      this.stopReads = this.reads?.start()
-      this.publish()
-      void this.drain()
-    }
-    return () => this.stop()
+    return this.outbox.start()
   }
 
   stop(): void {
-    this.users = Math.max(0, this.users - 1)
-    if (this.users > 0) return
-    this.generation += 1
-    this.unsubscribeReads?.()
-    this.stopReads?.()
-    this.unsubscribeReads = undefined
-    this.stopReads = undefined
-    if (this.retryTimer) clearTimeout(this.retryTimer)
-    this.retryTimer = undefined
+    this.outbox.stop()
   }
 
   update(deckId: string, patch: DeckMetadataPatch, expectedRevision?: number): void {
-    if (this.capacityBlocked)
+    if (this.outbox.capacityBlocked)
       throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
     if (this.snapshot.failures.some((failure) => failure.action.deckId === deckId))
       throw new Error("Resolve the saved local edit before making another change")
@@ -264,7 +263,7 @@ export class DeckMetadataWriteController {
     expectedRevision?: number,
     supersedes?: string[],
   ): void {
-    this.publish()
+    this.outbox.publish()
     const current = this.snapshot.metadata.find((deck) => deck.deckId === deckId && !deck.deleted)
     if (!current) throw new Error("Deck metadata is not available on this device")
     const now = this.now()
@@ -287,7 +286,7 @@ export class DeckMetadataWriteController {
     const result = this.repository.enqueue(action, this.snapshot.pending)
     if (!result.accepted)
       throw new Error("The offline deck queue is full. Reconnect before making more changes.")
-    this.publish()
+    this.outbox.publish()
   }
 
   discardFailure(operationId: string): void {
@@ -296,8 +295,8 @@ export class DeckMetadataWriteController {
     for (const entry of this.snapshot.failures)
       if (entry.action.deckId === failure.action.deckId)
         this.repository.dismissFailed(entry.action.operationId)
-    this.capacityBlocked = false
-    this.publish()
+    this.outbox.unblock()
+    this.outbox.publish()
     void this.drain()
   }
 
@@ -327,86 +326,61 @@ export class DeckMetadataWriteController {
     void this.drain()
   }
 
-  async drain(): Promise<void> {
-    if (this.draining) {
-      this.drainAgain = true
-      return
-    }
-    if (this.users === 0 || this.capacityBlocked) return
-    const generation = this.generation
-    if (this.retryTimer) clearTimeout(this.retryTimer)
-    this.retryTimer = undefined
-    this.draining = true
-    try {
-      const result = await drainOutbox({
-        repository: this.repository,
-        currentFailures: () => this.repository.loadFailed(),
-        operationId: (action) => action.operationId,
-        classifyFailure: (cause) => {
-          const code = convexErrorCode(cause)
-          if (code === "sync_conflict")
-            return { kind: "reject" as const, reason: DECK_CONFLICT_REASON }
-          return code && permanentErrors.has(code)
-            ? {
-                kind: "reject" as const,
-                reason: convexErrorMessage(cause, "Could not sync this edit"),
-              }
-            : { kind: "retry" as const }
-        },
-        send: async (action) => {
-          for (const id of action.supersedes ?? []) this.repository.dismissFailed(id)
-          if (
-            this.repository.loadFailed().some((failure) => failure.action.deckId === action.deckId)
-          )
-            throw new ConvexError({
-              code: "sync_conflict",
-              message: DECK_CONFLICT_REASON,
-            })
-          const result = await this.client.mutation(api.decks.syncWrite, {
-            id: action.id,
-            operationId: action.operationId,
-            expectedOwnerId: this.repository.ownerId,
-            returnConflict: true,
-            expectedRevision: action.expectedRevision,
-            name: action.name,
-            format: action.format,
-            game: action.game,
-            note: action.note,
-            deleted: false,
-          })
-          const deck = "status" in result ? result.deck : result
-          if (this.reads) this.reads.acceptMetadata([deck])
-          else this.repository.mergeMetadata([deck])
-          if ("status" in result)
-            throw new ConvexError({
-              code: "sync_conflict",
-              message: DECK_CONFLICT_REASON,
-            })
-          return { operationId: action.operationId }
-        },
-        shouldContinue: () => generation === this.generation && this.users > 0,
-        onChange: () => this.publish(),
-      })
-      this.capacityBlocked = result.blockedByFailureCapacity
-      this.publish()
-      if (result.stoppedForRetry && generation === this.generation && this.users > 0)
-        this.retryTimer = setTimeout(
-          () => {
-            this.retryTimer = undefined
-            void this.drain()
-          },
-          Math.min(60_000, RETRY_DELAY_MS * 2 ** Math.min(result.pending[0]?.attempts ?? 0, 5)),
-        )
-    } finally {
-      this.draining = false
-      if (this.drainAgain && this.users > 0) {
-        this.drainAgain = false
-        void this.drain()
-      }
-    }
+  drain(): Promise<void> {
+    return this.outbox.drain()
   }
 
-  private buildSnapshot(): DeckSyncWriteSnapshot {
+  private drainOnce(shouldContinue: () => boolean) {
+    return drainOutbox({
+      repository: this.repository,
+      currentFailures: () => this.repository.loadFailed(),
+      operationId: (action) => action.operationId,
+      classifyFailure: (cause) => {
+        const code = convexErrorCode(cause)
+        if (code === "sync_conflict")
+          return { kind: "reject" as const, reason: DECK_CONFLICT_REASON }
+        return code && permanentErrors.has(code)
+          ? {
+              kind: "reject" as const,
+              reason: convexErrorMessage(cause, "Could not sync this edit"),
+            }
+          : { kind: "retry" as const }
+      },
+      send: async (action) => {
+        for (const id of action.supersedes ?? []) this.repository.dismissFailed(id)
+        if (this.repository.loadFailed().some((failure) => failure.action.deckId === action.deckId))
+          throw new ConvexError({
+            code: "sync_conflict",
+            message: DECK_CONFLICT_REASON,
+          })
+        const result = await this.client.mutation(api.decks.syncWrite, {
+          id: action.id,
+          operationId: action.operationId,
+          expectedOwnerId: this.repository.ownerId,
+          returnConflict: true,
+          expectedRevision: action.expectedRevision,
+          name: action.name,
+          format: action.format,
+          game: action.game,
+          note: action.note,
+          deleted: false,
+        })
+        const deck = "status" in result ? result.deck : result
+        if (this.reads) this.reads.acceptMetadata([deck])
+        else this.repository.mergeMetadata([deck])
+        if ("status" in result)
+          throw new ConvexError({
+            code: "sync_conflict",
+            message: DECK_CONFLICT_REASON,
+          })
+        return { operationId: action.operationId }
+      },
+      shouldContinue,
+      onChange: () => this.outbox.publish(),
+    })
+  }
+
+  private buildSnapshot(capacityBlocked: boolean): DeckSyncWriteSnapshot {
     const pending = this.repository.loadPending()
     const byId = new Map<string, SyncedDeck>(
       this.repository.loadMetadata().map((deck) => [deck.deckId, deck]),
@@ -431,13 +405,8 @@ export class DeckMetadataWriteController {
       metadata: [...byId.values()],
       pending,
       failures: this.repository.loadFailed(),
-      capacityBlocked: this.capacityBlocked,
+      capacityBlocked,
     }
-  }
-
-  private publish(): void {
-    this.snapshot = this.buildSnapshot()
-    for (const listener of this.listeners) listener()
   }
 }
 
