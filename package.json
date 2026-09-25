@@ -49,6 +49,8 @@
     "build:android:dev": "env APP_VARIANT=development npx eas-cli@latest build --profile development:device --platform android --local",
     "build:android:preview": "npx eas-cli@latest build --profile preview:device --platform android --local",
     "build:android:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx eas-cli@latest build --profile production --platform android --local",
+    "ota:preview": "env APP_VARIANT=preview npx eas-cli@latest update --channel preview --environment preview",
+    "ota:prod": "env APP_VARIANT=production npx eas-cli@latest update --channel production --environment production",
     "start:concurrent": "concurrently --kill-others \"pnpm start:expo\" \"pnpm convex:dev\""
   },
   "dependencies": {
