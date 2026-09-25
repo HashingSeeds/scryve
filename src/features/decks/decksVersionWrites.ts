@@ -13,6 +13,7 @@ import {
   type DurablePendingRecord,
   type DurableStringStorage,
 } from "@/features/sync/durableOutbox"
+import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
 import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
@@ -255,46 +256,44 @@ export class DeckVersionWriteRepository {
 }
 
 export class DeckVersionWriteController {
-  private readonly listeners = new Set<() => void>()
-  private snapshot: DeckVersionWriteSnapshot
-  private users = 0
-  private capacityBlocked = false
-  private draining = false
-  private drainAgain = false
-  private generation = 0
-  private retryTimer: ReturnType<typeof setTimeout> | undefined
+  private readonly outbox: OutboxController<DeckVersionWriteSnapshot>
 
   constructor(
     private readonly client: Pick<ConvexReactClient, "mutation">,
     private readonly repository: DeckVersionWriteRepository,
     private readonly now: () => number = Date.now,
   ) {
-    this.snapshot = this.buildSnapshot()
+    this.outbox = createOutboxController({
+      snapshot: ({ capacityBlocked }) => ({
+        pending: this.repository.loadPending(),
+        failures: this.repository.loadFailed(),
+        capacityBlocked,
+      }),
+      drain: (shouldContinue) => this.drainOnce(shouldContinue),
+      retryDelay: (result) =>
+        Math.min(60_000, RETRY_DELAY_MS * 2 ** Math.min(result.pending[0]?.attempts ?? 0, 5)),
+      onResult: () => this.outbox.publish(),
+    })
   }
 
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+  get subscribe() {
+    return this.outbox.subscribe
   }
 
-  getSnapshot = () => this.snapshot
+  get getSnapshot() {
+    return this.outbox.getSnapshot
+  }
+
+  private get snapshot() {
+    return this.outbox.getSnapshot()
+  }
 
   start(): () => void {
-    this.users += 1
-    if (this.users === 1) {
-      this.generation += 1
-      this.publish()
-      void this.drain()
-    }
-    return () => this.stop()
+    return this.outbox.start()
   }
 
   stop(): void {
-    this.users = Math.max(0, this.users - 1)
-    if (this.users > 0) return
-    this.generation += 1
-    if (this.retryTimer) clearTimeout(this.retryTimer)
-    this.retryTimer = undefined
+    this.outbox.stop()
   }
 
   update(
@@ -303,7 +302,7 @@ export class DeckVersionWriteController {
     cards: readonly VersionCardPayload[],
     expectedRevision: number,
   ): void {
-    if (this.capacityBlocked)
+    if (this.outbox.capacityBlocked)
       throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
     if (this.snapshot.failures.some((failure) => failure.action.versionId === versionId))
       throw new Error("Resolve the saved card edit before making another change")
@@ -342,7 +341,7 @@ export class DeckVersionWriteController {
     const result = this.repository.enqueue(action, this.snapshot.pending)
     if (!result.accepted)
       throw new Error("The offline card queue is full. Reconnect before making more changes.")
-    this.publish()
+    this.outbox.publish()
   }
 
   /** Queues an offline version create and registers its provisional local row.
@@ -353,7 +352,7 @@ export class DeckVersionWriteController {
     note: string,
     cards: readonly VersionCardPayload[],
   ): string {
-    if (this.capacityBlocked)
+    if (this.outbox.capacityBlocked)
       throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
     // Local policy parity keeps permanently invalid payloads out of the retry loop.
     const versionName = assertVersionName(name)
@@ -386,7 +385,7 @@ export class DeckVersionWriteController {
       local: true,
     })
     this.repository.cache.saveCards(provisionalId, 0, cards)
-    this.publish()
+    this.outbox.publish()
     void this.drain()
     return provisionalId
   }
@@ -397,14 +396,14 @@ export class DeckVersionWriteController {
     patch: { name?: string; note?: string },
     expectedRevision: number,
   ): void {
-    if (this.capacityBlocked)
+    if (this.outbox.capacityBlocked)
       throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
     const name = patch.name !== undefined ? assertVersionName(patch.name) : undefined
     if (patch.note !== undefined && patch.note.trim().length > MAX_DECK_NOTE_LENGTH)
       throw new Error(`Notes must be at most ${MAX_DECK_NOTE_LENGTH} characters`)
     if (this.snapshot.failures.some((failure) => failure.action.versionId === versionId))
       throw new Error("Resolve the saved version change before making another change")
-    this.publish()
+    this.outbox.publish()
     this.enqueue(deckId, versionId, [], expectedRevision, {
       op: "rename",
       ...(name !== undefined ? { name } : {}),
@@ -414,11 +413,11 @@ export class DeckVersionWriteController {
   }
 
   deleteVersion(deckId: string, versionId: string, expectedRevision: number): void {
-    if (this.capacityBlocked)
+    if (this.outbox.capacityBlocked)
       throw new Error("Sync paused. Resolve a saved local edit before making more changes.")
     if (this.snapshot.failures.some((failure) => failure.action.versionId === versionId))
       throw new Error("Resolve the saved version change before making another change")
-    this.publish()
+    this.outbox.publish()
     const remaining = this.repository.cache
       .loadVersions(deckId)
       .filter((version) => !version.deleted && version.versionId !== versionId).length
@@ -439,8 +438,8 @@ export class DeckVersionWriteController {
         this.repository.dismissFailed(entry.action.operationId)
     if (failure.action.op === "create")
       this.repository.cache.discardDraft(failure.action.deckId, failure.action.versionId)
-    this.capacityBlocked = false
-    this.publish()
+    this.outbox.unblock()
+    this.outbox.publish()
     void this.drain()
   }
 
@@ -467,8 +466,8 @@ export class DeckVersionWriteController {
         ...(latest.action.note ? { note: latest.action.note } : {}),
       })
       for (const entry of related) this.repository.dismissFailed(entry.action.operationId)
-      this.capacityBlocked = false
-      this.publish()
+      this.outbox.unblock()
+      this.outbox.publish()
       void this.drain()
       return
     }
@@ -491,8 +490,8 @@ export class DeckVersionWriteController {
       )
     }
     for (const entry of related) this.repository.dismissFailed(entry.action.operationId)
-    this.capacityBlocked = false
-    this.publish()
+    this.outbox.unblock()
+    this.outbox.publish()
     void this.drain()
   }
 
@@ -540,111 +539,75 @@ export class DeckVersionWriteController {
     })
   }
 
-  async drain(): Promise<void> {
-    if (this.draining) {
-      this.drainAgain = true
-      return
-    }
-    if (this.users === 0 || this.capacityBlocked) return
-    const generation = this.generation
-    if (this.retryTimer) clearTimeout(this.retryTimer)
-    this.retryTimer = undefined
-    this.draining = true
-    try {
-      const result = await drainOutbox({
-        repository: this.repository,
-        currentFailures: () => this.repository.loadFailed(),
-        operationId: (action) => action.operationId,
-        classifyFailure: (cause) => {
-          const code = convexErrorCode(cause)
-          if (code === "sync_conflict")
-            return {
-              kind: "reject" as const,
-              reason: /earlier edit conflicted/.test(convexErrorMessage(cause, ""))
-                ? DECK_VERSION_QUEUE_CONFLICT_REASON
-                : DECK_VERSION_CONFLICT_REASON,
-            }
-          return code && permanentErrors.has(code)
-            ? {
-                kind: "reject" as const,
-                reason: convexErrorMessage(cause, "Could not sync these card changes"),
-              }
-            : { kind: "retry" as const }
-        },
-        send: async (action) => {
-          if (
-            this.repository
-              .loadFailed()
-              .some((failure) => failure.action.versionId === action.versionId)
-          )
-            throw new ConvexError({
-              code: "sync_conflict",
-              message: "An earlier edit conflicted. Choose which version to keep.",
-            })
-          const result = await this.send(action)
-          if ("status" in result) {
-            this.repository.recordConflict(action.deckId, result.version)
-            throw new ConvexError({
-              code: "sync_conflict",
-              message: DECK_VERSION_CONFLICT_REASON,
-            })
-          }
-          if (action.op === "create") {
-            this.repository.cache.recordMapping(action.versionId, result.versionId)
-            this.repository.cache.saveCards(result.versionId, result.revision, action.cards)
-            this.repository.cache.confirmDraft(action.deckId, action.versionId, result)
-            this.repository.rebasePending(action.versionId, result.revision)
-          }
-          if (action.op === "rename" || action.op === "delete") {
-            this.repository.cache.mergeVersions(action.deckId, [result])
-            this.repository.rebasePending(action.versionId, result.revision)
-          }
-          if (action.op === "cards" || action.op === undefined) {
-            const ackedVersionId = this.mappedVersion(action.versionId)
-            this.repository.cache.saveCards(ackedVersionId, result.revision, action.cards)
-            this.repository.cache.bumpVersion(action.deckId, ackedVersionId, result.revision)
-            this.repository.rebasePending(action.versionId, result.revision)
-          }
-          return { operationId: action.operationId }
-        },
-        shouldContinue: () => generation === this.generation && this.users > 0,
-        onChange: () => this.publish(),
-      })
-      this.capacityBlocked = result.blockedByFailureCapacity
-      this.publish()
-      if (result.stoppedForRetry && generation === this.generation && this.users > 0)
-        this.retryTimer = setTimeout(
-          () => {
-            this.retryTimer = undefined
-            void this.drain()
-          },
-          Math.min(60_000, RETRY_DELAY_MS * 2 ** Math.min(result.pending[0]?.attempts ?? 0, 5)),
-        )
-    } finally {
-      this.draining = false
-      if (this.drainAgain && this.users > 0) {
-        this.drainAgain = false
-        void this.drain()
-      }
-    }
+  drain(): Promise<void> {
+    return this.outbox.drain()
   }
 
-  private buildSnapshot(): DeckVersionWriteSnapshot {
-    return {
-      pending: this.repository.loadPending(),
-      failures: this.repository.loadFailed(),
-      capacityBlocked: this.capacityBlocked,
-    }
+  private drainOnce(shouldContinue: () => boolean) {
+    return drainOutbox({
+      repository: this.repository,
+      currentFailures: () => this.repository.loadFailed(),
+      operationId: (action) => action.operationId,
+      classifyFailure: (cause) => {
+        const code = convexErrorCode(cause)
+        if (code === "sync_conflict")
+          return {
+            kind: "reject" as const,
+            reason: /earlier edit conflicted/.test(convexErrorMessage(cause, ""))
+              ? DECK_VERSION_QUEUE_CONFLICT_REASON
+              : DECK_VERSION_CONFLICT_REASON,
+          }
+        return code && permanentErrors.has(code)
+          ? {
+              kind: "reject" as const,
+              reason: convexErrorMessage(cause, "Could not sync these card changes"),
+            }
+          : { kind: "retry" as const }
+      },
+      send: async (action) => {
+        if (
+          this.repository
+            .loadFailed()
+            .some((failure) => failure.action.versionId === action.versionId)
+        )
+          throw new ConvexError({
+            code: "sync_conflict",
+            message: "An earlier edit conflicted. Choose which version to keep.",
+          })
+        const result = await this.send(action)
+        if ("status" in result) {
+          this.repository.recordConflict(action.deckId, result.version)
+          throw new ConvexError({
+            code: "sync_conflict",
+            message: DECK_VERSION_CONFLICT_REASON,
+          })
+        }
+        if (action.op === "create") {
+          this.repository.cache.recordMapping(action.versionId, result.versionId)
+          this.repository.cache.saveCards(result.versionId, result.revision, action.cards)
+          this.repository.cache.confirmDraft(action.deckId, action.versionId, result)
+          this.repository.rebasePending(action.versionId, result.revision)
+        }
+        if (action.op === "rename" || action.op === "delete") {
+          this.repository.cache.mergeVersions(action.deckId, [result])
+          this.repository.rebasePending(action.versionId, result.revision)
+        }
+        if (action.op === "cards" || action.op === undefined) {
+          const ackedVersionId = this.mappedVersion(action.versionId)
+          this.repository.cache.saveCards(ackedVersionId, result.revision, action.cards)
+          this.repository.cache.bumpVersion(action.deckId, ackedVersionId, result.revision)
+          this.repository.rebasePending(action.versionId, result.revision)
+        }
+        return { operationId: action.operationId }
+      },
+      shouldContinue,
+      onChange: () => this.outbox.publish(),
+    })
   }
 
   /** Version id of a queued write once a pending create got its server identity. */
   mappedVersion(versionId: string): string {
     return this.repository.cache.mappedVersionId(versionId) ?? versionId
-  }
-
-  private publish(): void {
-    this.snapshot = this.buildSnapshot()
-    for (const listener of this.listeners) listener()
   }
 }
 
