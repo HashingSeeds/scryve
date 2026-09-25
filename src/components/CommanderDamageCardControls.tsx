@@ -6,6 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { accessibleForeground } from "@/utils/colorContrast"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { overlayTint } from "./LifeControls"
@@ -14,12 +15,17 @@ import {
   type LifeCardContentInsets,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
+import { PlayerMark } from "./PlayerMark"
 import { Sword } from "./Sword"
 import { Text } from "./Text"
+import type { PlayerMarkShape } from "../../convex/lib/appearance"
+
+export type CommanderAttacker = { color: string; shape?: PlayerMarkShape; seatNumber: number }
 
 type AssignmentTarget = {
   kind: "target"
   attackerName: string
+  attacker?: CommanderAttacker
   total: number
   onChange: (step: -1 | 1) => void
 }
@@ -171,7 +177,7 @@ export function CommanderDamageCardControls({
               compact={compact}
               emphasized
               disabled={mode.submitDisabled}
-              showSword={life === undefined}
+              showSword
               life={life}
               onPress={mode.onSubmit}
             />
@@ -190,14 +196,6 @@ export function CommanderDamageCardControls({
           >
             {mode.kind === "target" ? (
               <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
-                {life !== undefined ? (
-                  <Text
-                    text={mode.attackerName}
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={1.2}
-                    style={[themed($caption), { color: foreground }]}
-                  />
-                ) : null}
                 {life === undefined ? (
                   <Text
                     text="↓"
@@ -206,13 +204,35 @@ export function CommanderDamageCardControls({
                     style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
                   />
                 ) : null}
-                <Text
-                  testID={`commander-total-seat-${seatNumber}`}
-                  text={String(mode.total)}
-                  weight="bold"
-                  maxFontSizeMultiplier={1.2}
-                  style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
-                />
+                <View style={themed($incomingTotal)}>
+                  {life !== undefined && mode.attacker ? (
+                    <View
+                      testID={`commander-attacker-seat-${seatNumber}`}
+                      style={[
+                        themed(compact ? $compactAttackerChip : $attackerChip),
+                        {
+                          backgroundColor: mode.attacker.color,
+                          borderColor: overlayTint(foreground, 0.6),
+                        },
+                      ]}
+                    >
+                      <PlayerMark
+                        seatNumber={mode.attacker.seatNumber}
+                        shape={mode.attacker.shape}
+                        color={accessibleForeground(mode.attacker.color)}
+                        insetSwordColor={mode.attacker.color}
+                        size={compact ? 22 : 30}
+                      />
+                    </View>
+                  ) : null}
+                  <Text
+                    testID={`commander-total-seat-${seatNumber}`}
+                    text={String(mode.total)}
+                    weight="bold"
+                    maxFontSizeMultiplier={1.2}
+                    style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
+                  />
+                </View>
                 {life !== undefined ? (
                   <Text
                     testID={`commander-life-seat-${seatNumber}`}
@@ -402,5 +422,21 @@ const $localOverlay: ThemedStyle<ViewStyle> = ({ colors }) => ({
 const $localTotal: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xxs,
+})
+const $attackerChip: ThemedStyle<ViewStyle> = () => ({
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  borderWidth: 2,
+  alignItems: "center",
+  justifyContent: "center",
+})
+const $compactAttackerChip: ThemedStyle<ViewStyle> = () => ({
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  borderWidth: 2,
+  alignItems: "center",
+  justifyContent: "center",
 })
 const $localLife: ThemedStyle<TextStyle> = () => ({ fontSize: 18, lineHeight: 22 })
