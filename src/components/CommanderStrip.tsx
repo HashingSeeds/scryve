@@ -9,7 +9,7 @@ import { accessibleForeground } from "@/utils/colorContrast"
 
 import type { CommanderBoardSeat } from "./commanderDamageLayout"
 import { overlayTint } from "./LifeControls"
-import type { LifeCardContentRotation } from "./playerCardTypes"
+import type { LifeCardContentInsets, LifeCardContentRotation } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
@@ -29,6 +29,7 @@ export interface CommanderStripProps {
   color: string
   foreground: string
   contentRotation: LifeCardContentRotation
+  contentInsets?: LifeCardContentInsets
   compact?: boolean
   open: boolean
   disabled?: boolean
@@ -48,6 +49,7 @@ export function CommanderStrip({
   color,
   foreground,
   contentRotation,
+  contentInsets,
   compact,
   open,
   disabled,
@@ -97,7 +99,7 @@ export function CommanderStrip({
       testID={`commander-strip-seat-${seatNumber}`}
       style={[
         themed($strip),
-        stripEdge(contentRotation, spacing.xs),
+        stripEdge(contentRotation, spacing.xs, contentInsets),
         { flexDirection: stripDirection(contentRotation) },
       ]}
     >
@@ -169,11 +171,19 @@ function stripDirection(rotation: LifeCardContentRotation): ViewStyle["flexDirec
   return "row"
 }
 
-function stripEdge(rotation: LifeCardContentRotation, inset: number): ViewStyle {
-  if (rotation === 90) return { left: inset, top: inset, bottom: inset }
-  if (rotation === -90) return { right: inset, top: inset, bottom: inset }
-  if (rotation === 180) return { top: inset, left: inset, right: inset }
-  return { bottom: inset, left: inset, right: inset }
+function stripEdge(
+  rotation: LifeCardContentRotation,
+  gap: number,
+  insets?: LifeCardContentInsets,
+): ViewStyle {
+  const top = gap + (insets?.top ?? 0)
+  const bottom = gap + (insets?.bottom ?? 0)
+  const left = gap + (insets?.left ?? 0)
+  const right = gap + (insets?.right ?? 0)
+  if (rotation === 90) return { left, top, bottom }
+  if (rotation === -90) return { right, top, bottom }
+  if (rotation === 180) return { top, left, right }
+  return { bottom, left, right }
 }
 
 const $strip: ThemedStyle<ViewStyle> = () => ({

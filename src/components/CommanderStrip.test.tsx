@@ -49,6 +49,15 @@ describe("CommanderStrip", () => {
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
+  it("clears the card's safe-area inset on its edge", () => {
+    const view = renderStrip({
+      contentRotation: 180,
+      contentInsets: { top: 47, bottom: 0, left: 0, right: 0 },
+    })
+
+    expect(view.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 55 })
+  })
+
   it("maps damage to board positions and opens the grid from a damage disc", () => {
     const onToggle = jest.fn()
     const onPressSword = jest.fn()

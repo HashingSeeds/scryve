@@ -516,6 +516,7 @@ export function LifeCard({
           color={color}
           foreground={foreground}
           contentRotation={contentRotation}
+          contentInsets={contentInsets}
           compact={compact}
           open={commanderOverviewOpen}
           disabled={disabled}
