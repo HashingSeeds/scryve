@@ -31,8 +31,9 @@ Development identity:
 
 - App: `Scryve (Dev)`
 - Bundle identifier: `com.sowinghope.count.dev`
-- Clerk test identity: `jane+clerk_test@sow.care`
-- Clerk development OTP: `424242`
+- Clerk test identities: `jane+clerk_test@sow.care`, `john+clerk_test@sow.care`
+- Clerk development OTP: `424242` (same for both)
+- Any `*+clerk_test@sow.care` address is a test account on a development build.
 
 Bundle presence proves the variant, not native compatibility. An Expo
 fingerprint can prove that an EAS build matches this worktree's native runtime,
@@ -96,7 +97,7 @@ the Clerk publishable key is not a test key or the Convex deployment does not
 match the development configuration.
 
 When the affected flow requires authentication and a Clerk session already
-exists, confirm it belongs to `jane+clerk_test@sow.care`. If the identity cannot
+exists, confirm it belongs to a `*+clerk_test@sow.care` test account. If the identity cannot
 be confirmed or belongs to another account, stop and report the mismatch. Do
 not sign out, switch accounts, or treat that session as valid test evidence
 without separate approval.
@@ -121,7 +122,7 @@ the affected flow needs:
 5. Force-close and reopen the app once. Confirm the Clerk session and current
    consent persist before navigating to the changed screen.
 
-The email address and fixed OTP work only with Clerk test mode. Never enable
+The test addresses and fixed OTP work only with Clerk test mode. Never enable
 Clerk test mode in production and never request or store a Clerk secret key in
 the app, repository, screenshots, or report.
 
