@@ -28,11 +28,12 @@ function deferred<T>() {
 
 const flush = () => new Promise(setImmediate)
 
-function setup(overrides: Partial<OutboxControllerOptions<Pending, Failed, number>> = {}) {
-  let published = 0
+type Snapshot = { capacityBlocked: boolean }
+
+function setup(overrides: Partial<OutboxControllerOptions<Pending, Failed, Snapshot>> = {}) {
   const drain = jest.fn<Promise<Result>, [() => boolean]>(async () => result())
-  const controller = createOutboxController<Pending, Failed, number>({
-    snapshot: () => (published += 1),
+  const controller = createOutboxController<Pending, Failed, Snapshot>({
+    snapshot: (state) => ({ ...state }),
     drain,
     retryDelay: (drained) => 1_000 * 2 ** (drained.pending[0]?.attempts ?? 0),
     ...overrides,
@@ -124,19 +125,15 @@ describe("createOutboxController", () => {
       .fn<Promise<Result>, [() => boolean]>()
       .mockResolvedValueOnce(result({ blockedByFailureCapacity: true }))
       .mockResolvedValue(result())
-    const snapshot = jest.fn(({ capacityBlocked }: { capacityBlocked: boolean }) =>
-      capacityBlocked ? 1 : 0,
-    )
-    const controller = createOutboxController<Pending, Failed, number>({
-      snapshot,
-      drain,
-      retryDelay: () => 0,
-    })
+    const { controller } = setup({ drain, retryDelay: () => 0 })
+    const published: Snapshot[] = []
+    controller.subscribe(() => published.push(controller.getSnapshot()))
 
     controller.start()
     await flush()
     controller.publish()
-    expect(controller.getSnapshot()).toBe(1)
+    expect(published.at(-1)).toEqual({ capacityBlocked: true })
+    expect(controller.state$.get()).toBe(published.at(-1))
     await controller.drain()
     expect(drain).toHaveBeenCalledTimes(1)
 
