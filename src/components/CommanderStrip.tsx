@@ -13,6 +13,7 @@ import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
+const CENTERED_NAME_HALF_WIDTH = 48
 const PIP = { length: 38, depth: 26 }
 const COMPACT_PIP = { length: 30, depth: 22 }
 
@@ -32,6 +33,7 @@ export interface CommanderStripProps {
   inspectDisabled?: boolean
   onToggle: () => void
   onPressSword: () => void
+  edgeLength?: number
 }
 
 export function CommanderStrip({
@@ -50,6 +52,7 @@ export function CommanderStrip({
   inspectDisabled,
   onToggle,
   onPressSword,
+  edgeLength,
 }: CommanderStripProps) {
   const {
     themed,
@@ -75,6 +78,9 @@ export function CommanderStrip({
     },
   })
   const direction = stripDirection(contentRotation)
+  const pipRun = edgeLength
+    ? Math.max(edgeLength / 2 - CENTERED_NAME_HALF_WIDTH - spacing.xs, pip.depth)
+    : undefined
 
   return (
     <View
@@ -92,6 +98,7 @@ export function CommanderStrip({
         style={({ pressed }) => [
           themed($pips),
           { flexDirection: direction },
+          pipRun !== undefined && (sideways ? { maxHeight: pipRun } : { maxWidth: pipRun }),
           open && { backgroundColor: overlayTint(foreground, 0.24) },
           pressed && { backgroundColor: overlayTint(foreground, 0.32) },
         ]}
@@ -178,7 +185,7 @@ const $strip: ThemedStyle<ViewStyle> = () => ({
 
 const $pips: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexShrink: 1,
-  overflow: "hidden",
+  flexWrap: "wrap",
   alignItems: "center",
   gap: spacing.xxs,
   padding: spacing.xxs,

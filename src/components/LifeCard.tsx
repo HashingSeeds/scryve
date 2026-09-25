@@ -520,6 +520,7 @@ export function LifeCard({
           inspectDisabled={inspectDisabled}
           onToggle={commanderDamage.inspection.onToggle}
           onPressSword={beginCommanderAssignment}
+          edgeLength={Math.abs(contentRotation) === 90 ? cardSize.height : cardSize.width}
         />
       ) : null}
       {editorOpen ? (
