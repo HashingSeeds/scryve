@@ -6,15 +6,12 @@ import { remotePage } from "@/features/async/remoteState"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { createLobbyIdentifiers } from "@/features/connected/identifiers"
-import {
-  connectedDeploymentScope,
-  ConnectedGameRepository,
-  subscribeResumeIndex,
-} from "@/features/connected/persistence"
+import { connectedDeploymentScope, ConnectedGameRepository } from "@/features/connected/persistence"
 import {
   useConnectedProfile,
   type ConnectedProfileState,
 } from "@/features/connected/useConnectedProfile"
+import { useResumeGames } from "@/features/connected/useResumeGames"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
@@ -58,12 +55,6 @@ export function ConnectedHostSource({
   )
 }
 
-function readResumeGamesOnRevision(
-  repository: ConnectedGameRepository,
-  revision: number,
-): ResumableGame[] {
-  return revision >= 0 ? repository.loadResumeIndex() : []
-}
 function ConnectedHostQuerySource({
   connectedProfile,
   onLobbyCreated,
@@ -144,15 +135,7 @@ function ConnectedHostQuerySource({
       activeGamesState.nextPage.status === "exhausted",
     )
   }, [connectedUserId, resumeRepository, activeGamesState])
-  const [resumeIndexRevision, refreshResumeIndex] = useState(0)
-  useEffect(() => {
-    refreshResumeIndex((revision) => revision + 1)
-    return subscribeResumeIndex(() => refreshResumeIndex((revision) => revision + 1))
-  }, [resumeRepository])
-  const cachedResumeGames = useMemo(
-    () => readResumeGamesOnRevision(resumeRepository, resumeIndexRevision),
-    [resumeRepository, resumeIndexRevision],
-  )
+  const cachedResumeGames = useResumeGames(resumeRepository)
 
   async function host(setup: Parameters<ConnectedHostFeed["host"]>[0]) {
     captureAnalytics("connection_attempt", { action: "create", stage: "started" })

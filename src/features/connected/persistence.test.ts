@@ -593,6 +593,52 @@ function restarted(repository: ConnectedGameRepository, storage: MemoryStorage) 
 }
 
 describe("connected resume index", () => {
+  it("tracks projection recency without undoing removal or touching saved actions", () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    const observe = repository.createResumeObserver()
+    const projection: ConnectedProjection = {
+      schemaVersion: 1,
+      publicId: "game-public",
+      status: "active",
+      playerCount: 2,
+      startingLife: 20,
+      ruleset: "standard",
+      isHost: true,
+      eventSequence: 0,
+      serverUpdatedAt: 10,
+      recentOperationIds: [],
+      players: [],
+    }
+    repository.syncResumeIndex([resumeEntry("game-other", 5)], true)
+    repository.saveProjection(projection)
+    repository.enqueue(action("operation-resume-001"))
+    const writes = jest.spyOn(storage, "set")
+
+    observe(projection)
+    expect(repository.loadResumeIndex().map((game) => game.publicId)).toEqual([
+      "game-public",
+      "game-other",
+    ])
+    writes.mockClear()
+    observe(projection)
+    expect(writes).not.toHaveBeenCalled()
+    observe({ ...projection, serverUpdatedAt: 11 })
+    expect(repository.loadResumeIndex()[0].updatedAt).toBe(11)
+
+    repository.removeResumeEntry(projection.publicId)
+    observe({ ...projection, serverUpdatedAt: 11 })
+    expect(repository.loadResumeIndex().map((game) => game.publicId)).toEqual(["game-other"])
+
+    const observeAfterRemount = repository.createResumeObserver()
+    observeAfterRemount({ ...projection, serverUpdatedAt: 11 })
+    expect(repository.loadResumeIndex()[0].publicId).toBe("game-public")
+    observeAfterRemount({ ...projection, status: "finished", serverUpdatedAt: 12 })
+    expect(repository.loadResumeIndex().map((game) => game.publicId)).toEqual(["game-other"])
+    expect(repository.loadProjection(projection.publicId)?.status).toBe("active")
+    expect(repository.loadOutbox(projection.publicId)).toHaveLength(1)
+  })
+
   it("persists hydrated rows readable by a freshly constructed repository", () => {
     const storage = new MemoryStorage()
     const deployment = "small-ibis-123.convex.cloud"
