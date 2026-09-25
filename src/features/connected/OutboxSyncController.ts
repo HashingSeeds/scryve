@@ -9,6 +9,7 @@ import {
   MAX_COMMANDER_DAMAGE,
 } from "@/features/game/domain"
 import type { DeviceId, LifeDelta } from "@/features/game/types"
+import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import type { DrainOutboxSnapshot, OutboxAcknowledgement } from "./drainOutbox"
@@ -123,13 +124,9 @@ export class OutboxSyncController {
       timeout?: ReturnType<typeof setTimeout>
     }
   >()
-  private draining = false
   private drainScheduled = false
-  private drainEpoch = 0
-  private retryTimer: ReturnType<typeof setTimeout> | undefined
   private stopped = false
-  private readonly listeners = new Set<() => void>()
-  private snapshot: OutboxSyncSnapshot
+  private readonly outbox: OutboxController<OutboxSyncSnapshot>
 
   constructor(options: OutboxSyncControllerOptions) {
     this.options = options
@@ -140,19 +137,28 @@ export class OutboxSyncController {
     this.confirmed = options.repository.loadProjection(options.publicId)
     this.pending = options.repository.loadOutbox(options.publicId)
     this.failed = options.repository.loadFailed(options.publicId)
-    this.snapshot = this.buildSnapshot()
+    this.outbox = createOutboxController({
+      snapshot: () => this.buildSnapshot(),
+      drain: (shouldContinue) => this.drainOnce(shouldContinue),
+      retryDelay: () =>
+        this.environment.isWebSocketConnected
+          ? Math.min(250 * 2 ** Math.min(this.pending[0]?.attempts ?? 0, 5), 8_000)
+          : undefined,
+      canDrain: () => this.canSync() && this.pending.length > 0,
+      hasPending: () => this.pending.length > 0,
+      setTimeoutFn: this.setTimeoutFn,
+      clearTimeoutFn: this.clearTimeoutFn,
+    })
+    this.outbox.start()
   }
 
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener)
-    return () => {
-      this.listeners.delete(listener)
-    }
+  get subscribe() {
+    return this.outbox.subscribe
   }
 
-  /* useSyncExternalStore loops forever unless repeated reads return the identical object, so the
-     snapshot is rebuilt only in publish(). */
-  getSnapshot = (): OutboxSyncSnapshot => this.snapshot
+  get getSnapshot() {
+    return this.outbox.getSnapshot
+  }
 
   setEnvironment(environment: OutboxSyncEnvironment): void {
     if (!this.environmentInitialized) {
@@ -167,12 +173,9 @@ export class OutboxSyncController {
       previous.isWebSocketConnected !== environment.isWebSocketConnected ||
       previous.remoteReady !== environment.remoteReady
     this.environment = environment
-    if (changed) this.drainEpoch += 1
+    if (changed) this.outbox.invalidate()
     if (!environment.isWebSocketConnected) this.reconnectPending = true
-    if (!this.canSync() && this.retryTimer) {
-      this.clearTimeoutFn(this.retryTimer)
-      this.retryTimer = undefined
-    }
+    if (!this.canSync()) this.outbox.cancelRetry()
     this.publish()
   }
 
@@ -386,10 +389,7 @@ export class OutboxSyncController {
 
   dispose(): void {
     this.stopped = true
-    if (this.retryTimer) {
-      this.clearTimeoutFn(this.retryTimer)
-      this.retryTimer = undefined
-    }
+    this.outbox.stop()
     for (const waiter of this.projectionWaiters.values()) {
       if (waiter.timeout) this.clearTimeoutFn(waiter.timeout)
       waiter.reject(new Error("Connected game sync stopped"))
@@ -424,26 +424,22 @@ export class OutboxSyncController {
   private publish(): void {
     if (this.confirmed)
       this.options.repository.cleanupTerminalGame(this.confirmed, this.pending, this.failed)
-    this.snapshot = this.buildSnapshot()
-    for (const listener of [...this.listeners]) listener()
+    this.outbox.publish()
     this.scheduleDrain()
   }
 
   private scheduleDrain(): void {
-    if (this.stopped || this.drainScheduled || this.draining) return
+    if (this.stopped || this.drainScheduled || this.outbox.draining) return
     if (!this.canSync() || this.pending.length === 0) return
     this.drainScheduled = true
     void Promise.resolve().then(() => {
       this.drainScheduled = false
-      this.runDrain()
+      this.outbox.unblock()
+      void this.outbox.drain()
     })
   }
 
-  private runDrain(): void {
-    if (this.stopped || this.draining) return
-    if (!this.canSync() || this.pending.length === 0) return
-    this.draining = true
-    const epoch = this.drainEpoch
+  private async drainOnce(shouldContinue: () => boolean) {
     const drainStartPending = [...this.pending]
     const drainingOperationIds = new Set(
       drainStartPending.map((action) => action.event.operationId),
@@ -461,54 +457,38 @@ export class OutboxSyncController {
       this.failed = next.failures
       this.publish()
     }
-    let rerunAfterDrain = false
-    void (async () => {
-      try {
-        const result = await drainConnectedOutbox({
-          repository: this.options.repository,
-          publicId: this.options.publicId,
-          failed: this.failed,
-          currentFailures: () => this.failed,
-          send: (action) => this.sendAndAwaitProjection(action),
-          onAttempt: (operationId) => this.inFlight.add(operationId),
-          onSettled: (operationId) => {
-            this.inFlight.delete(operationId)
-            this.resolveProjectionWaiter()
-          },
-          onChange: applyDrainSnapshot,
-          shouldContinue: () => !this.stopped && this.drainEpoch === epoch,
-        })
-        if (this.stopped) return
-        const settledIds = new Set([...result.acknowledged, ...result.failed])
-        applyDrainSnapshot({
-          pending:
-            result.pending ??
-            drainStartPending.filter((action) => !settledIds.has(action.event.operationId)),
-          failures: result.failures ?? this.failed,
-        })
-        this.offline = result.stoppedForRetry
-        if (result.blockedByFailureCapacity)
-          this.changeError =
-            "Failed changes need review before more rejected changes can be retained. Dismiss reviewed failures, then retry syncing."
-        this.publish()
-        if (result.stoppedForRetry && this.environment.isWebSocketConnected && !this.stopped) {
-          const attempts = this.pending[0]?.attempts ?? 0
-          const delay = Math.min(250 * 2 ** Math.min(attempts, 5), 8_000)
-          if (this.retryTimer) this.clearTimeoutFn(this.retryTimer)
-          this.retryTimer = this.setTimeoutFn(() => {
-            if (this.stopped) return
-            this.retryTimer = undefined
-            this.scheduleDrain()
-          }, delay)
-        } else if (!result.blockedByFailureCapacity && this.pending.length > 0 && this.canSync()) {
-          rerunAfterDrain = true
-        }
-      } finally {
-        this.draining = false
-        this.resolveProjectionWaiter()
-        if (rerunAfterDrain && !this.stopped) this.scheduleDrain()
-      }
-    })()
+    try {
+      const result = await drainConnectedOutbox({
+        repository: this.options.repository,
+        publicId: this.options.publicId,
+        failed: this.failed,
+        currentFailures: () => this.failed,
+        send: (action) => this.sendAndAwaitProjection(action),
+        onAttempt: (operationId) => this.inFlight.add(operationId),
+        onSettled: (operationId) => {
+          this.inFlight.delete(operationId)
+          this.resolveProjectionWaiter()
+        },
+        onChange: applyDrainSnapshot,
+        shouldContinue: () => !this.stopped && shouldContinue(),
+      })
+      if (this.stopped) return result
+      const settledIds = new Set([...result.acknowledged, ...result.failed])
+      applyDrainSnapshot({
+        pending:
+          result.pending ??
+          drainStartPending.filter((action) => !settledIds.has(action.event.operationId)),
+        failures: result.failures ?? this.failed,
+      })
+      this.offline = result.stoppedForRetry
+      if (result.blockedByFailureCapacity)
+        this.changeError =
+          "Failed changes need review before more rejected changes can be retained. Dismiss reviewed failures, then retry syncing."
+      this.publish()
+      return result
+    } finally {
+      this.resolveProjectionWaiter()
+    }
   }
 
   private async sendAndAwaitProjection(action: PendingLifeAction): Promise<OutboxAcknowledgement> {
