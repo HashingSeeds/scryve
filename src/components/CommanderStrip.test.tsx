@@ -58,7 +58,7 @@ describe("CommanderStrip", () => {
     expect(view.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 55 })
   })
 
-  it("maps damage to board positions and opens the grid from a damage disc", () => {
+  it("shows the whole board once any opponent deals damage", () => {
     const onToggle = jest.fn()
     const onPressSword = jest.fn()
     const view = renderStrip({ incoming: { [players[2].id]: 21 }, onToggle, onPressSword })
@@ -71,16 +71,20 @@ describe("CommanderStrip", () => {
               row
                 .findAll((node) => typeof node.props?.testID === "string")
                 .map((node) => node.props.testID as string)
-                .filter((testID) => testID.startsWith("commander-")),
+                .filter((testID) => /^commander-(own|pip)-/.test(testID)),
             ),
           ],
     )
-    expect(rows).toEqual([["commander-mark-seat-1"], [`commander-pip-seat-1-${players[2].id}`]])
+    expect(rows.filter((row) => row.length > 0)).toEqual([
+      ["commander-own-seat-1", `commander-pip-seat-1-${players[1].id}`],
+      [`commander-pip-seat-1-${players[2].id}`],
+    ])
+    expect(view.getByTestId(`commander-pip-seat-1-${players[1].id}`)).not.toHaveTextContent("0")
+    expect(view.getByTestId(`commander-pip-seat-1-${players[2].id}`)).toHaveTextContent("21")
 
-    const pip = view.getByTestId(`commander-pip-seat-1-${players[2].id}`)
-    expect(pip).toHaveTextContent("21")
-    expect(pip.props.accessibilityLabel).toBe("Show commander damage for Seat 1, Ada, 21 from Cy")
-    fireEvent.press(pip)
+    const map = view.getByTestId("commander-map-seat-1")
+    expect(map.props.accessibilityLabel).toBe("Show commander damage for Seat 1, Ada, 21 from Cy")
+    fireEvent.press(map)
     fireEvent.press(view.getByTestId("commander-mark-seat-1"))
     expect(onToggle).toHaveBeenCalledTimes(1)
     expect(onPressSword).toHaveBeenCalledTimes(1)

@@ -436,14 +436,14 @@ describe("CurrentGameScreen", () => {
       fireEvent.press(view.getByTestId("commander-done-seat-1"))
       expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
 
-      fireEvent.press(view.getByTestId(/^commander-pip-seat-2-/))
+      fireEvent.press(view.getByTestId("commander-map-seat-2"))
       expect(view.getByTestId("commander-board-seat-2")).toBeTruthy()
       expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
         "Exit commander damage",
       )
       fireEvent.press(view.getByTestId("game-menu-button"))
       expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
-      fireEvent.press(view.getByTestId(/^commander-pip-seat-2-/))
+      fireEvent.press(view.getByTestId("commander-map-seat-2"))
       armCommander(view, 3)
       expect(view.queryByTestId("commander-board-seat-2")).toBeNull()
       fireEvent.press(view.getByTestId("commander-done-seat-3"))
