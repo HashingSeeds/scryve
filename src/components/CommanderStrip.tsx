@@ -74,8 +74,11 @@ export function CommanderStrip({
       testID={`commander-strip-seat-${seatNumber}`}
       style={[
         themed($strip),
+        dealt.length > 0 && themed($stripWithMap),
         stripEdge(contentRotation, spacing.xs, contentInsets),
-        { flexDirection: stripDirection(contentRotation) },
+        {
+          flexDirection: stripDirection(contentRotation),
+        },
       ]}
     >
       {dealt.length > 0 ? (
@@ -204,9 +207,11 @@ function stripEdge(
 const $strip: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
   zIndex: 10,
-  justifyContent: "space-between",
+  justifyContent: "flex-end",
   alignItems: "center",
 })
+
+const $stripWithMap: ThemedStyle<ViewStyle> = () => ({ justifyContent: "space-between" })
 
 const $map: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,

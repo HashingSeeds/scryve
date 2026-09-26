@@ -45,6 +45,7 @@ describe("CommanderStrip", () => {
     const view = renderStrip({ onPressSword })
 
     expect(view.queryByTestId("commander-map-seat-1")).toBeNull()
+    expect(view.getByTestId("commander-strip-seat-1")).toHaveStyle({ justifyContent: "flex-end" })
     fireEvent.press(view.getByTestId("commander-mark-seat-1"))
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
