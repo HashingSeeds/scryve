@@ -320,7 +320,7 @@ export function LifeCard({
         <View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={[themed($readout), safeContentStyle]}
+          style={themed($readout)}
         >
           {eliminated ? (
             <View
