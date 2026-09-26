@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
-import Svg, { Path, Rect } from "react-native-svg"
 
 import { counterValueLabel, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
@@ -14,8 +13,10 @@ import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
   CommanderDamageCardControls,
+  type CommanderAttacker,
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
+import { CommanderStrip } from "./CommanderStrip"
 import { LifeControls } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
@@ -51,6 +52,7 @@ export type LifeCardCommanderDamage = Omit<
 > & {
   inspection?: { open: boolean; onToggle: () => void }
   attackerName?: string
+  attacker?: CommanderAttacker
   stagedAgainstOwner?: number
   onStage?: (step: number) => void
   armBar?: { stagedTargets: number; onSend: () => void; onCancel: () => void }
@@ -145,7 +147,6 @@ export function LifeCard({
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
-  const toolbarSize = spacing.xl + spacing.sm
   const markStyle = getPlayerMarkCorner(contentRotation, cardPadding)
   const commanderOverviewEntering =
     reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
@@ -197,6 +198,7 @@ export function LifeCard({
           kind: "source",
           playerName: displayName,
           submitLabel: commanderDamage.armBar ? "Send" : "Done",
+          mark: { color, shape, seatNumber },
           submitDisabled: commanderDamage.armBar?.stagedTargets === 0,
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
           onCancel: commanderDamage.armBar?.onCancel,
@@ -205,6 +207,7 @@ export function LifeCard({
         ? {
             kind: "target",
             attackerName: commanderDamage.attackerName ?? "Commander",
+            attacker: commanderDamage.attacker,
             total:
               (commanderDamage.incoming[armedCommanderId] ?? 0) +
               (commanderDamage.stagedAgainstOwner ?? 0),
@@ -502,52 +505,25 @@ export function LifeCard({
         />
       ) : null}
       {commanderDamage?.inspection && !commanderCardMode ? (
-        <View
-          style={[
-            themed($commanderToolbar),
-            commanderToolbarEdge(contentRotation, spacing.xs, toolbarSize),
-          ]}
-        >
-          <Pressable
-            testID={`commander-inspect-seat-${seatNumber}`}
-            accessibilityRole="button"
-            accessibilityLabel={`${commanderOverviewOpen ? "Close" : "Show"} commander damage for ${identity}`}
-            accessibilityState={{ expanded: commanderOverviewOpen, disabled: !!inspectDisabled }}
-            disabled={inspectDisabled}
-            onPress={commanderDamage.inspection.onToggle}
-            style={themed($commanderToolbarButton)}
-          >
-            <Svg
-              width={24}
-              height={24}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={foreground}
-              strokeWidth={1.6}
-            >
-              <Rect x={3} y={3} width={18} height={18} rx={1} />
-              <Path d="M12 3v18M3 12h18" />
-            </Svg>
-          </Pressable>
-          <Pressable
-            testID={`commander-mark-seat-${seatNumber}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Assign commander damage from ${identity}`}
-            accessibilityState={{ disabled: !!disabled }}
-            disabled={disabled}
-            onPress={beginCommanderAssignment}
-            style={themed($commanderToolbarButton)}
-          >
-            <PlayerMark
-              seatNumber={seatNumber}
-              shape={shape}
-              color={foreground}
-              rotation={contentRotation}
-              insetSwordColor={color}
-              size={36}
-            />
-          </Pressable>
-        </View>
+        <CommanderStrip
+          seatNumber={seatNumber}
+          identity={identity}
+          ownerPlayerId={commanderDamage.ownerPlayerId}
+          players={commanderDamage.players ?? []}
+          seats={commanderDamage.seats}
+          incoming={commanderDamage.incoming}
+          shape={shape}
+          color={color}
+          foreground={foreground}
+          contentRotation={contentRotation}
+          contentInsets={contentInsets}
+          compact={compact}
+          open={commanderOverviewOpen}
+          disabled={disabled}
+          inspectDisabled={inspectDisabled}
+          onToggle={commanderDamage.inspection.onToggle}
+          onPressSword={beginCommanderAssignment}
+        />
       ) : null}
       {editorOpen ? (
         <LifeEditor
@@ -694,29 +670,3 @@ const $eliminatedMark: ThemedStyle<TextStyle> = () => ({
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
-
-function commanderToolbarEdge(
-  rotation: LifeCardContentRotation,
-  inset: number,
-  size: number,
-): ViewStyle {
-  if (rotation === 90)
-    return { left: inset, top: inset, bottom: inset, width: size, flexDirection: "column" }
-  if (rotation === -90)
-    return { right: inset, top: inset, bottom: inset, width: size, flexDirection: "column-reverse" }
-  if (rotation === 180)
-    return { top: inset, left: inset, right: inset, height: size, flexDirection: "row-reverse" }
-  return { bottom: inset, left: inset, right: inset, height: size, flexDirection: "row" }
-}
-const $commanderToolbar: ThemedStyle<ViewStyle> = () => ({
-  position: "absolute",
-  zIndex: 10,
-  justifyContent: "space-between",
-  alignItems: "center",
-})
-const $commanderToolbarButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: spacing.xl + spacing.sm,
-  height: spacing.xl + spacing.sm,
-  alignItems: "center",
-  justifyContent: "center",
-})

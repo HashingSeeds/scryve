@@ -119,6 +119,7 @@ export function PlayerGrid({
         players.map(({ id }) => id),
       )
     : null
+  const armedPlayer = players.find(({ id }) => id === commanderDamage?.armedPlayerId)
 
   return (
     <View
@@ -226,9 +227,12 @@ export function PlayerGrid({
                           columns: boardSeats.columns,
                           incoming: commanderDamage.incomingFor(player),
                           armedPlayerId: commanderDamage.armedPlayerId,
-                          attackerName: commanderDamage.armedPlayerId
-                            ? players.find(({ id }) => id === commanderDamage.armedPlayerId)?.name
-                            : undefined,
+                          attackerName: armedPlayer?.name,
+                          attacker: armedPlayer && {
+                            color: armedPlayer.color,
+                            shape: armedPlayer.shape,
+                            seatNumber: players.indexOf(armedPlayer) + 1,
+                          },
                           stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
                           pendingClaims: commanderDamage.pendingFor?.(player),
                           onPressSword: () => commanderDamage.onPressSword(player),

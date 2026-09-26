@@ -6,6 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { accessibleForeground } from "@/utils/colorContrast"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { overlayTint } from "./LifeControls"
@@ -14,12 +15,17 @@ import {
   type LifeCardContentInsets,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
+import { PlayerMark } from "./PlayerMark"
 import { Sword } from "./Sword"
 import { Text } from "./Text"
+import type { PlayerMarkShape } from "../../convex/lib/appearance"
+
+export type CommanderAttacker = { color: string; shape?: PlayerMarkShape; seatNumber: number }
 
 type AssignmentTarget = {
   kind: "target"
   attackerName: string
+  attacker?: CommanderAttacker
   total: number
   onChange: (step: -1 | 1) => void
 }
@@ -28,6 +34,7 @@ type AssignmentSource = {
   kind: "source"
   playerName: string
   submitLabel: "Done" | "Send"
+  mark?: CommanderAttacker
   submitDisabled?: boolean
   onSubmit: () => void
   onCancel?: () => void
@@ -80,7 +87,9 @@ export function CommanderDamageCardControls({
     transform: [{ scale: 0.98 + progress.value * 0.02 }],
   }))
   const controlForeground =
-    life !== undefined || mode.kind === "target" ? foreground : theme.colors.board.text
+    mode.kind === "target" || (life !== undefined && mode.kind === "claim")
+      ? foreground
+      : theme.colors.board.text
 
   return (
     <Animated.View
@@ -96,7 +105,8 @@ export function CommanderDamageCardControls({
               backgroundColor: overlayTint(foreground, 0.04),
             }
           : themed($activePlayerOverlay),
-        life !== undefined && themed($localOverlay),
+        mode.kind === "source" && mode.mark && { borderColor: mode.mark.color },
+        life !== undefined && mode.kind !== "source" && themed($localOverlay),
         entranceStyle,
       ]}
     >
@@ -171,8 +181,8 @@ export function CommanderDamageCardControls({
               compact={compact}
               emphasized
               disabled={mode.submitDisabled}
-              showSword={life === undefined}
-              life={life}
+              mark={mode.mark}
+              markInset={theme.colors.board.background}
               onPress={mode.onSubmit}
             />
           </View>
@@ -190,14 +200,6 @@ export function CommanderDamageCardControls({
           >
             {mode.kind === "target" ? (
               <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
-                {life !== undefined ? (
-                  <Text
-                    text={mode.attackerName}
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={1.2}
-                    style={[themed($caption), { color: foreground }]}
-                  />
-                ) : null}
                 {life === undefined ? (
                   <Text
                     text="↓"
@@ -206,19 +208,42 @@ export function CommanderDamageCardControls({
                     style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
                   />
                 ) : null}
-                <Text
-                  testID={`commander-total-seat-${seatNumber}`}
-                  text={String(mode.total)}
-                  weight="bold"
-                  maxFontSizeMultiplier={1.2}
-                  style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
-                />
+                <View style={themed($incomingTotal)}>
+                  {life !== undefined && mode.attacker ? (
+                    <View
+                      testID={`commander-attacker-seat-${seatNumber}`}
+                      style={[
+                        themed(compact ? $compactAttackerChip : $attackerChip),
+                        {
+                          backgroundColor: mode.attacker.color,
+                          borderColor: overlayTint(foreground, 0.6),
+                        },
+                      ]}
+                    >
+                      <PlayerMark
+                        seatNumber={mode.attacker.seatNumber}
+                        shape={mode.attacker.shape}
+                        color={accessibleForeground(mode.attacker.color)}
+                        insetSwordColor={mode.attacker.color}
+                        size={compact ? 22 : 30}
+                      />
+                    </View>
+                  ) : null}
+                  <Text
+                    testID={`commander-total-seat-${seatNumber}`}
+                    text={String(mode.total)}
+                    weight="bold"
+                    maxFontSizeMultiplier={1.2}
+                    style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
+                  />
+                </View>
                 {life !== undefined ? (
                   <Text
                     testID={`commander-life-seat-${seatNumber}`}
                     text={`${life} life`}
                     maxFontSizeMultiplier={1.2}
                     style={[themed($localLife), { color: foreground }]}
+                    numberOfLines={1}
                   />
                 ) : null}
               </View>
@@ -260,8 +285,8 @@ function CommanderAction({
   compact,
   emphasized,
   disabled,
-  showSword,
-  life,
+  mark,
+  markInset,
   onPress,
 }: {
   testID: string
@@ -272,8 +297,8 @@ function CommanderAction({
   compact?: boolean
   emphasized?: boolean
   disabled?: boolean
-  showSword?: boolean
-  life?: number
+  mark?: CommanderAttacker
+  markInset?: string
   onPress: () => void
 }) {
   const { themed } = useAppTheme()
@@ -287,16 +312,23 @@ function CommanderAction({
       onPress={onPress}
       style={({ pressed }) => [
         themed($action),
-        emphasized && life === undefined && { backgroundColor: overlayTint(foreground, 0.18) },
+        emphasized && !mark && { backgroundColor: overlayTint(foreground, 0.18) },
         pressed && !disabled && { backgroundColor: overlayTint(foreground, 0.3) },
         disabled && themed($disabledAction),
       ]}
     >
       <View style={[themed($actionContent), rotationStyle]}>
-        {life !== undefined ? (
-          <Text text={String(life)} weight="bold" style={[themed($total), { color: foreground }]} />
+        {mark ? (
+          <PlayerMark
+            seatNumber={mark.seatNumber}
+            shape={mark.shape}
+            color={mark.color}
+            insetSwordColor={markInset}
+            size={compact ? 56 : 88}
+          />
+        ) : emphasized ? (
+          <Sword size={compact ? 30 : 40} color={foreground} />
         ) : null}
-        {showSword ? <Sword size={compact ? 30 : 40} color={foreground} /> : null}
         <Text
           text={text}
           weight="bold"
@@ -403,4 +435,28 @@ const $localTotal: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xxs,
 })
-const $localLife: ThemedStyle<TextStyle> = () => ({ fontSize: 18, lineHeight: 22 })
+const $attackerChip: ThemedStyle<ViewStyle> = () => ({
+  transform: [{ translateY: -3 }],
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  borderWidth: 2,
+  alignItems: "center",
+  justifyContent: "center",
+})
+const $compactAttackerChip: ThemedStyle<ViewStyle> = () => ({
+  transform: [{ translateY: -2 }],
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  borderWidth: 2,
+  alignItems: "center",
+  justifyContent: "center",
+})
+const $localLife: ThemedStyle<TextStyle> = ({ spacing }) => ({
+  position: "absolute",
+  top: "100%",
+  marginTop: spacing.xxs,
+  fontSize: 18,
+  lineHeight: 22,
+})

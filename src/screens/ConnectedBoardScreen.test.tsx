@@ -185,22 +185,26 @@ describe("ConnectedBoardScreen", () => {
     )
   })
 
-  it("opens the named commander board from the toolbar on your own seat", () => {
+  it("opens the commander board from a damage disc on your own seat", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       projection: {
         ...connectedHarness.runtime.projection,
-        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
+        commanderDamage: {
+          totals: [{ fromPlayerId: "player-2", toPlayerId: "player-1", total: 3 }],
+          pendingClaims: [],
+          eliminatedPlayerIds: [],
+        },
       },
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.queryByTestId("commander-overview-seat-2")).toBeNull()
 
-    fireEvent.press(screen.getByTestId("commander-inspect-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-map-seat-2"))
     expect(screen.getByTestId("commander-overview-seat-2")).toBeTruthy()
     expect(screen.getByTestId("commander-cell-seat-2-player-1")).toBeTruthy()
 
-    fireEvent.press(screen.getByTestId("commander-inspect-seat-2"))
+    fireEvent.press(screen.getByTestId("commander-map-seat-2"))
     expect(screen.queryByTestId("commander-overview-seat-2")).toBeNull()
   })
 
@@ -209,12 +213,16 @@ describe("ConnectedBoardScreen", () => {
       ...connectedHarness.runtime,
       projection: {
         ...connectedHarness.runtime.projection,
-        commanderDamage: { totals: [], pendingClaims: [], eliminatedPlayerIds: [] },
+        commanderDamage: {
+          totals: [{ fromPlayerId: "player-1", toPlayerId: "player-2", total: 3 }],
+          pendingClaims: [],
+          eliminatedPlayerIds: [],
+        },
       },
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-inspect-seat-1"))
+    fireEvent.press(screen.getByTestId("commander-map-seat-1"))
     expect(screen.getByTestId("commander-overview-seat-1")).toBeTruthy()
     expect(screen.getByTestId("commander-mark-seat-1").props.accessibilityState.disabled).toBe(true)
   })
