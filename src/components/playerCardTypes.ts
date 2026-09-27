@@ -35,6 +35,12 @@ export const LIFE_FONT_MAX = 160
 export const LIFE_FONT_SIZE = 120
 export const COMPACT_LIFE_FONT_SIZE = 84
 
+export const SCREEN_CORNER_CLEARANCE = 24
+
+export function screenCornerOffset(gap: number, inset = 0) {
+  return Math.min(gap + inset, Math.max(gap, SCREEN_CORNER_CLEARANCE))
+}
+
 export const PLAYER_MARK_SIZE = 80
 export const COMPACT_PLAYER_MARK_SIZE = 60
 export const PLAYER_MARK_MUTED_OPACITY = 0.72

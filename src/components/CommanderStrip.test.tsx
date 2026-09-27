@@ -50,13 +50,13 @@ describe("CommanderStrip", () => {
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
-  it("clears the card's safe-area inset on its edge", () => {
+  it("tucks into the screen corner instead of clearing the full notch inset", () => {
     const view = renderStrip({
       contentRotation: 180,
       contentInsets: { top: 47, bottom: 0, left: 0, right: 0 },
     })
 
-    expect(view.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 55 })
+    expect(view.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 24, left: 8, right: 8 })
   })
 
   it("shows the whole board once any opponent deals damage", () => {

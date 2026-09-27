@@ -32,6 +32,7 @@ import {
   LIFE_TARGET_SIZE,
   PLAYER_MARK_MUTED_OPACITY,
   PLAYER_MARK_SIZE,
+  screenCornerOffset,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardMenuCorner,
@@ -231,11 +232,22 @@ export function LifeCard({
     cardPadding -
     21 -
     (statusLabel ? spacing.xxxs + 18 : 0)
-  const showStatus = statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0
+  const nameInCorner = !!commanderDamage?.inspection
+  const showStatus =
+    nameInCorner || statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0
   const statusTopOffset =
     statusEdgeInset > 0 && statusEdgeLength > 0
       ? Math.min(defaultStatusOffset, availableStatusOffset)
       : defaultStatusOffset
+
+  const cornerStatus = nameInCorner
+    ? cornerStatusPlacement({
+        rotation: contentRotation,
+        cardSize,
+        padding: cardPadding,
+        insets: contentInsets,
+      })
+    : undefined
 
   useEffect(() => {
     if (frozen) {
@@ -359,15 +371,23 @@ export function LifeCard({
           <View
             testID={`life-status-layer-seat-${seatNumber}`}
             pointerEvents="none"
-            style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
+            style={[
+              themed($statusLayer),
+              cornerStatus?.layer,
+              { transform: [{ rotate: `${contentRotation}deg` }] },
+            ]}
           >
             {showStatus ? (
               <View
                 testID={`life-status-seat-${seatNumber}`}
-                style={[
-                  themed(compact ? $compactStatusPosition : $statusPosition),
-                  { marginTop: statusTopOffset },
-                ]}
+                style={
+                  cornerStatus
+                    ? [themed($cornerStatusPosition), cornerStatus.position]
+                    : [
+                        themed(compact ? $compactStatusPosition : $statusPosition),
+                        { marginTop: statusTopOffset },
+                      ]
+                }
               >
                 <Text
                   testID={`player-name-seat-${seatNumber}`}
@@ -377,7 +397,11 @@ export function LifeCard({
                   weight="medium"
                   maxFontSizeMultiplier={1.3}
                   numberOfLines={1}
-                  style={[themed($name), { color: foreground }]}
+                  style={[
+                    themed($name),
+                    cornerStatus && themed($cornerText),
+                    { color: foreground },
+                  ]}
                 />
                 {statusLabel ? (
                   <Text
@@ -386,7 +410,11 @@ export function LifeCard({
                     size="xxs"
                     maxFontSizeMultiplier={1.3}
                     numberOfLines={1}
-                    style={[themed($status), { color: foreground }]}
+                    style={[
+                      themed($status),
+                      cornerStatus && themed($cornerText),
+                      { color: foreground },
+                    ]}
                   />
                 ) : null}
               </View>
@@ -612,6 +640,67 @@ const $statusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xxxs,
 })
+
+const $cornerStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  alignItems: "flex-start",
+  gap: spacing.xxxs,
+})
+
+const $cornerText: ThemedStyle<TextStyle> = () => ({ maxWidth: "100%", textAlign: "left" })
+
+const CENTER_CUTOUT_HALF_WIDTH = 64
+
+const CONTENT_LEFT_EDGE = {
+  0: "left",
+  180: "right",
+  90: "top",
+  [-90]: "bottom",
+} as const
+
+const CONTENT_BOTTOM_EDGE = {
+  0: "bottom",
+  180: "top",
+  90: "left",
+  [-90]: "right",
+} as const
+
+function cornerStatusPlacement({
+  rotation,
+  cardSize,
+  padding,
+  insets,
+}: {
+  rotation: LifeCardContentRotation
+  cardSize: { width: number; height: number }
+  padding: number
+  insets?: LifeCardContentInsets
+}) {
+  const width = Math.max(cardSize.width - padding * 2, 0)
+  const height = Math.max(cardSize.height - padding * 2, 0)
+  const sideways = Math.abs(rotation) === 90
+  const bottomInset = insets?.[CONTENT_BOTTOM_EDGE[rotation]] ?? 0
+  const left = screenCornerOffset(padding, insets?.[CONTENT_LEFT_EDGE[rotation]]) - padding
+  const run = sideways ? height : width
+  const layer: ViewStyle | undefined = sideways
+    ? {
+        width: height,
+        height: width,
+        left: (width - height) / 2,
+        top: (height - width) / 2,
+        right: undefined,
+        bottom: undefined,
+      }
+    : undefined
+  const position: ViewStyle = {
+    left,
+    bottom: screenCornerOffset(padding, bottomInset) - padding,
+    maxWidth: run
+      ? Math.max(run / 2 - left - (bottomInset > 0 ? CENTER_CUTOUT_HALF_WIDTH : padding), 0)
+      : undefined,
+  }
+  return { layer, position }
+}
 
 const $compactStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   top: "50%",

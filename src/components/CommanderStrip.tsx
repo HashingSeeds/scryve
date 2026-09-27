@@ -9,13 +9,17 @@ import { accessibleForeground } from "@/utils/colorContrast"
 
 import type { CommanderBoardSeat } from "./commanderDamageLayout"
 import { overlayTint } from "./LifeControls"
-import type { LifeCardContentInsets, LifeCardContentRotation } from "./playerCardTypes"
+import {
+  screenCornerOffset,
+  type LifeCardContentInsets,
+  type LifeCardContentRotation,
+} from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
-const DISC_SIZE = 24
-const COMPACT_DISC_SIZE = 20
+const DISC_SIZE = 32
+const COMPACT_DISC_SIZE = 28
 const SWORD_SIZE = 36
 
 export interface CommanderStripProps {
@@ -187,10 +191,10 @@ function stripEdge(
   gap: number,
   insets?: LifeCardContentInsets,
 ): ViewStyle {
-  const top = gap + (insets?.top ?? 0)
-  const bottom = gap + (insets?.bottom ?? 0)
-  const left = gap + (insets?.left ?? 0)
-  const right = gap + (insets?.right ?? 0)
+  const top = screenCornerOffset(gap, insets?.top)
+  const bottom = screenCornerOffset(gap, insets?.bottom)
+  const left = screenCornerOffset(gap, insets?.left)
+  const right = screenCornerOffset(gap, insets?.right)
   if (rotation === 90) return { left, top, bottom }
   if (rotation === -90) return { right, top, bottom }
   if (rotation === 180) return { top, left, right }
@@ -228,14 +232,14 @@ const $idleDisc: ThemedStyle<ViewStyle> = () => ({ opacity: 0.45 })
 const $lethalDisc: ThemedStyle<ViewStyle> = () => ({ borderWidth: 2 })
 
 const $count: ThemedStyle<TextStyle> = () => ({
-  fontSize: 13,
-  lineHeight: 16,
+  fontSize: 15,
+  lineHeight: 18,
   fontVariant: ["tabular-nums"],
 })
 
 const $compactCount: ThemedStyle<TextStyle> = () => ({
-  fontSize: 11,
-  lineHeight: 14,
+  fontSize: 13,
+  lineHeight: 16,
   fontVariant: ["tabular-nums"],
 })
 

@@ -214,6 +214,47 @@ describe("LifeCard", () => {
     },
   )
 
+  it("moves the name to the corner opposite the commander grid", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          contentRotation={-90}
+          contentInsets={{ top: 47, bottom: 0, left: 0, right: 0 }}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            inspection: { open: false, onToggle: jest.fn() },
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 200, height: 340 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-status-layer-seat-1").props.style),
+    ).toMatchObject({
+      width: 324,
+      height: 184,
+      left: -70,
+      top: 70,
+    })
+    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
+      left: 0,
+      bottom: 0,
+      maxWidth: 154,
+    })
+  })
+
   it("hides the commander grid behind the player mark", () => {
     const view = render(
       <ThemeProvider initialContext="light">
