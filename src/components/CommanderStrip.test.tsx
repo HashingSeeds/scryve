@@ -72,20 +72,20 @@ describe("CommanderStrip", () => {
               row
                 .findAll((node) => typeof node.props?.testID === "string")
                 .map((node) => node.props.testID as string)
-                .filter((testID) => /^commander-(own|pip)-/.test(testID)),
+                .filter((testID) => /^commander-(mark|pip)-/.test(testID)),
             ),
           ],
     )
     expect(rows.filter((row) => row.length > 0)).toEqual([
-      ["commander-own-seat-1", `commander-pip-seat-1-${players[1].id}`],
+      ["commander-mark-seat-1", `commander-pip-seat-1-${players[1].id}`],
       [`commander-pip-seat-1-${players[2].id}`],
     ])
     expect(view.getByTestId(`commander-pip-seat-1-${players[1].id}`)).not.toHaveTextContent("0")
     expect(view.getByTestId(`commander-pip-seat-1-${players[2].id}`)).toHaveTextContent("21")
 
-    const map = view.getByTestId("commander-map-seat-1")
-    expect(map.props.accessibilityLabel).toBe("Show commander damage for Seat 1, Ada, 21 from Cy")
-    fireEvent.press(map)
+    const idle = view.getByTestId(`commander-pip-seat-1-${players[1].id}`)
+    expect(idle.props.accessibilityLabel).toBe("Show commander damage for Seat 1, Ada, 0 from Bo")
+    fireEvent.press(idle)
     fireEvent.press(view.getByTestId("commander-mark-seat-1"))
     expect(onToggle).toHaveBeenCalledTimes(1)
     expect(onPressSword).toHaveBeenCalledTimes(1)

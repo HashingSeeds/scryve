@@ -67,14 +67,38 @@ export function CommanderStrip({
   const boardRows = Array.from(new Set(seats.map(({ row }) => row)))
     .sort((a, b) => a - b)
     .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
-  const summary = dealt.map(({ id, name }) => `${incoming[id]} from ${name}`).join(", ")
+  const sword = (size: number) => (
+    <Pressable
+      key={ownerPlayerId}
+      testID={`commander-mark-seat-${seatNumber}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Assign commander damage from ${identity}`}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      hitSlop={8}
+      onPress={onPressSword}
+      style={({ pressed }) => [
+        themed($sword),
+        { width: size, height: size },
+        pressed && { opacity: 0.72 },
+      ]}
+    >
+      <PlayerMark
+        seatNumber={seatNumber}
+        shape={shape}
+        color={foreground}
+        rotation={contentRotation}
+        insetSwordColor={color}
+        size={size}
+      />
+    </Pressable>
+  )
 
   return (
     <View
       testID={`commander-strip-seat-${seatNumber}`}
       style={[
         themed($strip),
-        dealt.length > 0 && themed($stripWithMap),
         stripEdge(contentRotation, spacing.xs, contentInsets),
         {
           flexDirection: stripDirection(contentRotation),
@@ -82,19 +106,9 @@ export function CommanderStrip({
       ]}
     >
       {dealt.length > 0 ? (
-        <Pressable
+        <View
           testID={`commander-map-seat-${seatNumber}`}
-          accessibilityRole="button"
-          accessibilityLabel={`${open ? "Close" : "Show"} commander damage for ${identity}, ${summary}`}
-          accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
-          disabled={inspectDisabled}
-          hitSlop={8}
-          onPress={onToggle}
-          style={({ pressed }) => [
-            themed($map),
-            open && { backgroundColor: overlayTint(foreground, 0.24) },
-            pressed && { backgroundColor: overlayTint(foreground, 0.32) },
-          ]}
+          style={[themed($map), open && { backgroundColor: overlayTint(foreground, 0.24) }]}
         >
           {boardRows.map((row, rowIndex) => (
             <View key={rowIndex} style={themed($mapRow)}>
@@ -103,25 +117,20 @@ export function CommanderStrip({
                 const player = players[playerIndex]
                 if (!player) return null
                 const size = { width: disc, height: disc }
-                if (playerId === ownerPlayerId)
-                  return (
-                    <View
-                      key={playerId}
-                      testID={`commander-own-seat-${seatNumber}`}
-                      style={[
-                        themed($ownDisc),
-                        size,
-                        { borderColor: overlayTint(foreground, 0.6) },
-                      ]}
-                    />
-                  )
+                if (playerId === ownerPlayerId) return sword(disc)
                 const total = incoming[playerId] ?? 0
                 const ink = accessibleForeground(player.color)
                 return (
-                  <View
+                  <Pressable
                     key={playerId}
                     testID={`commander-pip-seat-${seatNumber}-${playerId}`}
-                    style={[
+                    accessibilityRole="button"
+                    accessibilityLabel={`${open ? "Close" : "Show"} commander damage for ${identity}, ${total} from ${player.name}`}
+                    accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
+                    disabled={inspectDisabled}
+                    hitSlop={2}
+                    onPress={onToggle}
+                    style={({ pressed }) => [
                       themed($disc),
                       size,
                       { backgroundColor: player.color, borderColor: overlayTint(foreground, 0.5) },
@@ -130,6 +139,7 @@ export function CommanderStrip({
                         themed($lethalDisc),
                         { borderColor: foreground },
                       ],
+                      pressed && { opacity: 0.72 },
                     ]}
                   >
                     {total > 0 ? (
@@ -152,32 +162,15 @@ export function CommanderStrip({
                         size={Math.round(disc * 0.5)}
                       />
                     )}
-                  </View>
+                  </Pressable>
                 )
               })}
             </View>
           ))}
-        </Pressable>
-      ) : null}
-      <Pressable
-        testID={`commander-mark-seat-${seatNumber}`}
-        accessibilityRole="button"
-        accessibilityLabel={`Assign commander damage from ${identity}`}
-        accessibilityState={{ disabled: !!disabled }}
-        disabled={disabled}
-        hitSlop={8}
-        onPress={onPressSword}
-        style={({ pressed }) => [themed($sword), pressed && { opacity: 0.72 }]}
-      >
-        <PlayerMark
-          seatNumber={seatNumber}
-          shape={shape}
-          color={foreground}
-          rotation={contentRotation}
-          insetSwordColor={color}
-          size={SWORD_SIZE}
-        />
-      </Pressable>
+        </View>
+      ) : (
+        sword(SWORD_SIZE)
+      )}
     </View>
   )
 }
@@ -211,8 +204,6 @@ const $strip: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
 })
 
-const $stripWithMap: ThemedStyle<ViewStyle> = () => ({ justifyContent: "space-between" })
-
 const $map: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,
   padding: spacing.xxs,
@@ -232,12 +223,6 @@ const $disc: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
 })
 
-const $ownDisc: ThemedStyle<ViewStyle> = () => ({
-  borderRadius: 999,
-  borderWidth: 1,
-  borderStyle: "dashed",
-})
-
 const $idleDisc: ThemedStyle<ViewStyle> = () => ({ opacity: 0.45 })
 
 const $lethalDisc: ThemedStyle<ViewStyle> = () => ({ borderWidth: 2 })
@@ -255,9 +240,6 @@ const $compactCount: ThemedStyle<TextStyle> = () => ({
 })
 
 const $sword: ThemedStyle<ViewStyle> = () => ({
-  flexShrink: 0,
-  width: SWORD_SIZE,
-  height: SWORD_SIZE,
   alignItems: "center",
   justifyContent: "center",
 })
