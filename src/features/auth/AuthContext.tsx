@@ -76,6 +76,7 @@ export function ConfiguredAuth({
       <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
       <RevenueCatProvider
+        key={user?.id}
         apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
         appUserID={user?.id}
         configurationMessage={revenueCat.configured ? undefined : revenueCat.message}
