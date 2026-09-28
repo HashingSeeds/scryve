@@ -21,6 +21,10 @@ const expiredCustomerInfo = {
   entitlements: { active: {}, all: {}, verification: "VERIFIED" },
   requestDate: "2026-09-27T06:01:00Z",
 } as never
+const revokedCustomerInfo = {
+  entitlements: { active: {}, all: {}, verification: "VERIFIED" },
+  requestDate: "2026-09-27T06:09:00Z",
+} as never
 const monthlyPackage = {
   identifier: "$rc_monthly",
   product: { identifier: "monthly:base-monthly-plan" },
@@ -52,6 +56,7 @@ jest.mock("react-native-purchases", () => {
       addCustomerInfoUpdateListener: jest.fn(),
       removeCustomerInfoUpdateListener: jest.fn(),
       getCustomerInfo: jest.fn(),
+      invalidateCustomerInfoCache: jest.fn().mockResolvedValue(undefined),
       getOfferings: jest.fn(),
       purchasePackage: jest.fn(),
       restorePurchases: jest.fn(),
@@ -120,6 +125,19 @@ describe("RevenueCatProvider", () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.isCountPro).toBe(true)
+  })
+
+  it("forces fresh customer info after reconnect to remove revoked Pro access", async () => {
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isCountPro).toBe(true))
+    purchasesMock.getCustomerInfo.mockResolvedValue(revokedCustomerInfo)
+
+    await act(async () => {
+      await result.current.refreshCustomerInfo(true)
+    })
+
+    expect(Purchases.invalidateCustomerInfoCache).toHaveBeenCalledTimes(1)
+    expect(result.current.isCountPro).toBe(false)
   })
 
   it("drops the previous user's newer CustomerInfo after switching accounts", async () => {

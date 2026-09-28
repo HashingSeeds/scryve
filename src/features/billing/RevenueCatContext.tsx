@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from "react"
+import { Platform } from "react-native"
 import Purchases, {
   PURCHASES_ERROR_CODE,
   type CustomerInfo,
@@ -41,7 +42,7 @@ interface RevenueCatAccess {
   customerInfo: CustomerInfo | null
   currentOffering: PurchasesOffering | null
   error?: string
-  refreshCustomerInfo: () => Promise<CustomerInfo | null>
+  refreshCustomerInfo: (force?: boolean) => Promise<CustomerInfo | null>
   purchase: (productId: CountProductId) => Promise<PurchaseResult>
   restorePurchases: () => Promise<PurchaseResult>
   presentPaywall: () => Promise<CountPaywallResult>
@@ -145,18 +146,22 @@ export function RevenueCatProvider({
     setCustomerInfo((current) => mostRecentlyFetchedCustomerInfo(current, next))
   }, [])
 
-  const refreshCustomerInfo = useCallback(async () => {
-    if (!apiKey || !appUserID) return null
-    try {
-      const next = await Purchases.getCustomerInfo()
-      acceptCustomerInfo(next)
-      setError(undefined)
-      return next
-    } catch (cause) {
-      setError(revenueCatErrorMessage(cause))
-      return null
-    }
-  }, [acceptCustomerInfo, apiKey, appUserID])
+  const refreshCustomerInfo = useCallback(
+    async (force = false) => {
+      if (!apiKey || !appUserID) return null
+      try {
+        if (force && Platform.OS !== "web") await Purchases.invalidateCustomerInfoCache()
+        const next = await Purchases.getCustomerInfo()
+        acceptCustomerInfo(next)
+        setError(undefined)
+        return next
+      } catch (cause) {
+        setError(revenueCatErrorMessage(cause))
+        return null
+      }
+    },
+    [acceptCustomerInfo, apiKey, appUserID],
+  )
 
   useEffect(() => {
     if (!apiKey || !appUserID) {

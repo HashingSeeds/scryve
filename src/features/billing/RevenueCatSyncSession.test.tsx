@@ -7,6 +7,7 @@ import { reportCrash } from "@/utils/crashReporting"
 import { RevenueCatSyncSession } from "./RevenueCatSyncSession"
 
 const mockSyncCurrent = jest.fn<Promise<{ synced: boolean; enabled: boolean }>, [object]>()
+const mockRefreshCustomerInfo = jest.fn<Promise<null>, [boolean?]>()
 let mockProfile: ConnectedProfileState
 let mockCustomerInfo: object | null
 let mockLoading = false
@@ -20,7 +21,11 @@ jest.mock("@/features/connected/useConnectedProfile", () => ({
   useConnectedProfile: () => mockProfile,
 }))
 jest.mock("./RevenueCatContext", () => ({
-  useRevenueCat: () => ({ customerInfo: mockCustomerInfo, isLoading: mockLoading }),
+  useRevenueCat: () => ({
+    customerInfo: mockCustomerInfo,
+    isLoading: mockLoading,
+    refreshCustomerInfo: mockRefreshCustomerInfo,
+  }),
 }))
 jest.mock("@/utils/crashReporting", () => ({
   ErrorType: { HANDLED: "Handled" },
@@ -37,6 +42,7 @@ beforeEach(() => {
   mockCustomerInfo = { entitlements: { active: {} } }
   mockLoading = false
   mockSyncCurrent.mockResolvedValue({ synced: true, enabled: true })
+  mockRefreshCustomerInfo.mockResolvedValue(null)
 })
 
 it("catches up existing subscribers and refreshes after purchase or restore without trusting client claims", () => {
@@ -69,9 +75,12 @@ it("waits for the profile and billing, then retries on reconnect and account cha
   mockProfile = ready()
   view.rerender(<RevenueCatSyncSession />)
   expect(mockSyncCurrent).toHaveBeenCalledTimes(2)
+  expect(mockRefreshCustomerInfo).toHaveBeenCalledTimes(1)
+  expect(mockRefreshCustomerInfo).toHaveBeenCalledWith(true)
   mockProfile = ready("user_b")
   view.rerender(<RevenueCatSyncSession />)
   expect(mockSyncCurrent).toHaveBeenCalledTimes(3)
+  expect(mockRefreshCustomerInfo).toHaveBeenCalledTimes(1)
 })
 
 it("leaves cached billing state intact when the server cannot sync", async () => {

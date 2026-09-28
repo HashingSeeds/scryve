@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useAction } from "convex/react"
 
 import {
@@ -12,9 +12,18 @@ import { api } from "../../../convex/_generated/api"
 
 function SyncEntitlements() {
   const profile = useConnectedProfile()
-  const { customerInfo, isLoading } = useRevenueCat()
+  const { customerInfo, isLoading, refreshCustomerInfo } = useRevenueCat()
   const syncCurrent = useAction(api.revenuecat.syncCurrent)
   const readyUserId = profile.status === "ready" ? profile.profile.userId : undefined
+  const wasOffline = useRef(false)
+
+  useEffect(() => {
+    if (profile.status === "offline") wasOffline.current = true
+    if (readyUserId && !isLoading && wasOffline.current) {
+      wasOffline.current = false
+      void refreshCustomerInfo(true)
+    }
+  }, [profile.status, isLoading, readyUserId, refreshCustomerInfo])
 
   useEffect(() => {
     if (!readyUserId || isLoading) return
