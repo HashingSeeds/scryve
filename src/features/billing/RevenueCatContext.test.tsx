@@ -15,6 +15,11 @@ const customerInfo = {
     all: {},
     verification: "VERIFIED",
   },
+  requestDate: "2026-09-27T06:08:26Z",
+} as never
+const expiredCustomerInfo = {
+  entitlements: { active: {}, all: {}, verification: "VERIFIED" },
+  requestDate: "2026-09-27T06:01:00Z",
 } as never
 const monthlyPackage = {
   identifier: "$rc_monthly",
@@ -96,5 +101,46 @@ describe("RevenueCatProvider", () => {
       expect(await result.current.purchase("monthly")).toMatchObject({ status: "purchased" })
     })
     expect(Purchases.purchasePackage).toHaveBeenCalledWith(monthlyPackage)
+  })
+
+  it("keeps a network update when offerings finish after the cached launch read", async () => {
+    let resolveOfferings!: (value: never) => void
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    purchasesMock.getOfferings.mockReturnValue(
+      new Promise((resolve) => {
+        resolveOfferings = resolve
+      }),
+    )
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(Purchases.addCustomerInfoUpdateListener).toHaveBeenCalled())
+    const listener = purchasesMock.addCustomerInfoUpdateListener.mock.calls[0][0]
+
+    act(() => listener(customerInfo))
+    await act(async () => resolveOfferings({ current: offering, all: {} } as never))
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.isCountPro).toBe(true)
+  })
+
+  it("drops the previous user's newer CustomerInfo after switching accounts", async () => {
+    let appUserID = "user_123"
+    const { result, rerender } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={appUserID}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(result.current.isCountPro).toBe(true))
+
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("user_123")
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    appUserID = "user_456"
+    rerender({})
+
+    await waitFor(() => expect(Purchases.logIn).toHaveBeenCalledWith("user_456"))
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.isCountPro).toBe(false)
   })
 })

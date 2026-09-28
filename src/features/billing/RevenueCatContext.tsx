@@ -100,6 +100,10 @@ export function hasCountPro(customerInfo: CustomerInfo | null) {
   return Boolean(entitlement && entitlement.verification !== "FAILED")
 }
 
+function mostRecentlyFetchedCustomerInfo(current: CustomerInfo | null, next: CustomerInfo) {
+  return current && Date.parse(current.requestDate) > Date.parse(next.requestDate) ? current : next
+}
+
 async function configureForUser(apiKey: string, appUserID: string) {
   const configured = await Purchases.isConfigured()
   if (!configured) {
@@ -137,19 +141,22 @@ export function RevenueCatProvider({
   const [isLoading, setIsLoading] = useState(Boolean(apiKey && appUserID))
   const [error, setError] = useState<string>()
   const configured = Boolean(apiKey)
+  const acceptCustomerInfo = useCallback((next: CustomerInfo) => {
+    setCustomerInfo((current) => mostRecentlyFetchedCustomerInfo(current, next))
+  }, [])
 
   const refreshCustomerInfo = useCallback(async () => {
     if (!apiKey || !appUserID) return null
     try {
       const next = await Purchases.getCustomerInfo()
-      setCustomerInfo(next)
+      acceptCustomerInfo(next)
       setError(undefined)
       return next
     } catch (cause) {
       setError(revenueCatErrorMessage(cause))
       return null
     }
-  }, [apiKey, appUserID])
+  }, [acceptCustomerInfo, apiKey, appUserID])
 
   useEffect(() => {
     if (!apiKey || !appUserID) {
@@ -160,8 +167,9 @@ export function RevenueCatProvider({
     }
 
     let cancelled = false
+    setCustomerInfo(null)
     const listener: CustomerInfoUpdateListener = (next) => {
-      if (!cancelled) setCustomerInfo(next)
+      if (!cancelled) acceptCustomerInfo(next)
     }
     setIsLoading(true)
     setError(undefined)
@@ -170,14 +178,13 @@ export function RevenueCatProvider({
       .then(async () => {
         if (cancelled) return
         Purchases.addCustomerInfoUpdateListener(listener)
-        const [nextCustomerInfo, offerings] = await Promise.all([
-          Purchases.getCustomerInfo(),
+        const [, offerings] = await Promise.all([
+          Purchases.getCustomerInfo().then((next) => {
+            if (!cancelled) acceptCustomerInfo(next)
+          }),
           Purchases.getOfferings(),
         ])
-        if (!cancelled) {
-          setCustomerInfo(nextCustomerInfo)
-          setCurrentOffering(offerings.current)
-        }
+        if (!cancelled) setCurrentOffering(offerings.current)
       })
       .catch((cause) => {
         if (!cancelled) setError(revenueCatErrorMessage(cause))
@@ -190,7 +197,7 @@ export function RevenueCatProvider({
       cancelled = true
       Purchases.removeCustomerInfoUpdateListener(listener)
     }
-  }, [apiKey, appUserID])
+  }, [acceptCustomerInfo, apiKey, appUserID])
 
   const purchase = useCallback(
     async (productId: CountProductId): Promise<PurchaseResult> => {
@@ -203,7 +210,7 @@ export function RevenueCatProvider({
       try {
         setError(undefined)
         const result = await Purchases.purchasePackage(selectedPackage)
-        setCustomerInfo(result.customerInfo)
+        acceptCustomerInfo(result.customerInfo)
         return { status: "purchased", customerInfo: result.customerInfo }
       } catch (cause) {
         const error = purchasesError(cause)
@@ -214,21 +221,21 @@ export function RevenueCatProvider({
         return { status: "failed", message }
       }
     },
-    [currentOffering],
+    [acceptCustomerInfo, currentOffering],
   )
 
   const restorePurchases = useCallback(async (): Promise<PurchaseResult> => {
     try {
       setError(undefined)
       const restored = await Purchases.restorePurchases()
-      setCustomerInfo(restored)
+      acceptCustomerInfo(restored)
       return { status: "purchased", customerInfo: restored }
     } catch (cause) {
       const message = revenueCatErrorMessage(cause)
       setError(message)
       return { status: "failed", message }
     }
-  }, [])
+  }, [acceptCustomerInfo])
 
   const presentPaywall = useCallback(async () => {
     try {
