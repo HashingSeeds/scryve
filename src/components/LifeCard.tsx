@@ -234,7 +234,7 @@ export function LifeCard({
     (statusLabel ? spacing.xxxs + 18 : 0)
   const nameInCorner = !!commanderDamage?.inspection
   const showStatus =
-    nameInCorner || statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0
+    !nameInCorner && (statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0)
   const statusTopOffset =
     statusEdgeInset > 0 && statusEdgeLength > 0
       ? Math.min(defaultStatusOffset, availableStatusOffset)
@@ -244,7 +244,7 @@ export function LifeCard({
     ? cornerStatusPlacement({
         rotation: contentRotation,
         cardSize,
-        padding: cardPadding,
+        gap: compact ? spacing.sm : spacing.md,
         insets: contentInsets,
       })
     : undefined
@@ -371,23 +371,15 @@ export function LifeCard({
           <View
             testID={`life-status-layer-seat-${seatNumber}`}
             pointerEvents="none"
-            style={[
-              themed($statusLayer),
-              cornerStatus?.layer,
-              { transform: [{ rotate: `${contentRotation}deg` }] },
-            ]}
+            style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
           >
             {showStatus ? (
               <View
                 testID={`life-status-seat-${seatNumber}`}
-                style={
-                  cornerStatus
-                    ? [themed($cornerStatusPosition), cornerStatus.position]
-                    : [
-                        themed(compact ? $compactStatusPosition : $statusPosition),
-                        { marginTop: statusTopOffset },
-                      ]
-                }
+                style={[
+                  themed(compact ? $compactStatusPosition : $statusPosition),
+                  { marginTop: statusTopOffset },
+                ]}
               >
                 <Text
                   testID={`player-name-seat-${seatNumber}`}
@@ -397,11 +389,7 @@ export function LifeCard({
                   weight="medium"
                   maxFontSizeMultiplier={1.3}
                   numberOfLines={1}
-                  style={[
-                    themed($name),
-                    cornerStatus && themed($cornerText),
-                    { color: foreground },
-                  ]}
+                  style={[themed($name), { color: foreground }]}
                 />
                 {statusLabel ? (
                   <Text
@@ -410,11 +398,7 @@ export function LifeCard({
                     size="xxs"
                     maxFontSizeMultiplier={1.3}
                     numberOfLines={1}
-                    style={[
-                      themed($status),
-                      cornerStatus && themed($cornerText),
-                      { color: foreground },
-                    ]}
+                    style={[themed($status), { color: foreground }]}
                   />
                 ) : null}
               </View>
@@ -540,18 +524,72 @@ export function LifeCard({
           players={commanderDamage.players ?? []}
           seats={commanderDamage.seats}
           incoming={commanderDamage.incoming}
-          shape={shape}
-          color={color}
           foreground={foreground}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
           compact={compact}
           open={commanderOverviewOpen}
-          disabled={disabled}
           inspectDisabled={inspectDisabled}
           onToggle={commanderDamage.inspection.onToggle}
-          onPressSword={beginCommanderAssignment}
         />
+      ) : null}
+      {cornerStatus && !commanderCardMode ? (
+        <View
+          testID={`life-corner-layer-seat-${seatNumber}`}
+          pointerEvents="box-none"
+          style={[
+            themed($cornerLayer),
+            cornerStatus.layer,
+            { transform: [{ rotate: `${contentRotation}deg` }] },
+          ]}
+        >
+          <Pressable
+            testID={`commander-mark-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Assign commander damage from ${identity}${
+              statusLabel ? `, ${statusLabel}` : ""
+            }`}
+            accessibilityState={{ disabled: !!disabled }}
+            disabled={disabled}
+            hitSlop={8}
+            onPress={beginCommanderAssignment}
+            style={({ pressed }) => [
+              themed($cornerIdentity),
+              cornerStatus.position,
+              pressed && { opacity: 0.72 },
+            ]}
+          >
+            <PlayerMark
+              seatNumber={seatNumber}
+              shape={shape}
+              color={foreground}
+              insetSwordColor={color}
+              size={compact ? 22 : 26}
+            />
+            <View testID={`life-status-seat-${seatNumber}`} style={themed($cornerText)}>
+              <Text
+                testID={`player-name-seat-${seatNumber}`}
+                text={displayName}
+                accessible={false}
+                size="xs"
+                weight="medium"
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={{ color: foreground }}
+              />
+              {statusLabel ? (
+                <Text
+                  text={statusLabel}
+                  weight="bold"
+                  size="xxs"
+                  maxFontSizeMultiplier={1.3}
+                  numberOfLines={1}
+                  style={[themed($status), { color: foreground }]}
+                />
+              ) : null}
+            </View>
+          </Pressable>
+        </View>
       ) : null}
       {editorOpen ? (
         <LifeEditor
@@ -641,13 +679,19 @@ const $statusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,
 })
 
-const $cornerStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  alignItems: "flex-start",
-  gap: spacing.xxxs,
+const $cornerLayer: ThemedStyle<ViewStyle> = () => ({
+  ...StyleSheet.absoluteFill,
+  zIndex: 10,
 })
 
-const $cornerText: ThemedStyle<TextStyle> = () => ({ maxWidth: "100%", textAlign: "left" })
+const $cornerIdentity: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+
+const $cornerText: ThemedStyle<ViewStyle> = () => ({ flexShrink: 1, alignItems: "flex-start" })
 
 const CENTER_CUTOUT_HALF_WIDTH = 64
 
@@ -668,19 +712,18 @@ const CONTENT_BOTTOM_EDGE = {
 function cornerStatusPlacement({
   rotation,
   cardSize,
-  padding,
+  gap,
   insets,
 }: {
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
-  padding: number
+  gap: number
   insets?: LifeCardContentInsets
 }) {
-  const width = Math.max(cardSize.width - padding * 2, 0)
-  const height = Math.max(cardSize.height - padding * 2, 0)
+  const { width, height } = cardSize
   const sideways = Math.abs(rotation) === 90
   const bottomInset = insets?.[CONTENT_BOTTOM_EDGE[rotation]] ?? 0
-  const left = screenCornerOffset(padding, insets?.[CONTENT_LEFT_EDGE[rotation]]) - padding
+  const left = screenCornerOffset(gap, insets?.[CONTENT_LEFT_EDGE[rotation]])
   const run = sideways ? height : width
   const layer: ViewStyle | undefined = sideways
     ? {
@@ -694,9 +737,9 @@ function cornerStatusPlacement({
     : undefined
   const position: ViewStyle = {
     left,
-    bottom: screenCornerOffset(padding, bottomInset) - padding,
+    bottom: screenCornerOffset(gap, bottomInset),
     maxWidth: run
-      ? Math.max(run / 2 - left - (bottomInset > 0 ? CENTER_CUTOUT_HALF_WIDTH : padding), 0)
+      ? Math.max(run / 2 - left - (bottomInset > 0 ? CENTER_CUTOUT_HALF_WIDTH : gap), 0)
       : undefined,
   }
   return { layer, position }

@@ -214,7 +214,8 @@ describe("LifeCard", () => {
     },
   )
 
-  it("moves the name to the corner opposite the commander grid", () => {
+  it("puts the name and assign sword in the corner opposite the commander grid", () => {
+    const onPressSword = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
         <LifeCard
@@ -231,6 +232,7 @@ describe("LifeCard", () => {
             columns: commanderSeats.columns,
             incoming: {},
             inspection: { open: false, onToggle: jest.fn() },
+            onPressSword,
           }}
           onChange={jest.fn()}
         />
@@ -241,18 +243,22 @@ describe("LifeCard", () => {
     })
 
     expect(
-      StyleSheet.flatten(view.getByTestId("life-status-layer-seat-1").props.style),
+      StyleSheet.flatten(view.getByTestId("life-corner-layer-seat-1").props.style),
     ).toMatchObject({
-      width: 324,
-      height: 184,
+      width: 340,
+      height: 200,
       left: -70,
       top: 70,
     })
-    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
-      left: 0,
-      bottom: 0,
-      maxWidth: 154,
+    const corner = view.getByTestId("commander-mark-seat-1")
+    expect(StyleSheet.flatten(corner.props.style)).toMatchObject({
+      left: 16,
+      bottom: 16,
+      maxWidth: 138,
     })
+    expect(corner).toHaveTextContent("Ada")
+    fireEvent.press(corner)
+    expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
   it("hides the commander grid behind the player mark", () => {
