@@ -152,6 +152,10 @@ export class OutboxSyncController {
     this.outbox.start()
   }
 
+  get state$() {
+    return this.outbox.state$
+  }
+
   get subscribe() {
     return this.outbox.subscribe
   }

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useValue } from "@legendapp/state/react"
 import { useConvexAuth, useConvexConnectionState, useMutation, useQuery } from "convex/react"
 
 import type { ConnectionStatus } from "@/components/ConnectionBadge"
@@ -188,7 +189,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
       }),
     [deviceId, ownerId, publicId, repository],
   )
-  const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
+  const snapshot = useValue(() => controller.state$.get())
   const head = snapshot.pending[0]?.event
   const remote = useQuery(api.games.lobbyProjection, {
     publicId,

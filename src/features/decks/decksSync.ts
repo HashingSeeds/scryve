@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react"
+import { useEffect, useMemo } from "react"
+import { useValue } from "@legendapp/state/react"
 import { useConvex, type ConvexReactClient } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
+import { createSnapshotStore, type SnapshotStore } from "@/features/sync/snapshotStore"
 import { storage } from "@/utils/storage"
 
 import { api } from "../../../convex/_generated/api"
@@ -143,11 +145,10 @@ export class DeckSyncRepository {
 }
 
 export class DeckSyncController {
-  private readonly listeners = new Set<() => void>()
   private subscriptions = new Map<string, () => void>()
   private metadata: SyncedDeck[]
   private shelf: MineDeck[]
-  private snapshot: DeckSyncSnapshot
+  private readonly store: SnapshotStore<DeckSyncSnapshot>
   private users = 0
   private generation = 0
   private refreshing = false
@@ -159,15 +160,24 @@ export class DeckSyncController {
   ) {
     this.metadata = repository.loadMetadata()
     this.shelf = repository.loadShelf()
-    this.snapshot = this.buildSnapshot(true)
+    this.store = createSnapshotStore(this.buildSnapshot(true))
   }
 
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+  get state$() {
+    return this.store.state$
   }
 
-  getSnapshot = () => this.snapshot
+  get subscribe() {
+    return this.store.subscribe
+  }
+
+  get getSnapshot() {
+    return this.store.getSnapshot
+  }
+
+  private get snapshot() {
+    return this.store.getSnapshot()
+  }
 
   start(): () => void {
     this.users += 1
@@ -276,8 +286,7 @@ export class DeckSyncController {
   }
 
   private publish(loading: boolean, unavailable = false): void {
-    this.snapshot = { ...this.buildSnapshot(loading), unavailable }
-    for (const listener of this.listeners) listener()
+    this.store.set({ ...this.buildSnapshot(loading), unavailable })
   }
 }
 
@@ -316,10 +325,6 @@ export function useDeckSync(
   useEffect(() => {
     if (shelf && shelf.ownerId === ownerId) controller?.saveShelf(shelf.decks)
   }, [controller, ownerId, shelf])
-  const snapshot = useSyncExternalStore(
-    controller?.subscribe ?? (() => () => undefined),
-    controller?.getSnapshot ?? (() => emptySnapshot),
-    controller?.getSnapshot ?? (() => emptySnapshot),
-  )
+  const snapshot = useValue(() => controller?.state$.get() ?? emptySnapshot)
   return { ...snapshot, retry: () => controller?.refresh() }
 }

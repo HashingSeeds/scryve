@@ -1,12 +1,13 @@
 import type { DrainOutboxResult } from "./drainOutbox"
 import type { DurableFailedRecord, DurablePendingRecord } from "./durableOutbox"
+import { createSnapshotStore, type SnapshotObservable } from "./snapshotStore"
 
 type TimerHandle = ReturnType<typeof setTimeout>
 
 export interface OutboxControllerOptions<
   Pending extends DurablePendingRecord,
   Failed extends DurableFailedRecord<Pending>,
-  Snapshot,
+  Snapshot extends object,
 > {
   snapshot: (state: { capacityBlocked: boolean }) => Snapshot
   drain: (shouldContinue: () => boolean) => Promise<DrainOutboxResult<Pending, Failed>>
@@ -20,34 +21,40 @@ export interface OutboxControllerOptions<
   clearTimeoutFn?: (handle: TimerHandle) => void
 }
 
-export type OutboxController<Snapshot> = ReturnType<
-  typeof createOutboxController<
-    DurablePendingRecord,
-    DurableFailedRecord<DurablePendingRecord>,
-    Snapshot
-  >
->
+export interface OutboxController<Snapshot extends object> {
+  readonly state$: SnapshotObservable<Snapshot>
+  readonly draining: boolean
+  readonly capacityBlocked: boolean
+  subscribe(listener: () => void): () => void
+  getSnapshot(): Snapshot
+  publish(): void
+  drain(): Promise<void>
+  cancelRetry(): void
+  invalidate(): void
+  start(): () => void
+  stop(): void
+  unblock(): void
+}
 
 /**
  * Shared lifecycle for durable outbox sync: ref-counted start/stop, single-flight drains that
  * coalesce concurrent requests, generation fencing so a stopped session stops sending, capped
- * retry backoff, failure-capacity pausing, and a snapshot for useSyncExternalStore.
+ * retry backoff, failure-capacity pausing, and the published snapshot as a Legend observable.
  * Domains supply how to drain (send + failure classification) and what to publish.
  */
 export function createOutboxController<
   Pending extends DurablePendingRecord,
   Failed extends DurableFailedRecord<Pending>,
-  Snapshot,
->(options: OutboxControllerOptions<Pending, Failed, Snapshot>) {
+  Snapshot extends object,
+>(options: OutboxControllerOptions<Pending, Failed, Snapshot>): OutboxController<Snapshot> {
   const setTimeoutFn = options.setTimeoutFn ?? ((handler, delay) => setTimeout(handler, delay))
   const clearTimeoutFn = options.clearTimeoutFn ?? ((handle) => clearTimeout(handle))
-  const listeners = new Set<() => void>()
   let users = 0
   let generation = 0
   let draining = false
   let drainAgain = false
   let capacityBlocked = false
-  let snapshot = options.snapshot({ capacityBlocked })
+  const store = createSnapshotStore(options.snapshot({ capacityBlocked }))
   let retryTimer: TimerHandle | undefined
 
   const active = () => users > 0
@@ -58,8 +65,7 @@ export function createOutboxController<
   }
 
   const publish = () => {
-    snapshot = options.snapshot({ capacityBlocked })
-    for (const listener of [...listeners]) listener()
+    store.set(options.snapshot({ capacityBlocked }))
   }
 
   const drain = async (): Promise<void> => {
@@ -98,15 +104,9 @@ export function createOutboxController<
   }
 
   return {
-    subscribe: (listener: () => void) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    /* useSyncExternalStore loops forever unless repeated reads return the identical object, so
-       the snapshot is rebuilt only in publish(). */
-    getSnapshot: () => snapshot,
+    state$: store.state$,
+    subscribe: store.subscribe,
+    getSnapshot: store.getSnapshot,
     publish,
     drain,
     cancelRetry,

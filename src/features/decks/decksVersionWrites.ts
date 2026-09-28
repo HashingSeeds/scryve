@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react"
+import { useEffect, useMemo } from "react"
 import { randomUUID } from "expo-crypto"
+import { useValue } from "@legendapp/state/react"
 import { useConvex, type ConvexReactClient } from "convex/react"
 import type { FunctionArgs, FunctionReturnType } from "convex/server"
 import { ConvexError } from "convex/values"
@@ -274,6 +275,10 @@ export class DeckVersionWriteController {
         Math.min(60_000, RETRY_DELAY_MS * 2 ** Math.min(result.pending[0]?.attempts ?? 0, 5)),
       onResult: () => this.outbox.publish(),
     })
+  }
+
+  get state$() {
+    return this.outbox.state$
   }
 
   get subscribe() {
@@ -643,11 +648,7 @@ export function useDeckVersionWrites(enabled: boolean, ownerId?: string) {
     [client, enabled, ownerId],
   )
   useEffect(() => controller?.start(), [controller])
-  const snapshot = useSyncExternalStore(
-    controller?.subscribe ?? (() => () => undefined),
-    controller?.getSnapshot ?? (() => emptySnapshot),
-    controller?.getSnapshot ?? (() => emptySnapshot),
-  )
+  const snapshot = useValue(() => controller?.state$.get() ?? emptySnapshot)
   return {
     ...snapshot,
     update: (
