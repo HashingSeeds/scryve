@@ -45,14 +45,24 @@ describe("CommanderStrip", () => {
     expect(view.queryByTestId("commander-strip-seat-1")).toBeNull()
   })
 
-  it("tucks into the screen corner instead of clearing the full notch inset", () => {
-    const view = renderStrip({
+  it("tucks into a screen corner but keeps the full inset beside a mid-edge notch", () => {
+    const props = {
       incoming: damaged,
-      contentRotation: 180,
+      contentRotation: 180 as const,
       contentInsets: { top: 47, bottom: 0, left: 0, right: 0 },
+    }
+    const corner = renderStrip({
+      ...props,
+      screenEdges: { top: true, bottom: false, left: true, right: false },
     })
+    expect(corner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 24, left: 8, right: 8 })
+    corner.unmount()
 
-    expect(view.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 24, left: 8, right: 8 })
+    const inner = renderStrip({
+      ...props,
+      screenEdges: { top: true, bottom: false, left: false, right: true },
+    })
+    expect(inner.getByTestId("commander-strip-seat-1")).toHaveStyle({ top: 55 })
   })
 
   it("shows the whole board, with the card's own seat as a muted mark", () => {

@@ -10,7 +10,9 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import type { CommanderBoardSeat } from "./commanderDamageLayout"
 import { overlayTint } from "./LifeControls"
 import {
-  screenCornerOffset,
+  cornerOffset,
+  type LifeCardEdge,
+  type LifeCardScreenEdges,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
 } from "./playerCardTypes"
@@ -30,6 +32,7 @@ export interface CommanderStripProps {
   foreground: string
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  screenEdges?: LifeCardScreenEdges
   compact?: boolean
   open: boolean
   inspectDisabled?: boolean
@@ -46,6 +49,7 @@ export function CommanderStrip({
   foreground,
   contentRotation,
   contentInsets,
+  screenEdges,
   compact,
   open,
   inspectDisabled,
@@ -68,7 +72,7 @@ export function CommanderStrip({
       testID={`commander-strip-seat-${seatNumber}`}
       style={[
         themed($strip),
-        stripEdge(contentRotation, spacing.xs, contentInsets),
+        stripEdge(contentRotation, spacing.xs, contentInsets, screenEdges),
         {
           flexDirection: stripDirection(contentRotation),
         },
@@ -162,19 +166,25 @@ function stripDirection(rotation: LifeCardContentRotation): ViewStyle["flexDirec
   return "row"
 }
 
+const STRIP_CORNER = {
+  0: ["bottom", "right", "left"],
+  180: ["top", "left", "right"],
+  90: ["left", "bottom", "top"],
+  [-90]: ["right", "top", "bottom"],
+} as const satisfies Record<LifeCardContentRotation, readonly LifeCardEdge[]>
+
 function stripEdge(
   rotation: LifeCardContentRotation,
   gap: number,
   insets?: LifeCardContentInsets,
+  screenEdges?: LifeCardScreenEdges,
 ): ViewStyle {
-  const top = screenCornerOffset(gap, insets?.top)
-  const bottom = screenCornerOffset(gap, insets?.bottom)
-  const left = screenCornerOffset(gap, insets?.left)
-  const right = screenCornerOffset(gap, insets?.right)
-  if (rotation === 90) return { left, top, bottom }
-  if (rotation === -90) return { right, top, bottom }
-  if (rotation === 180) return { top, left, right }
-  return { bottom, left, right }
+  const [edge, side, start] = STRIP_CORNER[rotation]
+  return {
+    [edge]: cornerOffset(gap, edge, side, insets, screenEdges),
+    [side]: cornerOffset(gap, side, edge, insets, screenEdges),
+    [start]: gap + (insets?.[start] ?? 0),
+  }
 }
 
 const $strip: ThemedStyle<ViewStyle> = () => ({

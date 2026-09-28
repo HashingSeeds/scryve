@@ -32,9 +32,10 @@ import {
   LIFE_TARGET_SIZE,
   PLAYER_MARK_MUTED_OPACITY,
   PLAYER_MARK_SIZE,
-  screenCornerOffset,
+  cornerOffset,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
+  type LifeCardScreenEdges,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
@@ -79,6 +80,7 @@ export interface LifeCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  screenEdges?: LifeCardScreenEdges
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   lifeFontSize?: number
@@ -102,6 +104,7 @@ export function LifeCard({
   compact,
   contentRotation = 0,
   contentInsets,
+  screenEdges,
   menuCorner,
   menuEdgeCenter,
   lifeFontSize,
@@ -246,6 +249,7 @@ export function LifeCard({
         cardSize,
         gap: compact ? spacing.sm : spacing.md,
         insets: contentInsets,
+        screenEdges,
       })
     : undefined
 
@@ -527,6 +531,7 @@ export function LifeCard({
           foreground={foreground}
           contentRotation={contentRotation}
           contentInsets={contentInsets}
+          screenEdges={screenEdges}
           compact={compact}
           open={commanderOverviewOpen}
           inspectDisabled={inspectDisabled}
@@ -702,6 +707,13 @@ const CONTENT_LEFT_EDGE = {
   [-90]: "bottom",
 } as const
 
+const CONTENT_RIGHT_EDGE = {
+  0: "right",
+  180: "left",
+  90: "bottom",
+  [-90]: "top",
+} as const
+
 const CONTENT_BOTTOM_EDGE = {
   0: "bottom",
   180: "top",
@@ -714,16 +726,22 @@ function cornerStatusPlacement({
   cardSize,
   gap,
   insets,
+  screenEdges,
 }: {
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   gap: number
   insets?: LifeCardContentInsets
+  screenEdges?: LifeCardScreenEdges
 }) {
   const { width, height } = cardSize
   const sideways = Math.abs(rotation) === 90
-  const bottomInset = insets?.[CONTENT_BOTTOM_EDGE[rotation]] ?? 0
-  const left = screenCornerOffset(gap, insets?.[CONTENT_LEFT_EDGE[rotation]])
+  const bottomEdge = CONTENT_BOTTOM_EDGE[rotation]
+  const leftEdge = CONTENT_LEFT_EDGE[rotation]
+  const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
+  const bottom = cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
+  const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
+  const cutoutAtMiddle = spansScreenEdge && (insets?.[bottomEdge] ?? 0) > 0
   const run = sideways ? height : width
   const layer: ViewStyle | undefined = sideways
     ? {
@@ -737,9 +755,9 @@ function cornerStatusPlacement({
     : undefined
   const position: ViewStyle = {
     left,
-    bottom: screenCornerOffset(gap, bottomInset),
+    bottom,
     maxWidth: run
-      ? Math.max(run / 2 - left - (bottomInset > 0 ? CENTER_CUTOUT_HALF_WIDTH : gap), 0)
+      ? Math.max(run / 2 - left - (cutoutAtMiddle ? CENTER_CUTOUT_HALF_WIDTH : gap), 0)
       : undefined,
   }
   return { layer, position }

@@ -9,6 +9,9 @@ export interface LifeCardContentInsets {
   right: number
 }
 
+export type LifeCardEdge = keyof LifeCardContentInsets
+export type LifeCardScreenEdges = Record<LifeCardEdge, boolean>
+
 export function lifeCardContentInsetStyle(insets?: LifeCardContentInsets): {
   paddingTop: number
   paddingBottom: number
@@ -37,8 +40,16 @@ export const COMPACT_LIFE_FONT_SIZE = 84
 
 export const SCREEN_CORNER_CLEARANCE = 24
 
-export function screenCornerOffset(gap: number, inset = 0) {
-  return Math.min(gap + inset, Math.max(gap, SCREEN_CORNER_CLEARANCE))
+export function cornerOffset(
+  gap: number,
+  edge: LifeCardEdge,
+  side: LifeCardEdge,
+  insets?: LifeCardContentInsets,
+  screenEdges?: LifeCardScreenEdges,
+) {
+  const inset = insets?.[edge] ?? 0
+  const screenCorner = !!screenEdges?.[edge] && !!screenEdges[side]
+  return screenCorner ? Math.min(gap + inset, Math.max(gap, SCREEN_CORNER_CLEARANCE)) : gap + inset
 }
 
 export const PLAYER_MARK_SIZE = 80

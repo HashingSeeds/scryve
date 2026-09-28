@@ -171,11 +171,17 @@ export function PlayerGrid({
                     ? "unowned"
                     : "owned"
                   : undefined
+            const screenEdges = {
+              top: rowIndex === 0,
+              bottom: rowIndex === rows.length - 1,
+              left: columnIndex === 0,
+              right: columnIndex === row.length - 1,
+            }
             const contentInsets = {
-              top: rowIndex === 0 ? insets.top : 0,
-              bottom: rowIndex === rows.length - 1 ? insets.bottom : 0,
-              left: columnIndex === 0 ? insets.left : 0,
-              right: columnIndex === row.length - 1 ? insets.right : 0,
+              top: screenEdges.top ? insets.top : 0,
+              bottom: screenEdges.bottom ? insets.bottom : 0,
+              left: screenEdges.left ? insets.left : 0,
+              right: screenEdges.right ? insets.right : 0,
             }
             const fallbackMenu =
               fallbackMenuBoundary === null
@@ -194,6 +200,7 @@ export function PlayerGrid({
                   compact={layout.compact}
                   contentRotation={contentRotation}
                   contentInsets={contentInsets}
+                  screenEdges={screenEdges}
                   menuCorner={menuCorner}
                   menuEdgeCenter={fallbackMenu?.edgeCenter}
                   lifeFontSize={getLifeFontSize({

@@ -261,6 +261,40 @@ describe("LifeCard", () => {
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
+  it("keeps room for the name when a side notch is not at the card's middle", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          compact
+          contentRotation={90}
+          contentInsets={{ top: 0, bottom: 0, left: 47, right: 0 }}
+          screenEdges={{ top: true, bottom: false, left: true, right: false }}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            inspection: { open: false, onToggle: jest.fn() },
+            onPressSword: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 420, height: 193 } },
+    })
+
+    expect(StyleSheet.flatten(view.getByTestId("commander-mark-seat-1").props.style)).toMatchObject(
+      { left: 12, bottom: 24, maxWidth: 193 / 2 - 12 - 12 },
+    )
+  })
+
   it("hides the commander grid behind the player mark", () => {
     const view = render(
       <ThemeProvider initialContext="light">
