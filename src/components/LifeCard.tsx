@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
-import Svg, { Path, Rect } from "react-native-svg"
 
 import { counterValueLabel, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
@@ -14,8 +13,10 @@ import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
   CommanderDamageCardControls,
+  type CommanderAttacker,
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
+import { CommanderStrip } from "./CommanderStrip"
 import { LifeControls } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
@@ -31,8 +32,10 @@ import {
   LIFE_TARGET_SIZE,
   PLAYER_MARK_MUTED_OPACITY,
   PLAYER_MARK_SIZE,
+  cornerOffset,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
+  type LifeCardScreenEdges,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
@@ -51,6 +54,7 @@ export type LifeCardCommanderDamage = Omit<
 > & {
   inspection?: { open: boolean; onToggle: () => void }
   attackerName?: string
+  attacker?: CommanderAttacker
   stagedAgainstOwner?: number
   onStage?: (step: number) => void
   armBar?: { stagedTargets: number; onSend: () => void; onCancel: () => void }
@@ -76,6 +80,7 @@ export interface LifeCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  screenEdges?: LifeCardScreenEdges
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   lifeFontSize?: number
@@ -99,6 +104,7 @@ export function LifeCard({
   compact,
   contentRotation = 0,
   contentInsets,
+  screenEdges,
   menuCorner,
   menuEdgeCenter,
   lifeFontSize,
@@ -145,7 +151,6 @@ export function LifeCard({
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
-  const toolbarSize = spacing.xl + spacing.sm
   const markStyle = getPlayerMarkCorner(contentRotation, cardPadding)
   const commanderOverviewEntering =
     reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
@@ -197,6 +202,7 @@ export function LifeCard({
           kind: "source",
           playerName: displayName,
           submitLabel: commanderDamage.armBar ? "Send" : "Done",
+          mark: { color, shape, seatNumber },
           submitDisabled: commanderDamage.armBar?.stagedTargets === 0,
           onSubmit: commanderDamage.armBar?.onSend ?? commanderDamage.onPressSword ?? (() => {}),
           onCancel: commanderDamage.armBar?.onCancel,
@@ -205,6 +211,7 @@ export function LifeCard({
         ? {
             kind: "target",
             attackerName: commanderDamage.attackerName ?? "Commander",
+            attacker: commanderDamage.attacker,
             total:
               (commanderDamage.incoming[armedCommanderId] ?? 0) +
               (commanderDamage.stagedAgainstOwner ?? 0),
@@ -228,11 +235,23 @@ export function LifeCard({
     cardPadding -
     21 -
     (statusLabel ? spacing.xxxs + 18 : 0)
-  const showStatus = statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0
+  const nameInCorner = !!commanderDamage?.inspection
+  const showStatus =
+    !nameInCorner && (statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0)
   const statusTopOffset =
     statusEdgeInset > 0 && statusEdgeLength > 0
       ? Math.min(defaultStatusOffset, availableStatusOffset)
       : defaultStatusOffset
+
+  const cornerStatus = nameInCorner
+    ? cornerStatusPlacement({
+        rotation: contentRotation,
+        cardSize,
+        gap: compact ? spacing.sm : spacing.md,
+        insets: contentInsets,
+        screenEdges,
+      })
+    : undefined
 
   useEffect(() => {
     if (frozen) {
@@ -322,19 +341,6 @@ export function LifeCard({
           pointerEvents="none"
           style={themed($readout)}
         >
-          {eliminated ? (
-            <View
-              testID={`life-eliminated-seat-${seatNumber}`}
-              pointerEvents="none"
-              style={themed($eliminated)}
-            >
-              <Text
-                text="✕"
-                style={[themed($eliminatedMark), { color: foreground }]}
-                maxFontSizeMultiplier={1}
-              />
-            </View>
-          ) : null}
           <Text
             testID={`life-total-seat-${seatNumber}`}
             text={String(life)}
@@ -391,6 +397,13 @@ export function LifeCard({
           </View>
         </View>
       </View>
+      {eliminated ? (
+        <View
+          testID={`life-eliminated-seat-${seatNumber}`}
+          pointerEvents="none"
+          style={themed($eliminated)}
+        />
+      ) : null}
       {commanderDamage && commanderOverviewOpen && !commanderCardMode ? (
         <Animated.View
           testID={`commander-overview-seat-${seatNumber}`}
@@ -502,50 +515,78 @@ export function LifeCard({
         />
       ) : null}
       {commanderDamage?.inspection && !commanderCardMode ? (
+        <CommanderStrip
+          seatNumber={seatNumber}
+          identity={identity}
+          ownerPlayerId={commanderDamage.ownerPlayerId}
+          players={commanderDamage.players ?? []}
+          seats={commanderDamage.seats}
+          incoming={commanderDamage.incoming}
+          foreground={foreground}
+          contentRotation={contentRotation}
+          contentInsets={contentInsets}
+          screenEdges={screenEdges}
+          compact={compact}
+          open={commanderOverviewOpen}
+          inspectDisabled={inspectDisabled}
+          onToggle={commanderDamage.inspection.onToggle}
+        />
+      ) : null}
+      {cornerStatus && !commanderCardMode ? (
         <View
+          testID={`life-corner-layer-seat-${seatNumber}`}
+          pointerEvents="box-none"
           style={[
-            themed($commanderToolbar),
-            commanderToolbarEdge(contentRotation, spacing.xs, toolbarSize),
+            themed($cornerLayer),
+            cornerStatus.layer,
+            { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
           <Pressable
-            testID={`commander-inspect-seat-${seatNumber}`}
-            accessibilityRole="button"
-            accessibilityLabel={`${commanderOverviewOpen ? "Close" : "Show"} commander damage for ${identity}`}
-            accessibilityState={{ expanded: commanderOverviewOpen, disabled: !!inspectDisabled }}
-            disabled={inspectDisabled}
-            onPress={commanderDamage.inspection.onToggle}
-            style={themed($commanderToolbarButton)}
-          >
-            <Svg
-              width={24}
-              height={24}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={foreground}
-              strokeWidth={1.6}
-            >
-              <Rect x={3} y={3} width={18} height={18} rx={1} />
-              <Path d="M12 3v18M3 12h18" />
-            </Svg>
-          </Pressable>
-          <Pressable
             testID={`commander-mark-seat-${seatNumber}`}
             accessibilityRole="button"
-            accessibilityLabel={`Assign commander damage from ${identity}`}
+            accessibilityLabel={`Assign commander damage from ${identity}${
+              statusLabel ? `, ${statusLabel}` : ""
+            }`}
             accessibilityState={{ disabled: !!disabled }}
             disabled={disabled}
+            hitSlop={8}
             onPress={beginCommanderAssignment}
-            style={themed($commanderToolbarButton)}
+            style={({ pressed }) => [
+              themed($cornerIdentity),
+              cornerStatus.position,
+              pressed && { opacity: 0.72 },
+            ]}
           >
             <PlayerMark
               seatNumber={seatNumber}
               shape={shape}
               color={foreground}
-              rotation={contentRotation}
               insetSwordColor={color}
-              size={36}
+              size={compact ? 22 : 26}
             />
+            <View testID={`life-status-seat-${seatNumber}`} style={themed($cornerText)}>
+              <Text
+                testID={`player-name-seat-${seatNumber}`}
+                text={displayName}
+                accessible={false}
+                size="xs"
+                weight="medium"
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+                style={{ color: foreground }}
+              />
+              {statusLabel ? (
+                <Text
+                  text={statusLabel}
+                  weight="bold"
+                  size="xxs"
+                  maxFontSizeMultiplier={1.3}
+                  numberOfLines={1}
+                  style={[themed($status), { color: foreground }]}
+                />
+              ) : null}
+            </View>
           </Pressable>
         </View>
       ) : null}
@@ -637,6 +678,85 @@ const $statusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxxs,
 })
 
+const $cornerLayer: ThemedStyle<ViewStyle> = () => ({
+  ...StyleSheet.absoluteFill,
+  zIndex: 10,
+})
+
+const $cornerIdentity: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+})
+
+const $cornerText: ThemedStyle<ViewStyle> = () => ({ flexShrink: 1, alignItems: "flex-start" })
+
+const CENTER_CUTOUT_HALF_WIDTH = 64
+
+const CONTENT_LEFT_EDGE = {
+  0: "left",
+  180: "right",
+  90: "top",
+  [-90]: "bottom",
+} as const
+
+const CONTENT_RIGHT_EDGE = {
+  0: "right",
+  180: "left",
+  90: "bottom",
+  [-90]: "top",
+} as const
+
+const CONTENT_BOTTOM_EDGE = {
+  0: "bottom",
+  180: "top",
+  90: "left",
+  [-90]: "right",
+} as const
+
+function cornerStatusPlacement({
+  rotation,
+  cardSize,
+  gap,
+  insets,
+  screenEdges,
+}: {
+  rotation: LifeCardContentRotation
+  cardSize: { width: number; height: number }
+  gap: number
+  insets?: LifeCardContentInsets
+  screenEdges?: LifeCardScreenEdges
+}) {
+  const { width, height } = cardSize
+  const sideways = Math.abs(rotation) === 90
+  const bottomEdge = CONTENT_BOTTOM_EDGE[rotation]
+  const leftEdge = CONTENT_LEFT_EDGE[rotation]
+  const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
+  const bottom = cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
+  const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
+  const cutoutAtMiddle = spansScreenEdge && (insets?.[bottomEdge] ?? 0) > 0
+  const run = sideways ? height : width
+  const layer: ViewStyle | undefined = sideways
+    ? {
+        width: height,
+        height: width,
+        left: (width - height) / 2,
+        top: (height - width) / 2,
+        right: undefined,
+        bottom: undefined,
+      }
+    : undefined
+  const position: ViewStyle = {
+    left,
+    bottom,
+    maxWidth: run
+      ? Math.max(run / 2 - left - (cutoutAtMiddle ? CENTER_CUTOUT_HALF_WIDTH : gap), 0)
+      : undefined,
+  }
+  return { layer, position }
+}
+
 const $compactStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   top: "50%",
   left: 0,
@@ -679,44 +799,12 @@ const $overviewClose: ThemedStyle<ViewStyle> = () => ({
 
 const $mutedContent: ThemedStyle<ViewStyle> = () => ({ opacity: 0 })
 
-const $eliminated: ThemedStyle<ViewStyle> = () => ({
+const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 3,
-})
-
-const $eliminatedMark: ThemedStyle<TextStyle> = () => ({
-  fontSize: 176,
-  lineHeight: 184,
-  opacity: 0.22,
+  zIndex: 9,
+  backgroundColor: colors.board.background,
+  opacity: 0.6,
 })
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
-
-function commanderToolbarEdge(
-  rotation: LifeCardContentRotation,
-  inset: number,
-  size: number,
-): ViewStyle {
-  if (rotation === 90)
-    return { left: inset, top: inset, bottom: inset, width: size, flexDirection: "column" }
-  if (rotation === -90)
-    return { right: inset, top: inset, bottom: inset, width: size, flexDirection: "column-reverse" }
-  if (rotation === 180)
-    return { top: inset, left: inset, right: inset, height: size, flexDirection: "row-reverse" }
-  return { bottom: inset, left: inset, right: inset, height: size, flexDirection: "row" }
-}
-const $commanderToolbar: ThemedStyle<ViewStyle> = () => ({
-  position: "absolute",
-  zIndex: 10,
-  justifyContent: "space-between",
-  alignItems: "center",
-})
-const $commanderToolbarButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  width: spacing.xl + spacing.sm,
-  height: spacing.xl + spacing.sm,
-  alignItems: "center",
-  justifyContent: "center",
-})

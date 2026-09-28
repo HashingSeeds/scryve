@@ -92,11 +92,19 @@ describe("LifeCard", () => {
         )
         expect(
           StyleSheet.flatten(view.getByTestId("commander-card-mode-seat-1").props.style),
-        ).toMatchObject({
-          backgroundColor: darkTheme.colors.transparent,
-          borderRadius: radius,
-          borderWidth: 0,
-        })
+        ).toMatchObject(
+          armedPlayerId === commanderIds[0]
+            ? {
+                backgroundColor: darkTheme.colors.board.background,
+                borderRadius: 0,
+                borderWidth: 0,
+              }
+            : {
+                backgroundColor: darkTheme.colors.transparent,
+                borderRadius: radius,
+                borderWidth: 0,
+              },
+        )
       }
     },
   )
@@ -205,6 +213,87 @@ describe("LifeCard", () => {
       })
     },
   )
+
+  it("puts the name and assign sword in the corner opposite the commander grid", () => {
+    const onPressSword = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          contentRotation={-90}
+          contentInsets={{ top: 47, bottom: 0, left: 0, right: 0 }}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            inspection: { open: false, onToggle: jest.fn() },
+            onPressSword,
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 200, height: 340 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-corner-layer-seat-1").props.style),
+    ).toMatchObject({
+      width: 340,
+      height: 200,
+      left: -70,
+      top: 70,
+    })
+    const corner = view.getByTestId("commander-mark-seat-1")
+    expect(StyleSheet.flatten(corner.props.style)).toMatchObject({
+      left: 16,
+      bottom: 16,
+      maxWidth: 138,
+    })
+    expect(corner).toHaveTextContent("Ada")
+    fireEvent.press(corner)
+    expect(onPressSword).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps room for the name when a side notch is not at the card's middle", () => {
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          compact
+          contentRotation={90}
+          contentInsets={{ top: 0, bottom: 0, left: 47, right: 0 }}
+          screenEdges={{ top: true, bottom: false, left: true, right: false }}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            seats: commanderSeats.seats,
+            rows: commanderSeats.rows,
+            columns: commanderSeats.columns,
+            incoming: {},
+            inspection: { open: false, onToggle: jest.fn() },
+            onPressSword: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 420, height: 193 } },
+    })
+
+    expect(StyleSheet.flatten(view.getByTestId("commander-mark-seat-1").props.style)).toMatchObject(
+      { left: 12, bottom: 24, maxWidth: 193 / 2 - 12 - 12 },
+    )
+  })
 
   it("hides the commander grid behind the player mark", () => {
     const view = render(
