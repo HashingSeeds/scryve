@@ -341,19 +341,6 @@ export function LifeCard({
           pointerEvents="none"
           style={[themed($readout), safeContentStyle]}
         >
-          {eliminated ? (
-            <View
-              testID={`life-eliminated-seat-${seatNumber}`}
-              pointerEvents="none"
-              style={themed($eliminated)}
-            >
-              <Text
-                text="✕"
-                style={[themed($eliminatedMark), { color: foreground }]}
-                maxFontSizeMultiplier={1}
-              />
-            </View>
-          ) : null}
           <Text
             testID={`life-total-seat-${seatNumber}`}
             text={String(life)}
@@ -410,6 +397,13 @@ export function LifeCard({
           </View>
         </View>
       </View>
+      {eliminated ? (
+        <View
+          testID={`life-eliminated-seat-${seatNumber}`}
+          pointerEvents="none"
+          style={themed($eliminated)}
+        />
+      ) : null}
       {commanderDamage && commanderOverviewOpen && !commanderCardMode ? (
         <Animated.View
           testID={`commander-overview-seat-${seatNumber}`}
@@ -805,17 +799,11 @@ const $overviewClose: ThemedStyle<ViewStyle> = () => ({
 
 const $mutedContent: ThemedStyle<ViewStyle> = () => ({ opacity: 0 })
 
-const $eliminated: ThemedStyle<ViewStyle> = () => ({
+const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 3,
-})
-
-const $eliminatedMark: ThemedStyle<TextStyle> = () => ({
-  fontSize: 176,
-  lineHeight: 184,
-  opacity: 0.22,
+  zIndex: 9,
+  backgroundColor: colors.board.background,
+  opacity: 0.6,
 })
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })

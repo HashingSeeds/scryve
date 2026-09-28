@@ -96,8 +96,8 @@ describe("LifeCard", () => {
           armedPlayerId === commanderIds[0]
             ? {
                 backgroundColor: darkTheme.colors.board.background,
-                borderColor: color,
-                borderRadius: radius,
+                borderRadius: 0,
+                borderWidth: 0,
               }
             : {
                 backgroundColor: darkTheme.colors.transparent,

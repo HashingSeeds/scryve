@@ -105,7 +105,6 @@ export function CommanderDamageCardControls({
               backgroundColor: overlayTint(foreground, 0.04),
             }
           : themed($activePlayerOverlay),
-        mode.kind === "source" && mode.mark && { borderColor: mode.mark.color },
         life !== undefined && mode.kind !== "source" && themed($localOverlay),
         entranceStyle,
       ]}
@@ -370,8 +369,8 @@ const $compactOverlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $activePlayerOverlay: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.board.background,
-  borderColor: colors.board.text,
-  borderWidth: 3,
+  borderWidth: 0,
+  borderRadius: 0,
 })
 
 const $safeContent: ViewStyle = { flex: 1 }
