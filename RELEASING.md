@@ -6,8 +6,8 @@ This app uses two release paths: OTA updates for JS and asset changes within an 
 
 1. Merge your changes to main.
 2. Confirm the native fingerprint matches the installed production build and that any required Convex change is already live.
-3. Test the commit in a preview build with `APP_VARIANT=preview pnpm exec eas update --channel preview --environment preview`. Run `pnpm e2e` and the manual smoke pass. Preview uses a different app identifier and runtime fingerprint, so this checks behavior but does not prove production compatibility.
-4. Publish the tested commit with production configuration: `APP_VARIANT=production pnpm exec eas update --channel production --environment production`.
+3. Test the commit in a preview build with `pnpm ota:preview --message "..."`. Run `pnpm e2e` and the manual smoke pass. Preview uses a different app identifier and runtime fingerprint, so this checks behavior but does not prove production compatibility.
+4. Publish the tested commit with production configuration: `pnpm ota:prod --message "..."`.
 5. Watch Sentry for new fatal issues after publishing. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
 
 Do not republish a preview update group to production. If a future staging build uses the same native configuration, runtime, environment, and code signing as production, promote its tested group with `eas update:republish --group <update-group-id> --destination-channel production`.
