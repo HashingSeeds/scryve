@@ -145,24 +145,8 @@ export function LifeEditor({
   const editorHeight = sideways ? cardWidth : cardHeight
   const valueFontSize = compact ? styles.compactValue.fontSize : styles.value.fontSize
   const safe = contentInsets ?? { top: 0, bottom: 0, left: 0, right: 0 }
-  const physicalX = (safe.left - safe.right) / 2
-  const physicalY = (safe.top - safe.bottom) / 2
-  const sourceX =
-    rotation === 180
-      ? -physicalX
-      : rotation === 90
-        ? physicalY
-        : rotation === -90
-          ? -physicalY
-          : physicalX
-  const sourceY =
-    rotation === 180
-      ? -physicalY
-      : rotation === 90
-        ? -physicalX
-        : rotation === -90
-          ? physicalX
-          : physicalY
+  const sourceX = 0
+  const sourceY = 0
   const valueStyle = useAnimatedStyle(() => ({
     opacity: valueCenter === null ? 0 : 1,
     transform: [
