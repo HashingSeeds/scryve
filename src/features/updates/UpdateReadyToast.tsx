@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { AccessibilityInfo, Platform, View } from "react-native"
 import { usePathname } from "expo-router"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -46,17 +46,19 @@ export function UpdateReadyToastWithForegroundChecks() {
     setVisible(true)
   }, [held, readyId])
 
+  const showing = visible && !held
   useEffect(() => {
-    if (!visible) return
+    if (!showing) return
+    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility("Update ready")
     const timeout = setTimeout(() => setVisible(false), VISIBLE_MS)
     return () => clearTimeout(timeout)
-  }, [visible])
+  }, [showing])
 
   if (update.status !== "ready") return null
 
   return (
     <>
-      {visible && !held ? (
+      {showing ? (
         <View
           pointerEvents="box-none"
           style={[themed($layer), { top: insets.top + theme.spacing.md }]}
