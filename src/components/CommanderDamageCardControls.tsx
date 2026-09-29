@@ -98,7 +98,6 @@ export function CommanderDamageCardControls({
       style={[
         themed($overlay),
         compact && themed($compactOverlay),
-        lifeCardContentInsetStyle(contentInsets),
         mode.kind === "target"
           ? {
               borderColor: overlayTint(foreground, 0.28),
@@ -109,7 +108,10 @@ export function CommanderDamageCardControls({
         entranceStyle,
       ]}
     >
-      <View testID={`commander-card-content-seat-${seatNumber}`} style={$safeContent}>
+      <View
+        testID={`commander-card-content-seat-${seatNumber}`}
+        style={[$safeContent, lifeCardContentInsetStyle(contentInsets)]}
+      >
         {mode.kind === "target" ? (
           <View
             testID={`commander-target-seat-${seatNumber}`}
@@ -186,91 +188,91 @@ export function CommanderDamageCardControls({
             />
           </View>
         )}
-
-        {mode.kind !== "source" ? (
-          <View
-            pointerEvents="none"
-            accessible={life !== undefined}
-            accessibilityLabel={
-              life !== undefined ? `${modeAccessibilityLabel(mode)}, ${life} life` : undefined
-            }
-            accessibilityLiveRegion={life !== undefined ? "polite" : undefined}
-            style={[themed($summary), rotationStyle]}
-          >
-            {mode.kind === "target" ? (
-              <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
-                {life === undefined ? (
-                  <Text
-                    text="↓"
-                    weight="bold"
-                    maxFontSizeMultiplier={1.2}
-                    style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
-                  />
-                ) : null}
-                <View style={themed($incomingTotal)}>
-                  {life !== undefined && mode.attacker ? (
-                    <View
-                      testID={`commander-attacker-seat-${seatNumber}`}
-                      style={[
-                        themed(compact ? $compactAttackerChip : $attackerChip),
-                        {
-                          backgroundColor: mode.attacker.color,
-                          borderColor: overlayTint(foreground, 0.6),
-                        },
-                      ]}
-                    >
-                      <PlayerMark
-                        seatNumber={mode.attacker.seatNumber}
-                        shape={mode.attacker.shape}
-                        color={accessibleForeground(mode.attacker.color)}
-                        insetSwordColor={mode.attacker.color}
-                        size={compact ? 22 : 30}
-                      />
-                    </View>
-                  ) : null}
-                  <Text
-                    testID={`commander-total-seat-${seatNumber}`}
-                    text={String(mode.total)}
-                    weight="bold"
-                    maxFontSizeMultiplier={1.2}
-                    style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
-                  />
-                </View>
-                {life !== undefined ? (
-                  <Text
-                    testID={`commander-life-seat-${seatNumber}`}
-                    text={`${life} life`}
-                    maxFontSizeMultiplier={1.2}
-                    style={[themed($localLife), { color: foreground }]}
-                    numberOfLines={1}
-                  />
-                ) : null}
-              </View>
-            ) : mode.kind === "claim" ? (
-              <>
-                <Text
-                  text={`${mode.attackerName} dealt ${mode.damage}`}
-                  weight="bold"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={1.2}
-                  style={[themed($headline), { color: controlForeground }]}
-                />
-                <Text
-                  text={
-                    mode.additionalClaims > 0
-                      ? `Confirm commander damage · ${mode.additionalClaims} more pending`
-                      : "Confirm commander damage"
-                  }
-                  size="xxs"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={1.2}
-                  style={[themed($caption), { color: controlForeground }]}
-                />
-              </>
-            ) : null}
-          </View>
-        ) : null}
       </View>
+
+      {mode.kind !== "source" ? (
+        <View
+          pointerEvents="none"
+          accessible={life !== undefined}
+          accessibilityLabel={
+            life !== undefined ? `${modeAccessibilityLabel(mode)}, ${life} life` : undefined
+          }
+          accessibilityLiveRegion={life !== undefined ? "polite" : undefined}
+          style={[themed($summary), rotationStyle]}
+        >
+          {mode.kind === "target" ? (
+            <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
+              {life === undefined ? (
+                <Text
+                  text="↓"
+                  weight="bold"
+                  maxFontSizeMultiplier={1.2}
+                  style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
+                />
+              ) : null}
+              <View style={themed($incomingTotal)}>
+                {life !== undefined && mode.attacker ? (
+                  <View
+                    testID={`commander-attacker-seat-${seatNumber}`}
+                    style={[
+                      themed(compact ? $compactAttackerChip : $attackerChip),
+                      {
+                        backgroundColor: mode.attacker.color,
+                        borderColor: overlayTint(foreground, 0.6),
+                      },
+                    ]}
+                  >
+                    <PlayerMark
+                      seatNumber={mode.attacker.seatNumber}
+                      shape={mode.attacker.shape}
+                      color={accessibleForeground(mode.attacker.color)}
+                      insetSwordColor={mode.attacker.color}
+                      size={compact ? 22 : 30}
+                    />
+                  </View>
+                ) : null}
+                <Text
+                  testID={`commander-total-seat-${seatNumber}`}
+                  text={String(mode.total)}
+                  weight="bold"
+                  maxFontSizeMultiplier={1.2}
+                  style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
+                />
+              </View>
+              {life !== undefined ? (
+                <Text
+                  testID={`commander-life-seat-${seatNumber}`}
+                  text={`${life} life`}
+                  maxFontSizeMultiplier={1.2}
+                  style={[themed($localLife), { color: foreground }]}
+                  numberOfLines={1}
+                />
+              ) : null}
+            </View>
+          ) : mode.kind === "claim" ? (
+            <>
+              <Text
+                text={`${mode.attackerName} dealt ${mode.damage}`}
+                weight="bold"
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}
+                style={[themed($headline), { color: controlForeground }]}
+              />
+              <Text
+                text={
+                  mode.additionalClaims > 0
+                    ? `Confirm commander damage · ${mode.additionalClaims} more pending`
+                    : "Confirm commander damage"
+                }
+                size="xxs"
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.2}
+                style={[themed($caption), { color: controlForeground }]}
+              />
+            </>
+          ) : null}
+        </View>
+      ) : null}
     </Animated.View>
   )
 }
@@ -375,9 +377,7 @@ const $activePlayerOverlay: ThemedStyle<ViewStyle> = ({ colors }) => ({
 
 const $safeContent: ViewStyle = { flex: 1 }
 
-const $zones: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFill,
-})
+const $zones: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 
 const $action: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
@@ -434,7 +434,9 @@ const $localTotal: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xxs,
 })
-const $attackerChip: ThemedStyle<ViewStyle> = () => ({
+const $attackerChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  left: -44 - spacing.xs,
   transform: [{ translateY: -3 }],
   width: 44,
   height: 44,
@@ -443,7 +445,9 @@ const $attackerChip: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
   justifyContent: "center",
 })
-const $compactAttackerChip: ThemedStyle<ViewStyle> = () => ({
+const $compactAttackerChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  left: -32 - spacing.xs,
   transform: [{ translateY: -2 }],
   width: 32,
   height: 32,
