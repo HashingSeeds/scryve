@@ -37,7 +37,6 @@ const getUniqueIdentifier = () => {
   if (IS_DEV) {
     return "com.sowinghope.count.dev"
   }
-  // Preview shares the production identifier so store-tied features (purchases) work.
   return "com.sowinghope.count"
 }
 
