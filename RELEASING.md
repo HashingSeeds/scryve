@@ -58,7 +58,7 @@ Existing clients keep their current API contracts and cached offline access.
    and `REVENUECAT_ENVIRONMENT` to `SANDBOX` for isolated testing or `PRODUCTION`
    for production. The default is `PRODUCTION`. Never expose these secrets through
    `EXPO_PUBLIC_*` variables.
-3. Deploy schema expansion checkpoint `f028cbd` first: the new
+3. Deploy schema expansion checkpoint `85ab031` first: the new
    `revenueCatCustomerStates` and `revenueCatWebhookEvents` tables and their indexes.
    Preserve this checkpoint when merging. Then deploy the backend code
    before releasing the client. No existing fields or functions are removed.
