@@ -572,8 +572,10 @@ function ConnectedBoardReady({
   const seatColors = useMemo(() => players.map((player) => player.color), [players])
   const exitAction = useMemo(
     () =>
-      armedCommander ? { label: "Exit commander damage", onPress: exitCommanderDamage } : undefined,
-    [armedCommander, exitCommanderDamage],
+      armedCommander || inspectedPlayerId
+        ? { label: "Exit commander damage", onPress: exitCommanderDamage }
+        : undefined,
+    [armedCommander, inspectedPlayerId, exitCommanderDamage],
   )
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen

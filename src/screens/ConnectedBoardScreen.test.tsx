@@ -203,8 +203,11 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("commander-pip-seat-2-player-2"))
     expect(screen.getByTestId("commander-overview-seat-2")).toBeTruthy()
     expect(screen.getByTestId("commander-cell-seat-2-player-1")).toBeTruthy()
+    expect(screen.queryByTestId("commander-pip-seat-2-player-2")).toBeNull()
 
-    fireEvent.press(screen.getByTestId("commander-pip-seat-2-player-2"))
+    const exit = screen.getByTestId("game-menu-button")
+    expect(exit.props.accessibilityLabel).toBe("Exit commander damage")
+    fireEvent.press(exit)
     expect(screen.queryByTestId("commander-overview-seat-2")).toBeNull()
   })
 
