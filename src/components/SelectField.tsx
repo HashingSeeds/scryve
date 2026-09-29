@@ -30,9 +30,9 @@ export interface SelectFieldProps {
 
 export type Anchor = { x: number; y: number; width: number; height: number }
 
-const ANCHOR_GAP = 6
 const SCREEN_MARGIN = 12
 const MIN_MENU_HEIGHT = 180
+const MAX_MENU_HEIGHT = 360
 const OPEN_SPRING = { damping: 18, stiffness: 260, mass: 0.6 } as const
 
 export function menuPlacement(
@@ -48,10 +48,8 @@ export function menuPlacement(
       position: "absolute",
       left: anchor.x,
       width: anchor.width,
-      maxHeight: Math.max(0, (dropsDown ? spaceBelow : spaceAbove) - ANCHOR_GAP),
-      ...(dropsDown
-        ? { top: anchor.y + anchor.height + ANCHOR_GAP }
-        : { bottom: windowHeight - anchor.y + ANCHOR_GAP }),
+      maxHeight: Math.min(MAX_MENU_HEIGHT, Math.max(0, dropsDown ? spaceBelow : spaceAbove)),
+      ...(dropsDown ? { top: anchor.y + anchor.height } : { bottom: windowHeight - anchor.y }),
     },
   }
 }
@@ -102,13 +100,7 @@ export function SelectField({
   const placement = anchor ? menuPlacement(anchor, windowHeight) : undefined
   const dropsDown = placement?.dropsDown ?? true
 
-  const $entrance = useAnimatedStyle(() => ({
-    opacity: entrance.value,
-    transform: [
-      { translateY: (dropsDown ? -1 : 1) * ANCHOR_GAP * (1 - entrance.value) },
-      { scaleY: 0.94 + 0.06 * entrance.value },
-    ],
-  }))
+  const $entrance = useAnimatedStyle(() => ({ opacity: entrance.value }))
 
   return (
     <View>
@@ -122,6 +114,7 @@ export function SelectField({
         disabled={disabled}
         style={({ pressed }) => [
           themed($trigger),
+          open && (dropsDown ? $triggerOpenDown : $triggerOpenUp),
           pressed && themed($triggerPressed),
           disabled && $dimmed,
         ]}
@@ -148,7 +141,12 @@ export function SelectField({
         <Animated.View
           testID={testID ? `${testID}-menu` : undefined}
           accessibilityViewIsModal
-          style={[themed($menu), placement?.style ?? themed($menuFallback), $entrance]}
+          style={[
+            themed($menu),
+            anchor && (dropsDown ? $menuAttachedDown : $menuAttachedUp),
+            placement?.style ?? themed($menuFallback),
+            $entrance,
+          ]}
         >
           <ScrollView style={$menuClip} contentContainerStyle={themed($menuContent)}>
             {clearLabel ? (
@@ -204,7 +202,6 @@ function MenuOption({
       style={({ pressed }) => [
         themed($optionRow),
         divided && themed($optionDivider),
-        selected && themed($optionSelected),
         pressed && themed($optionPressed),
       ]}
       onPress={onPress}
@@ -234,6 +231,8 @@ const $trigger: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $triggerPressed: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.palette.neutral200,
 })
+const $triggerOpenDown: ViewStyle = { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }
+const $triggerOpenUp: ViewStyle = { borderTopLeftRadius: 0, borderTopRightRadius: 0 }
 const $triggerText: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 const $triggerLabel: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.textDim,
@@ -242,20 +241,23 @@ const $triggerLabel: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 const $triggerValue: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $caret: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim, lineHeight: 20 })
-const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.palette.overlay20,
-})
-const $menu: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $scrim: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.transparent })
+const $menu: ThemedStyle<ViewStyle> = ({ colors }) => ({
   borderRadius: CHOICE_RADIUS,
   borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.background,
-  shadowColor: colors.palette.neutral900,
-  shadowOffset: { width: 0, height: spacing.xxs },
-  shadowOpacity: 0.35,
-  shadowRadius: spacing.md,
-  elevation: 16,
 })
+const $menuAttachedDown: ViewStyle = {
+  borderTopWidth: 0,
+  borderTopLeftRadius: 0,
+  borderTopRightRadius: 0,
+}
+const $menuAttachedUp: ViewStyle = {
+  borderBottomWidth: 0,
+  borderBottomLeftRadius: 0,
+  borderBottomRightRadius: 0,
+}
 const $menuFallback: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignSelf: "center",
   marginTop: spacing.xxl,
@@ -279,13 +281,10 @@ const $optionDivider: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   marginBottom: spacing.xxs,
   paddingBottom: spacing.sm,
 })
-const $optionSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.palette.neutral200,
-})
 const $optionPressed: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.palette.neutral300,
 })
 const $optionText: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
-const $optionLabel: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
+const $optionLabel: ThemedStyle<TextStyle> = () => ({ fontWeight: "400" })
 const $optionDetail: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $optionCheck: ThemedStyle<TextStyle> = () => ({ fontWeight: "700", lineHeight: 20 })
