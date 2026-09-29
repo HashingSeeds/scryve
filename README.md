@@ -49,6 +49,26 @@ chmod +x "$(git rev-parse --git-common-dir)/hooks/post-checkout"
 
 Contributors without the shared file can copy `.env.example` to `.env.local`.
 
+### Convex preview for this worktree
+
+Put a Convex **preview deploy key** in `~/.config/scryve/.env.preview` as
+`CONVEX_DEPLOY_KEY=preview:...`, or provide `CONVEX_DEPLOY_KEY` in the shell.
+The older `CONVEX_PREVIEW_DEPLOY_KEY` name works too. With a different
+`XDG_CONFIG_HOME`, use `$XDG_CONFIG_HOME/scryve/.env.preview`. Keep this file
+outside the repo; the post-checkout hook does not link deploy keys.
+
+Run `pnpm preview:up` to create or update a preview for the current branch.
+It writes the preview URL, site URL, and deployment name to this worktree's
+ignored `.env.development.local`. It never changes the shared `.env.local`.
+Run `pnpm preview:check` to check that deployment, then `pnpm start:expo` to
+serve the development client against it. Use `pnpm start:expo` here because
+`pnpm start` also starts `convex dev`.
+
+A fresh preview has no Clerk user projections. Sign in with a development
+test account and open Account once to sync its profile before testing decks
+or connected play. Preview deployments expire; rerun `pnpm preview:up` when
+needed.
+
 Static checks run with:
 
 ```bash
