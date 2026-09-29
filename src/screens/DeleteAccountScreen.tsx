@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { View } from "react-native"
+import { Linking, View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Header } from "@/components/Header"
@@ -100,6 +100,30 @@ export function DeleteAccountScreen({
         ) : null}
         {canRequestDeletion ? (
           <>
+            <View style={themed($subscriptionNotice)}>
+              <Text text="Have a Scryve Pro subscription?" style={themed($strong)} />
+              <Text
+                text="Deleting your account won't cancel it. You may keep being charged until you cancel through Apple or Google Play. You can still delete now, but you'll lose access to any paid time left."
+                size="xs"
+                style={themed($muted)}
+              />
+              <Button
+                text="Manage Apple subscriptions"
+                accessibilityRole="link"
+                style={themed($subscriptionLink)}
+                textStyle={themed($subscriptionLinkText)}
+                onPress={() => void Linking.openURL("https://apps.apple.com/account/subscriptions")}
+              />
+              <Button
+                text="Manage Google Play subscriptions"
+                accessibilityRole="link"
+                style={themed($subscriptionLink)}
+                textStyle={themed($subscriptionLinkText)}
+                onPress={() =>
+                  void Linking.openURL("https://play.google.com/store/account/subscriptions")
+                }
+              />
+            </View>
             {email ? (
               <Text text={`Signed in as ${email}`} size="xs" style={themed($muted)} />
             ) : null}
@@ -310,6 +334,17 @@ const $centerMuted: ThemedStyle<TextStyle> = ({ colors }) => ({
   textAlign: "center",
 })
 const $strong: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
+const $subscriptionNotice: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
+const $subscriptionLink: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  alignSelf: "flex-start",
+  minHeight: 44,
+  paddingHorizontal: 0,
+  borderWidth: 0,
+  backgroundColor: colors.transparent,
+})
+const $subscriptionLinkText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.tint,
+})
 const $stepList: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   gap: spacing.xs,
   paddingVertical: spacing.xs,
