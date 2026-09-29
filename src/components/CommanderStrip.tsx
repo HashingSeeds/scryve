@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
-import { Pressable, View } from "react-native"
+import { Pressable, StyleSheet, View } from "react-native"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
@@ -9,6 +9,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
 import type { CommanderBoardSeat } from "./commanderDamageLayout"
+import { Icon } from "./Icon"
 import { overlayTint } from "./LifeControls"
 import {
   cornerOffset,
@@ -85,12 +86,8 @@ export function CommanderStrip({
     <View
       testID={`commander-strip-seat-${seatNumber}`}
       onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
-      pointerEvents={open ? "none" : "auto"}
-      accessibilityElementsHidden={open}
-      importantForAccessibility={open ? "no-hide-descendants" : "auto"}
       style={[
         themed($strip),
-        open && $hidden,
         stripEdge(contentRotation, spacing.xs, contentInsets, screenEdges),
         {
           flexDirection: stripDirection(contentRotation),
@@ -103,7 +100,13 @@ export function CommanderStrip({
         style={themed($map)}
       >
         {boardRows.map((row, rowIndex) => (
-          <View key={rowIndex} style={themed($mapRow)}>
+          <View
+            key={rowIndex}
+            pointerEvents={open ? "none" : "auto"}
+            accessibilityElementsHidden={open}
+            importantForAccessibility={open ? "no-hide-descendants" : "auto"}
+            style={[themed($mapRow), open && $hidden]}
+          >
             {row.map(({ playerId }) => {
               const playerIndex = players.findIndex(({ id }) => id === playerId)
               const player = players[playerIndex]
@@ -174,6 +177,28 @@ export function CommanderStrip({
             })}
           </View>
         ))}
+        {open ? (
+          <Pressable
+            testID={`commander-strip-close-seat-${seatNumber}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Close commander damage for ${identity}`}
+            hitSlop={12}
+            onPress={onToggle}
+            style={({ pressed }) => [
+              StyleSheet.absoluteFill,
+              {
+                alignItems:
+                  contentRotation === 90 || contentRotation === 180 ? "flex-start" : "flex-end",
+                justifyContent:
+                  contentRotation === -90 || contentRotation === 180 ? "flex-start" : "flex-end",
+                padding: spacing.xxs,
+              },
+              pressed && { opacity: 0.72 },
+            ]}
+          >
+            <Icon icon="x" color={foreground} size={18} />
+          </Pressable>
+        ) : null}
       </View>
     </View>
   )
