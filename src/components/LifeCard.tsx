@@ -188,10 +188,24 @@ export function LifeCard({
   }, [localCommander, commanderOverviewOpen, commanderOverviewDuration, overviewProgress])
   const localOverviewVisible = localCommander && (commanderOverviewOpen || overviewVisible)
   const headerEdge = { 0: "top", 90: "right", [-90]: "left", 180: "bottom" } as const
+  const headerPadding = {
+    0: "paddingTop",
+    90: "paddingRight",
+    [-90]: "paddingLeft",
+    180: "paddingBottom",
+  } as const
+  const footerPadding = {
+    0: "paddingBottom",
+    90: "paddingLeft",
+    [-90]: "paddingRight",
+    180: "paddingTop",
+  } as const
   const overviewInsets = {
     ...safeContentStyle,
-    [headerEdge[contentRotation]]: (contentInsets?.[headerEdge[contentRotation]] ?? 0) + 56,
+    [headerPadding[contentRotation]]: (contentInsets?.[headerEdge[contentRotation]] ?? 0) + 56,
+    [footerPadding[contentRotation]]: 0,
   }
+  const boardInsets = localCommander ? overviewInsets : safeContentStyle
   const lifeOffset = Math.max(
     (Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height) / 2 -
       (contentInsets?.[headerEdge[contentRotation]] ?? 0) -
@@ -525,10 +539,8 @@ export function LifeCard({
           ]}
         >
           <View
-            style={[
-              themed($commanderOverviewContent),
-              localCommander ? overviewInsets : safeContentStyle,
-            ]}
+            testID={`commander-overview-content-seat-${seatNumber}`}
+            style={[themed($commanderOverviewContent), boardInsets]}
           >
             <Animated.View
               testID={`commander-overview-board-seat-${seatNumber}`}
@@ -553,17 +565,15 @@ export function LifeCard({
                   width: Math.max(
                     cardSize.width -
                       cardPadding * 2 -
-                      (contentInsets?.left ?? 0) -
-                      (contentInsets?.right ?? 0) -
-                      (localCommander && Math.abs(contentRotation) === 90 ? 56 : 0),
+                      boardInsets.paddingLeft -
+                      boardInsets.paddingRight,
                     0,
                   ),
                   height: Math.max(
                     cardSize.height -
                       cardPadding * 2 -
-                      (contentInsets?.top ?? 0) -
-                      (contentInsets?.bottom ?? 0) -
-                      (localCommander && Math.abs(contentRotation) !== 90 ? 56 : 0),
+                      boardInsets.paddingTop -
+                      boardInsets.paddingBottom,
                     0,
                   ),
                 }}

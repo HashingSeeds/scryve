@@ -151,9 +151,7 @@ describe("LifeCard", () => {
         nativeEvent: { layout: { width: 200, height: 300 } },
       })
       view.rerender(renderInspection(true))
-      expect(
-        view.getByTestId("commander-strip-seat-1", { includeHiddenElements: true }),
-      ).not.toBeVisible()
+      expect(view.getByTestId("commander-strip-close-seat-1")).toBeVisible()
       fireEvent(view.getByTestId("commander-overview-board-seat-1"), "layout", {
         nativeEvent: { layout: { x: 0, y: 56, width: 100, height: 200 } },
       })
@@ -176,6 +174,53 @@ describe("LifeCard", () => {
       expect(view.queryByTestId("commander-overview-seat-1")).toBeNull()
     },
   )
+
+  it("uses the card origin and full bottom space for a vertical inspection grid", () => {
+    const players = Array.from({ length: 5 }, (_, seat) => ({
+      id: asPlayerId(`player-${seat + 1}`),
+      seat,
+      name: `Player ${seat + 1}`,
+      life: 40,
+      color: "#41476E",
+    }))
+    const seats = commanderBoardSeats(
+      [[0, 1], [2, 3], [4]],
+      players.map(({ id }) => id),
+    )
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Player 5"
+          seatNumber={5}
+          life={40}
+          color="#41476E"
+          compact
+          contentInsets={{ top: 0, bottom: 34, left: 0, right: 0 }}
+          onChange={jest.fn()}
+          commanderDamage={{
+            ownerPlayerId: players[4].id,
+            players,
+            ...seats,
+            incoming: { [players[0].id]: 2 },
+            inspection: { open: true, onToggle: jest.fn() },
+          }}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-5"), "layout", {
+      nativeEvent: { layout: { width: 400, height: 300 } },
+    })
+    expect(view.getByTestId("commander-overview-content-seat-5")).toHaveStyle({
+      top: 0,
+      left: 0,
+      paddingTop: 56,
+      paddingBottom: 0,
+    })
+    const availableHeight = 300 - darkTheme.spacing.xxs * 2 - 56
+    expect(view.getByTestId("commander-cell-seat-5-player-1")).toHaveStyle({
+      height: Math.floor((availableHeight - darkTheme.spacing.xxxs * 2) / 3),
+    })
+  })
 
   it("contains rotated commander labels and controls inside the padded safe area", () => {
     const view = render(

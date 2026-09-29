@@ -40,6 +40,15 @@ function renderStrip(props: Partial<CommanderStripProps> = {}) {
 const damaged = { [players[2].id]: 21 }
 
 describe("CommanderStrip", () => {
+  it("replaces the compact grid with a nearby close button while inspecting", () => {
+    const onToggle = jest.fn()
+    const view = renderStrip({ incoming: damaged, open: true, onToggle })
+    expect(view.queryByTestId(`commander-pip-seat-1-${players[2].id}`)).toBeNull()
+    const close = view.getByRole("button", { name: "Close commander damage for Seat 1, Ada" })
+    fireEvent.press(close)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
   it("stays hidden until someone deals damage", () => {
     const view = renderStrip()
     expect(view.queryByTestId("commander-strip-seat-1")).toBeNull()
