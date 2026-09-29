@@ -85,8 +85,9 @@ Existing clients keep their current API contracts and cached offline access.
 7. Publish the client after backend verification. It checks existing subscribers
    when billing and the signed-in profile are ready, after purchase or restore,
    and after reconnect. Older clients gain server access through webhooks; for an
-   existing subscriber without a new event, resend a historical webhook from
-   RevenueCat to reconcile their current status.
+   existing subscriber without a new event, open the updated client to sync
+   their current status. RevenueCat's Retry action applies to failed or retrying
+   deliveries, not arbitrary successful historical events.
 
 The endpoint waits for a bounded RevenueCat fetch and the atomic database update
 before acknowledging delivery. Failed fetches return non-200 so RevenueCat retries.

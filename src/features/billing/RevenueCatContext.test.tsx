@@ -108,12 +108,11 @@ describe("RevenueCatProvider", () => {
     expect(Purchases.purchasePackage).toHaveBeenCalledWith(monthlyPackage)
   })
 
-  it("keeps a network update when offerings finish after the cached launch read", async () => {
-    let resolveOfferings!: (value: never) => void
-    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
-    purchasesMock.getOfferings.mockReturnValue(
+  it("keeps a newer listener update when stale customer info resolves later", async () => {
+    let resolveCustomerInfo!: (value: never) => void
+    purchasesMock.getCustomerInfo.mockReturnValue(
       new Promise((resolve) => {
-        resolveOfferings = resolve
+        resolveCustomerInfo = resolve
       }),
     )
     const { result } = renderHook(() => useRevenueCat(), { wrapper })
@@ -121,7 +120,7 @@ describe("RevenueCatProvider", () => {
     const listener = purchasesMock.addCustomerInfoUpdateListener.mock.calls[0][0]
 
     act(() => listener(customerInfo))
-    await act(async () => resolveOfferings({ current: offering, all: {} } as never))
+    await act(async () => resolveCustomerInfo(expiredCustomerInfo))
 
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.isCountPro).toBe(true)
