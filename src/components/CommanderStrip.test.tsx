@@ -95,12 +95,32 @@ describe("CommanderStrip", () => {
       [`commander-pip-seat-1-${players[2].id}`],
     ])
     expect(view.queryByTestId("commander-mark-seat-1")).toBeNull()
-    expect(view.getByTestId(`commander-pip-seat-1-${players[2].id}`)).toHaveTextContent("21")
+    expect(
+      view.getByTestId(`commander-pip-seat-1-${players[2].id}`, { includeHiddenElements: true }),
+    ).toHaveTextContent("21")
 
-    const idle = view.getByTestId(`commander-pip-seat-1-${players[1].id}`)
+    const idle = view.getByTestId(`commander-pip-seat-1-${players[1].id}`, {
+      includeHiddenElements: true,
+    })
     expect(idle).not.toHaveTextContent("0")
-    expect(idle.props.accessibilityLabel).toBe("Show commander damage for Seat 1, Ada, 0 from Bo")
-    fireEvent.press(idle)
+    const toggle = view.getByRole("button", {
+      name: "Show commander damage for Seat 1, Ada, 21 from Cy",
+    })
+    expect(
+      view.getByTestId("commander-strip-close-icon-seat-1", { includeHiddenElements: true }),
+    ).not.toBeVisible()
+    expect(view.getAllByRole("button")).toHaveLength(1)
+    expect(toggle).toBe(view.getByTestId("commander-map-seat-1"))
+    fireEvent.press(toggle)
     expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it("disables the whole compact grid when inspection is unavailable", () => {
+    const onToggle = jest.fn()
+    const view = renderStrip({ incoming: damaged, inspectDisabled: true, onToggle })
+    const toggle = view.getByTestId("commander-map-seat-1")
+    expect(toggle).toBeDisabled()
+    fireEvent.press(toggle)
+    expect(onToggle).not.toHaveBeenCalled()
   })
 })

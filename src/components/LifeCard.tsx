@@ -234,7 +234,7 @@ export function LifeCard({
       { scale: 1 + (32 / resolvedLifeFontSize - 1) * overviewProgress.value },
     ],
   }))
-  const overviewStyle = useAnimatedStyle(() => ({ opacity: overviewProgress.value }))
+  const overviewCloseStyle = useAnimatedStyle(() => ({ opacity: overviewProgress.value }))
   const boardStyle = useAnimatedStyle(() => ({
     opacity: boardBounds ? 1 : 0,
     transform: [
@@ -535,7 +535,6 @@ export function LifeCard({
             themed($commanderOverview),
             compact && themed($compactCommanderOverview),
             { backgroundColor: color },
-            localCommander && overviewStyle,
           ]}
         >
           <View
@@ -660,6 +659,7 @@ export function LifeCard({
           compact={compact}
           open={localOverviewVisible}
           inspectDisabled={inspectDisabled}
+          closeIconStyle={overviewCloseStyle}
           onToggle={commanderDamage.inspection.onToggle}
           onBoundsChange={setStripBounds}
         />

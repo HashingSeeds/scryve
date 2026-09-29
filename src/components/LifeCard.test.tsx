@@ -1,10 +1,12 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
+import * as Reanimated from "react-native-reanimated"
 
 import { asPlayerId, PLAYER_COLORS } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
 import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
+import * as reducedMotion from "@/utils/useReducedMotion"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
@@ -220,6 +222,57 @@ describe("LifeCard", () => {
     expect(view.getByTestId("commander-cell-seat-5-player-1")).toHaveStyle({
       height: Math.floor((availableHeight - darkTheme.spacing.xxxs * 2) / 3),
     })
+  })
+
+  it("keeps the collapsing grid visible until its reverse animation finishes", () => {
+    const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    const timing = jest
+      .spyOn(Reanimated, "withTiming")
+      .mockImplementation((value, config, done) => {
+        setTimeout(() => done?.(true), config?.duration ?? 0)
+        return value
+      })
+    const renderInspection = (open: boolean) => (
+      <ThemeProvider initialContext="dark">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={40}
+          color="#41476E"
+          onChange={jest.fn()}
+          commanderDamage={{
+            ownerPlayerId: commanderIds[0],
+            ...commanderSeats,
+            players: commanderIds.map((id, seat) => ({
+              id,
+              seat,
+              name: `Player ${seat + 1}`,
+              life: 40,
+              color: "#41476E",
+            })),
+            incoming: { [commanderIds[1]]: 3 },
+            inspection: { open, onToggle: jest.fn() },
+          }}
+        />
+      </ThemeProvider>
+    )
+    try {
+      const view = render(renderInspection(true))
+      expect(view.getByTestId("commander-strip-close-icon-seat-1")).toHaveStyle({ opacity: 1 })
+      view.rerender(renderInspection(false))
+      expect(view.getByTestId("commander-overview-seat-1")).toBeVisible()
+      expect(view.getByTestId("commander-strip-close-seat-1")).toBeVisible()
+      expect(
+        view.getByTestId("commander-strip-close-icon-seat-1", { includeHiddenElements: true }),
+      ).toHaveStyle({ opacity: 0 })
+      act(() => jest.advanceTimersByTime(219))
+      expect(view.getByTestId("commander-overview-seat-1")).toBeVisible()
+      act(() => jest.advanceTimersByTime(1))
+      expect(view.queryByTestId("commander-overview-seat-1")).toBeNull()
+    } finally {
+      timing.mockRestore()
+      motion.mockRestore()
+    }
   })
 
   it.each([0, 90, -90, 180] as const)(
