@@ -574,6 +574,21 @@ export default defineSchema({
     .index("by_user_and_feature", ["userId", "feature"])
     .index("by_user", ["userId"]),
 
+  revenueCatCustomerStates: defineTable({
+    appUserId: v.string(),
+    enabled: v.boolean(),
+    environment: v.union(v.literal("PRODUCTION"), v.literal("SANDBOX")),
+    observedAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_app_user_id", ["appUserId"]),
+
+  revenueCatWebhookEvents: defineTable({
+    eventId: v.string(),
+    eventTimestampMs: v.number(),
+    environment: v.optional(v.union(v.literal("PRODUCTION"), v.literal("SANDBOX"))),
+    processedAt: v.number(),
+  }).index("by_event_id", ["eventId"]),
+
   legalAcceptances: defineTable({
     clerkUserId: v.string(),
     document: v.union(v.literal("terms"), v.literal("privacy")),

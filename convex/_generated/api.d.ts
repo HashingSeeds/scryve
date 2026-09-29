@@ -44,10 +44,12 @@ import type * as lib_moderationRetention from "../lib/moderationRetention.js";
 import type * as lib_nameFilter from "../lib/nameFilter.js";
 import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_policy from "../lib/policy.js";
+import type * as lib_revenueCat from "../lib/revenueCat.js";
 import type * as lib_scryfall from "../lib/scryfall.js";
 import type * as lib_usernameSuggestions from "../lib/usernameSuggestions.js";
 import type * as moderation from "../moderation.js";
 import type * as providerHealth from "../providerHealth.js";
+import type * as revenuecat from "../revenuecat.js";
 import type * as users from "../users.js";
 import type * as waitlist from "../waitlist.js";
 
@@ -94,10 +96,12 @@ declare const fullApi: ApiFromModules<{
   "lib/nameFilter": typeof lib_nameFilter;
   "lib/pagination": typeof lib_pagination;
   "lib/policy": typeof lib_policy;
+  "lib/revenueCat": typeof lib_revenueCat;
   "lib/scryfall": typeof lib_scryfall;
   "lib/usernameSuggestions": typeof lib_usernameSuggestions;
   moderation: typeof moderation;
   providerHealth: typeof providerHealth;
+  revenuecat: typeof revenuecat;
   users: typeof users;
   waitlist: typeof waitlist;
 }>;

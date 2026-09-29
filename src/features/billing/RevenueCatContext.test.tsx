@@ -15,6 +15,15 @@ const customerInfo = {
     all: {},
     verification: "VERIFIED",
   },
+  requestDate: "2026-09-27T06:08:26Z",
+} as never
+const expiredCustomerInfo = {
+  entitlements: { active: {}, all: {}, verification: "VERIFIED" },
+  requestDate: "2026-09-27T06:01:00Z",
+} as never
+const revokedCustomerInfo = {
+  entitlements: { active: {}, all: {}, verification: "VERIFIED" },
+  requestDate: "2026-09-27T06:09:00Z",
 } as never
 const monthlyPackage = {
   identifier: "$rc_monthly",
@@ -47,6 +56,7 @@ jest.mock("react-native-purchases", () => {
       addCustomerInfoUpdateListener: jest.fn(),
       removeCustomerInfoUpdateListener: jest.fn(),
       getCustomerInfo: jest.fn(),
+      invalidateCustomerInfoCache: jest.fn().mockResolvedValue(undefined),
       getOfferings: jest.fn(),
       purchasePackage: jest.fn(),
       restorePurchases: jest.fn(),
@@ -96,5 +106,58 @@ describe("RevenueCatProvider", () => {
       expect(await result.current.purchase("monthly")).toMatchObject({ status: "purchased" })
     })
     expect(Purchases.purchasePackage).toHaveBeenCalledWith(monthlyPackage)
+  })
+
+  it("keeps a newer listener update when stale customer info resolves later", async () => {
+    let resolveCustomerInfo!: (value: never) => void
+    purchasesMock.getCustomerInfo.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCustomerInfo = resolve
+      }),
+    )
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(Purchases.addCustomerInfoUpdateListener).toHaveBeenCalled())
+    const listener = purchasesMock.addCustomerInfoUpdateListener.mock.calls[0][0]
+
+    act(() => listener(customerInfo))
+    await act(async () => resolveCustomerInfo(expiredCustomerInfo))
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.isCountPro).toBe(true)
+  })
+
+  it("forces fresh customer info after reconnect to remove revoked Pro access", async () => {
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isCountPro).toBe(true))
+    purchasesMock.getCustomerInfo.mockResolvedValue(revokedCustomerInfo)
+
+    await act(async () => {
+      await result.current.refreshCustomerInfo(true)
+    })
+
+    expect(Purchases.invalidateCustomerInfoCache).toHaveBeenCalledTimes(1)
+    expect(result.current.isCountPro).toBe(false)
+  })
+
+  it("drops the previous user's newer CustomerInfo after switching accounts", async () => {
+    let appUserID = "user_123"
+    const { result, rerender } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public" appUserID={appUserID}>
+          {children}
+        </RevenueCatProvider>
+      ),
+    })
+    await waitFor(() => expect(result.current.isCountPro).toBe(true))
+
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("user_123")
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    appUserID = "user_456"
+    rerender({})
+
+    await waitFor(() => expect(Purchases.logIn).toHaveBeenCalledWith("user_456"))
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.isCountPro).toBe(false)
   })
 })

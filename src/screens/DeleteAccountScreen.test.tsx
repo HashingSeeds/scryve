@@ -1,3 +1,4 @@
+import { Linking } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
@@ -56,6 +57,27 @@ describe("DeleteAccountScreen", () => {
       </ThemeProvider>,
     )
     expect(view.getByText("All devices are signed out")).toBeTruthy()
+  })
+
+  it("warns that billing continues and opens subscription management", () => {
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(undefined)
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <DeleteAccountScreen
+          deletionStatus={null}
+          isSubmitting={false}
+          onBack={jest.fn()}
+          onRequestDeletion={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("Have a Scryve Pro subscription?")).toBeTruthy()
+    expect(view.getByText(/Deleting your account won't cancel it/)).toBeTruthy()
+    fireEvent.press(view.getByText("Manage Apple subscriptions"))
+    expect(openURL).toHaveBeenCalledWith("https://apps.apple.com/account/subscriptions")
+    fireEvent.press(view.getByText("Manage Google Play subscriptions"))
+    expect(openURL).toHaveBeenCalledWith("https://play.google.com/store/account/subscriptions")
+    openURL.mockRestore()
   })
 
   it("offers a retry after a failed deletion", () => {

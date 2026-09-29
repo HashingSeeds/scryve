@@ -6,6 +6,7 @@ import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import { readRevenueCatConfig } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
+import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 
 import { ClerkAuthModal } from "./ClerkAuthModal"
@@ -75,11 +76,13 @@ export function ConfiguredAuth({
       <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
       <RevenueCatProvider
+        key={user?.id}
         apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
         appUserID={user?.id}
         configurationMessage={revenueCat.configured ? undefined : revenueCat.message}
       >
         <AuthAccessContext.Provider value={value}>
+          {revenueCat.configured && isLoaded && isSignedIn ? <RevenueCatSyncSession /> : null}
           {children}
           {/* Intentionally always mounted beside app content; visibility alone is toggled. */}
           <ClerkAuthModal visible={visible} onDismiss={() => setVisible(false)} />
