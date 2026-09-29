@@ -1,7 +1,7 @@
 # Maestro end-to-end tests
 
 Scryve's Maestro flows exercise an installed build. Development builds use
-`com.sowinghope.count.dev`; preview builds use `com.sowinghope.count.preview`.
+`com.sowinghope.count.dev`; preview and production builds use `com.sowinghope.count`.
 Maestro requires no runtime dependency inside the Expo app.
 
 ## Prerequisites
@@ -21,7 +21,7 @@ pnpm e2e full
 
 `pnpm e2e` checks the local environment and runs flows tagged `smoke`. The runner auto-detects
 the installed app id (development builds use `com.sowinghope.count.dev`); set `MAESTRO_APP_ID` to
-override, including `MAESTRO_APP_ID=com.sowinghope.count.preview` for a preview build.
+override.
 The shared startup flow accepts the first-use legal consent gate and opens the playable board.
 Flows tagged `unconfigured` need a build compiled without cloud environment variables and are
 excluded from both runner commands; execute them directly with `maestro test` when testing that build.
