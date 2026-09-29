@@ -258,6 +258,8 @@ describe("RevenueCat entitlement sync", () => {
     const fetchSpy = jest
       .spyOn(globalThis, "fetch")
       .mockImplementation(async () => subscriberResponse({ enabled: true, observedAt: 500 }))
+    await t.withIdentity({ subject: "clerk_source" }).action(api.revenuecat.syncCurrent, {})
+    expect((await entitlements(t, "clerk_source"))[0]).toMatchObject({ enabled: true })
     expect(
       (
         await sendWebhook(t, {
@@ -286,7 +288,7 @@ describe("RevenueCat entitlement sync", () => {
         })
       ).status,
     ).toBe(200)
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
 
     expect(
       (
@@ -298,7 +300,7 @@ describe("RevenueCat entitlement sync", () => {
         })
       ).status,
     ).toBe(200)
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
   it("maps lifetime, grace-period, sandbox, and expired Count Pro state to server access", async () => {

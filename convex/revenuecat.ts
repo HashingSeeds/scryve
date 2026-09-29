@@ -14,6 +14,7 @@ const snapshotValidator = v.object({
   appUserIds: v.array(v.string()),
   enabled: v.boolean(),
   observedAt: v.number(),
+  transferRevocation: v.optional(v.boolean()),
 })
 
 export const hasProcessedWebhook = internalQuery({
@@ -57,7 +58,12 @@ export const commitSync = internalMutation({
           .query("revenueCatCustomerStates")
           .withIndex("by_app_user_id", (q) => q.eq("appUserId", appUserId))
           .unique()
-        if (current && current.observedAt >= snapshot.observedAt) continue
+        if (
+          current &&
+          (current.observedAt > snapshot.observedAt ||
+            (current.observedAt === snapshot.observedAt && !snapshot.transferRevocation))
+        )
+          continue
         const value = {
           enabled: snapshot.enabled,
           environment: args.environment,

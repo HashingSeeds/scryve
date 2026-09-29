@@ -95,7 +95,7 @@ async function fetchTransferSnapshots(
     appUserIds.map(async (appUserId) => ({
       appUserIds: [appUserId],
       ...(await fetchRevenueCatSnapshot(appUserId, apiKey, environment)),
-      ...(transferredFrom.has(appUserId) ? { enabled: false } : {}),
+      ...(transferredFrom.has(appUserId) ? { enabled: false, transferRevocation: true } : {}),
     })),
   )
 }
