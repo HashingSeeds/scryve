@@ -39,6 +39,8 @@ export function SubscriptionControls() {
         ) : null}
       </View>
 
+      {billing.isLoading ? <ActivityIndicator accessibilityLabel="Loading Scryve Pro" /> : null}
+
       {billing.configured ? (
         <Button
           testID={
@@ -56,10 +58,6 @@ export function SubscriptionControls() {
           }
         />
       ) : null}
-
-      <View style={$loading}>
-        {billing.isLoading ? <ActivityIndicator accessibilityLabel="Loading Scryve Pro" /> : null}
-      </View>
 
       {!billing.configured ? (
         <Text
@@ -86,8 +84,9 @@ const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim 
 const $button: ThemedStyle<ViewStyle> = () => ({
   minWidth: 112,
   minHeight: 44,
+  justifyContent: "flex-end",
+  paddingRight: 0,
   borderWidth: 0,
   backgroundColor: "transparent",
 })
 const $buttonText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.tint })
-const $loading: ViewStyle = { minWidth: 20 }
