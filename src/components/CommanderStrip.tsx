@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ComponentProps } from "react"
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
+import Animated from "react-native-reanimated"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
@@ -38,6 +39,7 @@ export interface CommanderStripProps {
   compact?: boolean
   open: boolean
   inspectDisabled?: boolean
+  closeIconStyle?: ComponentProps<typeof Animated.View>["style"]
   onBoundsChange?: (bounds: LayoutRectangle) => void
   onToggle: () => void
 }
@@ -56,6 +58,7 @@ export function CommanderStrip({
   compact,
   open,
   inspectDisabled,
+  closeIconStyle,
   onToggle,
   onBoundsChange,
 }: CommanderStripProps) {
@@ -80,6 +83,11 @@ export function CommanderStrip({
   const boardRows = Array.from(new Set(seats.map(({ row }) => row)))
     .sort((a, b) => a - b)
     .map((row) => seats.filter((seat) => seat.row === row).sort((a, b) => a.column - b.column))
+  const closePosition: ViewStyle = {
+    alignItems: contentRotation === 90 || contentRotation === 180 ? "flex-start" : "flex-end",
+    justifyContent: contentRotation === -90 || contentRotation === 180 ? "flex-start" : "flex-end",
+    padding: spacing.xxs,
+  }
   if (dealt.length === 0) return null
 
   return (
@@ -94,17 +102,27 @@ export function CommanderStrip({
         },
       ]}
     >
-      <View
-        testID={`commander-map-seat-${seatNumber}`}
+      <Pressable
+        testID={`commander-${open ? "strip-close" : "map"}-seat-${seatNumber}`}
         onLayout={(event) => setMapBounds(event.nativeEvent.layout)}
-        style={themed($map)}
+        accessibilityRole="button"
+        accessibilityLabel={
+          open
+            ? `Close commander damage for ${identity}`
+            : `Show commander damage for ${identity}, ${dealt.map((player) => `${incoming[player.id]} from ${player.name}`).join(", ")}`
+        }
+        accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
+        disabled={inspectDisabled}
+        hitSlop={open ? 12 : 2}
+        onPress={onToggle}
+        style={({ pressed }) => [themed($map), pressed && { opacity: 0.72 }]}
       >
         {boardRows.map((row, rowIndex) => (
           <View
             key={rowIndex}
-            pointerEvents={open ? "none" : "auto"}
-            accessibilityElementsHidden={open}
-            importantForAccessibility={open ? "no-hide-descendants" : "auto"}
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
             style={[themed($mapRow), open && $hidden]}
           >
             {row.map(({ playerId }) => {
@@ -131,16 +149,10 @@ export function CommanderStrip({
               const total = incoming[playerId] ?? 0
               const ink = accessibleForeground(player.color)
               return (
-                <Pressable
+                <View
                   key={playerId}
                   testID={`commander-pip-seat-${seatNumber}-${playerId}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${open ? "Close" : "Show"} commander damage for ${identity}, ${total} from ${player.name}`}
-                  accessibilityState={{ expanded: open, disabled: !!inspectDisabled }}
-                  disabled={inspectDisabled}
-                  hitSlop={2}
-                  onPress={onToggle}
-                  style={({ pressed }) => [
+                  style={[
                     themed($disc),
                     size,
                     { backgroundColor: player.color, borderColor: overlayTint(foreground, 0.5) },
@@ -149,7 +161,6 @@ export function CommanderStrip({
                       themed($lethalDisc),
                       { borderColor: foreground },
                     ],
-                    pressed && { opacity: 0.72 },
                   ]}
                 >
                   {total > 0 ? (
@@ -172,34 +183,19 @@ export function CommanderStrip({
                       size={Math.round(disc * 0.5)}
                     />
                   )}
-                </Pressable>
+                </View>
               )
             })}
           </View>
         ))}
-        {open ? (
-          <Pressable
-            testID={`commander-strip-close-seat-${seatNumber}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Close commander damage for ${identity}`}
-            hitSlop={12}
-            onPress={onToggle}
-            style={({ pressed }) => [
-              StyleSheet.absoluteFill,
-              {
-                alignItems:
-                  contentRotation === 90 || contentRotation === 180 ? "flex-start" : "flex-end",
-                justifyContent:
-                  contentRotation === -90 || contentRotation === 180 ? "flex-start" : "flex-end",
-                padding: spacing.xxs,
-              },
-              pressed && { opacity: 0.72 },
-            ]}
-          >
-            <Icon icon="x" color={foreground} size={18} />
-          </Pressable>
-        ) : null}
-      </View>
+        <Animated.View
+          testID={`commander-strip-close-icon-seat-${seatNumber}`}
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, closePosition, !open && $hidden, closeIconStyle]}
+        >
+          <Icon icon="x" color={foreground} size={18} />
+        </Animated.View>
+      </Pressable>
     </View>
   )
 }

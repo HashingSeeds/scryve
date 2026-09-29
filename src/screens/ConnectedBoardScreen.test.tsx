@@ -185,7 +185,7 @@ describe("ConnectedBoardScreen", () => {
     )
   })
 
-  it("opens the commander board from a damage disc on your own seat", () => {
+  it("opens the commander board from the compact grid on your own seat", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       projection: {
@@ -200,7 +200,7 @@ describe("ConnectedBoardScreen", () => {
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.queryByTestId("commander-overview-seat-2")).toBeNull()
 
-    fireEvent.press(screen.getByTestId("commander-pip-seat-2-player-2"))
+    fireEvent.press(screen.getByTestId("commander-map-seat-2"))
     expect(screen.getByTestId("commander-overview-seat-2")).toBeTruthy()
     expect(screen.getByTestId("commander-cell-seat-2-player-1")).toBeTruthy()
     expect(screen.queryByTestId("commander-pip-seat-2-player-2")).toBeNull()
@@ -225,7 +225,7 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
 
-    fireEvent.press(screen.getByTestId("commander-pip-seat-1-player-1"))
+    fireEvent.press(screen.getByTestId("commander-map-seat-1"))
     expect(screen.getByTestId("commander-overview-seat-1")).toBeTruthy()
     expect(screen.getByTestId("commander-mark-seat-1").props.accessibilityState.disabled).toBe(true)
   })
