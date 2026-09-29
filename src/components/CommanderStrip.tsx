@@ -1,4 +1,5 @@
-import type { TextStyle, ViewStyle } from "react-native"
+import { useEffect, useState } from "react"
+import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { Pressable, View } from "react-native"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
@@ -36,6 +37,7 @@ export interface CommanderStripProps {
   compact?: boolean
   open: boolean
   inspectDisabled?: boolean
+  onBoundsChange?: (bounds: LayoutRectangle) => void
   onToggle: () => void
 }
 
@@ -54,11 +56,23 @@ export function CommanderStrip({
   open,
   inspectDisabled,
   onToggle,
+  onBoundsChange,
 }: CommanderStripProps) {
   const {
     themed,
     theme: { spacing },
   } = useAppTheme()
+  const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
+  const [mapBounds, setMapBounds] = useState<LayoutRectangle | null>(null)
+  useEffect(() => {
+    if (stripBounds && mapBounds) {
+      onBoundsChange?.({
+        ...mapBounds,
+        x: stripBounds.x + mapBounds.x,
+        y: stripBounds.y + mapBounds.y,
+      })
+    }
+  }, [stripBounds, mapBounds, onBoundsChange])
   const disc = compact ? COMPACT_DISC_SIZE : DISC_SIZE
   const glyphRotation: ViewStyle = { transform: [{ rotate: `${contentRotation}deg` }] }
   const dealt = players.filter(({ id }) => id !== ownerPlayerId && (incoming[id] ?? 0) > 0)
@@ -70,8 +84,13 @@ export function CommanderStrip({
   return (
     <View
       testID={`commander-strip-seat-${seatNumber}`}
+      onLayout={(event) => setStripBounds(event.nativeEvent.layout)}
+      pointerEvents={open ? "none" : "auto"}
+      accessibilityElementsHidden={open}
+      importantForAccessibility={open ? "no-hide-descendants" : "auto"}
       style={[
         themed($strip),
+        open && $hidden,
         stripEdge(contentRotation, spacing.xs, contentInsets, screenEdges),
         {
           flexDirection: stripDirection(contentRotation),
@@ -80,7 +99,8 @@ export function CommanderStrip({
     >
       <View
         testID={`commander-map-seat-${seatNumber}`}
-        style={[themed($map), open && { backgroundColor: overlayTint(foreground, 0.24) }]}
+        onLayout={(event) => setMapBounds(event.nativeEvent.layout)}
+        style={themed($map)}
       >
         {boardRows.map((row, rowIndex) => (
           <View key={rowIndex} style={themed($mapRow)}>
@@ -234,3 +254,5 @@ const $ownSeat: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "center",
   opacity: 0.35,
 })
+
+const $hidden: ViewStyle = { opacity: 0 }

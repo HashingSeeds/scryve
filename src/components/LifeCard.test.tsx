@@ -109,6 +109,74 @@ describe("LifeCard", () => {
     },
   )
 
+  it.each([0, 90, -90, 180] as const)(
+    "expands the commander map and keeps life visible at %s degrees",
+    (rotation) => {
+      const players = commanderIds.map((id, seat) => ({
+        id,
+        seat,
+        name: `Player ${seat + 1}`,
+        life: 40,
+        color: "#41476E",
+      }))
+      const props = {
+        playerName: "Ada",
+        seatNumber: 1,
+        life: 40,
+        contentRotation: rotation,
+        color: "#41476E",
+        onChange: jest.fn(),
+        commanderDamage: {
+          ownerPlayerId: commanderIds[0],
+          players,
+          ...commanderSeats,
+          incoming: { [commanderIds[1]]: 3 },
+          inspection: { open: false, onToggle: jest.fn() },
+        },
+      }
+      const renderInspection = (open: boolean) => (
+        <ThemeProvider initialContext="dark">
+          <LifeCard
+            {...props}
+            commanderDamage={{
+              ...props.commanderDamage,
+              inspection: { ...props.commanderDamage.inspection, open },
+            }}
+          />
+        </ThemeProvider>
+      )
+      const view = render(renderInspection(false))
+      expect(view.getByTestId("commander-strip-seat-1")).toBeVisible()
+      fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+        nativeEvent: { layout: { width: 200, height: 300 } },
+      })
+      view.rerender(renderInspection(true))
+      expect(
+        view.getByTestId("commander-strip-seat-1", { includeHiddenElements: true }),
+      ).not.toBeVisible()
+      fireEvent(view.getByTestId("commander-overview-board-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 56, width: 100, height: 200 } },
+      })
+      expect(view.getByTestId("life-total-seat-1")).toBeVisible()
+      const offset = (Math.abs(rotation) === 90 ? 100 : 150) - darkTheme.spacing.xs - 24
+      expect(view.getByTestId("life-readout-seat-1")).toHaveStyle({
+        transform: [
+          { translateX: rotation === 90 ? offset : rotation === -90 ? -offset : 0 },
+          { translateY: rotation === 0 ? -offset : rotation === 180 ? offset : 0 },
+          {
+            scale: expect.closeTo(
+              32 / StyleSheet.flatten(view.getByTestId("life-total-seat-1").props.style).fontSize,
+            ),
+          },
+        ],
+      })
+      expect(view.getByTestId("commander-board-seat-1")).toBeVisible()
+      view.rerender(renderInspection(false))
+      expect(view.getByTestId("commander-strip-seat-1")).toBeVisible()
+      expect(view.queryByTestId("commander-overview-seat-1")).toBeNull()
+    },
+  )
+
   it("contains rotated commander labels and controls inside the padded safe area", () => {
     const view = render(
       <ThemeProvider initialContext="dark">

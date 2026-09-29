@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState } from "react"
-import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
+import type {
+  LayoutChangeEvent,
+  LayoutRectangle,
+  StyleProp,
+  TextStyle,
+  ViewStyle,
+} from "react-native"
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
+import Animated, {
+  FadeIn,
+  FadeOut,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated"
 
 import { counterValueLabel, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
@@ -151,6 +164,94 @@ export function LifeCard({
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
+  const [overviewVisible, setOverviewVisible] = useState(commanderOverviewOpen)
+  const [stripBounds, setStripBounds] = useState<LayoutRectangle | null>(null)
+  const [boardBounds, setBoardBounds] = useState<LayoutRectangle | null>(null)
+  const overviewProgress = useSharedValue(commanderOverviewOpen ? 1 : 0)
+  useEffect(() => {
+    if (!localCommander) return
+    if (commanderOverviewOpen) setOverviewVisible(true)
+    if (commanderOverviewDuration === 0) {
+      overviewProgress.value = commanderOverviewOpen ? 1 : 0
+      setOverviewVisible(commanderOverviewOpen)
+      return
+    }
+    overviewProgress.value = withTiming(
+      commanderOverviewOpen ? 1 : 0,
+      {
+        duration: commanderOverviewDuration,
+      },
+      (finished) => {
+        if (finished && !commanderOverviewOpen) runOnJS(setOverviewVisible)(false)
+      },
+    )
+  }, [localCommander, commanderOverviewOpen, commanderOverviewDuration, overviewProgress])
+  const localOverviewVisible = localCommander && (commanderOverviewOpen || overviewVisible)
+  const headerEdge = { 0: "top", 90: "right", [-90]: "left", 180: "bottom" } as const
+  const overviewInsets = {
+    ...safeContentStyle,
+    [headerEdge[contentRotation]]: (contentInsets?.[headerEdge[contentRotation]] ?? 0) + 56,
+  }
+  const lifeOffset = Math.max(
+    (Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height) / 2 -
+      (contentInsets?.[headerEdge[contentRotation]] ?? 0) -
+      cardPadding -
+      24,
+    0,
+  )
+  const overviewLifeStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX:
+          contentRotation === 90
+            ? lifeOffset * overviewProgress.value
+            : contentRotation === -90
+              ? -lifeOffset * overviewProgress.value
+              : 0,
+      },
+      {
+        translateY:
+          contentRotation === 0
+            ? -lifeOffset * overviewProgress.value
+            : contentRotation === 180
+              ? lifeOffset * overviewProgress.value
+              : 0,
+      },
+      { scale: 1 + (32 / resolvedLifeFontSize - 1) * overviewProgress.value },
+    ],
+  }))
+  const overviewStyle = useAnimatedStyle(() => ({ opacity: overviewProgress.value }))
+  const boardStyle = useAnimatedStyle(() => ({
+    opacity: boardBounds ? 1 : 0,
+    transform: [
+      {
+        translateX:
+          stripBounds && boardBounds
+            ? (stripBounds.x + stripBounds.width / 2 - boardBounds.x - boardBounds.width / 2) *
+              (1 - overviewProgress.value)
+            : 0,
+      },
+      {
+        translateY:
+          stripBounds && boardBounds
+            ? (stripBounds.y + stripBounds.height / 2 - boardBounds.y - boardBounds.height / 2) *
+              (1 - overviewProgress.value)
+            : 0,
+      },
+      {
+        scaleX:
+          stripBounds && boardBounds && boardBounds.width > 0
+            ? 1 + (stripBounds.width / boardBounds.width - 1) * (1 - overviewProgress.value)
+            : 1,
+      },
+      {
+        scaleY:
+          stripBounds && boardBounds && boardBounds.height > 0
+            ? 1 + (stripBounds.height / boardBounds.height - 1) * (1 - overviewProgress.value)
+            : 1,
+      },
+    ],
+  }))
   const markStyle = getPlayerMarkCorner(contentRotation, cardPadding)
   const commanderOverviewEntering =
     reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
@@ -327,19 +428,25 @@ export function LifeCard({
       )}
       <View
         pointerEvents={commanderOverviewOpen || commanderCardMode ? "none" : "box-none"}
-        accessibilityElementsHidden={commanderOverviewOpen || !!commanderCardMode}
+        accessibilityElementsHidden={
+          (!localCommander && commanderOverviewOpen) || !!commanderCardMode
+        }
         importantForAccessibility={
-          commanderOverviewOpen || commanderCardMode ? "no-hide-descendants" : "auto"
+          (!localCommander && commanderOverviewOpen) || commanderCardMode
+            ? "no-hide-descendants"
+            : "auto"
         }
         style={[
           themed($content),
-          (commanderCardMode || commanderOverviewOpen) && themed($mutedContent),
+          (commanderCardMode || (!localCommander && commanderOverviewOpen)) &&
+            themed($mutedContent),
+          localOverviewVisible && $overviewReadout,
         ]}
       >
-        <View
+        <Animated.View
           testID={`life-readout-seat-${seatNumber}`}
           pointerEvents="none"
-          style={themed($readout)}
+          style={[themed($readout), localCommander && overviewLifeStyle]}
         >
           <Text
             testID={`life-total-seat-${seatNumber}`}
@@ -395,7 +502,7 @@ export function LifeCard({
               </View>
             ) : null}
           </View>
-        </View>
+        </Animated.View>
       </View>
       {eliminated ? (
         <View
@@ -404,50 +511,64 @@ export function LifeCard({
           style={themed($eliminated)}
         />
       ) : null}
-      {commanderDamage && commanderOverviewOpen && !commanderCardMode ? (
+      {commanderDamage && (commanderOverviewOpen || localOverviewVisible) && !commanderCardMode ? (
         <Animated.View
           testID={`commander-overview-seat-${seatNumber}`}
-          entering={commanderOverviewEntering}
-          exiting={commanderOverviewExiting}
+          entering={localCommander ? undefined : commanderOverviewEntering}
+          exiting={localCommander ? undefined : commanderOverviewExiting}
           accessibilityViewIsModal={!localCommander}
           style={[
             themed($commanderOverview),
             compact && themed($compactCommanderOverview),
             { backgroundColor: color },
+            localCommander && overviewStyle,
           ]}
         >
-          <View style={[themed($commanderOverviewContent), safeContentStyle]}>
-            <CommanderDamageBoard
-              ownerPlayerId={commanderDamage.ownerPlayerId}
-              players={commanderDamage.players}
-              seats={commanderDamage.seats}
-              rows={commanderDamage.rows}
-              columns={commanderDamage.columns}
-              incoming={commanderDamage.incoming}
-              onPressSword={beginCommanderAssignment}
-              seatNumber={seatNumber}
-              contentRotation={contentRotation}
-              compact={compact}
-              expanded
-              foreground={foreground}
-              style={themed($expandedCommanderBoard)}
-              maxSize={{
-                width: Math.max(
-                  cardSize.width -
-                    cardPadding * 2 -
-                    (contentInsets?.left ?? 0) -
-                    (contentInsets?.right ?? 0),
-                  0,
-                ),
-                height: Math.max(
-                  cardSize.height -
-                    cardPadding * 2 -
-                    (contentInsets?.top ?? 0) -
-                    (contentInsets?.bottom ?? 0),
-                  0,
-                ),
-              }}
-            />
+          <View
+            style={[
+              themed($commanderOverviewContent),
+              localCommander ? overviewInsets : safeContentStyle,
+            ]}
+          >
+            <Animated.View
+              testID={`commander-overview-board-seat-${seatNumber}`}
+              onLayout={(event) => setBoardBounds(event.nativeEvent.layout)}
+              style={localCommander ? boardStyle : undefined}
+            >
+              <CommanderDamageBoard
+                ownerPlayerId={commanderDamage.ownerPlayerId}
+                players={commanderDamage.players}
+                seats={commanderDamage.seats}
+                rows={commanderDamage.rows}
+                columns={commanderDamage.columns}
+                incoming={commanderDamage.incoming}
+                onPressSword={beginCommanderAssignment}
+                seatNumber={seatNumber}
+                contentRotation={contentRotation}
+                compact={compact}
+                expanded
+                foreground={foreground}
+                style={themed($expandedCommanderBoard)}
+                maxSize={{
+                  width: Math.max(
+                    cardSize.width -
+                      cardPadding * 2 -
+                      (contentInsets?.left ?? 0) -
+                      (contentInsets?.right ?? 0) -
+                      (localCommander && Math.abs(contentRotation) === 90 ? 56 : 0),
+                    0,
+                  ),
+                  height: Math.max(
+                    cardSize.height -
+                      cardPadding * 2 -
+                      (contentInsets?.top ?? 0) -
+                      (contentInsets?.bottom ?? 0) -
+                      (localCommander && Math.abs(contentRotation) !== 90 ? 56 : 0),
+                    0,
+                  ),
+                }}
+              />
+            </Animated.View>
           </View>
           {!localCommander ? (
             <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -483,7 +604,7 @@ export function LifeCard({
           mode={commanderCardMode}
           life={localCommander ? life : undefined}
         />
-      ) : !commanderOverviewOpen && ownership !== "unowned" ? (
+      ) : !commanderOverviewOpen && !localOverviewVisible && ownership !== "unowned" ? (
         <LifeControls
           playerName={displayName}
           seatNumber={seatNumber}
@@ -527,9 +648,10 @@ export function LifeCard({
           contentInsets={contentInsets}
           screenEdges={screenEdges}
           compact={compact}
-          open={commanderOverviewOpen}
+          open={localOverviewVisible}
           inspectDisabled={inspectDisabled}
           onToggle={commanderDamage.inspection.onToggle}
+          onBoundsChange={setStripBounds}
         />
       ) : null}
       {cornerStatus && !commanderCardMode ? (
@@ -808,3 +930,5 @@ const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
+
+const $overviewReadout: ViewStyle = { zIndex: 8 }
