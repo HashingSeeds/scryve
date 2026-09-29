@@ -89,11 +89,13 @@ async function fetchTransferSnapshots(
   apiKey: string,
   environment: RevenueCatEnvironment,
 ) {
+  const transferredFrom = new Set(transfer.transferredFrom)
   const appUserIds = [...new Set([...transfer.transferredFrom, ...transfer.transferredTo])]
   return await Promise.all(
     appUserIds.map(async (appUserId) => ({
       appUserIds: [appUserId],
       ...(await fetchRevenueCatSnapshot(appUserId, apiKey, environment)),
+      ...(transferredFrom.has(appUserId) ? { enabled: false } : {}),
     })),
   )
 }

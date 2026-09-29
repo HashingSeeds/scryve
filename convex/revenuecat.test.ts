@@ -251,16 +251,13 @@ describe("RevenueCat entitlement sync", () => {
     expect(await t.run((ctx) => ctx.db.query("revenueCatCustomerStates").collect())).toEqual([])
   })
 
-  it("syncs transfer source and destination independently and ignores sandbox events", async () => {
+  it("revokes transfer source with shared subscriber data and ignores sandbox events", async () => {
     const t = convexTest(schema, modules)
     await createUser(t, "clerk_source")
     await createUser(t, "clerk_destination")
-    const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-      subscriberResponse({
-        enabled: String(input).includes("clerk_destination"),
-        observedAt: 500,
-      }),
-    )
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => subscriberResponse({ enabled: true, observedAt: 500 }))
     expect(
       (
         await sendWebhook(t, {
