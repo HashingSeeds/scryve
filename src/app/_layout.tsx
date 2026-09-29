@@ -11,6 +11,7 @@ import { CloudProviders } from "@/features/auth/AuthContext"
 import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
 import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
+import { UpdateReadyToastWithForegroundChecks } from "@/features/updates/UpdateReadyToast"
 import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
 import { ThemeProvider } from "@/theme/context"
 import { initAnalytics } from "@/utils/analytics"
@@ -76,6 +77,7 @@ function Root() {
                   options={{ statusBarHidden: true, gestureEnabled: false }}
                 />
               </Stack>
+              <UpdateReadyToastWithForegroundChecks />
             </LegalConsentGate>
           </KeyboardProvider>
         </SafeAreaProvider>

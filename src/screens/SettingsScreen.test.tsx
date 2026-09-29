@@ -1,5 +1,6 @@
 import { Platform } from "react-native"
 import * as Clipboard from "expo-clipboard"
+import * as Updates from "expo-updates"
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
@@ -28,8 +29,16 @@ jest.mock("expo-application", () => ({
     return mockApp.nativeBuildVersion
   },
 }))
+const mockUpdatesHook: {
+  isDownloading: boolean
+  downloadProgress?: number
+  isUpdatePending: boolean
+  downloadedUpdate?: { updateId: string; manifest: unknown }
+} = { isDownloading: false, isUpdatePending: false }
 jest.mock("expo-updates", () => ({
   __esModule: true,
+  useUpdates: () => mockUpdatesHook,
+  reloadAsync: jest.fn(() => Promise.resolve()),
   get isEnabled() {
     return mockUpdates.isEnabled
   },
@@ -62,6 +71,12 @@ describe("SettingsScreen", () => {
       runtimeVersion: "abcdef1234567890abcdef1234567890",
       updateId: "12345678-abcd-4321-abcd-123456789012",
       channel: "preview",
+    })
+    Object.assign(mockUpdatesHook, {
+      isDownloading: false,
+      downloadProgress: undefined,
+      isUpdatePending: false,
+      downloadedUpdate: undefined,
     })
     jest.mocked(Clipboard.setStringAsync).mockReset().mockResolvedValue(true)
     jest.mocked(analyticsId).mockReset().mockReturnValue(null)
@@ -99,6 +114,36 @@ describe("SettingsScreen", () => {
         `Analytics ID: ${id}`,
       ].join("\n"),
     )
+  })
+
+  it("shows download progress, then release notes and restart for a waiting update", () => {
+    Object.assign(mockUpdatesHook, { isDownloading: true, downloadProgress: 0.42 })
+    const renderSettings = () => (
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={DEFAULT_LOCAL_SETTINGS}
+          onBack={jest.fn()}
+          onSettingsChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(renderSettings())
+    expect(view.getByText("Downloading update 42%")).toBeTruthy()
+
+    Object.assign(mockUpdatesHook, {
+      isDownloading: false,
+      isUpdatePending: true,
+      downloadedUpdate: {
+        updateId: "next-update",
+        manifest: { extra: { expoClient: { extra: { releaseNotes: ["Faster sync"] } } } },
+      },
+    })
+    view.rerender(renderSettings())
+    expect(view.getByText("Update ready")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("What's in this update"))
+    expect(view.getByText("\u2022 Faster sync")).toBeTruthy()
+    fireEvent.press(view.getByTestId("update-restart-button"))
+    expect(Updates.reloadAsync).toHaveBeenCalled()
   })
 
   it("distinguishes bundled launches from development and missing metadata", () => {

@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import { useAppUpdate } from "@/features/updates/appUpdate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
@@ -34,6 +35,7 @@ export function AppUtilityMenu({
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [open, setOpen] = useState(false)
+  const updateReady = useAppUpdate().status === "ready"
   const progress = useSharedValue(0)
 
   useEffect(() => {
@@ -101,7 +103,7 @@ export function AppUtilityMenu({
           <Pressable
             testID="utility-menu-button"
             accessibilityRole="button"
-            accessibilityLabel="More"
+            accessibilityLabel={updateReady ? "More, update ready" : "More"}
             accessibilityState={{ expanded: open }}
             style={themed($trigger)}
             onPress={() => {
@@ -118,6 +120,7 @@ export function AppUtilityMenu({
             ) : (
               <Text text="More" weight="bold" size="xs" />
             )}
+            {updateReady ? <View testID="utility-update-dot" style={themed($updateDot)} /> : null}
           </Pressable>
         </Animated.View>
         <Animated.View
@@ -129,10 +132,12 @@ export function AppUtilityMenu({
           <Pressable
             testID="utility-settings-button"
             accessibilityRole="button"
-            style={themed($item)}
+            accessibilityLabel={updateReady ? "Settings, update ready" : "Settings"}
+            style={themed([$item, $settingsItem])}
             onPress={() => choose(onSettings)}
           >
             <Text text="Settings" weight="medium" />
+            {updateReady ? <View style={themed($inlineUpdateDot)} /> : null}
           </Pressable>
           <Pressable
             testID="utility-account-button"
@@ -193,4 +198,25 @@ const $item: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingHorizontal: spacing.md,
   borderBottomWidth: StyleSheet.hairlineWidth,
   borderBottomColor: colors.separator,
+})
+const $settingsItem: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: spacing.xs,
+})
+const $inlineUpdateDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: 7,
+  height: 7,
+  borderRadius: 3.5,
+  backgroundColor: colors.tint,
+})
+const $updateDot: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: "absolute",
+  top: 7,
+  right: 7,
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: colors.tint,
 })

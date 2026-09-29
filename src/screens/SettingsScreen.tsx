@@ -27,6 +27,7 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import { AppUpdateStatus } from "@/features/updates/AppUpdateStatus"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import {
@@ -355,6 +356,7 @@ export function SettingsScreen({
         ) : null}
         <View style={themed($legalSection)}>
           <Text text="App information" preset="subheading" accessibilityRole="header" />
+          <AppUpdateStatus />
           {analyticsId() ? (
             <>
               <Text
