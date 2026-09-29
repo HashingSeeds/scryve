@@ -1,3 +1,3 @@
 module.exports = {
-  sourceSkips: ["PackageJsonScriptsAll", "GitIgnore"],
+  sourceSkips: ["PackageJsonScriptsAll", "GitIgnore", "ExpoConfigExtraSection"],
 }
