@@ -312,13 +312,13 @@ export function SettingsScreen({
         ) : null}
         {BlockedPlayers}
         {onOpenSupport ? (
-          <View style={themed($legalSection)}>
+          <View>
             <Text text="Help" preset="subheading" accessibilityRole="header" />
             <ListItem text="Help & support" rightIcon="caretRight" onPress={onOpenSupport} />
           </View>
         ) : null}
         {onOpenPrivacy && onOpenTerms ? (
-          <View style={themed($legalSection)}>
+          <View>
             <Text text="Legal" preset="subheading" accessibilityRole="header" />
             <ListItem text="Privacy Policy" rightIcon="caretRight" onPress={onOpenPrivacy} />
             <ListItem
@@ -354,7 +354,7 @@ export function SettingsScreen({
             ) : null}
           </View>
         ) : null}
-        <View style={themed($legalSection)}>
+        <View>
           <Text text="App information" preset="subheading" accessibilityRole="header" />
           <AppUpdateStatus />
           {analyticsId() ? (
@@ -424,16 +424,8 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $choice: ThemedStyle<ViewStyle> = () => ({ flexGrow: 1, minWidth: 56 })
 const $label: ThemedStyle<TextStyle> = () => ({ fontWeight: "600" })
 const $muted: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
-const $accountSection: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+const $accountSection: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
-  paddingTop: spacing.lg,
-  borderTopWidth: 1,
-  borderColor: colors.separator,
-})
-const $legalSection: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  paddingTop: spacing.lg,
-  borderTopWidth: 1,
-  borderColor: colors.separator,
 })
 const $copyButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginTop: spacing.sm,
