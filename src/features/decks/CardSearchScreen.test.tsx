@@ -153,3 +153,16 @@ it("uses only cached eligible cards offline without provider requests", () => {
   expect(mockQuery).not.toHaveBeenCalled()
   expect(mockAction).not.toHaveBeenCalled()
 })
+
+it("keeps required color-choice commanders out of the colorless filter", () => {
+  mockConnection.isWebSocketConnected = false
+  saveCardDetails({
+    talrand: { ...eligible, colorIdentity: "" },
+    ring: { ...eligible, commanderEligibility: "color-choice", colorIdentity: "" },
+  })
+  const view = chooser(deck.slice(0, 2))
+  fireEvent.press(view.getByTestId("commander-color-filter"))
+  fireEvent.press(view.getByTestId("commander-color-filter-option-C"))
+  expect(view.getByLabelText("Choose Talrand as commander")).toBeTruthy()
+  expect(view.queryByLabelText("Choose Sol Ring as commander")).toBeNull()
+})

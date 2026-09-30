@@ -80,7 +80,8 @@ export function CardSearchScreen({
 
   function matchesColor(details?: FocusedCardDetails) {
     if (!colorFilter) return true
-    if (colorFilter === "C") return details?.colorIdentity === ""
+    if (colorFilter === "C")
+      return details?.colorIdentity === "" && details.commanderEligibility !== "color-choice"
     return (
       details?.colorIdentity?.includes(colorFilter) ||
       details?.commanderEligibility === "color-choice"
@@ -251,6 +252,17 @@ export function CardSearchScreen({
     if (!error) setCommanderColor(undefined)
   }
 
+  const catalogResults = results?.filter(
+    (card) =>
+      !choosingCommander ||
+      ("scryfallId" in card && eligible(card) && matchesColor(card) && !inDeck(card)),
+  )
+  const cachedCandidates = offlineResults?.filter(
+    (entry) =>
+      !choosingCommander ||
+      (!inDeck(entry.card) && matchesColor(cachedRules[cardDetailsKey(entry.card, game)])),
+  )
+
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <Screen
@@ -301,11 +313,11 @@ export function CardSearchScreen({
             />
           ) : null}
           {choosingCommander &&
-          (results?.some(
+          (catalogResults?.some(
             (card) =>
               "commanderEligibility" in card && card.commanderEligibility === "color-choice",
           ) ||
-            offlineResults?.some(
+            cachedCandidates?.some(
               (entry) =>
                 cachedRules[cardDetailsKey(entry.card, game)]?.commanderEligibility ===
                 "color-choice",
@@ -386,62 +398,49 @@ export function CardSearchScreen({
           {offline ? (
             <Text size="xxs" text="You’re offline. Searching cards already in your decks." />
           ) : null}
-          {offlineResults
-            ?.filter(
-              (entry) =>
-                !choosingCommander ||
-                (!inDeck(entry.card) &&
-                  matchesColor(cachedRules[cardDetailsKey(entry.card, game)])),
-            )
-            .map((entry, index) => (
-              <View key={index} style={themed($result)}>
-                <View style={$name}>
-                  <Text size="sm" weight="medium" text={entry.card.name} />
-                  <Text size="xxs" text={`From your cached decks · ${entry.game ?? game}`} />
-                </View>
-                <TouchableOpacity
-                  style={$add}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add ${entry.card.name} to deck`}
-                  onPress={() => addOffline(entry)}
-                >
-                  <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
-                </TouchableOpacity>
+          {cachedCandidates?.map((entry, index) => (
+            <View key={index} style={themed($result)}>
+              <View style={$name}>
+                <Text size="sm" weight="medium" text={entry.card.name} />
+                <Text size="xxs" text={`From your cached decks · ${entry.game ?? game}`} />
               </View>
-            ))}
-          {offline && offlineResults?.length === 0 ? (
+              <TouchableOpacity
+                style={$add}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${entry.card.name} to deck`}
+                onPress={() => addOffline(entry)}
+              >
+                <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {offline && cachedCandidates?.length === 0 ? (
             <Text text="No cached cards match. Cards appear here after you add them online." />
           ) : null}
-          {results
-            ?.filter(
-              (card) =>
-                !choosingCommander ||
-                ("scryfallId" in card && eligible(card) && matchesColor(card) && !inDeck(card)),
-            )
-            .map((card, index) => (
-              <View key={index} style={themed($result)}>
-                <CardImage
-                  game={game}
-                  source={card.smallImageUrl ?? card.imageUrl}
-                  accessibilityLabel={card.name}
-                  compact
-                  style={$image}
-                />
-                <View style={$name}>
-                  <Text size="sm" weight="medium" text={card.name} />
-                  <Text size="xxs" text={"scryfallId" in card ? card.typeLine : card.typeLabel} />
-                </View>
-                <TouchableOpacity
-                  style={$add}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add ${card.name} to deck`}
-                  onPress={() => add(card)}
-                >
-                  <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
-                </TouchableOpacity>
+          {catalogResults?.map((card, index) => (
+            <View key={index} style={themed($result)}>
+              <CardImage
+                game={game}
+                source={card.smallImageUrl ?? card.imageUrl}
+                accessibilityLabel={card.name}
+                compact
+                style={$image}
+              />
+              <View style={$name}>
+                <Text size="sm" weight="medium" text={card.name} />
+                <Text size="xxs" text={"scryfallId" in card ? card.typeLine : card.typeLabel} />
               </View>
-            ))}
-          {results?.length === 0 ? <Text text="No cards found." /> : null}
+              <TouchableOpacity
+                style={$add}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${card.name} to deck`}
+                onPress={() => add(card)}
+              >
+                <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {catalogResults?.length === 0 ? <Text text="No cards found." /> : null}
           {message ? <Text accessibilityLiveRegion="polite" text={message} /> : null}
         </ScrollView>
       </Screen>
