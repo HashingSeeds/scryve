@@ -22,6 +22,7 @@ const eligible = {
   commanderEligibility: "eligible",
   commanderLegality: "legal",
   colorIdentity: "U",
+  commanderRulesUpdatedAt: new Date().toISOString(),
 }
 const deck = [
   { name: "Talrand", quantity: 1, scryfallId: "talrand", oracleId: "talrand-oracle" },
@@ -371,3 +372,29 @@ it("counts down a paused eligibility lookup and hydrates after its retry", async
   expect(mockAction).toHaveBeenCalledTimes(2)
   expect(view.getByLabelText("Choose Unknown as commander")).toBeTruthy()
 })
+
+it.each([
+  { commanderEligibility: "ineligible", commanderLegality: "legal" },
+  { commanderEligibility: "eligible", commanderLegality: "banned" },
+])(
+  "refreshes expired hidden Commander rules despite a complete expired server batch",
+  async (rules) => {
+    const expired = {
+      ...eligible,
+      ...rules,
+      commanderRulesUpdatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+    }
+    saveCardDetails({ unknown: expired })
+    mockQuery.mockResolvedValue([{ key: "unknown", details: expired }])
+    mockAction.mockResolvedValue({ ...eligible, commanderRulesUpdatedAt: new Date().toISOString() })
+    const view = chooser([deck[2]])
+    expect(view.queryByLabelText("Choose Unknown as commander")).toBeNull()
+    await act(async () => {})
+    expect(mockQuery).toHaveBeenCalledWith(expect.anything(), {
+      game: "mtg",
+      items: [{ key: "unknown", scryfallId: "unknown" }],
+    })
+    expect(mockAction).toHaveBeenCalledWith(expect.anything(), { scryfallId: "unknown" })
+    expect(view.getByLabelText("Choose Unknown as commander")).toBeTruthy()
+  },
+)

@@ -79,6 +79,7 @@ export function CardSearchScreen({
   const [colorFilters, setColorFilters] = useState<string[]>([])
   const [exactColors, setExactColors] = useState(false)
   const [keywords, setKeywords] = useState<string[]>([])
+  const needsKeywords = keywords.length > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [keywordQuery, setKeywordQuery] = useState("")
   const [keywordCatalog, setKeywordCatalog] = useState<string[]>(() => {
@@ -175,15 +176,18 @@ export function CardSearchScreen({
       setCheckingDeck(true)
       setRulesError(undefined)
       const cached = loadCardDetails()
-      const missing = cardsToCheck.filter((card) => {
-        const details = cached[cardDetailsKey(card, game)]
-        return (
-          !details?.commanderEligibility ||
-          !details.commanderLegality ||
-          details.colorIdentity === undefined ||
-          (keywords.length > 0 && details.keywords === undefined)
+      function hasCurrentRules(details?: FocusedCardDetails) {
+        return Boolean(
+          details?.commanderEligibility &&
+          details.commanderLegality &&
+          details.colorIdentity !== undefined &&
+          Date.parse(details.commanderRulesUpdatedAt ?? "") >= Date.now() - 86_400_000 &&
+          (!needsKeywords || details.keywords !== undefined),
         )
-      })
+      }
+      const missing = cardsToCheck.filter(
+        (card) => !hasCurrentRules(cached[cardDetailsKey(card, game)]),
+      )
       try {
         const items = missing.flatMap((card) =>
           card.scryfallId ? [{ key: cardDetailsKey(card, game), scryfallId: card.scryfallId }] : [],
@@ -197,13 +201,7 @@ export function CardSearchScreen({
         }
         for (const card of missing) {
           const key = cardDetailsKey(card, game)
-          if (
-            cached[key]?.commanderEligibility &&
-            cached[key]?.commanderLegality &&
-            cached[key]?.colorIdentity !== undefined &&
-            (keywords.length === 0 || cached[key]?.keywords !== undefined)
-          )
-            continue
+          if (hasCurrentRules(cached[key])) continue
           const id =
             card.scryfallId ??
             [card.printingId, card.providerCardId].find(
@@ -236,7 +234,7 @@ export function CardSearchScreen({
     choosingCommander,
     offline,
     rulesAttempt,
-    keywords,
+    needsKeywords,
     rulesRetryAfterMs,
   ])
 
