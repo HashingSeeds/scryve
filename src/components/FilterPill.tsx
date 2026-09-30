@@ -55,7 +55,7 @@ export function FilterButton({
   const { themed, theme } = useAppTheme()
   const label = count ? `Filters (${count})` : "Filters"
   return (
-    <View style={$filterOverlay}>
+    <View style={themed($filterOverlap)}>
       <TouchableOpacity
         testID={testID}
         accessibilityRole="button"
@@ -122,16 +122,16 @@ const $chipSelectedText: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 
-const $filterOverlay: ViewStyle = {
-  position: "absolute",
-  right: 0,
+const $filterOverlap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexShrink: 0,
+  marginLeft: -spacing.md,
   minHeight: 44,
   justifyContent: "center",
-}
+})
 const $filterButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minHeight: 32,
   minWidth: 44,
-  borderRadius: spacing.lg,
+  borderRadius: spacing.md,
   backgroundColor: colors.tint,
   flexDirection: "row",
   alignItems: "center",

@@ -424,9 +424,10 @@ export function CardSearchScreen({
             <View style={$filterRow}>
               <ScrollView
                 horizontal
+                style={$filterScroll}
                 showsHorizontalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
-                contentContainerStyle={[$pills, $colorScroll]}
+                contentContainerStyle={[$pills, themed($colorScroll)]}
               >
                 {[...COMMANDER_COLORS, { id: "C", label: "Colorless" }].map((color) => (
                   <FilterPill
@@ -736,4 +737,8 @@ const $filterBody: ViewStyle = { gap: 16 }
 const $searchHeader: ViewStyle = { paddingBottom: 4 }
 const $searchResults: ViewStyle = { paddingTop: 8 }
 
-const $colorScroll: ViewStyle = { flexWrap: "nowrap", paddingRight: 128 }
+const $filterScroll: ViewStyle = { flex: 1 }
+const $colorScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexWrap: "nowrap",
+  paddingRight: spacing.md,
+})

@@ -315,6 +315,7 @@ export function HistoryScreen({
             <View style={$chipRow}>
               <ScrollView
                 horizontal
+                style={$filterScroll}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={themed($chipScroll)}
               >
@@ -612,9 +613,10 @@ const $chipRow: ViewStyle = {
   alignItems: "center",
   minHeight: 44,
 }
+const $filterScroll: ViewStyle = { flex: 1 }
 const $chipScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
-  paddingRight: 128,
+  paddingRight: spacing.md,
 })
 const $chipWrap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
