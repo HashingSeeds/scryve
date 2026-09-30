@@ -748,3 +748,43 @@ describe("keyword abilities catalog", () => {
     })
   })
 })
+
+describe("card search query limits", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("sends combined commander filters unchanged to Scryfall", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    const query =
+      '(Atraxa, Grand Unifier) is:commander f:commander (id>=wubg or o:"choose a color") kw:"Flying" kw:"Vigilance" kw:"Deathtouch" kw:"Lifelink"'
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response({ data: [] }))
+    await expect(t.action(api.cards.search, { query })).resolves.toEqual([])
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`,
+      expect.any(Object),
+    )
+  })
+
+  it.each([undefined, "mtg"])(
+    "rejects oversized Magic queries for game %s before fetching",
+    async (game) => {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected fetch"))
+      await expect(
+        t.action(api.cards.search, { query: "x".repeat(1025), ...(game ? { game } : {}) }),
+      ).rejects.toMatchObject({
+        data: { code: "query_too_long", message: "Choose fewer filters or shorten your search." },
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(["pokemon", "ygo"])("retains the 120 character query limit for %s", async (game) => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected fetch"))
+    await expect(t.action(api.cards.search, { game, query: "x".repeat(121) })).resolves.toEqual([])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})

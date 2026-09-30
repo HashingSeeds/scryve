@@ -100,7 +100,13 @@ export const search = action({
   args: { query: v.string(), game: v.optional(v.string()) },
   handler: async (ctx, args): Promise<CardReference[] | CatalogCard[]> => {
     const query = args.query.trim()
-    if (query.length < 2 || query.length > 120) return []
+    const game = assertGameSystem(args.game ?? "mtg")
+    if (game === "mtg" && query.length > 1024)
+      throw new ConvexError({
+        code: "query_too_long",
+        message: "Choose fewer filters or shorten your search.",
+      })
+    if (query.length < 2 || (game !== "mtg" && query.length > 120)) return []
     if (!(await ctx.auth.getUserIdentity())) {
       const limit = await deckRateLimiter.limit(ctx, "guestDeckImport")
       if (!limit.ok)
@@ -110,7 +116,6 @@ export const search = action({
           retryAfterMs: limit.retryAfter,
         })
     }
-    const game = assertGameSystem(args.game ?? "mtg")
     await requireActionCapability(ctx, game, "cardCatalog")
     const includeImages = await actionCapabilityEnabled(ctx, game, "images")
     if (game !== "mtg") {
