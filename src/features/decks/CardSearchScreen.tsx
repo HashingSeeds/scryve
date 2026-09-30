@@ -11,13 +11,14 @@ import { CardImage } from "@/components/CardImage"
 import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
 import { Header } from "@/components/Header"
+import { RetryableError } from "@/components/RetryableError"
 import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { convexErrorMessage } from "@/utils/convexError"
+import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
@@ -70,6 +71,8 @@ export function CardSearchScreen({
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string>()
+  const [searchError, setSearchError] = useState<{ message: string; retryAfterMs?: number }>()
+  const [searchAttempt, setSearchAttempt] = useState(0)
 
   const offline = connection?.isWebSocketConnected === false
   const [cachedRules, setCachedRules] = useState(() => loadCardDetails())
@@ -114,6 +117,7 @@ export function CardSearchScreen({
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()
+  const [rulesRetryAfterMs, setRulesRetryAfterMs] = useState<number>()
 
   function eligible(details?: FocusedCardDetails) {
     return (
@@ -164,7 +168,8 @@ export function CardSearchScreen({
   useEffect(() => {
     const cardsToCheck = commanderCards ?? []
     const client = convex
-    if (!choosingCommander || !cardsToCheck?.length || offline || !client) return
+    if (!choosingCommander || !cardsToCheck?.length || offline || !client || rulesRetryAfterMs)
+      return
     let active = true
     async function checkDeck() {
       setCheckingDeck(true)
@@ -212,8 +217,10 @@ export function CardSearchScreen({
           setCachedRules({ ...cached })
         }
       } catch (cause) {
-        if (active)
+        if (active) {
           setRulesError(convexErrorMessage(cause, "Could not check all cards in this deck."))
+          setRulesRetryAfterMs(convexRetryAfterMs(cause))
+        }
       } finally {
         if (active) setCheckingDeck(false)
       }
@@ -222,10 +229,21 @@ export function CardSearchScreen({
     return () => {
       active = false
     }
-  }, [convex, game, commanderCards, choosingCommander, offline, rulesAttempt, keywords])
+  }, [
+    convex,
+    game,
+    commanderCards,
+    choosingCommander,
+    offline,
+    rulesAttempt,
+    keywords,
+    rulesRetryAfterMs,
+  ])
 
   useEffect(() => {
+    if (searchError?.retryAfterMs && !offline) return
     let active = true
+    setSearchError(undefined)
     setResults(undefined)
     setOfflineResults(undefined)
     setMessage(undefined)
@@ -267,12 +285,13 @@ export function CardSearchScreen({
         if (active) setResults(found)
       } catch (cause) {
         if (active)
-          setMessage(
-            convexErrorMessage(
+          setSearchError({
+            message: convexErrorMessage(
               cause,
               "Could not search cards. Check your connection and try again.",
             ),
-          )
+            retryAfterMs: convexRetryAfterMs(cause),
+          })
       } finally {
         if (active) setBusy(false)
       }
@@ -292,6 +311,8 @@ export function CardSearchScreen({
     exactColors,
     keywords,
     searchRequested,
+    searchAttempt,
+    searchError?.retryAfterMs,
   ])
 
   function searchEntry(card: SearchCard) {
@@ -421,7 +442,6 @@ export function CardSearchScreen({
               </ScrollView>
               <FilterButton
                 testID="commander-filters-button"
-                backgroundColor={theme.colors.surface}
                 count={keywords.length + (exactColors ? 1 : 0)}
                 onPress={() => setFiltersOpen(true)}
               />
@@ -451,13 +471,15 @@ export function CardSearchScreen({
           {choosingCommander ? <Text weight="medium" text="In this deck" /> : null}
           {checkingDeck ? <Text size="sm" text="Checking commander eligibility…" /> : null}
           {rulesError ? (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Retry commander eligibility"
-              onPress={() => setRulesAttempt((current) => current + 1)}
-            >
-              <Text text={`${rulesError} Tap to retry.`} />
-            </TouchableOpacity>
+            <RetryableError
+              message={rulesError}
+              retryAfterMs={rulesRetryAfterMs}
+              testID="retry-commander-eligibility"
+              onRetry={() => {
+                setRulesRetryAfterMs(undefined)
+                setRulesAttempt((current) => current + 1)
+              }}
+            />
           ) : null}
           {choosingCommander
             ? commanderCards
@@ -567,6 +589,17 @@ export function CardSearchScreen({
             </View>
           ))}
           {catalogResults?.length === 0 ? <Text text="No cards found." /> : null}
+          {searchError ? (
+            <RetryableError
+              message={searchError.message}
+              retryAfterMs={searchError.retryAfterMs}
+              testID="retry-card-search"
+              onRetry={() => {
+                setSearchError(undefined)
+                setSearchAttempt((current) => current + 1)
+              }}
+            />
+          ) : null}
           {message ? <Text accessibilityLiveRegion="polite" text={message} /> : null}
         </ScrollView>
       </Screen>

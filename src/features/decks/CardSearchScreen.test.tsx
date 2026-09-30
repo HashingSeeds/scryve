@@ -1,4 +1,5 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { ConvexError } from "convex/values"
 
 import { ThemeProvider } from "@/theme/context"
 import { loadString, remove } from "@/utils/storage"
@@ -76,6 +77,7 @@ it("hides unknown, ineligible, and banned deck cards and hydrates eligibility", 
     { key: "unknown", details: { ...eligible, commanderLegality: "banned" } },
   ])
   const view = chooser()
+  await act(async () => {})
   expect(view.getByLabelText("Choose Talrand as commander")).toBeTruthy()
   expect(view.queryByLabelText("Choose Sol Ring as commander")).toBeNull()
   expect(view.queryByText("Unknown")).toBeNull()
@@ -287,4 +289,85 @@ it("fetches searchable keyword choices, combines selected keywords, and reuses t
   expect(offlineView.queryByLabelText("Choose Sol Ring as commander")).toBeNull()
   expect(mockAction).not.toHaveBeenCalled()
   expect(mockQuery).not.toHaveBeenCalled()
+})
+
+it.each(["commander", "main"])(
+  "counts down a paused %s search and retries the latest query without requests during cooldown",
+  async (section) => {
+    jest.useFakeTimers()
+    const failure = new ConvexError({
+      code: "scryfall_rate_limited",
+      message: "Scryfall requests are paused. Try again shortly.",
+      retryAfterMs: 3000,
+    })
+    mockAction.mockRejectedValueOnce(failure).mockResolvedValue([searchCard])
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <CardSearchScreen
+          game="mtg"
+          format="commander"
+          initialSection={section}
+          commanderCards={[]}
+          onAdd={jest.fn()}
+          onClose={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    if (section === "commander") fireEvent.press(view.getByTestId("commander-color-U"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "bar")
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(view.getByText("Retrying in 3s")).toBeTruthy()
+    expect(view.getByTestId("retry-card-search")).toBeDisabled()
+    fireEvent.changeText(view.getByTestId("card-search-input"), "baral")
+    await act(async () => jest.advanceTimersByTime(1000))
+    expect(view.getByText("Retrying in 2s")).toBeTruthy()
+    expect(mockAction).toHaveBeenCalledTimes(1)
+    await act(async () => jest.advanceTimersByTime(2000))
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(mockAction).toHaveBeenCalledTimes(2)
+    expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
+      game: "mtg",
+      query:
+        section === "commander"
+          ? '(baral) is:commander f:commander (id>=u or o:"choose a color")'
+          : "baral",
+    })
+    expect(view.queryByText(failure.data.message)).toBeNull()
+  },
+)
+
+it("offers manual retry for search errors without a cooldown", async () => {
+  jest.useFakeTimers()
+  mockAction.mockRejectedValueOnce(new Error("network failed")).mockResolvedValue([searchCard])
+  const view = chooser([])
+  fireEvent.changeText(view.getByTestId("card-search-input"), "baral")
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(view.getByTestId("retry-card-search")).toBeEnabled()
+  fireEvent.press(view.getByTestId("retry-card-search"))
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(mockAction).toHaveBeenCalledTimes(2)
+  expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
+})
+
+it("counts down a paused eligibility lookup and hydrates after its retry", async () => {
+  jest.useFakeTimers()
+  mockAction
+    .mockRejectedValueOnce(
+      new ConvexError({
+        code: "scryfall_rate_limited",
+        message: "Scryfall requests are paused. Try again shortly.",
+        retryAfterMs: 3000,
+      }),
+    )
+    .mockResolvedValue(eligible)
+  const view = chooser([deck[2]])
+  await act(async () => {})
+  expect(view.getByText("Retrying in 3s")).toBeTruthy()
+  expect(view.getByTestId("retry-commander-eligibility")).toBeDisabled()
+  await act(async () => jest.advanceTimersByTime(1000))
+  expect(view.getByText("Retrying in 2s")).toBeTruthy()
+  expect(mockAction).toHaveBeenCalledTimes(1)
+  await act(async () => jest.advanceTimersByTime(2000))
+  expect(mockAction).toHaveBeenCalledTimes(2)
+  expect(view.getByLabelText("Choose Unknown as commander")).toBeTruthy()
 })
