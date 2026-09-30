@@ -78,6 +78,14 @@ describe("PlayerGrid", () => {
       const view = render(
         <ThemeProvider initialContext="dark">
           <PlayerGrid
+            boardOrientation={{
+              width: 390,
+              height: 844,
+              screenWidth: 390,
+              screenHeight: 844,
+              fontScale: 1,
+              rotation: 0,
+            }}
             players={gamePlayers}
             commanderDamage={commanderDamage}
             onChange={jest.fn()}
@@ -95,29 +103,45 @@ describe("PlayerGrid", () => {
         }))
       const portrait = seatLayout()
       act(() => Dimensions.set({ window: { width: 844, height: 390, scale: 3, fontScale: 1 } }))
+      const pendingStyle = StyleSheet.flatten(view.getByTestId("player-grid").props.style)
+      const pendingSeats = seatLayout()
       view.rerender(
         <ThemeProvider initialContext="dark">
           <PlayerGrid
-            boardRotation={boardRotation}
+            boardOrientation={{
+              width: 390,
+              height: 844,
+              screenWidth: 844,
+              screenHeight: 390,
+              fontScale: 1,
+              rotation: boardRotation,
+            }}
             players={gamePlayers}
             commanderDamage={commanderDamage}
             onChange={jest.fn()}
           />
         </ThemeProvider>,
       )
-      fireEvent(view.getByTestId("player-grid-frame"), "layout", {
-        nativeEvent: { layout: { width: 844, height: 390 } },
+      const transitionStyle = StyleSheet.flatten(view.getByTestId("player-grid").props.style)
+      const landscapeSeats = seatLayout()
+      const landscapeStyle = StyleSheet.flatten(view.getByTestId("player-grid").props.style)
+      view.unmount()
+      act(() => Dimensions.set({ window }))
+      expect(pendingStyle).toMatchObject({
+        width: 390,
+        height: 844,
+        transform: [{ rotate: "0deg" }],
       })
-      expect(seatLayout()).toEqual(portrait)
-      expect(StyleSheet.flatten(view.getByTestId("player-grid").props.style)).toMatchObject({
+      expect(pendingSeats).toEqual(portrait)
+      expect(transitionStyle).toMatchObject({ width: 390, height: 844 })
+      expect(landscapeSeats).toEqual(portrait)
+      expect(landscapeStyle).toMatchObject({
         width: 390,
         height: 844,
         left: 227,
         top: -227,
         transform: [{ rotate: `${boardRotation}deg` }],
       })
-      view.unmount()
-      act(() => Dimensions.set({ window }))
     },
   )
 

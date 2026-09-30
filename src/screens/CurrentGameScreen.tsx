@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
-import { View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
+import Animated from "react-native-reanimated"
 
 import { Button } from "@/components/Button"
 import { DialogCard, $dialogText, type DialogOrigin } from "@/components/DialogCard"
@@ -72,7 +72,8 @@ export function CurrentGameScreen({
   const { themed } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)
   const system = runtime.game.system
-  const { width, height, fontScale, rotation } = useGameBoardOrientation()
+  const boardOrientation = useGameBoardOrientation()
+  const { width, height, fontScale, rotation } = boardOrientation
   const [menuOpen, setMenuOpen] = useState(false)
   const [freshBoard, setFreshBoard] = useState(fresh)
   const [savedGameId, setSavedGameId] = useState<string>()
@@ -260,9 +261,14 @@ export function CurrentGameScreen({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <View testID="game-board" style={themed($board)}>
+      <Animated.View
+        ref={boardOrientation.frameRef}
+        collapsable={false}
+        testID="game-board"
+        style={themed($board)}
+      >
         <PlayerGrid
-          boardRotation={rotation}
+          boardOrientation={boardOrientation}
           players={runtime.game.players}
           system={system}
           lifeStep={runtime.game.lifeStep}
@@ -289,6 +295,8 @@ export function CurrentGameScreen({
         <GameRadialMenu
           open={menuOpen}
           anchor={menuAnchor}
+          boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
+          nativeFrame={boardOrientation.nativeFrame}
           compact={playerCount > 2}
           actions={radialActions}
           variant={menuButtonStyle}
@@ -306,7 +314,7 @@ export function CurrentGameScreen({
             onAccount={onAccount}
           />
         ) : null}
-      </View>
+      </Animated.View>
 
       {layoutPickerOpen ? (
         <DialogCard
