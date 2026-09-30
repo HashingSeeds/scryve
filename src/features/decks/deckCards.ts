@@ -1,3 +1,5 @@
+export type CommanderColor = "W" | "U" | "B" | "R" | "G"
+
 export type DeckCard = {
   game?: string
   identityNamespace?: string
@@ -15,6 +17,7 @@ export type DeckCard = {
   smallImageUrl?: string
   quantity: number
   board?: "main" | "sideboard" | "commander"
+  commanderColor?: CommanderColor
 }
 
 export function cardSection(card: DeckCard) {

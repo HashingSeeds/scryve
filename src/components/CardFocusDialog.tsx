@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { type ImageStyle } from "expo-image"
@@ -7,7 +8,9 @@ import { Button } from "@/components/Button"
 import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { DialogCard } from "@/components/DialogCard"
 import { RetryableError } from "@/components/RetryableError"
+import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
+import type { CommanderColor } from "@/features/decks/deckCards"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -17,6 +20,7 @@ export type FocusedCard = CardImageIdentity & {
   smallImageUrl?: string
   quantity: number
   boardLabel: string
+  commanderColor?: CommanderColor
 }
 
 export type FocusedCardDetails = {
@@ -28,6 +32,10 @@ export type FocusedCardDetails = {
   setName?: string
   collectorNumber?: string
   rarity?: string
+  commanderEligibility?: string
+  commanderLegality?: string
+  colorIdentity?: string
+  commanderRulesUpdatedAt?: string
 }
 
 export interface CardFocusDialogProps {
@@ -38,10 +46,19 @@ export interface CardFocusDialogProps {
   onRetryDetails?: () => void
   onIncrement?: () => void
   onDecrement?: () => void
+  onSetCommander?: (color?: CommanderColor) => void
   onClose: () => void
 }
 
 const CARD_ASPECT_RATIO = 488 / 680
+
+export const COMMANDER_COLORS = [
+  { id: "W", label: "White" },
+  { id: "U", label: "Blue" },
+  { id: "B", label: "Black" },
+  { id: "R", label: "Red" },
+  { id: "G", label: "Green" },
+] as const
 
 function capitalized(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
@@ -65,9 +82,20 @@ export function CardFocusDialog({
   onRetryDetails,
   onIncrement,
   onDecrement,
+  onSetCommander,
   onClose,
 }: CardFocusDialogProps) {
   const { themed } = useAppTheme()
+  const [commanderColor, setCommanderColor] = useState(card.commanderColor)
+  const needsColor = details?.commanderEligibility === "color-choice"
+  const commanderProblem =
+    !details?.commanderEligibility || !details?.commanderLegality
+      ? "Commander eligibility not yet verified."
+      : details.commanderEligibility === "ineligible"
+        ? "This card cannot be a commander on its own."
+        : details.commanderLegality !== "legal"
+          ? "This card is not legal in Commander."
+          : undefined
   const printing = details ? printingLine(details) : ""
   const smallImageUrl = details?.smallImageUrl ?? card.smallImageUrl
   const displayImageUrl = details?.imageUrl ?? card.imageUrl ?? smallImageUrl
@@ -139,6 +167,28 @@ export function CardFocusDialog({
           ) : null}
         </View>
       </ScrollView>
+      {onSetCommander ? (
+        <View style={themed($details)}>
+          {needsColor ? (
+            <SelectField
+              testID="commander-color"
+              label="Commander color"
+              options={COMMANDER_COLORS}
+              value={commanderColor}
+              onSelect={(color) =>
+                setCommanderColor(COMMANDER_COLORS.find((option) => option.id === color)?.id)
+              }
+            />
+          ) : null}
+          {commanderProblem ? <Text size="xs" text={commanderProblem} /> : null}
+          <Button
+            testID="set-commander"
+            text="Set as commander"
+            disabled={Boolean(commanderProblem) || (needsColor && !commanderColor)}
+            onPress={() => onSetCommander(needsColor ? commanderColor : undefined)}
+          />
+        </View>
+      ) : null}
       <View testID="card-focus-quantity" style={themed($quantityRow)}>
         <Text
           size="sm"

@@ -100,4 +100,22 @@ describe("CardFocusDialog", () => {
     expect(view.queryByTestId("card-focus-image")).toBeNull()
     expect(view.getByText("No image found")).toBeTruthy()
   })
+
+  it("requires a chosen color before designating a color-choice commander", () => {
+    const onSetCommander = jest.fn()
+    const view = renderDialog({
+      details: {
+        ...details,
+        commanderEligibility: "color-choice",
+        commanderLegality: "legal",
+        colorIdentity: "",
+      },
+      onSetCommander,
+    })
+    expect(view.getByTestId("set-commander")).toBeDisabled()
+    fireEvent.press(view.getByTestId("commander-color"))
+    fireEvent.press(view.getByTestId("commander-color-option-U"))
+    fireEvent.press(view.getByTestId("set-commander"))
+    expect(onSetCommander).toHaveBeenCalledWith("U")
+  })
 })

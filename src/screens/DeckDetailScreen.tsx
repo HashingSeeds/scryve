@@ -20,8 +20,13 @@ import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
-import { prefetchCardDetails } from "@/features/decks/cardDetailsCache"
+import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
+import {
+  addCommander,
+  getCommanderWarnings,
+  selectCommander,
+} from "@/features/decks/commanderSelection"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
@@ -84,7 +89,8 @@ function cardsChanged(draft: DeckCard[], stored: DeckCard[]) {
     draft.some(
       (card, index) =>
         printingKey(card) !== printingKey(stored[index]) ||
-        card.quantity !== stored[index].quantity,
+        card.quantity !== stored[index].quantity ||
+        card.commanderColor !== stored[index].commanderColor,
     )
   )
 }
@@ -326,6 +332,8 @@ function DeckDetailContent({
   const [pendingNavigation, setPendingNavigation] =
     useState<Parameters<typeof navigation.dispatch>[0]>()
   const [adding, setAdding] = useState(false)
+  const [choosingCommander, setChoosingCommander] = useState(false)
+  const [commanderSelected, setCommanderSelected] = useState(false)
   const [draftNote, setDraftNote] = useState("")
   const [draftMetadataRevision, setDraftMetadataRevision] = useState<number>()
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
@@ -474,6 +482,7 @@ function DeckDetailContent({
           catalogCardId: focusedCard.cardId ?? focusedCard.printingId ?? focusedCard.providerCardId,
         }
       : undefined,
+    (deck?.game ?? "mtg") === "mtg" && deck?.format === "commander",
   )
   const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)
   // Offline selection resolves through the cached rows; saved drafts included.
@@ -593,6 +602,7 @@ function DeckDetailContent({
     setDraftMetadataRevision(currentMetadataRevision)
     setUndo(undefined)
     setError(undefined)
+    setCommanderSelected(false)
     setEditing(true)
   }
 
@@ -600,6 +610,7 @@ function DeckDetailContent({
     setDraft([])
     setUndo(undefined)
     setError(undefined)
+    setCommanderSelected(false)
     setEditing(false)
   }
 
@@ -667,6 +678,40 @@ function DeckDetailContent({
 
   function focusCard(card: DeckCard) {
     setFocusedKey(printingKey(card))
+  }
+
+  const singleCommander =
+    deck?.game === "mtg" &&
+    deck.format === "commander" &&
+    cards.reduce(
+      (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
+      0,
+    ) <= 1
+
+  const cachedRules = commanderSelected ? loadCardDetails() : {}
+  const commanderWarnings = commanderSelected
+    ? getCommanderWarnings(cards, (card) => cachedRules[cardDetailsKey(card, deck?.game ?? "mtg")])
+    : []
+
+  function chooseCommander(color?: DeckCard["commanderColor"]) {
+    if (!focusedCard || knownDeleted || cardsUnavailable || cardsCached) return
+    const cached = loadCardDetails()
+    const result = selectCommander(
+      draft,
+      printingKey(focusedCard),
+      (card) =>
+        card === focusedCard ? details : cached[cardDetailsKey(card, deck?.game ?? "mtg")],
+      color,
+    )
+    setFocusedKey(undefined)
+    if ("error" in result) {
+      setError(result.error)
+      return
+    }
+    setError(undefined)
+    setUndo(undefined)
+    setDraft(result.cards)
+    setCommanderSelected(true)
   }
 
   function decrementFocusedCard(card: DeckCard) {
@@ -969,8 +1014,19 @@ function DeckDetailContent({
         onAdd={() => {
           if (knownDeleted) return
           if (!editing) startEditing()
+          setChoosingCommander(false)
           setAdding(true)
         }}
+        onChooseCommander={
+          singleCommander && !cardsUnavailable && (!cardsCached || versionTarget)
+            ? () => {
+                if (!editing) startEditing()
+                setChoosingCommander(true)
+                setAdding(true)
+              }
+            : undefined
+        }
+        commanderWarnings={commanderWarnings}
         onNoteChange={setDraftNote}
         onFocus={focusCard}
         onIncrement={addCard}
@@ -1172,8 +1228,42 @@ function DeckDetailContent({
           game={detail?.deck.game ?? deck.game ?? "mtg"}
           format={detail?.deck.format ?? deck.format}
           offlineCandidates={offlineCandidates}
+          initialSection={choosingCommander ? "commander" : undefined}
+          commanderCards={draft}
+          onChooseCommander={(card) => {
+            setAdding(false)
+            focusCard(card)
+          }}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
+            if (
+              deck.game === "mtg" &&
+              deck.format === "commander" &&
+              cardSection(card) === "commander"
+            ) {
+              const cached = loadCardDetails()
+              const selectedDetails = cached[cardDetailsKey(card, deck.game)]
+              const result = addCommander(
+                draft,
+                card,
+                (entry) =>
+                  (
+                    card.oracleId && entry.oracleId
+                      ? card.oracleId === entry.oracleId
+                      : card.name === entry.name
+                  )
+                    ? selectedDetails
+                    : cached[cardDetailsKey(entry, deck.game)],
+                card.commanderColor,
+              )
+              if ("error" in result) return result.error
+              if (result.cards.length > 300) return "A deck can have at most 300 entries."
+              setDraft(result.cards)
+              setUndo(undefined)
+              setCommanderSelected(true)
+              if (choosingCommander) setAdding(false)
+              return undefined
+            }
             const existing = draft.find((entry) => printingKey(entry) === printingKey(card))
             if (existing && existing.quantity >= 999) return "A card can have at most 999 copies."
             if (!existing && draft.length >= 300) return "A deck can have at most 300 entries."
@@ -1185,6 +1275,7 @@ function DeckDetailContent({
 
       {focusedCard ? (
         <CardFocusDialog
+          key={printingKey(focusedCard)}
           card={{
             game: detail?.deck.game ?? deck.game ?? focusedCard.game ?? "mtg",
             cardId:
@@ -1197,14 +1288,25 @@ function DeckDetailContent({
             smallImageUrl: focusedCard.smallImageUrl,
             quantity: focusedCard.quantity,
             boardLabel: boardLabel(configuredSections, cardSection(focusedCard)),
+            commanderColor: focusedCard.commanderColor,
           }}
           details={details}
           detailsError={detailsError}
           detailsRetryAfterMs={detailsRetryAfterMs}
           onRetryDetails={retryDetails}
+          onSetCommander={
+            editing && singleCommander && !cardsUnavailable && !cardsCached && !knownDeleted
+              ? chooseCommander
+              : undefined
+          }
           {...(editing
             ? {
-                onIncrement: () => addCard(focusedCard),
+                onIncrement:
+                  deck.game === "mtg" &&
+                  deck.format === "commander" &&
+                  cardSection(focusedCard) === "commander"
+                    ? undefined
+                    : () => addCard(focusedCard),
                 onDecrement: () => decrementFocusedCard(focusedCard),
               }
             : {})}

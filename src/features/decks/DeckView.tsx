@@ -12,7 +12,7 @@ import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
+import { cardSection, groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { deckFormatLabel, deckGame, deckSections } from "../../../convex/lib/deckGames"
 
 export function DeckView({
@@ -40,6 +40,8 @@ export function DeckView({
   onCancel,
   onDetails,
   onAdd,
+  onChooseCommander,
+  commanderWarnings,
   onNoteChange,
   onFocus,
   onIncrement,
@@ -70,6 +72,8 @@ export function DeckView({
   onCancel: () => void
   onDetails: () => void
   onAdd: () => void
+  onChooseCommander?: () => void
+  commanderWarnings?: string[]
   onNoteChange: (note: string) => void
   onFocus: (card: DeckCard) => void
   onIncrement: (card: DeckCard) => void
@@ -78,6 +82,9 @@ export function DeckView({
 }) {
   const { themed, theme } = useAppTheme()
   const sections = groupedCards(cards, deckSections(game, format))
+  if (onChooseCommander && !sections.some((section) => section.board === "commander")) {
+    sections.unshift({ board: "commander", label: "Commander", data: [], quantity: 0 })
+  }
   return (
     <>
       <Header
@@ -207,6 +214,21 @@ export function DeckView({
         renderSectionHeader={({ section }) => (
           <View style={themed($section)}>
             <Text size="sm" weight="semiBold" text={section.label} />
+            {section.board === "commander" && onChooseCommander ? (
+              <TouchableOpacity
+                testID="choose-commander"
+                accessibilityRole="button"
+                disabled={busy || editingDisabled}
+                style={$touch}
+                onPress={onChooseCommander}
+              >
+                <Text
+                  size="xs"
+                  style={themed($action)}
+                  text={section.quantity ? "Change commander" : "Choose commander"}
+                />
+              </TouchableOpacity>
+            ) : null}
             <Text size="sm" style={themed($dim)} text={String(section.quantity)} />
           </View>
         )}
@@ -262,6 +284,9 @@ export function DeckView({
                     cardsUnavailable ||
                     cardsCached ||
                     editingDisabled ||
+                    (game === "mtg" &&
+                      format === "commander" &&
+                      cardSection(item) === "commander") ||
                     item.quantity >= 999
                   }
                   style={$touch}
@@ -278,6 +303,9 @@ export function DeckView({
       />
       <BottomActionBar style={themed($bar)}>
         {error}
+        {commanderWarnings?.map((warning) => (
+          <Text key={warning} size="xs" text={warning} />
+        ))}
         {undo ? (
           <View style={$row}>
             <Text size="xs" style={$flex} text={`Removed ${undo.name}`} />

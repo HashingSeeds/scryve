@@ -1,7 +1,7 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { Header } from "@/components/Header"
-import { clearCardDetails } from "@/features/decks/cardDetailsCache"
+import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import type { GuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
 
@@ -9,9 +9,10 @@ import { GuestDeckDetailScreen } from "./GuestDeckDetailScreen"
 
 const mockSearchCards = jest.fn()
 const mockConvex = { action: mockSearchCards }
+const mockConnectionState = { isWebSocketConnected: true }
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvex,
-  useConvexConnectionState: () => ({ isWebSocketConnected: true }),
+  useConvexConnectionState: () => mockConnectionState,
   useAction: () => mockSearchCards,
 }))
 
@@ -74,6 +75,7 @@ function renderScreen(onBack = jest.fn()) {
 beforeEach(() => {
   clearCardDetails()
   mockSearchCards.mockReset()
+  mockConnectionState.isWebSocketConnected = true
   mockPreventRemove = false
   mockPreventRemoveCallback = undefined
   mockNavigationDispatch.mockClear()
@@ -81,6 +83,80 @@ beforeEach(() => {
   mockSaveFailure = false
   mockSaveGuestDeck.mockClear()
   mockDeleteGuestDeck.mockClear()
+})
+
+test("changes a cached commander offline and saves both sections without changing the card count", async () => {
+  mockCurrent = {
+    ...mockStored,
+    deck: {
+      ...mockStored.deck,
+      cards: [
+        {
+          name: "Sai",
+          quantity: 1,
+          scryfallId: "sai",
+          board: "commander",
+          imageUrl: "https://cards.example/sai.jpg",
+        },
+        {
+          name: "Talrand",
+          quantity: 1,
+          scryfallId: "talrand",
+          board: "main",
+          imageUrl: "https://cards.example/talrand.jpg",
+        },
+        {
+          name: "Mountain",
+          quantity: 1,
+          scryfallId: "mountain",
+          board: "main",
+          imageUrl: "https://cards.example/mountain.jpg",
+        },
+      ],
+    },
+  }
+  saveCardDetails({
+    sai: { commanderEligibility: "eligible", commanderLegality: "legal", colorIdentity: "U" },
+    talrand: { commanderEligibility: "eligible", commanderLegality: "legal", colorIdentity: "U" },
+    mountain: {
+      commanderEligibility: "ineligible",
+      commanderLegality: "legal",
+      colorIdentity: "R",
+    },
+  })
+  mockConnectionState.isWebSocketConnected = false
+  const view = renderScreen()
+  fireEvent.press(view.getByTestId("choose-commander"))
+  expect(view.queryByLabelText("Choose Mountain as commander")).toBeNull()
+  fireEvent.press(view.getByLabelText("Choose Talrand as commander"))
+  await waitFor(() => expect(view.getByTestId("set-commander")).toBeEnabled())
+  fireEvent.press(view.getByTestId("set-commander"))
+  expect(view.getByText("Outside this commander's color identity: Mountain.")).toBeTruthy()
+  fireEvent.press(view.getByLabelText("Remove Mountain"))
+  expect(view.queryByText("Outside this commander's color identity: Mountain.")).toBeNull()
+  fireEvent.press(view.getByText("Undo"))
+  expect(view.getByText("Outside this commander's color identity: Mountain.")).toBeTruthy()
+  fireEvent.press(view.getByTestId("save-version-button"))
+  expect(mockSaveGuestDeck).toHaveBeenCalledWith(
+    expect.objectContaining({
+      cards: expect.arrayContaining([
+        expect.objectContaining({ name: "Sai", quantity: 1, board: "main", section: "main" }),
+        expect.objectContaining({
+          name: "Talrand",
+          quantity: 1,
+          board: "commander",
+          section: "commander",
+        }),
+        expect.objectContaining({ name: "Mountain", quantity: 1 }),
+      ]),
+    }),
+    expect.anything(),
+  )
+  expect(mockSearchCards).not.toHaveBeenCalled()
+  view.unmount()
+  const reopened = renderScreen()
+  expect(reopened.getByTestId("deck-card-row-commander:talrand")).toBeTruthy()
+  expect(reopened.getByText("Magic · Commander · 3 cards")).toBeTruthy()
 })
 
 function editNote(view: ReturnType<typeof renderScreen>, value: string) {

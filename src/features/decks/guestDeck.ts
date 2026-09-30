@@ -68,6 +68,8 @@ function isPayload(value: unknown): value is GuestDeckPayload {
       !Number.isInteger(card.quantity) ||
       card.quantity < 1 ||
       card.quantity > 999 ||
+      (card.commanderColor !== undefined &&
+        (typeof card.commanderColor !== "string" || !/^[WUBRG]$/.test(card.commanderColor))) ||
       (card.board !== undefined &&
         card.board !== "main" &&
         card.board !== "sideboard" &&

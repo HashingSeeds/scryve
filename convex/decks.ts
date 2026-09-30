@@ -58,6 +58,9 @@ const cardValidator = v.object({
   smallImageUrl: v.optional(v.string()),
   quantity: v.number(),
   board: v.optional(boardValidator),
+  commanderColor: v.optional(
+    v.union(v.literal("W"), v.literal("U"), v.literal("B"), v.literal("R"), v.literal("G")),
+  ),
 })
 
 type DeckCardInput = Infer<typeof cardValidator>
@@ -148,7 +151,7 @@ function canonicalCardRows(cards: DeckCardInput[]) {
   return cards
     .map(
       (card) =>
-        `${card.section ?? card.board ?? "main"}:${card.cardId ?? card.oracleId ?? ""}:${card.printingId ?? card.providerCardId ?? card.scryfallId ?? card.originalReference ?? ""}:${card.quantity}`,
+        `${card.section ?? card.board ?? "main"}:${card.cardId ?? card.oracleId ?? ""}:${card.printingId ?? card.providerCardId ?? card.scryfallId ?? card.originalReference ?? ""}:${card.quantity}${card.commanderColor ? `:${card.commanderColor}` : ""}`,
     )
     .sort()
 }
@@ -188,6 +191,7 @@ function cardFields(game: string, card: DeckCardInput) {
     ...(card.smallImageUrl ? { smallImageUrl: card.smallImageUrl } : {}),
     quantity: card.quantity,
     ...(card.board ? { board: card.board } : {}),
+    ...(card.commanderColor ? { commanderColor: card.commanderColor } : {}),
   }
 }
 

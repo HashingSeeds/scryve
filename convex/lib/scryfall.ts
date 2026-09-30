@@ -73,6 +73,10 @@ export type CardReference = {
   setCode?: string
   collectorNumber?: string
   rarity?: string
+  commanderEligibility?: "eligible" | "ineligible" | "color-choice"
+  commanderLegality?: string
+  commanderRulesUpdatedAt?: string
+  colorIdentity?: string
 }
 
 export function objectRecord(value: unknown): Record<string, unknown> | null {
@@ -110,6 +114,32 @@ function sizedImageUrl(
   return stringField(imageUris, size) ?? stringField(faceImages, size)
 }
 
+function standaloneCommanderEligibility(
+  card: Record<string, unknown>,
+  firstFace: Record<string, unknown> | null,
+) {
+  const front = firstFace ?? card
+  const typeLine = stringField(front, "type_line")
+  if (!typeLine) return undefined
+  const oracleText = stringField(front, "oracle_text") ?? ""
+  const legendary = /\bLegendary\b/.test(typeLine)
+  const creature = /\bCreature\b/.test(typeLine)
+  const vehicle = /\bVehicle\b/.test(typeLine)
+  const spacecraft =
+    /\bSpacecraft\b/.test(typeLine) &&
+    stringField(front, "power") !== undefined &&
+    stringField(front, "toughness") !== undefined
+  const grist = card.name === "Grist, the Hunger Tide"
+  const permission = /\bcan be your commander\b/i.test(oracleText)
+  const standaloneEligible =
+    !/\bBackground\b/.test(typeLine) &&
+    ((legendary && (creature || vehicle || spacecraft || grist)) || permission)
+  if (!standaloneEligible) return "ineligible" as const
+  return /choose a color/i.test(oracleText) && /before the game begins/i.test(oracleText)
+    ? ("color-choice" as const)
+    : ("eligible" as const)
+}
+
 export function normalizeScryfallCard(value: unknown): CardReference | null {
   const card = objectRecord(value)
   if (!card || typeof card.id !== "string" || typeof card.name !== "string") return null
@@ -127,6 +157,14 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
   const setCode = stringField(card, "set")
   const collectorNumber = stringField(card, "collector_number")
   const rarity = stringField(card, "rarity")
+  const eligibility = standaloneCommanderEligibility(card, firstFace)
+  const commanderLegality = stringField(objectRecord(card.legalities), "commander")
+  const colors = card.color_identity
+  const colorIdentity =
+    Array.isArray(colors) &&
+    colors.every((color) => typeof color === "string" && /^[WUBRG]$/.test(color))
+      ? [..."WUBRG"].filter((color) => colors.includes(color)).join("")
+      : undefined
   return {
     scryfallId: card.id,
     oracleId,
@@ -140,5 +178,10 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
     ...(setCode ? { setCode } : {}),
     ...(collectorNumber ? { collectorNumber } : {}),
     ...(rarity ? { rarity } : {}),
+    ...(eligibility
+      ? { commanderEligibility: eligibility, commanderRulesUpdatedAt: new Date().toISOString() }
+      : {}),
+    ...(commanderLegality ? { commanderLegality } : {}),
+    ...(colorIdentity !== undefined ? { colorIdentity } : {}),
   }
 }

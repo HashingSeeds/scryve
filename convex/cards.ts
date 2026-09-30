@@ -311,7 +311,12 @@ function isCompleteReference(cached: Doc<"cardReferences">) {
 
 function toCardReference(cached: Doc<"cardReferences">): CardReference {
   const { _id: _, _creationTime: __, updatedAt: ___, ...reference } = cached
-  return reference
+  return {
+    ...reference,
+    ...(reference.commanderEligibility !== undefined
+      ? { commanderRulesUpdatedAt: new Date(cached.updatedAt).toISOString() }
+      : {}),
+  }
 }
 
 export const byId = action({
@@ -320,27 +325,46 @@ export const byId = action({
     if (!/^[0-9a-f-]{36}$/i.test(args.scryfallId))
       throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
     const cached: Doc<"cardReferences"> | null = await ctx.runQuery(internal.cards.cachedById, args)
-    if (cached && isCompleteReference(cached)) return toCardReference(cached)
-    const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(args.scryfallId)}`)
-    if (response.status === 404)
-      throw new ConvexError({ code: "card_not_found", message: "Card not found" })
-    if (!response.ok)
-      throw new ConvexError({
-        code: "scryfall_unavailable",
-        message: `Card lookup is temporarily unavailable (${response.status})`,
-      })
-    const card = normalizeScryfallCard((await response.json()) as unknown)
-    if (!card)
-      throw new ConvexError({
-        code: "scryfall_invalid_response",
-        message: "Card service returned an invalid response",
-      })
-    await ctx.runMutation(internal.cards.cache, card)
-    return card
+    if (
+      cached &&
+      isCompleteReference(cached) &&
+      cached.commanderEligibility !== undefined &&
+      cached.commanderLegality !== undefined &&
+      cached.colorIdentity !== undefined &&
+      cached.updatedAt >= Date.now() - 24 * 60 * 60 * 1000
+    )
+      return toCardReference(cached)
+    try {
+      const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(args.scryfallId)}`)
+      if (response.status === 404)
+        throw new ConvexError({ code: "card_not_found", message: "Card not found" })
+      if (!response.ok)
+        throw new ConvexError({
+          code: "scryfall_unavailable",
+          message: `Card lookup is temporarily unavailable (${response.status})`,
+        })
+      const card = normalizeScryfallCard((await response.json()) as unknown)
+      if (!card)
+        throw new ConvexError({
+          code: "scryfall_invalid_response",
+          message: "Card service returned an invalid response",
+        })
+      await ctx.runMutation(internal.cards.cache, card)
+      return card
+    } catch (cause) {
+      if (cached && isCompleteReference(cached)) return toCardReference(cached)
+      throw cause
+    }
   },
 })
 
 const cardDetailsValidator = v.object({
+  commanderEligibility: v.optional(
+    v.union(v.literal("eligible"), v.literal("ineligible"), v.literal("color-choice")),
+  ),
+  commanderLegality: v.optional(v.string()),
+  commanderRulesUpdatedAt: v.optional(v.string()),
+  colorIdentity: v.optional(v.string()),
   imageUrl: v.optional(v.string()),
   smallImageUrl: v.optional(v.string()),
   manaCost: v.optional(v.string()),
@@ -398,6 +422,18 @@ export const detailsBatch = query({
                 ? { collectorNumber: reference.collectorNumber }
                 : {}),
               ...(reference.rarity !== undefined ? { rarity: reference.rarity } : {}),
+              ...(reference.commanderEligibility !== undefined
+                ? { commanderEligibility: reference.commanderEligibility }
+                : {}),
+              ...(reference.commanderLegality !== undefined
+                ? { commanderLegality: reference.commanderLegality }
+                : {}),
+              ...(reference.commanderRulesUpdatedAt !== undefined
+                ? { commanderRulesUpdatedAt: reference.commanderRulesUpdatedAt }
+                : {}),
+              ...(reference.colorIdentity !== undefined
+                ? { colorIdentity: reference.colorIdentity }
+                : {}),
             },
           })
         }
@@ -439,6 +475,12 @@ export const cachedById = internalQuery({
 })
 
 const cardReferenceValidator = v.object({
+  commanderEligibility: v.optional(
+    v.union(v.literal("eligible"), v.literal("ineligible"), v.literal("color-choice")),
+  ),
+  commanderLegality: v.optional(v.string()),
+  commanderRulesUpdatedAt: v.optional(v.string()),
+  colorIdentity: v.optional(v.string()),
   scryfallId: v.string(),
   oracleId: v.string(),
   name: v.string(),
@@ -458,7 +500,8 @@ async function upsertCardReference(ctx: MutationCtx, card: CardReference) {
     .query("cardReferences")
     .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", card.scryfallId))
     .unique()
-  const value = { ...card, updatedAt: Date.now() }
+  const { commanderRulesUpdatedAt: _, ...reference } = card
+  const value = { ...reference, updatedAt: Date.now() }
   if (existing) {
     await ctx.db.patch(existing._id, value)
     return existing._id

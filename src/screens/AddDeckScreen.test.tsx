@@ -29,6 +29,9 @@ const mockResolvePrecon = jest.fn(async () => ({
       name: "Hakbal of the Surging Soul",
       quantity: 1,
       board: "commander",
+      collectorNumber: "3",
+      commanderEligibility: "eligible",
+      colorIdentity: "GU",
     },
   ],
 }))
@@ -653,6 +656,19 @@ describe("AddDeckScreen", () => {
       }),
     )
     expect(onCreated).toHaveBeenCalledWith("deck-imported")
+    expect(mockImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cards: [{
+          name: "Hakbal of the Surging Soul",
+          quantity: 1,
+          oracleId: "11111111-1111-1111-1111-111111111111",
+          scryfallId: "22222222-2222-2222-2222-222222222222",
+          board: "commander",
+          imageUrl: undefined,
+          smallImageUrl: undefined,
+        }],
+      }),
+    )
   })
 
   it("keeps the selected deck visible while its outline loads", async () => {

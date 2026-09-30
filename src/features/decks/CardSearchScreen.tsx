@@ -4,6 +4,7 @@ import type { ViewStyle } from "react-native"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
+import { COMMANDER_COLORS } from "@/components/CardFocusDialog"
 import { CardImage } from "@/components/CardImage"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
@@ -14,6 +15,8 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
 
+import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
+import { cardDetailsKey, printingKey, type CommanderColor, type DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
 import { api } from "../../../convex/_generated/api"
@@ -27,6 +30,9 @@ export function CardSearchScreen({
   onAdd,
   onClose,
   offlineCandidates,
+  initialSection,
+  commanderCards,
+  onChooseCommander,
 }: {
   game: string
   format: string
@@ -37,14 +43,19 @@ export function CardSearchScreen({
    * this index only — never the catalog and never a name-only candidate.
    */
   offlineCandidates?: KnownCardEntry[]
+  initialSection?: string
+  commanderCards?: DeckCard[]
+  onChooseCommander?: (card: DeckCard) => void
 }) {
   const convex = useConvex()
   const connection = useConvexConnectionState()
   const { themed, theme } = useAppTheme()
   const sections = deckSections(game, format)
   const [section, setSection] = useState(
-    sections.find((item) => item.id === "main")?.id ?? sections[0]?.id ?? "main",
+    initialSection ?? sections.find((item) => item.id === "main")?.id ?? sections[0]?.id ?? "main",
   )
+  const choosingCommander = game === "mtg" && format === "commander" && section === "commander"
+  const [commanderColor, setCommanderColor] = useState<CommanderColor>()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
@@ -52,20 +63,34 @@ export function CardSearchScreen({
   const [message, setMessage] = useState<string>()
 
   const offline = offlineCandidates !== undefined && connection?.isWebSocketConnected === false
+  const cachedRules = loadCardDetails()
 
   useEffect(() => {
     let active = true
     setResults(undefined)
     setOfflineResults(undefined)
     setMessage(undefined)
-    setBusy(query.trim().length >= 2)
-    if (query.trim().length < 2) return
+    const searchQuery = choosingCommander
+      ? query.slice(0, 80).replace(/[()"]/g, " ").trim()
+      : query.trim()
+    setBusy(searchQuery.length >= 2)
+    if (searchQuery.length < 2) return
     if (offline) {
       setBusy(false)
-      const wanted = query.trim().toLowerCase()
+      const wanted = searchQuery.toLowerCase()
+      const cached = loadCardDetails()
       setResults(undefined)
       setOfflineResults(
-        offlineCandidates.filter((entry) => entry.card.name.toLowerCase().includes(wanted)),
+        offlineCandidates.filter((entry) => {
+          const rules = cached[cardDetailsKey(entry.card, game)]
+          return (
+            entry.card.name.toLowerCase().includes(wanted) &&
+            (!choosingCommander ||
+              ((rules?.commanderEligibility === "eligible" ||
+                rules?.commanderEligibility === "color-choice") &&
+                rules.commanderLegality === "legal"))
+          )
+        }),
       )
       return
     }
@@ -73,7 +98,10 @@ export function CardSearchScreen({
     const timer = setTimeout(async () => {
       try {
         if (!convex) throw new Error("Card search unavailable")
-        const found = await convex.action(api.cards.search, { game, query: query.trim() })
+        const found = await convex.action(api.cards.search, {
+          game,
+          query: choosingCommander ? `(${searchQuery}) is:commander f:commander` : searchQuery,
+        })
         if (active) setResults(found)
       } catch (cause) {
         if (active)
@@ -91,13 +119,15 @@ export function CardSearchScreen({
       active = false
       clearTimeout(timer)
     }
-  }, [convex, game, query, offline, offlineCandidates])
+  }, [convex, game, query, offline, offlineCandidates, choosingCommander])
 
   function add(card: SearchCard) {
+    if ("scryfallId" in card) saveCardDetails({ [card.scryfallId]: card })
     const error = onAdd({
       name: card.name,
       quantity: 1,
       section,
+      ...(choosingCommander && commanderColor ? { commanderColor } : {}),
       imageUrl: card.imageUrl,
       smallImageUrl: card.smallImageUrl,
       ...("scryfallId" in card
@@ -112,11 +142,18 @@ export function CardSearchScreen({
           }),
     })
     setMessage(error ?? `Added ${card.name}.`)
+    if (!error) setCommanderColor(undefined)
   }
 
   function addOffline(entry: KnownCardEntry) {
-    const error = onAdd({ ...entry.card, quantity: 1, section })
+    const error = onAdd({
+      ...entry.card,
+      quantity: 1,
+      section,
+      ...(choosingCommander ? { commanderColor } : {}),
+    })
     setMessage(error ?? `Added ${entry.card.name}.`)
+    if (!error) setCommanderColor(undefined)
   }
 
   return (
@@ -128,7 +165,7 @@ export function CardSearchScreen({
         contentContainerStyle={$screen}
       >
         <Header
-          title="Add cards"
+          title={initialSection === "commander" ? "Choose commander" : "Add cards"}
           leftIcon="back"
           onLeftPress={onClose}
           rightText="Done"
@@ -141,7 +178,7 @@ export function CardSearchScreen({
             accessibilityLabel="Search cards"
             placeholder="Search by card name"
             value={query}
-            maxLength={120}
+            maxLength={choosingCommander ? 80 : 120}
             autoCorrect={false}
             autoFocus
             returnKeyType="search"
@@ -155,12 +192,69 @@ export function CardSearchScreen({
               if (value) setSection(value)
             }}
           />
+          {choosingCommander &&
+          (results?.some(
+            (card) =>
+              "commanderEligibility" in card && card.commanderEligibility === "color-choice",
+          ) ||
+            offlineResults?.some(
+              (entry) =>
+                cachedRules[cardDetailsKey(entry.card, game)]?.commanderEligibility ===
+                "color-choice",
+            )) ? (
+            <SelectField
+              testID="search-commander-color"
+              label="Commander color"
+              options={COMMANDER_COLORS}
+              value={commanderColor}
+              onSelect={(color) =>
+                setCommanderColor(COMMANDER_COLORS.find((option) => option.id === color)?.id)
+              }
+            />
+          ) : null}
         </View>
         <ScrollView
           style={$results}
           contentContainerStyle={themed($search)}
           keyboardShouldPersistTaps="handled"
         >
+          {choosingCommander && onChooseCommander
+            ? commanderCards
+                ?.filter((card) => {
+                  const cached = cachedRules[cardDetailsKey(card, game)]
+                  return (
+                    cached?.commanderEligibility !== "ineligible" &&
+                    (!cached?.commanderLegality || cached.commanderLegality === "legal") &&
+                    (!query.trim() || card.name.toLowerCase().includes(query.trim().toLowerCase()))
+                  )
+                })
+                .map((card) => (
+                  <TouchableOpacity
+                    key={printingKey(card)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${cachedRules[cardDetailsKey(card, game)]?.commanderEligibility ? "Choose" : "Check"} ${card.name} as commander`}
+                    style={themed($result)}
+                    onPress={() => onChooseCommander(card)}
+                  >
+                    <CardImage
+                      game={game}
+                      source={card.smallImageUrl ?? card.imageUrl}
+                      compact
+                      style={$image}
+                      accessibilityLabel={card.name}
+                    />
+                    <Text size="sm" text={card.name} style={$name} />
+                    <Text
+                      size="xxs"
+                      text={
+                        cachedRules[cardDetailsKey(card, game)]?.commanderEligibility
+                          ? "In this deck"
+                          : "Check eligibility"
+                      }
+                    />
+                  </TouchableOpacity>
+                ))
+            : null}
           {busy ? <Text size="sm" text="Searching…" /> : null}
           {offline ? (
             <Text size="xxs" text="You’re offline. Searching cards already in your decks." />

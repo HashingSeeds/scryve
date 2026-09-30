@@ -169,7 +169,25 @@ function DeckCapacityStatus({ onReady }: { onReady: (capacity: DeckCapacity) => 
 }
 
 function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
-  return cards.map((card) => ({ ...card }))
+  return cards.map((card) => ({
+    name: card.name,
+    quantity: card.quantity,
+    imageUrl: card.imageUrl,
+    smallImageUrl: card.smallImageUrl,
+    ...("scryfallId" in card
+      ? { oracleId: card.oracleId, scryfallId: card.scryfallId, board: card.board }
+      : {
+          game: card.game,
+          identityNamespace: card.identityNamespace,
+          cardId: card.cardId,
+          providerCardId: card.providerCardId,
+          printingId: card.printingId,
+          section: card.section,
+          entryKind: card.entryKind,
+          originalReference: card.originalReference,
+          category: card.category,
+        }),
+  }))
 }
 
 function preconDetail(deck: PreconstructedDeck) {

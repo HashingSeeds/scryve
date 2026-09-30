@@ -1,7 +1,7 @@
 import { StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
-import { clearCardDetails } from "@/features/decks/cardDetailsCache"
+import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
 import { cardDetailsKey } from "@/features/decks/deckCards"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
@@ -302,6 +302,98 @@ describe("DeckDetailScreen", () => {
 
   afterEach(() => {
     mockMappedVersion.mockImplementation((versionId: string) => versionId)
+  })
+
+  it("queues an offline commander swap with its pinned version revision", async () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockConnectionState.isWebSocketConnected = false
+    mockDetail.value = undefined
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 7,
+      versionNumber: 1,
+      name: "Main",
+      cardCount: 2,
+      cardQuantity: 2,
+      deleted: false,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = [
+      { ...solRing, name: "Sai", scryfallId: "sai", oracleId: "sai-oracle", board: "commander" },
+      {
+        ...solRing,
+        name: "Talrand",
+        scryfallId: "talrand",
+        oracleId: "talrand-oracle",
+        board: "main",
+      },
+    ]
+    saveCardDetails({
+      sai: { commanderEligibility: "eligible", commanderLegality: "legal", colorIdentity: "U" },
+      talrand: { commanderEligibility: "eligible", commanderLegality: "legal", colorIdentity: "U" },
+    })
+    const view = renderDetail(offlineAccess)
+    fireEvent.press(view.getByTestId("choose-commander"))
+    fireEvent.press(view.getByLabelText("Choose Talrand as commander"))
+    await waitFor(() => expect(view.getByTestId("set-commander")).toBeEnabled())
+    fireEvent.press(view.getByTestId("set-commander"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    expect(mockVersionCardUpdate).toHaveBeenCalledWith(
+      "deck-1",
+      "version-main",
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Sai", quantity: 1, section: "main", board: "main" }),
+        expect.objectContaining({
+          name: "Talrand",
+          quantity: 1,
+          section: "commander",
+          board: "commander",
+        }),
+      ]),
+      7,
+    )
+    expect(mockSaveVersion).not.toHaveBeenCalled()
+    expect(mockCardById).not.toHaveBeenCalled()
+  })
+
+  it("saves a changed commander color when the card and quantity stay the same", async () => {
+    mockDetail.value = {
+      ...loadedDetail,
+      cards: [{ ...solRing, name: "The Prismatic Piper", board: "commander", commanderColor: "U" }],
+    }
+    saveCardDetails({
+      [solRing.scryfallId]: {
+        commanderEligibility: "color-choice",
+        commanderLegality: "legal",
+        colorIdentity: "",
+        commanderRulesUpdatedAt: new Date().toISOString(),
+      },
+    })
+    const view = renderDetail()
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByLabelText("1× The Prismatic Piper"))
+    await waitFor(() => expect(view.getByTestId("set-commander")).toBeEnabled())
+    fireEvent.press(view.getByTestId("commander-color"))
+    fireEvent.press(view.getByTestId("commander-color-option-G"))
+    fireEvent.press(view.getByTestId("set-commander"))
+    expect(view.getByTestId("save-version-button")).toBeEnabled()
+    fireEvent.press(view.getByTestId("save-version-button"))
+    await waitFor(() =>
+      expect(mockSaveVersion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: [
+            expect.objectContaining({
+              name: "The Prismatic Piper",
+              quantity: 1,
+              commanderColor: "G",
+            }),
+          ],
+        }),
+      ),
+    )
   })
 
   it("renders cached version contents offline and queues durable card edits on save", () => {

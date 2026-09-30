@@ -76,6 +76,128 @@ describe("card provider caching and health", () => {
     })
   })
 
+  it("enriches legacy Magic references once and serves Commander metadata in batches", async () => {
+    const id = "11111111-1111-1111-1111-111111111111"
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await t.mutation(internal.cards.cache, {
+      scryfallId: id,
+      oracleId: id,
+      name: "Sai, Master Thopterist",
+      setName: "Core Set 2019",
+    })
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() =>
+      response({
+        id,
+        oracle_id: id,
+        name: "Sai, Master Thopterist",
+        set_name: "Core Set 2019",
+        type_line: "Legendary Creature — Human Artificer",
+        color_identity: ["U"],
+        legalities: { commander: "legal" },
+      }),
+    )
+    const metadata = {
+      commanderEligibility: "eligible",
+      commanderLegality: "legal",
+      colorIdentity: "U",
+    }
+    await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject(metadata)
+    await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject(metadata)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(
+      await t.query(api.cards.detailsBatch, { game: "mtg", items: [{ key: id, scryfallId: id }] }),
+    ).toEqual([{ key: id, details: expect.objectContaining(metadata) }])
+  })
+
+  it("refreshes Commander metadata older than a day and reports its cache timestamp", async () => {
+    const id = "11111111-1111-1111-1111-111111111111"
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await t.mutation(internal.cards.cache, {
+      scryfallId: id,
+      oracleId: id,
+      name: "Candidate",
+      setName: "Commander",
+      commanderEligibility: "eligible",
+      commanderLegality: "legal",
+      colorIdentity: "U",
+    })
+    const oldUpdatedAt = Date.now() - 25 * 60 * 60 * 1000
+    await t.run(async (ctx) => {
+      const cached = await ctx.db
+        .query("cardReferences")
+        .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", id))
+        .unique()
+      if (!cached) throw new Error("Missing reference")
+      await ctx.db.patch(cached._id, { updatedAt: oldUpdatedAt })
+    })
+    const oldDetails = await t.query(api.cards.detailsBatch, {
+      game: "mtg",
+      items: [{ key: id, scryfallId: id }],
+    })
+    expect(oldDetails[0].details.commanderRulesUpdatedAt).toBe(new Date(oldUpdatedAt).toISOString())
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() =>
+      response({
+        id,
+        oracle_id: id,
+        name: "Candidate",
+        set_name: "Commander",
+        type_line: "Legendary Creature — Human",
+        color_identity: ["U"],
+        legalities: { commander: "banned" },
+      }),
+    )
+    const refreshed = await t.action(api.cards.byId, { scryfallId: id })
+    expect(refreshed.commanderLegality).toBe("banned")
+    expect(Date.parse(refreshed.commanderRulesUpdatedAt ?? "")).toBeGreaterThan(oldUpdatedAt)
+    const cached = await t.action(api.cards.byId, { scryfallId: id })
+    expect(cached.commanderRulesUpdatedAt).toEqual(expect.any(String))
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([503, 429])(
+    "keeps stale card details and their timestamp when refresh returns %s",
+    async (status) => {
+      const id = "11111111-1111-1111-1111-111111111111"
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      await t.mutation(internal.cards.cache, {
+        scryfallId: id,
+        oracleId: id,
+        name: "Candidate",
+        setName: "Commander",
+        oracleText: "Flying",
+        imageUrl: "https://cards.scryfall.io/normal/candidate.jpg",
+        commanderEligibility: "eligible",
+        commanderLegality: "legal",
+        colorIdentity: "U",
+      })
+      const oldUpdatedAt = Date.now() - 25 * 60 * 60 * 1000
+      await t.run(async (ctx) => {
+        const cached = await ctx.db
+          .query("cardReferences")
+          .withIndex("by_scryfall_id", (q) => q.eq("scryfallId", id))
+          .unique()
+        if (!cached) throw new Error("Missing reference")
+        await ctx.db.patch(cached._id, { updatedAt: oldUpdatedAt })
+      })
+      jest.spyOn(global, "fetch").mockImplementation(() => response({}, status))
+      await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject({
+        oracleText: "Flying",
+        imageUrl: "https://cards.scryfall.io/normal/candidate.jpg",
+        commanderRulesUpdatedAt: new Date(oldUpdatedAt).toISOString(),
+      })
+      const cached = await t.query(internal.cards.cachedById, { scryfallId: id })
+      expect(cached?.updatedAt).toBe(oldUpdatedAt)
+      await expect(
+        t.action(api.cards.byId, { scryfallId: "22222222-2222-2222-2222-222222222222" }),
+      ).rejects.toMatchObject({
+        data: { code: status === 429 ? "scryfall_rate_limited" : "scryfall_unavailable" },
+      })
+    },
+  )
+
   it("upgrades a text-only cache after image access is enabled", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response([pokemonCard]))
     const t = convexTest(schema, modules)
