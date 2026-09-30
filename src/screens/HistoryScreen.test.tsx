@@ -214,10 +214,34 @@ describe("unified history screen", () => {
 
     openFilters()
     fireEvent.press(screen.getByTestId("history-outcome-win"))
-    fireEvent.press(screen.getByTestId("history-format-20 life"))
+    fireEvent.press(screen.getByTestId("history-format-none:20 life"))
     fireEvent.press(screen.getByTestId("history-filters-button"))
     expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
     expect(screen.queryByTestId("history-row-connected-connected-1")).toBeNull()
+  })
+
+  it("narrows format choices to the selected game system", () => {
+    renderHistory({
+      connected: connectedFeed([
+        connectedGame({ system: "mtg", format: "standard" }),
+        connectedGame({ publicId: "pokemon-1", system: "pokemon", format: "standard" }),
+      ]),
+    })
+
+    openFilters()
+    expect(screen.getByText("Standard (Magic)")).toBeTruthy()
+    expect(screen.getByText("Standard (Pokémon)")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("history-format-mtg:Standard"))
+
+    fireEvent.press(screen.getByTestId("history-system-pokemon"))
+
+    expect(screen.queryByTestId("history-format-mtg:Standard")).toBeNull()
+    expect(screen.queryByTestId("history-format-none:20 life")).toBeNull()
+    expect(screen.getByTestId("history-format-pokemon:Standard")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("history-filters-button"))
+    expect(screen.getByTestId("history-row-connected-pokemon-1")).toBeTruthy()
+    expect(screen.queryByTestId("history-row-connected-connected-1")).toBeNull()
+    expect(screen.queryByTestId("history-row-local-local-1")).toBeNull()
   })
 
   it("filters by pod size", () => {
