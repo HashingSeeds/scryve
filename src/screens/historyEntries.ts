@@ -3,7 +3,9 @@ import {
   NO_PLAY_SYSTEM,
   playFormatLabel,
   isPlaySystemId,
+  PLAY_SYSTEM_IDS,
   playSystemId,
+  playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import type { LocalGameSummary } from "@/features/game/types"
@@ -110,6 +112,32 @@ export function connectedHistoryEntry(game: {
 
 export type DateRange = "any" | "7d" | "30d" | "year"
 
+export type HistorySystem = PlaySystemId | typeof NO_PLAY_SYSTEM
+export type FormatKey = `${HistorySystem}:${string}`
+
+const SYSTEM_ORDER: HistorySystem[] = [...PLAY_SYSTEM_IDS, NO_PLAY_SYSTEM]
+
+export function entrySystem(entry: HistoryEntry): HistorySystem {
+  return entry.system ?? NO_PLAY_SYSTEM
+}
+
+export function systemLabel(system: HistorySystem) {
+  return playSystemRules(system).shortLabel
+}
+
+export function entryFormatKey(entry: HistoryEntry): FormatKey {
+  return `${entrySystem(entry)}:${entry.format}`
+}
+
+export function formatKeySystem(key: FormatKey): HistorySystem {
+  const system = key.slice(0, key.indexOf(":"))
+  return isPlaySystemId(system) ? system : NO_PLAY_SYSTEM
+}
+
+export function formatKeyLabel(key: FormatKey) {
+  return key.slice(key.indexOf(":") + 1)
+}
+
 export interface HistoryFilters {
   source: "all" | HistorySource
   dateRange: DateRange
@@ -117,7 +145,8 @@ export interface HistoryFilters {
   decks: string[]
   outcomes: HistoryOutcome[]
   podSizes: number[]
-  formats: string[]
+  systems: HistorySystem[]
+  formats: FormatKey[]
 }
 
 export const POD_SIZE_MAX = 5
@@ -128,6 +157,7 @@ export const NO_FILTERS: HistoryFilters = {
   decks: [],
   outcomes: [],
   podSizes: [],
+  systems: [],
   formats: [],
 }
 
@@ -179,6 +209,7 @@ export function filtersActive(filters: HistoryFilters) {
     filters.decks.length > 0 ||
     filters.outcomes.length > 0 ||
     filters.podSizes.length > 0 ||
+    filters.systems.length > 0 ||
     filters.formats.length > 0
   )
 }
@@ -191,6 +222,7 @@ export function activeFilterCount(filters: HistoryFilters) {
     filters.decks.length +
     filters.outcomes.length +
     filters.podSizes.length +
+    filters.systems.length +
     filters.formats.length
   )
 }
@@ -198,21 +230,50 @@ export function activeFilterCount(filters: HistoryFilters) {
 export function filterOptions(entries: HistoryEntry[]) {
   const players = new Set<string>()
   const decks = new Set<string>()
-  const formats = new Set<string>()
+  const systems = new Set<HistorySystem>()
+  const formats = new Set<FormatKey>()
   const podSizes = new Set<number>()
   for (const entry of entries) {
     entryPlayerNames(entry).forEach((name) => players.add(name))
     entryDeckNames(entry).forEach((deck) => decks.add(deck))
-    formats.add(entry.format)
+    systems.add(entrySystem(entry))
+    formats.add(entryFormatKey(entry))
     podSizes.add(podSizeBucket(entry.players.length))
   }
   const byName = (a: string, b: string) => a.localeCompare(b)
   return {
     players: [...players].sort(byName),
     decks: [...decks].sort(byName),
-    formats: [...formats].sort(byName),
+    systems: SYSTEM_ORDER.filter((system) => systems.has(system)),
+    formats: [...formats].sort(
+      (a, b) =>
+        SYSTEM_ORDER.indexOf(formatKeySystem(a)) - SYSTEM_ORDER.indexOf(formatKeySystem(b)) ||
+        byName(formatKeyLabel(a), formatKeyLabel(b)),
+    ),
     podSizes: [...podSizes].sort((a, b) => a - b),
   }
+}
+
+export function formatChoices(formats: FormatKey[], systems: HistorySystem[]) {
+  const available =
+    systems.length > 0 ? formats.filter((key) => systems.includes(formatKeySystem(key))) : formats
+  const labels = available.map(formatKeyLabel)
+  return available.map((key) => {
+    const label = formatKeyLabel(key)
+    const shared = labels.indexOf(label) !== labels.lastIndexOf(label)
+    return { key, label: shared ? `${label} (${systemLabel(formatKeySystem(key))})` : label }
+  })
+}
+
+export function toggleSystem(filters: HistoryFilters, system: HistorySystem): HistoryFilters {
+  const systems = filters.systems.includes(system)
+    ? filters.systems.filter((value) => value !== system)
+    : [...filters.systems, system]
+  const formats =
+    systems.length > 0
+      ? filters.formats.filter((key) => systems.includes(formatKeySystem(key)))
+      : filters.formats
+  return { ...filters, systems, formats }
 }
 
 export function filterHistory(entries: HistoryEntry[], filters: HistoryFilters, now: number) {
@@ -220,7 +281,8 @@ export function filterHistory(entries: HistoryEntry[], filters: HistoryFilters, 
     if (filters.source !== "all" && entry.source !== filters.source) return false
     if (!matchesDateRange(entry.finishedAt, filters.dateRange, now)) return false
     if (filters.outcomes.length > 0 && !filters.outcomes.includes(entry.outcome)) return false
-    if (filters.formats.length > 0 && !filters.formats.includes(entry.format)) return false
+    if (filters.systems.length > 0 && !filters.systems.includes(entrySystem(entry))) return false
+    if (filters.formats.length > 0 && !filters.formats.includes(entryFormatKey(entry))) return false
     if (
       filters.podSizes.length > 0 &&
       !filters.podSizes.includes(podSizeBucket(entry.players.length))

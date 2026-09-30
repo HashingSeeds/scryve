@@ -26,12 +26,16 @@ import {
   filterHistory,
   filterOptions,
   filtersActive,
+  formatChoices,
+  formatKeyLabel,
   localHistoryEntry,
   NO_FILTERS,
   OUTCOME_LABELS,
   podSizeLabel,
   sortedByRecency,
+  systemLabel,
   tallyOutcomes,
+  toggleSystem,
   type DateRange,
 } from "./historyEntries"
 
@@ -263,6 +267,7 @@ export function HistoryScreen({
   const now = Date.now()
   const visible = filterHistory(entries, filters, now)
   const options = useMemo(() => filterOptions(entries), [entries])
+  const formats = formatChoices(options.formats, filters.systems)
   const record = tallyOutcomes(visible)
   const filterCount = activeFilterCount(filters)
   const anyFilters = filtersActive(filters)
@@ -332,9 +337,14 @@ export function HistoryScreen({
       label: podSizeLabel(size),
       clear: () => patch({ podSizes: filters.podSizes.filter((value) => value !== size) }),
     })),
+    ...filters.systems.map((system) => ({
+      key: `system:${system}`,
+      label: systemLabel(system),
+      clear: () => setFilters((current) => toggleSystem(current, system)),
+    })),
     ...filters.formats.map((format) => ({
       key: `format:${format}`,
-      label: format,
+      label: formatKeyLabel(format),
       clear: () => patch({ formats: filters.formats.filter((value) => value !== format) }),
     })),
   ]
@@ -579,15 +589,28 @@ export function HistoryScreen({
               ))}
             </ChipGroup>
           ) : null}
-          {options.formats.length > 0 ? (
-            <ChipGroup heading="Ruleset / starting life">
-              {options.formats.map((format) => (
+          {options.systems.length > 0 ? (
+            <ChipGroup heading="Game system">
+              {options.systems.map((system) => (
                 <FilterChip
-                  key={format}
-                  testID={`history-format-${format}`}
-                  label={format}
-                  selected={filters.formats.includes(format)}
-                  onPress={() => patch({ formats: toggled(filters.formats, format) })}
+                  key={system}
+                  testID={`history-system-${system}`}
+                  label={systemLabel(system)}
+                  selected={filters.systems.includes(system)}
+                  onPress={() => setFilters((current) => toggleSystem(current, system))}
+                />
+              ))}
+            </ChipGroup>
+          ) : null}
+          {formats.length > 0 ? (
+            <ChipGroup heading="Format">
+              {formats.map((format) => (
+                <FilterChip
+                  key={format.key}
+                  testID={`history-format-${format.key}`}
+                  label={format.label}
+                  selected={filters.formats.includes(format.key)}
+                  onPress={() => patch({ formats: toggled(filters.formats, format.key) })}
                 />
               ))}
             </ChipGroup>
