@@ -113,6 +113,7 @@ export const iconRegistry = {
   back: require("@assets/icons/back.png"),
   caretRight: require("@assets/icons/caretRight.png"),
   check: require("@assets/icons/check.png"),
+  github: require("@assets/icons/github.png"),
   hidden: require("@assets/icons/hidden.png"),
   ladybug: require("@assets/icons/ladybug.png"),
   view: require("@assets/icons/view.png"),
