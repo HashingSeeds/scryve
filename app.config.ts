@@ -1,4 +1,5 @@
 import type { ConfigContext, ExpoConfig } from "expo/config"
+import { CodeGenerator, withMainActivity } from "expo/config-plugins"
 
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
@@ -91,6 +92,7 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
   const expoConfig = {
     ...config,
     name: getAppName(),
+    slug: config.slug ?? "count",
     scheme: [getAppScheme(), getLegacyAppScheme()],
     ios: {
       ...config.ios,
@@ -128,5 +130,17 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     plugins,
   }
 
-  return expoConfig
+  return withMainActivity(expoConfig, (config) => {
+    const { modResults } = config
+    modResults.contents = CodeGenerator.mergeContents({
+      src: modResults.contents,
+      tag: "scryve-rotation-animation",
+      anchor: /super\.onCreate\(null\)/,
+      offset: 1,
+      comment: "    //",
+      newSrc:
+        "    window.attributes = window.attributes.apply { rotationAnimation = android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_JUMPCUT }",
+    }).contents
+    return config
+  })
 }

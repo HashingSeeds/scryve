@@ -3,6 +3,7 @@ import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
+import Animated from "react-native-reanimated"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
@@ -305,7 +306,8 @@ function ConnectedBoardReady({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const { width, height, fontScale, rotation } = useGameBoardOrientation()
+  const boardOrientation = useGameBoardOrientation()
+  const { width, height, fontScale, rotation } = boardOrientation
   const [menuOpen, setMenuOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
@@ -607,9 +609,14 @@ function ConnectedBoardReady({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <View testID="connected-game-board" style={themed($board)}>
+      <Animated.View
+        ref={boardOrientation.frameRef}
+        collapsable={false}
+        testID="connected-game-board"
+        style={themed($board)}
+      >
         <PlayerGrid
-          boardRotation={rotation}
+          boardOrientation={boardOrientation}
           players={players}
           system={system}
           lifeStep={game.lifeStep}
@@ -669,6 +676,8 @@ function ConnectedBoardReady({
         <GameRadialMenu
           open={menuOpen}
           anchor={menuAnchor}
+          boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
+          nativeFrame={boardOrientation.nativeFrame}
           compact={players.length > 2}
           actions={radialActions}
           variant={menuButtonStyle}
@@ -696,7 +705,7 @@ function ConnectedBoardReady({
             setStatusOpen(true)
           }}
         />
-      </View>
+      </Animated.View>
 
       {inviteDialogOpen && invitation ? (
         <DialogCard

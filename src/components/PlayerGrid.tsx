@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
+import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import {
@@ -9,6 +10,7 @@ import {
 } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
+import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -48,7 +50,8 @@ export interface CommanderDamageGridBinding {
 
 export interface PlayerGridProps {
   players: GamePlayer[]
-  boardRotation?: number
+  boardOrientation?: Omit<ReturnType<typeof useGameBoardOrientation>, "frameRef" | "nativeFrame"> &
+    Partial<Pick<ReturnType<typeof useGameBoardOrientation>, "nativeFrame">>
   system?: PlaySystemId
   lifeStep?: number
   layoutVariant?: PlayerGridLayoutVariant
@@ -66,7 +69,7 @@ const SINGLE_PLAYER_ROW_FLEX = 0.8
 
 export function PlayerGrid({
   players,
-  boardRotation = 0,
+  boardOrientation,
   system,
   lifeStep,
   layoutVariant = "auto",
@@ -80,9 +83,26 @@ export function PlayerGrid({
   style,
 }: PlayerGridProps) {
   const dimensions = useWindowDimensions()
-  const { fontScale } = dimensions
-  const width = boardRotation ? dimensions.height : dimensions.width
-  const height = boardRotation ? dimensions.width : dimensions.height
+  const boardRotation = boardOrientation?.rotation ?? 0
+  const { width, height, fontScale } = boardOrientation ?? dimensions
+  const nativeFrame = boardOrientation?.nativeFrame
+  const nativeBoardStyle = useAnimatedStyle(() => {
+    if (!boardOrientation) return {}
+    const frame = nativeFrame?.value ?? {
+      width: boardOrientation.screenWidth,
+      height: boardOrientation.screenHeight,
+      rotation: boardRotation,
+    }
+    const width = Math.min(frame.width, frame.height)
+    const height = Math.max(frame.width, frame.height)
+    return {
+      width,
+      height,
+      left: (frame.width - width) / 2,
+      top: (frame.height - height) / 2,
+      transform: [{ rotate: `${frame.rotation}deg` }],
+    }
+  })
   const screenInsets = useSafeAreaInsets()
   const insets =
     boardRotation === 90
@@ -100,7 +120,6 @@ export function PlayerGrid({
             left: screenInsets.bottom,
           }
         : screenInsets
-  const [frame, setFrame] = useState({ width: 0, height: 0 })
   const {
     themed,
     theme: { spacing },
@@ -144,32 +163,25 @@ export function PlayerGrid({
   const armedPlayer = players.find(({ id }) => id === commanderDamage?.armedPlayerId)
 
   return (
-    <View
-      testID="player-grid-frame"
-      style={$frame}
-      onLayout={({ nativeEvent: { layout } }) =>
-        setFrame((current) =>
-          current.width === layout.width && current.height === layout.height
-            ? current
-            : { width: layout.width, height: layout.height },
-        )
-      }
-    >
-      <View
+    <View testID="player-grid-frame" style={$frame}>
+      <Animated.View
         testID="player-grid"
         accessibilityLabel={`${players.length} player ${counter.label} grid`}
         onLayout={measureBoard}
         style={[
           themed($grid),
           style,
-          boardRotation !== 0 && $rotatedGrid,
-          boardRotation !== 0 && {
-            width: frame.height,
-            height: frame.width,
-            left: (frame.width - frame.height) / 2,
-            top: (frame.height - frame.width) / 2,
-            transform: [{ rotate: `${boardRotation}deg` }],
+          boardOrientation && $fixedGrid,
+          boardOrientation && {
+            width,
+            height,
+            transform: [
+              { translateX: -width / 2 },
+              { translateY: -height / 2 },
+              { rotate: `${boardRotation}deg` },
+            ],
           },
+          nativeBoardStyle,
           (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
         ]}
       >
@@ -311,7 +323,7 @@ export function PlayerGrid({
             })}
           </View>
         ))}
-      </View>
+      </Animated.View>
     </View>
   )
 }
@@ -543,7 +555,7 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 
-const $rotatedGrid: ViewStyle = { position: "absolute" }
+const $fixedGrid: ViewStyle = { position: "absolute", left: "50%", top: "50%" }
 
 const $frame: ViewStyle = { flex: 1, width: "100%" }
 
