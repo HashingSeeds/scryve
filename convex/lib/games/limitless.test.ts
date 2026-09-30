@@ -36,6 +36,19 @@ describe("Limitless Pokemon deck normalization", () => {
     expect(pokemonSummaryLookupKey("Pokegear 3.0", "0186")).toBe("pokegear 3.0:186")
   })
 
+  it("links each deck to its own Limitless decklist page", () => {
+    const decklist = {
+      pokemon: [{ count: 60, set: "DRI", number: "12", name: "Crustle" }],
+    }
+    const result = normalizeLimitlessStandings({ id: "t1", name: "Weekly" }, [
+      { player: "a b/c", placing: 2, decklist },
+    ])
+
+    expect(result[0]?.sourceUrl).toBe(
+      "https://play.limitlesstcg.com/tournament/t1/player/a%20b%2Fc/decklist",
+    )
+  })
+
   it("drops standings without a structurally valid deck list", () => {
     expect(normalizeLimitlessStandings({ id: "t", name: "T" }, [{ player: "p" }])).toEqual([])
   })

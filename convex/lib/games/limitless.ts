@@ -73,7 +73,7 @@ export function normalizeLimitlessStandings(
         externalId: `${tournamentId}:${player}`,
         name: archetype || `${tournamentName} #${placing}`,
         format: format === "expanded" ? "expanded" : "standard",
-        sourceUrl: `https://play.limitlesstcg.com/tournament/${tournamentId}/standings`,
+        sourceUrl: `https://play.limitlesstcg.com/tournament/${tournamentId}/player/${encodeURIComponent(player)}/decklist`,
         ...(date && Number.isFinite(Date.parse(date)) ? { publishedAt: Date.parse(date) } : {}),
         entries,
       } satisfies LimitlessDeck,
