@@ -1,4 +1,4 @@
-import { Image, StyleSheet } from "react-native"
+import { StyleSheet } from "react-native"
 import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import * as deckSync from "@/features/decks/decksSync"
@@ -402,6 +402,9 @@ describe("DecksScreen", () => {
     expect(StyleSheet.flatten(view.getByText("All").props.style).color).toBe(
       accessibleForeground(themeColors.tint),
     )
+    expect(
+      contrastRatio(accessibleForeground(themeColors.tint), themeColors.tint),
+    ).toBeGreaterThanOrEqual(4.5)
 
     fireEvent.press(view.getByTestId("deck-filters-button"))
     fireEvent.press(view.getByTestId("system-filter-mtg"))
@@ -412,12 +415,9 @@ describe("DecksScreen", () => {
     )
     fireEvent.press(done)
     const activeFilter = view.getByLabelText("Remove filter Magic")
-    expect(StyleSheet.flatten(within(activeFilter).getByText("Magic").props.style).color).toBe(
+    expect(StyleSheet.flatten(within(activeFilter).getByText("Magic  ✕").props.style).color).toBe(
       accessibleForeground(themeColors.tint),
     )
-    expect(
-      StyleSheet.flatten(within(activeFilter).UNSAFE_getByType(Image).props.style).tintColor,
-    ).toBe(accessibleForeground(themeColors.tint))
   })
 
   it("shows the deck shelf structure while decks load", () => {
@@ -470,6 +470,14 @@ describe("DecksScreen", () => {
     fireEvent.press(view.getByTestId("collection-filter-favorites"))
     expect(view.getByLabelText("Remove filter Magic")).toBeTruthy()
     expect(view.getByLabelText("Remove filter Standard")).toBeTruthy()
+
+    expect(view.getByLabelText("Filters (2)")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Remove filter Standard"))
+    expect(view.getByLabelText("Filters (1)")).toBeTruthy()
+    expect(view.queryByLabelText("Remove filter Standard")).toBeNull()
+    fireEvent.press(view.getByLabelText("Remove filter Magic"))
+    expect(view.getByLabelText("Filters")).toBeTruthy()
+    expect(view.queryByLabelText("Remove filter Magic")).toBeNull()
   })
 
   it("narrows the shelf by search and offers a way back", () => {
