@@ -63,7 +63,7 @@
     "@expo/dom-webview": "~57.0.1",
     "@expo/metro-runtime": "~57.0.16",
     "@legendapp/state": "3.0.0-beta.48",
-    "@sentry/react-native": "^7.11.0",
+    "@sentry/react-native": "^8.28.0",
     "convex": "1.42.3",
     "date-fns": "^4.1.0",
     "expo": "57.0.24",
@@ -150,6 +150,13 @@
     "typescript": "~6.0.3",
     "vitest": "4.1.11",
     "wrangler": "4.127.1"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "@sentry/react-native"
+      ]
+    }
   },
   "engines": {
     "node": "24.18.1",

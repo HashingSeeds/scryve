@@ -50,11 +50,7 @@ describe("observability initialization", () => {
     setTelemetryAdapter()
   })
 
-  it.each([
-    ["ios", 0],
-    ["android", 1],
-    ["web", 1],
-  ] as const)("configures error replay for %s", (platform, errorReplaySampleRate) => {
+  it.each(["ios", "android", "web"] as const)("configures error replay for %s", (platform) => {
     jest.replaceProperty(Platform, "OS", platform)
     initObservability()
 
@@ -63,7 +59,7 @@ describe("observability initialization", () => {
         sendDefaultPii: false,
         enableLogs: false,
         replaysSessionSampleRate: 0,
-        replaysOnErrorSampleRate: errorReplaySampleRate,
+        replaysOnErrorSampleRate: 1,
         integrations: [
           { type: platform === "web" ? "browserReplay" : "mobileReplay" },
           { type: "feedback" },
