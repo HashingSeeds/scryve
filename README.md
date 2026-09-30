@@ -7,15 +7,16 @@ Missing Clerk or Convex configuration never blocks offline local games.
 ## Toolchain
 
 The project pins Node 24.18.1 in `.nvmrc` and pnpm 10.34.5 through the `packageManager`
-field in `package.json`. Use Corepack so the project-selected pnpm version wins over any ambient
-global installation.
+field in `package.json`. Install pnpm 10 or newer and call it directly; it switches itself to the
+pinned version. Don't use `corepack pnpm`: scripts that call `pnpm` again fail with a version
+mismatch when the global pnpm is a different major.
 
 ## Getting Started
 
 ```bash
 nvm use
-corepack pnpm install --frozen-lockfile
-corepack pnpm run start
+pnpm install --frozen-lockfile
+pnpm run start
 ```
 
 Development configuration is split three ways:
@@ -69,9 +70,9 @@ needed.
 ## Static checks
 
 ```bash
-corepack pnpm run compile
-corepack pnpm run lint:check
-corepack pnpm test --runInBand
+pnpm run compile
+pnpm run lint:check
+pnpm test --runInBand
 ```
 
 ## Builds
