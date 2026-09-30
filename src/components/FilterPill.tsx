@@ -118,7 +118,7 @@ const $chipSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.tint,
 })
 const $chipSelectedText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.palette.neutral100,
+  color: accessibleForeground(colors.tint),
 })
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 

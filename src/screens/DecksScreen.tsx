@@ -6,11 +6,9 @@ import Svg, { Path } from "react-native-svg"
 
 import { Button } from "@/components/Button"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
-import type { FilterChip } from "@/components/FilterChips"
-import { FilterChips } from "@/components/FilterChips"
+import { FilterButton, FilterGroup, FilterPill } from "@/components/FilterPill"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { Header } from "@/components/Header"
-import { Icon } from "@/components/Icon"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
@@ -26,7 +24,6 @@ import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { useAppTheme } from "@/theme/context"
 import type { Theme, ThemedStyle } from "@/theme/types"
-import { accessibleForeground } from "@/utils/colorContrast"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
@@ -172,38 +169,6 @@ function DeckRow({
   )
 }
 
-function CollectionChip({
-  id,
-  label,
-  selected,
-  onPress,
-}: {
-  id: DeckCollection
-  label: string
-  selected: boolean
-  onPress: () => void
-}) {
-  const { themed } = useAppTheme()
-  return (
-    <TouchableOpacity
-      testID={`collection-filter-${id}`}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected }}
-      activeOpacity={0.8}
-      style={[themed($collectionChip), selected ? themed($collectionChipSelected) : undefined]}
-      onPress={onPress}
-    >
-      <Text
-        text={label}
-        size="xxs"
-        weight={selected ? "medium" : "normal"}
-        style={selected ? themed($collectionChipSelectedText) : themed($dimmedText)}
-      />
-    </TouchableOpacity>
-  )
-}
-
 function StarIcon({ selected, color }: { selected: boolean; color: string }) {
   return (
     <Svg width={24} height={24} viewBox="0 0 24 24" accessibilityElementsHidden>
@@ -215,22 +180,6 @@ function StarIcon({ selected, color }: { selected: boolean; color: string }) {
         strokeLinejoin="round"
       />
     </Svg>
-  )
-}
-
-function ActiveFilterChip({ label, onPress }: { label: string; onPress: () => void }) {
-  const { theme, themed } = useAppTheme()
-  return (
-    <TouchableOpacity
-      accessibilityRole="button"
-      accessibilityLabel={`Remove filter ${label}`}
-      activeOpacity={0.8}
-      style={themed($activeFilter)}
-      onPress={onPress}
-    >
-      <Text size="xxs" weight="medium" style={themed($activeFilterText)} text={label} />
-      <Icon icon="x" color={accessibleForeground(theme.colors.tint)} size={12} />
-    </TouchableOpacity>
   )
 }
 
@@ -473,7 +422,7 @@ export function DecksScreen({
   const [search, setSearch] = useState("")
   const [filtersOpen, setFiltersOpen] = useState(false)
 
-  const formatChips = useMemo<FilterChip[]>(() => {
+  const formatChips = useMemo(() => {
     if (system === ALL_SYSTEMS) return []
     const known = deckFormats(system).map((candidate) => ({
       id: candidate.id,
@@ -540,25 +489,27 @@ export function DecksScreen({
       />
       <View style={themed($content)}>
         <View style={themed($filterRow)}>
-          <View
+          <ScrollView
             testID="collection-filter"
             accessibilityLabel="Deck collection"
-            style={themed($collectionFilter)}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={$filterScroll}
+            contentContainerStyle={themed($collectionFilter)}
           >
             {COLLECTIONS.map(({ id, label }) => (
-              <CollectionChip
+              <FilterPill
                 key={id}
-                id={id}
+                testID={`collection-filter-${id}`}
                 label={label}
                 selected={collection === id}
                 onPress={() => setCollection(id)}
               />
             ))}
-          </View>
-          <Button
+          </ScrollView>
+          <FilterButton
             testID="deck-filters-button"
-            style={themed($filtersButton)}
-            text={filterCount ? `Filters (${filterCount})` : "Filters"}
+            count={filterCount}
             onPress={() => setFiltersOpen(true)}
           />
         </View>
@@ -575,7 +526,9 @@ export function DecksScreen({
         {filterCount > 0 ? (
           <View style={themed($activeFilters)}>
             {system !== ALL_SYSTEMS && selectedSystem ? (
-              <ActiveFilterChip
+              <FilterPill
+                selected
+                removable
                 label={selectedSystem.shortLabel}
                 onPress={() => {
                   setSystem(ALL_SYSTEMS)
@@ -584,7 +537,9 @@ export function DecksScreen({
               />
             ) : null}
             {activeFormat !== ALL_FORMATS && selectedFormat ? (
-              <ActiveFilterChip
+              <FilterPill
+                selected
+                removable
                 label={selectedFormat.label}
                 onPress={() => setFormat(ALL_FORMATS)}
               />
@@ -681,32 +636,34 @@ export function DecksScreen({
       >
         <Text preset="subheading" text="Filters" />
         <ScrollView contentContainerStyle={themed($dialogBody)}>
-          <View style={themed($filterGroup)}>
-            <Text weight="bold" size="xxs" style={themed($groupHeading)} text="SYSTEM" />
-            <FilterChips
-              testID="system-filter"
-              accessibilityLabel="System"
-              chips={[
-                { id: ALL_SYSTEMS, label: "All systems" },
-                ...DECK_GAME_LIST.map((candidate) => ({
-                  id: candidate.id,
-                  label: candidate.shortLabel,
-                })),
-              ]}
-              selectedId={system}
-              onSelect={chooseSystem}
-            />
+          <View testID="system-filter" accessibilityLabel="System">
+            <FilterGroup heading="System">
+              {[{ id: ALL_SYSTEMS, shortLabel: "All systems" }, ...DECK_GAME_LIST].map(
+                (candidate) => (
+                  <FilterPill
+                    key={candidate.id}
+                    testID={`system-filter-${candidate.id}`}
+                    label={candidate.shortLabel}
+                    selected={system === candidate.id}
+                    onPress={() => chooseSystem(candidate.id)}
+                  />
+                ),
+              )}
+            </FilterGroup>
           </View>
           {system !== ALL_SYSTEMS && formatChips.length > 1 ? (
-            <View style={themed($filterGroup)}>
-              <Text weight="bold" size="xxs" style={themed($groupHeading)} text="FORMAT" />
-              <FilterChips
-                testID="format-filter"
-                accessibilityLabel="Format"
-                chips={formatChips}
-                selectedId={format}
-                onSelect={setFormat}
-              />
+            <View testID="format-filter" accessibilityLabel="Format">
+              <FilterGroup heading="Format">
+                {formatChips.map((candidate) => (
+                  <FilterPill
+                    key={candidate.id}
+                    testID={`format-filter-${candidate.id}`}
+                    label={candidate.label}
+                    selected={format === candidate.id}
+                    onPress={() => setFormat(candidate.id)}
+                  />
+                ))}
+              </FilterGroup>
             </View>
           ) : null}
         </ScrollView>
@@ -745,33 +702,14 @@ const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $filterRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
-  gap: spacing.xs,
+  minHeight: 44,
   paddingVertical: spacing.xs,
 })
+const $filterScroll: ViewStyle = { flex: 1 }
 const $collectionFilter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
   flexDirection: "row",
   gap: spacing.xs,
-})
-const $collectionChip: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  paddingVertical: spacing.xxs,
-  paddingHorizontal: spacing.sm,
-  borderRadius: spacing.lg,
-  borderWidth: 1,
-  borderColor: colors.separator,
-})
-const $collectionChipSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  borderColor: colors.tint,
-  backgroundColor: colors.tint,
-})
-const $collectionChipSelectedText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: accessibleForeground(colors.tint),
-})
-const $filtersButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 36,
-  borderRadius: 12,
-  paddingHorizontal: spacing.sm,
-  paddingVertical: 0,
+  paddingRight: spacing.md,
 })
 const $activeFilters: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
@@ -780,25 +718,7 @@ const $activeFilters: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.xs,
 })
 const $searchField: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.xs })
-const $activeFilter: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.xs,
-  paddingVertical: spacing.xxs,
-  paddingHorizontal: spacing.sm,
-  borderRadius: spacing.lg,
-  backgroundColor: colors.tint,
-})
-const $activeFilterText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: accessibleForeground(colors.tint),
-})
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
-const $filterGroup: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $groupHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.textDim,
-  textTransform: "uppercase",
-  letterSpacing: 1,
-})
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.xs,
   paddingBottom: spacing.xxxl + spacing.lg,
