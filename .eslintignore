@@ -4,7 +4,6 @@ android
 .expo
 dist
 .vscode
-ignite/ignite.json
 package.json
 .eslintignore
 dist-export-check
