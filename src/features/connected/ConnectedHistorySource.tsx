@@ -1,22 +1,14 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react"
-import { useConvexAuth, useMutation, usePaginatedQuery, useQuery } from "convex/react"
+import { useConvexAuth, useMutation, usePaginatedQuery } from "convex/react"
 
-import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { remotePage, type RemotePage } from "@/features/async/remoteState"
 import type { HistoryEntry } from "@/screens/historyEntries"
 import { connectedHistoryEntry } from "@/screens/historyEntries"
 
 import { api } from "../../../convex/_generated/api"
 
-export type ConnectedHistoryAccess =
-  | { status: "not-applicable" }
-  | { status: "loading" }
-  | { status: "ready"; premiumLocked: boolean }
-  | { status: "unavailable"; retry: () => void }
-
 export interface ConnectedHistoryFeed {
   page: RemotePage<HistoryEntry> | { status: "unavailable"; retry: () => void }
-  access: ConnectedHistoryAccess
   migration: { status: "running" | "complete" } | { status: "failed"; retry: () => void }
 }
 
@@ -64,36 +56,11 @@ export function ConnectedHistorySource({
     if (result.status === "loading") return result
     return { ...result, items: result.items.map(connectedHistoryEntry) }
   })()
-  const feed = {
+  return children({
     page,
     migration:
       migrationStatus === "failed"
         ? ({ status: "failed", retry: retryMigration } as const)
         : ({ status: migrationStatus } as const),
-  }
-
-  if (page.status !== "ready" || page.items.length < PAGE_SIZE)
-    return children({ ...feed, access: { status: "not-applicable" } })
-
-  return (
-    <ConvexQueryBoundary
-      fallback={({ retry }) => children({ ...feed, access: { status: "unavailable", retry } })}
-    >
-      <ConnectedHistoryAccessSource isAuthenticated={isAuthenticated}>
-        {(access) => children({ ...feed, access })}
-      </ConnectedHistoryAccessSource>
-    </ConvexQueryBoundary>
-  )
-}
-
-function ConnectedHistoryAccessSource({
-  isAuthenticated,
-  children,
-}: {
-  isAuthenticated: boolean
-  children: (access: ConnectedHistoryAccess) => ReactNode
-}) {
-  const entitlements = useQuery(api.entitlements.current, isAuthenticated ? {} : "skip")
-  if (entitlements === undefined) return children({ status: "loading" })
-  return children({ status: "ready", premiumLocked: !entitlements.fullHistory })
+  })
 }
