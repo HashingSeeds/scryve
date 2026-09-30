@@ -17,6 +17,16 @@ export type LimitlessDeck = {
   entries: LimitlessDeckEntry[]
 }
 
+export function limitlessDecklistUrl(tournamentId: string, player: string) {
+  return `https://play.limitlesstcg.com/tournament/${tournamentId}/player/${encodeURIComponent(player)}/decklist`
+}
+
+export function parseLimitlessExternalId(externalId: string) {
+  const separator = externalId.indexOf(":")
+  if (separator < 1 || separator === externalId.length - 1) return undefined
+  return { tournamentId: externalId.slice(0, separator), player: externalId.slice(separator + 1) }
+}
+
 function integer(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) ? value : undefined
 }
@@ -73,7 +83,7 @@ export function normalizeLimitlessStandings(
         externalId: `${tournamentId}:${player}`,
         name: archetype || `${tournamentName} #${placing}`,
         format: format === "expanded" ? "expanded" : "standard",
-        sourceUrl: `https://play.limitlesstcg.com/tournament/${tournamentId}/standings`,
+        sourceUrl: limitlessDecklistUrl(tournamentId, player),
         ...(date && Number.isFinite(Date.parse(date)) ? { publishedAt: Date.parse(date) } : {}),
         entries,
       } satisfies LimitlessDeck,

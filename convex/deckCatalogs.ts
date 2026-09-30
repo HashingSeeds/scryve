@@ -11,7 +11,9 @@ import { deckRateLimiter } from "./lib/deckRateLimits"
 import { MAX_CATALOG_BATCH, type NormalizedCard } from "./lib/games/cards"
 import curatedDecks from "./lib/games/curatedDecks.json"
 import {
+  limitlessDecklistUrl,
   normalizeLimitlessStandings,
+  parseLimitlessExternalId,
   pokemonSummaryLookupKey,
   type LimitlessDeck,
 } from "./lib/games/limitless"
@@ -154,6 +156,29 @@ export const upsert = internalMutation({
     for (const entry of args.entries)
       await ctx.db.insert("deckCatalogCards", { catalogDeckId, game, ...entry })
     return catalogDeckId
+  },
+})
+
+export const backfillLimitlessSourceUrls = internalMutation({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("deckCatalogs")
+      .withIndex("by_game_and_source_and_external_id", (q) =>
+        q.eq("game", "pokemon").eq("source", "limitless"),
+      )
+      .paginate(args.paginationOpts)
+    for (const row of page.page) {
+      const id = parseLimitlessExternalId(row.externalId)
+      if (!id) continue
+      const sourceUrl = limitlessDecklistUrl(id.tournamentId, id.player)
+      if (row.sourceUrl !== sourceUrl) await ctx.db.patch(row._id, { sourceUrl })
+    }
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.deckCatalogs.backfillLimitlessSourceUrls, {
+        paginationOpts: { ...args.paginationOpts, cursor: page.continueCursor },
+      })
+    return null
   },
 })
 
