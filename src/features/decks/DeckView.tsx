@@ -213,11 +213,12 @@ export function DeckView({
         }
         renderSectionHeader={({ section }) => (
           <View style={themed($section)}>
-            <Text size="sm" weight="semiBold" text={section.label} />
+            <Text size="sm" weight="semiBold" text={section.label} style={$flex} />
             {section.board === "commander" && onChooseCommander ? (
               <TouchableOpacity
                 testID="choose-commander"
                 accessibilityRole="button"
+                accessibilityLabel={section.quantity ? "Change commander" : "Choose commander"}
                 disabled={busy || editingDisabled}
                 style={$touch}
                 onPress={onChooseCommander}
@@ -225,11 +226,13 @@ export function DeckView({
                 <Text
                   size="xs"
                   style={themed($action)}
-                  text={section.quantity ? "Change commander" : "Choose commander"}
+                  text={section.quantity ? "Change" : "Choose"}
                 />
               </TouchableOpacity>
             ) : null}
-            <Text size="sm" style={themed($dim)} text={String(section.quantity)} />
+            {section.board !== "commander" || !onChooseCommander ? (
+              <Text size="sm" style={themed($dim)} text={String(section.quantity)} />
+            ) : null}
           </View>
         )}
         renderItem={({ item }) => (
@@ -382,7 +385,7 @@ const $notes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
-  justifyContent: "space-between",
+  alignItems: "center",
   paddingTop: spacing.lg,
   paddingBottom: spacing.xs,
 })

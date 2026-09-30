@@ -79,8 +79,8 @@ it("hides unknown, ineligible, and banned deck cards and hydrates eligibility", 
   ])
   const view = chooser()
   await act(async () => {})
-  expect(view.getByLabelText("Choose Talrand as commander")).toBeTruthy()
-  expect(view.queryByLabelText("Choose Sol Ring as commander")).toBeNull()
+  expect(view.getByLabelText("Preview Talrand as commander")).toBeTruthy()
+  expect(view.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
   expect(view.queryByText("Unknown")).toBeNull()
   expect(view.queryByText("Check eligibility")).toBeNull()
   expect(view.queryByText("Add to")).toBeNull()
@@ -92,8 +92,8 @@ it("refreshes old metadata and reveals eligible deck cards without listing unkno
   saveCardDetails({ unknown: { typeLine: "Legendary Creature" } })
   mockAction.mockResolvedValue(eligible)
   const view = chooser([deck[2]])
-  expect(view.queryByLabelText("Choose Unknown as commander")).toBeNull()
-  await waitFor(() => expect(view.getByLabelText("Choose Unknown as commander")).toBeTruthy())
+  expect(view.queryByLabelText("Preview Unknown as commander")).toBeNull()
+  await waitFor(() => expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy())
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), { scryfallId: "unknown" })
 })
 
@@ -120,23 +120,23 @@ it("searches Scryfall for legal commanders beyond the cache and removes deck dup
   jest.useRealTimers()
 })
 
-it("applies the selected color to deck cards and the Scryfall query, including multicolor cards", async () => {
+it("defaults to the exact selected color for deck and provider results", async () => {
   jest.useFakeTimers()
   saveCardDetails({ talrand: eligible, ring: { ...eligible, colorIdentity: "UB" } })
   mockAction.mockResolvedValue([{ ...searchCard, colorIdentity: "UB" }])
   const view = chooser(deck.slice(0, 2))
   fireEvent.press(view.getByTestId("commander-color-B"))
-  expect(view.queryByLabelText("Choose Talrand as commander")).toBeNull()
-  expect(view.getByLabelText("Choose Sol Ring as commander")).toBeTruthy()
+  expect(view.queryByLabelText("Preview Talrand as commander")).toBeNull()
+  expect(view.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
   fireEvent.changeText(view.getByTestId("card-search-input"), "ar")
   await act(async () => {
     jest.advanceTimersByTime(400)
   })
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
     game: "mtg",
-    query: '(ar) is:commander f:commander (id>=b or o:"choose a color")',
+    query: '(ar) is:commander f:commander (id=b or o:"choose a color")',
   })
-  expect(view.getByLabelText("Preview Baral as commander")).toBeTruthy()
+  expect(view.queryByLabelText("Preview Baral as commander")).toBeNull()
   jest.useRealTimers()
 })
 
@@ -156,7 +156,7 @@ it("uses only cached eligible cards offline without provider requests", () => {
       />
     </ThemeProvider>,
   )
-  expect(view.getByLabelText("Choose Talrand as commander")).toBeTruthy()
+  expect(view.getByLabelText("Preview Talrand as commander")).toBeTruthy()
   expect(view.queryByText("Unknown")).toBeNull()
   expect(mockQuery).not.toHaveBeenCalled()
   expect(mockAction).not.toHaveBeenCalled()
@@ -170,8 +170,8 @@ it("keeps required color-choice commanders out of the colorless filter", () => {
   })
   const view = chooser(deck.slice(0, 2))
   fireEvent.press(view.getByTestId("commander-color-C"))
-  expect(view.getByLabelText("Choose Talrand as commander")).toBeTruthy()
-  expect(view.queryByLabelText("Choose Sol Ring as commander")).toBeNull()
+  expect(view.getByLabelText("Preview Talrand as commander")).toBeTruthy()
+  expect(view.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
 })
 
 afterEach(() => jest.useRealTimers())
@@ -184,7 +184,7 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   fireEvent.press(view.getByTestId("commander-color-U"))
   fireEvent.changeText(view.getByTestId("card-search-input"), "ar")
   await act(async () => jest.advanceTimersByTime(400))
-  fireEvent.press(view.getByLabelText("Preview Baral as commander"))
+  fireEvent.press(view.getByText("Baral"))
   await act(async () => {})
   expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
   expect(onAdd).not.toHaveBeenCalled()
@@ -209,7 +209,7 @@ it("previews a result without assigning it, preserves search filters on dismiss,
   expect(view.queryByTestId("card-focus-dialog")).toBeNull()
 })
 
-it("includes all selected colors and switches to exact identity for deck and provider results", async () => {
+it("requires the exact selected identity by default and optionally allows additional colors", async () => {
   jest.useFakeTimers()
   saveCardDetails({
     talrand: eligible,
@@ -220,24 +220,24 @@ it("includes all selected colors and switches to exact identity for deck and pro
   const view = chooser()
   fireEvent.press(view.getByTestId("commander-color-U"))
   fireEvent.press(view.getByTestId("commander-color-B"))
-  expect(view.queryByLabelText("Choose Talrand as commander")).toBeNull()
-  expect(view.getByLabelText("Choose Sol Ring as commander")).toBeTruthy()
-  expect(view.getByLabelText("Choose Unknown as commander")).toBeTruthy()
-  await act(async () => jest.advanceTimersByTime(400))
-  expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
-    game: "mtg",
-    query: 'is:commander f:commander (id>=ub or o:"choose a color")',
-  })
-  fireEvent.press(view.getByTestId("commander-filters-button"))
-  await act(async () => {})
-  fireEvent.press(view.getByLabelText("Exactly these colors"))
-  fireEvent.press(view.getByLabelText("Dismiss commander filters"))
-  expect(view.getByLabelText("Choose Sol Ring as commander")).toBeTruthy()
-  expect(view.queryByLabelText("Choose Unknown as commander")).toBeNull()
+  expect(view.queryByLabelText("Preview Talrand as commander")).toBeNull()
+  expect(view.getByLabelText("Preview Sol Ring as commander")).toBeTruthy()
+  expect(view.queryByLabelText("Preview Unknown as commander")).toBeNull()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
     game: "mtg",
     query: 'is:commander f:commander (id=ub or o:"choose a color")',
+  })
+  fireEvent.press(view.getByTestId("commander-filters-button"))
+  await act(async () => {})
+  fireEvent.press(view.getByLabelText("Allow additional colors"))
+  fireEvent.press(view.getByLabelText("Dismiss commander filters"))
+  expect(view.getByLabelText("Preview Sol Ring as commander")).toBeTruthy()
+  expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy()
+  await act(async () => jest.advanceTimersByTime(400))
+  expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    game: "mtg",
+    query: 'is:commander f:commander (id>=ub or o:"choose a color")',
   })
 })
 
@@ -270,8 +270,8 @@ it("fetches searchable keyword choices, combines selected keywords, and reuses t
   fireEvent.changeText(view.getByLabelText("Search keywords"), "ward")
   fireEvent.press(view.getByLabelText("Ward"))
   fireEvent.press(view.getByLabelText("Dismiss commander filters"))
-  expect(view.getByLabelText("Choose Talrand as commander")).toBeTruthy()
-  expect(view.queryByLabelText("Choose Sol Ring as commander")).toBeNull()
+  expect(view.getByLabelText("Preview Talrand as commander")).toBeTruthy()
+  expect(view.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
     game: "mtg",
@@ -286,8 +286,8 @@ it("fetches searchable keyword choices, combines selected keywords, and reuses t
   fireEvent.press(offlineView.getByTestId("commander-filters-button"))
   fireEvent.press(offlineView.getByLabelText("Ward"))
   fireEvent.press(offlineView.getByLabelText("Dismiss commander filters"))
-  expect(offlineView.getByLabelText("Choose Talrand as commander")).toBeTruthy()
-  expect(offlineView.queryByLabelText("Choose Sol Ring as commander")).toBeNull()
+  expect(offlineView.getByLabelText("Preview Talrand as commander")).toBeTruthy()
+  expect(offlineView.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
   expect(mockAction).not.toHaveBeenCalled()
   expect(mockQuery).not.toHaveBeenCalled()
 })
@@ -330,7 +330,7 @@ it.each(["commander", "main"])(
       game: "mtg",
       query:
         section === "commander"
-          ? '(baral) is:commander f:commander (id>=u or o:"choose a color")'
+          ? '(baral) is:commander f:commander (id=u or o:"choose a color")'
           : "baral",
     })
     expect(view.queryByText(failure.data.message)).toBeNull()
@@ -370,7 +370,7 @@ it("counts down a paused eligibility lookup and hydrates after its retry", async
   expect(mockAction).toHaveBeenCalledTimes(1)
   await act(async () => jest.advanceTimersByTime(2000))
   expect(mockAction).toHaveBeenCalledTimes(2)
-  expect(view.getByLabelText("Choose Unknown as commander")).toBeTruthy()
+  expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy()
 })
 
 it.each([
@@ -388,13 +388,13 @@ it.each([
     mockQuery.mockResolvedValue([{ key: "unknown", details: expired }])
     mockAction.mockResolvedValue({ ...eligible, commanderRulesUpdatedAt: new Date().toISOString() })
     const view = chooser([deck[2]])
-    expect(view.queryByLabelText("Choose Unknown as commander")).toBeNull()
+    expect(view.queryByLabelText("Preview Unknown as commander")).toBeNull()
     await act(async () => {})
     expect(mockQuery).toHaveBeenCalledWith(expect.anything(), {
       game: "mtg",
       items: [{ key: "unknown", scryfallId: "unknown" }],
     })
     expect(mockAction).toHaveBeenCalledWith(expect.anything(), { scryfallId: "unknown" })
-    expect(view.getByLabelText("Choose Unknown as commander")).toBeTruthy()
+    expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy()
   },
 )

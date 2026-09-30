@@ -6,7 +6,11 @@ import type { FunctionReturnType } from "convex/server"
 
 import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
-import { CardFocusDialog, COMMANDER_COLORS } from "@/components/CardFocusDialog"
+import {
+  CardFocusDialog,
+  COMMANDER_COLORS,
+  cardColorIdentityLabel,
+} from "@/components/CardFocusDialog"
 import { CardImage } from "@/components/CardImage"
 import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
 import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
@@ -77,7 +81,7 @@ export function CardSearchScreen({
   const offline = connection?.isWebSocketConnected === false
   const [cachedRules, setCachedRules] = useState(() => loadCardDetails())
   const [colorFilters, setColorFilters] = useState<string[]>([])
-  const [exactColors, setExactColors] = useState(false)
+  const [exactColors, setExactColors] = useState(true)
   const [keywords, setKeywords] = useState<string[]>([])
   const needsKeywords = keywords.length > 0
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -382,6 +386,8 @@ export function CardSearchScreen({
       (!inDeck(entry.card) && matchesFilters(cachedRules[cardDetailsKey(entry.card, game)])),
   )
 
+  const ResultRow = choosingCommander ? TouchableOpacity : View
+
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <Screen
@@ -391,8 +397,8 @@ export function CardSearchScreen({
         contentContainerStyle={$screen}
       >
         <Header
-          title={initialSection === "commander" ? "Choose commander" : "Add cards"}
-          leftIcon="back"
+          title={choosingCommander ? "Commander" : "Add cards"}
+          leftTx="common:back"
           onLeftPress={onClose}
           rightText="Done"
           onRightPress={onClose}
@@ -441,7 +447,7 @@ export function CardSearchScreen({
               </ScrollView>
               <FilterButton
                 testID="commander-filters-button"
-                count={keywords.length + (exactColors ? 1 : 0)}
+                count={keywords.length + (!exactColors ? 1 : 0)}
                 onPress={() => setFiltersOpen(true)}
               />
             </View>
@@ -490,7 +496,7 @@ export function CardSearchScreen({
                   <TouchableOpacity
                     key={printingKey(card)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Choose ${card.name} as commander`}
+                    accessibilityLabel={`Preview ${card.name} as commander`}
                     style={themed($result)}
                     onPress={() => preview(card)}
                   >
@@ -501,7 +507,16 @@ export function CardSearchScreen({
                       style={$image}
                       accessibilityLabel={card.name}
                     />
-                    <Text size="sm" text={card.name} style={$name} />
+                    <View style={$name}>
+                      <Text size="sm" text={card.name} />
+                      <Text
+                        size="xxs"
+                        text={cardColorIdentityLabel(
+                          cachedRules[cardDetailsKey(card, game)],
+                          card.name,
+                        )}
+                      />
+                    </View>
                   </TouchableOpacity>
                 ))
             : null}
@@ -530,34 +545,53 @@ export function CardSearchScreen({
             <Text size="xxs" text="You’re offline. Searching cards already in your decks." />
           ) : null}
           {cachedCandidates?.map((entry, index) => (
-            <View key={index} style={themed($result)}>
+            <ResultRow
+              key={index}
+              style={themed($result)}
+              accessibilityRole={choosingCommander ? "button" : undefined}
+              accessibilityLabel={
+                choosingCommander ? `Preview ${entry.card.name} as commander` : undefined
+              }
+              onPress={choosingCommander ? () => addOffline(entry) : undefined}
+            >
               <View style={$name}>
                 <Text size="sm" weight="medium" text={entry.card.name} />
                 <Text size="xxs" text={`From your cached decks · ${entry.game ?? game}`} />
+                {choosingCommander ? (
+                  <Text
+                    size="xxs"
+                    text={cardColorIdentityLabel(
+                      cachedRules[cardDetailsKey(entry.card, game)],
+                      entry.card.name,
+                    )}
+                  />
+                ) : null}
               </View>
-              <TouchableOpacity
-                style={$add}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  choosingCommander
-                    ? `Preview ${entry.card.name} as commander`
-                    : `Add ${entry.card.name} to deck`
-                }
-                onPress={() => addOffline(entry)}
-              >
-                <Text
-                  size="sm"
-                  style={{ color: theme.colors.brandText }}
-                  text={choosingCommander ? "View" : "+ Add"}
-                />
-              </TouchableOpacity>
-            </View>
+              {!choosingCommander ? (
+                <TouchableOpacity
+                  style={$add}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${entry.card.name} to deck`}
+                  onPress={() => addOffline(entry)}
+                >
+                  <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
+                </TouchableOpacity>
+              ) : null}
+            </ResultRow>
           ))}
           {offline && cachedCandidates?.length === 0 ? (
             <Text text="No cached cards match. Cards appear here after you add them online." />
           ) : null}
           {catalogResults?.map((card, index) => (
-            <View key={index} style={themed($result)}>
+            <ResultRow
+              key={index}
+              style={themed($result)}
+              accessibilityRole={choosingCommander ? "button" : undefined}
+              accessibilityLabel={
+                choosingCommander ? `Preview ${card.name} as commander` : undefined
+              }
+              onPress={choosingCommander ? () => add(card) : undefined}
+            >
               <CardImage
                 game={game}
                 source={card.smallImageUrl ?? card.imageUrl}
@@ -568,24 +602,21 @@ export function CardSearchScreen({
               <View style={$name}>
                 <Text size="sm" weight="medium" text={card.name} />
                 <Text size="xxs" text={"scryfallId" in card ? card.typeLine : card.typeLabel} />
+                {choosingCommander && "scryfallId" in card ? (
+                  <Text size="xxs" text={cardColorIdentityLabel(card, card.name)} />
+                ) : null}
               </View>
-              <TouchableOpacity
-                style={$add}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  choosingCommander
-                    ? `Preview ${card.name} as commander`
-                    : `Add ${card.name} to deck`
-                }
-                onPress={() => add(card)}
-              >
-                <Text
-                  size="sm"
-                  style={{ color: theme.colors.brandText }}
-                  text={choosingCommander ? "View" : "+ Add"}
-                />
-              </TouchableOpacity>
-            </View>
+              {!choosingCommander ? (
+                <TouchableOpacity
+                  style={$add}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${card.name} to deck`}
+                  onPress={() => add(card)}
+                >
+                  <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
+                </TouchableOpacity>
+              ) : null}
+            </ResultRow>
           ))}
           {catalogResults?.length === 0 ? <Text text="No cards found." /> : null}
           {searchError ? (
@@ -613,7 +644,7 @@ export function CardSearchScreen({
           <ScrollView contentContainerStyle={$filterBody} keyboardShouldPersistTaps="handled">
             <FilterGroup heading="Color match">
               <FilterPill
-                label="Include these colors"
+                label="Allow additional colors"
                 selected={!exactColors}
                 onPress={() => setExactColors(false)}
               />
@@ -663,7 +694,7 @@ export function CardSearchScreen({
               onPress={() => {
                 setColorFilters([])
                 setKeywords([])
-                setExactColors(false)
+                setExactColors(true)
               }}
             />
             <Button

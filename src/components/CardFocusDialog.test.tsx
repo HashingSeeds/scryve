@@ -50,6 +50,14 @@ describe("CardFocusDialog", () => {
     expect(view.getByTestId("card-focus-quantity")).toBeTruthy()
   })
 
+  it("explains the full color identity of a double-faced commander", () => {
+    const view = renderDialog({
+      card: { ...card, name: "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger" },
+      details: { ...details, colorIdentity: "RW" },
+    })
+    expect(view.getByText("Color identity: White, Red · Both faces")).toBeTruthy()
+  })
+
   it("reports quantity changes to the screen", () => {
     const view = renderDialog()
     fireEvent.press(view.getByTestId("card-focus-increment"))

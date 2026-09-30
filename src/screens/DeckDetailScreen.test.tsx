@@ -337,7 +337,7 @@ describe("DeckDetailScreen", () => {
     })
     const view = renderDetail(offlineAccess)
     fireEvent.press(view.getByTestId("choose-commander"))
-    fireEvent.press(view.getByLabelText("Choose Talrand as commander"))
+    fireEvent.press(view.getByLabelText("Preview Talrand as commander"))
     await waitFor(() => expect(view.getByTestId("set-commander")).toBeEnabled())
     fireEvent.press(view.getByTestId("set-commander"))
     fireEvent.press(view.getByTestId("save-version-button"))

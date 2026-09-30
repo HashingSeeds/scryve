@@ -62,6 +62,20 @@ export const COMMANDER_COLORS = [
   { id: "G", label: "Green" },
 ] as const
 
+export function cardColorIdentityLabel(details: FocusedCardDetails | undefined, name: string) {
+  if (details?.colorIdentity === undefined) return undefined
+  const colors = COMMANDER_COLORS.filter((color) => details.colorIdentity?.includes(color.id))
+    .map((color) => color.label)
+    .join(", ")
+  const identity =
+    details.commanderEligibility === "color-choice"
+      ? colors
+        ? `${colors} + chosen color`
+        : "Choose a color"
+      : colors || "Colorless"
+  return `Color identity: ${identity}${name.includes(" // ") ? " · Both faces" : ""}`
+}
+
 function capitalized(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
@@ -100,6 +114,7 @@ export function CardFocusDialog({
           ? "This card is not legal in Commander."
           : undefined
   const printing = details ? printingLine(details) : ""
+  const colorIdentity = cardColorIdentityLabel(details, card.name)
   const smallImageUrl = details?.smallImageUrl ?? card.smallImageUrl
   const displayImageUrl = details?.imageUrl ?? card.imageUrl ?? smallImageUrl
   const cachedThumbnailUrl = displayImageUrl === smallImageUrl ? undefined : smallImageUrl
@@ -151,6 +166,7 @@ export function CardFocusDialog({
           {details?.typeLine ? (
             <Text size="sm" style={themed($dimText)} text={details.typeLine} />
           ) : null}
+          {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
           {details?.oracleText ? <Text selectable text={details.oracleText} /> : null}
           {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
           {!details && !detailsError ? (

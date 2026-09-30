@@ -127,8 +127,8 @@ test("changes a cached commander offline and saves both sections without changin
   mockConnectionState.isWebSocketConnected = false
   const view = renderScreen()
   fireEvent.press(view.getByTestId("choose-commander"))
-  expect(view.queryByLabelText("Choose Mountain as commander")).toBeNull()
-  fireEvent.press(view.getByLabelText("Choose Talrand as commander"))
+  expect(view.queryByLabelText("Preview Mountain as commander")).toBeNull()
+  fireEvent.press(view.getByLabelText("Preview Talrand as commander"))
   await waitFor(() => expect(view.getByTestId("set-commander")).toBeEnabled())
   fireEvent.press(view.getByTestId("set-commander"))
   expect(view.getByText("Outside this commander's color identity: Mountain.")).toBeTruthy()
