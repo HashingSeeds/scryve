@@ -123,3 +123,9 @@ jest.mock("../src/i18n/index.ts", () => ({
 declare global {
   let __TEST__: boolean
 }
+
+jest.mock("expo-screen-orientation", () => ({
+  ...jest.requireActual("expo-screen-orientation"),
+  getOrientationAsync: jest.fn(async () => 0),
+  addOrientationChangeListener: jest.fn(() => ({ remove: jest.fn() })),
+}))

@@ -64,6 +64,7 @@ type Props = {
   system?: PlaySystemId
   color: string
   rotation: LifeCardContentRotation
+  boardRotation?: number
   cardWidth: number
   cardHeight: number
   contentInsets?: LifeCardContentInsets
@@ -81,6 +82,7 @@ export function LifeEditor({
   system,
   color,
   rotation,
+  boardRotation = 0,
   cardWidth,
   cardHeight,
   contentInsets,
@@ -231,7 +233,8 @@ export function LifeEditor({
   function drag(event: GestureResponderEvent) {
     const dx = event.nativeEvent.pageX - start.current.x
     const dy = event.nativeEvent.pageY - start.current.y
-    const distance = rotation === 180 ? -dx : rotation === 90 ? dy : rotation === -90 ? -dy : dx
+    const screenAngle = ((rotation + boardRotation) * Math.PI) / 180
+    const distance = dx * Math.cos(screenAngle) + dy * Math.sin(screenAngle)
     const rawSteps = Math.round((distance / Math.max(trackWidth / 2, 1)) * scrubSteps)
     const clampedSteps = Math.max(-scrubSteps, Math.min(scrubSteps, rawSteps))
     holdEdge(rawSteps >= scrubSteps ? 1 : rawSteps <= -scrubSteps ? -1 : 0)

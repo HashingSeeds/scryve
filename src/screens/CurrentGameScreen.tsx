@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
-import { useWindowDimensions, View } from "react-native"
+import { View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 
 import { Button } from "@/components/Button"
@@ -26,6 +26,10 @@ import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
 import { supportsCommanderDamage } from "@/features/game/playSystems"
 import type { GamePlayer, LocalGame, LocalGameResult, PlayerId } from "@/features/game/types"
+import {
+  rotateGameBoardAnchor,
+  useGameBoardOrientation,
+} from "@/features/game/useGameBoardOrientation"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
@@ -68,7 +72,7 @@ export function CurrentGameScreen({
   const { themed } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)
   const system = runtime.game.system
-  const { width, height, fontScale } = useWindowDimensions()
+  const { width, height, fontScale, rotation } = useGameBoardOrientation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [freshBoard, setFreshBoard] = useState(fresh)
   const [savedGameId, setSavedGameId] = useState<string>()
@@ -115,8 +119,8 @@ export function CurrentGameScreen({
     [playerCount, width, height, fontScale, layoutVariant],
   )
   const menuAnchor = useMemo(
-    () => getPlayerGridMenuAnchor(playerCount, gridLayout),
-    [playerCount, gridLayout],
+    () => rotateGameBoardAnchor(getPlayerGridMenuAnchor(playerCount, gridLayout), rotation),
+    [playerCount, gridLayout, rotation],
   )
 
   function confirmEnd(result: LocalGameResult) {
@@ -258,6 +262,7 @@ export function CurrentGameScreen({
     >
       <View testID="game-board" style={themed($board)}>
         <PlayerGrid
+          boardRotation={rotation}
           players={runtime.game.players}
           system={system}
           lifeStep={runtime.game.lifeStep}

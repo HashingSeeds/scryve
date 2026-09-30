@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, ScrollView, Share, useWindowDimensions, View } from "react-native"
+import { ActivityIndicator, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
 
@@ -46,6 +46,10 @@ import {
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
+import {
+  rotateGameBoardAnchor,
+  useGameBoardOrientation,
+} from "@/features/game/useGameBoardOrientation"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -311,7 +315,7 @@ function ConnectedBoardReady({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const { width, height, fontScale } = useWindowDimensions()
+  const { width, height, fontScale, rotation } = useGameBoardOrientation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
@@ -499,8 +503,8 @@ function ConnectedBoardReady({
     [players.length, width, height, fontScale, layoutVariant],
   )
   const menuAnchor = useMemo(
-    () => getPlayerGridMenuAnchor(players.length, gridLayout),
-    [players.length, gridLayout],
+    () => rotateGameBoardAnchor(getPlayerGridMenuAnchor(players.length, gridLayout), rotation),
+    [players.length, gridLayout, rotation],
   )
 
   /**
@@ -624,6 +628,7 @@ function ConnectedBoardReady({
     >
       <View testID="connected-game-board" style={themed($board)}>
         <PlayerGrid
+          boardRotation={rotation}
           players={players}
           system={system}
           lifeStep={game.lifeStep}
