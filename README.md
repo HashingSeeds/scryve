@@ -2,7 +2,7 @@
 
 Scryve is a life counter and deck tracking app for trading card games, with multiplayer built in. It is local-first (MMKV) with Convex sync, and runs on iOS, Android, and web with Expo and React Native.
 
-Missing Clerk or Convex configuration never blocks offline local games.
+Offline, local games are always available, even without an account.
 
 ## Toolchain
 
