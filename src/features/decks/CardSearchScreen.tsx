@@ -9,7 +9,7 @@ import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { CardFocusDialog, COMMANDER_COLORS } from "@/components/CardFocusDialog"
 import { CardImage } from "@/components/CardImage"
 import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
-import { FilterPill, FilterGroup } from "@/components/FilterPill"
+import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
@@ -379,7 +379,7 @@ export function CardSearchScreen({
           onRightPress={onClose}
           backgroundColor={theme.colors.surface}
         />
-        <View style={themed($search)}>
+        <View style={[themed($search), choosingCommander ? $searchHeader : undefined]}>
           <TextField
             testID="card-search-input"
             accessibilityLabel="Search cards"
@@ -419,9 +419,9 @@ export function CardSearchScreen({
                   />
                 ))}
               </ScrollView>
-              <Button
+              <FilterButton
                 testID="commander-filters-button"
-                text={keywords.length ? `Filters (${keywords.length})` : "Filters"}
+                count={keywords.length + (exactColors ? 1 : 0)}
                 onPress={() => setFiltersOpen(true)}
               />
             </View>
@@ -444,7 +444,7 @@ export function CardSearchScreen({
         </View>
         <ScrollView
           style={$results}
-          contentContainerStyle={themed($search)}
+          contentContainerStyle={[themed($search), choosingCommander ? $searchResults : undefined]}
           keyboardShouldPersistTaps="handled"
         >
           {choosingCommander ? <Text weight="medium" text="In this deck" /> : null}
@@ -700,3 +700,6 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
 const $filterRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
 const $pills: ViewStyle = { flexDirection: "row", flexWrap: "wrap", gap: 8 }
 const $filterBody: ViewStyle = { gap: 16 }
+
+const $searchHeader: ViewStyle = { paddingBottom: 4 }
+const $searchResults: ViewStyle = { paddingTop: 8 }

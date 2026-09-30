@@ -7,7 +7,7 @@ import { Card } from "@/components/Card"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { EmptyState } from "@/components/EmptyState"
-import { FilterPill, FilterGroup } from "@/components/FilterPill"
+import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -328,10 +328,9 @@ export function HistoryScreen({
                   />
                 ))}
               </ScrollView>
-              <Button
+              <FilterButton
                 testID="history-filters-button"
-                style={themed($filtersButton)}
-                text={filterCount > 0 ? `Filters (${filterCount})` : "Filters"}
+                count={filterCount}
                 onPress={() => setFiltersOpen(true)}
               />
             </View>
@@ -618,11 +617,6 @@ const $chipWrap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
   gap: spacing.xs,
-})
-const $filtersButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 36,
-  paddingHorizontal: spacing.sm,
-  paddingVertical: 0,
 })
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $dayHeading: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({
