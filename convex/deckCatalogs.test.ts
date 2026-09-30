@@ -560,7 +560,9 @@ describe("Limitless sourceUrl backfill", () => {
 
     jest.useFakeTimers()
     try {
-      await t.mutation(internal.deckCatalogs.backfillLimitlessSourceUrls, {})
+      await t.mutation(internal.deckCatalogs.backfillLimitlessSourceUrls, {
+        paginationOpts: { numItems: 50, cursor: null },
+      })
       await t.finishAllScheduledFunctions(() => jest.runAllTimers())
       const after = await urls()
       expect(after).toEqual({
@@ -570,7 +572,9 @@ describe("Limitless sourceUrl backfill", () => {
         other: oldUrl,
       })
 
-      await t.mutation(internal.deckCatalogs.backfillLimitlessSourceUrls, {})
+      await t.mutation(internal.deckCatalogs.backfillLimitlessSourceUrls, {
+        paginationOpts: { numItems: 50, cursor: null },
+      })
       await t.finishAllScheduledFunctions(() => jest.runAllTimers())
       expect(await urls()).toEqual(after)
     } finally {

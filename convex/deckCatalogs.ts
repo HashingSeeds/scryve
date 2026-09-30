@@ -159,17 +159,15 @@ export const upsert = internalMutation({
   },
 })
 
-const LIMITLESS_BACKFILL_BATCH = 50
-
 export const backfillLimitlessSourceUrls = internalMutation({
-  args: { cursor: v.optional(v.string()) },
+  args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
     const page = await ctx.db
       .query("deckCatalogs")
       .withIndex("by_game_and_source_and_external_id", (q) =>
         q.eq("game", "pokemon").eq("source", "limitless"),
       )
-      .paginate({ numItems: LIMITLESS_BACKFILL_BATCH, cursor: args.cursor ?? null })
+      .paginate(args.paginationOpts)
     for (const row of page.page) {
       const id = parseLimitlessExternalId(row.externalId)
       if (!id) continue
@@ -178,7 +176,7 @@ export const backfillLimitlessSourceUrls = internalMutation({
     }
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.deckCatalogs.backfillLimitlessSourceUrls, {
-        cursor: page.continueCursor,
+        paginationOpts: { ...args.paginationOpts, cursor: page.continueCursor },
       })
     return null
   },
