@@ -452,8 +452,10 @@ describe("DecksScreen", () => {
     expect(view.getByTestId("deck-filters-dialog")).toBeTruthy()
     expect(view.getByTestId("system-filter")).toBeTruthy()
     expect(view.queryByTestId("format-filter")).toBeNull()
+    expect(view.getByText("Choose a system to filter by format.")).toBeTruthy()
 
     fireEvent.press(view.getByTestId("system-filter-mtg"))
+    expect(view.queryByText("Choose a system to filter by format.")).toBeNull()
     expect(view.getByTestId("format-filter")).toBeTruthy()
     expect(view.getByTestId("format-filter-all").props.accessibilityState.selected).toBe(true)
 
@@ -478,6 +480,22 @@ describe("DecksScreen", () => {
     fireEvent.press(view.getByLabelText("Remove filter Magic"))
     expect(view.getByLabelText("Filters")).toBeTruthy()
     expect(view.queryByLabelText("Remove filter Magic")).toBeNull()
+  })
+
+  it("reserves the same dialog height when systems reveal different formats", () => {
+    const view = renderShelf()
+    fireEvent.press(view.getByTestId("deck-filters-button"))
+
+    for (const system of ["all", "mtg", "ygo", "pokemon", "all"]) {
+      fireEvent.press(view.getByTestId(`system-filter-${system}`))
+      expect(StyleSheet.flatten(view.getByTestId("deck-filters-dialog").props.style)).toMatchObject(
+        {
+          height: 480,
+          maxHeight: "100%",
+        },
+      )
+      expect(view.getByTestId("deck-filters-done")).toBeEnabled()
+    }
   })
 
   it("narrows the shelf by search and offers a way back", () => {
