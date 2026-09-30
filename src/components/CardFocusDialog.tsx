@@ -35,6 +35,7 @@ export type FocusedCardDetails = {
   commanderEligibility?: string
   commanderLegality?: string
   colorIdentity?: string
+  keywords?: string
   commanderRulesUpdatedAt?: string
 }
 
@@ -44,6 +45,7 @@ export interface CardFocusDialogProps {
   detailsError?: string
   detailsRetryAfterMs?: number
   onRetryDetails?: () => void
+  showQuantity?: boolean
   onIncrement?: () => void
   onDecrement?: () => void
   onSetCommander?: (color?: CommanderColor) => void
@@ -80,6 +82,7 @@ export function CardFocusDialog({
   detailsError,
   detailsRetryAfterMs,
   onRetryDetails,
+  showQuantity = true,
   onIncrement,
   onDecrement,
   onSetCommander,
@@ -189,29 +192,31 @@ export function CardFocusDialog({
           />
         </View>
       ) : null}
-      <View testID="card-focus-quantity" style={themed($quantityRow)}>
-        <Text
-          size="sm"
-          style={themed($quantityLabel)}
-          text={`${card.quantity}× in ${card.boardLabel}`}
-        />
-        {onDecrement ? (
-          <Button
-            text="−"
-            testID="card-focus-decrement"
-            style={themed($quantityButton)}
-            onPress={onDecrement}
+      {showQuantity ? (
+        <View testID="card-focus-quantity" style={themed($quantityRow)}>
+          <Text
+            size="sm"
+            style={themed($quantityLabel)}
+            text={`${card.quantity}× in ${card.boardLabel}`}
           />
-        ) : null}
-        {onIncrement ? (
-          <Button
-            text="+"
-            testID="card-focus-increment"
-            style={themed($quantityButton)}
-            onPress={onIncrement}
-          />
-        ) : null}
-      </View>
+          {onDecrement ? (
+            <Button
+              text="−"
+              testID="card-focus-decrement"
+              style={themed($quantityButton)}
+              onPress={onDecrement}
+            />
+          ) : null}
+          {onIncrement ? (
+            <Button
+              text="+"
+              testID="card-focus-increment"
+              style={themed($quantityButton)}
+              onPress={onIncrement}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </DialogCard>
   )
 }

@@ -181,6 +181,40 @@ export const search = action({
   },
 })
 
+export const keywordAbilities = action({
+  args: {},
+  returns: v.array(v.string()),
+  handler: async (ctx): Promise<string[]> => {
+    await requireActionCapability(ctx, "mtg", "cardCatalog")
+    const response = await fetchScryfall(ctx, "/catalog/keyword-abilities")
+    if (!response.ok)
+      throw new ConvexError({
+        code: "scryfall_unavailable",
+        message: "Keyword abilities are temporarily unavailable",
+      })
+    const payload = objectRecord((await response.json()) as unknown)
+    const data = payload?.data
+    if (
+      payload?.object !== "catalog" ||
+      !Array.isArray(data) ||
+      data.length === 0 ||
+      data.length > 1024 ||
+      !data.every(
+        (keyword): keyword is string =>
+          typeof keyword === "string" &&
+          keyword.trim().length > 0 &&
+          keyword.length <= 100 &&
+          !/[\r\n]/.test(keyword),
+      )
+    )
+      throw new ConvexError({
+        code: "scryfall_invalid_response",
+        message: "Invalid keyword abilities response",
+      })
+    return [...new Set(data)]
+  },
+})
+
 export const byCatalogId = action({
   args: { game: v.string(), cardId: v.string() },
   handler: async (ctx, args): Promise<CatalogCard> => {
@@ -331,6 +365,7 @@ export const byId = action({
       cached.commanderEligibility !== undefined &&
       cached.commanderLegality !== undefined &&
       cached.colorIdentity !== undefined &&
+      cached.keywords !== undefined &&
       cached.updatedAt >= Date.now() - 24 * 60 * 60 * 1000
     )
       return toCardReference(cached)
@@ -370,6 +405,7 @@ const cardDetailsValidator = v.object({
   manaCost: v.optional(v.string()),
   typeLine: v.optional(v.string()),
   oracleText: v.optional(v.string()),
+  keywords: v.optional(v.string()),
   setName: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),
   rarity: v.optional(v.string()),
@@ -417,6 +453,7 @@ export const detailsBatch = query({
               ...(reference.manaCost !== undefined ? { manaCost: reference.manaCost } : {}),
               ...(reference.typeLine !== undefined ? { typeLine: reference.typeLine } : {}),
               ...(reference.oracleText !== undefined ? { oracleText: reference.oracleText } : {}),
+              ...(reference.keywords !== undefined ? { keywords: reference.keywords } : {}),
               ...(reference.setName !== undefined ? { setName: reference.setName } : {}),
               ...(reference.collectorNumber !== undefined
                 ? { collectorNumber: reference.collectorNumber }
@@ -489,6 +526,7 @@ const cardReferenceValidator = v.object({
   manaCost: v.optional(v.string()),
   typeLine: v.optional(v.string()),
   oracleText: v.optional(v.string()),
+  keywords: v.optional(v.string()),
   setName: v.optional(v.string()),
   setCode: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),

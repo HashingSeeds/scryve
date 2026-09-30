@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react"
-import { Modal, ScrollView, TouchableOpacity, View } from "react-native"
+import { Keyboard, Modal, ScrollView, TouchableOpacity, View } from "react-native"
 import type { ViewStyle } from "react-native"
 import { useConvex, useConvexConnectionState } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
+import { Button } from "@/components/Button"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
-import { COMMANDER_COLORS } from "@/components/CardFocusDialog"
+import { CardFocusDialog, COMMANDER_COLORS } from "@/components/CardFocusDialog"
 import { CardImage } from "@/components/CardImage"
+import { DialogCard, $dialogActions, $dialogButton } from "@/components/DialogCard"
+import { FilterPill, FilterGroup } from "@/components/FilterPill"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
@@ -15,11 +18,13 @@ import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage } from "@/utils/convexError"
+import { loadString, saveString } from "@/utils/storage"
 
 import { loadCardDetails, saveCardDetails } from "./cardDetailsCache"
 import { cardDetailsKey, printingKey, type CommanderColor, type DeckCard } from "./deckCards"
 import type { KnownCardEntry } from "./deckVersionsCache"
 import type { GuestDeckPayload } from "./guestDeck"
+import { useCardDetails } from "./useCardDetails"
 import { api } from "../../../convex/_generated/api"
 import { deckSections } from "../../../convex/lib/deckGames"
 
@@ -33,7 +38,6 @@ export function CardSearchScreen({
   offlineCandidates,
   initialSection,
   commanderCards,
-  onChooseCommander,
 }: {
   game: string
   format: string
@@ -46,7 +50,6 @@ export function CardSearchScreen({
   offlineCandidates?: KnownCardEntry[]
   initialSection?: string
   commanderCards?: DeckCard[]
-  onChooseCommander?: (card: DeckCard) => void
 }) {
   const convex = useConvex()
   const connection = useConvexConnectionState()
@@ -56,7 +59,12 @@ export function CardSearchScreen({
     initialSection ?? sections.find((item) => item.id === "main")?.id ?? sections[0]?.id ?? "main",
   )
   const choosingCommander = game === "mtg" && format === "commander" && section === "commander"
-  const [commanderColor, setCommanderColor] = useState<CommanderColor>()
+  const [candidate, setCandidate] = useState<DeckCard>()
+  const [candidateError, setCandidateError] = useState<string>()
+  const candidateDetails = useCardDetails(
+    candidate ? { ...candidate, detailKey: cardDetailsKey(candidate, game), game } : undefined,
+    true,
+  )
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchCard[]>()
   const [offlineResults, setOfflineResults] = useState<KnownCardEntry[]>()
@@ -65,7 +73,44 @@ export function CardSearchScreen({
 
   const offline = connection?.isWebSocketConnected === false
   const [cachedRules, setCachedRules] = useState(() => loadCardDetails())
-  const [colorFilter, setColorFilter] = useState<string>()
+  const [colorFilters, setColorFilters] = useState<string[]>([])
+  const [exactColors, setExactColors] = useState(false)
+  const [keywords, setKeywords] = useState<string[]>([])
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [keywordQuery, setKeywordQuery] = useState("")
+  const [keywordCatalog, setKeywordCatalog] = useState<string[]>(() => {
+    try {
+      const value: unknown = JSON.parse(loadString("scryve.cards.keyword-abilities.v1") ?? "null")
+      return Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === "string")
+        : []
+    } catch {
+      return []
+    }
+  })
+  const [keywordError, setKeywordError] = useState<string>()
+  const searchRequested =
+    query.trim().length >= 2 ||
+    (choosingCommander && (colorFilters.length > 0 || keywords.length > 0))
+
+  useEffect(() => {
+    if (!filtersOpen || offline || !convex) return
+    let active = true
+    setKeywordError(undefined)
+    void convex
+      .action(api.cards.keywordAbilities, {})
+      .then((catalog) => {
+        if (!active) return
+        setKeywordCatalog([...catalog].sort((a, b) => a.localeCompare(b)))
+        saveString("scryve.cards.keyword-abilities.v1", JSON.stringify(catalog))
+      })
+      .catch(() => {
+        if (active) setKeywordError("Keyword choices unavailable. Try reopening filters.")
+      })
+    return () => {
+      active = false
+    }
+  }, [filtersOpen, convex, offline])
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()
@@ -78,14 +123,36 @@ export function CardSearchScreen({
     )
   }
 
-  function matchesColor(details?: FocusedCardDetails) {
-    if (!colorFilter) return true
-    if (colorFilter === "C")
+  function matchesFilters(details?: FocusedCardDetails) {
+    if (!keywords.every((keyword) => details?.keywords?.split("\n").includes(keyword))) return false
+    if (!colorFilters.length) return true
+    if (colorFilters.includes("C"))
       return details?.colorIdentity === "" && details.commanderEligibility !== "color-choice"
+    const identity = details?.colorIdentity
+    if (identity === undefined) return false
+    const missing = colorFilters.filter((color) => !identity.includes(color))
+    const canChooseColor = details?.commanderEligibility === "color-choice"
     return (
-      details?.colorIdentity?.includes(colorFilter) ||
-      details?.commanderEligibility === "color-choice"
+      (missing.length === 0 || (canChooseColor && missing.length === 1)) &&
+      (!exactColors || [...identity].every((color) => colorFilters.includes(color)))
     )
+  }
+
+  function toggleColor(color: string) {
+    setColorFilters((current) =>
+      color === "C"
+        ? current.includes("C")
+          ? []
+          : ["C"]
+        : current.includes(color)
+          ? current.filter((value) => value !== color)
+          : [...current.filter((value) => value !== "C"), color],
+    )
+  }
+
+  function preview(card: DeckCard) {
+    setCandidateError(undefined)
+    setCandidate(card)
   }
 
   function inDeck(card: { name: string; oracleId?: string }) {
@@ -108,7 +175,8 @@ export function CardSearchScreen({
         return (
           !details?.commanderEligibility ||
           !details.commanderLegality ||
-          details.colorIdentity === undefined
+          details.colorIdentity === undefined ||
+          (keywords.length > 0 && details.keywords === undefined)
         )
       })
       try {
@@ -127,7 +195,8 @@ export function CardSearchScreen({
           if (
             cached[key]?.commanderEligibility &&
             cached[key]?.commanderLegality &&
-            cached[key]?.colorIdentity !== undefined
+            cached[key]?.colorIdentity !== undefined &&
+            (keywords.length === 0 || cached[key]?.keywords !== undefined)
           )
             continue
           const id =
@@ -153,7 +222,7 @@ export function CardSearchScreen({
     return () => {
       active = false
     }
-  }, [convex, game, commanderCards, choosingCommander, offline, rulesAttempt])
+  }, [convex, game, commanderCards, choosingCommander, offline, rulesAttempt, keywords])
 
   useEffect(() => {
     let active = true
@@ -163,8 +232,8 @@ export function CardSearchScreen({
     const searchQuery = choosingCommander
       ? query.slice(0, 80).replace(/[()"]/g, " ").trim()
       : query.trim()
-    setBusy(searchQuery.length >= 2)
-    if (searchQuery.length < 2) return
+    setBusy(searchRequested)
+    if (!searchRequested) return
     if (offline) {
       setBusy(false)
       const wanted = searchQuery.toLowerCase()
@@ -192,7 +261,7 @@ export function CardSearchScreen({
         const found = await convex.action(api.cards.search, {
           game,
           query: choosingCommander
-            ? `(${searchQuery}) is:commander f:commander${colorFilter ? (colorFilter === "C" ? " id:c" : ` (id>=${colorFilter.toLowerCase()} or o:"choose a color")`) : ""}`
+            ? `${searchQuery.length >= 2 ? `(${searchQuery}) ` : ""}is:commander f:commander${colorFilters.length ? (colorFilters.includes("C") ? " id:c" : ` (id${exactColors ? "=" : ">="}${colorFilters.join("").toLowerCase()} or o:"choose a color")`) : ""}${keywords.map((keyword) => ` kw:"${keyword.replace(/["\\]/g, "")}"`).join("")}`
             : searchQuery,
         })
         if (active) setResults(found)
@@ -212,18 +281,24 @@ export function CardSearchScreen({
       active = false
       clearTimeout(timer)
     }
-  }, [convex, game, query, offline, offlineCandidates, choosingCommander, colorFilter])
+  }, [
+    convex,
+    game,
+    query,
+    offline,
+    offlineCandidates,
+    choosingCommander,
+    colorFilters,
+    exactColors,
+    keywords,
+    searchRequested,
+  ])
 
-  function add(card: SearchCard) {
-    if ("scryfallId" in card) {
-      saveCardDetails({ [card.scryfallId]: card })
-      setCachedRules((current) => ({ ...current, [card.scryfallId]: card }))
-    }
-    const error = onAdd({
+  function searchEntry(card: SearchCard) {
+    return {
       name: card.name,
       quantity: 1,
       section,
-      ...(choosingCommander && commanderColor ? { commanderColor } : {}),
       imageUrl: card.imageUrl,
       smallImageUrl: card.smallImageUrl,
       ...("scryfallId" in card
@@ -236,31 +311,56 @@ export function CardSearchScreen({
             identityNamespace: card.identityNamespace,
             category: card.category,
           }),
-    })
+    }
+  }
+
+  function add(card: SearchCard) {
+    if ("scryfallId" in card) {
+      saveCardDetails({ [card.scryfallId]: card })
+      setCachedRules((current) => ({ ...current, [card.scryfallId]: card }))
+    }
+    if (choosingCommander) {
+      preview(searchEntry(card))
+      return
+    }
+    const error = onAdd(searchEntry(card))
     setMessage(error ?? `Added ${card.name}.`)
-    if (!error) setCommanderColor(undefined)
   }
 
   function addOffline(entry: KnownCardEntry) {
-    const error = onAdd({
-      ...entry.card,
-      quantity: 1,
-      section,
-      ...(choosingCommander ? { commanderColor } : {}),
-    })
+    if (choosingCommander) {
+      preview(entry.card)
+      return
+    }
+    const error = onAdd({ ...entry.card, quantity: 1, section })
     setMessage(error ?? `Added ${entry.card.name}.`)
-    if (!error) setCommanderColor(undefined)
+  }
+
+  function setCommander(commanderColor?: CommanderColor) {
+    if (!candidate) return
+    const error = onAdd({
+      ...candidate,
+      quantity: 1,
+      section: "commander",
+      board: "commander",
+      commanderColor,
+    })
+    if (error) {
+      setCandidateError(error)
+      return
+    }
+    setCandidate(undefined)
   }
 
   const catalogResults = results?.filter(
     (card) =>
       !choosingCommander ||
-      ("scryfallId" in card && eligible(card) && matchesColor(card) && !inDeck(card)),
+      ("scryfallId" in card && eligible(card) && matchesFilters(card) && !inDeck(card)),
   )
   const cachedCandidates = offlineResults?.filter(
     (entry) =>
       !choosingCommander ||
-      (!inDeck(entry.card) && matchesColor(cachedRules[cardDetailsKey(entry.card, game)])),
+      (!inDeck(entry.card) && matchesFilters(cachedRules[cardDetailsKey(entry.card, game)])),
   )
 
   return (
@@ -302,35 +402,44 @@ export function CardSearchScreen({
             />
           ) : null}
           {choosingCommander ? (
-            <SelectField
-              testID="commander-color-filter"
-              label="Color identity"
-              options={[...COMMANDER_COLORS, { id: "C", label: "Colorless" }]}
-              value={colorFilter}
-              placeholder="All colors"
-              clearLabel="All colors"
-              onSelect={setColorFilter}
-            />
+            <View style={$filterRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={$pills}
+              >
+                {[...COMMANDER_COLORS, { id: "C", label: "Colorless" }].map((color) => (
+                  <FilterPill
+                    key={color.id}
+                    testID={`commander-color-${color.id}`}
+                    label={color.label}
+                    selected={colorFilters.includes(color.id)}
+                    onPress={() => toggleColor(color.id)}
+                  />
+                ))}
+              </ScrollView>
+              <Button
+                testID="commander-filters-button"
+                text={keywords.length ? `Filters (${keywords.length})` : "Filters"}
+                onPress={() => setFiltersOpen(true)}
+              />
+            </View>
           ) : null}
-          {choosingCommander &&
-          (catalogResults?.some(
-            (card) =>
-              "commanderEligibility" in card && card.commanderEligibility === "color-choice",
-          ) ||
-            cachedCandidates?.some(
-              (entry) =>
-                cachedRules[cardDetailsKey(entry.card, game)]?.commanderEligibility ===
-                "color-choice",
-            )) ? (
-            <SelectField
-              testID="search-commander-color"
-              label="Commander color"
-              options={COMMANDER_COLORS}
-              value={commanderColor}
-              onSelect={(color) =>
-                setCommanderColor(COMMANDER_COLORS.find((option) => option.id === color)?.id)
-              }
-            />
+          {choosingCommander && keywords.length ? (
+            <View style={$pills}>
+              {keywords.map((keyword) => (
+                <FilterPill
+                  key={keyword}
+                  label={keyword}
+                  selected
+                  removable
+                  onPress={() =>
+                    setKeywords((current) => current.filter((value) => value !== keyword))
+                  }
+                />
+              ))}
+            </View>
           ) : null}
         </View>
         <ScrollView
@@ -349,11 +458,11 @@ export function CardSearchScreen({
               <Text text={`${rulesError} Tap to retry.`} />
             </TouchableOpacity>
           ) : null}
-          {choosingCommander && onChooseCommander
+          {choosingCommander
             ? commanderCards
                 ?.filter((card) => {
                   const cached = cachedRules[cardDetailsKey(card, game)]
-                  return eligible(cached) && matchesColor(cached)
+                  return eligible(cached) && matchesFilters(cached)
                 })
                 .map((card) => (
                   <TouchableOpacity
@@ -361,7 +470,7 @@ export function CardSearchScreen({
                     accessibilityRole="button"
                     accessibilityLabel={`Choose ${card.name} as commander`}
                     style={themed($result)}
-                    onPress={() => onChooseCommander(card)}
+                    onPress={() => preview(card)}
                   >
                     <CardImage
                       game={game}
@@ -379,14 +488,14 @@ export function CardSearchScreen({
           !commanderCards?.some(
             (card) =>
               eligible(cachedRules[cardDetailsKey(card, game)]) &&
-              matchesColor(cachedRules[cardDetailsKey(card, game)]),
+              matchesFilters(cachedRules[cardDetailsKey(card, game)]),
           ) ? (
             <Text size="sm" text="No eligible commanders in this deck." />
           ) : null}
           {choosingCommander ? (
             <Text weight="medium" text={offline ? "Cached cards" : "Scryfall"} />
           ) : null}
-          {choosingCommander && query.trim().length < 2 ? (
+          {choosingCommander && !searchRequested ? (
             <Text
               size="sm"
               text={
@@ -407,10 +516,18 @@ export function CardSearchScreen({
               <TouchableOpacity
                 style={$add}
                 accessibilityRole="button"
-                accessibilityLabel={`Add ${entry.card.name} to deck`}
+                accessibilityLabel={
+                  choosingCommander
+                    ? `Preview ${entry.card.name} as commander`
+                    : `Add ${entry.card.name} to deck`
+                }
                 onPress={() => addOffline(entry)}
               >
-                <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
+                <Text
+                  size="sm"
+                  style={{ color: theme.colors.brandText }}
+                  text={choosingCommander ? "View" : "+ Add"}
+                />
               </TouchableOpacity>
             </View>
           ))}
@@ -433,10 +550,18 @@ export function CardSearchScreen({
               <TouchableOpacity
                 style={$add}
                 accessibilityRole="button"
-                accessibilityLabel={`Add ${card.name} to deck`}
+                accessibilityLabel={
+                  choosingCommander
+                    ? `Preview ${card.name} as commander`
+                    : `Add ${card.name} to deck`
+                }
                 onPress={() => add(card)}
               >
-                <Text size="sm" style={{ color: theme.colors.brandText }} text="+ Add" />
+                <Text
+                  size="sm"
+                  style={{ color: theme.colors.brandText }}
+                  text={choosingCommander ? "View" : "+ Add"}
+                />
               </TouchableOpacity>
             </View>
           ))}
@@ -444,6 +569,104 @@ export function CardSearchScreen({
           {message ? <Text accessibilityLiveRegion="polite" text={message} /> : null}
         </ScrollView>
       </Screen>
+      {filtersOpen ? (
+        <DialogCard
+          visible
+          onClose={() => setFiltersOpen(false)}
+          dialogTestID="commander-filters-dialog"
+          backdropAccessibilityLabel="Dismiss commander filters"
+        >
+          <Text preset="subheading" text="Filters" />
+          <ScrollView contentContainerStyle={$filterBody} keyboardShouldPersistTaps="handled">
+            <FilterGroup heading="Color match">
+              <FilterPill
+                label="Include these colors"
+                selected={!exactColors}
+                onPress={() => setExactColors(false)}
+              />
+              <FilterPill
+                label="Exactly these colors"
+                selected={exactColors}
+                onPress={() => setExactColors(true)}
+              />
+            </FilterGroup>
+            <TextField
+              accessibilityLabel="Search keywords"
+              placeholder="Search keywords"
+              value={keywordQuery}
+              onChangeText={setKeywordQuery}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+              autoCorrect={false}
+            />
+            <FilterGroup heading="Keywords">
+              {keywordCatalog
+                .filter((keyword) => keyword.toLowerCase().includes(keywordQuery.toLowerCase()))
+                .slice(0, 40)
+                .map((keyword) => (
+                  <FilterPill
+                    key={keyword}
+                    label={keyword}
+                    selected={keywords.includes(keyword)}
+                    onPress={() =>
+                      setKeywords((current) =>
+                        current.includes(keyword)
+                          ? current.filter((value) => value !== keyword)
+                          : [...current, keyword],
+                      )
+                    }
+                  />
+                ))}
+            </FilterGroup>
+            {keywordError ? <Text text={keywordError} /> : null}
+            {offline && !keywordCatalog.length ? (
+              <Text text="Open filters online to save keyword choices." />
+            ) : null}
+          </ScrollView>
+          <View style={themed($dialogActions)}>
+            <Button
+              style={themed($dialogButton)}
+              text="Clear all"
+              onPress={() => {
+                setColorFilters([])
+                setKeywords([])
+                setExactColors(false)
+              }}
+            />
+            <Button
+              style={themed($dialogButton)}
+              text="Done"
+              onPress={() => setFiltersOpen(false)}
+            />
+          </View>
+        </DialogCard>
+      ) : null}
+      {candidate ? (
+        <CardFocusDialog
+          key={printingKey(candidate)}
+          card={{
+            game,
+            cardId:
+              candidate.scryfallId ??
+              candidate.cardId ??
+              candidate.printingId ??
+              candidate.providerCardId,
+            name: candidate.name,
+            imageUrl: candidate.imageUrl,
+            smallImageUrl: candidate.smallImageUrl,
+            quantity: candidate.quantity,
+            boardLabel: inDeck(candidate) ? "In this deck" : "Scryfall",
+            commanderColor: candidate.commanderColor,
+          }}
+          details={candidateDetails.details}
+          detailsError={candidateError ?? candidateDetails.detailsError}
+          detailsRetryAfterMs={candidateDetails.detailsRetryAfterMs}
+          onRetryDetails={candidateDetails.retryDetails}
+          onClose={() => setCandidate(undefined)}
+          showQuantity={false}
+          onSetCommander={setCommander}
+        />
+      ) : null}
     </Modal>
   )
 }
@@ -473,3 +696,7 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
 })
+
+const $filterRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
+const $pills: ViewStyle = { flexDirection: "row", flexWrap: "wrap", gap: 8 }
+const $filterBody: ViewStyle = { gap: 16 }

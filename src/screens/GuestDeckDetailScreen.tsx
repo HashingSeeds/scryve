@@ -330,10 +330,6 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
           format={current.format}
           initialSection={choosingCommander ? "commander" : undefined}
           commanderCards={current.cards}
-          onChooseCommander={(card) => {
-            setAdding(false)
-            setFocusedIndex(current.cards.indexOf(card))
-          }}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
             setUndo(undefined)

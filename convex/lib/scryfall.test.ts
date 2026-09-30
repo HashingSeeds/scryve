@@ -155,3 +155,23 @@ describe("Commander eligibility", () => {
     expect(normalizeScryfallCard(base)).not.toHaveProperty("commanderEligibility")
   })
 })
+
+describe("card keywords", () => {
+  const card = { id: "test", name: "Candidate" }
+
+  it("preserves the provider keywords as scalar metadata, including known empty lists", () => {
+    expect(normalizeScryfallCard({ ...card, keywords: ["Flying", "Ward"] })).toMatchObject({
+      keywords: "Flying\nWard",
+    })
+    expect(normalizeScryfallCard({ ...card, keywords: [] })).toMatchObject({ keywords: "" })
+    expect(normalizeScryfallCard(card)).not.toHaveProperty("keywords")
+  })
+
+  it.each([
+    { keywords: [123] },
+    { keywords: ["Flying\nWard"] },
+    { keywords: Array(257).fill("Flying") },
+  ])("omits invalid keyword arrays %j", ({ keywords }) =>
+    expect(normalizeScryfallCard({ ...card, keywords })).not.toHaveProperty("keywords"),
+  )
+})

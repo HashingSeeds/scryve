@@ -500,6 +500,7 @@ export default defineSchema({
     manaCost: v.optional(v.string()),
     typeLine: v.optional(v.string()),
     oracleText: v.optional(v.string()),
+    keywords: v.optional(v.string()),
     setName: v.optional(v.string()),
     setCode: v.optional(v.string()),
     collectorNumber: v.optional(v.string()),

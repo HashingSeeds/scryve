@@ -85,6 +85,9 @@ describe("card provider caching and health", () => {
       oracleId: id,
       name: "Sai, Master Thopterist",
       setName: "Core Set 2019",
+      commanderEligibility: "eligible",
+      commanderLegality: "legal",
+      colorIdentity: "U",
     })
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() =>
       response({
@@ -95,12 +98,14 @@ describe("card provider caching and health", () => {
         type_line: "Legendary Creature — Human Artificer",
         color_identity: ["U"],
         legalities: { commander: "legal" },
+        keywords: ["Flying", "Ward"],
       }),
     )
     const metadata = {
       commanderEligibility: "eligible",
       commanderLegality: "legal",
       colorIdentity: "U",
+      keywords: "Flying\nWard",
     }
     await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject(metadata)
     await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject(metadata)
@@ -146,6 +151,7 @@ describe("card provider caching and health", () => {
         type_line: "Legendary Creature — Human",
         color_identity: ["U"],
         legalities: { commander: "banned" },
+        keywords: [],
       }),
     )
     const refreshed = await t.action(api.cards.byId, { scryfallId: id })
@@ -699,5 +705,46 @@ describe("card details batch", () => {
         items: Array.from({ length: 401 }, (_, index) => ({ key: `mtg:${index}` })),
       }),
     ).rejects.toMatchObject({ data: { code: "details_batch_too_large" } })
+  })
+})
+
+describe("keyword abilities catalog", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("loads the provider catalog without signing in", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation(() => response({ object: "catalog", data: ["Flying", "Ward", "Flying"] }))
+    await expect(t.action(api.cards.keywordAbilities, {})).resolves.toEqual(["Flying", "Ward"])
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.scryfall.com/catalog/keyword-abilities",
+      expect.any(Object),
+    )
+  })
+
+  it.each([
+    { object: "list", data: ["Flying"] },
+    { object: "catalog", data: [] },
+    { object: "catalog", data: [123] },
+    { object: "catalog", data: ["Flying\nWard"] },
+    { object: "catalog", data: Array(1025).fill("Flying") },
+  ])("rejects malformed or unbounded catalogs", async (payload) => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    jest.spyOn(global, "fetch").mockImplementation(() => response(payload))
+    await expect(t.action(api.cards.keywordAbilities, {})).rejects.toMatchObject({
+      data: { code: "scryfall_invalid_response" },
+    })
+  })
+
+  it("reports provider outages", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    jest.spyOn(global, "fetch").mockImplementation(() => response({}, 503))
+    await expect(t.action(api.cards.keywordAbilities, {})).rejects.toMatchObject({
+      data: { code: "scryfall_unavailable" },
+    })
   })
 })

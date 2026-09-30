@@ -69,6 +69,7 @@ export type CardReference = {
   manaCost?: string
   typeLine?: string
   oracleText?: string
+  keywords?: string
   setName?: string
   setCode?: string
   collectorNumber?: string
@@ -153,6 +154,14 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
   const manaCost = cardOrFaceField(card, faces, "mana_cost", FACE_INLINE_SEPARATOR)
   const typeLine = cardOrFaceField(card, faces, "type_line", FACE_INLINE_SEPARATOR)
   const oracleText = cardOrFaceField(card, faces, "oracle_text", FACE_ORACLE_SEPARATOR)
+  const keywords =
+    Array.isArray(card.keywords) &&
+    card.keywords.length <= 256 &&
+    card.keywords.every(
+      (keyword) => typeof keyword === "string" && keyword.length <= 100 && !/[\r\n]/.test(keyword),
+    )
+      ? card.keywords.join("\n")
+      : undefined
   const setName = stringField(card, "set_name")
   const setCode = stringField(card, "set")
   const collectorNumber = stringField(card, "collector_number")
@@ -174,6 +183,7 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
     ...(manaCost ? { manaCost } : {}),
     ...(typeLine ? { typeLine } : {}),
     ...(oracleText ? { oracleText } : {}),
+    ...(keywords !== undefined ? { keywords } : {}),
     ...(setName ? { setName } : {}),
     ...(setCode ? { setCode } : {}),
     ...(collectorNumber ? { collectorNumber } : {}),

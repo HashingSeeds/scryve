@@ -1230,10 +1230,6 @@ function DeckDetailContent({
           offlineCandidates={offlineCandidates}
           initialSection={choosingCommander ? "commander" : undefined}
           commanderCards={draft}
-          onChooseCommander={(card) => {
-            setAdding(false)
-            focusCard(card)
-          }}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
             if (
