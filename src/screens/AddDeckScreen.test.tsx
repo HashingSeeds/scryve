@@ -658,15 +658,17 @@ describe("AddDeckScreen", () => {
     expect(onCreated).toHaveBeenCalledWith("deck-imported")
     expect(mockImport).toHaveBeenCalledWith(
       expect.objectContaining({
-        cards: [{
-          name: "Hakbal of the Surging Soul",
-          quantity: 1,
-          oracleId: "11111111-1111-1111-1111-111111111111",
-          scryfallId: "22222222-2222-2222-2222-222222222222",
-          board: "commander",
-          imageUrl: undefined,
-          smallImageUrl: undefined,
-        }],
+        cards: [
+          {
+            name: "Hakbal of the Surging Soul",
+            quantity: 1,
+            oracleId: "11111111-1111-1111-1111-111111111111",
+            scryfallId: "22222222-2222-2222-2222-222222222222",
+            board: "commander",
+            imageUrl: undefined,
+            smallImageUrl: undefined,
+          },
+        ],
       }),
     )
   })
