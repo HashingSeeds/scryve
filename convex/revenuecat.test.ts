@@ -340,14 +340,14 @@ describe("RevenueCat entitlement sync", () => {
     )
     await actor.action(api.revenuecat.syncCurrent, {})
     await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
-      fullHistory: false,
+      fullHistory: true,
       proDecksLimit: false,
     })
 
     fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: false, observedAt: 1_000 }))
     await actor.action(api.revenuecat.syncCurrent, {})
     await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
-      fullHistory: false,
+      fullHistory: true,
       proDecksLimit: false,
     })
   })
