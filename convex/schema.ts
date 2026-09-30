@@ -501,6 +501,7 @@ export default defineSchema({
     typeLine: v.optional(v.string()),
     oracleText: v.optional(v.string()),
     keywords: v.optional(v.string()),
+    faceDetails: v.optional(v.string()),
     setName: v.optional(v.string()),
     setCode: v.optional(v.string()),
     collectorNumber: v.optional(v.string()),

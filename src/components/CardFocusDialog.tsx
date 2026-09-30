@@ -7,9 +7,11 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { DialogCard } from "@/components/DialogCard"
+import { FilterPill } from "@/components/FilterPill"
 import { RetryableError } from "@/components/RetryableError"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
+import { readCardFaces } from "@/features/decks/cardFaces"
 import type { CommanderColor } from "@/features/decks/deckCards"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -35,6 +37,7 @@ export type FocusedCardDetails = {
   commanderEligibility?: string
   commanderLegality?: string
   colorIdentity?: string
+  faceDetails?: string
   keywords?: string
   commanderRulesUpdatedAt?: string
 }
@@ -104,6 +107,11 @@ export function CardFocusDialog({
 }: CardFocusDialogProps) {
   const { themed } = useAppTheme()
   const [commanderColor, setCommanderColor] = useState(card.commanderColor)
+  const [faceIndex, setFaceIndex] = useState(0)
+  const faces = readCardFaces(details?.faceDetails)
+  const face = faces[faceIndex]
+  const visibleDetails = face ?? details
+  const visibleName = face?.name ?? card.name
   const needsColor = details?.commanderEligibility === "color-choice"
   const commanderProblem =
     !details?.commanderEligibility || !details?.commanderLegality
@@ -115,10 +123,16 @@ export function CardFocusDialog({
           : undefined
   const printing = details ? printingLine(details) : ""
   const colorIdentity = cardColorIdentityLabel(details, card.name)
-  const smallImageUrl = details?.smallImageUrl ?? card.smallImageUrl
-  const displayImageUrl = details?.imageUrl ?? card.imageUrl ?? smallImageUrl
+  const smallImageUrl = face ? face.smallImageUrl : (details?.smallImageUrl ?? card.smallImageUrl)
+  const displayImageUrl = face
+    ? (face.imageUrl ?? smallImageUrl)
+    : (details?.imageUrl ?? card.imageUrl ?? smallImageUrl)
   const cachedThumbnailUrl = displayImageUrl === smallImageUrl ? undefined : smallImageUrl
-  const imageAccessibilityLabel = [card.name, details?.typeLine, details?.oracleText]
+  const imageAccessibilityLabel = [
+    visibleName,
+    visibleDetails?.typeLine,
+    visibleDetails?.oracleText,
+  ]
     .filter(Boolean)
     .join(". ")
 
@@ -135,7 +149,7 @@ export function CardFocusDialog({
       accessibilityViewIsModal
     >
       <View style={themed($header)}>
-        <Text preset="subheading" style={themed($name)} text={card.name} />
+        <Text preset="subheading" style={themed($name)} text={visibleName} />
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Close card details"
@@ -145,6 +159,19 @@ export function CardFocusDialog({
           <Text text="Close" weight="bold" style={themed($closeText)} />
         </TouchableOpacity>
       </View>
+      {faces.length === 2 ? (
+        <View style={themed($faceControls)}>
+          {faces.map((entry, index) => (
+            <FilterPill
+              key={entry.name}
+              testID={`card-face-${index}`}
+              label={index === 0 ? "Front" : "Back"}
+              selected={faceIndex === index}
+              onPress={() => setFaceIndex(index)}
+            />
+          ))}
+        </View>
+      ) : null}
       <ScrollView
         style={$scrollBody}
         contentContainerStyle={themed($scrollContent)}
@@ -152,7 +179,7 @@ export function CardFocusDialog({
       >
         <CardImage
           game={card.game}
-          cardId={card.cardId}
+          cardId={faceIndex === 0 ? card.cardId : undefined}
           testID="card-focus-image"
           accessibilityLabel={imageAccessibilityLabel}
           source={displayImageUrl}
@@ -160,14 +187,14 @@ export function CardFocusDialog({
           style={themed($cardImage)}
         />
         <View style={themed($details)}>
-          {details?.manaCost ? (
-            <Text size="sm" style={themed($dimText)} text={details.manaCost} />
+          {visibleDetails?.manaCost ? (
+            <Text size="sm" style={themed($dimText)} text={visibleDetails.manaCost} />
           ) : null}
-          {details?.typeLine ? (
-            <Text size="sm" style={themed($dimText)} text={details.typeLine} />
+          {visibleDetails?.typeLine ? (
+            <Text size="sm" style={themed($dimText)} text={visibleDetails.typeLine} />
           ) : null}
           {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
-          {details?.oracleText ? <Text selectable text={details.oracleText} /> : null}
+          {visibleDetails?.oracleText ? <Text selectable text={visibleDetails.oracleText} /> : null}
           {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
           {!details && !detailsError ? (
             <Text size="sm" style={themed($dimText)} text="Loading details…" />
@@ -255,6 +282,12 @@ const $cardImage: ThemedStyle<ImageStyle> = ({ spacing }) => ({
   alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
   borderRadius: spacing.xs,
+})
+const $faceControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "center",
+  gap: spacing.xs,
+  paddingVertical: spacing.xs,
 })
 const $details: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })

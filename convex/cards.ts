@@ -371,6 +371,7 @@ export const byId = action({
       cached.commanderLegality !== undefined &&
       cached.colorIdentity !== undefined &&
       cached.keywords !== undefined &&
+      (!cached.name.includes(" // ") || cached.faceDetails !== undefined) &&
       cached.updatedAt >= Date.now() - 24 * 60 * 60 * 1000
     )
       return toCardReference(cached)
@@ -411,6 +412,7 @@ const cardDetailsValidator = v.object({
   typeLine: v.optional(v.string()),
   oracleText: v.optional(v.string()),
   keywords: v.optional(v.string()),
+  faceDetails: v.optional(v.string()),
   setName: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),
   rarity: v.optional(v.string()),
@@ -459,6 +461,9 @@ export const detailsBatch = query({
               ...(reference.typeLine !== undefined ? { typeLine: reference.typeLine } : {}),
               ...(reference.oracleText !== undefined ? { oracleText: reference.oracleText } : {}),
               ...(reference.keywords !== undefined ? { keywords: reference.keywords } : {}),
+              ...(reference.faceDetails !== undefined
+                ? { faceDetails: reference.faceDetails }
+                : {}),
               ...(reference.setName !== undefined ? { setName: reference.setName } : {}),
               ...(reference.collectorNumber !== undefined
                 ? { collectorNumber: reference.collectorNumber }
@@ -532,6 +537,7 @@ const cardReferenceValidator = v.object({
   typeLine: v.optional(v.string()),
   oracleText: v.optional(v.string()),
   keywords: v.optional(v.string()),
+  faceDetails: v.optional(v.string()),
   setName: v.optional(v.string()),
   setCode: v.optional(v.string()),
   collectorNumber: v.optional(v.string()),

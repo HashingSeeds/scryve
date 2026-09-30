@@ -175,3 +175,67 @@ describe("card keywords", () => {
     expect(normalizeScryfallCard({ ...card, keywords })).not.toHaveProperty("keywords"),
   )
 })
+
+describe("physical card faces", () => {
+  const front = {
+    name: "Front",
+    mana_cost: "{U}",
+    type_line: "Creature",
+    oracle_text: "Front rules",
+    image_uris: { normal: "front.jpg", small: "front-small.jpg" },
+  }
+  const back = {
+    name: "Back",
+    type_line: "Creature",
+    oracle_text: "Back rules",
+    image_uris: { normal: "back.jpg", small: "back-small.jpg" },
+  }
+  const card = { id: "test", name: "Front // Back", card_faces: [front, back] }
+
+  it("serializes both physical faces while retaining combined metadata", () => {
+    const result = normalizeScryfallCard(card)
+    expect(JSON.parse(result?.faceDetails ?? "null")).toEqual([
+      {
+        name: "Front",
+        manaCost: "{U}",
+        typeLine: "Creature",
+        oracleText: "Front rules",
+        imageUrl: "front.jpg",
+        smallImageUrl: "front-small.jpg",
+      },
+      {
+        name: "Back",
+        typeLine: "Creature",
+        oracleText: "Back rules",
+        imageUrl: "back.jpg",
+        smallImageUrl: "back-small.jpg",
+      },
+    ])
+    expect(result).toMatchObject({
+      imageUrl: "front.jpg",
+      smallImageUrl: "front-small.jpg",
+      manaCost: "{U}",
+      typeLine: "Creature // Creature",
+      oracleText: "Front rules\n—\nBack rules",
+    })
+  })
+
+  it("records a checked sentinel for shared-image split and adventure cards", () => {
+    expect(normalizeScryfallCard({ ...card, image_uris: { normal: "shared.jpg" } })).toMatchObject({
+      faceDetails: "[]",
+      imageUrl: "shared.jpg",
+    })
+  })
+
+  it("omits face details for single-faced or malformed face payloads", () => {
+    expect(normalizeScryfallCard({ id: "single", name: "Single" })).not.toHaveProperty(
+      "faceDetails",
+    )
+    expect(normalizeScryfallCard({ ...card, card_faces: [front] })).not.toHaveProperty(
+      "faceDetails",
+    )
+    expect(normalizeScryfallCard({ ...card, card_faces: [front, {}] })).not.toHaveProperty(
+      "faceDetails",
+    )
+  })
+})

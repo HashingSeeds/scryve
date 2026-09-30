@@ -58,6 +58,53 @@ describe("CardFocusDialog", () => {
     expect(view.getByText("Color identity: White, Red · Both faces")).toBeTruthy()
   })
 
+  it("switches the image and rules while preserving identity and commander assignment", () => {
+    const onSetCommander = jest.fn()
+    const view = renderDialog({
+      card: { ...card, name: "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger" },
+      details: {
+        ...details,
+        commanderEligibility: "eligible",
+        commanderLegality: "legal",
+        colorIdentity: "RW",
+        faceDetails: JSON.stringify([
+          {
+            name: "Ajani, Nacatl Pariah",
+            imageUrl: "https://cards.scryfall.io/front.jpg",
+            manaCost: "{1}{W}",
+            typeLine: "Legendary Creature",
+            oracleText: "Front rules",
+          },
+          {
+            name: "Ajani, Nacatl Avenger",
+            imageUrl: "https://cards.scryfall.io/back.jpg",
+            typeLine: "Legendary Planeswalker",
+            oracleText: "Back rules",
+          },
+        ]),
+      },
+      onSetCommander,
+    })
+    expect(view.getByText("Front rules")).toBeTruthy()
+    expect(view.queryByText("Back rules")).toBeNull()
+    fireEvent.press(view.getByTestId("card-face-1"))
+    expect(view.getByText("Ajani, Nacatl Avenger")).toBeTruthy()
+    expect(view.getByText("Back rules")).toBeTruthy()
+    expect(view.queryByText("Front rules")).toBeNull()
+    expect(view.queryByText("{1}{W}")).toBeNull()
+    expect(view.getByTestId("card-focus-image").props.source).toEqual([
+      { uri: "https://cards.scryfall.io/back.jpg" },
+    ])
+    expect(view.getByText("Color identity: White, Red · Both faces")).toBeTruthy()
+    fireEvent.press(view.getByTestId("set-commander"))
+    expect(onSetCommander).toHaveBeenCalledWith(undefined)
+    fireEvent.press(view.getByTestId("card-face-0"))
+    expect(view.getByText("Front rules")).toBeTruthy()
+    expect(view.getByTestId("card-focus-image").props.source).toEqual([
+      { uri: "https://cards.scryfall.io/front.jpg" },
+    ])
+  })
+
   it("reports quantity changes to the screen", () => {
     const view = renderDialog()
     fireEvent.press(view.getByTestId("card-focus-increment"))

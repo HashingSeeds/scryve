@@ -183,3 +183,35 @@ test("serves warmed details from storage without fetching", async () => {
   expect(result.current.detailsError).toBeUndefined()
   expect(mockLookup).not.toHaveBeenCalled()
 })
+
+test("upgrades cached multi-face details once and reuses them offline", async () => {
+  const card = { detailKey: "legacy-faces", name: "Front // Back", scryfallId: "faces" }
+  saveCardDetails({ [card.detailKey]: { oracleText: "Combined saved rules" } })
+  const faceDetails = JSON.stringify([{ name: "Front" }, { name: "Back" }])
+  mockLookup.mockReset().mockResolvedValue({ oracleText: "Combined rules", faceDetails })
+  const view = renderHook(() => useCardDetails(card))
+  await waitFor(() => expect(view.result.current.details?.faceDetails).toBe(faceDetails))
+  expect(mockLookup).toHaveBeenCalledTimes(1)
+  view.unmount()
+  mockConnectionState.isWebSocketConnected = false
+  mockLookup.mockClear()
+  try {
+    const offline = renderHook(() => useCardDetails(card))
+    expect(offline.result.current.details?.faceDetails).toBe(faceDetails)
+    expect(mockLookup).not.toHaveBeenCalled()
+  } finally {
+    mockConnectionState.isWebSocketConnected = true
+  }
+})
+
+test("keeps legacy multi-face info usable without repeatedly fetching an older backend", async () => {
+  const card = { detailKey: "old-backend-faces", name: "Front // Back", scryfallId: "old-faces" }
+  saveCardDetails({ [card.detailKey]: { oracleText: "Saved rules" } })
+  mockLookup.mockReset().mockResolvedValue({ oracleText: "Saved rules" })
+  const { result } = renderHook(() => useCardDetails(card))
+  await waitFor(() =>
+    expect(result.current.detailsError).toBe("Could not load both faces. Showing saved card info."),
+  )
+  expect(result.current.details?.oracleText).toBe("Saved rules")
+  expect(mockLookup).toHaveBeenCalledTimes(1)
+})

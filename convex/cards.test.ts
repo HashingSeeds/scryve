@@ -788,3 +788,109 @@ describe("card search query limits", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
+
+describe("cached physical card faces", () => {
+  afterEach(() => jest.restoreAllMocks())
+  const id = "11111111-1111-1111-1111-111111111111"
+  const metadata = {
+    scryfallId: id,
+    oracleId: id,
+    name: "Front // Back",
+    setName: "Test",
+    commanderEligibility: "eligible" as const,
+    commanderLegality: "legal",
+    colorIdentity: "U",
+    keywords: "",
+  }
+
+  it.each([false, true])(
+    "upgrades a legacy multiface cache once, including shared image %s",
+    async (sharedImage) => {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      await t.mutation(internal.cards.cache, metadata)
+      const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() =>
+        response({
+          id,
+          oracle_id: id,
+          name: metadata.name,
+          set_name: "Test",
+          color_identity: ["U"],
+          keywords: [],
+          legalities: { commander: "legal" },
+          ...(sharedImage ? { image_uris: { normal: "shared.jpg" } } : {}),
+          card_faces: [
+            {
+              name: "Front",
+              type_line: "Legendary Creature",
+              oracle_text: "Front rules",
+              image_uris: { normal: "front.jpg" },
+            },
+            {
+              name: "Back",
+              type_line: "Creature",
+              oracle_text: "Back rules",
+              image_uris: { normal: "back.jpg" },
+            },
+          ],
+        }),
+      )
+      const refreshed = await t.action(api.cards.byId, { scryfallId: id })
+      expect(JSON.parse(refreshed.faceDetails ?? "null")).toEqual(
+        sharedImage
+          ? []
+          : [
+              {
+                name: "Front",
+                typeLine: "Legendary Creature",
+                oracleText: "Front rules",
+                imageUrl: "front.jpg",
+              },
+              {
+                name: "Back",
+                typeLine: "Creature",
+                oracleText: "Back rules",
+                imageUrl: "back.jpg",
+              },
+            ],
+      )
+      expect((await t.action(api.cards.byId, { scryfallId: id })).faceDetails).toBe(
+        refreshed.faceDetails,
+      )
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(
+        await t.query(api.cards.detailsBatch, {
+          game: "mtg",
+          items: [{ key: id, scryfallId: id }],
+        }),
+      ).toEqual([
+        { key: id, details: expect.objectContaining({ faceDetails: refreshed.faceDetails }) },
+      ])
+    },
+  )
+
+  it("accepts complete single-faced references without face metadata", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await t.mutation(internal.cards.cache, { ...metadata, name: "Single" })
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("unexpected fetch"))
+    await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject({
+      name: "Single",
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it("retains legacy combined metadata when upgrading faces fails", async () => {
+    const t = convexTest(schema, modules)
+    registerRateLimiter(t)
+    await t.mutation(internal.cards.cache, {
+      ...metadata,
+      oracleText: "Front rules\n—\nBack rules",
+    })
+    jest.spyOn(global, "fetch").mockImplementation(() => response({}, 503))
+    await expect(t.action(api.cards.byId, { scryfallId: id })).resolves.toMatchObject({
+      name: metadata.name,
+      oracleText: "Front rules\n—\nBack rules",
+    })
+  })
+})

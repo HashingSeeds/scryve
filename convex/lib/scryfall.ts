@@ -69,6 +69,7 @@ export type CardReference = {
   manaCost?: string
   typeLine?: string
   oracleText?: string
+  faceDetails?: string
   keywords?: string
   setName?: string
   setCode?: string
@@ -154,6 +155,33 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
   const manaCost = cardOrFaceField(card, faces, "mana_cost", FACE_INLINE_SEPARATOR)
   const typeLine = cardOrFaceField(card, faces, "type_line", FACE_INLINE_SEPARATOR)
   const oracleText = cardOrFaceField(card, faces, "oracle_text", FACE_ORACLE_SEPARATOR)
+  const physicalFaces =
+    faces.length === 2 && !imageUris
+      ? faces.map((value) => {
+          const face = objectRecord(value)
+          const name = stringField(face, "name")
+          if (!name) return null
+          const images = objectRecord(face?.image_uris)
+          const imageUrl = stringField(images, "normal")
+          const smallImageUrl = stringField(images, "small")
+          const manaCost = stringField(face, "mana_cost")
+          const typeLine = stringField(face, "type_line")
+          const oracleText = stringField(face, "oracle_text")
+          return {
+            name,
+            ...(imageUrl ? { imageUrl } : {}),
+            ...(smallImageUrl ? { smallImageUrl } : {}),
+            ...(manaCost ? { manaCost } : {}),
+            ...(typeLine ? { typeLine } : {}),
+            ...(oracleText ? { oracleText } : {}),
+          }
+        })
+      : undefined
+  const faceDetails = physicalFaces?.every((face) => face !== null)
+    ? JSON.stringify(physicalFaces)
+    : faces.length > 1 && imageUris
+      ? "[]"
+      : undefined
   const keywords =
     Array.isArray(card.keywords) &&
     card.keywords.length <= 256 &&
@@ -184,6 +212,7 @@ export function normalizeScryfallCard(value: unknown): CardReference | null {
     ...(typeLine ? { typeLine } : {}),
     ...(oracleText ? { oracleText } : {}),
     ...(keywords !== undefined ? { keywords } : {}),
+    ...(faceDetails !== undefined ? { faceDetails } : {}),
     ...(setName ? { setName } : {}),
     ...(setCode ? { setCode } : {}),
     ...(collectorNumber ? { collectorNumber } : {}),

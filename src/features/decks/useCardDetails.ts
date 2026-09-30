@@ -66,14 +66,16 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
           ? (detailsByKey[legacyDetailKey] ?? readCardDetail(legacyDetailKey))
           : undefined)
       const enrichmentKey = `${detailKey}:${attempt}`
+      const needsFaces = game === "mtg" && name.includes(" // ")
       if (
         warmed &&
-        (!requireCommanderRules ||
-          (warmed.commanderEligibility &&
-            warmed.commanderLegality &&
-            warmed.colorIdentity !== undefined &&
-            (offline ||
-              Date.parse(warmed.commanderRulesUpdatedAt ?? "") >= Date.now() - 86_400_000)) ||
+        (offline ||
+          ((!needsFaces || warmed.faceDetails !== undefined) &&
+            (!requireCommanderRules ||
+              (warmed.commanderEligibility &&
+                warmed.commanderLegality &&
+                warmed.colorIdentity !== undefined &&
+                Date.parse(warmed.commanderRulesUpdatedAt ?? "") >= Date.now() - 86_400_000))) ||
           enrichmentAttempts.current.has(enrichmentKey))
       ) {
         if (active && !detailsByKey[detailKey])
@@ -96,12 +98,17 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
               ? catalogCardDetails(await byPokemonReference({ name, originalReference }))
               : undefined
         if (!active) return
-        if (requireCommanderRules) enrichmentAttempts.current.add(enrichmentKey)
+        if (requireCommanderRules || needsFaces) enrichmentAttempts.current.add(enrichmentKey)
         if (details) {
           setFailure(undefined)
           saveCardDetails({ [detailKey]: details })
           setDetailsByKey((current) => ({ ...current, [detailKey]: details }))
-          if (
+          if (needsFaces && details.faceDetails === undefined) {
+            setFailure({
+              key: detailKey,
+              message: "Could not load both faces. Showing saved card info.",
+            })
+          } else if (
             requireCommanderRules &&
             !(Date.parse(details.commanderRulesUpdatedAt ?? "") >= Date.now() - 86_400_000)
           ) {
