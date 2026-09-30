@@ -633,9 +633,10 @@ export function DecksScreen({
         dialogTestID="deck-filters-dialog"
         dialogAccessibilityRole="alert"
         backdropAccessibilityLabel="Dismiss filters"
+        style={$filtersDialog}
       >
         <Text preset="subheading" text="Filters" />
-        <ScrollView contentContainerStyle={themed($dialogBody)}>
+        <ScrollView style={$filtersScroll} contentContainerStyle={themed($dialogBody)}>
           <View testID="system-filter" accessibilityLabel="System">
             <FilterGroup heading="System">
               {[{ id: ALL_SYSTEMS, shortLabel: "All systems" }, ...DECK_GAME_LIST].map(
@@ -665,6 +666,12 @@ export function DecksScreen({
                 ))}
               </FilterGroup>
             </View>
+          ) : system === ALL_SYSTEMS ? (
+            <Text
+              size="xs"
+              style={themed($dimmedText)}
+              text="Choose a system to filter by format."
+            />
           ) : null}
         </ScrollView>
         <View style={themed($dialogActions)}>
@@ -718,6 +725,8 @@ const $activeFilters: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingBottom: spacing.xs,
 })
 const $searchField: ThemedStyle<ViewStyle> = ({ spacing }) => ({ paddingBottom: spacing.xs })
+const $filtersDialog: ViewStyle = { height: 480 }
+const $filtersScroll: ViewStyle = { flex: 1 }
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $listContent: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingTop: spacing.xs,
