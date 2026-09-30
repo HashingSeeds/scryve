@@ -386,6 +386,7 @@ export function SettingsScreen({
           })}
           <Button
             testID="copy-debug-info-button"
+            preset="primary"
             text={copyStatus === "Copied" ? "Copied" : "Copy debug info"}
             onPress={copyDebugInfo}
             style={themed($copyButton)}

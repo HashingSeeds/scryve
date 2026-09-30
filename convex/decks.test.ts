@@ -820,7 +820,7 @@ describe("premium deck tracking", () => {
     })
   })
 
-  it("limits free history while preserving older games for a later premium unlock", async () => {
+  it("lets non-Pro users page past 10 connected games", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "history-owner", "History Owner")
     await t.run(async (ctx) => {
@@ -859,22 +859,16 @@ describe("premium deck tracking", () => {
         })
       }
     })
-    const freeHistory = await actor.query(api.games.connectedHistory, {
-      paginationOpts: { cursor: null, numItems: 20 },
+    const first = await actor.query(api.games.connectedHistory, {
+      paginationOpts: { cursor: null, numItems: 10 },
     })
-    expect(freeHistory.page).toHaveLength(10)
-    expect(freeHistory).toMatchObject({ premium: false, hasLockedHistory: true, isDone: true })
-    await t.mutation(internal.entitlements.setUserFeature, {
-      clerkUserId: "history-owner",
-      feature: "full_history",
-      enabled: true,
-      source: "test",
+    expect(first.page).toHaveLength(10)
+    expect(first).toMatchObject({ premium: false, hasLockedHistory: false, isDone: false })
+    const second = await actor.query(api.games.connectedHistory, {
+      paginationOpts: { cursor: first.continueCursor, numItems: 10 },
     })
-    const premiumHistory = await actor.query(api.games.connectedHistory, {
-      paginationOpts: { cursor: null, numItems: 20 },
-    })
-    expect(premiumHistory.page).toHaveLength(11)
-    expect(premiumHistory).toMatchObject({ premium: true, hasLockedHistory: false, isDone: true })
+    expect(second.page).toHaveLength(1)
+    expect(second.isDone).toBe(true)
   })
 })
 

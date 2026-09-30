@@ -1,24 +1,22 @@
 # Scryve
 
-Scryve is an Expo Router life-counter app built on Ignite's component and theme foundation.
+Scryve is a life counter and deck tracking app for trading card games, with multiplayer built in. It is local-first (MMKV) with Convex sync, and runs on iOS, Android, and web with Expo and React Native.
 
-This is the boilerplate that [Infinite Red](https://infinite.red) uses as a way to test bleeding-edge changes to our React Native stack.
-
-- [Quick start documentation](https://github.com/infinitered/ignite/blob/master/docs/boilerplate/Boilerplate.md)
-- [Full documentation](https://github.com/infinitered/ignite/blob/master/docs/README.md)
+Offline, local games are always available, even without an account.
 
 ## Toolchain
 
 The project pins Node 24.18.1 in `.nvmrc` and pnpm 10.34.5 through the `packageManager`
-field in `package.json`. Use Corepack so the project-selected pnpm version wins over any ambient
-global installation.
+field in `package.json`. Install pnpm 10 or newer and call it directly; it switches itself to the
+pinned version. Don't use `corepack pnpm`: scripts that call `pnpm` again fail with a version
+mismatch when the global pnpm is a different major.
 
 ## Getting Started
 
 ```bash
 nvm use
-corepack pnpm install --frozen-lockfile
-corepack pnpm run start
+pnpm install --frozen-lockfile
+pnpm run start
 ```
 
 Development configuration is split three ways:
@@ -69,53 +67,26 @@ test account and open Account once to sync its profile before testing decks
 or connected play. Preview deployments expire; rerun `pnpm preview:up` when
 needed.
 
-Static checks run with:
+## Static checks
 
 ```bash
-corepack pnpm run compile
-corepack pnpm run lint:check
-corepack pnpm test --runInBand
+pnpm run compile
+pnpm run lint:check
+pnpm test --runInBand
 ```
 
-To make things work on your local simulator, or on your phone, you need first to [run `eas build`](https://github.com/infinitered/ignite/blob/master/docs/expo/EAS.md). We have many shortcuts on `package.json` to make it easier:
+## Builds
+
+Builds run locally through [EAS](https://docs.expo.dev/build/introduction/). Shortcuts in `package.json`:
 
 ```bash
-pnpm run build:ios:sim # build for ios simulator
-pnpm run build:ios:device # build for ios device
-pnpm run build:ios:prod # build for ios device
+pnpm run build:ios:sim      # iOS simulator, development profile
+pnpm run build:ios:dev      # iOS device, development profile
+pnpm run build:ios:preview  # iOS device, preview profile
+pnpm run build:ios:prod     # iOS, production profile
 ```
 
-### `./assets`
-
-This directory is designed to organize and store various assets, making it easy for you to manage and use them in your application. The assets are further categorized into subdirectories, including `icons` and `images`:
-
-```tree
-assets
-├── icons
-└── images
-```
-
-**icons**
-This is where your icon assets will live. These icons can be used for buttons, navigation elements, or any other UI components. The recommended format for icons is PNG, but other formats can be used as well.
-
-Ignite comes with a built-in `Icon` component. You can find detailed usage instructions in the [docs](https://github.com/infinitered/ignite/blob/master/docs/boilerplate/app/components/Icon.md).
-
-**images**
-This is where your images will live, such as background images, logos, or any other graphics. You can use various formats such as PNG, JPEG, or GIF for your images.
-
-Another valuable built-in component within Ignite is the `AutoImage` component. You can find detailed usage instructions in the [docs](https://github.com/infinitered/ignite/blob/master/docs/Components-AutoImage.md).
-
-How to use your `icon` or `image` assets:
-
-```typescript
-import { Image } from 'react-native';
-
-const MyComponent = () => {
-  return (
-    <Image source={require('assets/images/my_image.png')} />
-  );
-};
-```
+Each has an Android equivalent (`build:android:sim`, `build:android:dev`, `build:android:preview`, `build:android:prod`).
 
 ## Running Maestro end-to-end tests
 
@@ -131,25 +102,6 @@ pnpm run test:maestro        # all flows
 ```
 
 The flows, conventions, and troubleshooting notes live in [`.maestro/README.md`](.maestro/README.md).
-
-## Next Steps
-
-### Ignite Cookbook
-
-[Ignite Cookbook](https://ignitecookbook.com/) is an easy way for developers to browse and share code snippets (or “recipes”) that actually work.
-
-### Upgrade Ignite boilerplate
-
-Read our [Upgrade Guide](https://ignitecookbook.com/docs/recipes/UpdatingIgnite) to learn how to upgrade your Ignite project.
-
-## Community
-
-⭐️ Help us out by [starring on GitHub](https://github.com/infinitered/ignite), filing bug reports in [issues](https://github.com/infinitered/ignite/issues) or [ask questions](https://github.com/infinitered/ignite/discussions).
-
-💬 Join us on [Slack](https://join.slack.com/t/infiniteredcommunity/shared_invite/zt-1f137np4h-zPTq_CbaRFUOR_glUFs2UA) to discuss.
-
-📰 Make our Editor-in-chief happy by [reading the React Native Newsletter](https://reactnativenewsletter.com/).
-Connected lobby development is configuration-gated; see [docs/CONNECTED_SETUP.md](docs/CONNECTED_SETUP.md). Missing Clerk/Convex configuration never blocks offline local games.
 
 ## Web wait-list gate
 

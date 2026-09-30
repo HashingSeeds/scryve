@@ -42,7 +42,6 @@ const HistoryConnection = memo(function HistoryConnection({
           onChange={onChange}
           feed={{
             page: { status: "unavailable", retry },
-            access: { status: "unavailable", retry },
             migration: { status: "complete" },
           }}
         />

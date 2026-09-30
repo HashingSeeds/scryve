@@ -15,7 +15,7 @@ Lots of apps have gotten bogged down with bad tech decisions and "slop". We have
 Scryve is a joy to use regardless of network connection and it always will be. Our Convex backend makes syncing smooth and fast, but when networks are slow or lost everything should still work. MMKV keeps the data locally and then it all gracefully catches up when reconnected. Or our users can choose local-only without an account for features where that makes sense.
 
 4. Multi-surface
-T3 Code has 2 key app surfaces: web and mobile.
+Scryve has 2 key app surfaces: web and mobile.
 
 Mobile is the main surface most users install first. It's a React Native/Expo app for both iOS and Android, available on the App Store and Google Play (soon).
 
@@ -32,7 +32,7 @@ We need to be on the same page with terminology. When communicating, use this la
 
 - **you** means the agent reading this file and changing Scryve.
 - **I, me, we, us, and maintainers** mean Matt and the people building Scryve. These are who you are talking to now.
-- **user or player** means the person using Scrive to play games, build decks, and see their stats.
+- **user or player** means the person using Scryve to play games, build decks, and see their stats.
 - **team** means a group of players (e.g. two player teams).
 - **game** means the local or connected play session.
 - **match** means multiple games, such as best-of-three.

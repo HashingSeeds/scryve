@@ -5,6 +5,7 @@ import type { Doc } from "../_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
 
 export const PREMIUM_FEATURES = {
+  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Retained for installed-client compatibility; no longer gates anything server-side.
   fullHistory: "full_history",
   proDecksLimit: "pro_decks_limit",
   unlimitedDecks: "unlimited_decks",

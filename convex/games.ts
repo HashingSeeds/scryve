@@ -31,7 +31,6 @@ import {
   assertPlayerCount,
   assertRuleset,
   assertStartingLife,
-  FREE_CONNECTED_HISTORY_GAMES,
   HISTORY_MIGRATION_VERSION,
   inviteIsUsable,
   INVITE_LIFETIME_MS,
@@ -2111,6 +2110,7 @@ export const cleanupStaleGames = internalMutation({
   },
 })
 
+// eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Installed clients still read `premium` and `hasLockedHistory`; history itself is free for everyone.
 export const connectedHistory = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
@@ -2120,14 +2120,7 @@ export const connectedHistory = query({
       .query("gameHistoryEntries")
       .withIndex("by_user_and_finished_at", (q) => q.eq("userId", user._id))
       .order("desc")
-      .paginate(
-        boundedPaginationOptions(
-          args.paginationOpts,
-          premium
-            ? CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS
-            : Math.min(FREE_CONNECTED_HISTORY_GAMES, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS),
-        ),
-      )
+      .paginate(boundedPaginationOptions(args.paginationOpts, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS))
     const blocked = await blockedUserIdsFor(ctx, user._id)
     const page = []
     for (const entry of history.page) {
@@ -2151,9 +2144,8 @@ export const connectedHistory = query({
     return {
       ...history,
       page,
-      isDone: premium ? history.isDone : true,
       premium,
-      hasLockedHistory: !premium && !history.isDone,
+      hasLockedHistory: false,
       migrationRequired: (user.historyMigrationVersion ?? 0) < HISTORY_MIGRATION_VERSION,
     }
   },

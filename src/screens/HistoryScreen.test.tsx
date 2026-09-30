@@ -45,7 +45,6 @@ function connectedFeed(
       items: games.map(connectedHistoryEntry),
       nextPage: { status: "exhausted" },
     },
-    access: { status: "ready", premiumLocked: false },
     migration: { status: "complete" },
     ...overrides,
   }
@@ -215,10 +214,34 @@ describe("unified history screen", () => {
 
     openFilters()
     fireEvent.press(screen.getByTestId("history-outcome-win"))
-    fireEvent.press(screen.getByTestId("history-format-20 life"))
+    fireEvent.press(screen.getByTestId("history-format-none:20 life"))
     fireEvent.press(screen.getByTestId("history-filters-button"))
     expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
     expect(screen.queryByTestId("history-row-connected-connected-1")).toBeNull()
+  })
+
+  it("narrows format choices to the selected game system", () => {
+    renderHistory({
+      connected: connectedFeed([
+        connectedGame({ system: "mtg", format: "standard" }),
+        connectedGame({ publicId: "pokemon-1", system: "pokemon", format: "standard" }),
+      ]),
+    })
+
+    openFilters()
+    expect(screen.getByText("Standard (Magic)")).toBeTruthy()
+    expect(screen.getByText("Standard (Pokémon)")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("history-format-mtg:Standard"))
+
+    fireEvent.press(screen.getByTestId("history-system-pokemon"))
+
+    expect(screen.queryByTestId("history-format-mtg:Standard")).toBeNull()
+    expect(screen.queryByTestId("history-format-none:20 life")).toBeNull()
+    expect(screen.getByTestId("history-format-pokemon:Standard")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("history-filters-button"))
+    expect(screen.getByTestId("history-row-connected-pokemon-1")).toBeTruthy()
+    expect(screen.queryByTestId("history-row-connected-connected-1")).toBeNull()
+    expect(screen.queryByTestId("history-row-local-local-1")).toBeNull()
   })
 
   it("filters by pod size", () => {
@@ -309,7 +332,6 @@ describe("unified history screen", () => {
     renderHistory()
 
     expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
-    expect(screen.queryByText(/Unlock full history/)).toBeNull()
   })
 
   it("names the winner a local game recorded", () => {
@@ -373,47 +395,6 @@ describe("unified history screen", () => {
 
     expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
     fireEvent.press(screen.getByTestId("history-retry-connected"))
-    expect(retry).toHaveBeenCalledTimes(1)
-  })
-
-  it("reserves one stable footer slot while full-history access loads", () => {
-    const view = renderHistory({
-      connected: connectedFeed([connectedGame()], { access: { status: "loading" } }),
-    })
-
-    const loadingSlot = screen.getByTestId("history-access-slot")
-    expect(screen.getByText("Checking full-history access…")).toBeTruthy()
-
-    view.rerender(
-      themed(
-        <HistoryScreen
-          games={[localGame()]}
-          onBack={jest.fn()}
-          onSelectLocal={jest.fn()}
-          onSelectConnected={jest.fn()}
-          connected={connectedFeed([connectedGame()], {
-            access: { status: "ready", premiumLocked: true },
-          })}
-        />,
-      ),
-    )
-
-    expect(screen.getByTestId("history-access-slot").props.style).toEqual(loadingSlot.props.style)
-    expect(screen.getByText("Unlock full history")).toBeTruthy()
-  })
-
-  it("keeps healthy history visible when only full-history access is unavailable", () => {
-    const retry = jest.fn()
-    renderHistory({
-      connected: connectedFeed([connectedGame()], {
-        access: { status: "unavailable", retry },
-      }),
-    })
-
-    expect(screen.getByTestId("history-row-local-local-1")).toBeTruthy()
-    expect(screen.getByTestId("history-row-connected-connected-1")).toBeTruthy()
-    expect(screen.getByText("Full-history access is unavailable.")).toBeTruthy()
-    fireEvent.press(screen.getByTestId("history-retry-access"))
     expect(retry).toHaveBeenCalledTimes(1)
   })
 

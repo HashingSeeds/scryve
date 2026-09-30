@@ -8,14 +8,14 @@ export const current = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx)
-    const [fullHistory, proDecksLimit, deckAnalytics, deckVersions] = await Promise.all([
-      hasFeature(ctx, user, PREMIUM_FEATURES.fullHistory),
+    const [proDecksLimit, deckAnalytics, deckVersions] = await Promise.all([
       hasFeature(ctx, user, PREMIUM_FEATURES.proDecksLimit),
       hasFeature(ctx, user, PREMIUM_FEATURES.deckAnalytics),
       hasFeature(ctx, user, PREMIUM_FEATURES.deckVersions),
     ])
     return {
-      fullHistory,
+      // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- History is free; `true` keeps installed clients from showing the retired upsell.
+      fullHistory: true,
       proDecksLimit,
       unlimitedDecks: proDecksLimit,
       deckAnalytics,

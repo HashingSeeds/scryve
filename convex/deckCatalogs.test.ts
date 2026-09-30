@@ -513,3 +513,72 @@ it.each(["ygo", "pokemon"])("browses %s examples and official decks in one list"
   const filtered = await t.action(api.deckCatalogs.browse, { ...args, query: result.decks[0].name })
   expect(filtered.decks.some((deck) => deck._id === result.decks[0]._id)).toBe(true)
 })
+
+describe("Limitless sourceUrl backfill", () => {
+  it("rewrites only stale Limitless rows and is a no-op on rerun", async () => {
+    const t = convexTest(schema, modules)
+    const oldUrl = "https://play.limitlesstcg.com/tournament/t1/standings"
+    const newUrl = "https://play.limitlesstcg.com/tournament/t2/player/bob/decklist"
+    const base = { kind: "tournament", name: "Deck", fetchedAt: 1 }
+    const ids = await t.run(async (ctx) => ({
+      stale: await ctx.db.insert("deckCatalogs", {
+        ...base,
+        game: "pokemon",
+        source: "limitless",
+        externalId: "t1:a b",
+        sourceUrl: oldUrl,
+      }),
+      current: await ctx.db.insert("deckCatalogs", {
+        ...base,
+        game: "pokemon",
+        source: "limitless",
+        externalId: "t2:bob",
+        sourceUrl: newUrl,
+      }),
+      unparseable: await ctx.db.insert("deckCatalogs", {
+        ...base,
+        game: "pokemon",
+        source: "limitless",
+        externalId: "nocolon",
+        sourceUrl: oldUrl,
+      }),
+      other: await ctx.db.insert("deckCatalogs", {
+        ...base,
+        game: "pokemon",
+        source: "fixture",
+        externalId: "t1:a",
+        sourceUrl: oldUrl,
+      }),
+    }))
+    const urls = () =>
+      t.run(async (ctx) => ({
+        stale: (await ctx.db.get(ids.stale))?.sourceUrl,
+        current: (await ctx.db.get(ids.current))?.sourceUrl,
+        unparseable: (await ctx.db.get(ids.unparseable))?.sourceUrl,
+        other: (await ctx.db.get(ids.other))?.sourceUrl,
+      }))
+
+    jest.useFakeTimers()
+    try {
+      await t.mutation(internal.deckCatalogs.backfillLimitlessSourceUrls, {
+        paginationOpts: { numItems: 50, cursor: null },
+      })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      const after = await urls()
+      expect(after).toEqual({
+        stale: "https://play.limitlesstcg.com/tournament/t1/player/a%20b/decklist",
+        current: newUrl,
+        unparseable: oldUrl,
+        other: oldUrl,
+      })
+
+      await t.mutation(internal.deckCatalogs.backfillLimitlessSourceUrls, {
+        paginationOpts: { numItems: 50, cursor: null },
+      })
+      await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+      expect(await urls()).toEqual(after)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+})
