@@ -39,17 +39,17 @@ fi
 [ "$prev_head" = "$null_sha" ] || exit 0
 [ -d node_modules ] && exit 0
 [ -n "$SCRYVE_SKIP_INSTALL" ] && exit 0
-command -v corepack >/dev/null 2>&1 || exit 0
+command -v pnpm >/dev/null 2>&1 || exit 0
 
 # Git exports these for the hook. Leaving them set would point any nested git
 # command run by an install script at the wrong repository.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 
 echo "post-checkout: installing dependencies (SCRYVE_SKIP_INSTALL=1 to skip)"
-if corepack pnpm install --frozen-lockfile; then
+if pnpm install --frozen-lockfile; then
   echo "post-checkout: dependencies ready"
 else
-  echo "post-checkout: install failed. Run 'corepack pnpm install' in this worktree." >&2
+  echo "post-checkout: install failed. Run 'pnpm install' in this worktree." >&2
 fi
 
 # Never fail the git command that triggered the hook.
