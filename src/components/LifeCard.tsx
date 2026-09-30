@@ -91,6 +91,7 @@ export interface LifeCardProps {
   life: number
   color: string
   compact?: boolean
+  boardRotation?: number
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
@@ -115,6 +116,7 @@ export function LifeCard({
   life,
   color,
   compact,
+  boardRotation = 0,
   contentRotation = 0,
   contentInsets,
   screenEdges,
@@ -731,6 +733,7 @@ export function LifeCard({
           system={system}
           color={color}
           rotation={contentRotation}
+          boardRotation={boardRotation}
           cardWidth={cardSize.width}
           cardHeight={cardSize.height}
           contentInsets={contentInsets}

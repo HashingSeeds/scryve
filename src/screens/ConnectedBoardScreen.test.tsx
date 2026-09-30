@@ -802,7 +802,7 @@ describe("ConnectedBoardScreen", () => {
   })
 
   it.each([
-    [5, 2],
+    [5, 3],
     [6, 4],
   ])(
     "keeps the outer board geometry stable when a %i-player projection arrives",

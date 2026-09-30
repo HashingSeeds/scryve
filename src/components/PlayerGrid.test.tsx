@@ -1,10 +1,11 @@
 import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 
+import { LifeCard } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   COMPACT_LIFE_TARGET_SIZE,
@@ -62,6 +63,63 @@ describe("PlayerGrid", () => {
     expect(initialOpacity).toBe(0)
     expect(measuredOpacity).toBe(1)
   })
+
+  it.each([-90, 90])(
+    "preserves five-player seats and commander grids when the board turns %i°",
+    (boardRotation) => {
+      const window = Dimensions.get("window")
+      const gamePlayers = players(5)
+      const commanderDamage = {
+        incomingFor: () => ({}),
+        armedPlayerId: null,
+        onPressSword: jest.fn(),
+        onStage: jest.fn(),
+      }
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <PlayerGrid
+            players={gamePlayers}
+            commanderDamage={commanderDamage}
+            onChange={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+      const seatLayout = () =>
+        view.UNSAFE_getAllByType(LifeCard).map(({ props }) => ({
+          seatNumber: props.seatNumber,
+          contentRotation: props.contentRotation,
+          menuCorner: props.menuCorner,
+          commanderSeats: props.commanderDamage.seats,
+          commanderRows: props.commanderDamage.rows,
+          commanderColumns: props.commanderDamage.columns,
+        }))
+      const portrait = seatLayout()
+      act(() => Dimensions.set({ window: { width: 844, height: 390, scale: 3, fontScale: 1 } }))
+      view.rerender(
+        <ThemeProvider initialContext="dark">
+          <PlayerGrid
+            boardRotation={boardRotation}
+            players={gamePlayers}
+            commanderDamage={commanderDamage}
+            onChange={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+      fireEvent(view.getByTestId("player-grid-frame"), "layout", {
+        nativeEvent: { layout: { width: 844, height: 390 } },
+      })
+      expect(seatLayout()).toEqual(portrait)
+      expect(StyleSheet.flatten(view.getByTestId("player-grid").props.style)).toMatchObject({
+        width: 390,
+        height: 844,
+        left: 227,
+        top: -227,
+        transform: [{ rotate: `${boardRotation}deg` }],
+      })
+      view.unmount()
+      act(() => Dimensions.set({ window }))
+    },
+  )
 
   it("keeps one card's life font size when another total gains a digit", () => {
     const initialPlayers = players(2)

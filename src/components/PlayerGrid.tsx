@@ -48,6 +48,7 @@ export interface CommanderDamageGridBinding {
 
 export interface PlayerGridProps {
   players: GamePlayer[]
+  boardRotation?: number
   system?: PlaySystemId
   lifeStep?: number
   layoutVariant?: PlayerGridLayoutVariant
@@ -65,6 +66,7 @@ const SINGLE_PLAYER_ROW_FLEX = 0.8
 
 export function PlayerGrid({
   players,
+  boardRotation = 0,
   system,
   lifeStep,
   layoutVariant = "auto",
@@ -77,8 +79,28 @@ export function PlayerGrid({
   onChange,
   style,
 }: PlayerGridProps) {
-  const { width, height, fontScale } = useWindowDimensions()
-  const insets = useSafeAreaInsets()
+  const dimensions = useWindowDimensions()
+  const { fontScale } = dimensions
+  const width = boardRotation ? dimensions.height : dimensions.width
+  const height = boardRotation ? dimensions.width : dimensions.height
+  const screenInsets = useSafeAreaInsets()
+  const insets =
+    boardRotation === 90
+      ? {
+          top: screenInsets.right,
+          right: screenInsets.bottom,
+          bottom: screenInsets.left,
+          left: screenInsets.top,
+        }
+      : boardRotation === -90
+        ? {
+            top: screenInsets.left,
+            right: screenInsets.top,
+            bottom: screenInsets.right,
+            left: screenInsets.bottom,
+          }
+        : screenInsets
+  const [frame, setFrame] = useState({ width: 0, height: 0 })
   const {
     themed,
     theme: { spacing },
@@ -123,147 +145,173 @@ export function PlayerGrid({
 
   return (
     <View
-      testID="player-grid"
-      accessibilityLabel={`${players.length} player ${counter.label} grid`}
-      onLayout={measureBoard}
-      style={[
-        themed($grid),
-        style,
-        (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
-      ]}
+      testID="player-grid-frame"
+      style={$frame}
+      onLayout={({ nativeEvent: { layout } }) =>
+        setFrame((current) =>
+          current.width === layout.width && current.height === layout.height
+            ? current
+            : { width: layout.width, height: layout.height },
+        )
+      }
     >
-      {rows.map((row, rowIndex) => (
-        <View
-          key={rowIndex}
-          testID={`player-grid-row-${rowIndex}`}
-          style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}
-        >
-          {row.map((index, columnIndex) => {
-            if (index === null) {
+      <View
+        testID="player-grid"
+        accessibilityLabel={`${players.length} player ${counter.label} grid`}
+        onLayout={measureBoard}
+        style={[
+          themed($grid),
+          style,
+          boardRotation !== 0 && $rotatedGrid,
+          boardRotation !== 0 && {
+            width: frame.height,
+            height: frame.width,
+            left: (frame.width - frame.height) / 2,
+            top: (frame.height - frame.width) / 2,
+            transform: [{ rotate: `${boardRotation}deg` }],
+          },
+          (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
+        ]}
+      >
+        {rows.map((row, rowIndex) => (
+          <View
+            key={rowIndex}
+            testID={`player-grid-row-${rowIndex}`}
+            style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}
+          >
+            {row.map((index, columnIndex) => {
+              if (index === null) {
+                return (
+                  <View
+                    key={`empty-${rowIndex}-${columnIndex}`}
+                    testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                    style={themed($cell)}
+                  />
+                )
+              }
+              const player = players[index]
+              const seatNumber = index + 1
+              const playerDisabled = Boolean(isPlayerDisabled?.(player))
+              const playerOwned = Boolean(isPlayerOwned?.(player))
+              const contentRotation = getPlayerContentRotation({
+                playerCount: players.length,
+                layout,
+                row,
+                rowIndex,
+                columnIndex,
+                playerIndex: index,
+              })
+              const ownership = isPlayerOwned
+                ? playerOwned
+                  ? "owned"
+                  : "unowned"
+                : disabled
+                  ? "disabled"
+                  : isPlayerDisabled
+                    ? playerDisabled
+                      ? "unowned"
+                      : "owned"
+                    : undefined
+              const screenEdges = {
+                top: rowIndex === 0,
+                bottom: rowIndex === rows.length - 1,
+                left: columnIndex === 0,
+                right: columnIndex === row.length - 1,
+              }
+              const contentInsets = {
+                top: screenEdges.top ? insets.top : 0,
+                bottom: screenEdges.bottom ? insets.bottom : 0,
+                left: screenEdges.left ? insets.left : 0,
+                right: screenEdges.right ? insets.right : 0,
+              }
+              const fallbackMenu =
+                fallbackMenuBoundary === null
+                  ? undefined
+                  : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
+              const menuCorner =
+                menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
               return (
                 <View
-                  key={`empty-${rowIndex}-${columnIndex}`}
-                  testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                  key={player.id}
+                  testID={`player-cell-seat-${seatNumber}`}
                   style={themed($cell)}
-                />
+                >
+                  <LifeCard
+                    playerName={player.name}
+                    seatNumber={seatNumber}
+                    shape={player.shape}
+                    life={player.life}
+                    color={player.color}
+                    compact={layout.compact}
+                    contentRotation={contentRotation}
+                    boardRotation={boardRotation}
+                    contentInsets={contentInsets}
+                    screenEdges={screenEdges}
+                    menuCorner={menuCorner}
+                    menuEdgeCenter={fallbackMenu?.edgeCenter}
+                    lifeFontSize={getLifeFontSize({
+                      ...lifeFontSizeInput,
+                      digits: String(player.life).length,
+                    })}
+                    system={system}
+                    lifeStep={lifeStep}
+                    disabled={disabled || playerDisabled}
+                    ownership={ownership}
+                    pendingCount={getPendingCount?.(player)}
+                    eliminated={isPlayerEliminated?.(player)}
+                    commanderDamage={
+                      commanderDamage && boardSeats
+                        ? {
+                            ownerPlayerId: player.id,
+                            players: commanderDamage.inspection ? players : undefined,
+                            inspection: commanderDamage.inspection
+                              ? {
+                                  open: commanderDamage.inspection.playerId === player.id,
+                                  onToggle: () =>
+                                    commanderDamage.inspection?.onChange(
+                                      commanderDamage.inspection.playerId === player.id
+                                        ? null
+                                        : player.id,
+                                    ),
+                                }
+                              : undefined,
+                            seats: boardSeats.seats,
+                            rows: boardSeats.rows,
+                            columns: boardSeats.columns,
+                            incoming: commanderDamage.incomingFor(player),
+                            armedPlayerId: commanderDamage.armedPlayerId,
+                            attackerName: armedPlayer?.name,
+                            attacker: armedPlayer && {
+                              color: armedPlayer.color,
+                              shape: armedPlayer.shape,
+                              seatNumber: players.indexOf(armedPlayer) + 1,
+                            },
+                            stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
+                            pendingClaims: commanderDamage.pendingFor?.(player),
+                            onPressSword: () => commanderDamage.onPressSword(player),
+                            onStage: (step) => commanderDamage.onStage(player, step),
+                            ...(commanderDamage.staging &&
+                            commanderDamage.armedPlayerId === player.id
+                              ? {
+                                  armBar: {
+                                    stagedTargets: commanderDamage.staging.stagedTargets,
+                                    onSend: commanderDamage.staging.onSend,
+                                    onCancel: commanderDamage.staging.onCancel,
+                                  },
+                                }
+                              : {}),
+                          }
+                        : undefined
+                    }
+                    onChange={(delta) => onChange(player.id, delta)}
+                    style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
+                  />
+                </View>
               )
-            }
-            const player = players[index]
-            const seatNumber = index + 1
-            const playerDisabled = Boolean(isPlayerDisabled?.(player))
-            const playerOwned = Boolean(isPlayerOwned?.(player))
-            const contentRotation = getPlayerContentRotation({
-              playerCount: players.length,
-              layout,
-              row,
-              rowIndex,
-              columnIndex,
-              playerIndex: index,
-            })
-            const ownership = isPlayerOwned
-              ? playerOwned
-                ? "owned"
-                : "unowned"
-              : disabled
-                ? "disabled"
-                : isPlayerDisabled
-                  ? playerDisabled
-                    ? "unowned"
-                    : "owned"
-                  : undefined
-            const screenEdges = {
-              top: rowIndex === 0,
-              bottom: rowIndex === rows.length - 1,
-              left: columnIndex === 0,
-              right: columnIndex === row.length - 1,
-            }
-            const contentInsets = {
-              top: screenEdges.top ? insets.top : 0,
-              bottom: screenEdges.bottom ? insets.bottom : 0,
-              left: screenEdges.left ? insets.left : 0,
-              right: screenEdges.right ? insets.right : 0,
-            }
-            const fallbackMenu =
-              fallbackMenuBoundary === null
-                ? undefined
-                : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
-            const menuCorner =
-              menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
-            return (
-              <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={themed($cell)}>
-                <LifeCard
-                  playerName={player.name}
-                  seatNumber={seatNumber}
-                  shape={player.shape}
-                  life={player.life}
-                  color={player.color}
-                  compact={layout.compact}
-                  contentRotation={contentRotation}
-                  contentInsets={contentInsets}
-                  screenEdges={screenEdges}
-                  menuCorner={menuCorner}
-                  menuEdgeCenter={fallbackMenu?.edgeCenter}
-                  lifeFontSize={getLifeFontSize({
-                    ...lifeFontSizeInput,
-                    digits: String(player.life).length,
-                  })}
-                  system={system}
-                  lifeStep={lifeStep}
-                  disabled={disabled || playerDisabled}
-                  ownership={ownership}
-                  pendingCount={getPendingCount?.(player)}
-                  eliminated={isPlayerEliminated?.(player)}
-                  commanderDamage={
-                    commanderDamage && boardSeats
-                      ? {
-                          ownerPlayerId: player.id,
-                          players: commanderDamage.inspection ? players : undefined,
-                          inspection: commanderDamage.inspection
-                            ? {
-                                open: commanderDamage.inspection.playerId === player.id,
-                                onToggle: () =>
-                                  commanderDamage.inspection?.onChange(
-                                    commanderDamage.inspection.playerId === player.id
-                                      ? null
-                                      : player.id,
-                                  ),
-                              }
-                            : undefined,
-                          seats: boardSeats.seats,
-                          rows: boardSeats.rows,
-                          columns: boardSeats.columns,
-                          incoming: commanderDamage.incomingFor(player),
-                          armedPlayerId: commanderDamage.armedPlayerId,
-                          attackerName: armedPlayer?.name,
-                          attacker: armedPlayer && {
-                            color: armedPlayer.color,
-                            shape: armedPlayer.shape,
-                            seatNumber: players.indexOf(armedPlayer) + 1,
-                          },
-                          stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
-                          pendingClaims: commanderDamage.pendingFor?.(player),
-                          onPressSword: () => commanderDamage.onPressSword(player),
-                          onStage: (step) => commanderDamage.onStage(player, step),
-                          ...(commanderDamage.staging && commanderDamage.armedPlayerId === player.id
-                            ? {
-                                armBar: {
-                                  stagedTargets: commanderDamage.staging.stagedTargets,
-                                  onSend: commanderDamage.staging.onSend,
-                                  onCancel: commanderDamage.staging.onCancel,
-                                },
-                              }
-                            : {}),
-                        }
-                      : undefined
-                  }
-                  onChange={(delta) => onChange(player.id, delta)}
-                  style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
-                />
-              </View>
-            )
-          })}
-        </View>
-      ))}
+            })}
+          </View>
+        ))}
+      </View>
     </View>
   )
 }
@@ -494,6 +542,10 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+
+const $rotatedGrid: ViewStyle = { position: "absolute" }
+
+const $frame: ViewStyle = { flex: 1, width: "100%" }
 
 const $unmeasured: ViewStyle = { opacity: 0 }
 
