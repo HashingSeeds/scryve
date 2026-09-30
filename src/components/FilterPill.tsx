@@ -46,7 +46,9 @@ export function FilterButton({
   count = 0,
   onPress,
   testID,
+  backgroundColor,
 }: {
+  backgroundColor?: string
   count?: number
   onPress: () => void
   testID?: string
@@ -58,8 +60,8 @@ export function FilterButton({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
-      activeOpacity={0.8}
-      style={themed($filterButton)}
+      activeOpacity={1}
+      style={[themed($filterButton), backgroundColor ? { backgroundColor } : undefined]}
       onPress={onPress}
     >
       <Svg
@@ -118,7 +120,10 @@ const $chipSelectedText: ThemedStyle<TextStyle> = ({ colors }) => ({
 })
 const $dimmedText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 
-const $filterButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $filterButton: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  position: "absolute",
+  right: 0,
+  backgroundColor: colors.background,
   minHeight: 44,
   minWidth: 44,
   flexDirection: "row",

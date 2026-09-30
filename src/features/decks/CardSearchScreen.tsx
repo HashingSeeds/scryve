@@ -407,7 +407,7 @@ export function CardSearchScreen({
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
-                contentContainerStyle={$pills}
+                contentContainerStyle={[$pills, $colorScroll]}
               >
                 {[...COMMANDER_COLORS, { id: "C", label: "Colorless" }].map((color) => (
                   <FilterPill
@@ -421,6 +421,7 @@ export function CardSearchScreen({
               </ScrollView>
               <FilterButton
                 testID="commander-filters-button"
+                backgroundColor={theme.colors.surface}
                 count={keywords.length + (exactColors ? 1 : 0)}
                 onPress={() => setFiltersOpen(true)}
               />
@@ -697,9 +698,11 @@ const $result: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderBottomColor: colors.separator,
 })
 
-const $filterRow: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 }
+const $filterRow: ViewStyle = { flexDirection: "row", alignItems: "center", minHeight: 44 }
 const $pills: ViewStyle = { flexDirection: "row", flexWrap: "wrap", gap: 8 }
 const $filterBody: ViewStyle = { gap: 16 }
 
 const $searchHeader: ViewStyle = { paddingBottom: 4 }
 const $searchResults: ViewStyle = { paddingTop: 8 }
+
+const $colorScroll: ViewStyle = { flexWrap: "nowrap", paddingRight: 128 }

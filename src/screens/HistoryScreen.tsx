@@ -312,7 +312,7 @@ export function HistoryScreen({
           <View style={themed($headerBlock)}>
             <Text preset="heading" text="History" />
             <Text size="xs" style={themed($dimmedText)} text={countLabel} />
-            <View style={themed($chipRow)}>
+            <View style={$chipRow}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -607,12 +607,15 @@ const $statusButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.md,
 })
-const $chipRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $chipRow: ViewStyle = {
   flexDirection: "row",
   alignItems: "center",
+  minHeight: 44,
+}
+const $chipScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
+  paddingRight: 128,
 })
-const $chipScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $chipWrap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
