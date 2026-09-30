@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { type ImageStyle } from "expo-image"
@@ -6,8 +7,12 @@ import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CardImage, type CardImageIdentity } from "@/components/CardImage"
 import { DialogCard } from "@/components/DialogCard"
+import { FilterPill } from "@/components/FilterPill"
 import { RetryableError } from "@/components/RetryableError"
+import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
+import { readCardFaces } from "@/features/decks/cardFaces"
+import type { CommanderColor } from "@/features/decks/deckCards"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -17,6 +22,7 @@ export type FocusedCard = CardImageIdentity & {
   smallImageUrl?: string
   quantity: number
   boardLabel: string
+  commanderColor?: CommanderColor
 }
 
 export type FocusedCardDetails = {
@@ -28,6 +34,12 @@ export type FocusedCardDetails = {
   setName?: string
   collectorNumber?: string
   rarity?: string
+  commanderEligibility?: string
+  commanderLegality?: string
+  colorIdentity?: string
+  faceDetails?: string
+  keywords?: string
+  commanderRulesUpdatedAt?: string
 }
 
 export interface CardFocusDialogProps {
@@ -36,12 +48,36 @@ export interface CardFocusDialogProps {
   detailsError?: string
   detailsRetryAfterMs?: number
   onRetryDetails?: () => void
+  showQuantity?: boolean
   onIncrement?: () => void
   onDecrement?: () => void
+  onSetCommander?: (color?: CommanderColor) => void
   onClose: () => void
 }
 
 const CARD_ASPECT_RATIO = 488 / 680
+
+export const COMMANDER_COLORS = [
+  { id: "W", label: "White" },
+  { id: "U", label: "Blue" },
+  { id: "B", label: "Black" },
+  { id: "R", label: "Red" },
+  { id: "G", label: "Green" },
+] as const
+
+export function cardColorIdentityLabel(details: FocusedCardDetails | undefined, name: string) {
+  if (details?.colorIdentity === undefined) return undefined
+  const colors = COMMANDER_COLORS.filter((color) => details.colorIdentity?.includes(color.id))
+    .map((color) => color.label)
+    .join(", ")
+  const identity =
+    details.commanderEligibility === "color-choice"
+      ? colors
+        ? `${colors} + chosen color`
+        : "Choose a color"
+      : colors || "Colorless"
+  return `Color identity: ${identity}${name.includes(" // ") ? " · Both faces" : ""}`
+}
 
 function capitalized(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
@@ -63,16 +99,40 @@ export function CardFocusDialog({
   detailsError,
   detailsRetryAfterMs,
   onRetryDetails,
+  showQuantity = true,
   onIncrement,
   onDecrement,
+  onSetCommander,
   onClose,
 }: CardFocusDialogProps) {
   const { themed } = useAppTheme()
+  const [commanderColor, setCommanderColor] = useState(card.commanderColor)
+  const [faceIndex, setFaceIndex] = useState(0)
+  const faces = readCardFaces(details?.faceDetails)
+  const face = faces[faceIndex]
+  const visibleDetails = face ?? details
+  const visibleName = face?.name ?? card.name
+  const needsColor = details?.commanderEligibility === "color-choice"
+  const commanderProblem =
+    !details?.commanderEligibility || !details?.commanderLegality
+      ? "Commander eligibility not yet verified."
+      : details.commanderEligibility === "ineligible"
+        ? "This card cannot be a commander on its own."
+        : details.commanderLegality !== "legal"
+          ? "This card is not legal in Commander."
+          : undefined
   const printing = details ? printingLine(details) : ""
-  const smallImageUrl = details?.smallImageUrl ?? card.smallImageUrl
-  const displayImageUrl = details?.imageUrl ?? card.imageUrl ?? smallImageUrl
+  const colorIdentity = cardColorIdentityLabel(details, card.name)
+  const smallImageUrl = face ? face.smallImageUrl : (details?.smallImageUrl ?? card.smallImageUrl)
+  const displayImageUrl = face
+    ? (face.imageUrl ?? smallImageUrl)
+    : (details?.imageUrl ?? card.imageUrl ?? smallImageUrl)
   const cachedThumbnailUrl = displayImageUrl === smallImageUrl ? undefined : smallImageUrl
-  const imageAccessibilityLabel = [card.name, details?.typeLine, details?.oracleText]
+  const imageAccessibilityLabel = [
+    visibleName,
+    visibleDetails?.typeLine,
+    visibleDetails?.oracleText,
+  ]
     .filter(Boolean)
     .join(". ")
 
@@ -89,7 +149,7 @@ export function CardFocusDialog({
       accessibilityViewIsModal
     >
       <View style={themed($header)}>
-        <Text preset="subheading" style={themed($name)} text={card.name} />
+        <Text preset="subheading" style={themed($name)} text={visibleName} />
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Close card details"
@@ -99,6 +159,19 @@ export function CardFocusDialog({
           <Text text="Close" weight="bold" style={themed($closeText)} />
         </TouchableOpacity>
       </View>
+      {faces.length === 2 ? (
+        <View style={themed($faceControls)}>
+          {faces.map((entry, index) => (
+            <FilterPill
+              key={entry.name}
+              testID={`card-face-${index}`}
+              label={index === 0 ? "Front" : "Back"}
+              selected={faceIndex === index}
+              onPress={() => setFaceIndex(index)}
+            />
+          ))}
+        </View>
+      ) : null}
       <ScrollView
         style={$scrollBody}
         contentContainerStyle={themed($scrollContent)}
@@ -106,7 +179,7 @@ export function CardFocusDialog({
       >
         <CardImage
           game={card.game}
-          cardId={card.cardId}
+          cardId={faceIndex === 0 ? card.cardId : undefined}
           testID="card-focus-image"
           accessibilityLabel={imageAccessibilityLabel}
           source={displayImageUrl}
@@ -114,13 +187,14 @@ export function CardFocusDialog({
           style={themed($cardImage)}
         />
         <View style={themed($details)}>
-          {details?.manaCost ? (
-            <Text size="sm" style={themed($dimText)} text={details.manaCost} />
+          {visibleDetails?.manaCost ? (
+            <Text size="sm" style={themed($dimText)} text={visibleDetails.manaCost} />
           ) : null}
-          {details?.typeLine ? (
-            <Text size="sm" style={themed($dimText)} text={details.typeLine} />
+          {visibleDetails?.typeLine ? (
+            <Text size="sm" style={themed($dimText)} text={visibleDetails.typeLine} />
           ) : null}
-          {details?.oracleText ? <Text selectable text={details.oracleText} /> : null}
+          {colorIdentity ? <Text size="sm" text={colorIdentity} /> : null}
+          {visibleDetails?.oracleText ? <Text selectable text={visibleDetails.oracleText} /> : null}
           {printing ? <Text size="xs" style={themed($dimText)} text={printing} /> : null}
           {!details && !detailsError ? (
             <Text size="sm" style={themed($dimText)} text="Loading details…" />
@@ -139,29 +213,53 @@ export function CardFocusDialog({
           ) : null}
         </View>
       </ScrollView>
-      <View testID="card-focus-quantity" style={themed($quantityRow)}>
-        <Text
-          size="sm"
-          style={themed($quantityLabel)}
-          text={`${card.quantity}× in ${card.boardLabel}`}
-        />
-        {onDecrement ? (
+      {onSetCommander ? (
+        <View style={themed($details)}>
+          {needsColor ? (
+            <SelectField
+              testID="commander-color"
+              label="Commander color"
+              options={COMMANDER_COLORS}
+              value={commanderColor}
+              onSelect={(color) =>
+                setCommanderColor(COMMANDER_COLORS.find((option) => option.id === color)?.id)
+              }
+            />
+          ) : null}
+          {commanderProblem ? <Text size="xs" text={commanderProblem} /> : null}
           <Button
-            text="−"
-            testID="card-focus-decrement"
-            style={themed($quantityButton)}
-            onPress={onDecrement}
+            testID="set-commander"
+            text="Set as commander"
+            disabled={Boolean(commanderProblem) || (needsColor && !commanderColor)}
+            onPress={() => onSetCommander(needsColor ? commanderColor : undefined)}
           />
-        ) : null}
-        {onIncrement ? (
-          <Button
-            text="+"
-            testID="card-focus-increment"
-            style={themed($quantityButton)}
-            onPress={onIncrement}
+        </View>
+      ) : null}
+      {showQuantity ? (
+        <View testID="card-focus-quantity" style={themed($quantityRow)}>
+          <Text
+            size="sm"
+            style={themed($quantityLabel)}
+            text={`${card.quantity}× in ${card.boardLabel}`}
           />
-        ) : null}
-      </View>
+          {onDecrement ? (
+            <Button
+              text="−"
+              testID="card-focus-decrement"
+              style={themed($quantityButton)}
+              onPress={onDecrement}
+            />
+          ) : null}
+          {onIncrement ? (
+            <Button
+              text="+"
+              testID="card-focus-increment"
+              style={themed($quantityButton)}
+              onPress={onIncrement}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </DialogCard>
   )
 }
@@ -184,6 +282,12 @@ const $cardImage: ThemedStyle<ImageStyle> = ({ spacing }) => ({
   alignSelf: "center",
   aspectRatio: CARD_ASPECT_RATIO,
   borderRadius: spacing.xs,
+})
+const $faceControls: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "center",
+  gap: spacing.xs,
+  paddingVertical: spacing.xs,
 })
 const $details: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $name: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })

@@ -83,6 +83,96 @@ test("serves warmed details from storage without fetching", async () => {
   expect(mockLookup).not.toHaveBeenCalled()
 })
 
+test("enriches old cached details once when commander rules are needed", async () => {
+  saveCardDetails({ "legacy-commander": { oracleText: "Saved text" } })
+  mockLookup.mockReset().mockResolvedValue({
+    oracleText: "Current text",
+    commanderEligibility: "eligible",
+    commanderLegality: "legal",
+    colorIdentity: "U",
+    commanderRulesUpdatedAt: new Date().toISOString(),
+  })
+  const { result } = renderHook(() =>
+    useCardDetails(
+      {
+        detailKey: "legacy-commander",
+        name: "Sai",
+        scryfallId: "sai",
+      },
+      true,
+    ),
+  )
+  await waitFor(() => expect(result.current.details?.commanderEligibility).toBe("eligible"))
+  expect(mockLookup).toHaveBeenCalledTimes(1)
+})
+
+test("keeps unknown commander rules unverified without a lookup loop", async () => {
+  mockLookup.mockReset().mockResolvedValue({ oracleText: "Older backend response" })
+  const { result } = renderHook(() =>
+    useCardDetails(
+      {
+        detailKey: "unknown-commander",
+        name: "Sai",
+        scryfallId: "sai",
+      },
+      true,
+    ),
+  )
+  await waitFor(() => expect(result.current.details?.oracleText).toBe("Older backend response"))
+  expect(result.current.details?.commanderEligibility).toBeUndefined()
+  expect(mockLookup).toHaveBeenCalledTimes(1)
+})
+
+test("retries enrichment when the focused card changed before its response arrived", async () => {
+  saveCardDetails({ "cancelled-commander": { oracleText: "Saved text" } })
+  let finishFirst!: (details: { oracleText: string }) => void
+  mockLookup.mockReset().mockReturnValueOnce(
+    new Promise((resolve) => {
+      finishFirst = resolve
+    }),
+  )
+  mockLookup.mockResolvedValue({
+    commanderEligibility: "eligible",
+    commanderLegality: "legal",
+    colorIdentity: "U",
+    commanderRulesUpdatedAt: new Date().toISOString(),
+  })
+  const card = { detailKey: "cancelled-commander", name: "Sai", scryfallId: "sai" }
+  const { result, rerender } = renderHook(
+    ({ focused }: { focused: typeof card | undefined }) => useCardDetails(focused, true),
+    { initialProps: { focused: card } },
+  )
+  rerender({ focused: undefined })
+  await act(async () => finishFirst({ oracleText: "Cancelled response" }))
+  rerender({ focused: card })
+  await waitFor(() => expect(result.current.details?.commanderEligibility).toBe("eligible"))
+  expect(mockLookup).toHaveBeenCalledTimes(2)
+})
+
+test("shows legacy guest cached details offline without inventing commander eligibility", async () => {
+  saveCardDetails({ "mtg:main:legacy-sai": { oracleText: "Saved Sai text" } })
+  mockConnectionState.isWebSocketConnected = false
+  mockLookup.mockClear()
+  try {
+    const { result } = renderHook(() =>
+      useCardDetails(
+        {
+          detailKey: "legacy-sai",
+          legacyDetailKey: "mtg:main:legacy-sai",
+          name: "Sai",
+          scryfallId: "legacy-sai",
+        },
+        true,
+      ),
+    )
+    await waitFor(() => expect(result.current.details?.oracleText).toBe("Saved Sai text"))
+    expect(result.current.details?.commanderEligibility).toBeUndefined()
+    expect(mockLookup).not.toHaveBeenCalled()
+  } finally {
+    mockConnectionState.isWebSocketConnected = true
+  }
+})
+
 test("serves warmed details from storage without fetching", async () => {
   saveCardDetails({ "warmed-key": { oracleText: "Warmed text" } })
   mockLookup.mockClear()
@@ -92,4 +182,36 @@ test("serves warmed details from storage without fetching", async () => {
   await waitFor(() => expect(result.current.details?.oracleText).toBe("Warmed text"))
   expect(result.current.detailsError).toBeUndefined()
   expect(mockLookup).not.toHaveBeenCalled()
+})
+
+test("upgrades cached multi-face details once and reuses them offline", async () => {
+  const card = { detailKey: "legacy-faces", name: "Front // Back", scryfallId: "faces" }
+  saveCardDetails({ [card.detailKey]: { oracleText: "Combined saved rules" } })
+  const faceDetails = JSON.stringify([{ name: "Front" }, { name: "Back" }])
+  mockLookup.mockReset().mockResolvedValue({ oracleText: "Combined rules", faceDetails })
+  const view = renderHook(() => useCardDetails(card))
+  await waitFor(() => expect(view.result.current.details?.faceDetails).toBe(faceDetails))
+  expect(mockLookup).toHaveBeenCalledTimes(1)
+  view.unmount()
+  mockConnectionState.isWebSocketConnected = false
+  mockLookup.mockClear()
+  try {
+    const offline = renderHook(() => useCardDetails(card))
+    expect(offline.result.current.details?.faceDetails).toBe(faceDetails)
+    expect(mockLookup).not.toHaveBeenCalled()
+  } finally {
+    mockConnectionState.isWebSocketConnected = true
+  }
+})
+
+test("keeps legacy multi-face info usable without repeatedly fetching an older backend", async () => {
+  const card = { detailKey: "old-backend-faces", name: "Front // Back", scryfallId: "old-faces" }
+  saveCardDetails({ [card.detailKey]: { oracleText: "Saved rules" } })
+  mockLookup.mockReset().mockResolvedValue({ oracleText: "Saved rules" })
+  const { result } = renderHook(() => useCardDetails(card))
+  await waitFor(() =>
+    expect(result.current.detailsError).toBe("Could not load both faces. Showing saved card info."),
+  )
+  expect(result.current.details?.oracleText).toBe("Saved rules")
+  expect(mockLookup).toHaveBeenCalledTimes(1)
 })

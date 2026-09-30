@@ -24,6 +24,57 @@ async function synced(t: ReturnType<typeof convexTest>, subject: string, name: s
 }
 
 describe("premium deck tracking", () => {
+  it("preserves a commander's chosen color through imports, version saves, and queued sync", async () => {
+    const t = convexTest(schema, modules)
+    const owner = await synced(t, "commander-color-owner", "Commander Player")
+    const card = {
+      oracleId: "11111111-1111-1111-1111-111111111111",
+      scryfallId: "22222222-2222-2222-2222-222222222222",
+      name: "The Prismatic Piper",
+      quantity: 1,
+      section: "commander",
+      board: "commander" as const,
+      commanderColor: "U" as const,
+    }
+    const deckId = await owner.mutation(api.decks.importResolved, {
+      name: "Piper",
+      format: "commander",
+      cards: [card],
+    })
+    const detail = await owner.query(api.decks.detail, { deckId })
+    expect(detail.cards).toMatchObject([{ commanderColor: "U" }])
+    const versionId = detail.versions[0]._id
+    await owner.mutation(api.decks.saveVersion, {
+      deckId,
+      versionId,
+      cards: [{ ...card, commanderColor: "G" }],
+    })
+    expect((await owner.query(api.decks.detail, { deckId })).cards).toMatchObject([
+      { commanderColor: "G" },
+    ])
+    await owner.mutation(api.decks.syncVersionWrite, {
+      deckId,
+      versionId,
+      operationId: "33333333-3333-4333-8333-333333333333",
+      expectedRevision: 2,
+      cards: [{ ...card, commanderColor: "R" }],
+    })
+    expect((await owner.query(api.decks.detail, { deckId })).cards).toMatchObject([
+      { commanderColor: "R" },
+    ])
+    const imported = await owner.mutation(api.decks.importGuest, {
+      name: "Guest Piper",
+      format: "commander",
+      cards: [card],
+      localId: "44444444-4444-4444-8444-444444444444",
+      localUpdatedAt: 123,
+    })
+    if (imported.status === "limit_reached") throw new Error("Unexpected deck limit")
+    expect((await owner.query(api.decks.detail, { deckId: imported.deckId })).cards).toMatchObject([
+      { commanderColor: "U" },
+    ])
+  })
+
   it("lets a player clear a deck only when the lobby makes decks optional", async () => {
     const t = convexTest(schema, modules)
     const optionalHost = await synced(t, "optional-host", "Optional Host")

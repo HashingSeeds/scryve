@@ -18,6 +18,9 @@ const genericDeckCardFields = {
 const legacyMagicDeckCardFields = {
   oracleId: v.optional(v.string()),
   scryfallId: v.optional(v.string()),
+  commanderColor: v.optional(
+    v.union(v.literal("W"), v.literal("U"), v.literal("B"), v.literal("R"), v.literal("G")),
+  ),
 }
 
 export default defineSchema({
@@ -484,6 +487,11 @@ export default defineSchema({
   }).index("by_deck", ["deckId"]),
 
   cardReferences: defineTable({
+    commanderEligibility: v.optional(
+      v.union(v.literal("eligible"), v.literal("ineligible"), v.literal("color-choice")),
+    ),
+    commanderLegality: v.optional(v.string()),
+    colorIdentity: v.optional(v.string()),
     scryfallId: v.string(),
     oracleId: v.string(),
     name: v.string(),
@@ -492,6 +500,8 @@ export default defineSchema({
     manaCost: v.optional(v.string()),
     typeLine: v.optional(v.string()),
     oracleText: v.optional(v.string()),
+    keywords: v.optional(v.string()),
+    faceDetails: v.optional(v.string()),
     setName: v.optional(v.string()),
     setCode: v.optional(v.string()),
     collectorNumber: v.optional(v.string()),

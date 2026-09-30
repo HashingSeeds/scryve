@@ -4,6 +4,7 @@ import type { ConvexReactClient } from "convex/react"
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
 import { storage } from "@/utils/storage"
 
+import { readCardFaces } from "./cardFaces"
 import { cardDetailsKey, type DeckCard } from "./deckCards"
 import { api } from "../../../convex/_generated/api"
 
@@ -102,7 +103,14 @@ export async function prefetchCardDetails(
     const urls = [
       ...new Set(
         found
-          .flatMap((entry) => [entry.details.imageUrl, entry.details.smallImageUrl])
+          .flatMap((entry) => [
+            entry.details.imageUrl,
+            entry.details.smallImageUrl,
+            ...readCardFaces(entry.details.faceDetails).flatMap((face) => [
+              face.imageUrl,
+              face.smallImageUrl,
+            ]),
+          ])
           .filter((url): url is string => Boolean(url)),
       ),
     ]

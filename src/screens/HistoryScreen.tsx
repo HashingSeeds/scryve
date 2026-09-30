@@ -6,6 +6,7 @@ import { Button } from "@/components/Button"
 import { useCollapsingTitle } from "@/components/CollapsingTitle"
 import { $dialogActions, $dialogButton, DialogCard } from "@/components/DialogCard"
 import { EmptyState } from "@/components/EmptyState"
+import { FilterPill, FilterGroup, FilterButton } from "@/components/FilterPill"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -93,50 +94,6 @@ function subtitleFor(entry: HistoryEntry) {
 
 function toggled<T>(values: T[], value: T) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
-}
-
-function FilterChip({
-  label,
-  selected,
-  onPress,
-  removable,
-  testID,
-}: {
-  label: string
-  selected?: boolean
-  onPress: () => void
-  removable?: boolean
-  testID?: string
-}) {
-  const { themed } = useAppTheme()
-  return (
-    <TouchableOpacity
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={removable ? `Remove filter ${label}` : label}
-      accessibilityState={{ selected: Boolean(selected) }}
-      activeOpacity={0.8}
-      style={[themed($chip), selected ? themed($chipSelected) : undefined]}
-      onPress={onPress}
-    >
-      <Text
-        size="xxs"
-        weight={selected ? "medium" : "normal"}
-        style={selected ? themed($chipSelectedText) : themed($dimmedText)}
-        text={removable ? `${label}  ✕` : label}
-      />
-    </TouchableOpacity>
-  )
-}
-
-function ChipGroup({ heading, children }: { heading: string; children: React.ReactNode }) {
-  const { themed } = useAppTheme()
-  return (
-    <View style={themed($chipGroup)}>
-      <Text weight="bold" size="xxs" style={themed($groupHeading)} text={heading} />
-      <View style={themed($chipWrap)}>{children}</View>
-    </View>
-  )
 }
 
 function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => void }) {
@@ -364,14 +321,15 @@ export function HistoryScreen({
           <View style={themed($headerBlock)}>
             <Text preset="heading" text="History" />
             <Text size="xs" style={themed($dimmedText)} text={countLabel} />
-            <View style={themed($chipRow)}>
+            <View style={$chipRow}>
               <ScrollView
                 horizontal
+                style={$filterScroll}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={themed($chipScroll)}
               >
                 {SOURCES.map((source) => (
-                  <FilterChip
+                  <FilterPill
                     key={source.value}
                     testID={`history-source-${source.value}`}
                     label={source.label}
@@ -380,17 +338,16 @@ export function HistoryScreen({
                   />
                 ))}
               </ScrollView>
-              <Button
+              <FilterButton
                 testID="history-filters-button"
-                style={themed($filtersButton)}
-                text={filterCount > 0 ? `Filters (${filterCount})` : "Filters"}
+                count={filterCount}
                 onPress={() => setFiltersOpen(true)}
               />
             </View>
             {activeChips.length > 0 ? (
               <View style={themed($chipWrap)}>
                 {activeChips.map((chip) => (
-                  <FilterChip
+                  <FilterPill
                     key={chip.key}
                     label={chip.label}
                     selected
@@ -499,9 +456,9 @@ export function HistoryScreen({
       >
         <Text preset="subheading" text="Filters" />
         <ScrollView contentContainerStyle={themed($dialogBody)}>
-          <ChipGroup heading="Date">
+          <FilterGroup heading="Date">
             {DATE_RANGES.map((range) => (
-              <FilterChip
+              <FilterPill
                 key={range}
                 testID={`history-date-${range}`}
                 label={DATE_RANGE_LABELS[range]}
@@ -509,11 +466,11 @@ export function HistoryScreen({
                 onPress={() => patch({ dateRange: range })}
               />
             ))}
-          </ChipGroup>
+          </FilterGroup>
           {options.players.length > 0 ? (
-            <ChipGroup heading="Players">
+            <FilterGroup heading="Players">
               {options.players.map((name) => (
-                <FilterChip
+                <FilterPill
                   key={name}
                   testID={`history-player-${name}`}
                   label={name}
@@ -521,12 +478,12 @@ export function HistoryScreen({
                   onPress={() => patch({ players: toggled(filters.players, name) })}
                 />
               ))}
-            </ChipGroup>
+            </FilterGroup>
           ) : null}
           {options.decks.length > 0 ? (
-            <ChipGroup heading="Decks">
+            <FilterGroup heading="Decks">
               {options.decks.map((deck) => (
-                <FilterChip
+                <FilterPill
                   key={deck}
                   testID={`history-deck-${deck}`}
                   label={deck}
@@ -534,11 +491,11 @@ export function HistoryScreen({
                   onPress={() => patch({ decks: toggled(filters.decks, deck) })}
                 />
               ))}
-            </ChipGroup>
+            </FilterGroup>
           ) : null}
-          <ChipGroup heading="Result">
+          <FilterGroup heading="Result">
             {OUTCOMES.map((outcome) => (
-              <FilterChip
+              <FilterPill
                 key={outcome}
                 testID={`history-outcome-${outcome}`}
                 label={OUTCOME_LABELS[outcome]}
@@ -546,11 +503,11 @@ export function HistoryScreen({
                 onPress={() => patch({ outcomes: toggled(filters.outcomes, outcome) })}
               />
             ))}
-          </ChipGroup>
+          </FilterGroup>
           {options.podSizes.length > 0 ? (
-            <ChipGroup heading="Pod size">
+            <FilterGroup heading="Pod size">
               {options.podSizes.map((size) => (
-                <FilterChip
+                <FilterPill
                   key={size}
                   testID={`history-pod-${size}`}
                   label={podSizeLabel(size)}
@@ -558,12 +515,12 @@ export function HistoryScreen({
                   onPress={() => patch({ podSizes: toggled(filters.podSizes, size) })}
                 />
               ))}
-            </ChipGroup>
+            </FilterGroup>
           ) : null}
           {options.systems.length > 0 ? (
-            <ChipGroup heading="Game system">
+            <FilterGroup heading="Game system">
               {options.systems.map((system) => (
-                <FilterChip
+                <FilterPill
                   key={system}
                   testID={`history-system-${system}`}
                   label={systemLabel(system)}
@@ -571,12 +528,12 @@ export function HistoryScreen({
                   onPress={() => setFilters((current) => toggleSystem(current, system))}
                 />
               ))}
-            </ChipGroup>
+            </FilterGroup>
           ) : null}
           {formats.length > 0 ? (
-            <ChipGroup heading="Format">
+            <FilterGroup heading="Format">
               {formats.map((format) => (
-                <FilterChip
+                <FilterPill
                   key={format.key}
                   testID={`history-format-${format.key}`}
                   label={format.label}
@@ -584,7 +541,7 @@ export function HistoryScreen({
                   onPress={() => patch({ formats: toggled(filters.formats, format.key) })}
                 />
               ))}
-            </ChipGroup>
+            </FilterGroup>
           ) : null}
         </ScrollView>
         <View style={themed($dialogActions)}>
@@ -638,41 +595,20 @@ const $statusButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.md,
 })
-const $chipRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $chipRow: ViewStyle = {
   flexDirection: "row",
   alignItems: "center",
+  minHeight: 44,
+}
+const $filterScroll: ViewStyle = { flex: 1 }
+const $chipScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
+  paddingRight: spacing.md,
 })
-const $chipScroll: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $chipWrap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   flexWrap: "wrap",
   gap: spacing.xs,
-})
-const $chipGroup: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
-const $groupHeading: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.textDim,
-  textTransform: "uppercase",
-  letterSpacing: 1,
-})
-const $chip: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  paddingVertical: spacing.xxs,
-  paddingHorizontal: spacing.sm,
-  borderRadius: spacing.lg,
-  borderWidth: 1,
-  borderColor: colors.separator,
-})
-const $chipSelected: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  borderColor: colors.tint,
-  backgroundColor: colors.tint,
-})
-const $chipSelectedText: ThemedStyle<TextStyle> = ({ colors }) => ({
-  color: colors.palette.neutral100,
-})
-const $filtersButton: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 36,
-  paddingHorizontal: spacing.sm,
-  paddingVertical: 0,
 })
 const $dialogBody: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $dayHeading: ThemedStyle<TextStyle> = ({ colors, spacing }) => ({

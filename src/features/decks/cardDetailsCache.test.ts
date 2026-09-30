@@ -82,6 +82,29 @@ describe("card details cache", () => {
     expect(query).toHaveBeenCalledTimes(1)
   })
 
+  it("warms both faces and their images for offline detail viewing", async () => {
+    const store = memoryStore()
+    const faceDetails = JSON.stringify([
+      { name: "Front", imageUrl: "https://cards/front.jpg" },
+      { name: "Back", imageUrl: "https://cards/back.jpg" },
+    ])
+    const query = jest.fn(async () => [
+      { key: "double-id", details: { imageUrl: "https://cards/front.jpg", faceDetails } },
+    ])
+    await prefetchCardDetails(
+      { query },
+      {
+        game: "mtg",
+        versionId: "double-version",
+        revision: 1,
+        cards: [{ name: "Front // Back", quantity: 1, scryfallId: "double-id" }],
+      },
+      store,
+    )
+    expect(readCardDetail("double-id", store)?.faceDetails).toBe(faceDetails)
+    expect(mockPrefetch).toHaveBeenCalledWith(["https://cards/front.jpg", "https://cards/back.jpg"])
+  })
+
   it("retries after a failed warm and skips fully warmed versions", async () => {
     const store = memoryStore()
     const query = jest.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce([])

@@ -11,8 +11,14 @@ import { DeckSettingsDialog } from "@/components/DeckSettingsDialog"
 import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
+import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import { printingKey } from "@/features/decks/deckCards"
+import {
+  addCommander,
+  getCommanderWarnings,
+  selectCommander,
+} from "@/features/decks/commanderSelection"
+import { cardDetailsKey, cardSection, printingKey } from "@/features/decks/deckCards"
 import { DeckView } from "@/features/decks/DeckView"
 import {
   deleteGuestDeck,
@@ -52,6 +58,8 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const [cancelling, setCancelling] = useState(false)
   const [undo, setUndo] = useState<{ name: string; cards: GuestCard[] }>()
   const [adding, setAdding] = useState(false)
+  const [choosingCommander, setChoosingCommander] = useState(false)
+  const [commanderSelected, setCommanderSelected] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -65,11 +73,13 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
     focusedCard
       ? {
           ...focusedCard,
-          detailKey: `${focusedGame}:${printingKey(focusedCard)}`,
+          detailKey: cardDetailsKey(focusedCard, focusedGame),
+          legacyDetailKey: `${focusedGame}:${printingKey(focusedCard)}`,
           game: focusedGame,
           catalogCardId: focusedCard.cardId ?? focusedCard.printingId ?? focusedCard.providerCardId,
         }
       : undefined,
+    focusedGame === "mtg" && (draft ?? stored?.deck)?.format === "commander",
   )
   const [deleteRevision, setDeleteRevision] = useState<typeof revisionRef.current>()
   const draftRef = useRef(draft)
@@ -124,6 +134,17 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
   const current = draft ?? stored?.deck
   if (!current) return null
   const game = current.game ?? DEFAULT_DECK_GAME
+  const singleCommander =
+    game === "mtg" &&
+    current.format === "commander" &&
+    current.cards.reduce(
+      (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
+      0,
+    ) <= 1
+  const cachedRules = commanderSelected ? loadCardDetails() : {}
+  const commanderWarnings = commanderSelected
+    ? getCommanderWarnings(current.cards, (card) => cachedRules[cardDetailsKey(card, game)])
+    : []
   const sections = deckSections(game, current.format)
   const sectionLabel = (card: GuestCard) => {
     const id = card.section ?? card.board ?? "main"
@@ -138,6 +159,25 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
       ),
     })
   const update = (changes: Partial<GuestDeckPayload>) => setDraft({ ...current, ...changes })
+  const chooseCommander = (color?: GuestCard["commanderColor"]) => {
+    if (!focusedCard) return
+    const cached = loadCardDetails()
+    const result = selectCommander(
+      current.cards,
+      printingKey(focusedCard),
+      (card) => (card === focusedCard ? details : cached[cardDetailsKey(card, game)]),
+      color,
+    )
+    setFocusedIndex(undefined)
+    if ("error" in result) {
+      setError(result.error)
+      return
+    }
+    setError(undefined)
+    setUndo(undefined)
+    update({ cards: result.cards })
+    setCommanderSelected(true)
+  }
   const save = () => {
     setError(undefined)
     setConflict(false)
@@ -202,8 +242,19 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         onDetails={() => setSettings(true)}
         onAdd={() => {
           setEditing(true)
+          setChoosingCommander(false)
           setAdding(true)
         }}
+        onChooseCommander={
+          singleCommander
+            ? () => {
+                setEditing(true)
+                setChoosingCommander(true)
+                setAdding(true)
+              }
+            : undefined
+        }
+        commanderWarnings={commanderWarnings}
         onNoteChange={(note) => update({ note })}
         onFocus={(card) => setFocusedIndex(current.cards.indexOf(card))}
         onIncrement={(card) => {
@@ -243,6 +294,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
                   const latest = loadGuestDeck()
                   if (!latest) return
                   setDraft(latest.deck)
+                  setCommanderSelected(false)
                   baseRef.current = latest.deck
                   revisionRef.current = { localId: latest.localId, updatedAt: latest.updatedAt }
                   setError(undefined)
@@ -276,9 +328,39 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         <CardSearchScreen
           game={game}
           format={current.format}
+          initialSection={choosingCommander ? "commander" : undefined}
+          commanderCards={current.cards}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
             setUndo(undefined)
+            if (
+              game === "mtg" &&
+              current.format === "commander" &&
+              cardSection(card) === "commander"
+            ) {
+              const cached = loadCardDetails()
+              const selectedDetails = cached[cardDetailsKey(card, game)]
+              const result = addCommander(
+                current.cards,
+                card,
+                (entry) =>
+                  (
+                    card.oracleId && entry.oracleId
+                      ? card.oracleId === entry.oracleId
+                      : card.name === entry.name
+                  )
+                    ? selectedDetails
+                    : cached[cardDetailsKey(entry, game)],
+                card.commanderColor,
+              )
+              if ("error" in result) return result.error
+              if (result.cards.length > MAX_DECK_CARDS)
+                return `A deck can have at most ${MAX_DECK_CARDS} entries.`
+              update({ cards: result.cards })
+              setCommanderSelected(true)
+              if (choosingCommander) setAdding(false)
+              return undefined
+            }
             const index = current.cards.findIndex(
               (entry) => printingKey(entry) === printingKey(card),
             )
@@ -297,6 +379,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
       ) : null}
       {focusedCard && focusedIndex !== undefined ? (
         <CardFocusDialog
+          key={printingKey(focusedCard)}
           card={{
             game,
             cardId:
@@ -309,19 +392,26 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
             smallImageUrl: focusedCard.smallImageUrl,
             quantity: focusedCard.quantity,
             boardLabel: sectionLabel(focusedCard),
+            commanderColor: focusedCard.commanderColor,
           }}
           details={details}
           detailsError={detailsError}
           detailsRetryAfterMs={detailsRetryAfterMs}
           onRetryDetails={retryDetails}
           onClose={() => setFocusedIndex(undefined)}
+          onSetCommander={editing && singleCommander ? chooseCommander : undefined}
           {...(editing
             ? {
-                onIncrement: () =>
-                  updateCard(focusedIndex, {
-                    ...focusedCard,
-                    quantity: Math.min(999, focusedCard.quantity + 1),
-                  }),
+                onIncrement:
+                  cardSection(focusedCard) === "commander" &&
+                  game === "mtg" &&
+                  current.format === "commander"
+                    ? undefined
+                    : () =>
+                        updateCard(focusedIndex, {
+                          ...focusedCard,
+                          quantity: Math.min(999, focusedCard.quantity + 1),
+                        }),
                 onDecrement: () => {
                   if (focusedCard.quantity <= 1) setFocusedIndex(undefined)
                   updateCard(
@@ -351,6 +441,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         onConfirm={() => {
           if (cancelling) {
             setDraft(baseRef.current)
+            setCommanderSelected(false)
             setEditing(false)
             setUndo(undefined)
             setDiscarding(false)

@@ -32,6 +32,8 @@ describe("normalizeScryfallCard", () => {
       setCode: "dom",
       collectorNumber: "168",
       rarity: "common",
+      commanderEligibility: "ineligible",
+      commanderRulesUpdatedAt: expect.any(String),
     })
   })
 
@@ -80,5 +82,160 @@ describe("normalizeScryfallCard", () => {
     })
     expect(normalizeScryfallCard({ name: "No Identifier" })).toBeNull()
     expect(normalizeScryfallCard(null)).toBeNull()
+  })
+})
+
+describe("Commander eligibility", () => {
+  const base = {
+    id: "22222222-2222-2222-2222-222222222222",
+    name: "Candidate",
+    color_identity: ["G", "U"],
+    legalities: { commander: "legal" },
+  }
+
+  it.each([
+    [{ type_line: "Legendary Creature — Human" }, "eligible"],
+    [{ type_line: "Creature — Human" }, "ineligible"],
+    [{ type_line: "Legendary Planeswalker — Jace" }, "ineligible"],
+    [
+      {
+        type_line: "Legendary Planeswalker — Teferi",
+        oracle_text: "Teferi can be your commander.",
+      },
+      "eligible",
+    ],
+    [{ type_line: "Legendary Artifact — Vehicle", power: "7", toughness: "5" }, "eligible"],
+    [{ type_line: "Legendary Artifact — Spacecraft", power: "*", toughness: "8" }, "eligible"],
+    [{ type_line: "Legendary Artifact — Vehicle" }, "eligible"],
+    [{ type_line: "Legendary Artifact — Spacecraft" }, "ineligible"],
+    [{ type_line: "Legendary Artifact — Equipment", power: "7", toughness: "5" }, "ineligible"],
+    [{ type_line: "Artifact — Vehicle", power: "7", toughness: "5" }, "ineligible"],
+    [{ type_line: "Legendary Enchantment — Background" }, "ineligible"],
+    [{ name: "Grist, the Hunger Tide", type_line: "Legendary Planeswalker — Grist" }, "eligible"],
+    [
+      {
+        type_line: "Legendary Creature — Shapeshifter",
+        oracle_text:
+          "If The Prismatic Piper is your commander, choose a color before the game begins.",
+      },
+      "color-choice",
+    ],
+    [
+      { card_faces: [{ type_line: "Sorcery" }, { type_line: "Legendary Creature — God" }] },
+      "ineligible",
+    ],
+    [
+      { card_faces: [{ type_line: "Legendary Creature — God" }, { type_line: "Artifact" }] },
+      "eligible",
+    ],
+  ])("normalizes %j as %s", (fields, expected) => {
+    expect(normalizeScryfallCard({ ...base, ...fields })).toMatchObject({
+      commanderEligibility: expected,
+      commanderLegality: "legal",
+      colorIdentity: "UG",
+    })
+  })
+
+  it("keeps legality separate from eligibility and preserves colorless identity", () => {
+    expect(
+      normalizeScryfallCard({
+        ...base,
+        type_line: "Legendary Creature — Human",
+        color_identity: [],
+        legalities: { commander: "banned" },
+      }),
+    ).toMatchObject({
+      commanderEligibility: "eligible",
+      commanderLegality: "banned",
+      colorIdentity: "",
+    })
+    expect(normalizeScryfallCard({ ...base, color_identity: ["purple"] })).not.toHaveProperty(
+      "colorIdentity",
+    )
+    expect(normalizeScryfallCard(base)).not.toHaveProperty("commanderEligibility")
+  })
+})
+
+describe("card keywords", () => {
+  const card = { id: "test", name: "Candidate" }
+
+  it("preserves the provider keywords as scalar metadata, including known empty lists", () => {
+    expect(normalizeScryfallCard({ ...card, keywords: ["Flying", "Ward"] })).toMatchObject({
+      keywords: "Flying\nWard",
+    })
+    expect(normalizeScryfallCard({ ...card, keywords: [] })).toMatchObject({ keywords: "" })
+    expect(normalizeScryfallCard(card)).not.toHaveProperty("keywords")
+  })
+
+  it.each([
+    { keywords: [123] },
+    { keywords: ["Flying\nWard"] },
+    { keywords: Array(257).fill("Flying") },
+  ])("omits invalid keyword arrays %j", ({ keywords }) =>
+    expect(normalizeScryfallCard({ ...card, keywords })).not.toHaveProperty("keywords"),
+  )
+})
+
+describe("physical card faces", () => {
+  const front = {
+    name: "Front",
+    mana_cost: "{U}",
+    type_line: "Creature",
+    oracle_text: "Front rules",
+    image_uris: { normal: "front.jpg", small: "front-small.jpg" },
+  }
+  const back = {
+    name: "Back",
+    type_line: "Creature",
+    oracle_text: "Back rules",
+    image_uris: { normal: "back.jpg", small: "back-small.jpg" },
+  }
+  const card = { id: "test", name: "Front // Back", card_faces: [front, back] }
+
+  it("serializes both physical faces while retaining combined metadata", () => {
+    const result = normalizeScryfallCard(card)
+    expect(JSON.parse(result?.faceDetails ?? "null")).toEqual([
+      {
+        name: "Front",
+        manaCost: "{U}",
+        typeLine: "Creature",
+        oracleText: "Front rules",
+        imageUrl: "front.jpg",
+        smallImageUrl: "front-small.jpg",
+      },
+      {
+        name: "Back",
+        typeLine: "Creature",
+        oracleText: "Back rules",
+        imageUrl: "back.jpg",
+        smallImageUrl: "back-small.jpg",
+      },
+    ])
+    expect(result).toMatchObject({
+      imageUrl: "front.jpg",
+      smallImageUrl: "front-small.jpg",
+      manaCost: "{U}",
+      typeLine: "Creature // Creature",
+      oracleText: "Front rules\n—\nBack rules",
+    })
+  })
+
+  it("records a checked sentinel for shared-image split and adventure cards", () => {
+    expect(normalizeScryfallCard({ ...card, image_uris: { normal: "shared.jpg" } })).toMatchObject({
+      faceDetails: "[]",
+      imageUrl: "shared.jpg",
+    })
+  })
+
+  it("omits face details for single-faced or malformed face payloads", () => {
+    expect(normalizeScryfallCard({ id: "single", name: "Single" })).not.toHaveProperty(
+      "faceDetails",
+    )
+    expect(normalizeScryfallCard({ ...card, card_faces: [front] })).not.toHaveProperty(
+      "faceDetails",
+    )
+    expect(normalizeScryfallCard({ ...card, card_faces: [front, {}] })).not.toHaveProperty(
+      "faceDetails",
+    )
   })
 })
