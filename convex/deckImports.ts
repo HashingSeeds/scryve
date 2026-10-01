@@ -31,6 +31,9 @@ type ParsedEntry = {
   quantity: number
   board: DeckBoard
   scryfallId?: string
+  setCode?: string
+  collectorNumber?: string
+  originalReference?: string
 }
 
 export type ResolvedDeckCard = CardReference & {
@@ -145,6 +148,12 @@ function pokemonName(reference: string) {
   return (match?.[1] ?? reference).trim()
 }
 
+function ydkCardId(reference: string) {
+  return /^\d{1,10}$/.test(reference) && Number(reference) <= 0xffffffff
+    ? String(Number(reference))
+    : undefined
+}
+
 function decodeYdkeSection(encoded: string) {
   if (!encoded) return []
   let bytes: Uint8Array
@@ -204,18 +213,27 @@ export function parseGenericDeckList(list: string, game: Exclude<GameSystemId, "
       sectionExplicit = true
       continue
     }
-    if (game === "pokemon" && /^(pok[eé]mon|trainer|energy):\s*\d+$/i.test(line)) continue
+    if (game === "ygo" && line.startsWith("#")) continue
+    if (
+      game === "pokemon" &&
+      /^(?:(?:pok[eé]mon|trainer|energy):\s*\d+|total cards:\s*\d+)$/i.test(line)
+    )
+      continue
 
-    const ydkId = game === "ygo" ? line.match(/^\d{5,12}$/)?.[0] : undefined
+    const ydkId = game === "ygo" ? ydkCardId(line) : undefined
     const quantityMatch = line.match(/^(\d{1,3})\s*x?\s+(.+)$/i)
     const quantity = ydkId ? 1 : quantityMatch ? Number(quantityMatch[1]) : 0
     const originalReference = ydkId ?? quantityMatch?.[2]?.trim() ?? ""
-    if (!originalReference || quantity < 1 || quantity > 999) {
+    if (
+      !originalReference ||
+      quantity < 1 ||
+      quantity > 999 ||
+      (game === "ygo" && /^\d+$/.test(originalReference) && !ydkCardId(originalReference))
+    ) {
       invalidLines.push(sourceLine)
       continue
     }
-    const providerCardId =
-      game === "ygo" && /^\d{5,12}$/.test(originalReference) ? originalReference : undefined
+    const providerCardId = game === "ygo" ? ydkCardId(originalReference) : undefined
     const name =
       providerCardId !== undefined
         ? `Card ${providerCardId}`
@@ -425,11 +443,17 @@ function sectionBoard(line: string): DeckBoard | "ignore" | undefined {
   return undefined
 }
 
-function stripPrintingSuffix(name: string) {
-  return name
-    .replace(/\s+\([A-Z0-9]{2,8}\)(?:\s+[A-Za-z0-9-]+)?\s*$/i, "")
-    .replace(/\s+\*[A-Z0-9-]+\*\s*$/i, "")
-    .trim()
+function parsePrintingReference(reference: string) {
+  const withoutFinish = reference.replace(/\s+\*[A-Z0-9-]+\*\s*$/i, "").trim()
+  const printing = withoutFinish.match(/^(.+?)\s+\(([A-Z0-9]{2,8})\)(?:\s+([A-Za-z0-9-]+))?$/i)
+  return printing
+    ? {
+        name: printing[1].trim(),
+        setCode: printing[2].toLowerCase(),
+        ...(printing[3] ? { collectorNumber: printing[3] } : {}),
+        originalReference: reference.trim(),
+      }
+    : { name: withoutFinish }
 }
 
 export function parsePastedDeckList(list: string) {
@@ -448,20 +472,22 @@ export function parsePastedDeckList(list: string) {
       continue
     }
     if (board === "ignore") continue
-    const match = line.match(/^(\d{1,3})\s*x?\s+(.+)$/i)
+    const sideboardPrefix = /^SB:\s*/i.test(line)
+    const match = line.replace(/^SB:\s*/i, "").match(/^(\d{1,3})\s*x?\s+(.+)$/i)
     const quantity = match ? Number(match[1]) : 0
-    const name = match ? stripPrintingSuffix(match[2]) : ""
-    if (!match || !name || quantity < 1 || quantity > 999) {
+    const reference = parsePrintingReference(match?.[2] ?? "")
+    if (!match || !reference.name || quantity < 1 || quantity > 999) {
       invalidLines.push(sourceLine)
       continue
     }
-    const key = `${board}:${name.toLocaleLowerCase()}`
+    const entry: ParsedEntry = {
+      ...reference,
+      board: sideboardPrefix ? "sideboard" : board,
+      quantity,
+    }
+    const key = printingKey(entry)
     const current = entries.get(key)
-    entries.set(key, {
-      name,
-      board,
-      quantity: (current?.quantity ?? 0) + quantity,
-    })
+    entries.set(key, { ...entry, quantity: (current?.quantity ?? 0) + quantity })
   }
   return { entries: [...entries.values()], invalidLines }
 }
@@ -478,8 +504,17 @@ function preconFromValue(value: unknown): PreconstructedDeck | null {
   }
 }
 
+function lookupKey(
+  entry: Pick<ParsedEntry, "name" | "scryfallId" | "setCode" | "collectorNumber">,
+) {
+  if (entry.scryfallId) return `id:${entry.scryfallId.toLowerCase()}`
+  if (entry.setCode && entry.collectorNumber)
+    return `printing:${entry.setCode.toLowerCase()}:${entry.collectorNumber.toLowerCase()}`
+  return `name:${entry.name.toLocaleLowerCase()}${entry.setCode ? `:set:${entry.setCode.toLowerCase()}` : ""}`
+}
+
 function printingKey(entry: ParsedEntry) {
-  return `${entry.board}:${entry.scryfallId ?? entry.name.toLocaleLowerCase()}`
+  return `${entry.board}:${lookupKey(entry)}`
 }
 
 function mtgJsonEntries(payload: unknown) {
@@ -534,50 +569,64 @@ async function resolveEntries(ctx: ActionCtx, entries: ParsedEntry[]) {
     })
   const resolved = new Map<string, CardReference>()
   const unresolved = new Set<string>()
-  for (let offset = 0; offset < entries.length; offset += SCRYFALL_COLLECTION_SIZE) {
-    const batch = entries.slice(offset, offset + SCRYFALL_COLLECTION_SIZE)
-    const response = await fetchScryfall(ctx, "/cards/collection", {
-      method: "POST",
-      body: JSON.stringify({
-        identifiers: batch.map((entry) =>
-          entry.scryfallId ? { id: entry.scryfallId } : { name: entry.name },
-        ),
-      }),
-    })
-    if (!response.ok)
-      throw new ConvexError({
-        code: "scryfall_unavailable",
-        message: `Card resolution is temporarily unavailable (${response.status})`,
+  const lookupGroups = new Map<string, ParsedEntry[]>()
+  for (const entry of entries) {
+    const scope =
+      entry.scryfallId || entry.collectorNumber ? "exact" : entry.setCode ? "set" : "name"
+    const group = lookupGroups.get(scope) ?? []
+    group.push(entry)
+    lookupGroups.set(scope, group)
+  }
+  for (const [scope, group] of lookupGroups) {
+    for (let offset = 0; offset < group.length; offset += SCRYFALL_COLLECTION_SIZE) {
+      const batch = group.slice(offset, offset + SCRYFALL_COLLECTION_SIZE)
+      const response = await fetchScryfall(ctx, "/cards/collection", {
+        method: "POST",
+        body: JSON.stringify({
+          identifiers: batch.map((entry) =>
+            entry.scryfallId
+              ? { id: entry.scryfallId }
+              : entry.setCode && entry.collectorNumber
+                ? { set: entry.setCode, collector_number: entry.collectorNumber }
+                : { name: entry.name, ...(entry.setCode ? { set: entry.setCode } : {}) },
+          ),
+        }),
       })
-    const payload = objectRecord((await response.json()) as unknown)
-    const cards = Array.isArray(payload?.data) ? payload.data : []
-    for (const value of cards) {
-      const card = normalizeScryfallCard(value)
-      if (card) {
-        resolved.set(`id:${card.scryfallId.toLowerCase()}`, card)
-        resolved.set(`name:${card.name.toLocaleLowerCase()}`, card)
-      }
-    }
-    const missing = Array.isArray(payload?.not_found) ? payload.not_found : []
-    for (const value of missing) {
-      const identifier = objectRecord(value)
-      if (typeof identifier?.name === "string") unresolved.add(identifier.name)
-      else if (typeof identifier?.id === "string") {
-        const missingId = identifier.id
-        const original = batch.find(
-          (entry) => entry.scryfallId?.toLowerCase() === missingId.toLowerCase(),
-        )
-        unresolved.add(original?.name ?? missingId)
+      if (!response.ok)
+        throw new ConvexError({
+          code: "scryfall_unavailable",
+          message: `Card resolution is temporarily unavailable (${response.status})`,
+        })
+      const payload = objectRecord((await response.json()) as unknown)
+      const cards = Array.isArray(payload?.data) ? payload.data : []
+      for (const value of cards) {
+        const card = normalizeScryfallCard(value)
+        if (!card) continue
+        if (scope === "name") {
+          resolved.set(lookupKey({ name: card.name }), card)
+        } else if (scope === "set") {
+          if (card.setCode)
+            resolved.set(lookupKey({ name: card.name, setCode: card.setCode }), card)
+        } else {
+          resolved.set(lookupKey({ name: card.name, scryfallId: card.scryfallId }), card)
+          if (card.setCode && card.collectorNumber)
+            resolved.set(
+              lookupKey({
+                name: card.name,
+                setCode: card.setCode,
+                collectorNumber: card.collectorNumber,
+              }),
+              card,
+            )
+        }
       }
     }
   }
   const cards: ResolvedDeckCard[] = []
   for (const entry of entries) {
-    const card =
-      (entry.scryfallId && resolved.get(`id:${entry.scryfallId.toLowerCase()}`)) ||
-      resolved.get(`name:${entry.name.toLocaleLowerCase()}`)
+    const card = resolved.get(lookupKey(entry))
     if (!card) {
-      unresolved.add(entry.name)
+      unresolved.add(entry.originalReference ?? entry.name)
       continue
     }
     cards.push({ ...card, quantity: entry.quantity, board: entry.board })
