@@ -1184,28 +1184,31 @@ export function AddDeckScreen({
             ) : (
               <Text preset="subheading" text={name.trim() || "Imported deck"} />
             )}
-            <Text
-              size="sm"
-              style={themed($label)}
-              text={`${editingPasted ? "" : `${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · `}${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
-            />
-            {pastedDraft.attribution ? (
-              <TouchableOpacity
-                accessibilityRole="link"
-                accessibilityLabel={`View on Archidekt by ${pastedDraft.attribution.author}`}
-                style={themed($plainAction)}
-                onPress={() =>
-                  void Linking.openURL(pastedDraft.attribution!.sourceUrl).catch(() =>
-                    setError("Could not open Archidekt."),
-                  )
-                }
-              >
-                <Text
-                  text={`Archidekt · ${pastedDraft.attribution.author}`}
-                  style={themed($textAction)}
-                />
-              </TouchableOpacity>
-            ) : null}
+            <View style={themed($importSummaryRow)}>
+              <Text
+                size="sm"
+                style={themed($label)}
+                text={`${editingPasted ? "" : `${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · `}${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
+              />
+              {pastedDraft.attribution ? (
+                <TouchableOpacity
+                  accessibilityRole="link"
+                  accessibilityLabel={`View on Archidekt by ${pastedDraft.attribution.author}`}
+                  style={$importAttribution}
+                  onPress={() =>
+                    void Linking.openURL(pastedDraft.attribution!.sourceUrl).catch(() =>
+                      setError("Could not open Archidekt."),
+                    )
+                  }
+                >
+                  <Text
+                    text={`Archidekt · ${pastedDraft.attribution.author}`}
+                    size="xs"
+                    style={themed($label)}
+                  />
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
           {error ? <AlertNote text={error} /> : null}
           {!name.trim() ? <AlertNote text="Add a deck name." /> : null}
@@ -2049,3 +2052,16 @@ const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderBottomColor: "transparent",
 })
 const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.text })
+
+const $importSummaryRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "center",
+  justifyContent: "space-between",
+  columnGap: spacing.sm,
+})
+const $importAttribution: ViewStyle = {
+  minHeight: 44,
+  maxWidth: "100%",
+  justifyContent: "center",
+}
