@@ -1411,6 +1411,38 @@ describe("AddDeckScreen", () => {
     )
   })
 
+  it("keeps reloaded Archidekt commanders in main after editing to Modern", async () => {
+    mockResolveArchidekt.mockResolvedValue({
+      ...resolvedArchidekt,
+      format: "commander",
+      cards: [
+        ...resolvedForest.cards,
+        { ...resolvedForest.cards[0], quantity: 1, board: "commander" },
+      ],
+    })
+    const view = renderAddDeck()
+    enterLink(view)
+    await waitFor(() => expect(view.getByTestId("import-card-commander-0")).toBeTruthy())
+    fireEvent.press(view.getByTestId("edit-import-button"))
+    chooseFormat(view, "modern")
+    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByTestId("review-import-button"))
+    await waitFor(() => expect(mockResolveArchidekt).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(view.getByTestId("save-import-button")).toBeEnabled())
+    expect(view.getByText("Modern · 3 cards")).toBeTruthy()
+    expect(view.getByText("3× Forest")).toBeTruthy()
+    expect(view.queryByTestId("import-card-commander-0")).toBeNull()
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          format: "modern",
+          cards: [expect.objectContaining({ quantity: 3, board: "main", scryfallId: "forest-print" })],
+        }),
+      ),
+    )
+  })
+
   it.each(["url", "format", "kind", "game"])(
     "ignores Archidekt results after changing %s",
     async (change) => {
