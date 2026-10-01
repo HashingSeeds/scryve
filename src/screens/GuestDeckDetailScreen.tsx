@@ -34,17 +34,17 @@ import type { ThemedStyle } from "@/theme/types"
 import { DEFAULT_DECK_GAME, deckSections } from "../../convex/lib/deckGames"
 import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 
-type GuestDeckDetailScreenProps = { onBack: () => void }
+type GuestDeckDetailScreenProps = { localId: string; onBack: () => void }
 type GuestCard = GuestDeckPayload["cards"][number]
 
 function sameDraft(a: GuestDeckPayload | undefined, b: GuestDeckPayload | undefined) {
   return JSON.stringify(a) === JSON.stringify(b)
 }
 
-export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
+export function GuestDeckDetailScreen({ localId, onBack }: GuestDeckDetailScreenProps) {
   const { themed, theme } = useAppTheme()
   const navigation = useNavigation()
-  const stored = useGuestDeck()
+  const stored = useGuestDeck(localId)
   const [draft, setDraft] = useState<GuestDeckPayload | undefined>(() => stored?.deck)
   const revisionRef = useRef(
     stored ? { localId: stored.localId, updatedAt: stored.updatedAt } : undefined,
@@ -185,7 +185,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
       setError("Enter a deck name.")
       return
     }
-    const latest = loadGuestDeck()
+    const latest = loadGuestDeck(localId)
     const revision = revisionRef.current
     if (
       !latest ||
@@ -291,7 +291,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
                 testID="guest-deck-reload"
                 text="Reload saved deck"
                 onPress={() => {
-                  const latest = loadGuestDeck()
+                  const latest = loadGuestDeck(localId)
                   if (!latest) return
                   setDraft(latest.deck)
                   setCommanderSelected(false)
@@ -452,7 +452,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
         onClose={() => setDeleting(false)}
         onConfirm={() => {
           try {
-            const latest = loadGuestDeck()
+            const latest = loadGuestDeck(localId)
             if (
               !latest ||
               !deleteRevision ||
@@ -464,7 +464,7 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
               setDeleting(false)
               return
             }
-            deleteGuestDeck()
+            deleteGuestDeck(localId)
             setLeaving(true)
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Unable to delete guest deck.")

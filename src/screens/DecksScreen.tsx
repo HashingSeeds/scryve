@@ -19,7 +19,7 @@ import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
-import { useGuestDeck } from "@/features/decks/guestDeck"
+import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
 import { GuestDeckTransfer } from "@/features/decks/GuestDeckImportNotice"
 import { useRecentDecks } from "@/features/decks/recentDecks"
 import { useAppTheme } from "@/theme/context"
@@ -408,7 +408,7 @@ export function DecksScreen({
   const { theme, themed } = useAppTheme()
   const { format, setGame, setFormat } = useDeckFilters()
   const { deckIds: recentDeckIds } = useRecentDecks()
-  const guest = useGuestDeck()
+  const guestDecks = useGuestDecks()
   const [collection, setCollection] = useState<DeckCollection>("all")
   const [system, setSystem] = useState(
     DECK_GAME_LIST.find((game) => game.id === initialSystem)?.id ?? ALL_SYSTEMS,
@@ -434,22 +434,21 @@ export function DecksScreen({
   const selectedSystem = DECK_GAME_LIST.find((candidate) => candidate.id === system)
   const activeFormat = system === ALL_SYSTEMS ? ALL_FORMATS : format
   const filterCount = Number(system !== ALL_SYSTEMS) + Number(activeFormat !== ALL_FORMATS)
-  const guestRow: ShelfDeck | undefined = guest
-    ? {
-        _id: "guest",
-        name: guest.deck.name,
-        game: guest.deck.game ?? DEFAULT_DECK_GAME,
-        format: guest.deck.format,
-        cardQuantity: guest.deck.cards.reduce((total, card) => total + card.quantity, 0),
-      }
-    : undefined
-  const guestVisible =
-    guestRow &&
-    collection !== "favorites" &&
-    (collection !== "recent" || recentDeckIds.includes("guest")) &&
-    (system === ALL_SYSTEMS || guestRow.game === system) &&
-    (activeFormat === ALL_FORMATS || guestRow.format === activeFormat) &&
-    matchesSearch(guestRow, search)
+  const guestRows: ShelfDeck[] = guestDecks.map((guest) => ({
+    _id: guestDeckRouteId(guest.localId),
+    name: guest.deck.name,
+    game: guest.deck.game ?? DEFAULT_DECK_GAME,
+    format: guest.deck.format,
+    cardQuantity: guest.deck.cards.reduce((total, card) => total + card.quantity, 0),
+  }))
+  const visibleGuestRows = guestRows.filter(
+    (guestRow) =>
+      collection !== "favorites" &&
+      (collection !== "recent" || recentDeckIds.includes(guestRow._id)) &&
+      (system === ALL_SYSTEMS || guestRow.game === system) &&
+      (activeFormat === ALL_FORMATS || guestRow.format === activeFormat) &&
+      matchesSearch(guestRow, search),
+  )
   const guestOnly = Boolean(
     unavailableMessage ||
     (access && !access.loading && !access.ready && !access.signedIn && !access.ownerId),
@@ -546,38 +545,44 @@ export function DecksScreen({
             ) : null}
           </View>
         ) : null}
-        {guestVisible && guestRow ? (
+        {visibleGuestRows.length ? (
           <View>
             <Text size="xs" text="On this device" />
-            <DeckRow
-              deck={guestRow}
-              showGame={system === ALL_SYSTEMS}
-              onPress={() =>
-                onSelect({
-                  deckId: "guest",
-                  name: guestRow.name,
-                  game: guestRow.game ?? DEFAULT_DECK_GAME,
-                  format: guestRow.format,
-                  cardQuantity: guestRow.cardQuantity,
-                })
-              }
-            />
+            {visibleGuestRows.map((guestRow) => (
+              <DeckRow
+                key={guestRow._id}
+                deck={guestRow}
+                showGame={system === ALL_SYSTEMS}
+                onPress={() =>
+                  onSelect({
+                    deckId: guestRow._id,
+                    name: guestRow.name,
+                    game: guestRow.game ?? DEFAULT_DECK_GAME,
+                    format: guestRow.format,
+                    cardQuantity: guestRow.cardQuantity,
+                  })
+                }
+              />
+            ))}
           </View>
         ) : null}
         {access?.ready ? <GuestDeckTransfer access={access} /> : null}
         {guestOnly ? (
-          !guestVisible ? (
+          !visibleGuestRows.length ? (
             <View style={themed($empty)}>
-              <Text preset="subheading" text={guest ? "Nothing matches" : "No decks yet"} />
+              <Text
+                preset="subheading"
+                text={guestDecks.length ? "Nothing matches" : "No decks yet"}
+              />
               <Text
                 size="sm"
                 text={
-                  guest
+                  guestDecks.length
                     ? "Try another search or clear the filters."
                     : "Save a deck on this device. No account needed."
                 }
               />
-              {guest ? (
+              {guestDecks.length ? (
                 <Button
                   text="Clear search and filters"
                   onPress={() => {
