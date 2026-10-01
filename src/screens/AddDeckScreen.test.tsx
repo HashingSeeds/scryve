@@ -1437,7 +1437,9 @@ describe("AddDeckScreen", () => {
       expect(mockImport).toHaveBeenCalledWith(
         expect.objectContaining({
           format: "modern",
-          cards: [expect.objectContaining({ quantity: 3, board: "main", scryfallId: "forest-print" })],
+          cards: [
+            expect.objectContaining({ quantity: 3, board: "main", scryfallId: "forest-print" }),
+          ],
         }),
       ),
     )
