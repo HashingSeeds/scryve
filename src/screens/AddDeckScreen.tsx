@@ -820,6 +820,36 @@ export function AddDeckScreen({
     })
   }
 
+  function changeImportFormat(next?: string) {
+    if (!next || !pastedDraft || busy) return
+    const supportsCommander = deckSections(game, next).some((section) => section.id === "commander")
+    const cardsByPrinting = new Map<string, GuestDeckPayload["cards"][number]>()
+    for (const entry of pastedDraft.cards) {
+      const card = { ...entry }
+      if (!supportsCommander && cardSection(card) === "commander") {
+        card.section = "main"
+        card.board = "main"
+        delete card.commanderColor
+      }
+      const key = printingKey(card)
+      const existing = cardsByPrinting.get(key)
+      const quantity = (existing?.quantity ?? 0) + card.quantity
+      if (quantity > 999) {
+        setError(
+          `${card.name} would exceed 999 copies. Reduce its quantity before changing format.`,
+        )
+        return
+      }
+      cardsByPrinting.set(key, { ...(existing ?? card), quantity })
+    }
+    setDeckFormat(next)
+    setFormat(next)
+    setPastedDraft({ ...pastedDraft, format: next, cards: [...cardsByPrinting.values()] })
+    setError(undefined)
+    setGuestConflict(false)
+    setPendingGuestPayload(undefined)
+  }
+
   function addImportCard(card: GuestDeckPayload["cards"][number]) {
     if (busy) return "Wait for the deck to finish saving."
     if (!pastedDraft) return "Review the import before adding cards."
@@ -1074,14 +1104,7 @@ export function AddDeckScreen({
                   value={format}
                   disabled={busy}
                   options={deckFormats(game)}
-                  onSelect={(next) => {
-                    if (!next || busy) return
-                    setDeckFormat(next)
-                    setFormat(next)
-                    setPastedDraft({ ...pastedDraft, format: next })
-                    setGuestConflict(false)
-                    setPendingGuestPayload(undefined)
-                  }}
+                  onSelect={changeImportFormat}
                 />
                 {noteField}
               </>

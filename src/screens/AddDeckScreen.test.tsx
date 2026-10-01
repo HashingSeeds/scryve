@@ -1,6 +1,9 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
+import { saveCardDetails } from "@/features/decks/cardDetailsCache"
+import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
+import { cardDetailsKey } from "@/features/decks/deckCards"
 import { deleteGuestDeck, loadGuestDeck, saveGuestDeck } from "@/features/decks/guestDeck"
 import { ThemeProvider } from "@/theme/context"
 import { clear } from "@/utils/storage"
@@ -653,6 +656,99 @@ describe("AddDeckScreen", () => {
     expect(view.getByLabelText("Increase Forest")).toBeTruthy()
     expect(view.getByLabelText("Decrease Forest")).toBeTruthy()
     expect(view.getByTestId("import-add-cards")).toBeTruthy()
+  })
+
+  async function editColorCommander(quantity: number) {
+    const card = { ...resolvedForest.cards[0], board: "main" as const, quantity }
+    mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards: [card] })
+    saveCardDetails({
+      [cardDetailsKey(card, "mtg")]: {
+        commanderEligibility: "color-choice",
+        commanderLegality: "legal",
+        colorIdentity: "",
+      },
+    })
+    const view = renderAddDeck()
+    enterPasted(view)
+    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
+    fireEvent.press(view.getByTestId("edit-import-button"))
+    fireEvent.press(view.getByTestId("import-add-cards"))
+    act(() => {
+      expect(
+        view.UNSAFE_getByType(CardSearchScreen).props.onAdd({
+          ...card,
+          quantity: 1,
+          section: "commander",
+          board: "commander",
+          commanderColor: "U",
+        }),
+      ).toBeUndefined()
+    })
+    fireEvent.press(view.getByText("Done"))
+    return view
+  }
+
+  it("moves unsupported commanders to main and merges the same printing when changing format", async () => {
+    const view = await editColorCommander(4)
+    chooseFormat(view, "modern")
+    expect(view.getByText("Modern · 4 cards")).toBeTruthy()
+    expect(view.queryByTestId("import-card-commander-0")).toBeNull()
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          format: "modern",
+          cards: [expect.objectContaining({ quantity: 4, section: "main", board: "main" })],
+        }),
+      ),
+    )
+    expect(mockImport).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        cards: expect.arrayContaining([
+          expect.objectContaining({ commanderColor: expect.anything() }),
+        ]),
+      }),
+    )
+  })
+
+  it("preserves commanders and their chosen color in formats with a commander section", async () => {
+    const view = await editColorCommander(4)
+    chooseFormat(view, "brawl")
+    expect(view.getByTestId("import-card-commander-0")).toBeTruthy()
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          format: "brawl",
+          cards: expect.arrayContaining([
+            expect.objectContaining({ quantity: 1, section: "commander", commanderColor: "U" }),
+          ]),
+        }),
+      ),
+    )
+  })
+
+  it("keeps the format and every card when moving a commander would exceed 999 copies", async () => {
+    const view = await editColorCommander(999)
+    fireEvent.press(view.getAllByLabelText("Increase Forest")[1])
+    chooseFormat(view, "modern")
+    expect(
+      view.getByText("Forest would exceed 999 copies. Reduce its quantity before changing format."),
+    ).toBeTruthy()
+    expect(view.getByText("Commander · 1000 cards")).toBeTruthy()
+    expect(view.getByTestId("import-card-commander-0")).toBeTruthy()
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          format: "commander",
+          cards: expect.arrayContaining([
+            expect.objectContaining({ quantity: 999, section: "main" }),
+            expect.objectContaining({ quantity: 1, section: "commander", commanderColor: "U" }),
+          ]),
+        }),
+      ),
+    )
   })
 
   it("keeps quantity changes, removals, and searched additions in the unsaved import", async () => {
