@@ -14,4 +14,5 @@ export const APP_LINKS = {
   terms: "/play/terms",
   cookies: "/play/cookie-policy",
   deleteAccount: "/play/delete-account",
+  gameContentNotices: "/play/game-content-notices",
 } as const

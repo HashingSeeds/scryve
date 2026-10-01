@@ -6,18 +6,18 @@ import {
   type PlaySystemId,
 } from "@/features/game/playSystems"
 
-import { createDemoGame, mountBoard, type DemoGame, type DemoGameSetup } from "./board"
+import {
+  createCommanderDemo,
+  createDemoGame,
+  mountBoard,
+  type DemoGame,
+  type DemoGameSetup,
+} from "./board"
 
 const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
 const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
-// Rows are the damaged player, columns the commander that dealt it.
-const SAMPLE_COMMANDER_DAMAGE = [
-  [0, 3, 0, 6, 0],
-  [2, 0, 0, 3, 0],
-  [0, 21, 0, 4, 1],
-  [5, 0, 0, 0, 2],
-  [0, 0, 3, 2, 0],
-] as const
+// Commander damage the demo player deals to each successive opponent.
+const SAMPLE_COMMANDER_DAMAGE = [6, 3] as const
 
 function startingLife(system: PlaySystemId) {
   return defaultStartingLife(system, system === "mtg" ? "commander" : undefined)
@@ -42,10 +42,9 @@ function query<T extends Element>(selector: string, root: ParentNode = document)
 const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)")
 const narrow = matchMedia("(max-width: 900px)")
 
-// Features steps and the hero share one phone and one game. The pickers and the game menu
-// both reset the game the way the app would; the pickers follow whatever the game shows.
-function setUpFeatures(stage: HTMLElement) {
-  const game = createDemoGame(commanderSetup(5))
+// The hero, the Features steps, and connected play all show one game. The pickers and the
+// game menu reset it the way the app would; the pickers follow whatever the game shows.
+function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   const board = query<HTMLElement>("[data-board='features']", stage)
   mountBoard(board, game)
 
@@ -96,87 +95,42 @@ function setUpFeatures(stage: HTMLElement) {
   })
   game.subscribe((event) => event.type === "reset" && syncPickers())
   syncPickers()
-  setUpMenu(board, game)
 
-  // Commander damage badges appear only while that step is on screen.
+  // The commander damage demo plays while that step is on screen. Commander damage is a
+  // Magic format, so the step moves another system to Magic; the demo then plays on reset.
+  const commander = createCommanderDemo(board, game, {
+    damage: SAMPLE_COMMANDER_DAMAGE,
+    reducedMotion: prefersReducedMotion,
+  })
+  let showingCommander = false
   return (step: string) => {
-    const wantsDamage = step === "commander"
-    const hasDamage = Boolean(game.setup.commanderDamage)
-    if (wantsDamage === hasDamage) return
-    if (wantsDamage) {
-      game.reset({
-        ...commanderSetup(5),
-        commanderDamage: SAMPLE_COMMANDER_DAMAGE,
-        values: [32, 27, 9, 18, 35],
-      })
-    } else {
-      game.reset({ commanderDamage: undefined, values: game.life })
-    }
-  }
-}
-
-// The pentagon opens the app's game menu over the page.
-function setUpMenu(board: HTMLElement, game: DemoGame) {
-  const menu = query<HTMLElement>("[data-game-menu]")
-  const label = (name: string, text: string) =>
-    (query(`[data-show="${name}"]`, menu).textContent = text)
-  const syncLabels = () => {
-    label("players", String(game.setup.names.length))
-    label("system", playSystemRules(game.setup.system).shortLabel)
-  }
-  const setOpen = (open: boolean) => {
-    menu.hidden = !open
-    if (!open) return
-    syncLabels()
-    query<HTMLElement>("[data-act]", menu).focus()
-  }
-
-  board.addEventListener("click", (event) => {
-    if ((event.target as Element).closest(".pentagon")) setOpen(true)
-  })
-  menu.addEventListener("click", (event) => {
-    const target = event.target as Element
-    const action = target.closest<HTMLElement>("[data-act]")?.dataset.act
-    if (!action) return target === menu && setOpen(false)
-    if (action === "players") {
-      const count = game.setup.names.length === 6 ? 2 : game.setup.names.length + 1
-      game.reset({ names: NAMES.slice(0, count), values: [], layout: "auto" })
-    }
-    if (action === "system") {
-      const index = PLAY_SYSTEM_IDS.indexOf(game.setup.system)
-      const system = PLAY_SYSTEM_IDS[(index + 1) % PLAY_SYSTEM_IDS.length] ?? "mtg"
-      game.reset({ system, startingLife: startingLife(system), values: [] })
-    }
-    if (action === "players" || action === "system") return syncLabels()
-    if (action === "undo") game.undo()
-    if (action === "end") game.reset({ values: [] })
-    setOpen(false)
-  })
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !menu.hidden) setOpen(false)
-  })
-}
-
-function setUpConnected(stage: HTMLElement) {
-  const game = createDemoGame({ ...commanderSetup(4), values: [27, 33, 19, 40] })
-  const phones = stage.querySelectorAll<HTMLElement>("[data-board='connected']")
-  phones.forEach((el) => mountBoard(el, game))
-  game.subscribe(() => {
-    if (prefersReducedMotion.matches) return
-    phones.forEach((el) => {
-      const frame = el.closest<HTMLElement>(".phone")
-      frame?.classList.remove("synced")
-      void frame?.offsetWidth
-      frame?.classList.add("synced")
+    const wantsCommander = step === "commander"
+    if (wantsCommander === showingCommander) return
+    showingCommander = wantsCommander
+    if (!wantsCommander) return commander.stop()
+    commander.start()
+    if (game.setup.system === "mtg") return
+    game.reset({
+      system: "mtg",
+      startingLife: startingLife("mtg"),
+      values: SAMPLE_LIFE.slice(0, game.setup.names.length),
     })
-  })
+  }
+}
+
+// Both connected phones mount the same game, so a tap on either shows up on both.
+function setUpConnected(stage: HTMLElement, game: DemoGame) {
+  stage
+    .querySelectorAll<HTMLElement>("[data-board='connected']")
+    .forEach((el) => mountBoard(el, game))
 }
 
 // Whichever step crosses the middle of the viewport sets the stage's scene and step.
 function setUpStage() {
   const stage = query<HTMLElement>("[data-stage]")
-  const onFeatureStep = setUpFeatures(stage)
-  setUpConnected(stage)
+  const game = createDemoGame(commanderSetup(5))
+  const onFeatureStep = setUpFeatures(stage, game)
+  setUpConnected(stage, game)
 
   const steps = document.querySelectorAll<HTMLElement>(".steps [data-step]")
   const activate = (step: HTMLElement) => {
@@ -203,19 +157,47 @@ function setUpStage() {
   setUpLanding(stage, () => activate(query("[data-step='intro']")))
 }
 
-// The stage's phone starts out filling the hero (on its side on wide screens) and shrinks
-// into the stage over the first screen of scrolling. Until it lands it always shows the intro.
+// On wide screens the stage's phone starts out filling the hero, on its side, and shrinks
+// into the stage over the first screen of scrolling, standing up as it lands so it is upright
+// by the time the players step activates. Until it lands it always shows the intro.
 function setUpLanding(stage: HTMLElement, showIntro: () => void) {
   const slot = query<HTMLElement>("[data-hero-slot]")
   const tour = query<HTMLElement>(".tour")
   const header = query<HTMLElement>(".header")
   const rig = query<HTMLElement>(".rig", stage)
+  const phone = query<HTMLElement>(".phone.main", stage)
+  const players = query<HTMLElement>(".steps [data-step='players']")
   let frame = 0
+  const clamp = (value: number) => Math.min(1, Math.max(0, value))
+
+  const intro = query<HTMLElement>(".steps [data-step='intro']")
 
   const update = () => {
     frame = 0
-    const progress = Math.min(1, Math.max(0, scrollY / (tour.offsetTop - header.offsetHeight)))
+    // On small screens CSS pins the phone from the top, so there is nothing to animate.
+    if (narrow.matches) {
+      rig.style.translate = ""
+      rig.style.scale = ""
+      phone.style.removeProperty("--turn")
+      if (intro.getBoundingClientRect().top > innerHeight * 0.75) showIntro()
+      return
+    }
+    const landed = tour.offsetTop - header.offsetHeight
+    const progress = clamp(scrollY / landed)
     if (progress < 1) showIntro()
+    // Start turning before it lands so the two motions blend instead of stopping in between.
+    const turnFrom = landed * 0.6
+    const upright = players.getBoundingClientRect().top + scrollY - innerHeight / 2
+    const standing = clamp((scrollY - turnFrom) / (upright - turnFrom))
+    const turn = narrow.matches ? 0 : -90 * (1 - standing * standing * (3 - 2 * standing))
+    phone.style.setProperty("--turn", `${turn}deg`)
+    // Once landed the stage's own sticky positioning takes over, so the phone scrolls away
+    // with the tour instead of staying pinned over the closing section.
+    if (progress === 1) {
+      rig.style.translate = ""
+      rig.style.scale = ""
+      return
+    }
     // Ease out so the phone clears the hero copy early. It heads for where the stage pins,
     // and is offset from wherever the stage currently sits on the way there.
     const eased = 1 - (1 - progress) ** 3
@@ -241,6 +223,7 @@ function setUpLanding(stage: HTMLElement, showIntro: () => void) {
   }
   addEventListener("scroll", schedule, { passive: true })
   addEventListener("resize", schedule)
+  narrow.addEventListener("change", schedule)
   update()
 }
 

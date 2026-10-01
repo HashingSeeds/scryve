@@ -22,8 +22,8 @@ const plans = [
   ["Life counter for 2 to 6 players", "Yes", "Yes"],
   ["Connected play", "Yes", "Yes"],
   ["Game history", "Yes", "Yes"],
-  ["Decks", "1 on this device, 2 with an account", "100"],
-  ["Versions per deck", "1", "5"],
+  ["Decks", "2", "100"],
+  ["Deck versioning", "No", "Up to 5 versions"],
   ["Win rate by deck and version", "No", "Yes"],
 ]
 ---
@@ -50,7 +50,7 @@ const plans = [
       <div class="hero-slot" data-hero-slot></div>
     </section>
     <div class="hero-foot">
-      <h1>The life counter for Magic, Yu-Gi-Oh!, and Pokémon. <span>Tap a total. Open the menu to change players or games.</span></h1>
+      <h1>The life counter for Magic, Yu-Gi-Oh!, and Pokémon. <span>Tap either side of a total to change it.</span></h1>
       <GetTheApp />
     </div>
 
@@ -96,18 +96,17 @@ const plans = [
           </div>
           <div class="step" data-step="seats">
             <h2>Seats, colors, and marks.</h2>
-            <p>Everyone picks a seat, a color, and a mark before the host starts the game.</p>
-            <p class="note">Connected games need an account and a username. You can block or report any player.</p>
+            <p>Everyone signs in, then picks a seat, a color, and a mark before the host starts the game.</p>
           </div>
         </section>
 
         <section id="pro" data-scene="pro" aria-label="Decks and Scryve Pro">
           <div class="step" data-step="decks">
             <h2>Decks that keep score.</h2>
-            <p>Paste a list or import a public Archidekt deck, then pick your commander. Every finished game counts toward the deck's record.</p>
+            <p>Create your deck and choose it before the game. Every finished game counts toward its record.</p>
           </div>
           <div class="step" data-step="plans">
-            <h2>Free, or Pro.</h2>
+            <h2>Free or Pro</h2>
             <table class="plans">
               <thead><tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">Free</th><th scope="col">Scryve Pro</th></tr></thead>
               <tbody>
@@ -154,20 +153,6 @@ const plans = [
             <div class="screen"><div class="board-holder" data-board="connected"></div></div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="game-menu" data-game-menu hidden>
-      <div class="ring" role="menu" aria-label="Game menu">
-        <button type="button" role="menuitem" data-act="players" style="--action:#77558A">
-          Players<small data-show="players">5</small>
-        </button>
-        <button type="button" role="menuitem" data-act="system" style="--action:#41476E">
-          Game<small data-show="system">Magic</small>
-        </button>
-        <button type="button" class="close" role="menuitem" data-act="close" aria-label="Close menu">×</button>
-        <button type="button" role="menuitem" data-act="undo" style="--action:#39755C">Undo</button>
-        <button type="button" role="menuitem" data-act="end" style="--action:#C03403">End game</button>
       </div>
     </div>
 

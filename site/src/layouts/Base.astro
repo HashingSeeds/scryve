@@ -35,6 +35,8 @@ const fontFaces = fonts
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
     <meta name="color-scheme" content="dark" />
+    <!-- The site is already dark; stops Dark Reader and similar extensions recoloring it. -->
+    <meta name="darkreader-lock" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
@@ -59,12 +61,16 @@ const fontFaces = fonts
         <a href={APP_LINKS.cookies}>Cookie policy</a>
         <a href={APP_LINKS.support}>Support</a>
         <a href={APP_LINKS.deleteAccount}>Delete account</a>
+        <a href={APP_LINKS.gameContentNotices}>Game content notices</a>
       </nav>
       <p>
-        Scryve is unofficial Fan Content permitted under the Fan Content Policy. Not approved or
-        endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast.
-        ©Wizards of the Coast LLC. Yu-Gi-Oh! and Pokémon are trademarks of their respective owners;
-        Scryve is not affiliated with them.
+        Scryve is not affiliated with or endorsed by Wizards of the Coast, Konami, Nintendo, or The
+        Pokémon Company. Yu-Gi-Oh! and Pokémon are trademarks of their respective owners.
+      </p>
+      <p>
+        Scryve is unofficial Fan Content permitted under the Fan Content Policy. Not
+        approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the
+        Coast. ©Wizards of the Coast LLC.
       </p>
       <p>© {new Date().getFullYear()} Hashing Seeds LLC</p>
     </footer>
