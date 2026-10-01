@@ -310,7 +310,7 @@ figure {
   opacity: 0.8;
 }
 
-.badges .badge.hit {
+.badges .badge.dealt {
   background: var(--badge);
 }
 

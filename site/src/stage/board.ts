@@ -164,7 +164,7 @@ function commanderBadges(game: DemoGame, target: number): string {
       const dealt = damage[source] ?? 0
       const lethal = dealt >= 21 ? " lethal" : ""
       const content = dealt > 0 ? String(dealt) : markSvg(seatShape(source), "#fff")
-      return `<span class="badge${dealt > 0 ? " hit" : ""}${lethal}" style="--badge:${seatColor(source)}">${content}</span>`
+      return `<span class="badge${dealt > 0 ? " dealt" : ""}${lethal}" style="--badge:${seatColor(source)}">${content}</span>`
     })
     .join("")
   return `<span class="badges">${badges}</span>`
