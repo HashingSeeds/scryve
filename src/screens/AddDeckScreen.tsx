@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Linking, ScrollView, TouchableOpacity, View } from "react-native"
+import { Keyboard, Linking, ScrollView, TouchableOpacity, View } from "react-native"
 import { type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -318,6 +318,7 @@ export function AddDeckScreen({
     omitted: boolean
   }>()
   const [resolvingPasted, setResolvingPasted] = useState(false)
+  const [reviewingPasted, setReviewingPasted] = useState(false)
   const pastedToken = useRef(0)
   const pastedDraftCurrent =
     pastedDraft?.source === deckList && pastedDraft.game === game && pastedDraft.format === format
@@ -718,11 +719,19 @@ export function AddDeckScreen({
       const resolved = await resolvePasted({ list: deckList, game })
       if (pastedToken.current !== token) return
       setPastedDraft({ source: deckList, game, format, resolved, omitted: false })
+      Keyboard.dismiss()
+      setReviewingPasted(true)
     } catch (cause) {
       if (pastedToken.current === token) fail(cause, "Could not resolve deck list. Try again.")
     } finally {
       if (pastedToken.current === token) setResolvingPasted(false)
     }
+  }
+
+  function editImport() {
+    if (busy) return
+    invalidatePasted()
+    setReviewingPasted(false)
   }
 
   async function importPasted() {
@@ -872,6 +881,113 @@ export function AddDeckScreen({
       </TouchableOpacity>
     </View>
   )
+
+  if (reviewingPasted && pastedDraft) {
+    return (
+      <Screen
+        key="import-review"
+        preset="fixed"
+        safeAreaEdges={["bottom"]}
+        contentContainerStyle={themed($previewScreen)}
+      >
+        <Header title="Review deck" leftTx="common:back" onLeftPress={editImport} />
+        <ScrollView
+          testID="pasted-deck-review"
+          contentContainerStyle={themed($previewContent)}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={themed($previewSummary)}>
+            <Text preset="subheading" text={name || "Imported deck"} />
+            <Text
+              size="sm"
+              style={themed($label)}
+              text={`${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · ${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
+            />
+          </View>
+          {error ? <AlertNote text={error} /> : null}
+          {pastedProblems.length > 0 && !pastedDraft.omitted ? (
+            <View style={themed($stack)}>
+              <Text weight="bold" text="Fix or remove these lines" />
+              {pastedDraft.resolved.unresolved.map((line, index) => (
+                <Text key={`unmatched:${index}`} text={`Unmatched: ${line}`} />
+              ))}
+              {pastedDraft.resolved.invalidLines.map((line, index) => (
+                <Text key={`invalid:${index}`} text={`Not understood: ${line}`} />
+              ))}
+              <Text text="Edit the import to correct these lines, then review again." />
+              <Button
+                testID="omit-import-problems"
+                text="Remove unmatched and invalid lines"
+                disabled={!pastedDraftCurrent || busy || resolvingPasted}
+                onPress={() => setPastedDraft({ ...pastedDraft, omitted: true })}
+              />
+            </View>
+          ) : null}
+          {pastedDraft.omitted ? (
+            <AlertNote
+              text={`${pastedProblems.length} unmatched or invalid line${pastedProblems.length === 1 ? "" : "s"} removed from this import. Original text kept in the import form.`}
+            />
+          ) : null}
+          {catalogPreviewSections(
+            pastedCards.map((card) => ({
+              ...card,
+              section: "board" in card ? card.board : card.section,
+            })),
+            deckSections(pastedDraft.game, pastedDraft.format),
+          ).map((section) => {
+            const cards = section.entries
+            return (
+              <View key={section.id}>
+                <View style={themed($previewSectionHeader)}>
+                  <Text weight="bold" text={section.label} />
+                  <Text text={`${cards.reduce((total, card) => total + card.quantity, 0)}`} />
+                </View>
+                {cards.map((card, index) => (
+                  <View key={`${card.name}:${index}`} style={themed($previewCardRow)}>
+                    <Text text={`${card.quantity}× ${card.name}`} />
+                  </View>
+                ))}
+              </View>
+            )
+          })}
+        </ScrollView>
+        <BottomActionBar>
+          {!guestMode && (access?.ready ?? true) ? (
+            <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
+          ) : null}
+          {saveRecovery}
+          <View style={themed($configRow)}>
+            <Button
+              testID="edit-import-button"
+              text="Edit import"
+              disabled={busy}
+              onPress={editImport}
+              style={$flex1}
+            />
+            <Button
+              testID="save-import-button"
+              text={busy ? "Saving…" : guestMode ? "Save on device" : "Save deck"}
+              preset="reversed"
+              style={$flex1}
+              disabled={
+                busy ||
+                resolvingPasted ||
+                !pastedDraftCurrent ||
+                (!pastedDraft.omitted && pastedProblems.length > 0) ||
+                pastedCards.length === 0 ||
+                !name.trim() ||
+                (!capacityReady && !canRequestAccess) ||
+                (atCapacity && saveAttempted) ||
+                guestBlocked ||
+                waitingForGuest
+              }
+              onPress={importPasted}
+            />
+          </View>
+        </BottomActionBar>
+      </Screen>
+    )
+  }
 
   if (selectedCatalogDeck) {
     const entries = (catalogDetail?.entries ?? []).map((entry) => {
@@ -1370,7 +1486,7 @@ export function AddDeckScreen({
               testID="review-import-button"
               text={
                 resolvingPasted
-                  ? "Resolving cards…"
+                  ? "Loading deck…"
                   : pastedDraft
                     ? "Review changes"
                     : "Review deck list"
@@ -1379,82 +1495,6 @@ export function AddDeckScreen({
               disabled={busy || resolvingPasted || !deckList.trim()}
               onPress={reviewPasted}
             />
-            {pastedDraft ? (
-              <View testID="pasted-deck-review" style={themed($stack)}>
-                <Text preset="subheading" accessibilityRole="header" text="Review deck" />
-                <Text
-                  text={cardCountLabel(
-                    pastedCards.reduce((total, card) => total + card.quantity, 0),
-                  )}
-                />
-                {!pastedDraftCurrent ? (
-                  <AlertNote text="The list, system, or format changed. Review changes before saving." />
-                ) : null}
-                {catalogPreviewSections(
-                  pastedCards.map((card) => ({
-                    ...card,
-                    section: "board" in card ? card.board : card.section,
-                  })),
-                  deckSections(pastedDraft.game, pastedDraft.format),
-                ).map((section) => {
-                  const cards = section.entries
-                  return (
-                    <View key={section.id}>
-                      <View style={themed($previewSectionHeader)}>
-                        <Text weight="bold" text={section.label} />
-                        <Text text={`${cards.reduce((total, card) => total + card.quantity, 0)}`} />
-                      </View>
-                      {cards.map((card, index) => (
-                        <View key={`${card.name}:${index}`} style={themed($previewCardRow)}>
-                          <Text text={`${card.quantity}× ${card.name}`} />
-                        </View>
-                      ))}
-                    </View>
-                  )
-                })}
-                {pastedProblems.length > 0 && !pastedDraft.omitted ? (
-                  <View style={themed($stack)}>
-                    <Text weight="bold" text="Fix or remove these lines" />
-                    {pastedDraft.resolved.unresolved.map((line, index) => (
-                      <Text key={`unmatched:${index}`} text={`Unmatched: ${line}`} />
-                    ))}
-                    {pastedDraft.resolved.invalidLines.map((line, index) => (
-                      <Text key={`invalid:${index}`} text={`Not understood: ${line}`} />
-                    ))}
-                    <Text text="Correct the list above, then review changes." />
-                    <Button
-                      testID="omit-import-problems"
-                      text="Remove unmatched and invalid lines"
-                      disabled={!pastedDraftCurrent || busy || resolvingPasted}
-                      onPress={() => setPastedDraft({ ...pastedDraft, omitted: true })}
-                    />
-                  </View>
-                ) : null}
-                {pastedDraft.omitted ? (
-                  <AlertNote
-                    text={`${pastedProblems.length} unmatched or invalid line${pastedProblems.length === 1 ? "" : "s"} removed from this import. Original text kept above.`}
-                  />
-                ) : null}
-                <Button
-                  testID="save-import-button"
-                  text={busy ? "Saving…" : guestMode ? "Save deck on this device" : "Save deck"}
-                  preset="reversed"
-                  disabled={
-                    busy ||
-                    resolvingPasted ||
-                    !pastedDraftCurrent ||
-                    (!pastedDraft.omitted && pastedProblems.length > 0) ||
-                    pastedCards.length === 0 ||
-                    !name.trim() ||
-                    (!capacityReady && !canRequestAccess) ||
-                    (atCapacity && saveAttempted) ||
-                    guestBlocked ||
-                    waitingForGuest
-                  }
-                  onPress={importPasted}
-                />
-              </View>
-            ) : null}
           </View>
         ) : null}
 

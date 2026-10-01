@@ -407,7 +407,7 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByText("60× Forest")).toBeTruthy())
     expect(loadGuestDeck()).toBeUndefined()
     expect(onCreated).not.toHaveBeenCalled()
-    fireEvent.press(view.getByText("Save deck on this device"))
+    fireEvent.press(view.getByText("Save on device"))
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith("guest"))
     expect(loadGuestDeck()?.deck).toMatchObject({
       name: "Guest Forests",
@@ -454,9 +454,7 @@ describe("AddDeckScreen", () => {
     expect(mockImport).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("omit-import-problems"))
     expect(view.getByText(/2 unmatched or invalid lines removed/)).toBeTruthy()
-    expect(view.getByLabelText("Deck list").props.value).toBe(
-      "2 Forest\n1 Island (M21) 265\n0 Mountain",
-    )
+    expect(view.queryByLabelText("Deck list")).toBeNull()
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() =>
       expect(mockImport).toHaveBeenCalledWith(
@@ -464,6 +462,10 @@ describe("AddDeckScreen", () => {
           cards: [expect.objectContaining({ name: "Forest", quantity: 2 })],
         }),
       ),
+    )
+    fireEvent.press(view.getByTestId("edit-import-button"))
+    expect(view.getByLabelText("Deck list").props.value).toBe(
+      "2 Forest\n1 Island (M21) 265\n0 Mountain",
     )
   })
 
@@ -497,14 +499,15 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByTestId("omit-import-problems"))
     expect(view.queryByText("1× Pikachu")).toBeNull()
     expect(view.getByText("2× Pikachu")).toBeTruthy()
-    expect(view.getByText("2 cards")).toBeTruthy()
-    expect(view.getByLabelText("Deck list").props.value).toBe(source)
+    expect(view.getByText(/ · 2 cards$/)).toBeTruthy()
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() =>
       expect(mockImport).toHaveBeenCalledWith(
         expect.objectContaining({ cards: [expect.objectContaining(known)] }),
       ),
     )
+    fireEvent.press(view.getByTestId("edit-import-button"))
+    expect(view.getByLabelText("Deck list").props.value).toBe(source)
   })
 
   it("preserves the resolved draft and edited text when a repair request fails", async () => {
@@ -512,15 +515,16 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterPasted(view, "2 Forest\n1 Forst")
     await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
+    fireEvent.press(view.getByTestId("edit-import-button"))
     fireEvent.changeText(view.getByLabelText("Deck list"), "3 Forest")
     mockResolvePasted.mockRejectedValueOnce(new Error("Unavailable"))
     fireEvent.press(view.getByTestId("review-import-button"))
     await waitFor(() =>
       expect(view.getByText("Could not resolve deck list. Try again.")).toBeTruthy(),
     )
-    expect(view.getByText("2× Forest")).toBeTruthy()
+    expect(view.queryByTestId("pasted-deck-review")).toBeNull()
     expect(view.getByLabelText("Deck list").props.value).toBe("3 Forest")
-    expect(view.getByTestId("save-import-button")).toBeDisabled()
+    expect(view.queryByTestId("save-import-button")).toBeNull()
     mockResolvePasted.mockResolvedValueOnce({
       ...resolvedForest,
       cards: [{ ...resolvedForest.cards[0], quantity: 3 }],
@@ -529,6 +533,86 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByText("3× Forest")).toBeTruthy())
     expect(view.getByTestId("save-import-button")).toBeEnabled()
     expect(mockImport).not.toHaveBeenCalled()
+  })
+
+  it("replaces the form with review, then restores all fields for editing", async () => {
+    mockResolvePasted.mockResolvedValueOnce(resolvedForest)
+    const view = renderAddDeck()
+    chooseMode(view, "paste")
+    fireEvent.changeText(view.getByTestId("deck-note-input"), "Keep these notes")
+    enterPasted(view)
+    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
+    expect(view.getByText("Reviewed deck")).toBeTruthy()
+    expect(view.getByText("Commander · 2 cards")).toBeTruthy()
+    expect(view.queryByTestId("game-picker-options")).toBeNull()
+    expect(view.queryByTestId("format-picker-options")).toBeNull()
+    expect(view.queryByTestId("mode-picker-options")).toBeNull()
+    expect(view.queryByTestId("deck-name-input")).toBeNull()
+    expect(view.queryByTestId("deck-note-input")).toBeNull()
+    expect(view.getByTestId("save-import-button")).toBeEnabled()
+    fireEvent.press(view.getByTestId("edit-import-button"))
+    expect(view.queryByTestId("pasted-deck-review")).toBeNull()
+    expect(view.queryByTestId("save-import-button")).toBeNull()
+    expect(view.getByTestId("deck-name-input").props.value).toBe("Reviewed deck")
+    expect(view.getByTestId("deck-note-input").props.value).toBe("Keep these notes")
+    expect(view.getByLabelText("Deck list").props.value).toBe("2 Forest")
+    chooseFormat(view, "modern")
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Edited deck")
+    mockResolvePasted.mockResolvedValueOnce(resolvedForest)
+    fireEvent.press(view.getByTestId("review-import-button"))
+    await waitFor(() => expect(view.getByText("Modern · 2 cards")).toBeTruthy())
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Edited deck",
+          format: "modern",
+          note: "Keep these notes",
+        }),
+      ),
+    )
+  })
+
+  it("keeps guest replacement recovery available from the review", async () => {
+    const saved = saveGuestDeck({ name: "Keep me", game: "mtg", format: "commander", cards: [] })
+    mockResolvePasted.mockResolvedValueOnce(resolvedForest)
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AddDeckScreen
+          onBack={jest.fn()}
+          onCreated={jest.fn()}
+          access={{ ready: false, loading: false, signedIn: false, request: jest.fn() }}
+        />
+      </ThemeProvider>,
+    )
+    enterPasted(view)
+    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
+    fireEvent.press(view.getByTestId("save-import-button"))
+    expect(view.getByText("Replace saved deck…")).toBeTruthy()
+    expect(view.getByTestId("save-import-button")).toBeDisabled()
+    expect(loadGuestDeck()?.localId).toBe(saved.localId)
+    fireEvent.press(view.getByTestId("edit-import-button"))
+    expect(view.getByLabelText("Deck list").props.value).toBe("2 Forest")
+    expect(loadGuestDeck()?.localId).toBe(saved.localId)
+  })
+
+  it("shows loading on the review button until the deck is ready", async () => {
+    let finish: ((result: typeof resolvedForest) => void) | undefined
+    mockResolvePasted.mockImplementationOnce(
+      () =>
+        new Promise<typeof resolvedForest>((resolve) => {
+          finish = resolve
+        }),
+    )
+    const view = renderAddDeck()
+    enterPasted(view)
+    expect(view.getByText("Loading deck…")).toBeTruthy()
+    expect(view.getByTestId("review-import-button")).toBeDisabled()
+    expect(view.getByTestId("deck-name-input")).toBeTruthy()
+    expect(view.queryByTestId("pasted-deck-review")).toBeNull()
+    await act(async () => finish?.(resolvedForest))
+    expect(view.getByTestId("pasted-deck-review")).toBeTruthy()
+    expect(view.queryByTestId("review-import-button")).toBeNull()
   })
 
   it.each(["input", "format", "game"])(
