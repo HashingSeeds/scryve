@@ -10,6 +10,7 @@
 
 import type * as accountDeletion from "../accountDeletion.js";
 import type * as accountDeletionActions from "../accountDeletionActions.js";
+import type * as archidektImports from "../archidektImports.js";
 import type * as cardCatalog from "../cardCatalog.js";
 import type * as cards from "../cards.js";
 import type * as crons from "../crons.js";
@@ -32,6 +33,7 @@ import type * as lib_deckRateLimits from "../lib/deckRateLimits.js";
 import type * as lib_deckSync from "../lib/deckSync.js";
 import type * as lib_deckVersions from "../lib/deckVersions.js";
 import type * as lib_entitlements from "../lib/entitlements.js";
+import type * as lib_games_archidekt from "../lib/games/archidekt.js";
 import type * as lib_games_cards from "../lib/games/cards.js";
 import type * as lib_games_limitless from "../lib/games/limitless.js";
 import type * as lib_games_magic from "../lib/games/magic.js";
@@ -62,6 +64,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accountDeletion: typeof accountDeletion;
   accountDeletionActions: typeof accountDeletionActions;
+  archidektImports: typeof archidektImports;
   cardCatalog: typeof cardCatalog;
   cards: typeof cards;
   crons: typeof crons;
@@ -84,6 +87,7 @@ declare const fullApi: ApiFromModules<{
   "lib/deckSync": typeof lib_deckSync;
   "lib/deckVersions": typeof lib_deckVersions;
   "lib/entitlements": typeof lib_entitlements;
+  "lib/games/archidekt": typeof lib_games_archidekt;
   "lib/games/cards": typeof lib_games_cards;
   "lib/games/limitless": typeof lib_games_limitless;
   "lib/games/magic": typeof lib_games_magic;
