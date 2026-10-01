@@ -658,6 +658,73 @@ describe("AddDeckScreen", () => {
     expect(view.getByTestId("import-add-cards")).toBeTruthy()
   })
 
+  it.each(["modern", "brawl"])(
+    "normalizes resolved commander rows for %s on initial review and source reload",
+    async (format) => {
+      const commander = { ...resolvedForest.cards[0], quantity: 1, board: "commander" }
+      const resolved = { ...resolvedForest, cards: [...resolvedForest.cards, commander] }
+      mockResolvePasted.mockResolvedValueOnce(resolved).mockResolvedValueOnce(resolved)
+      const view = renderAddDeck()
+      chooseFormat(view, format)
+      enterPasted(view, "2 Forest\nCommander\n1 Forest")
+      await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
+      const expectSections = () => {
+        if (format === "modern") {
+          expect(view.queryByTestId("import-card-commander-0")).toBeNull()
+          expect(view.getByText("3× Forest")).toBeTruthy()
+        } else {
+          expect(view.getByTestId("import-card-commander-0")).toBeTruthy()
+          expect(view.getByText("2× Forest")).toBeTruthy()
+          expect(view.getByText("1× Forest")).toBeTruthy()
+        }
+      }
+      expectSections()
+      fireEvent.press(view.getByTestId("change-import-source"))
+      fireEvent.press(view.getByTestId("review-import-button"))
+      await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
+      expectSections()
+      fireEvent.press(view.getByTestId("save-import-button"))
+      await waitFor(() =>
+        expect(mockImport).toHaveBeenCalledWith(
+          expect.objectContaining({
+            format,
+            cards:
+              format === "modern"
+                ? [expect.objectContaining({ quantity: 3, board: "main" })]
+                : expect.arrayContaining([
+                    expect.objectContaining({ quantity: 1, board: "commander" }),
+                    expect.objectContaining({ quantity: 2, board: "main" }),
+                  ]),
+          }),
+        ),
+      )
+    },
+  )
+
+  it("rejects source resolution when remapping commander copies would exceed 999", async () => {
+    mockResolvePasted.mockResolvedValueOnce({
+      ...resolvedForest,
+      cards: [
+        { ...resolvedForest.cards[0], quantity: 999 },
+        { ...resolvedForest.cards[0], quantity: 1, board: "commander" },
+      ],
+    })
+    const view = renderAddDeck()
+    chooseFormat(view, "modern")
+    const source = "999 Forest\nCommander\n1 Forest"
+    enterPasted(view, source)
+    await waitFor(() =>
+      expect(
+        view.getByText(
+          "Forest has more than 999 copies after matching. Correct the source before reviewing.",
+        ),
+      ).toBeTruthy(),
+    )
+    expect(view.queryByTestId("pasted-deck-review")).toBeNull()
+    expect(view.getByLabelText("Deck list").props.value).toBe(source)
+    expect(mockImport).not.toHaveBeenCalled()
+  })
+
   async function editColorCommander(quantity: number) {
     const card = { ...resolvedForest.cards[0], board: "main" as const, quantity }
     mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards: [card] })

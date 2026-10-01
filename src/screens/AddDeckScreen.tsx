@@ -199,6 +199,25 @@ function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
   }))
 }
 
+function normalizeImportedCards(cards: GuestDeckPayload["cards"], game: string, format: string) {
+  const supportsCommander = deckSections(game, format).some((section) => section.id === "commander")
+  const cardsByPrinting = new Map<string, GuestDeckPayload["cards"][number]>()
+  for (const entry of cards) {
+    const card = { ...entry }
+    if (!supportsCommander && cardSection(card) === "commander") {
+      card.section = "main"
+      card.board = "main"
+      delete card.commanderColor
+    }
+    const key = printingKey(card)
+    const existing = cardsByPrinting.get(key)
+    const quantity = (existing?.quantity ?? 0) + card.quantity
+    if (quantity > 999) return { overflow: card.name }
+    cardsByPrinting.set(key, { ...(existing ?? card), quantity })
+  }
+  return { cards: [...cardsByPrinting.values()] }
+}
+
 function preconDetail(deck: PreconstructedDeck) {
   return ["Wizards", deck.type, deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
     .filter(Boolean)
@@ -745,25 +764,19 @@ export function AddDeckScreen({
     try {
       const resolved = await resolvePasted({ list: deckList, game })
       if (pastedToken.current !== token) return
-      const cardsByPrinting = new Map<string, GuestDeckPayload["cards"][number]>()
-      for (const card of importCards(resolved.cards)) {
-        const key = printingKey(card)
-        const existing = cardsByPrinting.get(key)
-        const quantity = (existing?.quantity ?? 0) + card.quantity
-        if (quantity > 999) {
-          setError(
-            `${card.name} has more than 999 copies after matching. Correct the source before reviewing.`,
-          )
-          return
-        }
-        cardsByPrinting.set(key, { ...(existing ?? card), quantity })
+      const normalized = normalizeImportedCards(importCards(resolved.cards), game, format)
+      if ("overflow" in normalized) {
+        setError(
+          `${normalized.overflow} has more than 999 copies after matching. Correct the source before reviewing.`,
+        )
+        return
       }
       setPastedDraft({
         source: deckList,
         game,
         format,
         resolved,
-        cards: [...cardsByPrinting.values()],
+        cards: normalized.cards,
         omitted: false,
       })
       setEditingPasted(false)
@@ -822,29 +835,16 @@ export function AddDeckScreen({
 
   function changeImportFormat(next?: string) {
     if (!next || !pastedDraft || busy) return
-    const supportsCommander = deckSections(game, next).some((section) => section.id === "commander")
-    const cardsByPrinting = new Map<string, GuestDeckPayload["cards"][number]>()
-    for (const entry of pastedDraft.cards) {
-      const card = { ...entry }
-      if (!supportsCommander && cardSection(card) === "commander") {
-        card.section = "main"
-        card.board = "main"
-        delete card.commanderColor
-      }
-      const key = printingKey(card)
-      const existing = cardsByPrinting.get(key)
-      const quantity = (existing?.quantity ?? 0) + card.quantity
-      if (quantity > 999) {
-        setError(
-          `${card.name} would exceed 999 copies. Reduce its quantity before changing format.`,
-        )
-        return
-      }
-      cardsByPrinting.set(key, { ...(existing ?? card), quantity })
+    const normalized = normalizeImportedCards(pastedDraft.cards, game, next)
+    if ("overflow" in normalized) {
+      setError(
+        `${normalized.overflow} would exceed 999 copies. Reduce its quantity before changing format.`,
+      )
+      return
     }
     setDeckFormat(next)
     setFormat(next)
-    setPastedDraft({ ...pastedDraft, format: next, cards: [...cardsByPrinting.values()] })
+    setPastedDraft({ ...pastedDraft, format: next, cards: normalized.cards })
     setError(undefined)
     setGuestConflict(false)
     setPendingGuestPayload(undefined)
