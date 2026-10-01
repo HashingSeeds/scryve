@@ -100,9 +100,23 @@ Sideboard
 `),
     ).toEqual({
       entries: [
-        { name: "Atraxa, Praetors' Voice", quantity: 1, board: "commander" },
+        {
+          name: "Atraxa, Praetors' Voice",
+          quantity: 1,
+          board: "commander",
+          setCode: "2x2",
+          collectorNumber: "186",
+          originalReference: "Atraxa, Praetors' Voice (2X2) 186",
+        },
         { name: "Sol Ring", quantity: 1, board: "main" },
-        { name: "Island", quantity: 2, board: "main" },
+        {
+          name: "Island",
+          quantity: 2,
+          board: "main",
+          setCode: "m21",
+          collectorNumber: "265",
+          originalReference: "Island (M21) 265",
+        },
         { name: "Swan Song", quantity: 1, board: "sideboard" },
       ],
       invalidLines: [],
@@ -114,6 +128,19 @@ Sideboard
       entries: [{ name: "Sol Ring", quantity: 3, board: "main" }],
       invalidLines: ["Sol Ring"],
     })
+  })
+
+  it("keeps distinct printings and supports inline sideboard entries", () => {
+    const result = parsePastedDeckList(
+      "1 Island (M21) 265\n2 Island (m21) 265\n1 Island (M21) 266 *F*\nSB: 2 Island (M21) 265\n1 Island",
+    )
+    expect(result.invalidLines).toEqual([])
+    expect(result.entries).toMatchObject([
+      { name: "Island", quantity: 3, board: "main", setCode: "m21", collectorNumber: "265" },
+      { name: "Island", quantity: 1, board: "main", setCode: "m21", collectorNumber: "266" },
+      { name: "Island", quantity: 2, board: "sideboard", setCode: "m21", collectorNumber: "265" },
+      { name: "Island", quantity: 1, board: "main" },
+    ])
   })
 
   it("ignores maybeboard and token sections", () => {
@@ -168,10 +195,199 @@ describe("Yu-Gi-Oh! deck list parsing", () => {
     })
   })
 
+  it("handles EDOPro comments and uint32 decimal ids without accepting overflow", () => {
+    const result = parseGenericDeckList(
+      "#main\n# arbitrary comment\n0\n1\n0000000012\n4294967295\n4294967296\n999999999999\n1 4294967296\n#extra\n42\n!side\n7",
+      "ygo",
+    )
+    expect(
+      result.entries.map(({ providerCardId, section }) => ({ providerCardId, section })),
+    ).toEqual([
+      { providerCardId: "0", section: "main" },
+      { providerCardId: "1", section: "main" },
+      { providerCardId: "12", section: "main" },
+      { providerCardId: "4294967295", section: "main" },
+      { providerCardId: "42", section: "extra" },
+      { providerCardId: "7", section: "side" },
+    ])
+    expect(result.invalidLines).toEqual(["4294967296", "999999999999", "1 4294967296"])
+  })
+
   it("rejects malformed YDKE payloads", () => {
     expect(() => parseGenericDeckList("ydke://broken!also-broken!still-broken!", "ygo")).toThrow(
       "This YDKE link is invalid",
     )
+  })
+})
+
+it("ignores recognized Pokémon total footers and reports malformed footer text", () => {
+  const result = parseGenericDeckList(
+    "Pokémon: 2\n2 Pikachu SVI 25\nTotal Cards: 60\nTotal Cards: many\nTotal Cards: 60 extra",
+    "pokemon",
+  )
+  expect(result.entries).toMatchObject([{ name: "Pikachu", quantity: 2 }])
+  expect(result.invalidLines).toEqual(["Total Cards: many", "Total Cards: 60 extra"])
+})
+
+describe("MTG pasted deck resolution", () => {
+  it("resolves full and face names without mixing name, set, and exact printing lookups", async () => {
+    const fullName = "Delver of Secrets // Insectile Aberration"
+    const newestId = "22222222-2222-2222-2222-222222222222"
+    const originalId = "33333333-3333-3333-3333-333333333333"
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (_input, options) => {
+      const { identifiers } = JSON.parse(String(options?.body)) as {
+        identifiers: Array<{ name?: string; set?: string; collector_number?: string }>
+      }
+      const originalSet = identifiers[0].set !== undefined
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: originalSet ? originalId : newestId,
+              oracle_id: "11111111-1111-1111-1111-111111111111",
+              name: fullName,
+              set: originalSet ? "isd" : "mid",
+              collector_number: originalSet ? "51" : "47",
+              card_faces: [{ name: "Delver of Secrets" }, { name: "Insectile Aberration" }],
+            },
+          ],
+          not_found: identifiers.filter(
+            ({ set, collector_number }) => set === "missing" || collector_number === "999",
+          ),
+        }),
+        { status: 200 },
+      )
+    })
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const result = await t.action(api.deckImports.resolvePasted, {
+        list: [
+          "1 Delver of Secrets",
+          `2 ${fullName}`,
+          "3 Insectile Aberration",
+          "4 Delver of Secrets (ISD)",
+          "5 Insectile Aberration (ISD)",
+          `6 ${fullName} (ISD)`,
+          "7 Delver of Secrets (ISD) 51",
+          "8 Delver of Secrets (ISD) 999",
+          "9 Delver of Secrets (MISSING)",
+        ].join("\n"),
+      })
+      expect(result.cards).toMatchObject(
+        Array.from({ length: 7 }, (_, index) => ({
+          name: fullName,
+          scryfallId: index < 3 ? newestId : originalId,
+          quantity: index + 1,
+          board: "main",
+        })),
+      )
+      expect(result.unresolved).toEqual([
+        "Delver of Secrets (ISD) 999",
+        "Delver of Secrets (MISSING)",
+      ])
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
+      expect(
+        await t.run(async (ctx) => await ctx.db.query("cardReferences").collect()),
+      ).toHaveLength(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("keeps name-only and name-with-set selections separate from exact printing results", async () => {
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (_input, options) => {
+      const { identifiers } = JSON.parse(String(options?.body)) as {
+        identifiers: Array<{ name?: string; set?: string; collector_number?: string }>
+      }
+      const data = identifiers
+        .flatMap((identifier) => {
+          if (
+            identifier.collector_number === "999" ||
+            identifier.collector_number === "266" ||
+            identifier.set === "missing"
+          )
+            return []
+          const collector = identifier.collector_number ?? (identifier.set ? "266" : "300")
+          return [
+            {
+              id: `22222222-2222-2222-2222-${collector.padStart(12, "0")}`,
+              name: "Island",
+              oracle_id: "11111111-1111-1111-1111-111111111111",
+              set: identifier.set ?? "new",
+              collector_number: collector,
+            },
+          ]
+        })
+        .reverse()
+      return new Response(JSON.stringify({ data }), { status: 200 })
+    })
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const result = await t.action(api.deckImports.resolvePasted, {
+        list: "1 Island\n2 Island (M21)\n3 Island (M21) 265\n4 Island (M21) 999\n5 Island (MISSING)\n6 Island (M21) 266",
+      })
+      expect(result.cards).toMatchObject([
+        { name: "Island", quantity: 1, setCode: "new", collectorNumber: "300" },
+        { name: "Island", quantity: 2, setCode: "m21", collectorNumber: "266" },
+        { name: "Island", quantity: 3, setCode: "m21", collectorNumber: "265" },
+      ])
+      expect(result.unresolved).toEqual([
+        "Island (M21) 266",
+        "Island (M21) 999",
+        "Island (MISSING)",
+      ])
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("requests exact printings and leaves a missing printing unresolved instead of using another", async () => {
+    const ids = ["22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333"]
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: ids.map((id, index) => ({
+            id,
+            oracle_id: "11111111-1111-1111-1111-111111111111",
+            name: "Island",
+            set: "m21",
+            collector_number: String(265 + index),
+          })),
+          not_found: [{ set: "m21", collector_number: "999" }],
+        }),
+        { status: 200 },
+      ),
+    )
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const result = await t.action(api.deckImports.resolvePasted, {
+        list: "2 Island (M21) 265\n1 Island (M21) 266\nSB: 3 Island (M21) 265\n1 Island (M21) 999",
+      })
+      expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toEqual({
+        identifiers: [
+          { set: "m21", collector_number: "265" },
+          { set: "m21", collector_number: "266" },
+          { set: "m21", collector_number: "265" },
+          { set: "m21", collector_number: "999" },
+        ],
+      })
+      expect(result.cards).toMatchObject([
+        { scryfallId: ids[0], quantity: 2, board: "main", collectorNumber: "265" },
+        { scryfallId: ids[1], quantity: 1, board: "main", collectorNumber: "266" },
+        { scryfallId: ids[0], quantity: 3, board: "sideboard", collectorNumber: "265" },
+      ])
+      expect(result.unresolved).toEqual(["Island (M21) 999"])
+      expect(result.invalidLines).toEqual([])
+      expect(
+        await t.run(async (ctx) => await ctx.db.query("cardReferences").collect()),
+      ).toHaveLength(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
 
