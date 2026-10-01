@@ -230,6 +230,71 @@ it("ignores recognized Pokémon total footers and reports malformed footer text"
 })
 
 describe("MTG pasted deck resolution", () => {
+  it("resolves full and face names without mixing name, set, and exact printing lookups", async () => {
+    const fullName = "Delver of Secrets // Insectile Aberration"
+    const newestId = "22222222-2222-2222-2222-222222222222"
+    const originalId = "33333333-3333-3333-3333-333333333333"
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (_input, options) => {
+      const { identifiers } = JSON.parse(String(options?.body)) as {
+        identifiers: Array<{ name?: string; set?: string; collector_number?: string }>
+      }
+      const originalSet = identifiers[0].set !== undefined
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: originalSet ? originalId : newestId,
+              oracle_id: "11111111-1111-1111-1111-111111111111",
+              name: fullName,
+              set: originalSet ? "isd" : "mid",
+              collector_number: originalSet ? "51" : "47",
+              card_faces: [{ name: "Delver of Secrets" }, { name: "Insectile Aberration" }],
+            },
+          ],
+          not_found: identifiers.filter(
+            ({ set, collector_number }) => set === "missing" || collector_number === "999",
+          ),
+        }),
+        { status: 200 },
+      )
+    })
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      const result = await t.action(api.deckImports.resolvePasted, {
+        list: [
+          "1 Delver of Secrets",
+          `2 ${fullName}`,
+          "3 Insectile Aberration",
+          "4 Delver of Secrets (ISD)",
+          "5 Insectile Aberration (ISD)",
+          `6 ${fullName} (ISD)`,
+          "7 Delver of Secrets (ISD) 51",
+          "8 Delver of Secrets (ISD) 999",
+          "9 Delver of Secrets (MISSING)",
+        ].join("\n"),
+      })
+      expect(result.cards).toMatchObject(
+        Array.from({ length: 7 }, (_, index) => ({
+          name: fullName,
+          scryfallId: index < 3 ? newestId : originalId,
+          quantity: index + 1,
+          board: "main",
+        })),
+      )
+      expect(result.unresolved).toEqual([
+        "Delver of Secrets (ISD) 999",
+        "Delver of Secrets (MISSING)",
+      ])
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
+      expect(
+        await t.run(async (ctx) => await ctx.db.query("cardReferences").collect()),
+      ).toHaveLength(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it("keeps name-only and name-with-set selections separate from exact printing results", async () => {
     const fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(async (_input, options) => {
       const { identifiers } = JSON.parse(String(options?.body)) as {

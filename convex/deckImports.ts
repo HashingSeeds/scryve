@@ -602,11 +602,12 @@ async function resolveEntries(ctx: ActionCtx, entries: ParsedEntry[]) {
       for (const value of cards) {
         const card = normalizeScryfallCard(value)
         if (!card) continue
+        const names = [card.name, ...card.name.split(" // ")]
         if (scope === "name") {
-          resolved.set(lookupKey({ name: card.name }), card)
+          for (const name of names) resolved.set(lookupKey({ name }), card)
         } else if (scope === "set") {
           if (card.setCode)
-            resolved.set(lookupKey({ name: card.name, setCode: card.setCode }), card)
+            for (const name of names) resolved.set(lookupKey({ name, setCode: card.setCode }), card)
         } else {
           resolved.set(lookupKey({ name: card.name, scryfallId: card.scryfallId }), card)
           if (card.setCode && card.collectorNumber)
