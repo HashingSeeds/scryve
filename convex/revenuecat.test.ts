@@ -25,14 +25,12 @@ function subscriberResponse({
   sandbox = false,
   expiresDate,
   gracePeriodExpiresDate = null,
-  lifetime = false,
 }: {
   enabled: boolean
   observedAt: number
   sandbox?: boolean
   expiresDate?: string
   gracePeriodExpiresDate?: string | null
-  lifetime?: boolean
 }) {
   const productIdentifier = "scryve_pro_monthly"
   return new Response(
@@ -42,16 +40,13 @@ function subscriberResponse({
         entitlements: enabled
           ? {
               "Count Pro": {
-                expires_date: lifetime
-                  ? null
-                  : (expiresDate ?? new Date(observedAt + 86_400_000).toISOString()),
+                expires_date: expiresDate ?? new Date(observedAt + 86_400_000).toISOString(),
                 grace_period_expires_date: gracePeriodExpiresDate,
                 product_identifier: productIdentifier,
               },
             }
           : {},
-        subscriptions: lifetime ? {} : { [productIdentifier]: { is_sandbox: sandbox } },
-        non_subscriptions: lifetime ? { [productIdentifier]: [{ is_sandbox: sandbox }] } : {},
+        subscriptions: { [productIdentifier]: { is_sandbox: sandbox } },
       },
     }),
     { status: 200, headers: { "content-type": "application/json" } },
@@ -303,13 +298,11 @@ describe("RevenueCat entitlement sync", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
-  it("maps lifetime, grace-period, sandbox, and expired Count Pro state to server access", async () => {
+  it("maps subscription, grace-period, sandbox, and expired Count Pro state to server access", async () => {
     const t = convexTest(schema, modules)
     const actor = await createUser(t, "clerk_status")
     const fetchSpy = jest.spyOn(globalThis, "fetch")
-    fetchSpy.mockResolvedValueOnce(
-      subscriberResponse({ enabled: true, observedAt: 700, lifetime: true }),
-    )
+    fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: true, observedAt: 700 }))
     await actor.action(api.revenuecat.syncCurrent, {})
     await expect(actor.query(api.entitlements.current, {})).resolves.toEqual({
       fullHistory: true,
@@ -349,6 +342,31 @@ describe("RevenueCat entitlement sync", () => {
     await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
       fullHistory: true,
       proDecksLimit: false,
+    })
+  })
+
+  it("requires a matching subscription before granting Pro access", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await createUser(t, "clerk_without_subscription")
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
+        request_date_ms: 700,
+        subscriber: {
+          entitlements: {
+            "Count Pro": { expires_date: null, product_identifier: "unsupported_product" },
+          },
+          subscriptions: {},
+          non_subscriptions: { unsupported_product: [{ is_sandbox: false }] },
+        },
+      }),
+    )
+
+    await expect(actor.action(api.revenuecat.syncCurrent, {})).resolves.toEqual({
+      synced: true,
+      enabled: false,
+    })
+    await expect(actor.query(api.decks.listMine, {})).resolves.toMatchObject({
+      capacity: { premium: false, limit: 2 },
     })
   })
 

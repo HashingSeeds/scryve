@@ -20,7 +20,7 @@ export function SubscriptionControls() {
     : billing.isCountPro
       ? expiration
         ? `${entitlement?.willRenew ? "Renews" : "Available until"} ${expiration}`
-        : "Lifetime access"
+        : "Pro access active"
       : billing.error
         ? "Status unavailable"
         : "Free plan"

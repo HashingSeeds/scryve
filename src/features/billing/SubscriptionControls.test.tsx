@@ -91,11 +91,11 @@ describe("SubscriptionControls", () => {
     ).toBeTruthy()
   })
 
-  it("describes a non-expiring entitlement as lifetime access", () => {
+  it("shows active Pro access when no expiration date is available", () => {
     mockBilling.isCountPro = true
     mockBilling.customerInfo = entitledCustomerInfo({ expirationDate: null, willRenew: false })
 
-    expect(renderControls().getByText("Lifetime access")).toBeTruthy()
+    expect(renderControls().getByText("Pro access active")).toBeTruthy()
   })
 
   it("blocks purchase actions while billing is loading", () => {

@@ -47,8 +47,8 @@ updates all Pro features together, including the legacy `unlimited_decks` flag.
 Existing clients keep their current API contracts and cached offline access.
 
 1. In RevenueCat, attach every Pro store product to the exact entitlement identifier
-   `Count Pro`. Configure the `default` offering with `$rc_monthly`, `$rc_annual`, and
-   `$rc_lifetime` packages and make it the default offering. Store product identifiers
+   `Count Pro`. Configure the `default` offering with `$rc_monthly` and `$rc_annual`
+   packages and make it the default offering. Store product identifiers
    must match the stores; the package identifiers above are RevenueCat identifiers.
    Configure its paywall and Customer Center for the app's existing billing UI.
 2. In each Convex deployment's Settings → Environment Variables, set

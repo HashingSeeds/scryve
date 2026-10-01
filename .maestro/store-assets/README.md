@@ -37,7 +37,7 @@ The current app has a large-logical-width layout defect: at lower tablet densiti
 
 Apple's review screenshot is an internal review artifact, not a public product-page screenshot.
 `CaptureAppleReview.yaml` preserves the installed app's state, opens the live Scryve Pro
-paywall, and captures all three purchase choices to:
+paywall, and captures both subscription choices to:
 
 ```text
 .maestro/screenshots/apple-review/count-pro-paywall.png
@@ -57,6 +57,6 @@ Run:
 pnpm run capture:apple-review
 ```
 
-The same screenshot may be uploaded as the App Review screenshot for `monthly`, `yearly`, and
-`lifetime` because it clearly shows all three products. Regenerate it when the paywall or product
+The same screenshot may be uploaded as the App Review screenshot for `monthly` and `yearly`
+because it clearly shows both subscriptions. Regenerate it when the paywall or product
 presentation materially changes.
