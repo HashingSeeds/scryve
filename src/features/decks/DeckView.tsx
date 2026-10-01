@@ -1,18 +1,17 @@
 import { type ReactNode } from "react"
 import { SectionList, TouchableOpacity, View } from "react-native"
-import type { ImageStyle, TextStyle, ViewStyle } from "react-native"
-import Svg, { Path } from "react-native-svg"
+import type { TextStyle, ViewStyle } from "react-native"
 
 import { BottomActionBar } from "@/components/BottomActionBar"
 import { Button } from "@/components/Button"
-import { CardImage } from "@/components/CardImage"
 import { Header } from "@/components/Header"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
-import { cardSection, groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
+import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
+import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
 import { deckFormatLabel, deckGame, deckSections } from "../../../convex/lib/deckGames"
 
 export function DeckView({
@@ -212,96 +211,24 @@ export function DeckView({
           </>
         }
         renderSectionHeader={({ section }) => (
-          <View style={themed($section)}>
-            <Text size="sm" weight="semiBold" text={section.label} style={$flex} />
-            {section.board === "commander" && onChooseCommander ? (
-              <TouchableOpacity
-                testID="choose-commander"
-                accessibilityRole="button"
-                accessibilityLabel={section.quantity ? "Change commander" : "Choose commander"}
-                disabled={busy || editingDisabled}
-                style={$touch}
-                onPress={onChooseCommander}
-              >
-                <Text
-                  size="xs"
-                  style={themed($action)}
-                  text={section.quantity ? "Change" : "Choose"}
-                />
-              </TouchableOpacity>
-            ) : null}
-            {section.board !== "commander" || !onChooseCommander ? (
-              <Text size="sm" style={themed($dim)} text={String(section.quantity)} />
-            ) : null}
-          </View>
+          <DeckCardSectionHeader
+            label={section.label}
+            quantity={section.quantity}
+            onChooseCommander={section.board === "commander" ? onChooseCommander : undefined}
+            disabled={busy || editingDisabled}
+          />
         )}
         renderItem={({ item }) => (
-          <View style={themed($card)}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={`${item.quantity}× ${item.name}`}
-              testID={`deck-card-row-${printingKey(item)}`}
-              style={themed($cardLink)}
-              onPress={() => onFocus(item)}
-            >
-              <CardImage
-                game={game}
-                cardId={item.scryfallId ?? item.cardId ?? item.printingId ?? item.providerCardId}
-                source={item.smallImageUrl ?? item.imageUrl}
-                accessibilityLabel={item.name}
-                compact
-                style={$image}
-              />
-              <Text size="sm" weight="medium" text={item.name} style={$flex} numberOfLines={2} />
-            </TouchableOpacity>
-            {editing ? (
-              <View style={$row}>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.quantity === 1 ? "Remove" : "Decrease"} ${item.name}`}
-                  disabled={busy || cardsUnavailable || cardsCached || editingDisabled}
-                  style={$touch}
-                  onPress={() => onDecrement(item)}
-                >
-                  {item.quantity === 1 ? (
-                    <Svg
-                      width={18}
-                      height={18}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke={theme.colors.brandText}
-                      strokeWidth={1.6}
-                    >
-                      <Path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" />
-                    </Svg>
-                  ) : (
-                    <Text text="−" style={themed($action)} />
-                  )}
-                </TouchableOpacity>
-                <Text size="sm" text={String(item.quantity)} style={$quantity} />
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={`Increase ${item.name}`}
-                  disabled={
-                    busy ||
-                    cardsUnavailable ||
-                    cardsCached ||
-                    editingDisabled ||
-                    (game === "mtg" &&
-                      format === "commander" &&
-                      cardSection(item) === "commander") ||
-                    item.quantity >= 999
-                  }
-                  style={$touch}
-                  onPress={() => onIncrement(item)}
-                >
-                  <Text text="+" style={themed($action)} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <Text size="sm" text={`${item.quantity}×`} style={themed($dim)} />
-            )}
-          </View>
+          <DeckCardRow
+            card={item}
+            game={game}
+            format={format}
+            editing={editing}
+            disabled={busy || cardsUnavailable || cardsCached || editingDisabled}
+            onFocus={onFocus}
+            onIncrement={onIncrement}
+            onDecrement={onDecrement}
+          />
         )}
       />
       <BottomActionBar style={themed($bar)}>
@@ -347,8 +274,6 @@ const $touch: ViewStyle = {
   justifyContent: "center",
 }
 const $disabled: TextStyle = { opacity: 0.4 }
-const $quantity: TextStyle = { minWidth: 18, textAlign: "center", fontVariant: ["tabular-nums"] }
-const $image: ImageStyle = { width: 32, height: 45 }
 const $noteInput: TextStyle = { minHeight: 160, textAlignVertical: "top" }
 const $noteAction: ViewStyle = { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }
 const $content: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -382,27 +307,6 @@ const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColo
 const $notes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.lg,
   gap: spacing.sm,
-})
-const $section: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
-  paddingTop: spacing.lg,
-  paddingBottom: spacing.xs,
-})
-const $card: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minHeight: 66,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.xs,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.separator,
-})
-const $cardLink: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-  paddingVertical: spacing.xs,
 })
 const $bar: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.surface })
 const $footer: ThemedStyle<ViewStyle> = ({ spacing }) => ({

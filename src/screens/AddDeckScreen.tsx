@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Linking, ScrollView, TouchableOpacity, View } from "react-native"
+import { Keyboard, Linking, ScrollView, TouchableOpacity, View } from "react-native"
 import { type ImageStyle } from "expo-image"
 import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -22,6 +22,11 @@ import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { AccountDeckCapacity } from "@/features/decks/AccountDeckCapacity"
+import { loadCardDetails } from "@/features/decks/cardDetailsCache"
+import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
+import { addCommander, getCommanderWarnings } from "@/features/decks/commanderSelection"
+import { DeckCardRow, DeckCardSectionHeader } from "@/features/decks/DeckCardRow"
+import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { replaceGuestDeck, saveGuestDeck, type GuestDeckPayload } from "@/features/decks/guestDeck"
@@ -44,6 +49,7 @@ import {
   preconSearchFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
+import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 
 type CreationMode = "precon" | "paste" | "blank"
 
@@ -53,8 +59,8 @@ type CapacityState = { status: "checking" } | { status: "ready"; capacity: DeckC
 
 const MODES: Array<{ id: CreationMode; label: string }> = [
   { id: "precon", label: "Browse" },
-  { id: "paste", label: "Paste" },
-  { id: "blank", label: "Empty" },
+  { id: "paste", label: "Import" },
+  { id: "blank", label: "Build" },
 ]
 
 const SEARCH_DEBOUNCE_MS = 350
@@ -99,7 +105,10 @@ type GenericImportedCard = {
 }
 
 function catalogCardDetailKey(
-  card: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+  card: Pick<
+    FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+    "game" | "cardId" | "printingId" | "providerCardId" | "name" | "originalReference"
+  >,
 ) {
   return `${card.game}:${card.cardId ?? card.printingId ?? card.providerCardId ?? `${card.name}:${card.originalReference ?? ""}`}`
 }
@@ -115,6 +124,7 @@ type FocusedPreviewCard = {
   game?: string
   catalogCardId?: string
   originalReference?: string
+  printingKey?: string
 }
 
 type PreconstructedDeckOutline = {
@@ -190,6 +200,25 @@ function importCards(cards: Array<ImportedCard | GenericImportedCard>) {
   }))
 }
 
+function normalizeImportedCards(cards: GuestDeckPayload["cards"], game: string, format: string) {
+  const supportsCommander = deckSections(game, format).some((section) => section.id === "commander")
+  const cardsByPrinting = new Map<string, GuestDeckPayload["cards"][number]>()
+  for (const entry of cards) {
+    const card = { ...entry }
+    if (!supportsCommander && cardSection(card) === "commander") {
+      card.section = "main"
+      card.board = "main"
+      delete card.commanderColor
+    }
+    const key = printingKey(card)
+    const existing = cardsByPrinting.get(key)
+    const quantity = (existing?.quantity ?? 0) + card.quantity
+    if (quantity > 999) return { overflow: card.name }
+    cardsByPrinting.set(key, { ...(existing ?? card), quantity })
+  }
+  return { cards: [...cardsByPrinting.values()] }
+}
+
 function preconDetail(deck: PreconstructedDeck) {
   return ["Wizards", deck.type, deck.code?.toUpperCase(), deck.releaseDate?.slice(0, 4)]
     .filter(Boolean)
@@ -232,8 +261,8 @@ function totalQuantity(cards: PreviewCard[]) {
   return cards.reduce((total, card) => total + card.quantity, 0)
 }
 
-export function catalogPreviewSections(
-  entries: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"],
+export function catalogPreviewSections<Entry extends { section: string }>(
+  entries: Entry[],
   configured: readonly { id: string; label: string }[],
 ) {
   const knownIds = new Set(configured.map((section) => section.id))
@@ -310,6 +339,37 @@ export function AddDeckScreen({
   const [name, setName] = useState("")
   const [note, setNote] = useState("")
   const [deckList, setDeckList] = useState("")
+  const [pastedDraft, setPastedDraft] = useState<{
+    source: string
+    game: string
+    format: string
+    resolved: Pick<
+      FunctionReturnType<typeof api.deckImports.resolvePasted>,
+      "unresolved" | "invalidLines"
+    >
+    cards: GuestDeckPayload["cards"]
+    omitted: boolean
+  }>()
+  const [resolvingPasted, setResolvingPasted] = useState(false)
+  const [reviewingPasted, setReviewingPasted] = useState(false)
+  const [editingPasted, setEditingPasted] = useState(false)
+  const [addingPastedCard, setAddingPastedCard] = useState(false)
+  const [choosingPastedCommander, setChoosingPastedCommander] = useState(false)
+  const [pastedCommanderSelected, setPastedCommanderSelected] = useState(false)
+  const pastedToken = useRef(0)
+  const pastedDraftCurrent =
+    pastedDraft?.source === deckList && pastedDraft.game === game && pastedDraft.format === format
+  const pastedProblems = pastedDraft
+    ? [...pastedDraft.resolved.unresolved, ...pastedDraft.resolved.invalidLines]
+    : []
+  const pastedCards = pastedDraft
+    ? pastedDraft.cards.filter(
+        (card) =>
+          !pastedDraft.omitted ||
+          !card.originalReference ||
+          !pastedDraft.resolved.unresolved.includes(card.originalReference),
+      )
+    : []
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
   const [catalogDecks, setCatalogDecks] = useState<CatalogDeck[]>([])
@@ -357,6 +417,7 @@ export function AddDeckScreen({
   useEffect(
     () => () => {
       previewToken.current += 1
+      pastedToken.current += 1
     },
     [],
   )
@@ -414,7 +475,16 @@ export function AddDeckScreen({
     }
   }
 
+  function invalidatePasted() {
+    pastedToken.current += 1
+    setResolvingPasted(false)
+    setError(undefined)
+    setGuestConflict(false)
+    setPendingGuestPayload(undefined)
+  }
+
   function chooseGame(next: string) {
+    invalidatePasted()
     previewToken.current += 1
     setPreviewRetryAfterMs(undefined)
     const nextFormat = defaultDeckFormat(next)
@@ -432,6 +502,7 @@ export function AddDeckScreen({
   }
 
   function chooseFormat(next: string) {
+    invalidatePasted()
     setDeckFormat(next)
     setFormat(next)
     setCatalogStatus("ready")
@@ -585,7 +656,19 @@ export function AddDeckScreen({
   }
 
   function focusCatalogCard(
-    card: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+    card: Pick<
+      FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+      | "game"
+      | "cardId"
+      | "printingId"
+      | "providerCardId"
+      | "scryfallId"
+      | "name"
+      | "originalReference"
+      | "quantity"
+      | "imageUrl"
+      | "smallImageUrl"
+    >,
     boardLabel: string,
   ) {
     const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
@@ -673,43 +756,170 @@ export function AddDeckScreen({
     }
   }
 
+  async function reviewPasted() {
+    if (!guestMode && access && !access.ready) {
+      access.request()
+      return
+    }
+    const token = ++pastedToken.current
+    setResolvingPasted(true)
+    setError(undefined)
+    try {
+      const resolved = await resolvePasted({ list: deckList, game })
+      if (pastedToken.current !== token) return
+      const normalized = normalizeImportedCards(importCards(resolved.cards), game, format)
+      if ("overflow" in normalized) {
+        setError(
+          `${normalized.overflow} has more than 999 copies after matching. Correct the source before reviewing.`,
+        )
+        return
+      }
+      setPastedDraft({
+        source: deckList,
+        game,
+        format,
+        resolved,
+        cards: normalized.cards,
+        omitted: false,
+      })
+      setEditingPasted(false)
+      setPastedCommanderSelected(false)
+      Keyboard.dismiss()
+      setReviewingPasted(true)
+    } catch (cause) {
+      if (pastedToken.current === token) fail(cause, "Could not resolve deck list. Try again.")
+    } finally {
+      if (pastedToken.current === token) setResolvingPasted(false)
+    }
+  }
+
+  function changeImportSource() {
+    if (busy) return
+    invalidatePasted()
+    setFocusedPreviewCard(undefined)
+    setAddingPastedCard(false)
+    setChoosingPastedCommander(false)
+    setPastedCommanderSelected(false)
+    setEditingPasted(false)
+    setReviewingPasted(false)
+  }
+
+  function editImport() {
+    if (busy) return
+    setFocusedPreviewCard(undefined)
+    if (editingPasted) Keyboard.dismiss()
+    setEditingPasted((current) => !current)
+  }
+
+  function focusImportCard(card: DeckCard, boardLabel: string) {
+    setFocusedPreviewCard({
+      ...card,
+      detailKey: cardDetailsKey(card, game),
+      printingKey: printingKey(card),
+      game,
+      catalogCardId: card.cardId ?? card.printingId ?? card.providerCardId,
+      boardLabel,
+    })
+  }
+
+  function changeImportQuantity(card: DeckCard, delta: number) {
+    if (!pastedDraft || busy) return
+    setGuestConflict(false)
+    setPendingGuestPayload(undefined)
+    if (card.quantity + delta <= 0) setFocusedPreviewCard(undefined)
+    setPastedDraft({
+      ...pastedDraft,
+      cards: pastedDraft.cards.flatMap((entry) =>
+        printingKey(entry) !== printingKey(card)
+          ? [entry]
+          : entry.quantity + delta > 0
+            ? [{ ...entry, quantity: Math.min(999, entry.quantity + delta) }]
+            : [],
+      ),
+    })
+  }
+
+  function changeImportFormat(next?: string) {
+    if (!next || !pastedDraft || busy) return
+    const normalized = normalizeImportedCards(pastedDraft.cards, game, next)
+    if ("overflow" in normalized) {
+      setError(
+        `${normalized.overflow} would exceed 999 copies. Reduce its quantity before changing format.`,
+      )
+      return
+    }
+    setDeckFormat(next)
+    setFormat(next)
+    setPastedDraft({ ...pastedDraft, format: next, cards: normalized.cards })
+    setError(undefined)
+    setGuestConflict(false)
+    setPendingGuestPayload(undefined)
+  }
+
+  function addImportCard(card: GuestDeckPayload["cards"][number]) {
+    if (busy) return "Wait for the deck to finish saving."
+    if (!pastedDraft) return "Review the import before adding cards."
+    if (game === "mtg" && format === "commander" && cardSection(card) === "commander") {
+      const cached = loadCardDetails()
+      const result = addCommander(
+        pastedCards,
+        card,
+        (entry) => cached[cardDetailsKey(entry, game)],
+        card.commanderColor,
+      )
+      if ("error" in result) return result.error
+      if (result.cards.length > MAX_DECK_CARDS)
+        return `A deck can have at most ${MAX_DECK_CARDS} entries.`
+      setPastedDraft({ ...pastedDraft, cards: result.cards })
+      setPastedCommanderSelected(true)
+    } else {
+      const existing = pastedCards.find((entry) => printingKey(entry) === printingKey(card))
+      if (existing && existing.quantity >= 999) return "A card can have at most 999 copies."
+      if (!existing && pastedCards.length >= MAX_DECK_CARDS)
+        return `A deck can have at most ${MAX_DECK_CARDS} entries.`
+      setPastedDraft({
+        ...pastedDraft,
+        cards: existing
+          ? pastedCards.map((entry) =>
+              entry === existing ? { ...entry, quantity: entry.quantity + 1 } : entry,
+            )
+          : [...pastedCards, card],
+      })
+    }
+    if (choosingPastedCommander) setAddingPastedCard(false)
+    setGuestConflict(false)
+    setPendingGuestPayload(undefined)
+    return undefined
+  }
+
   async function importPasted() {
+    if (
+      !pastedDraft ||
+      !pastedDraftCurrent ||
+      resolvingPasted ||
+      (!pastedDraft.omitted && pastedProblems.length > 0) ||
+      pastedCards.length === 0
+    )
+      return
     setSaveAttempted(true)
     if (!guestMode && access && !access.ready) {
       access.request()
       return
     }
     if (!capacityReady || atCapacity || waitingForGuest) return
+    const payload = {
+      name,
+      format,
+      game,
+      cards: pastedCards,
+    }
+    if (guestMode) {
+      saveGuest(payload)
+      return
+    }
     try {
       begin()
-      const resolved = await resolvePasted({ list: deckList, game })
-      const problems = [
-        resolved.unresolved.length
-          ? `Unmatched cards: ${resolved.unresolved.join(", ")}`
-          : undefined,
-        resolved.invalidLines.length
-          ? `Lines not understood: ${resolved.invalidLines.slice(0, 8).join(" | ")}`
-          : undefined,
-      ].filter((problem): problem is string => problem !== undefined)
-      if (problems.length) {
-        setError(problems.join(". "))
-        return
-      }
-      const payload = {
-        name,
-        format,
-        game,
-        ...(note.trim() ? { note } : {}),
-        cards: importCards(resolved.cards),
-      }
-      if (guestMode) {
-        saveGuest(payload)
-        return
-      }
       const deckId = await createImportedDeck(payload)
-      setName("")
-      setNote("")
-      setDeckList("")
       onCreated(deckId)
     } catch (cause) {
       fail(cause, "Could not import deck list")
@@ -728,9 +938,18 @@ export function AddDeckScreen({
       numberOfLines={3}
       textAlignVertical="top"
       maxLength={1000}
-      onChangeText={setNote}
+      editable={!busy}
+      onChangeText={(next) => {
+        if (busy) return
+        setNote(next)
+        setGuestConflict(false)
+        setPendingGuestPayload(undefined)
+      }}
     />
   )
+  const focusedImportCard = reviewingPasted
+    ? pastedCards.find((card) => printingKey(card) === focusedPreviewCard?.printingKey)
+    : undefined
   const previewCardDialog = focusedPreviewCard ? (
     <CardFocusDialog
       card={{
@@ -739,7 +958,7 @@ export function AddDeckScreen({
         name: focusedPreviewCard.name,
         imageUrl: focusedPreviewCard.imageUrl,
         smallImageUrl: focusedPreviewCard.smallImageUrl,
-        quantity: focusedPreviewCard.quantity,
+        quantity: focusedImportCard?.quantity ?? focusedPreviewCard.quantity,
         boardLabel: focusedPreviewCard.boardLabel,
       }}
       details={previewDetailsByKey[focusedPreviewCard.detailKey]}
@@ -747,6 +966,19 @@ export function AddDeckScreen({
       detailsRetryAfterMs={previewDetailsRetryAfterMs}
       onRetryDetails={retryPreviewDetails}
       onClose={() => setFocusedPreviewCard(undefined)}
+      {...(editingPasted && focusedImportCard
+        ? {
+            onIncrement:
+              busy ||
+              focusedImportCard.quantity >= 999 ||
+              (game === "mtg" &&
+                format === "commander" &&
+                cardSection(focusedImportCard) === "commander")
+                ? undefined
+                : () => changeImportQuantity(focusedImportCard, 1),
+            onDecrement: busy ? undefined : () => changeImportQuantity(focusedImportCard, -1),
+          }
+        : {})}
     />
   ) : null
   const guestRecovery = guestBlocked ? (
@@ -828,6 +1060,220 @@ export function AddDeckScreen({
       </TouchableOpacity>
     </View>
   )
+
+  if (reviewingPasted && pastedDraft) {
+    const singleCommander =
+      game === "mtg" &&
+      format === "commander" &&
+      pastedCards.reduce(
+        (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
+        0,
+      ) <= 1
+    const cachedRules = singleCommander && pastedCommanderSelected ? loadCardDetails() : {}
+    const commanderWarnings =
+      singleCommander && pastedCommanderSelected
+        ? getCommanderWarnings(
+            pastedCards,
+            (card) =>
+              cachedRules[cardDetailsKey(card, game)] ??
+              previewDetailsByKey[cardDetailsKey(card, game)],
+          )
+        : []
+    const sections = catalogPreviewSections(
+      pastedCards.map((card) => ({ ...card, section: cardSection(card) })),
+      deckSections(pastedDraft.game, pastedDraft.format),
+    )
+    if (
+      editingPasted &&
+      singleCommander &&
+      !sections.some((section) => section.id === "commander")
+    ) {
+      sections.unshift({ id: "commander", label: "Commander", entries: [] })
+    }
+    return (
+      <Screen
+        key="import-review"
+        preset="fixed"
+        safeAreaEdges={["bottom"]}
+        contentContainerStyle={themed($previewScreen)}
+      >
+        <Header
+          title={editingPasted ? "Edit deck" : "Review deck"}
+          leftTx="common:back"
+          onLeftPress={busy ? undefined : changeImportSource}
+          rightText={editingPasted ? "Done" : "Edit"}
+          onRightPress={busy ? undefined : editImport}
+        />
+        <ScrollView
+          testID="pasted-deck-review"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={themed($previewContent)}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={themed($previewSummary)}>
+            {editingPasted ? (
+              <View style={themed($importFields)}>
+                <TextField
+                  testID="deck-name-input"
+                  accessibilityLabel="Deck name"
+                  placeholder="Deck name"
+                  value={name}
+                  maxLength={80}
+                  editable={!busy}
+                  onChangeText={(next) => {
+                    if (busy) return
+                    setName(next)
+                    setGuestConflict(false)
+                    setPendingGuestPayload(undefined)
+                  }}
+                />
+                <SelectField
+                  testID="format-picker-options"
+                  label="Format"
+                  value={format}
+                  disabled={busy}
+                  options={deckFormats(game)}
+                  onSelect={changeImportFormat}
+                />
+              </View>
+            ) : (
+              <Text preset="subheading" text={name.trim() || "Imported deck"} />
+            )}
+            <Text
+              size="sm"
+              style={themed($label)}
+              text={`${editingPasted ? "" : `${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · `}${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
+            />
+          </View>
+          {error ? <AlertNote text={error} /> : null}
+          {!name.trim() ? <AlertNote text="Add a deck name." /> : null}
+          {pastedProblems.length > 0 && !pastedDraft.omitted ? (
+            <View style={themed($stack)}>
+              <Text weight="bold" text="Fix or remove these lines" />
+              {pastedDraft.resolved.unresolved.map((line, index) => (
+                <Text key={`unmatched:${index}`} text={`Unmatched: ${line}`} />
+              ))}
+              {pastedDraft.resolved.invalidLines.map((line, index) => (
+                <Text key={`invalid:${index}`} text={`Not understood: ${line}`} />
+              ))}
+              <Text text="Change source to correct these lines, then review again." />
+              <Button
+                testID="omit-import-problems"
+                text="Remove unmatched and invalid lines"
+                disabled={!pastedDraftCurrent || busy || resolvingPasted}
+                onPress={() => setPastedDraft({ ...pastedDraft, omitted: true })}
+              />
+            </View>
+          ) : null}
+          {pastedDraft.omitted ? (
+            <AlertNote
+              text={`${pastedProblems.length} unmatched or invalid line${pastedProblems.length === 1 ? "" : "s"} removed from this import. Original text kept in the import form.`}
+            />
+          ) : null}
+          {sections.map((section) => (
+            <View key={section.id}>
+              <DeckCardSectionHeader
+                label={section.label}
+                quantity={section.entries.reduce((total, card) => total + card.quantity, 0)}
+                disabled={busy}
+                onChooseCommander={
+                  editingPasted && singleCommander && section.id === "commander"
+                    ? () => {
+                        if (busy) return
+                        setFocusedPreviewCard(undefined)
+                        setChoosingPastedCommander(true)
+                        setAddingPastedCard(true)
+                      }
+                    : undefined
+                }
+              />
+              {section.entries.map((card, index) => {
+                const details = previewDetailsByKey[cardDetailsKey(card, game)]
+                return (
+                  <DeckCardRow
+                    key={`${printingKey(card)}:${index}`}
+                    card={card}
+                    game={game}
+                    format={format}
+                    editing={editingPasted}
+                    disabled={busy}
+                    testID={`import-card-${section.id}-${index}`}
+                    imageTestID={`import-card-thumbnail-${section.id}-${index}`}
+                    imageSource={
+                      card.smallImageUrl ??
+                      details?.smallImageUrl ??
+                      card.imageUrl ??
+                      details?.imageUrl
+                    }
+                    onFocus={(entry) => focusImportCard(entry, section.label)}
+                    onIncrement={(entry) => changeImportQuantity(entry, 1)}
+                    onDecrement={(entry) => changeImportQuantity(entry, -1)}
+                  />
+                )
+              })}
+            </View>
+          ))}
+        </ScrollView>
+        <BottomActionBar>
+          {!guestMode && (access?.ready ?? true) ? (
+            <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
+          ) : null}
+          {saveRecovery}
+          {commanderWarnings.map((warning) => (
+            <Text key={warning} size="xs" text={warning} />
+          ))}
+          <View style={themed($configRow)}>
+            {editingPasted ? (
+              <Button
+                testID="import-add-cards"
+                text="+ Add cards"
+                onPress={() => {
+                  if (busy) return
+                  setChoosingPastedCommander(false)
+                  setAddingPastedCard(true)
+                }}
+                disabled={busy}
+                style={$flex1}
+              />
+            ) : null}
+            <Button
+              testID="save-import-button"
+              text={busy ? "Saving…" : guestMode ? "Save on device" : "Save deck"}
+              preset="reversed"
+              style={$flex1}
+              disabled={
+                busy ||
+                resolvingPasted ||
+                !pastedDraftCurrent ||
+                (!pastedDraft.omitted && pastedProblems.length > 0) ||
+                pastedCards.length === 0 ||
+                !name.trim() ||
+                (!capacityReady && !canRequestAccess) ||
+                (atCapacity && saveAttempted) ||
+                guestBlocked ||
+                waitingForGuest
+              }
+              onPress={importPasted}
+            />
+          </View>
+        </BottomActionBar>
+        {previewCardDialog}
+        {addingPastedCard ? (
+          <CardSearchScreen
+            game={game}
+            format={format}
+            commanderCards={pastedCards}
+            initialSection={choosingPastedCommander ? "commander" : undefined}
+            onAdd={addImportCard}
+            onClose={() => {
+              Keyboard.dismiss()
+              setAddingPastedCard(false)
+            }}
+          />
+        ) : null}
+      </Screen>
+    )
+  }
 
   if (selectedCatalogDeck) {
     const entries = (catalogDetail?.entries ?? []).map((entry) => {
@@ -1183,7 +1629,10 @@ export function AddDeckScreen({
               accessibilityRole="tab"
               accessibilityState={{ selected: mode === candidate.id }}
               style={[themed($tab), mode === candidate.id && themed($selectedTab)]}
-              onPress={() => setMode(candidate.id)}
+              onPress={() => {
+                invalidatePasted()
+                setMode(candidate.id)
+              }}
             >
               <Text text={candidate.label} weight={mode === candidate.id ? "bold" : "normal"} />
             </TouchableOpacity>
@@ -1312,29 +1761,38 @@ export function AddDeckScreen({
               numberOfLines={12}
               textAlignVertical="top"
               maxLength={50_000}
-              onChangeText={setDeckList}
+              onChangeText={(next) => {
+                invalidatePasted()
+                setDeckList(next)
+              }}
             />
-            {noteField}
             {saveRecovery}
+            {pastedDraftCurrent ? (
+              <Button
+                testID="return-import-review-button"
+                text="Return to review"
+                disabled={resolvingPasted || busy}
+                onPress={() => {
+                  if (resolvingPasted || busy) return
+                  Keyboard.dismiss()
+                  setReviewingPasted(true)
+                }}
+              />
+            ) : null}
             <Button
+              testID="review-import-button"
               text={
-                busy
-                  ? "Resolving cards…"
-                  : guestMode
-                    ? "Save deck on this device"
-                    : "Import deck list"
+                resolvingPasted
+                  ? "Loading deck…"
+                  : pastedDraftCurrent
+                    ? "Reload source"
+                    : pastedDraft
+                      ? "Review changes"
+                      : "Review deck list"
               }
               preset="reversed"
-              disabled={
-                busy ||
-                (!capacityReady && !canRequestAccess) ||
-                (atCapacity && saveAttempted) ||
-                guestBlocked ||
-                waitingForGuest ||
-                !name.trim() ||
-                !deckList.trim()
-              }
-              onPress={importPasted}
+              disabled={busy || resolvingPasted || !deckList.trim()}
+              onPress={reviewPasted}
             />
           </View>
         ) : null}
@@ -1378,6 +1836,7 @@ export function AddDeckScreen({
   )
 }
 
+const $importFields: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   marginTop: spacing.sm,
