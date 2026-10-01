@@ -151,7 +151,13 @@ export function addCommander<T extends DeckCard>(
     cards.find((entry) =>
       card.oracleId && entry.oracleId ? card.oracleId === entry.oracleId : card.name === entry.name,
     )
-  if (existing) return selectCommander(cards, printingKey(existing), detailsFor, commanderColor)
+  if (existing)
+    return selectCommander(
+      cards,
+      printingKey(existing),
+      (entry) => (entry === existing ? (detailsFor(card) ?? detailsFor(entry)) : detailsFor(entry)),
+      commanderColor,
+    )
   const added = { ...card, quantity: 1, section: "main", board: "main" as const }
   return selectCommander([...cards, added], printingKey(added), detailsFor, commanderColor)
 }

@@ -24,7 +24,8 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { AccountDeckCapacity } from "@/features/decks/AccountDeckCapacity"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import { addCommander } from "@/features/decks/commanderSelection"
+import { addCommander, getCommanderWarnings } from "@/features/decks/commanderSelection"
+import { DeckCardRow, DeckCardSectionHeader } from "@/features/decks/DeckCardRow"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
@@ -353,6 +354,8 @@ export function AddDeckScreen({
   const [reviewingPasted, setReviewingPasted] = useState(false)
   const [editingPasted, setEditingPasted] = useState(false)
   const [addingPastedCard, setAddingPastedCard] = useState(false)
+  const [choosingPastedCommander, setChoosingPastedCommander] = useState(false)
+  const [pastedCommanderSelected, setPastedCommanderSelected] = useState(false)
   const pastedToken = useRef(0)
   const pastedDraftCurrent =
     pastedDraft?.source === deckList && pastedDraft.game === game && pastedDraft.format === format
@@ -780,6 +783,7 @@ export function AddDeckScreen({
         omitted: false,
       })
       setEditingPasted(false)
+      setPastedCommanderSelected(false)
       Keyboard.dismiss()
       setReviewingPasted(true)
     } catch (cause) {
@@ -794,6 +798,8 @@ export function AddDeckScreen({
     invalidatePasted()
     setFocusedPreviewCard(undefined)
     setAddingPastedCard(false)
+    setChoosingPastedCommander(false)
+    setPastedCommanderSelected(false)
     setEditingPasted(false)
     setReviewingPasted(false)
   }
@@ -865,6 +871,7 @@ export function AddDeckScreen({
       if (result.cards.length > MAX_DECK_CARDS)
         return `A deck can have at most ${MAX_DECK_CARDS} entries.`
       setPastedDraft({ ...pastedDraft, cards: result.cards })
+      setPastedCommanderSelected(true)
     } else {
       const existing = pastedCards.find((entry) => printingKey(entry) === printingKey(card))
       if (existing && existing.quantity >= 999) return "A card can have at most 999 copies."
@@ -879,6 +886,7 @@ export function AddDeckScreen({
           : [...pastedCards, card],
       })
     }
+    if (choosingPastedCommander) setAddingPastedCard(false)
     setGuestConflict(false)
     setPendingGuestPayload(undefined)
     return undefined
@@ -1054,6 +1062,34 @@ export function AddDeckScreen({
   )
 
   if (reviewingPasted && pastedDraft) {
+    const singleCommander =
+      game === "mtg" &&
+      format === "commander" &&
+      pastedCards.reduce(
+        (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
+        0,
+      ) <= 1
+    const cachedRules = singleCommander && pastedCommanderSelected ? loadCardDetails() : {}
+    const commanderWarnings =
+      singleCommander && pastedCommanderSelected
+        ? getCommanderWarnings(
+            pastedCards,
+            (card) =>
+              cachedRules[cardDetailsKey(card, game)] ??
+              previewDetailsByKey[cardDetailsKey(card, game)],
+          )
+        : []
+    const sections = catalogPreviewSections(
+      pastedCards.map((card) => ({ ...card, section: cardSection(card) })),
+      deckSections(pastedDraft.game, pastedDraft.format),
+    )
+    if (
+      editingPasted &&
+      singleCommander &&
+      !sections.some((section) => section.id === "commander")
+    ) {
+      sections.unshift({ id: "commander", label: "Commander", entries: [] })
+    }
     return (
       <Screen
         key="import-review"
@@ -1065,6 +1101,8 @@ export function AddDeckScreen({
           title={editingPasted ? "Edit deck" : "Review deck"}
           leftTx="common:back"
           onLeftPress={busy ? undefined : changeImportSource}
+          rightText={editingPasted ? "Done" : "Edit"}
+          onRightPress={busy ? undefined : editImport}
         />
         <ScrollView
           testID="pasted-deck-review"
@@ -1077,7 +1115,8 @@ export function AddDeckScreen({
               <View style={themed($importFields)}>
                 <TextField
                   testID="deck-name-input"
-                  label="Deck name"
+                  accessibilityLabel="Deck name"
+                  placeholder="Deck name"
                   value={name}
                   maxLength={80}
                   editable={!busy}
@@ -1103,11 +1142,11 @@ export function AddDeckScreen({
             <Text
               size="sm"
               style={themed($label)}
-              text={`${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · ${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
+              text={`${editingPasted ? "" : `${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · `}${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
             />
           </View>
           {error ? <AlertNote text={error} /> : null}
-          {!name.trim() ? <AlertNote text="Add a deck name with Edit deck." /> : null}
+          {!name.trim() ? <AlertNote text="Add a deck name." /> : null}
           {pastedProblems.length > 0 && !pastedDraft.omitted ? (
             <View style={themed($stack)}>
               <Text weight="bold" text="Fix or remove these lines" />
@@ -1131,114 +1170,72 @@ export function AddDeckScreen({
               text={`${pastedProblems.length} unmatched or invalid line${pastedProblems.length === 1 ? "" : "s"} removed from this import. Original text kept in the import form.`}
             />
           ) : null}
-          {catalogPreviewSections(
-            pastedCards.map((card) => ({
-              ...card,
-              section: cardSection(card),
-            })),
-            deckSections(pastedDraft.game, pastedDraft.format),
-          ).map((section) => {
-            const cards = section.entries
-            return (
-              <View key={section.id}>
-                <View style={themed($previewSectionHeader)}>
-                  <Text weight="bold" text={section.label} />
-                  <Text text={`${cards.reduce((total, card) => total + card.quantity, 0)}`} />
-                </View>
-                {cards.map((card, index) => {
-                  const cardId =
-                    card.scryfallId ?? card.cardId ?? card.printingId ?? card.providerCardId
-                  const detailKey = cardDetailsKey(card, game)
-                  const details = previewDetailsByKey[detailKey]
-                  return (
-                    <View key={`${printingKey(card)}:${index}`} style={themed($previewCardRow)}>
-                      <TouchableOpacity
-                        testID={`import-card-${section.id}-${index}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Preview ${card.name}`}
-                        activeOpacity={0.75}
-                        style={themed($previewCardLink)}
-                        onPress={() => focusImportCard(card, section.label)}
-                      >
-                        <View style={themed($previewThumbnailSlot)}>
-                          <CardImage
-                            game={pastedDraft.game}
-                            cardId={cardId}
-                            source={
-                              card.smallImageUrl ??
-                              details?.smallImageUrl ??
-                              card.imageUrl ??
-                              details?.imageUrl
-                            }
-                            accessibilityLabel={card.name}
-                            compact
-                            testID={`import-card-thumbnail-${section.id}-${index}`}
-                            style={themed($previewThumbnail)}
-                          />
-                        </View>
-                        <Text
-                          style={themed($previewCardName)}
-                          numberOfLines={2}
-                          text={editingPasted ? card.name : `${card.quantity}× ${card.name}`}
-                        />
-                      </TouchableOpacity>
-                      {editingPasted ? (
-                        <View style={[themed($configRow), $centeredRow]}>
-                          <TouchableOpacity
-                            accessibilityRole="button"
-                            style={$quantityAction}
-                            accessibilityLabel={`${card.quantity === 1 ? "Remove" : "Decrease"} ${card.name}`}
-                            disabled={busy}
-                            onPress={() => changeImportQuantity(card, -1)}
-                          >
-                            <Text text={card.quantity === 1 ? "×" : "−"} />
-                          </TouchableOpacity>
-                          <Text text={`${card.quantity}`} />
-                          <TouchableOpacity
-                            accessibilityRole="button"
-                            style={$quantityAction}
-                            accessibilityLabel={`Increase ${card.name}`}
-                            disabled={
-                              busy ||
-                              card.quantity >= 999 ||
-                              (game === "mtg" &&
-                                format === "commander" &&
-                                cardSection(card) === "commander")
-                            }
-                            onPress={() => changeImportQuantity(card, 1)}
-                          >
-                            <Text text="+" />
-                          </TouchableOpacity>
-                        </View>
-                      ) : null}
-                    </View>
-                  )
-                })}
-              </View>
-            )
-          })}
+          {sections.map((section) => (
+            <View key={section.id}>
+              <DeckCardSectionHeader
+                label={section.label}
+                quantity={section.entries.reduce((total, card) => total + card.quantity, 0)}
+                disabled={busy}
+                onChooseCommander={
+                  editingPasted && singleCommander && section.id === "commander"
+                    ? () => {
+                        if (busy) return
+                        setFocusedPreviewCard(undefined)
+                        setChoosingPastedCommander(true)
+                        setAddingPastedCard(true)
+                      }
+                    : undefined
+                }
+              />
+              {section.entries.map((card, index) => {
+                const details = previewDetailsByKey[cardDetailsKey(card, game)]
+                return (
+                  <DeckCardRow
+                    key={`${printingKey(card)}:${index}`}
+                    card={card}
+                    game={game}
+                    format={format}
+                    editing={editingPasted}
+                    disabled={busy}
+                    testID={`import-card-${section.id}-${index}`}
+                    imageTestID={`import-card-thumbnail-${section.id}-${index}`}
+                    imageSource={
+                      card.smallImageUrl ??
+                      details?.smallImageUrl ??
+                      card.imageUrl ??
+                      details?.imageUrl
+                    }
+                    onFocus={(entry) => focusImportCard(entry, section.label)}
+                    onIncrement={(entry) => changeImportQuantity(entry, 1)}
+                    onDecrement={(entry) => changeImportQuantity(entry, -1)}
+                  />
+                )
+              })}
+            </View>
+          ))}
         </ScrollView>
         <BottomActionBar>
           {!guestMode && (access?.ready ?? true) ? (
             <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
           ) : null}
           {saveRecovery}
-          {editingPasted ? (
-            <Button
-              testID="import-add-cards"
-              text="+ Add cards"
-              onPress={() => setAddingPastedCard(true)}
-              disabled={busy}
-            />
-          ) : null}
+          {commanderWarnings.map((warning) => (
+            <Text key={warning} size="xs" text={warning} />
+          ))}
           <View style={themed($configRow)}>
-            <Button
-              testID="edit-import-button"
-              text={editingPasted ? "Done editing" : "Edit deck"}
-              disabled={busy}
-              onPress={editImport}
-              style={$flex1}
-            />
+            {editingPasted ? (
+              <Button
+                testID="import-add-cards"
+                text="+ Add cards"
+                onPress={() => {
+                  if (busy) return
+                  setChoosingPastedCommander(false)
+                  setAddingPastedCard(true)
+                }}
+                disabled={busy}
+                style={$flex1}
+              />
+            ) : null}
             <Button
               testID="save-import-button"
               text={busy ? "Saving…" : guestMode ? "Save on device" : "Save deck"}
@@ -1266,6 +1263,7 @@ export function AddDeckScreen({
             game={game}
             format={format}
             commanderCards={pastedCards}
+            initialSection={choosingPastedCommander ? "commander" : undefined}
             onAdd={addImportCard}
             onClose={() => {
               Keyboard.dismiss()
@@ -1937,20 +1935,3 @@ const $tab: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderBottomColor: "transparent",
 })
 const $selectedTab: ThemedStyle<ViewStyle> = ({ colors }) => ({ borderBottomColor: colors.text })
-
-const $quantityAction: ViewStyle = {
-  minWidth: 44,
-  minHeight: 44,
-  alignItems: "center",
-  justifyContent: "center",
-}
-
-const $previewCardLink: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flex: 1,
-  minHeight: 68,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.sm,
-})
-
-const $centeredRow: ViewStyle = { alignItems: "center" }

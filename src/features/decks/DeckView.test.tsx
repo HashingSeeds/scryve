@@ -40,3 +40,47 @@ it("keeps the back action available in read-only mode", () => {
   fireEvent.press(view.getByLabelText("Back"))
   expect(onBack).toHaveBeenCalledTimes(1)
 })
+
+it.each(["cardsCached", "cardsUnavailable", "editingDisabled", "busy"] as const)(
+  "keeps shared card controls disabled for %s while previews remain available",
+  (disabledState) => {
+    const onIncrement = jest.fn()
+    const onDecrement = jest.fn()
+    const onFocus = jest.fn()
+    const noop = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <DeckView
+          tab="cards"
+          onTabChange={noop}
+          name="Cached deck"
+          game="mtg"
+          format="commander"
+          cards={[{ name: "Forest", quantity: 1, scryfallId: "forest" }]}
+          note=""
+          editing
+          dirty
+          {...{ [disabledState]: true }}
+          onBack={noop}
+          onEdit={noop}
+          onSave={noop}
+          onCancel={noop}
+          onDetails={noop}
+          onAdd={noop}
+          onNoteChange={noop}
+          onFocus={onFocus}
+          onIncrement={onIncrement}
+          onDecrement={onDecrement}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByLabelText("Remove Forest")).toBeDisabled()
+    expect(view.getByLabelText("Increase Forest")).toBeDisabled()
+    fireEvent.press(view.getByLabelText("Remove Forest"))
+    fireEvent.press(view.getByLabelText("Increase Forest"))
+    expect(onIncrement).not.toHaveBeenCalled()
+    expect(onDecrement).not.toHaveBeenCalled()
+    fireEvent.press(view.getByLabelText("1× Forest"))
+    expect(onFocus).toHaveBeenCalledWith(expect.objectContaining({ scryfallId: "forest" }))
+  },
+)

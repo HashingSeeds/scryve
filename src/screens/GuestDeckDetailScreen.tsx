@@ -339,18 +339,10 @@ export function GuestDeckDetailScreen({ onBack }: GuestDeckDetailScreenProps) {
               cardSection(card) === "commander"
             ) {
               const cached = loadCardDetails()
-              const selectedDetails = cached[cardDetailsKey(card, game)]
               const result = addCommander(
                 current.cards,
                 card,
-                (entry) =>
-                  (
-                    card.oracleId && entry.oracleId
-                      ? card.oracleId === entry.oracleId
-                      : card.name === entry.name
-                  )
-                    ? selectedDetails
-                    : cached[cardDetailsKey(entry, game)],
+                (entry) => cached[cardDetailsKey(entry, game)],
                 card.commanderColor,
               )
               if ("error" in result) return result.error

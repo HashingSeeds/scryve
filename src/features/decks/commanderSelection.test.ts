@@ -216,3 +216,37 @@ it("recomputes warnings from current cards after removing or adding conflicts", 
   ])
   expect(getCommanderWarnings([red], detailsFor)).toEqual([])
 })
+
+it("uses checked search metadata when moving an uncached Oracle-matching printing", () => {
+  const cards = [
+    card("Old", { board: "commander", commanderColor: "R" }),
+    card("Old", { board: "main", quantity: 2 }),
+    card("Piper", { oracleId: "piper-oracle", scryfallId: "owned-printing", quantity: 3 }),
+  ]
+  const chosen = card("Piper", { oracleId: "piper-oracle", scryfallId: "search-printing" })
+  const result = addCommander(
+    cards,
+    chosen,
+    (entry) =>
+      entry.scryfallId === "search-printing"
+        ? { ...eligible, commanderEligibility: "color-choice", colorIdentity: "" }
+        : undefined,
+    "G",
+  )
+  if ("error" in result) throw new Error(result.error)
+  expect(totalQuantity(result.cards)).toBe(6)
+  expect(result.cards).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ name: "Old", section: "main", quantity: 3 }),
+      expect.objectContaining({ scryfallId: "owned-printing", section: "main", quantity: 2 }),
+      expect.objectContaining({
+        scryfallId: "owned-printing",
+        section: "commander",
+        quantity: 1,
+        commanderColor: "G",
+      }),
+    ]),
+  )
+  expect(result.cards.some((entry) => entry.scryfallId === "search-printing")).toBe(false)
+  expect(result.cards.find((entry) => entry.name === "Old")?.commanderColor).toBeUndefined()
+})

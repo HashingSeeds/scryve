@@ -1238,18 +1238,10 @@ function DeckDetailContent({
               cardSection(card) === "commander"
             ) {
               const cached = loadCardDetails()
-              const selectedDetails = cached[cardDetailsKey(card, deck.game)]
               const result = addCommander(
                 draft,
                 card,
-                (entry) =>
-                  (
-                    card.oracleId && entry.oracleId
-                      ? card.oracleId === entry.oracleId
-                      : card.name === entry.name
-                  )
-                    ? selectedDetails
-                    : cached[cardDetailsKey(entry, deck.game)],
+                (entry) => cached[cardDetailsKey(entry, deck.game)],
                 card.commanderColor,
               )
               if ("error" in result) return result.error
