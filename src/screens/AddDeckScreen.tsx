@@ -327,6 +327,7 @@ export function AddDeckScreen({
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
+  const resolveArchidekt = useAction(api.archidektImports.resolvePublic)
   const searchTopDecks = useAction(api.deckCatalogs.browse)
   const importCatalog = useMutation(api.decks.importCatalog)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
@@ -339,8 +340,13 @@ export function AddDeckScreen({
   const [name, setName] = useState("")
   const [note, setNote] = useState("")
   const [deckList, setDeckList] = useState("")
+  const [importKind, setImportKind] = useState<"text" | "link">("text")
+  const [archidektUrl, setArchidektUrl] = useState("")
+  const importSource = importKind === "link" ? archidektUrl : deckList
   const [pastedDraft, setPastedDraft] = useState<{
     source: string
+    kind: "text" | "link"
+    attribution?: { sourceUrl: string; author: string }
     game: string
     format: string
     resolved: Pick<
@@ -358,7 +364,10 @@ export function AddDeckScreen({
   const [pastedCommanderSelected, setPastedCommanderSelected] = useState(false)
   const pastedToken = useRef(0)
   const pastedDraftCurrent =
-    pastedDraft?.source === deckList && pastedDraft.game === game && pastedDraft.format === format
+    pastedDraft?.source === importSource &&
+    pastedDraft.kind === importKind &&
+    pastedDraft.game === game &&
+    pastedDraft.format === format
   const pastedProblems = pastedDraft
     ? [...pastedDraft.resolved.unresolved, ...pastedDraft.resolved.invalidLines]
     : []
@@ -370,6 +379,14 @@ export function AddDeckScreen({
           !pastedDraft.resolved.unresolved.includes(card.originalReference),
       )
     : []
+  const sourceAttribution = pastedDraft?.attribution
+    ? `Imported from Archidekt by ${pastedDraft.attribution.author}\n${pastedDraft.attribution.sourceUrl}`
+    : ""
+  const importNote = [note.trim(), sourceAttribution].filter(Boolean).join("\n\n")
+  const noteLimit =
+    mode === "paste" && importKind === "link" && sourceAttribution
+      ? 1000 - sourceAttribution.length - 2
+      : 1000
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
   const [catalogDecks, setCatalogDecks] = useState<CatalogDeck[]>([])
@@ -485,6 +502,7 @@ export function AddDeckScreen({
 
   function chooseGame(next: string) {
     invalidatePasted()
+    setImportKind("text")
     previewToken.current += 1
     setPreviewRetryAfterMs(undefined)
     const nextFormat = defaultDeckFormat(next)
@@ -765,7 +783,11 @@ export function AddDeckScreen({
     setResolvingPasted(true)
     setError(undefined)
     try {
-      const resolved = await resolvePasted({ list: deckList, game })
+      if (importKind === "link" && game !== "mtg") return
+      const resolved =
+        importKind === "link"
+          ? await resolveArchidekt({ url: archidektUrl.trim() })
+          : await resolvePasted({ list: deckList, game })
       if (pastedToken.current !== token) return
       const normalized = normalizeImportedCards(importCards(resolved.cards), game, format)
       if ("overflow" in normalized) {
@@ -774,20 +796,41 @@ export function AddDeckScreen({
         )
         return
       }
+      const suggestedFormat =
+        "sourceUrl" in resolved
+          ? pastedDraft?.kind === "link" && pastedDraft.source === archidektUrl
+            ? format
+            : resolved.format
+          : format
+      if ("sourceUrl" in resolved) {
+        setName((current) => (current.trim() ? current : resolved.name.slice(0, 80)))
+        setDeckFormat(suggestedFormat)
+        setFormat(suggestedFormat)
+      }
       setPastedDraft({
-        source: deckList,
+        source: importSource,
+        kind: importKind,
         game,
-        format,
+        format: suggestedFormat,
         resolved,
         cards: normalized.cards,
         omitted: false,
+        ...("sourceUrl" in resolved
+          ? { attribution: { sourceUrl: resolved.sourceUrl, author: resolved.author } }
+          : {}),
       })
       setEditingPasted(false)
       setPastedCommanderSelected(false)
       Keyboard.dismiss()
       setReviewingPasted(true)
     } catch (cause) {
-      if (pastedToken.current === token) fail(cause, "Could not resolve deck list. Try again.")
+      if (pastedToken.current === token)
+        fail(
+          cause,
+          importKind === "link"
+            ? "Could not load this Archidekt deck. Try again or paste its text export."
+            : "Could not resolve deck list. Try again.",
+        )
     } finally {
       if (pastedToken.current === token) setResolvingPasted(false)
     }
@@ -898,7 +941,8 @@ export function AddDeckScreen({
       !pastedDraftCurrent ||
       resolvingPasted ||
       (!pastedDraft.omitted && pastedProblems.length > 0) ||
-      pastedCards.length === 0
+      pastedCards.length === 0 ||
+      importNote.length > 1000
     )
       return
     setSaveAttempted(true)
@@ -911,6 +955,7 @@ export function AddDeckScreen({
       name,
       format,
       game,
+      ...(importNote ? { note: importNote } : {}),
       cards: pastedCards,
     }
     if (guestMode) {
@@ -937,7 +982,12 @@ export function AddDeckScreen({
       multiline
       numberOfLines={3}
       textAlignVertical="top"
-      maxLength={1000}
+      maxLength={noteLimit}
+      helper={
+        note.length > noteLimit
+          ? "Shorten notes to leave room for the Archidekt source."
+          : undefined
+      }
       editable={!busy}
       onChangeText={(next) => {
         if (busy) return
@@ -1144,6 +1194,23 @@ export function AddDeckScreen({
               style={themed($label)}
               text={`${editingPasted ? "" : `${deckFormatLabel(pastedDraft.game, pastedDraft.format)} · `}${cardCountLabel(pastedCards.reduce((total, card) => total + card.quantity, 0))}`}
             />
+            {pastedDraft.attribution ? (
+              <TouchableOpacity
+                accessibilityRole="link"
+                accessibilityLabel={`View on Archidekt by ${pastedDraft.attribution.author}`}
+                style={themed($plainAction)}
+                onPress={() =>
+                  void Linking.openURL(pastedDraft.attribution!.sourceUrl).catch(() =>
+                    setError("Could not open Archidekt."),
+                  )
+                }
+              >
+                <Text
+                  text={`Archidekt · ${pastedDraft.attribution.author}`}
+                  style={themed($textAction)}
+                />
+              </TouchableOpacity>
+            ) : null}
           </View>
           {error ? <AlertNote text={error} /> : null}
           {!name.trim() ? <AlertNote text="Add a deck name." /> : null}
@@ -1247,6 +1314,7 @@ export function AddDeckScreen({
                 !pastedDraftCurrent ||
                 (!pastedDraft.omitted && pastedProblems.length > 0) ||
                 pastedCards.length === 0 ||
+                importNote.length > 1000 ||
                 !name.trim() ||
                 (!capacityReady && !canRequestAccess) ||
                 (atCapacity && saveAttempted) ||
@@ -1739,6 +1807,29 @@ export function AddDeckScreen({
 
         {mode === "paste" ? (
           <View style={themed($stack)}>
+            {game === "mtg" ? (
+              <View
+                accessibilityRole="tablist"
+                accessibilityLabel="Import source"
+                style={themed($tabs)}
+              >
+                {(["text", "link"] as const).map((kind) => (
+                  <TouchableOpacity
+                    key={kind}
+                    testID={`import-source-${kind}`}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: importKind === kind }}
+                    style={[themed($tab), importKind === kind && themed($selectedTab)]}
+                    onPress={() => {
+                      invalidatePasted()
+                      setImportKind(kind)
+                    }}
+                  >
+                    <Text text={kind === "text" ? "Paste text" : "Archidekt link"} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
             <TextField
               testID="deck-name-input"
               label="Deck name"
@@ -1746,26 +1837,53 @@ export function AddDeckScreen({
               maxLength={80}
               onChangeText={setName}
             />
-            <TextField
-              label="Deck list"
-              accessibilityLabel="Deck list"
-              helper={
-                game === "ygo"
-                  ? "Paste YDK card IDs or lines like 3 Ash Blossom. Main, Extra, and Side headings are supported."
-                  : game === "pokemon"
-                    ? "Paste a Pokémon TCG Live list with quantities, names, set codes, and card numbers."
-                    : 'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.'
-              }
-              value={deckList}
-              multiline
-              numberOfLines={12}
-              textAlignVertical="top"
-              maxLength={50_000}
-              onChangeText={(next) => {
-                invalidatePasted()
-                setDeckList(next)
-              }}
-            />
+            {importKind === "link" ? (
+              <>
+                <TextField
+                  testID="archidekt-url-input"
+                  label="Archidekt URL"
+                  placeholder="https://archidekt.com/decks/12345"
+                  helper="HTTPS links to public Magic decks. For other sites, paste a text export."
+                  value={archidektUrl}
+                  maxLength={2048}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={(next) => {
+                    invalidatePasted()
+                    setArchidektUrl(next)
+                  }}
+                />
+                <Button
+                  text="Paste text instead"
+                  onPress={() => {
+                    invalidatePasted()
+                    setImportKind("text")
+                  }}
+                />
+              </>
+            ) : (
+              <TextField
+                label="Deck list"
+                accessibilityLabel="Deck list"
+                helper={
+                  game === "ygo"
+                    ? "Paste YDK card IDs or lines like 3 Ash Blossom. Main, Extra, and Side headings are supported."
+                    : game === "pokemon"
+                      ? "Paste a Pokémon TCG Live list with quantities, names, set codes, and card numbers."
+                      : 'Use lines like "1 Sol Ring". Commander, Mainboard, and Sideboard headings are supported.'
+                }
+                value={deckList}
+                multiline
+                numberOfLines={12}
+                textAlignVertical="top"
+                maxLength={50_000}
+                onChangeText={(next) => {
+                  invalidatePasted()
+                  setDeckList(next)
+                }}
+              />
+            )}
             {saveRecovery}
             {pastedDraftCurrent ? (
               <Button
@@ -1788,10 +1906,12 @@ export function AddDeckScreen({
                     ? "Reload source"
                     : pastedDraft
                       ? "Review changes"
+                      : importKind === "link"
+                        ? "Review Archidekt deck"
                       : "Review deck list"
               }
               preset="reversed"
-              disabled={busy || resolvingPasted || !deckList.trim()}
+              disabled={busy || resolvingPasted || !importSource.trim()}
               onPress={reviewPasted}
             />
           </View>

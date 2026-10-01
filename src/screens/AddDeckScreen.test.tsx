@@ -1,3 +1,4 @@
+import { Linking } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
@@ -52,6 +53,7 @@ const mockPreviewPrecon = jest.fn(async () => ({
 const mockConvexClient = { action: jest.fn() }
 const mockConvexState: { client: typeof mockConvexClient | undefined } = { client: undefined }
 const mockResolvePasted = jest.fn()
+const mockResolveArchidekt = jest.fn()
 type MockCatalogDeck = {
   _id: string
   game: string
@@ -165,6 +167,7 @@ jest.mock("convex/react", () => ({
     if (reference === "cards.byId") return mockCardById
     if (reference === "cards.byCatalogId") return mockCatalogCardById
     if (reference === "cards.byPokemonReference") return mockPokemonCardByReference
+    if (reference === "archidektImports.resolvePublic") return mockResolveArchidekt
     if (reference === "deckCatalogs.browse") return mockBrowse
     if (reference === "deckImports.searchPreconstructed") return mockSearch
     if (reference === "deckImports.previewPreconstructed") return mockPreviewPrecon
@@ -183,6 +186,7 @@ jest.mock("../../convex/_generated/api", () => ({
       importResolved: "decks.importResolved",
       importCatalog: "decks.importCatalog",
     },
+    archidektImports: { resolvePublic: "archidektImports.resolvePublic" },
     deckImports: {
       searchPreconstructed: "deckImports.searchPreconstructed",
       previewPreconstructed: "deckImports.previewPreconstructed",
@@ -1314,6 +1318,149 @@ describe("AddDeckScreen", () => {
       if (change === "input") expect(view.getByLabelText("Deck list").props.value).toBe("3 Forest")
     },
   )
+
+  const resolvedArchidekt = {
+    ...resolvedForest,
+    name: "Public Forests",
+    format: "modern",
+    sourceUrl: "https://archidekt.com/decks/12345",
+    author: "ForestPlayer",
+  }
+
+  function enterLink(view: ReturnType<typeof renderAddDeck>) {
+    chooseMode(view, "paste")
+    fireEvent.press(view.getByTestId("import-source-link"))
+    fireEvent.changeText(view.getByTestId("archidekt-url-input"), resolvedArchidekt.sourceUrl)
+    fireEvent.press(view.getByTestId("review-import-button"))
+  }
+
+  it.each(["account", "guest"])(
+    "reviews an Archidekt deck with attribution before saving for %s",
+    async (owner) => {
+      mockResolveArchidekt.mockResolvedValueOnce(resolvedArchidekt)
+      const onCreated = jest.fn()
+      const request = jest.fn()
+      const view =
+        owner === "account"
+          ? renderAddDeck(onCreated)
+          : render(
+              <ThemeProvider initialContext="dark">
+                <AddDeckScreen
+                  onBack={jest.fn()}
+                  onCreated={onCreated}
+                  access={{ ready: false, loading: false, signedIn: false, request }}
+                />
+              </ThemeProvider>,
+            )
+      enterLink(view)
+      await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
+      expect(view.getByTestId("deck-name-input").props.value).toBe("Public Forests")
+      expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
+        "Format, Modern",
+      )
+      expect(view.getByText("Archidekt · ForestPlayer")).toBeTruthy()
+      expect(mockResolveArchidekt).toHaveBeenCalledWith({ url: resolvedArchidekt.sourceUrl })
+      expect(mockResolvePasted).not.toHaveBeenCalled()
+      expect(mockImport).not.toHaveBeenCalled()
+      expect(loadGuestDeck()).toBeUndefined()
+      const openSource = jest.spyOn(Linking, "openURL").mockResolvedValueOnce(undefined)
+      fireEvent.press(view.getByLabelText("View on Archidekt by ForestPlayer"))
+      expect(openSource).toHaveBeenCalledWith(resolvedArchidekt.sourceUrl)
+      openSource.mockRestore()
+      fireEvent.changeText(view.getByTestId("deck-note-input"), "Try four copies")
+      fireEvent.press(view.getByTestId("save-import-button"))
+      await waitFor(() =>
+        expect(onCreated).toHaveBeenCalledWith(owner === "account" ? "deck-imported" : "guest"),
+      )
+      const expectedDeck = {
+        name: "Public Forests",
+        format: "modern",
+        game: "mtg",
+        note: "Try four copies\n\nImported from Archidekt by ForestPlayer\nhttps://archidekt.com/decks/12345",
+        cards: [expect.objectContaining({ name: "Forest", quantity: 2 })],
+      }
+      if (owner === "account")
+        expect(mockImport).toHaveBeenCalledWith(expect.objectContaining(expectedDeck))
+      else expect(loadGuestDeck()?.deck).toMatchObject(expectedDeck)
+      expect(request).not.toHaveBeenCalled()
+    },
+  )
+
+  it("keeps a player's chosen format when reviewing the same Archidekt link again", async () => {
+    mockResolveArchidekt.mockResolvedValue(resolvedArchidekt)
+    const view = renderAddDeck()
+    enterLink(view)
+    await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
+    expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
+      "Format, Modern",
+    )
+    chooseFormat(view, "standard")
+    expect(view.getByTestId("save-import-button")).toBeDisabled()
+    fireEvent.press(view.getByTestId("review-import-button"))
+    await waitFor(() => expect(view.getByTestId("save-import-button")).toBeEnabled())
+    expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
+      "Format, Standard",
+    )
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(expect.objectContaining({ format: "standard" })),
+    )
+  })
+
+  it.each(["url", "format", "kind", "game"])(
+    "ignores Archidekt results after changing %s",
+    async (change) => {
+      let finish: ((result: typeof resolvedArchidekt) => void) | undefined
+      mockResolveArchidekt.mockImplementationOnce(
+        () =>
+          new Promise<typeof resolvedArchidekt>((resolve) => {
+            finish = resolve
+          }),
+      )
+      const view = renderAddDeck()
+      enterLink(view)
+      if (change === "url")
+        fireEvent.changeText(
+          view.getByTestId("archidekt-url-input"),
+          "https://archidekt.com/decks/67890",
+        )
+      else if (change === "format") chooseFormat(view, "standard")
+      else if (change === "kind") fireEvent.press(view.getByTestId("import-source-text"))
+      else chooseGame(view, "ygo")
+      await act(async () => finish?.(resolvedArchidekt))
+      expect(view.queryByTestId("pasted-deck-review")).toBeNull()
+      expect(view.queryByText("Archidekt · ForestPlayer")).toBeNull()
+      expect(mockImport).not.toHaveBeenCalled()
+    },
+  )
+
+  it("keeps a failed Archidekt URL and offers a text export fallback", async () => {
+    mockResolveArchidekt.mockRejectedValueOnce(
+      new ConvexError({ message: "Use a public Archidekt deck or paste its text export." }),
+    )
+    const view = renderAddDeck()
+    enterLink(view)
+    await waitFor(() =>
+      expect(view.getByText("Use a public Archidekt deck or paste its text export.")).toBeTruthy(),
+    )
+    expect(view.getByTestId("archidekt-url-input").props.value).toBe(resolvedArchidekt.sourceUrl)
+    fireEvent.press(view.getByText("Paste text instead"))
+    expect(view.getByLabelText("Deck list")).toBeTruthy()
+    expect(mockImport).not.toHaveBeenCalled()
+  })
+
+  it("requires shortening existing notes before saving source attribution", async () => {
+    mockResolveArchidekt.mockResolvedValueOnce(resolvedArchidekt)
+    const view = renderAddDeck()
+    chooseMode(view, "paste")
+    fireEvent.changeText(view.getByTestId("deck-note-input"), "x".repeat(1000))
+    enterLink(view)
+    await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
+    expect(view.getByText("Shorten notes to leave room for the Archidekt source.")).toBeTruthy()
+    expect(view.getByTestId("save-import-button")).toBeDisabled()
+    expect(mockImport).not.toHaveBeenCalled()
+    expect(view.getByTestId("deck-note-input").props.value).toHaveLength(1000)
+  })
 
   it("shows Magic examples and official decks together with source labels", async () => {
     mockSearchTopDecks.mockResolvedValueOnce([

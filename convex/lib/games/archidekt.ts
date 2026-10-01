@@ -1,0 +1,181 @@
+import { ConvexError } from "convex/values"
+
+import { MAX_DECK_CARDS } from "../policy"
+import { objectRecord } from "../scryfall"
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const FORMATS = new Map([
+  [1, "standard"],
+  [2, "modern"],
+  [3, "commander"],
+  [4, "legacy"],
+  [5, "vintage"],
+  [6, "pauper"],
+  [7, "constructed"],
+  [13, "brawl"],
+  [15, "pioneer"],
+])
+const EXCLUDED_CATEGORIES = [
+  "Maybeboard",
+  "Attraction",
+  "Stickers",
+  "Tokens & Extras",
+  "Planar Deck",
+]
+
+export type ArchidektEntry = {
+  name: string
+  scryfallId: string
+  oracleId: string
+  quantity: number
+  board: "main" | "sideboard" | "commander"
+}
+
+function invalidDeck(
+  message = "Archidekt returned an unsupported deck. Try its text export instead.",
+): never {
+  throw new ConvexError({ code: "archidekt_invalid_deck", message })
+}
+
+export function archidektDeckLink(input: string) {
+  let url: URL
+  try {
+    url = new URL(input.trim())
+  } catch {
+    throw new ConvexError({
+      code: "invalid_deck_url",
+      message: "Enter a public Archidekt deck link.",
+    })
+  }
+  const match = url.pathname.match(/^\/decks\/([1-9]\d{0,14})(?:\/[^/]*)?\/?$/)
+  if (
+    input.length > 2048 ||
+    url.protocol !== "https:" ||
+    !["archidekt.com", "www.archidekt.com"].includes(url.hostname) ||
+    url.port ||
+    url.username ||
+    url.password ||
+    !match
+  )
+    throw new ConvexError({
+      code: "invalid_deck_url",
+      message: "Enter a public Archidekt deck link.",
+    })
+  return { deckId: match[1], sourceUrl: `https://archidekt.com/decks/${match[1]}` }
+}
+
+// eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- Provider semantics are external and not apparent from the payload.
+// Archidekt uses the first category for inclusion and board; remaining categories are tags.
+export function parseArchidektDeck(payload: unknown, deckId: string) {
+  const deck = objectRecord(payload)
+  const owner = objectRecord(deck?.owner)
+  if (
+    !deck ||
+    String(deck.id) !== deckId ||
+    typeof deck.name !== "string" ||
+    !deck.name.trim() ||
+    deck.name.length > 500 ||
+    typeof owner?.username !== "string" ||
+    !owner.username.trim() ||
+    owner.username.length > 200 ||
+    deck.private !== false ||
+    deck.unlisted !== false ||
+    deck.intentionallySkippedCardData === true ||
+    !Array.isArray(deck.cards) ||
+    deck.cards.length > MAX_DECK_CARDS ||
+    !Array.isArray(deck.categories) ||
+    deck.categories.length > MAX_DECK_CARDS ||
+    (deck.customCards !== undefined &&
+      (!Array.isArray(deck.customCards) || deck.customCards.length > 0))
+  )
+    invalidDeck()
+  const format = typeof deck.deckFormat === "number" ? FORMATS.get(deck.deckFormat) : undefined
+  if (!format) invalidDeck("This Archidekt format is not supported. Try its text export instead.")
+  const categories = new Map<string, { included: boolean; premier: boolean }>()
+  for (const value of deck.categories) {
+    const category = objectRecord(value)
+    if (
+      !category ||
+      typeof category.name !== "string" ||
+      category.name.length > 200 ||
+      categories.has(category.name) ||
+      typeof category.includedInDeck !== "boolean" ||
+      typeof category.isPremier !== "boolean"
+    )
+      invalidDeck()
+    categories.set(category.name, {
+      included: category.includedInDeck,
+      premier: category.isPremier,
+    })
+  }
+  const entries = new Map<string, ArchidektEntry>()
+  const rowIds = new Set<number>()
+  for (const value of deck.cards) {
+    const row = objectRecord(value)
+    if (
+      !row ||
+      typeof row.id !== "number" ||
+      !Number.isSafeInteger(row.id) ||
+      rowIds.has(row.id) ||
+      typeof row.quantity !== "number" ||
+      !Number.isInteger(row.quantity) ||
+      row.quantity < 1 ||
+      row.quantity > 999 ||
+      (row.categories !== null &&
+        (!Array.isArray(row.categories) ||
+          row.categories.length > MAX_DECK_CARDS ||
+          !row.categories.every(
+            (category) => typeof category === "string" && category.length <= 200,
+          )))
+    )
+      invalidDeck()
+    rowIds.add(row.id)
+    if (row.deletedAt !== null && row.deletedAt !== undefined) invalidDeck()
+    const primary = Array.isArray(row.categories) ? row.categories[0] : undefined
+    const category = categories.get(primary) ?? {
+      included: !EXCLUDED_CATEGORIES.includes(primary),
+      premier: primary === "Commander",
+    }
+    if (!category.included) continue
+    if (EXCLUDED_CATEGORIES.includes(primary)) invalidDeck()
+    if (category.premier && primary !== "Commander") invalidDeck()
+    const card = objectRecord(row.card)
+    const oracle = objectRecord(card?.oracleCard)
+    if (
+      !card ||
+      typeof card.uid !== "string" ||
+      !UUID.test(card.uid) ||
+      !oracle ||
+      typeof oracle.uid !== "string" ||
+      !UUID.test(oracle.uid) ||
+      typeof oracle.name !== "string" ||
+      !oracle.name.trim() ||
+      oracle.name.length > 500 ||
+      !Array.isArray(oracle.types) ||
+      !oracle.types.every((type) => typeof type === "string")
+    )
+      invalidDeck()
+    if (
+      oracle.types.some((type) =>
+        ["Token", "Emblem", "Plane", "Phenomenon", "Sticker"].includes(type),
+      )
+    )
+      continue
+    const board = category.premier ? "commander" : primary === "Sideboard" ? "sideboard" : "main"
+    if (board === "commander" && !["commander", "brawl"].includes(format)) invalidDeck()
+    const key = `${board}:${card.uid.toLowerCase()}`
+    const previous = entries.get(key)
+    const quantity = (previous?.quantity ?? 0) + row.quantity
+    if (quantity > 999 || (previous && previous.oracleId !== oracle.uid.toLowerCase()))
+      invalidDeck()
+    entries.set(key, {
+      name: oracle.name,
+      scryfallId: card.uid.toLowerCase(),
+      oracleId: oracle.uid.toLowerCase(),
+      board,
+      quantity,
+    })
+  }
+  if (entries.size === 0) invalidDeck("No importable cards were found in this Archidekt deck.")
+  return { name: deck.name.trim(), format, author: owner.username, entries: [...entries.values()] }
+}
