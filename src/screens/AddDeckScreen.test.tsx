@@ -638,6 +638,137 @@ describe("AddDeckScreen", () => {
     expect(view.queryByTestId("review-import-button")).toBeNull()
   })
 
+  it("shows review thumbnails and loads only the tapped Magic printing", async () => {
+    const firstId = "33333333-3333-3333-3333-333333333333"
+    const secondId = "44444444-4444-4444-4444-444444444444"
+    const first = {
+      ...resolvedForest.cards[0],
+      name: "Island",
+      scryfallId: firstId,
+      smallImageUrl: "https://assets.example/island-one.jpg",
+    }
+    const second = {
+      ...first,
+      quantity: 1,
+      scryfallId: secondId,
+      smallImageUrl: "https://assets.example/island-two.jpg",
+    }
+    mockResolvePasted.mockResolvedValue({
+      cards: [first, second],
+      unresolved: [],
+      invalidLines: [],
+    })
+    const view = renderAddDeck()
+    enterPasted(view, "2 Island (M21) 265\n1 Island (DMU) 278")
+    await waitFor(() => expect(view.getByTestId("import-card-thumbnail-main-0")).toBeTruthy())
+    expect(view.getByTestId("import-card-thumbnail-main-0").props.source).toEqual([
+      { uri: first.smallImageUrl },
+    ])
+    expect(view.getByTestId("import-card-thumbnail-main-1").props.source).toEqual([
+      { uri: second.smallImageUrl },
+    ])
+    expect(mockCardById).not.toHaveBeenCalled()
+    fireEvent.press(view.getByTestId("import-card-main-1"))
+    await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
+    expect(mockCardById).toHaveBeenCalledWith({ scryfallId: secondId })
+    expect(mockCardById).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("import-card-main-0"))
+    await waitFor(() => expect(mockCardById).toHaveBeenCalledWith({ scryfallId: firstId }))
+    fireEvent.press(view.getByText("Close"))
+    fireEvent.press(view.getByTestId("import-card-main-1"))
+    await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
+    expect(mockCardById).toHaveBeenCalledTimes(2)
+    expect(mockImport).not.toHaveBeenCalled()
+    fireEvent.press(view.getByTestId("edit-import-button", { includeHiddenElements: true }))
+    expect(view.queryByTestId("card-focus-dialog")).toBeNull()
+    expect(view.getByLabelText("Deck list").props.value).toBe(
+      "2 Island (M21) 265\n1 Island (DMU) 278",
+    )
+    fireEvent.press(view.getByTestId("review-import-button"))
+    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
+    expect(view.queryByTestId("card-focus-dialog")).toBeNull()
+  })
+
+  it("routes a reviewed Yu-Gi-Oh card to catalog details", async () => {
+    mockResolvePasted.mockResolvedValueOnce({
+      cards: [
+        {
+          game: "ygo",
+          cardId: "14558127",
+          name: "Ash Blossom & Joyous Spring",
+          quantity: 3,
+          section: "main",
+          entryKind: "card",
+          originalReference: "14558127",
+          smallImageUrl: "https://assets.example/ash.jpg",
+        },
+      ],
+      unresolved: [],
+      invalidLines: [],
+    })
+    const view = renderAddDeck()
+    chooseGame(view, "ygo")
+    enterPasted(view, "3 Ash Blossom & Joyous Spring")
+    await waitFor(() => expect(view.getByTestId("import-card-main-0")).toBeTruthy())
+    expect(mockCatalogCardById).not.toHaveBeenCalled()
+    fireEvent.press(view.getByLabelText("Preview Ash Blossom & Joyous Spring"))
+    await waitFor(() => expect(view.getByText("Effect Monster")).toBeTruthy())
+    expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
+    expect(mockCardById).not.toHaveBeenCalled()
+    expect(mockImport).not.toHaveBeenCalled()
+  })
+
+  it("loads reviewed Pokemon details from its original reference and updates its thumbnail", async () => {
+    mockResolvePasted.mockResolvedValueOnce({
+      cards: [
+        {
+          game: "pokemon",
+          name: "Riolu",
+          quantity: 3,
+          section: "main",
+          entryKind: "card",
+          originalReference: "MEG 76",
+        },
+      ],
+      unresolved: [],
+      invalidLines: [],
+    })
+    const view = renderAddDeck()
+    chooseGame(view, "pokemon")
+    enterPasted(view, "3 Riolu MEG 76")
+    await waitFor(() => expect(view.getByTestId("import-card-main-0")).toBeTruthy())
+    expect(mockPokemonCardByReference).not.toHaveBeenCalled()
+    fireEvent.press(view.getByLabelText("Preview Riolu"))
+    await waitFor(() => expect(view.getByText("Pokemon · Basic · Fighting")).toBeTruthy())
+    expect(mockPokemonCardByReference).toHaveBeenCalledWith({
+      name: "Riolu",
+      originalReference: "MEG 76",
+    })
+    fireEvent.press(view.getByText("Close"))
+    expect(view.getByTestId("import-card-thumbnail-main-0").props.source).toEqual([
+      { uri: "https://assets.example/riolu/high.webp" },
+    ])
+    expect(mockImport).not.toHaveBeenCalled()
+  })
+
+  it("retries card detail failures without discarding the reviewed import", async () => {
+    mockResolvePasted.mockResolvedValueOnce(resolvedForest)
+    mockCardById.mockRejectedValueOnce(new Error("Unavailable"))
+    const view = renderAddDeck()
+    enterPasted(view)
+    await waitFor(() => expect(view.getByTestId("import-card-main-0")).toBeTruthy())
+    fireEvent.press(view.getByLabelText("Preview Forest"))
+    await waitFor(() => expect(view.getByText("Could not load card details")).toBeTruthy())
+    fireEvent.press(view.getByTestId("retry-card-details"))
+    await waitFor(() => expect(view.getByText("Explore twice.")).toBeTruthy())
+    expect(mockCardById).toHaveBeenCalledTimes(2)
+    fireEvent.press(view.getByText("Close"))
+    expect(view.getByText("2× Forest")).toBeTruthy()
+    expect(view.getByTestId("save-import-button")).toBeEnabled()
+    expect(mockImport).not.toHaveBeenCalled()
+  })
+
   it.each(["input", "format", "game"])(
     "ignores a resolution completed after changing %s",
     async (change) => {

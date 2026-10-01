@@ -99,7 +99,10 @@ type GenericImportedCard = {
 }
 
 function catalogCardDetailKey(
-  card: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+  card: Pick<
+    FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+    "game" | "cardId" | "printingId" | "providerCardId" | "name" | "originalReference"
+  >,
 ) {
   return `${card.game}:${card.cardId ?? card.printingId ?? card.providerCardId ?? `${card.name}:${card.originalReference ?? ""}`}`
 }
@@ -619,7 +622,19 @@ export function AddDeckScreen({
   }
 
   function focusCatalogCard(
-    card: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+    card: Pick<
+      FunctionReturnType<typeof api.deckCatalogs.detail>["entries"][number],
+      | "game"
+      | "cardId"
+      | "printingId"
+      | "providerCardId"
+      | "scryfallId"
+      | "name"
+      | "originalReference"
+      | "quantity"
+      | "imageUrl"
+      | "smallImageUrl"
+    >,
     boardLabel: string,
   ) {
     const catalogCardId = card.cardId ?? card.printingId ?? card.providerCardId
@@ -731,6 +746,7 @@ export function AddDeckScreen({
   function editImport() {
     if (busy) return
     invalidatePasted()
+    setFocusedPreviewCard(undefined)
     setReviewingPasted(false)
   }
 
@@ -943,11 +959,50 @@ export function AddDeckScreen({
                   <Text weight="bold" text={section.label} />
                   <Text text={`${cards.reduce((total, card) => total + card.quantity, 0)}`} />
                 </View>
-                {cards.map((card, index) => (
-                  <View key={`${card.name}:${index}`} style={themed($previewCardRow)}>
-                    <Text text={`${card.quantity}× ${card.name}`} />
-                  </View>
-                ))}
+                {cards.map((card, index) => {
+                  const cardId =
+                    "scryfallId" in card
+                      ? card.scryfallId
+                      : (card.cardId ?? card.printingId ?? card.providerCardId)
+                  const detailKey = "board" in card ? card.scryfallId : catalogCardDetailKey(card)
+                  const details = previewDetailsByKey[detailKey]
+                  return (
+                    <TouchableOpacity
+                      key={`${cardId ?? card.name}:${index}`}
+                      testID={`import-card-${section.id}-${index}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Preview ${card.name}`}
+                      activeOpacity={0.75}
+                      style={themed($previewCardRow)}
+                      onPress={() =>
+                        "board" in card
+                          ? focusPreviewCard(card, section.label)
+                          : focusCatalogCard(card, section.label)
+                      }
+                    >
+                      <View style={themed($previewThumbnailSlot)}>
+                        <CardImage
+                          game={pastedDraft.game}
+                          cardId={cardId}
+                          source={
+                            card.smallImageUrl ??
+                            details?.smallImageUrl ??
+                            card.imageUrl ??
+                            details?.imageUrl
+                          }
+                          accessibilityLabel={card.name}
+                          compact
+                          testID={`import-card-thumbnail-${section.id}-${index}`}
+                          style={themed($previewThumbnail)}
+                        />
+                      </View>
+                      <Text
+                        style={themed($previewCardName)}
+                        text={`${card.quantity}× ${card.name}`}
+                      />
+                    </TouchableOpacity>
+                  )
+                })}
               </View>
             )
           })}
@@ -986,6 +1041,7 @@ export function AddDeckScreen({
             />
           </View>
         </BottomActionBar>
+        {previewCardDialog}
       </Screen>
     )
   }
