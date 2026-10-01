@@ -784,26 +784,30 @@ export function AddDeckScreen({
     setError(undefined)
     try {
       if (importKind === "link" && game !== "mtg") return
-      const resolved =
+      const result =
         importKind === "link"
-          ? await resolveArchidekt({ url: archidektUrl.trim() })
-          : await resolvePasted({ list: deckList, game })
+          ? {
+              kind: "link" as const,
+              resolved: await resolveArchidekt({ url: archidektUrl.trim() }),
+            }
+          : { kind: "text" as const, resolved: await resolvePasted({ list: deckList, game }) }
       if (pastedToken.current !== token) return
-      const normalized = normalizeImportedCards(importCards(resolved.cards), game, format)
+      const resolved = result.resolved
+      const suggestedFormat =
+        result.kind === "link"
+          ? pastedDraft?.kind === "link" && pastedDraft.source === archidektUrl
+            ? format
+            : result.resolved.format
+          : format
+      const normalized = normalizeImportedCards(importCards(resolved.cards), game, suggestedFormat)
       if ("overflow" in normalized) {
         setError(
           `${normalized.overflow} has more than 999 copies after matching. Correct the source before reviewing.`,
         )
         return
       }
-      const suggestedFormat =
-        "sourceUrl" in resolved
-          ? pastedDraft?.kind === "link" && pastedDraft.source === archidektUrl
-            ? format
-            : resolved.format
-          : format
-      if ("sourceUrl" in resolved) {
-        setName((current) => (current.trim() ? current : resolved.name.slice(0, 80)))
+      if (result.kind === "link") {
+        setName((current) => (current.trim() ? current : result.resolved.name.slice(0, 80)))
         setDeckFormat(suggestedFormat)
         setFormat(suggestedFormat)
       }
@@ -815,8 +819,10 @@ export function AddDeckScreen({
         resolved,
         cards: normalized.cards,
         omitted: false,
-        ...("sourceUrl" in resolved
-          ? { attribution: { sourceUrl: resolved.sourceUrl, author: resolved.author } }
+        ...(result.kind === "link"
+          ? {
+              attribution: { sourceUrl: result.resolved.sourceUrl, author: result.resolved.author },
+            }
           : {}),
       })
       setEditingPasted(false)
@@ -1908,7 +1914,7 @@ export function AddDeckScreen({
                       ? "Review changes"
                       : importKind === "link"
                         ? "Review Archidekt deck"
-                      : "Review deck list"
+                        : "Review deck list"
               }
               preset="reversed"
               disabled={busy || resolvingPasted || !importSource.trim()}
