@@ -903,7 +903,6 @@ export function AddDeckScreen({
       name,
       format,
       game,
-      ...(note.trim() ? { note } : {}),
       cards: pastedCards,
     }
     if (guestMode) {
@@ -1064,17 +1063,8 @@ export function AddDeckScreen({
       >
         <Header
           title={editingPasted ? "Edit deck" : "Review deck"}
-          LeftActionComponent={
-            <TouchableOpacity
-              testID="change-import-source"
-              accessibilityRole="button"
-              style={themed($plainAction)}
-              disabled={busy}
-              onPress={changeImportSource}
-            >
-              <Text size="sm" text="Change source" />
-            </TouchableOpacity>
-          }
+          leftTx="common:back"
+          onLeftPress={busy ? undefined : changeImportSource}
         />
         <ScrollView
           testID="pasted-deck-review"
@@ -1084,7 +1074,7 @@ export function AddDeckScreen({
         >
           <View style={themed($previewSummary)}>
             {editingPasted ? (
-              <>
+              <View style={themed($importFields)}>
                 <TextField
                   testID="deck-name-input"
                   label="Deck name"
@@ -1106,8 +1096,7 @@ export function AddDeckScreen({
                   options={deckFormats(game)}
                   onSelect={changeImportFormat}
                 />
-                {noteField}
-              </>
+              </View>
             ) : (
               <Text preset="subheading" text={name.trim() || "Imported deck"} />
             )}
@@ -1779,7 +1768,6 @@ export function AddDeckScreen({
                 setDeckList(next)
               }}
             />
-            {noteField}
             {saveRecovery}
             {pastedDraftCurrent ? (
               <Button
@@ -1850,6 +1838,7 @@ export function AddDeckScreen({
   )
 }
 
+const $importFields: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.md })
 const $stack: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.sm,
   marginTop: spacing.sm,

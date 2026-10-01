@@ -470,7 +470,7 @@ describe("AddDeckScreen", () => {
         }),
       ),
     )
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     expect(view.getByLabelText("Deck list").props.value).toBe(
       "2 Forest\n1 Island (M21) 265\n0 Mountain",
     )
@@ -513,7 +513,7 @@ describe("AddDeckScreen", () => {
         expect.objectContaining({ cards: [expect.objectContaining(known)] }),
       ),
     )
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     expect(view.getByLabelText("Deck list").props.value).toBe(source)
   })
 
@@ -522,7 +522,7 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterPasted(view, "2 Forest\n1 Forst")
     await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     fireEvent.changeText(view.getByLabelText("Deck list"), "3 Forest")
     mockResolvePasted.mockRejectedValueOnce(new Error("Unavailable"))
     fireEvent.press(view.getByTestId("review-import-button"))
@@ -542,11 +542,11 @@ describe("AddDeckScreen", () => {
     expect(mockImport).not.toHaveBeenCalled()
   })
 
-  it("replaces the form with review, then restores all fields through Change source", async () => {
+  it("replaces the form with review and restores its fields through Back without importing Build notes", async () => {
     mockResolvePasted.mockResolvedValueOnce(resolvedForest)
     const view = renderAddDeck()
-    chooseMode(view, "paste")
-    fireEvent.changeText(view.getByTestId("deck-note-input"), "Keep these notes")
+    chooseMode(view, "blank")
+    fireEvent.changeText(view.getByTestId("deck-note-input"), "Keep these Build notes")
     enterPasted(view)
     await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
     expect(view.getByText("Reviewed deck")).toBeTruthy()
@@ -557,11 +557,11 @@ describe("AddDeckScreen", () => {
     expect(view.queryByTestId("deck-name-input")).toBeNull()
     expect(view.queryByTestId("deck-note-input")).toBeNull()
     expect(view.getByTestId("save-import-button")).toBeEnabled()
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     expect(view.queryByTestId("pasted-deck-review")).toBeNull()
     expect(view.queryByTestId("save-import-button")).toBeNull()
     expect(view.getByTestId("deck-name-input").props.value).toBe("Reviewed deck")
-    expect(view.getByTestId("deck-note-input").props.value).toBe("Keep these notes")
+    expect(view.queryByTestId("deck-note-input")).toBeNull()
     expect(view.getByLabelText("Deck list").props.value).toBe("2 Forest")
     chooseFormat(view, "modern")
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Edited deck")
@@ -574,9 +574,11 @@ describe("AddDeckScreen", () => {
         expect.objectContaining({
           name: "Edited deck",
           format: "modern",
-          note: "Keep these notes",
         }),
       ),
+    )
+    expect(mockImport).not.toHaveBeenCalledWith(
+      expect.objectContaining({ note: expect.anything() }),
     )
   })
 
@@ -621,7 +623,7 @@ describe("AddDeckScreen", () => {
     expect(view.getByText("Replace saved deck…")).toBeTruthy()
     expect(view.getByTestId("save-import-button")).toBeDisabled()
     expect(loadGuestDeck()?.localId).toBe(saved.localId)
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     expect(view.getByLabelText("Deck list").props.value).toBe("2 Forest")
     expect(loadGuestDeck()?.localId).toBe(saved.localId)
   })
@@ -679,7 +681,7 @@ describe("AddDeckScreen", () => {
         }
       }
       expectSections()
-      fireEvent.press(view.getByTestId("change-import-source"))
+      fireEvent.press(view.getByRole("button", { name: "common:back" }))
       fireEvent.press(view.getByTestId("review-import-button"))
       await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
       expectSections()
@@ -851,7 +853,6 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByLabelText("Remove Island"))
     expect(view.getByText("Commander · 2 cards")).toBeTruthy()
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Edited islands")
-    fireEvent.changeText(view.getByTestId("deck-note-input"), "Keep this change")
     chooseFormat(view, "modern")
     fireEvent.press(view.getByTestId("import-add-cards"))
     fireEvent.changeText(view.getByTestId("card-search-input"), "Sol Ring")
@@ -869,7 +870,7 @@ describe("AddDeckScreen", () => {
     expect(view.getByText("2× Island")).toBeTruthy()
     expect(view.queryByText("1× Island")).toBeNull()
     expect(view.getByText("2× Sol Ring")).toBeTruthy()
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     expect(view.getByLabelText("Deck list").props.value).toBe(
       "2 Island (M21) 265\n1 Island (DMU) 278",
     )
@@ -882,7 +883,6 @@ describe("AddDeckScreen", () => {
         expect.objectContaining({
           name: "Edited islands",
           format: "modern",
-          note: "Keep this change",
           cards: [
             expect.objectContaining({ scryfallId: first.scryfallId, quantity: 2 }),
             expect.objectContaining({
@@ -913,9 +913,9 @@ describe("AddDeckScreen", () => {
     expect(view.getByLabelText("Increase Forest")).toBeDisabled()
     expect(view.getByLabelText("Decrease Forest")).toBeDisabled()
     expect(view.getByTestId("import-add-cards")).toBeDisabled()
-    expect(view.getByTestId("change-import-source")).toBeDisabled()
+    expect(view.getByRole("button", { name: "common:back" })).toBeDisabled()
     expect(view.getByTestId("deck-name-input").props.editable).toBe(false)
-    expect(view.getByTestId("deck-note-input").props.editable).toBe(false)
+    expect(view.queryByTestId("deck-note-input")).toBeNull()
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Late edit")
     expect(view.getByTestId("deck-name-input").props.value).toBe("Reviewed deck")
     await act(async () => finishSave?.("deck-imported"))
@@ -942,7 +942,7 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     enterPasted(view)
     await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     let finish: ((result: typeof resolvedForest) => void) | undefined
     mockResolvePasted.mockImplementationOnce(
       () =>
@@ -960,41 +960,35 @@ describe("AddDeckScreen", () => {
     expect(view.getByText("3× Forest")).toBeTruthy()
   })
 
-  it.each(["name", "note", "format"])(
-    "refreshes guest replacement after editing %s",
-    async (field) => {
-      saveGuestDeck({ name: "Original guest", game: "mtg", format: "commander", cards: [] })
-      mockResolvePasted.mockResolvedValueOnce(resolvedForest)
-      const view = render(
-        <ThemeProvider initialContext="dark">
-          <AddDeckScreen
-            onBack={jest.fn()}
-            onCreated={jest.fn()}
-            access={{ ready: false, loading: false, signedIn: false, request: jest.fn() }}
-          />
-        </ThemeProvider>,
-      )
-      enterPasted(view)
-      await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
-      fireEvent.press(view.getByTestId("save-import-button"))
-      expect(view.getByText("Replace saved deck…")).toBeTruthy()
-      fireEvent.press(view.getByTestId("edit-import-button"))
-      if (field === "name") fireEvent.changeText(view.getByTestId("deck-name-input"), "Fresh name")
-      else if (field === "note")
-        fireEvent.changeText(view.getByTestId("deck-note-input"), "Fresh note")
-      else chooseFormat(view, "modern")
-      expect(view.queryByText("Replace saved deck…")).toBeNull()
-      expect(view.getByTestId("save-import-button")).toBeEnabled()
-      fireEvent.press(view.getByTestId("save-import-button"))
-      fireEvent.press(view.getByText("Replace saved deck…"))
-      fireEvent.press(view.getByTestId("confirm-guest-replace-action"))
-      expect(loadGuestDeck()?.deck).toMatchObject({
-        name: field === "name" ? "Fresh name" : "Reviewed deck",
-        ...(field === "note" ? { note: "Fresh note" } : {}),
-        format: field === "format" ? "modern" : "commander",
-      })
-    },
-  )
+  it.each(["name", "format"])("refreshes guest replacement after editing %s", async (field) => {
+    saveGuestDeck({ name: "Original guest", game: "mtg", format: "commander", cards: [] })
+    mockResolvePasted.mockResolvedValueOnce(resolvedForest)
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <AddDeckScreen
+          onBack={jest.fn()}
+          onCreated={jest.fn()}
+          access={{ ready: false, loading: false, signedIn: false, request: jest.fn() }}
+        />
+      </ThemeProvider>,
+    )
+    enterPasted(view)
+    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
+    fireEvent.press(view.getByTestId("save-import-button"))
+    expect(view.getByText("Replace saved deck…")).toBeTruthy()
+    fireEvent.press(view.getByTestId("edit-import-button"))
+    if (field === "name") fireEvent.changeText(view.getByTestId("deck-name-input"), "Fresh name")
+    else chooseFormat(view, "modern")
+    expect(view.queryByText("Replace saved deck…")).toBeNull()
+    expect(view.getByTestId("save-import-button")).toBeEnabled()
+    fireEvent.press(view.getByTestId("save-import-button"))
+    fireEvent.press(view.getByText("Replace saved deck…"))
+    fireEvent.press(view.getByTestId("confirm-guest-replace-action"))
+    expect(loadGuestDeck()?.deck).toMatchObject({
+      name: field === "name" ? "Fresh name" : "Reviewed deck",
+      format: field === "format" ? "modern" : "commander",
+    })
+  })
 
   it("merges matching aliases while keeping sections and printings distinct", async () => {
     const forest = resolvedForest.cards[0]
@@ -1097,7 +1091,7 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
     expect(mockCardById).toHaveBeenCalledTimes(2)
     expect(mockImport).not.toHaveBeenCalled()
-    fireEvent.press(view.getByTestId("change-import-source", { includeHiddenElements: true }))
+    fireEvent.press(view.getByRole("button", { name: "common:back", includeHiddenElements: true }))
     expect(view.queryByTestId("card-focus-dialog")).toBeNull()
     expect(view.getByLabelText("Deck list").props.value).toBe(
       "2 Island (M21) 265\n1 Island (DMU) 278",
