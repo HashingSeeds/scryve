@@ -18,13 +18,24 @@
 /connected /play/connected  301
 /connected/* /play/connected/:splat  301
 /settings /play/settings  301
+/settings/* /play/settings  301
 /account /play/account  301
+/account/* /play/account  301
 /support /play/support  301
+/support/* /play/support  301
 /game-content-notices /play/game-content-notices  301
+/game-content-notices/* /play/game-content-notices  301
 /privacy /play/privacy  301
+/privacy/* /play/privacy  301
 /terms /play/terms  301
+/terms/* /play/terms  301
 /cookie-policy /play/cookie-policy  301
+/cookie-policy/* /play/cookie-policy  301
 /delete-account /play/delete-account  301
+/delete-account/* /play/delete-account  301
+
+# Trailing slashes on app routes (store listings and legal text link these pages)
+/play/:page/ /play/:page  301
 
 # SPA deep links: serve the app shell for each app route
 /play/join/* /play/  200
