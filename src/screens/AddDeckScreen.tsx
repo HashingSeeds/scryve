@@ -897,7 +897,7 @@ export function AddDeckScreen({
           showsVerticalScrollIndicator={false}
         >
           <View style={themed($previewSummary)}>
-            <Text preset="subheading" text={name || "Imported deck"} />
+            <Text preset="subheading" text={name.trim() || "Imported deck"} />
             <Text
               size="sm"
               style={themed($label)}
@@ -905,6 +905,7 @@ export function AddDeckScreen({
             />
           </View>
           {error ? <AlertNote text={error} /> : null}
+          {!name.trim() ? <AlertNote text="Add a deck name with Edit import." /> : null}
           {pastedProblems.length > 0 && !pastedDraft.omitted ? (
             <View style={themed($stack)}>
               <Text weight="bold" text="Fix or remove these lines" />

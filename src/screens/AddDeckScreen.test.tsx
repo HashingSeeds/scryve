@@ -573,6 +573,29 @@ describe("AddDeckScreen", () => {
     )
   })
 
+  it.each(["", "   "])(
+    "explains a missing name in review and restores editing for %p",
+    async (blankName) => {
+      mockResolvePasted.mockResolvedValue(resolvedForest)
+      const view = renderAddDeck()
+      chooseMode(view, "paste")
+      fireEvent.changeText(view.getByTestId("deck-name-input"), blankName)
+      fireEvent.changeText(view.getByLabelText("Deck list"), "2 Forest")
+      fireEvent.press(view.getByTestId("review-import-button"))
+      await waitFor(() => expect(view.getByText("Add a deck name with Edit import.")).toBeTruthy())
+      expect(view.getByText("Imported deck")).toBeTruthy()
+      expect(view.getByTestId("save-import-button")).toBeDisabled()
+      expect(mockImport).not.toHaveBeenCalled()
+      fireEvent.press(view.getByTestId("edit-import-button"))
+      expect(view.getByTestId("deck-name-input").props.value).toBe(blankName)
+      fireEvent.changeText(view.getByTestId("deck-name-input"), "Named forests")
+      fireEvent.press(view.getByTestId("review-import-button"))
+      await waitFor(() => expect(view.getByText("Named forests")).toBeTruthy())
+      expect(view.queryByText("Add a deck name with Edit import.")).toBeNull()
+      expect(view.getByTestId("save-import-button")).toBeEnabled()
+    },
+  )
+
   it("keeps guest replacement recovery available from the review", async () => {
     const saved = saveGuestDeck({ name: "Keep me", game: "mtg", format: "commander", cards: [] })
     mockResolvePasted.mockResolvedValueOnce(resolvedForest)
