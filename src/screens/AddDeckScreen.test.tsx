@@ -505,7 +505,6 @@ describe("AddDeckScreen", () => {
         expect.objectContaining({ cards: [expect.objectContaining(known)] }),
       ),
     )
-    expect(mockImport.mock.calls[0][0].cards).toHaveLength(1)
   })
 
   it("preserves the resolved draft and edited text when a repair request fails", async () => {
