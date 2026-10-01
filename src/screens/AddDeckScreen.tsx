@@ -53,8 +53,8 @@ type CapacityState = { status: "checking" } | { status: "ready"; capacity: DeckC
 
 const MODES: Array<{ id: CreationMode; label: string }> = [
   { id: "precon", label: "Browse" },
-  { id: "paste", label: "Paste" },
-  { id: "blank", label: "Empty" },
+  { id: "paste", label: "Import" },
+  { id: "blank", label: "Build" },
 ]
 
 const SEARCH_DEBOUNCE_MS = 350
@@ -232,8 +232,8 @@ function totalQuantity(cards: PreviewCard[]) {
   return cards.reduce((total, card) => total + card.quantity, 0)
 }
 
-export function catalogPreviewSections(
-  entries: FunctionReturnType<typeof api.deckCatalogs.detail>["entries"],
+export function catalogPreviewSections<Entry extends { section: string }>(
+  entries: Entry[],
   configured: readonly { id: string; label: string }[],
 ) {
   const knownIds = new Set(configured.map((section) => section.id))
@@ -310,6 +310,28 @@ export function AddDeckScreen({
   const [name, setName] = useState("")
   const [note, setNote] = useState("")
   const [deckList, setDeckList] = useState("")
+  const [pastedDraft, setPastedDraft] = useState<{
+    source: string
+    game: string
+    format: string
+    resolved: FunctionReturnType<typeof api.deckImports.resolvePasted>
+    omitted: boolean
+  }>()
+  const [resolvingPasted, setResolvingPasted] = useState(false)
+  const pastedToken = useRef(0)
+  const pastedDraftCurrent =
+    pastedDraft?.source === deckList && pastedDraft.game === game && pastedDraft.format === format
+  const pastedProblems = pastedDraft
+    ? [...pastedDraft.resolved.unresolved, ...pastedDraft.resolved.invalidLines]
+    : []
+  const pastedCards = pastedDraft
+    ? pastedDraft.resolved.cards.filter(
+        (card) =>
+          !pastedDraft.omitted ||
+          !("originalReference" in card) ||
+          !pastedDraft.resolved.unresolved.includes(card.originalReference),
+      )
+    : []
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
   const [catalogDecks, setCatalogDecks] = useState<CatalogDeck[]>([])
@@ -357,6 +379,7 @@ export function AddDeckScreen({
   useEffect(
     () => () => {
       previewToken.current += 1
+      pastedToken.current += 1
     },
     [],
   )
@@ -414,7 +437,16 @@ export function AddDeckScreen({
     }
   }
 
+  function invalidatePasted() {
+    pastedToken.current += 1
+    setResolvingPasted(false)
+    setError(undefined)
+    setGuestConflict(false)
+    setPendingGuestPayload(undefined)
+  }
+
   function chooseGame(next: string) {
+    invalidatePasted()
     previewToken.current += 1
     setPreviewRetryAfterMs(undefined)
     const nextFormat = defaultDeckFormat(next)
@@ -432,6 +464,7 @@ export function AddDeckScreen({
   }
 
   function chooseFormat(next: string) {
+    invalidatePasted()
     setDeckFormat(next)
     setFormat(next)
     setCatalogStatus("ready")
@@ -673,43 +706,54 @@ export function AddDeckScreen({
     }
   }
 
+  async function reviewPasted() {
+    if (!guestMode && access && !access.ready) {
+      access.request()
+      return
+    }
+    const token = ++pastedToken.current
+    setResolvingPasted(true)
+    setError(undefined)
+    try {
+      const resolved = await resolvePasted({ list: deckList, game })
+      if (pastedToken.current !== token) return
+      setPastedDraft({ source: deckList, game, format, resolved, omitted: false })
+    } catch (cause) {
+      if (pastedToken.current === token) fail(cause, "Could not resolve deck list. Try again.")
+    } finally {
+      if (pastedToken.current === token) setResolvingPasted(false)
+    }
+  }
+
   async function importPasted() {
+    if (
+      !pastedDraft ||
+      !pastedDraftCurrent ||
+      resolvingPasted ||
+      (!pastedDraft.omitted && pastedProblems.length > 0) ||
+      pastedCards.length === 0
+    )
+      return
     setSaveAttempted(true)
     if (!guestMode && access && !access.ready) {
       access.request()
       return
     }
     if (!capacityReady || atCapacity || waitingForGuest) return
+    const payload = {
+      name,
+      format,
+      game,
+      ...(note.trim() ? { note } : {}),
+      cards: importCards(pastedCards),
+    }
+    if (guestMode) {
+      saveGuest(payload)
+      return
+    }
     try {
       begin()
-      const resolved = await resolvePasted({ list: deckList, game })
-      const problems = [
-        resolved.unresolved.length
-          ? `Unmatched cards: ${resolved.unresolved.join(", ")}`
-          : undefined,
-        resolved.invalidLines.length
-          ? `Lines not understood: ${resolved.invalidLines.slice(0, 8).join(" | ")}`
-          : undefined,
-      ].filter((problem): problem is string => problem !== undefined)
-      if (problems.length) {
-        setError(problems.join(". "))
-        return
-      }
-      const payload = {
-        name,
-        format,
-        game,
-        ...(note.trim() ? { note } : {}),
-        cards: importCards(resolved.cards),
-      }
-      if (guestMode) {
-        saveGuest(payload)
-        return
-      }
       const deckId = await createImportedDeck(payload)
-      setName("")
-      setNote("")
-      setDeckList("")
       onCreated(deckId)
     } catch (cause) {
       fail(cause, "Could not import deck list")
@@ -1183,7 +1227,10 @@ export function AddDeckScreen({
               accessibilityRole="tab"
               accessibilityState={{ selected: mode === candidate.id }}
               style={[themed($tab), mode === candidate.id && themed($selectedTab)]}
-              onPress={() => setMode(candidate.id)}
+              onPress={() => {
+                invalidatePasted()
+                setMode(candidate.id)
+              }}
             >
               <Text text={candidate.label} weight={mode === candidate.id ? "bold" : "normal"} />
             </TouchableOpacity>
@@ -1312,30 +1359,102 @@ export function AddDeckScreen({
               numberOfLines={12}
               textAlignVertical="top"
               maxLength={50_000}
-              onChangeText={setDeckList}
+              onChangeText={(next) => {
+                invalidatePasted()
+                setDeckList(next)
+              }}
             />
             {noteField}
             {saveRecovery}
             <Button
+              testID="review-import-button"
               text={
-                busy
+                resolvingPasted
                   ? "Resolving cards…"
-                  : guestMode
-                    ? "Save deck on this device"
-                    : "Import deck list"
+                  : pastedDraft
+                    ? "Review changes"
+                    : "Review deck list"
               }
               preset="reversed"
-              disabled={
-                busy ||
-                (!capacityReady && !canRequestAccess) ||
-                (atCapacity && saveAttempted) ||
-                guestBlocked ||
-                waitingForGuest ||
-                !name.trim() ||
-                !deckList.trim()
-              }
-              onPress={importPasted}
+              disabled={busy || resolvingPasted || !deckList.trim()}
+              onPress={reviewPasted}
             />
+            {pastedDraft ? (
+              <View testID="pasted-deck-review" style={themed($stack)}>
+                <Text preset="subheading" accessibilityRole="header" text="Review deck" />
+                <Text
+                  text={cardCountLabel(
+                    pastedCards.reduce((total, card) => total + card.quantity, 0),
+                  )}
+                />
+                {!pastedDraftCurrent ? (
+                  <AlertNote text="The list, system, or format changed. Review changes before saving." />
+                ) : null}
+                {catalogPreviewSections(
+                  pastedCards.map((card) => ({
+                    ...card,
+                    section: "board" in card ? card.board : card.section,
+                  })),
+                  deckSections(pastedDraft.game, pastedDraft.format),
+                ).map((section) => {
+                  const cards = section.entries
+                  return (
+                    <View key={section.id}>
+                      <View style={themed($previewSectionHeader)}>
+                        <Text weight="bold" text={section.label} />
+                        <Text text={`${cards.reduce((total, card) => total + card.quantity, 0)}`} />
+                      </View>
+                      {cards.map((card, index) => (
+                        <View key={`${card.name}:${index}`} style={themed($previewCardRow)}>
+                          <Text text={`${card.quantity}× ${card.name}`} />
+                        </View>
+                      ))}
+                    </View>
+                  )
+                })}
+                {pastedProblems.length > 0 && !pastedDraft.omitted ? (
+                  <View style={themed($stack)}>
+                    <Text weight="bold" text="Fix or remove these lines" />
+                    {pastedDraft.resolved.unresolved.map((line, index) => (
+                      <Text key={`unmatched:${index}`} text={`Unmatched: ${line}`} />
+                    ))}
+                    {pastedDraft.resolved.invalidLines.map((line, index) => (
+                      <Text key={`invalid:${index}`} text={`Not understood: ${line}`} />
+                    ))}
+                    <Text text="Correct the list above, then review changes." />
+                    <Button
+                      testID="omit-import-problems"
+                      text="Remove unmatched and invalid lines"
+                      disabled={!pastedDraftCurrent || busy || resolvingPasted}
+                      onPress={() => setPastedDraft({ ...pastedDraft, omitted: true })}
+                    />
+                  </View>
+                ) : null}
+                {pastedDraft.omitted ? (
+                  <AlertNote
+                    text={`${pastedProblems.length} unmatched or invalid line${pastedProblems.length === 1 ? "" : "s"} removed from this import. Original text kept above.`}
+                  />
+                ) : null}
+                <Button
+                  testID="save-import-button"
+                  text={busy ? "Saving…" : guestMode ? "Save deck on this device" : "Save deck"}
+                  preset="reversed"
+                  disabled={
+                    busy ||
+                    resolvingPasted ||
+                    !pastedDraftCurrent ||
+                    (!pastedDraft.omitted && pastedProblems.length > 0) ||
+                    pastedCards.length === 0 ||
+                    !name.trim() ||
+                    (!capacityReady && !canRequestAccess) ||
+                    (atCapacity && saveAttempted) ||
+                    guestBlocked ||
+                    waitingForGuest
+                  }
+                  onPress={importPasted}
+                />
+              </View>
+            ) : null}
           </View>
         ) : null}
 

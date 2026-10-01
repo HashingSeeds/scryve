@@ -278,7 +278,7 @@ describe("AddDeckScreen", () => {
     chooseMode(view, "paste")
     fireEvent.changeText(view.getByTestId("deck-name-input"), "My draft")
     fireEvent.changeText(view.getByLabelText("Deck list"), "1 Sol Ring")
-    fireEvent.press(view.getByText("Import deck list"))
+    fireEvent.press(view.getByText("Review deck list"))
     expect(request).toHaveBeenCalledTimes(1)
     expect(mockResolvePasted).not.toHaveBeenCalled()
     view.rerender(renderForm(true))
@@ -403,6 +403,10 @@ describe("AddDeckScreen", () => {
     chooseMode(view, "paste")
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Guest Forests")
     fireEvent.changeText(view.getByLabelText("Deck list"), "60 Forest")
+    fireEvent.press(view.getByText("Review deck list"))
+    await waitFor(() => expect(view.getByText("60× Forest")).toBeTruthy())
+    expect(loadGuestDeck()).toBeUndefined()
+    expect(onCreated).not.toHaveBeenCalled()
     fireEvent.press(view.getByText("Save deck on this device"))
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith("guest"))
     expect(loadGuestDeck()?.deck).toMatchObject({
@@ -413,6 +417,142 @@ describe("AddDeckScreen", () => {
     expect(request).not.toHaveBeenCalled()
     expect(mockImport).not.toHaveBeenCalled()
   })
+
+  const resolvedForest = {
+    cards: [
+      {
+        name: "Forest",
+        quantity: 2,
+        board: "main",
+        oracleId: "forest-oracle",
+        scryfallId: "forest-print",
+      },
+    ],
+    unresolved: [],
+    invalidLines: [],
+  }
+
+  function enterPasted(view: ReturnType<typeof renderAddDeck>, list = "2 Forest") {
+    chooseMode(view, "paste")
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Reviewed deck")
+    fireEvent.changeText(view.getByLabelText("Deck list"), list)
+    fireEvent.press(view.getByTestId("review-import-button"))
+  }
+
+  it("keeps a partial review for correction and requires explicit removal before saving", async () => {
+    mockResolvePasted.mockResolvedValueOnce({
+      ...resolvedForest,
+      unresolved: ["Island (M21) 265"],
+      invalidLines: ["0 Mountain"],
+    })
+    const view = renderAddDeck()
+    enterPasted(view, "2 Forest\n1 Island (M21) 265\n0 Mountain")
+    await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
+    expect(view.getByText("Unmatched: Island (M21) 265")).toBeTruthy()
+    expect(view.getByText("Not understood: 0 Mountain")).toBeTruthy()
+    expect(view.getByTestId("save-import-button")).toBeDisabled()
+    expect(mockImport).not.toHaveBeenCalled()
+    fireEvent.press(view.getByTestId("omit-import-problems"))
+    expect(view.getByText(/2 unmatched or invalid lines removed/)).toBeTruthy()
+    expect(view.getByLabelText("Deck list").props.value).toBe(
+      "2 Forest\n1 Island (M21) 265\n0 Mountain",
+    )
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cards: [expect.objectContaining({ name: "Forest", quantity: 2 })],
+        }),
+      ),
+    )
+  })
+
+  it("removes unmatched generic cards while preserving a matched printing with the same name", async () => {
+    const known = {
+      game: "pokemon",
+      name: "Pikachu",
+      quantity: 2,
+      section: "main",
+      entryKind: "card",
+      originalReference: "Pikachu SVI 63",
+      cardId: "sv1-63",
+    }
+    const unmatched = {
+      ...known,
+      quantity: 1,
+      originalReference: "Pikachu BAD 99",
+      cardId: undefined,
+    }
+    mockResolvePasted.mockResolvedValueOnce({
+      cards: [known, unmatched],
+      unresolved: [unmatched.originalReference],
+      invalidLines: [],
+    })
+    const view = renderAddDeck()
+    chooseGame(view, "pokemon")
+    const source = "2 Pikachu SVI 63\n1 Pikachu BAD 99"
+    enterPasted(view, source)
+    await waitFor(() => expect(view.getByText("1× Pikachu")).toBeTruthy())
+    expect(view.getByTestId("save-import-button")).toBeDisabled()
+    fireEvent.press(view.getByTestId("omit-import-problems"))
+    expect(view.queryByText("1× Pikachu")).toBeNull()
+    expect(view.getByText("2× Pikachu")).toBeTruthy()
+    expect(view.getByText("2 cards")).toBeTruthy()
+    expect(view.getByLabelText("Deck list").props.value).toBe(source)
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(
+        expect.objectContaining({ cards: [expect.objectContaining(known)] }),
+      ),
+    )
+    expect(mockImport.mock.calls[0][0].cards).toHaveLength(1)
+  })
+
+  it("preserves the resolved draft and edited text when a repair request fails", async () => {
+    mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, unresolved: ["Forst"] })
+    const view = renderAddDeck()
+    enterPasted(view, "2 Forest\n1 Forst")
+    await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
+    fireEvent.changeText(view.getByLabelText("Deck list"), "3 Forest")
+    mockResolvePasted.mockRejectedValueOnce(new Error("Unavailable"))
+    fireEvent.press(view.getByTestId("review-import-button"))
+    await waitFor(() =>
+      expect(view.getByText("Could not resolve deck list. Try again.")).toBeTruthy(),
+    )
+    expect(view.getByText("2× Forest")).toBeTruthy()
+    expect(view.getByLabelText("Deck list").props.value).toBe("3 Forest")
+    expect(view.getByTestId("save-import-button")).toBeDisabled()
+    mockResolvePasted.mockResolvedValueOnce({
+      ...resolvedForest,
+      cards: [{ ...resolvedForest.cards[0], quantity: 3 }],
+    })
+    fireEvent.press(view.getByTestId("review-import-button"))
+    await waitFor(() => expect(view.getByText("3× Forest")).toBeTruthy())
+    expect(view.getByTestId("save-import-button")).toBeEnabled()
+    expect(mockImport).not.toHaveBeenCalled()
+  })
+
+  it.each(["input", "format", "game"])(
+    "ignores a resolution completed after changing %s",
+    async (change) => {
+      let finish: ((result: typeof resolvedForest) => void) | undefined
+      mockResolvePasted.mockImplementationOnce(
+        () =>
+          new Promise<typeof resolvedForest>((resolve) => {
+            finish = resolve
+          }),
+      )
+      const view = renderAddDeck()
+      enterPasted(view)
+      if (change === "input") fireEvent.changeText(view.getByLabelText("Deck list"), "3 Forest")
+      else if (change === "format") chooseFormat(view, "modern")
+      else chooseGame(view, "ygo")
+      await act(async () => finish?.(resolvedForest))
+      expect(view.queryByTestId("pasted-deck-review")).toBeNull()
+      expect(mockImport).not.toHaveBeenCalled()
+      if (change === "input") expect(view.getByLabelText("Deck list").props.value).toBe("3 Forest")
+    },
+  )
 
   it("shows Magic examples and official decks together with source labels", async () => {
     mockSearchTopDecks.mockResolvedValueOnce([
