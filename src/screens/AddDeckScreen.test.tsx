@@ -1373,7 +1373,6 @@ describe("AddDeckScreen", () => {
       expect(view.getByTestId("pasted-deck-review")).toBeTruthy()
       expect(view.queryByTestId("archidekt-url-input")).toBeNull()
       fireEvent.press(view.getByLabelText("Decrease Forest"))
-      fireEvent.changeText(view.getByTestId("deck-note-input"), "Try four copies")
       expect(view.getByTestId("save-import-button")).toBeEnabled()
       fireEvent.press(view.getByTestId("save-import-button"))
       await waitFor(() =>
@@ -1383,7 +1382,7 @@ describe("AddDeckScreen", () => {
         name: "Public Forests",
         format: "modern",
         game: "mtg",
-        note: "Try four copies\n\nImported from Archidekt by ForestPlayer\nhttps://archidekt.com/decks/12345",
+        note: "Imported from Archidekt by ForestPlayer\nhttps://archidekt.com/decks/12345",
         cards: [expect.objectContaining({ name: "Forest", quantity: 1 })],
       }
       if (owner === "account")
@@ -1399,7 +1398,7 @@ describe("AddDeckScreen", () => {
     enterLink(view)
     await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
     expect(view.getByText("Modern · 2 cards")).toBeTruthy()
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     chooseFormat(view, "standard")
     expect(view.queryByTestId("save-import-button")).toBeNull()
     fireEvent.press(view.getByTestId("review-import-button"))
@@ -1425,7 +1424,7 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByTestId("import-card-commander-0")).toBeTruthy())
     fireEvent.press(view.getByTestId("edit-import-button"))
     chooseFormat(view, "modern")
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     fireEvent.press(view.getByTestId("review-import-button"))
     await waitFor(() => expect(mockResolveArchidekt).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(view.getByTestId("save-import-button")).toBeEnabled())
@@ -1494,7 +1493,6 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     chooseMode(view, "paste")
     fireEvent.changeText(view.getByTestId("deck-name-input"), "My forests")
-    fireEvent.changeText(view.getByTestId("deck-note-input"), "Keep this plan")
     enterLink(view)
     await waitFor(() => expect(view.getByText("My forests")).toBeTruthy())
     expect(view.getByText("Modern · 2 cards")).toBeTruthy()
@@ -1503,12 +1501,11 @@ describe("AddDeckScreen", () => {
     expect(view.queryByTestId("deck-note-input")).toBeNull()
     fireEvent.press(view.getByTestId("edit-import-button"))
     fireEvent.press(view.getByLabelText("Increase Forest"))
-    fireEvent.press(view.getByTestId("change-import-source"))
+    fireEvent.press(view.getByRole("button", { name: "common:back" }))
     expect(view.queryByTestId("pasted-deck-review")).toBeNull()
     expect(view.queryByTestId("save-import-button")).toBeNull()
     expect(view.getByTestId("archidekt-url-input").props.value).toBe(resolvedArchidekt.sourceUrl)
     expect(view.getByTestId("deck-name-input").props.value).toBe("My forests")
-    expect(view.getByTestId("deck-note-input").props.value).toBe("Keep this plan")
     expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
       "Format, Modern",
     )
@@ -1521,30 +1518,19 @@ describe("AddDeckScreen", () => {
     expect(mockImport).not.toHaveBeenCalled()
   })
 
-  it("recovers overflowing Archidekt notes through Edit deck without losing source attribution", async () => {
+  it("keeps Archidekt attribution separate from existing Build notes", async () => {
     mockResolveArchidekt.mockResolvedValue(resolvedArchidekt)
     const view = renderAddDeck()
-    chooseMode(view, "paste")
+    chooseMode(view, "blank")
     fireEvent.changeText(view.getByTestId("deck-note-input"), "x".repeat(1000))
     enterLink(view)
     await waitFor(() => expect(view.getByText("2× Forest")).toBeTruthy())
-    expect(
-      view.getByText("Shorten notes to leave room for the Archidekt source. Choose Edit deck."),
-    ).toBeTruthy()
-    expect(view.getByTestId("save-import-button")).toBeDisabled()
-    expect(mockImport).not.toHaveBeenCalled()
-    fireEvent.press(view.getByTestId("edit-import-button"))
-    expect(view.getByTestId("deck-note-input").props.value).toHaveLength(1000)
-    fireEvent.changeText(view.getByTestId("deck-note-input"), "Short notes")
     expect(view.getByTestId("save-import-button")).toBeEnabled()
-    expect(
-      view.queryByText("Shorten notes to leave room for the Archidekt source. Choose Edit deck."),
-    ).toBeNull()
     fireEvent.press(view.getByTestId("save-import-button"))
     await waitFor(() =>
       expect(mockImport).toHaveBeenCalledWith(
         expect.objectContaining({
-          note: "Short notes\n\nImported from Archidekt by ForestPlayer\nhttps://archidekt.com/decks/12345",
+          note: "Imported from Archidekt by ForestPlayer\nhttps://archidekt.com/decks/12345",
         }),
       ),
     )

@@ -382,11 +382,6 @@ export function AddDeckScreen({
   const sourceAttribution = pastedDraft?.attribution
     ? `Imported from Archidekt by ${pastedDraft.attribution.author}\n${pastedDraft.attribution.sourceUrl}`
     : ""
-  const importNote = [note.trim(), sourceAttribution].filter(Boolean).join("\n\n")
-  const noteLimit =
-    mode === "paste" && importKind === "link" && sourceAttribution
-      ? 1000 - sourceAttribution.length - 2
-      : 1000
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
   const [catalogDecks, setCatalogDecks] = useState<CatalogDeck[]>([])
@@ -947,8 +942,7 @@ export function AddDeckScreen({
       !pastedDraftCurrent ||
       resolvingPasted ||
       (!pastedDraft.omitted && pastedProblems.length > 0) ||
-      pastedCards.length === 0 ||
-      importNote.length > 1000
+      pastedCards.length === 0
     )
       return
     setSaveAttempted(true)
@@ -961,7 +955,7 @@ export function AddDeckScreen({
       name,
       format,
       game,
-      ...(importNote ? { note: importNote } : {}),
+      ...(sourceAttribution ? { note: sourceAttribution } : {}),
       cards: pastedCards,
     }
     if (guestMode) {
@@ -988,12 +982,7 @@ export function AddDeckScreen({
       multiline
       numberOfLines={3}
       textAlignVertical="top"
-      maxLength={noteLimit}
-      helper={
-        note.length > noteLimit
-          ? "Shorten notes to leave room for the Archidekt source."
-          : undefined
-      }
+      maxLength={1000}
       editable={!busy}
       onChangeText={(next) => {
         if (busy) return
@@ -1320,7 +1309,6 @@ export function AddDeckScreen({
                 !pastedDraftCurrent ||
                 (!pastedDraft.omitted && pastedProblems.length > 0) ||
                 pastedCards.length === 0 ||
-                importNote.length > 1000 ||
                 !name.trim() ||
                 (!capacityReady && !canRequestAccess) ||
                 (atCapacity && saveAttempted) ||
