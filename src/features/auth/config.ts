@@ -1,5 +1,7 @@
 import { normalizeHttpsOrigin } from "@/utils/httpsOrigin"
 
+export const APP_ROOT_URL = `${process.env.EXPO_BASE_URL ?? ""}/`
+
 export interface PublicCloudConfig {
   clerkPublishableKey: string
   convexUrl: string

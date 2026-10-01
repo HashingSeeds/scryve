@@ -103,24 +103,24 @@ pnpm run test:maestro        # all flows
 
 The flows, conventions, and troubleshooting notes live in [`.maestro/README.md`](.maestro/README.md).
 
-## Web wait-list gate
+## Marketing site and web app layout
 
-The production Pages deployment uses `functions/_middleware.ts` to admit signed-in Clerk users and
-redirect everyone else to `/waitlist/`. The gate is disabled unless the production Pages environment
-sets `WAITLIST_GATE_ENABLED=true`, so local and preview deployments remain open.
-
-Preview the wait-list source with live reload at `http://localhost:8788/waitlist/`:
+The public site at `https://scryve.sow.care/` is a static Astro project in `site/`. The Expo web app
+is exported with the base path `/play`, so it lives at `https://scryve.sow.care/play`. Invite links
+stay `https://scryve.sow.care/join/<token>` (native app links claim `/join`) and redirect to
+`/play/join/<token>` on the web.
 
 ```bash
-pnpm waitlist
+pnpm site:dev    # run the marketing site locally
+pnpm site:build  # build it to site/dist
 ```
 
-The production Pages environment also needs `APP_ORIGIN`, `CLERK_SECRET_KEY`,
-`TURNSTILE_SECRET_KEY`, `TURNSTILE_HOSTNAMES=scryve.sow.care`, and `WAITLIST_INGEST_SECRET`, along with the existing
-`EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` and `EXPO_PUBLIC_CONVEX_SITE_URL`. Set the same
-`WAITLIST_INGEST_SECRET` in the production Convex deployment. The public Turnstile site key is
-embedded in the wait-list page. The static page gets its Clerk Account Portal sign-in URL from
-`EXPO_PUBLIC_CLERK_SIGN_IN_URL` during `scripts/prepare-web-deploy.cjs`.
+`SCRYVE_WEB_BASE_URL=/play` is set only by the web export scripts (`bundle:web`, `bundle:web:prod`,
+`build:web:pages`). Native builds, EAS, and `pnpm web` do not use a base path.
+
+`scripts/prepare-web-deploy.cjs` assembles the Cloudflare Pages output in `dist/`: the site at the
+root, the Expo export under `dist/play/`, and `web/_redirects` as `dist/_redirects`. Add a rewrite
+for any new top-level route in `src/app` to `web/_redirects` so deep links return 200.
 
 For a Git-connected Cloudflare Pages project, use `pnpm build:web:pages` as the build command and
 `dist` as the build output directory.

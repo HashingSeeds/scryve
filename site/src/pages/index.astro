@@ -1,0 +1,188 @@
+---
+import qrcode from "qrcode"
+
+import appIcon from "../../../assets/images/app-icon-ios.png?url"
+import GetTheApp from "../components/GetTheApp.astro"
+import Base from "../layouts/Base.astro"
+import { APP_LINKS } from "../links"
+
+const qr = await qrcode.toString(new URL("/", Astro.site).href, {
+  type: "svg",
+  margin: 2,
+  color: { dark: "#000000", light: "#ffffff" },
+})
+
+const versions = [
+  { name: "Current", record: "6W 1L", rate: 86 },
+  { name: "Proliferate package", record: "5W 3L 1D", rate: 56 },
+  { name: "Budget swap", record: "3W 5L", rate: 38 },
+]
+const cards = ["Sol Ring", "Arcane Signet", "Fellwar Stone", "Mind Stone", "Cultivate"]
+const plans = [
+  ["Life counter for 2 to 6 players", "Yes", "Yes"],
+  ["Connected play", "Yes", "Yes"],
+  ["Game history", "Yes", "Yes"],
+  ["Decks", "1 on this device, 2 with an account", "100"],
+  ["Versions per deck", "1", "5"],
+  ["Win rate by deck and version", "No", "Yes"],
+]
+---
+
+<Base
+  title="Scryve: life counter and deck tracker for Magic, Yu-Gi-Oh!, and Pokémon"
+  description="A fast life counter for 2 to 6 players with commander damage, connected games across phones, and deck tracking. Works offline. Play in your browser or on iPhone and Android."
+>
+  <header class="header">
+    <a class="brand" href="/"><img src={appIcon} alt="" width="30" height="30" />Scryve</a>
+    <nav class="header-nav" aria-label="Sections">
+      <a href="#features">Features</a>
+      <a href="#connected">Connected play</a>
+      <a href="#pro">Pro</a>
+    </nav>
+    <div class="header-actions">
+      <a class="quiet" href={APP_LINKS.account}>Sign in</a>
+      <a class="button small" href={APP_LINKS.play}>Play in browser</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" data-hero aria-label="Live life counter">
+      <div class="hero-board" data-hero-board></div>
+      <div class="hero-menu" data-hero-menu hidden>
+        <div class="ring" role="menu" aria-label="Game menu">
+          <button type="button" role="menuitem" data-act="players" style="--action:#77558A">
+            Players<small data-show="players">4</small>
+          </button>
+          <button type="button" role="menuitem" data-act="system" style="--action:#41476E">
+            Game<small data-show="system">Magic</small>
+          </button>
+          <button type="button" class="close" role="menuitem" data-act="close" aria-label="Close menu">×</button>
+          <button type="button" role="menuitem" data-act="undo" style="--action:#39755C">Undo</button>
+          <button type="button" role="menuitem" data-act="end" style="--action:#C03403">End game</button>
+        </div>
+      </div>
+    </section>
+    <div class="hero-foot">
+      <h1>The life counter for Magic, Yu-Gi-Oh!, and Pokémon. <span>Tap a total. Open the menu to change players or games.</span></h1>
+      <GetTheApp />
+    </div>
+
+    <div class="tour">
+      <div class="steps">
+        <section data-scene="intro" aria-label="Platforms">
+          <div class="step" data-step="intro">
+            <h2>On the table in seconds.</h2>
+            <p>Open Scryve in your browser, or install it on iPhone, iPad, or Android. Local games need no account.</p>
+          </div>
+        </section>
+
+        <section id="features" data-scene="features" aria-label="Features">
+          <div class="step" data-step="players">
+            <h2>Two to six players.</h2>
+            <p>Pick the layout that matches how you sit.</p>
+            <div class="picker" data-pick="count" role="group" aria-label="Players">
+              {[2, 3, 4, 5, 6].map((count) => (
+                <button type="button" data-value={count} aria-pressed={String(count === 5)}>{count}</button>
+              ))}
+            </div>
+            <div class="picker" data-pick="layout" role="group" aria-label="Layout"></div>
+          </div>
+          <div class="step" data-step="commander">
+            <h2>Commander damage, per opponent.</h2>
+            <p>Every seat tracks damage from each commander at the table. At 21 from one commander, that player is out.</p>
+          </div>
+          <div class="step" data-step="systems">
+            <h2>Magic, Yu-Gi-Oh!, and Pokémon.</h2>
+            <p>Life, Life Points, or prize cards, with each game's formats built in.</p>
+            <div class="picker" data-pick="system" role="group" aria-label="Game"></div>
+          </div>
+          <div class="step" data-step="offline">
+            <h2>Works offline.</h2>
+            <p>Games live on your device. Sign in when you want sync, your decks on every device, and connected play.</p>
+          </div>
+        </section>
+
+        <section id="connected" data-scene="connected" aria-label="Connected play">
+          <div class="step" data-step="join">
+            <h2>One game, every phone.</h2>
+            <p>Players join from their own phones with a six-character code, a QR code, or a link. Tap either phone.</p>
+          </div>
+          <div class="step" data-step="seats">
+            <h2>Seats, colors, and marks.</h2>
+            <p>Everyone picks a seat, a color, and a mark before the host starts the game.</p>
+            <p class="note">Connected games need an account and a username. You can block or report any player.</p>
+          </div>
+        </section>
+
+        <section id="pro" data-scene="pro" aria-label="Decks and Scryve Pro">
+          <div class="step" data-step="decks">
+            <h2>Decks that keep score.</h2>
+            <p>Paste a list or import a public Archidekt deck, then pick your commander. Every finished game counts toward the deck's record.</p>
+          </div>
+          <div class="step" data-step="plans">
+            <h2>Free, or Pro.</h2>
+            <table class="plans">
+              <thead><tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">Free</th><th scope="col">Scryve Pro</th></tr></thead>
+              <tbody>
+                {plans.map(([feature, free, pro]) => (
+                  <tr><th scope="row">{feature}</th><td>{free}</td><td>{pro}</td></tr>
+                ))}
+              </tbody>
+            </table>
+            <p class="note">Pro is monthly or yearly. Upgrade from Account in the app.</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="stage" data-stage data-scene="intro" data-step="intro" aria-hidden="true">
+        <div class="rig">
+          <div class="phone main">
+            <div class="screen">
+              <div class="scene-screen" data-for="intro features">
+                <div class="board-holder" data-board="features"></div>
+                <span class="offline">Offline</span>
+              </div>
+              <div class="scene-screen" data-for="connected"><div class="board-holder" data-board="connected"></div></div>
+              <div class="scene-screen deck" data-for="pro">
+                <div class="deck-top"><span>Back</span><b>Deck</b><span>Edit</span></div>
+                <div class="deck-name">Atraxa Counters</div>
+                <div class="deck-meta">Magic · Commander · 100 cards</div>
+                <div class="deck-record"><b>58%</b><span>58% win rate · 14W 9L 1D over 24 games</span></div>
+                <div class="deck-label">Versions</div>
+                {versions.map((version) => (
+                  <div class="deck-row version">
+                    <span>{version.name}</span>
+                    <span class="bar"><span style={`width:${version.rate}%`}></span></span>
+                    <em>{version.record}</em>
+                  </div>
+                ))}
+                <div class="deck-label">Commander</div>
+                <div class="deck-row"><span>Atraxa, Praetors' Voice</span><em>1×</em></div>
+                <div class="deck-label">Main deck <em>99</em></div>
+                {cards.map((card) => <div class="deck-row"><span>{card}</span><em>1×</em></div>)}
+              </div>
+            </div>
+          </div>
+          <div class="phone second">
+            <div class="screen"><div class="board-holder" data-board="connected"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="closing">
+      <div>
+        <h2>Your next game starts here.</h2>
+        <GetTheApp />
+      </div>
+      <figure class="qr">
+        <Fragment set:html={qr} />
+        <figcaption>Scan to open on your phone</figcaption>
+      </figure>
+    </section>
+  </main>
+</Base>
+
+<script>
+  import "../stage/page"
+</script>

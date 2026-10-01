@@ -1,0 +1,43 @@
+# Cloudflare Pages routing. Order matters: first match wins, and a 200 rule applies even
+# when a static file exists at the path, so rewrites are limited to app routes and never
+# cover /play/_expo or /play/assets. Any other /play/* path falls back to play/404.html
+# (the app shell), see scripts/prepare-web-deploy.cjs. Add a rewrite here for new top-level
+# routes in src/app to keep them returning 200.
+
+# Retired wait-list
+/waitlist /  301
+/waitlist/* /  301
+
+# Invite links stay public at /join/<token> (native app links claim /join); the web app lives at /play.
+/join/:token /play/join/:token  302
+
+# Old web app URLs (also linked from store listings and legal text)
+/history /play/history  301
+/history/* /play/history/:splat  301
+/game/* /play/game/:splat  301
+/connected /play/connected  301
+/connected/* /play/connected/:splat  301
+/settings /play/settings  301
+/account /play/account  301
+/support /play/support  301
+/game-content-notices /play/game-content-notices  301
+/privacy /play/privacy  301
+/terms /play/terms  301
+/cookie-policy /play/cookie-policy  301
+/delete-account /play/delete-account  301
+
+# SPA deep links: serve the app shell for each app route
+/play/join/* /play/  200
+/play/history /play/  200
+/play/history/* /play/  200
+/play/game/* /play/  200
+/play/connected /play/  200
+/play/connected/* /play/  200
+/play/settings /play/  200
+/play/account /play/  200
+/play/support /play/  200
+/play/game-content-notices /play/  200
+/play/privacy /play/  200
+/play/terms /play/  200
+/play/cookie-policy /play/  200
+/play/delete-account /play/  200

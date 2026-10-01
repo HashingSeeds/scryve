@@ -1,0 +1,72 @@
+---
+import bold from "@expo-google-fonts/space-grotesk/700Bold/SpaceGrotesk_700Bold.ttf?url"
+import medium from "@expo-google-fonts/space-grotesk/500Medium/SpaceGrotesk_500Medium.ttf?url"
+import regular from "@expo-google-fonts/space-grotesk/400Regular/SpaceGrotesk_400Regular.ttf?url"
+
+import favicon from "../../../assets/images/app-icon-web-favicon.png?url"
+import shareImage from "../../../assets/images/app-icon-all.png?url"
+import { APP_LINKS, APP_STORE_ID } from "../links"
+import "../styles/site.css"
+
+interface Props {
+  title: string
+  description: string
+}
+
+const { title, description } = Astro.props
+const canonical = new URL(Astro.url.pathname, Astro.site)
+const fonts = [
+  { url: regular, weight: 400 },
+  { url: medium, weight: 500 },
+  { url: bold, weight: 700 },
+]
+const fontFaces = fonts
+  .map(
+    ({ url, weight }) =>
+      `@font-face{font-family:"Space Grotesk";src:url("${url}") format("truetype");font-weight:${weight};font-display:swap}`,
+  )
+  .join("")
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={favicon} />
+    <link rel="apple-touch-icon" href={shareImage} />
+    <meta name="apple-itunes-app" content={`app-id=${APP_STORE_ID}`} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL(shareImage, Astro.site)} />
+    <meta name="twitter:card" content="summary" />
+    <link rel="preload" href={medium} as="font" type="font/ttf" crossorigin />
+    <style set:html={fontFaces}></style>
+  </head>
+  <body>
+    <slot />
+    <footer class="footer">
+      <nav aria-label="Legal and support">
+        <a href={APP_LINKS.privacy}>Privacy</a>
+        <a href={APP_LINKS.terms}>Terms</a>
+        <a href={APP_LINKS.cookies}>Cookie policy</a>
+        <a href={APP_LINKS.support}>Support</a>
+        <a href={APP_LINKS.deleteAccount}>Delete account</a>
+      </nav>
+      <p>
+        Scryve is unofficial Fan Content permitted under the Fan Content Policy. Not approved or
+        endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast.
+        ©Wizards of the Coast LLC. Yu-Gi-Oh! and Pokémon are trademarks of their respective owners;
+        Scryve is not affiliated with them.
+      </p>
+      <p>© {new Date().getFullYear()} Hashing Seeds LLC</p>
+    </footer>
+  </body>
+</html>
