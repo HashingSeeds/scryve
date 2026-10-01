@@ -366,30 +366,28 @@ figure {
   filter: drop-shadow(0 6px 14px rgb(0 0 0 / 50%));
 }
 
-/* ---------- hero ---------- */
+/* ---------- hero: an empty slot the stage's phone fills until it lands (stage/page.ts) ---------- */
 
 .hero {
-  position: relative;
   height: calc(100svh - var(--header) - 96px);
   min-height: 440px;
-  padding: 0 clamp(8px, 1vw, 14px);
+  padding: 12px var(--gutter) 0;
 }
 
-.hero-board {
-  --seat-radius: 28px;
-  --pentagon: 5.5%;
+.hero-slot {
+  height: 100%;
 }
 
-.hero-menu {
-  position: absolute;
-  z-index: 5;
+.game-menu {
+  position: fixed;
+  z-index: 30;
   inset: 0;
   display: grid;
   place-items: center;
   background: rgb(0 0 0 / 60%);
 }
 
-.hero-menu[hidden] {
+.game-menu[hidden] {
   display: none;
 }
 
@@ -645,9 +643,11 @@ figure {
   pointer-events: auto;
 }
 
-/* The phone lies on its side until the tour starts, then stands up. */
-.stage[data-scene="intro"] .phone.main {
-  rotate: -90deg;
+/* On wide screens the phone lies on its side until the tour starts, then stands up. */
+@media (min-width: 901px) {
+  .stage[data-scene="intro"] .phone.main {
+    rotate: -90deg;
+  }
 }
 
 .phone.second {
@@ -866,11 +866,6 @@ figure {
 
   .hero {
     height: calc(100svh - var(--header) - 168px);
-  }
-
-  .hero-board {
-    --seat-radius: 20px;
-    --pentagon: 17%;
   }
 
   .hero-foot {

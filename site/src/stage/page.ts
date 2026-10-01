@@ -6,7 +6,7 @@ import {
   type PlaySystemId,
 } from "@/features/game/playSystems"
 
-import { createDemoGame, mountBoard, type DemoGameSetup } from "./board"
+import { createDemoGame, mountBoard, type DemoGame, type DemoGameSetup } from "./board"
 
 const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
 const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
@@ -42,112 +42,61 @@ function query<T extends Element>(selector: string, root: ParentNode = document)
 const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)")
 const narrow = matchMedia("(max-width: 900px)")
 
-// Hero: the real counter on a wide "table", or the phone grid on small screens.
-function setUpHero() {
-  const game = createDemoGame({ ...commanderSetup(4), values: [31, 24, 36, 18] })
-  const setShape = mountBoard(query("[data-hero-board]"), game, {
-    shape: narrow.matches ? "phone" : "table",
-  })
-  narrow.addEventListener("change", () => setShape(narrow.matches ? "phone" : "table"))
-
-  const hero = query<HTMLElement>("[data-hero]")
-  const menu = query<HTMLElement>("[data-hero-menu]")
-  const label = (name: string, text: string) =>
-    (query(`[data-show="${name}"]`, menu).textContent = text)
-  const syncLabels = () => {
-    label("players", String(game.setup.names.length))
-    label("system", playSystemRules(game.setup.system).shortLabel)
-  }
-  const setOpen = (open: boolean) => {
-    menu.hidden = !open
-    if (open) {
-      syncLabels()
-      query<HTMLElement>("[data-act]", menu).focus()
-    }
-  }
-
-  hero.addEventListener("click", (event) => {
-    const target = event.target as Element
-    if (target.closest(".pentagon")) return setOpen(true)
-    const action = target.closest<HTMLElement>("[data-act]")?.dataset.act
-    if (!action && target === menu) return setOpen(false)
-    if (action === "players") {
-      const count = game.setup.names.length === 6 ? 2 : game.setup.names.length + 1
-      game.reset({ names: NAMES.slice(0, count), values: [] })
-    }
-    if (action === "system") {
-      const index = PLAY_SYSTEM_IDS.indexOf(game.setup.system)
-      const system = PLAY_SYSTEM_IDS[(index + 1) % PLAY_SYSTEM_IDS.length] ?? "mtg"
-      game.reset({ system, startingLife: startingLife(system), values: [] })
-    }
-    if (action === "undo") game.undo()
-    if (action === "end") game.reset({ values: [] })
-    if (action === "close" || action === "undo" || action === "end") setOpen(false)
-    syncLabels()
-  })
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !menu.hidden) setOpen(false)
-  })
-}
-
-// Features steps drive one phone. Each control resets the demo game the way the app would.
+// Features steps and the hero share one phone and one game. The pickers and the game menu
+// both reset the game the way the app would; the pickers follow whatever the game shows.
 function setUpFeatures(stage: HTMLElement) {
   const game = createDemoGame(commanderSetup(5))
-  mountBoard(query("[data-board='features']", stage), game, { shape: "phone" })
+  const board = query<HTMLElement>("[data-board='features']", stage)
+  mountBoard(board, game)
 
   const countPicker = query<HTMLElement>("[data-pick='count']")
   const layoutPicker = query<HTMLElement>("[data-pick='layout']")
   const systemPicker = query<HTMLElement>("[data-pick='system']")
-
-  const renderLayouts = () => {
-    const count = game.setup.names.length
-    layoutPicker.innerHTML = getPlayerGridLayoutOptions(count)
-      .map(
-        (option) =>
-          `<button type="button" data-value="${option.variant}" aria-pressed="${option.variant === game.setup.layout}">${option.label}</button>`,
-      )
-      .join("")
-  }
   const press = (picker: HTMLElement, value: string) =>
     picker.querySelectorAll<HTMLElement>("button").forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.value === value))
     })
+  const syncPickers = () => {
+    const count = game.setup.names.length
+    layoutPicker.innerHTML = getPlayerGridLayoutOptions(count)
+      .map(
+        ({ variant, label }) => `<button type="button" data-value="${variant}">${label}</button>`,
+      )
+      .join("")
+    press(countPicker, String(count))
+    press(layoutPicker, game.setup.layout)
+    press(systemPicker, game.setup.system)
+  }
+  const picked = (event: Event) =>
+    (event.target as Element).closest<HTMLElement>("button")?.dataset.value
 
   countPicker.addEventListener("click", (event) => {
-    const value = (event.target as Element).closest<HTMLElement>("button")?.dataset.value
-    if (!value) return
-    const count = Number(value)
+    const count = Number(picked(event))
+    if (!count) return
     game.reset({
       names: NAMES.slice(0, count),
       values: SAMPLE_LIFE.slice(0, count),
       layout: "auto",
     })
-    press(countPicker, value)
-    renderLayouts()
   })
   layoutPicker.addEventListener("click", (event) => {
-    const value = (event.target as Element).closest<HTMLElement>("button")?.dataset.value
+    const value = picked(event)
     const option = getPlayerGridLayoutOptions(game.setup.names.length).find(
       ({ variant }) => variant === value,
     )
-    if (!option) return
-    game.reset({ layout: option.variant })
-    press(layoutPicker, option.variant)
+    if (option) game.reset({ layout: option.variant })
   })
   systemPicker.innerHTML = PLAY_SYSTEM_IDS.map(
-    (id) =>
-      `<button type="button" data-value="${id}" aria-pressed="${id === "mtg"}">${playSystemRules(id).shortLabel}</button>`,
+    (id) => `<button type="button" data-value="${id}">${playSystemRules(id).shortLabel}</button>`,
   ).join("")
   systemPicker.addEventListener("click", (event) => {
-    const id = PLAY_SYSTEM_IDS.find(
-      (system) =>
-        system === (event.target as Element).closest<HTMLElement>("button")?.dataset.value,
-    )
-    if (!id) return
-    game.reset({ system: id, startingLife: startingLife(id), values: [] })
-    press(systemPicker, id)
+    const value = picked(event)
+    const id = PLAY_SYSTEM_IDS.find((system) => system === value)
+    if (id) game.reset({ system: id, startingLife: startingLife(id), values: [] })
   })
-  renderLayouts()
+  game.subscribe((event) => event.type === "reset" && syncPickers())
+  syncPickers()
+  setUpMenu(board, game)
 
   // Commander damage badges appear only while that step is on screen.
   return (step: string) => {
@@ -160,19 +109,58 @@ function setUpFeatures(stage: HTMLElement) {
         commanderDamage: SAMPLE_COMMANDER_DAMAGE,
         values: [32, 27, 9, 18, 35],
       })
-      press(countPicker, "5")
-      press(systemPicker, "mtg")
-      renderLayouts()
     } else {
       game.reset({ commanderDamage: undefined, values: game.life })
     }
   }
 }
 
+// The pentagon opens the app's game menu over the page.
+function setUpMenu(board: HTMLElement, game: DemoGame) {
+  const menu = query<HTMLElement>("[data-game-menu]")
+  const label = (name: string, text: string) =>
+    (query(`[data-show="${name}"]`, menu).textContent = text)
+  const syncLabels = () => {
+    label("players", String(game.setup.names.length))
+    label("system", playSystemRules(game.setup.system).shortLabel)
+  }
+  const setOpen = (open: boolean) => {
+    menu.hidden = !open
+    if (!open) return
+    syncLabels()
+    query<HTMLElement>("[data-act]", menu).focus()
+  }
+
+  board.addEventListener("click", (event) => {
+    if ((event.target as Element).closest(".pentagon")) setOpen(true)
+  })
+  menu.addEventListener("click", (event) => {
+    const target = event.target as Element
+    const action = target.closest<HTMLElement>("[data-act]")?.dataset.act
+    if (!action) return target === menu && setOpen(false)
+    if (action === "players") {
+      const count = game.setup.names.length === 6 ? 2 : game.setup.names.length + 1
+      game.reset({ names: NAMES.slice(0, count), values: [], layout: "auto" })
+    }
+    if (action === "system") {
+      const index = PLAY_SYSTEM_IDS.indexOf(game.setup.system)
+      const system = PLAY_SYSTEM_IDS[(index + 1) % PLAY_SYSTEM_IDS.length] ?? "mtg"
+      game.reset({ system, startingLife: startingLife(system), values: [] })
+    }
+    if (action === "players" || action === "system") return syncLabels()
+    if (action === "undo") game.undo()
+    if (action === "end") game.reset({ values: [] })
+    setOpen(false)
+  })
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) setOpen(false)
+  })
+}
+
 function setUpConnected(stage: HTMLElement) {
   const game = createDemoGame({ ...commanderSetup(4), values: [27, 33, 19, 40] })
   const phones = stage.querySelectorAll<HTMLElement>("[data-board='connected']")
-  phones.forEach((el) => mountBoard(el, game, { shape: "phone" }))
+  phones.forEach((el) => mountBoard(el, game))
   game.subscribe(() => {
     if (prefersReducedMotion.matches) return
     phones.forEach((el) => {
@@ -190,8 +178,9 @@ function setUpStage() {
   const onFeatureStep = setUpFeatures(stage)
   setUpConnected(stage)
 
-  const steps = document.querySelectorAll<HTMLElement>("[data-step]")
+  const steps = document.querySelectorAll<HTMLElement>(".steps [data-step]")
   const activate = (step: HTMLElement) => {
+    if (stage.dataset.step === step.dataset.step && step.classList.contains("active")) return
     const scene = step.closest<HTMLElement>("[data-scene]")?.dataset.scene ?? "intro"
     stage.dataset.scene = scene
     stage.dataset.step = step.dataset.step ?? ""
@@ -211,7 +200,48 @@ function setUpStage() {
   }
   narrow.addEventListener("change", observe)
   observe()
+  setUpLanding(stage, () => activate(query("[data-step='intro']")))
 }
 
-setUpHero()
+// The stage's phone starts out filling the hero (on its side on wide screens) and shrinks
+// into the stage over the first screen of scrolling. Until it lands it always shows the intro.
+function setUpLanding(stage: HTMLElement, showIntro: () => void) {
+  const slot = query<HTMLElement>("[data-hero-slot]")
+  const tour = query<HTMLElement>(".tour")
+  const header = query<HTMLElement>(".header")
+  const rig = query<HTMLElement>(".rig", stage)
+  let frame = 0
+
+  const update = () => {
+    frame = 0
+    const progress = Math.min(1, Math.max(0, scrollY / (tour.offsetTop - header.offsetHeight)))
+    if (progress < 1) showIntro()
+    // Ease out so the phone clears the hero copy early. It heads for where the stage pins,
+    // and is offset from wherever the stage currently sits on the way there.
+    const eased = 1 - (1 - progress) ** 3
+    const from = slot.getBoundingClientRect()
+    const stageBox = stage.getBoundingClientRect()
+    const [width, height] = narrow.matches
+      ? [rig.offsetWidth, rig.offsetHeight]
+      : [rig.offsetHeight, rig.offsetWidth]
+    const lerp = (start: number, end: number) => start + (end - start) * eased
+    const scale = lerp(Math.min(from.width / width, from.height / height), 1)
+    const pinnedY = header.offsetHeight + stage.offsetHeight / 2
+    const x = lerp(from.left + from.width / 2, stageBox.left + stageBox.width / 2)
+    // Never slide up under the header.
+    const y = Math.max(
+      lerp(from.top + from.height / 2, pinnedY),
+      header.offsetHeight + (height * scale) / 2,
+    )
+    rig.style.translate = `${x - stageBox.left - stageBox.width / 2}px ${y - stageBox.top - stageBox.height / 2}px`
+    rig.style.scale = String(scale)
+  }
+  const schedule = () => {
+    frame ||= requestAnimationFrame(update)
+  }
+  addEventListener("scroll", schedule, { passive: true })
+  addEventListener("resize", schedule)
+  update()
+}
+
 setUpStage()

@@ -107,10 +107,7 @@ export function createDemoGame(initial: DemoGameSetup) {
 
 type SeatPlacement = { seat: number; rotation: number; flex?: number }
 
-// "phone" follows the app's portrait grid exactly; "table" seats half the pod on each long
-// edge of a wide screen, facing each other, for the desktop hero.
-export type BoardShape = "phone" | "table"
-
+// Seats follow the app's portrait grid exactly.
 function phoneRows(game: DemoGame) {
   const count = game.setup.names.length
   const layout = getPlayerGridLayout({
@@ -140,18 +137,6 @@ function phoneRows(game: DemoGame) {
             },
       ),
     })),
-  }
-}
-
-function tableRows(game: DemoGame) {
-  const seats = game.setup.names.map((_, seat) => seat)
-  const facing = Math.ceil(seats.length / 2)
-  return {
-    menu: { x: 0.5, y: 0.5 },
-    rows: [
-      { flex: 1, seats: seats.slice(0, facing).map((seat) => ({ seat, rotation: 180 })) },
-      { flex: 1, seats: seats.slice(facing).map((seat) => ({ seat, rotation: 0 })) },
-    ],
   }
 }
 
@@ -189,20 +174,13 @@ function seatHtml(game: DemoGame, placement: SeatPlacement, interactive: boolean
   </div>`
 }
 
-// Renders a live board into `el` and keeps it in sync with `game`. Returns a function
-// that switches between the phone and table shapes.
-export function mountBoard(
-  el: HTMLElement,
-  game: DemoGame,
-  { shape: initialShape, interactive = true }: { shape: BoardShape; interactive?: boolean },
-) {
-  let shape = initialShape
+// Renders a live board into `el` and keeps it in sync with `game`.
+export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true } = {}) {
   const chipTimers = new Map<number, { total: number; timer: number }>()
 
   function render() {
-    const { rows, menu } = shape === "phone" ? phoneRows(game) : tableRows(game)
+    const { rows, menu } = phoneRows(game)
     el.classList.add("board")
-    el.dataset.shape = shape
     el.innerHTML =
       rows
         .map(
@@ -249,9 +227,4 @@ export function mountBoard(
     event.type === "reset" ? render() : showChange(event.seat, event.delta),
   )
   render()
-
-  return (next: BoardShape) => {
-    shape = next
-    render()
-  }
 }

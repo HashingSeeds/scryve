@@ -46,21 +46,8 @@ const plans = [
   </header>
 
   <main>
-    <section class="hero" data-hero aria-label="Live life counter">
-      <div class="hero-board" data-hero-board></div>
-      <div class="hero-menu" data-hero-menu hidden>
-        <div class="ring" role="menu" aria-label="Game menu">
-          <button type="button" role="menuitem" data-act="players" style="--action:#77558A">
-            Players<small data-show="players">4</small>
-          </button>
-          <button type="button" role="menuitem" data-act="system" style="--action:#41476E">
-            Game<small data-show="system">Magic</small>
-          </button>
-          <button type="button" class="close" role="menuitem" data-act="close" aria-label="Close menu">×</button>
-          <button type="button" role="menuitem" data-act="undo" style="--action:#39755C">Undo</button>
-          <button type="button" role="menuitem" data-act="end" style="--action:#C03403">End game</button>
-        </div>
-      </div>
+    <section class="hero" aria-label="Live life counter">
+      <div class="hero-slot" data-hero-slot></div>
     </section>
     <div class="hero-foot">
       <h1>The life counter for Magic, Yu-Gi-Oh!, and Pokémon. <span>Tap a total. Open the menu to change players or games.</span></h1>
@@ -134,7 +121,7 @@ const plans = [
         </section>
       </div>
 
-      <div class="stage" data-stage data-scene="intro" data-step="intro" aria-hidden="true">
+      <div class="stage" data-stage data-scene="intro" data-step="intro">
         <div class="rig">
           <div class="phone main">
             <div class="screen">
@@ -142,8 +129,8 @@ const plans = [
                 <div class="board-holder" data-board="features"></div>
                 <span class="offline">Offline</span>
               </div>
-              <div class="scene-screen" data-for="connected"><div class="board-holder" data-board="connected"></div></div>
-              <div class="scene-screen deck" data-for="pro">
+              <div class="scene-screen" data-for="connected" aria-hidden="true"><div class="board-holder" data-board="connected"></div></div>
+              <div class="scene-screen deck" data-for="pro" aria-hidden="true">
                 <div class="deck-top"><span>Back</span><b>Deck</b><span>Edit</span></div>
                 <div class="deck-name">Atraxa Counters</div>
                 <div class="deck-meta">Magic · Commander · 100 cards</div>
@@ -163,10 +150,24 @@ const plans = [
               </div>
             </div>
           </div>
-          <div class="phone second">
+          <div class="phone second" aria-hidden="true">
             <div class="screen"><div class="board-holder" data-board="connected"></div></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="game-menu" data-game-menu hidden>
+      <div class="ring" role="menu" aria-label="Game menu">
+        <button type="button" role="menuitem" data-act="players" style="--action:#77558A">
+          Players<small data-show="players">5</small>
+        </button>
+        <button type="button" role="menuitem" data-act="system" style="--action:#41476E">
+          Game<small data-show="system">Magic</small>
+        </button>
+        <button type="button" class="close" role="menuitem" data-act="close" aria-label="Close menu">×</button>
+        <button type="button" role="menuitem" data-act="undo" style="--action:#39755C">Undo</button>
+        <button type="button" role="menuitem" data-act="end" style="--action:#C03403">End game</button>
       </div>
     </div>
 
