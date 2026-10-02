@@ -108,11 +108,6 @@ function isNonScrolling(preset?: ScreenPreset) {
   return !preset || preset === "fixed"
 }
 
-/**
- * Custom hook that handles the automatic enabling/disabling of scroll ability based on the content size and screen size.
- * @param {UseAutoPresetProps} props - The props for the `useAutoPreset` hook.
- * @returns {{boolean, Function, Function}} - The scroll state, and the `onContentSizeChange` and `onLayout` functions.
- */
 function useAutoPreset(props: AutoScreenProps): {
   scrollEnabled: boolean
   onContentSizeChange: (w: number, h: number) => void
@@ -128,7 +123,6 @@ function useAutoPreset(props: AutoScreenProps): {
   const updateScrollState = useCallback(() => {
     if (scrollViewHeight.current === null || scrollViewContentHeight.current === null) return
 
-    // check whether content fits the screen then toggle scroll state according to it
     const contentFitsScreen = (function () {
       if (point) {
         return scrollViewContentHeight.current < scrollViewHeight.current - point
@@ -140,12 +134,7 @@ function useAutoPreset(props: AutoScreenProps): {
     setScrollEnabled(!contentFitsScreen)
   }, [percent, point])
 
-  /**
-   * @param {number} w - The width of the content.
-   * @param {number} h - The height of the content.
-   */
-  function onContentSizeChange(w: number, h: number) {
-    // update scroll-view content height
+  function onContentSizeChange(_w: number, h: number) {
     scrollViewContentHeight.current = h
     updateScrollState()
   }
@@ -155,7 +144,6 @@ function useAutoPreset(props: AutoScreenProps): {
    */
   function onLayout(e: LayoutChangeEvent) {
     const { height } = e.nativeEvent.layout
-    // update scroll-view  height
     scrollViewHeight.current = height
     updateScrollState()
   }
@@ -171,10 +159,6 @@ function useAutoPreset(props: AutoScreenProps): {
   }
 }
 
-/**
- * @param {ScreenProps} props - The props for the `ScreenWithoutScrolling` component.
- * @returns {JSX.Element} - The rendered `ScreenWithoutScrolling` component.
- */
 function ScreenWithoutScrolling(props: ScreenProps) {
   const { themed } = useAppTheme()
   const { style, contentContainerStyle, contentInset, children, preset } = props
@@ -194,10 +178,6 @@ function ScreenWithoutScrolling(props: ScreenProps) {
   )
 }
 
-/**
- * @param {ScreenProps} props - The props for the `ScreenWithScrolling` component.
- * @returns {JSX.Element} - The rendered `ScreenWithScrolling` component.
- */
 function ScreenWithScrolling(props: ScreenProps) {
   const {
     children,
@@ -240,14 +220,6 @@ function ScreenWithScrolling(props: ScreenProps) {
   )
 }
 
-/**
- * Represents a screen component that provides a consistent layout and behavior for different screen presets.
- * The `Screen` component can be used with different presets such as "fixed", "scroll", or "auto".
- * It handles safe area insets, status bar settings, keyboard avoiding behavior, and scrollability based on the preset.
- * @see [Documentation and Examples]{@link https://docs.infinite.red/ignite-cli/boilerplate/app/components/Screen/}
- * @param {ScreenProps} props - The props for the `Screen` component.
- * @returns {JSX.Element} The rendered `Screen` component.
- */
 export function Screen(props: ScreenProps) {
   const {
     theme: { colors },

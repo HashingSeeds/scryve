@@ -43,13 +43,6 @@ type BaseIconProps = {
 type PressableIconProps = Omit<TouchableOpacityProps, "style"> & BaseIconProps
 type IconProps = Omit<ViewProps, "style"> & BaseIconProps
 
-/**
- * A component to render a registered icon.
- * It is wrapped in a <TouchableOpacity />
- * @see [Documentation and Examples]{@link https://docs.infinite.red/ignite-cli/boilerplate/app/components/Icon/}
- * @param {PressableIconProps} props - The props for the `PressableIcon` component.
- * @returns {JSX.Element} The rendered `PressableIcon` component.
- */
 export function PressableIcon(props: PressableIconProps) {
   const {
     icon,
@@ -76,13 +69,6 @@ export function PressableIcon(props: PressableIconProps) {
   )
 }
 
-/**
- * A component to render a registered icon.
- * It is wrapped in a <View />, use `PressableIcon` if you want to react to input
- * @see [Documentation and Examples]{@link https://docs.infinite.red/ignite-cli/boilerplate/app/components/Icon/}
- * @param {IconProps} props - The props for the `Icon` component.
- * @returns {JSX.Element} The rendered `Icon` component.
- */
 export function Icon(props: IconProps) {
   const {
     icon,
@@ -110,10 +96,8 @@ export function Icon(props: IconProps) {
 }
 
 export const iconRegistry = {
-  back: require("@assets/icons/back.png"),
   caretRight: require("@assets/icons/caretRight.png"),
   check: require("@assets/icons/check.png"),
-  github: require("@assets/icons/github.png"),
   hidden: require("@assets/icons/hidden.png"),
   ladybug: require("@assets/icons/ladybug.png"),
   view: require("@assets/icons/view.png"),
