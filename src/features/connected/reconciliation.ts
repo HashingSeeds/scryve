@@ -1,4 +1,7 @@
+import { convexErrorCode } from "@/utils/convexError"
+
 import type { ConnectedDisplayProjection, ConnectedProjection, PendingLifeAction } from "./model"
+import { PERMANENT_GAME_WRITE_CODES } from "../../../convex/lib/gameWriteErrors"
 
 export function mergeConfirmedProjection(
   current: ConnectedProjection | null,
@@ -54,7 +57,11 @@ export function oldestFirst(actions: readonly PendingLifeAction[]): PendingLifeA
 
 export type WriteFailureKind = "retry" | "permanent"
 
+const permanentWriteCodes = new Set<string>(PERMANENT_GAME_WRITE_CODES)
+
 export function classifyWriteFailure(cause: unknown): WriteFailureKind {
+  const code = convexErrorCode(cause)
+  if (code !== undefined) return permanentWriteCodes.has(code) ? "permanent" : "retry"
   const message = cause instanceof Error ? cause.message : String(cause)
   return /Seat-owner permission|Game membership required|Game is not active|Game not found|Operation identifier was reused|Invalid operation|Invalid device identifier|Invalid client timestamp|Life delta|ArgumentValidationError|Invalid argument|not a valid ID|acknowledgement did not match/.test(
     message,

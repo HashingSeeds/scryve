@@ -4,6 +4,7 @@ import {
   type DrainOutboxSnapshot as DurableDrainOutboxSnapshot,
   type OutboxAcknowledgement,
 } from "@/features/sync/drainOutbox"
+import { convexErrorMessage } from "@/utils/convexError"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import type { FailedLifeAction, PendingLifeAction } from "./model"
@@ -40,7 +41,13 @@ export async function drainConnectedOutbox(options: {
     operationId: (action) => action.event.operationId,
     classifyFailure: (cause) =>
       classifyWriteFailure(cause) === "permanent"
-        ? { kind: "reject", reason: cause instanceof Error ? cause.message : "Action was rejected" }
+        ? {
+            kind: "reject",
+            reason: convexErrorMessage(
+              cause,
+              cause instanceof Error ? cause.message : "Action was rejected",
+            ),
+          }
         : { kind: "retry" },
     now,
     failed: options.failed ?? options.repository.loadFailed(options.publicId),

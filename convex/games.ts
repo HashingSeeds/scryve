@@ -17,6 +17,7 @@ import {
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
+import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
 import {
@@ -49,13 +50,23 @@ const MAX_COMMANDER_DAMAGE = 99
 const MAX_PENDING_COMMANDER_CLAIMS = 100
 const NO_GAME_SYSTEM = "none"
 
-async function gameByPublicId(ctx: QueryCtx, publicId: string) {
+async function findGameByPublicId(ctx: QueryCtx, publicId: string) {
   assertPublicId(publicId)
-  const game = await ctx.db
+  return await ctx.db
     .query("games")
     .withIndex("by_public_id", (q) => q.eq("publicId", publicId))
     .unique()
+}
+
+async function gameByPublicId(ctx: QueryCtx, publicId: string) {
+  const game = await findGameByPublicId(ctx, publicId)
   if (!game) throw new Error("Game not found")
+  return game
+}
+
+async function gameByPublicIdForWrite(ctx: QueryCtx, publicId: string) {
+  const game = await findGameByPublicId(ctx, publicId)
+  if (!game) throw gameWriteError("game_not_found", "Game not found")
   return game
 }
 
@@ -74,6 +85,14 @@ function assertDeckRequirementSupported(gameSystem: string, deckRequired?: boole
 function assertLifeDelta(delta: number) {
   if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 999_999)
     throw new Error("Life delta must be a non-zero whole number from -999999 to 999999")
+}
+
+function assertGameWriteLifeDelta(delta: number) {
+  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 999_999)
+    throw gameWriteError(
+      "invalid_life_delta",
+      "Life delta must be a non-zero whole number from -999999 to 999999",
+    )
 }
 
 function assertCommanderDelta(delta: number) {
@@ -97,8 +116,25 @@ function assertOperationId(operationId: string) {
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(operationId)) throw new Error("Invalid operation identifier")
 }
 
+function assertGameWriteOperationId(operationId: string) {
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(operationId))
+    throw gameWriteError("invalid_operation_id", "Invalid operation identifier")
+}
+
 function assertDeviceId(deviceId: string) {
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId)) throw new Error("Invalid device identifier")
+}
+
+function assertGameWriteDeviceId(deviceId: string) {
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId))
+    throw gameWriteError("invalid_device_id", "Invalid device identifier")
+}
+
+function syncOperationMismatch() {
+  return gameWriteError(
+    "sync_operation_mismatch",
+    "Operation identifier was reused with different data",
+  )
 }
 
 function assertLocalId(localId: string) {
@@ -1450,19 +1486,19 @@ export const changeLife = mutation({
     clientCreatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    assertLifeDelta(args.delta)
-    assertOperationId(args.operationId)
-    assertDeviceId(args.deviceId)
+    assertGameWriteLifeDelta(args.delta)
+    assertGameWriteOperationId(args.operationId)
+    assertGameWriteDeviceId(args.deviceId)
     if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-      throw new Error("Invalid client timestamp")
+      throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
 
-    const game = await gameByPublicId(ctx, args.publicId)
+    const game = await gameByPublicIdForWrite(ctx, args.publicId)
     const user = await requireUser(ctx)
     const membership = await ctx.db
       .query("gamePlayers")
       .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
       .first()
-    if (!membership) throw new Error("Game membership required")
+    if (!membership) throw gameWriteError("game_membership_required", "Game membership required")
     const target = await ctx.db.get(args.playerId)
     if (
       !target ||
@@ -1470,7 +1506,7 @@ export const changeLife = mutation({
       (target.userId === undefined ? game.hostUserId !== user._id : target.userId !== user._id) ||
       (target.deviceId !== undefined && target.deviceId !== args.deviceId)
     )
-      throw new Error("Seat-owner permission required")
+      throw gameWriteError("seat_owner_required", "Seat-owner permission required")
 
     const duplicate = await ctx.db
       .query("gameEvents")
@@ -1486,7 +1522,7 @@ export const changeLife = mutation({
         duplicate.deviceId !== args.deviceId ||
         duplicate.clientCreatedAt !== args.clientCreatedAt
       )
-        throw new Error("Operation identifier was reused with different data")
+        throw syncOperationMismatch()
       return {
         operationId: duplicate.operationId,
         eventId: duplicate._id,
@@ -1495,7 +1531,7 @@ export const changeLife = mutation({
         deduplicated: true,
       }
     }
-    if (game.status !== "active") throw new Error("Game is not active")
+    if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const now = Date.now()
     const currentLife = target.currentLife + args.delta
@@ -1581,16 +1617,16 @@ export const submitCommanderDamage = mutation({
   },
   handler: async (ctx, args) => {
     assertCommanderDelta(args.delta)
-    assertOperationId(args.operationId)
-    assertDeviceId(args.deviceId)
+    assertGameWriteOperationId(args.operationId)
+    assertGameWriteDeviceId(args.deviceId)
     if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-      throw new Error("Invalid client timestamp")
+      throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
     if (args.fromPlayerId === args.toPlayerId) throw new Error("A commander cannot damage itself")
 
-    const game = await gameByPublicId(ctx, args.publicId)
+    const game = await gameByPublicIdForWrite(ctx, args.publicId)
     assertCommanderGame(game)
     const user = await requireUser(ctx)
-    if (game.status !== "active") throw new Error("Game is not active")
+    if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
     const source = await commanderPlayerForWrite(
       ctx,
       game,
@@ -1610,8 +1646,7 @@ export const submitCommanderDamage = mutation({
       )
       .unique()
     if (existing) {
-      if (!commanderClaimMatches(existing, args, user._id))
-        throw new Error("Operation identifier was reused with different data")
+      if (!commanderClaimMatches(existing, args, user._id)) throw syncOperationMismatch()
       return {
         operationId: existing.operationId,
         claimId: existing._id,
@@ -1625,7 +1660,7 @@ export const submitCommanderDamage = mutation({
         q.eq("gameId", game._id).eq("operationId", args.operationId),
       )
       .unique()
-    if (eventWithOperation) throw new Error("Operation identifier was reused with different data")
+    if (eventWithOperation) throw syncOperationMismatch()
 
     const pair = await ctx.db
       .query("gameCommanderDamage")
@@ -1717,12 +1752,13 @@ async function resolveCommanderClaim(
   },
   decision: "confirmed" | "declined",
 ) {
-  assertOperationId(args.operationId)
-  if (args.resolutionOperationId !== undefined) assertOperationId(args.resolutionOperationId)
-  assertDeviceId(args.deviceId)
+  assertGameWriteOperationId(args.operationId)
+  if (args.resolutionOperationId !== undefined)
+    assertGameWriteOperationId(args.resolutionOperationId)
+  assertGameWriteDeviceId(args.deviceId)
   if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-    throw new Error("Invalid client timestamp")
-  const game = await gameByPublicId(ctx, args.publicId)
+    throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
+  const game = await gameByPublicIdForWrite(ctx, args.publicId)
   assertCommanderGame(game)
   const user = await requireUser(ctx)
   const claim = await ctx.db
@@ -1737,7 +1773,7 @@ async function resolveCommanderClaim(
     claim.resolutionOperationId &&
     claim.resolutionOperationId !== args.resolutionOperationId
   )
-    throw new Error("Operation identifier was reused with different data")
+    throw syncOperationMismatch()
   const target = await commanderPlayerForWrite(
     ctx,
     game,
@@ -1759,12 +1795,11 @@ async function resolveCommanderClaim(
       (existing.claimOperationId !== claim.operationId ||
         existing.kind !== `commanderDamage.${decision}`)
     )
-      throw new Error("Operation identifier was reused with different data")
+      throw syncOperationMismatch()
   }
   if (claim.status !== "pending") {
     if (args.resolutionOperationId) {
-      if (claim.status !== decision)
-        throw new Error("Operation identifier was reused with different data")
+      if (claim.status !== decision) throw syncOperationMismatch()
       const event = await commanderResolutionEvent(ctx, claim)
       if (
         !event ||
@@ -1776,7 +1811,7 @@ async function resolveCommanderClaim(
         event.deviceId !== args.deviceId ||
         event.clientCreatedAt !== args.clientCreatedAt
       )
-        throw new Error("Operation identifier was reused with different data")
+        throw syncOperationMismatch()
       if (!claim.resolutionOperationId)
         await ctx.db.patch(claim._id, { resolutionOperationId: args.resolutionOperationId })
       if (event.operationId !== args.resolutionOperationId)
@@ -1806,7 +1841,7 @@ async function resolveCommanderClaim(
         : {}),
     }
   }
-  if (game.status !== "active") throw new Error("Game is not active")
+  if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
   const now = Date.now()
   const eventOperationId = args.resolutionOperationId ?? `${claim.operationId}_${decision}`

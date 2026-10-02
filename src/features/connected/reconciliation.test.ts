@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values"
+
 import type { ConnectedProjection, PendingLifeAction } from "./model"
 import {
   classifyWriteFailure,
@@ -6,6 +8,21 @@ import {
   overlayPendingDeltas,
 } from "./reconciliation"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
+
+const permanentFailures = [
+  ["seat_owner_required", "Seat-owner permission required"],
+  ["game_membership_required", "Game membership required"],
+  ["game_not_active", "Game is not active"],
+  ["game_not_found", "Game not found"],
+  ["sync_operation_mismatch", "Operation identifier was reused with different data"],
+  ["invalid_operation_id", "Invalid operation identifier"],
+  ["invalid_device_id", "Invalid device identifier"],
+  ["invalid_client_timestamp", "Invalid client timestamp"],
+  ["invalid_life_delta", "Life delta must be a non-zero whole number from -999999 to 999999"],
+]
+
+const legacyPermanentMessage =
+  /Seat-owner permission|Game membership required|Game is not active|Game not found|Operation identifier was reused|Invalid operation|Invalid device identifier|Invalid client timestamp|Life delta|ArgumentValidationError|Invalid argument|not a valid ID|acknowledgement did not match/
 
 const projection: ConnectedProjection = {
   schemaVersion: 1,
@@ -102,4 +119,41 @@ describe("connected reconciliation", () => {
     expect(classifyWriteFailure(new Error("Authentication required"))).toBe("retry")
     expect(classifyWriteFailure(new Error("Network disconnected"))).toBe("retry")
   })
+
+  it.each(permanentFailures)("classifies %s by code regardless of wording", (code) => {
+    for (const message of ["Write rejected", "This action cannot be saved"])
+      expect(classifyWriteFailure(new ConvexError({ code, message }))).toBe("permanent")
+  })
+
+  it.each(permanentFailures)("keeps the legacy regex phrase for %s", (code, message) => {
+    const serverError = new ConvexError({ code, message })
+    expect(serverError.message).toMatch(legacyPermanentMessage)
+  })
+
+  it.each([
+    ...permanentFailures.map(([, message]) => message),
+    "ArgumentValidationError",
+    "Invalid argument",
+    "not a valid ID",
+    "acknowledgement did not match",
+  ])("keeps the legacy fallback for %s", (message) => {
+    expect(classifyWriteFailure(new Error(message))).toBe("permanent")
+    expect(classifyWriteFailure(new ConvexError({ message }))).toBe("permanent")
+  })
+
+  it.each(["unknown_code", "unauthenticated", "auth_refresh_required"])(
+    "retries %s even when the message matches the legacy regex",
+    (code) => {
+      expect(classifyWriteFailure(new ConvexError({ code, message: "Game not found" }))).toBe(
+        "retry",
+      )
+    },
+  )
+
+  it.each([new Error("Unexpected failure"), new Error("Network disconnected"), null, {}])(
+    "retries unknown and transport failures: %s",
+    (cause) => {
+      expect(classifyWriteFailure(cause)).toBe("retry")
+    },
+  )
 })

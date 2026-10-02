@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values"
 import { convexTest } from "convex-test"
 
 import { api, internal } from "./_generated/api"
@@ -556,6 +557,102 @@ function lifeArgs(
 }
 
 describe("Convex realtime life writes", () => {
+  it("returns stable codes and preserves messages for permanent life-write failures", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const stranger = await synced(t, "code-stranger", "Stranger")
+    const args = lifeArgs(game.publicId, game.hostPlayerId, "operation-code-0001", 1)
+    await game.host.mutation(api.games.changeLife, args)
+    const failures = [
+      {
+        actor: stranger,
+        args,
+        code: "game_membership_required",
+        message: "Game membership required",
+      },
+      {
+        actor: game.host,
+        args: { ...args, playerId: game.joinerPlayerId },
+        code: "seat_owner_required",
+        message: "Seat-owner permission required",
+      },
+      {
+        actor: game.host,
+        args: { ...args, publicId: "missing-game-id-123456" },
+        code: "game_not_found",
+        message: "Game not found",
+      },
+      {
+        actor: game.host,
+        args: { ...args, delta: 5 },
+        code: "sync_operation_mismatch",
+        message: "Operation identifier was reused with different data",
+      },
+      {
+        actor: game.host,
+        args: { ...args, operationId: "short" },
+        code: "invalid_operation_id",
+        message: "Invalid operation identifier",
+      },
+      {
+        actor: game.host,
+        args: { ...args, deviceId: "short" },
+        code: "invalid_device_id",
+        message: "Invalid device identifier",
+      },
+      {
+        actor: game.host,
+        args: { ...args, clientCreatedAt: -1 },
+        code: "invalid_client_timestamp",
+        message: "Invalid client timestamp",
+      },
+      {
+        actor: game.host,
+        args: { ...args, delta: 0 },
+        code: "invalid_life_delta",
+        message: "Life delta must be a non-zero whole number from -999999 to 999999",
+      },
+    ]
+    for (const { actor, args: write, code, message } of failures) {
+      const result = actor.mutation(api.games.changeLife, write)
+      await expect(result).rejects.toBeInstanceOf(ConvexError)
+      await expect(result).rejects.toMatchObject({ data: { code, message } })
+      await expect(result).rejects.toThrow(message)
+    }
+    await game.host.mutation(api.games.finishGame, { publicId: game.publicId })
+    await expect(
+      game.host.mutation(api.games.changeLife, { ...args, operationId: "operation-code-0002" }),
+    ).rejects.toMatchObject({
+      data: { code: "game_not_active", message: "Game is not active" },
+    })
+  })
+
+  it("returns timestamp codes on every commander write path", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const resolution = {
+      publicId: game.publicId,
+      operationId: "commander-code-0001",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: -1,
+    }
+    const writes = [
+      () =>
+        game.host.mutation(api.games.submitCommanderDamage, {
+          ...resolution,
+          fromPlayerId: game.hostPlayerId,
+          toPlayerId: game.joinerPlayerId,
+          delta: 1,
+        }),
+      () => game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
+      () => game.joiner.mutation(api.games.declineCommanderDamage, resolution),
+    ]
+    for (const write of writes)
+      await expect(write()).rejects.toMatchObject({
+        data: { code: "invalid_client_timestamp", message: "Invalid client timestamp" },
+      })
+  })
+
   it("paginates a staged migration and discovers an older active game past 100 finished memberships", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "legacy-member", "Legacy")
@@ -1556,7 +1653,7 @@ describe("connected commander damage claims", () => {
     })
   })
 
-  it("rejects resolution operation IDs reused across claims", async () => {
+  it("returns a mismatch code when a commander resolution operation ID is reused", async () => {
     const t = convexTest(schema, modules)
     const game = await activeGame(t)
     const claimIds = ["commander-unique-claim-one", "commander-unique-claim-two"]
@@ -1592,7 +1689,12 @@ describe("connected commander damage claims", () => {
         ...resolution,
         operationId: claimIds[1],
       }),
-    ).rejects.toThrow("reused with different data")
+    ).rejects.toMatchObject({
+      data: {
+        code: "sync_operation_mismatch",
+        message: "Operation identifier was reused with different data",
+      },
+    })
     await expect(
       game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
     ).resolves.toMatchObject({ deduplicated: true })
