@@ -3,7 +3,7 @@ import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
 import { tokenCache } from "@clerk/expo/token-cache"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
 
-import { readPublicCloudConfig } from "@/features/auth/config"
+import { APP_ROOT_URL, readPublicCloudConfig } from "@/features/auth/config"
 import { readRevenueCatConfig } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
 import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
@@ -115,6 +115,7 @@ export function CloudProviders({ children }: { children: ReactNode }) {
     <ClerkProvider
       publishableKey={config.value.clerkPublishableKey}
       tokenCache={tokenCache}
+      afterSignOutUrl={APP_ROOT_URL}
       __experimental_resourceCache={resourceCache}
     >
       <ConfiguredAuth convexUrl={config.value.convexUrl}>{children}</ConfiguredAuth>

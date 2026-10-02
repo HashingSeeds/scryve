@@ -3,10 +3,7 @@ import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-import {
-  playerGridLayoutForCount,
-  type PlayerGridLayoutVariant,
-} from "@/features/game/playerLayouts"
+import { type PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
@@ -21,10 +18,17 @@ import {
   getLifeTargetTextSpace,
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
-  type LifeCardContentRotation,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
+import {
+  getCentralMenuBoundary,
+  getFourCardMenuJunction,
+  getPlayerContentRotation,
+  getPlayerGridLayout,
+  getPlayerGridRowFlex,
+  getPlayerGridRows,
+} from "./playerGridGeometry"
 
 export interface CommanderDamageGridBinding {
   incomingFor: (player: GamePlayer) => Record<PlayerId, number>
@@ -60,8 +64,6 @@ export interface PlayerGridProps {
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
-
-const SINGLE_PLAYER_ROW_FLEX = 0.8
 
 export function PlayerGrid({
   players,
@@ -270,6 +272,13 @@ export function PlayerGrid({
 
 export { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
 export type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
+export {
+  getPlayerContentRotation,
+  getPlayerGridLayout,
+  getPlayerGridMenuAnchor,
+  getPlayerGridRowFlex,
+  getPlayerGridRows,
+} from "./playerGridGeometry"
 
 const LIFE_CONTROL_GUTTER = 32
 const LIFE_HEIGHT_RATIO = 0.5
@@ -317,76 +326,6 @@ export function getLifeFontSize(input: {
   )
 }
 
-export function getPlayerGridRows(
-  playerCount: number,
-  layout: ReturnType<typeof getPlayerGridLayout>,
-): (number | null)[][] {
-  const seats = Array.from({ length: playerCount }, (_, index) => index)
-  if (layout.variant === "tabletop")
-    return [[0], ...chunkSeats(seats.slice(1, -1), 2), [playerCount - 1]]
-  if (layout.variant === "featured-first") return [[0], ...chunkSeats(seats.slice(1), 2)]
-  if (layout.variant === "featured-last")
-    return [...chunkSeats(seats.slice(0, -1), 2), [playerCount - 1]]
-  if (layout.variant === "even-grid") return chunkSeats(seats, 2, true)
-  if (layout.layout === "three-featured") return [[0], [1, 2]]
-  return chunkSeats(seats, layout.columnCount)
-}
-
-export function getPlayerGridMenuAnchor(
-  playerCount: number,
-  layout: ReturnType<typeof getPlayerGridLayout>,
-): { x: number; y: number } {
-  const rows = getPlayerGridRows(playerCount, layout)
-  const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
-  const totalRowFlex = rowFlexes.reduce((total, flex) => total + flex, 0)
-  let cumulativeFlex = 0
-  const boundaryPositions = rowFlexes.slice(0, -1).map((flex) => {
-    cumulativeFlex += flex
-    return cumulativeFlex / totalRowFlex
-  })
-  const junction = getFourCardMenuJunction(rows)
-  if (junction)
-    return {
-      x: junction.column / junction.columnCount,
-      y: boundaryPositions[junction.boundary - 1],
-    }
-  return { x: 0.5, y: boundaryPositions[getCentralMenuBoundary(rows, layout) - 1] ?? 0.5 }
-}
-
-function getCentralMenuBoundary(
-  rows: (number | null)[][],
-  layout: ReturnType<typeof getPlayerGridLayout>,
-) {
-  const flexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
-  const total = flexes.reduce((sum, flex) => sum + flex, 0)
-  let position = 0
-  let nearest = { boundary: 1, distance: Infinity }
-  for (let index = 0; index < rows.length - 1; index += 1) {
-    position += flexes[index] / total
-    const distance = Math.abs(position - 0.5)
-    if (distance < nearest.distance) nearest = { boundary: index + 1, distance }
-  }
-  return nearest.boundary
-}
-
-function getFourCardMenuJunction(rows: (number | null)[][]) {
-  for (let boundary = rows.length - 1; boundary > 0; boundary -= 1) {
-    const upper = rows[boundary - 1]
-    const lower = rows[boundary]
-    const columnCount = Math.max(upper.length, lower.length)
-    for (let column = columnCount - 1; column > 0; column -= 1) {
-      const fourCardsMeet = [
-        upper[column - 1],
-        upper[column],
-        lower[column - 1],
-        lower[column],
-      ].every((seat) => seat !== null && seat !== undefined)
-      if (fourCardsMeet) return { boundary, column, columnCount }
-    }
-  }
-  return null
-}
-
 function menuCornerAt(
   junction: ReturnType<typeof getFourCardMenuJunction>,
   row: number,
@@ -419,14 +358,6 @@ function fallbackMenuAt(
   return undefined
 }
 
-export function getPlayerGridRowFlex(
-  row: (number | null)[],
-  layout: ReturnType<typeof getPlayerGridLayout>,
-): number {
-  if (row.length !== 1 || layout.columnCount === 1) return 1
-  return SINGLE_PLAYER_ROW_FLEX
-}
-
 export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number
@@ -443,40 +374,6 @@ export function getScreenCornerSquaringStyle(input: {
     ...(touchesBottomEdge && touchesRightEdge ? { borderBottomRightRadius: 0 } : null),
   }
   return Object.keys(squared).length ? squared : undefined
-}
-
-export function getPlayerContentRotation(input: {
-  playerCount: number
-  layout: ReturnType<typeof getPlayerGridLayout>
-  row: (number | null)[]
-  rowIndex: number
-  columnIndex: number
-  playerIndex: number
-}): LifeCardContentRotation {
-  if (input.playerCount === 2 && input.layout.layout === "two-stacked")
-    return input.playerIndex === 0 ? 180 : 0
-
-  const occupiedColumns = input.row.flatMap((seat, column) => (seat === null ? [] : [column]))
-  if (occupiedColumns.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
-  if (input.columnIndex === occupiedColumns[0]) return 90
-  if (input.columnIndex === occupiedColumns[occupiedColumns.length - 1]) return -90
-  return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
-}
-
-function chunkSeats(
-  seats: number[],
-  columnCount: number,
-  fillLastRow = false,
-): (number | null)[][] {
-  const rows: (number | null)[][] = []
-  for (let index = 0; index < seats.length; index += columnCount) {
-    const row: (number | null)[] = seats.slice(index, index + columnCount)
-    if (fillLastRow) {
-      while (row.length < columnCount) row.push(null)
-    }
-    rows.push(row)
-  }
-  return rows
 }
 
 const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -496,71 +393,3 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
 
 const $unmeasured: ViewStyle = { opacity: 0 }
-
-export function getPlayerGridLayout(input: {
-  playerCount: number
-  width: number
-  height: number
-  fontScale?: number
-  layoutVariant?: PlayerGridLayoutVariant
-}) {
-  const landscape = input.width > input.height
-  const tablet = Math.min(input.width, input.height) >= 600
-  const largeText = (input.fontScale ?? 1) >= 1.4
-  const automaticColumnCount =
-    input.playerCount === 2
-      ? landscape
-        ? 2
-        : 1
-      : input.playerCount === 3 && landscape
-        ? 3
-        : input.playerCount >= 5 && landscape
-          ? 3
-          : 2
-  const variant = playerGridLayoutForCount(input.playerCount, input.layoutVariant)
-  const columnCount =
-    variant === "featured-first" ||
-    variant === "featured-last" ||
-    variant === "even-grid" ||
-    variant === "tabletop"
-      ? 2
-      : automaticColumnCount
-  const rowCount =
-    variant === "tabletop"
-      ? 2 + Math.ceil((input.playerCount - 2) / 2)
-      : variant === "featured-first" || variant === "featured-last"
-        ? 1 + Math.ceil((input.playerCount - 1) / 2)
-        : variant === "even-grid"
-          ? Math.ceil(input.playerCount / 2)
-          : input.playerCount === 3 && !landscape
-            ? 2
-            : Math.ceil(input.playerCount / columnCount)
-  const layout =
-    input.playerCount === 2
-      ? landscape
-        ? "two-side-by-side"
-        : "two-stacked"
-      : input.playerCount === 3
-        ? landscape
-          ? "three-tabletop"
-          : "three-featured"
-        : input.playerCount === 4
-          ? "four-grid"
-          : landscape
-            ? "dense-landscape"
-            : "dense-portrait"
-  const availableHeight = Math.max(input.height - 132, 300)
-  const baseCellHeight = Math.max(148, Math.floor(availableHeight / rowCount))
-  const minCellHeight = largeText ? Math.ceil(baseCellHeight * 1.25) : baseCellHeight
-  return {
-    variant,
-    columnCount,
-    rowCount,
-    layout,
-    minCellHeight,
-    compact: input.playerCount >= 5 || baseCellHeight < 280,
-    landscape,
-    tablet,
-    largeText,
-  }
-}

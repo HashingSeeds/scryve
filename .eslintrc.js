@@ -112,7 +112,7 @@ module.exports = {
   },
   overrides: [
     {
-      files: ["src/**/*.{ts,tsx}", "convex/**/*.ts", "functions/**/*.ts"],
+      files: ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
       excludedFiles: ["**/*.test.{ts,tsx}", "convex/_generated/**"],
       rules: {
         "@typescript-eslint/no-explicit-any": "error",

@@ -1,3 +1,7 @@
+// Assembles the Cloudflare Pages output in dist/:
+//   dist/            marketing site (site/dist, built by `pnpm site:build`)
+//   dist/play/       Expo web export (`expo export --output-dir dist/play`, base path /play)
+//   dist/_redirects  routing rules copied from web/_redirects
 const fs = require("node:fs")
 const path = require("node:path")
 
@@ -7,7 +11,7 @@ const path = require("node:path")
 const CLOUDFLARE_SKIPPED_DIR = "assets/node_modules/"
 const DEPLOYABLE_DIR = "assets/vendor/"
 const REWRITABLE_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".map"])
-const WAITLIST_SOURCE = path.join(process.cwd(), "web", "waitlist")
+const APP_DIR_NAME = "play"
 
 function collectRewritableFiles(directory, found = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -24,25 +28,34 @@ function fail(message) {
 }
 
 const distDirectory = path.join(process.cwd(), "dist")
-if (!fs.existsSync(distDirectory)) {
-  fail("dist/ not found. Run `pnpm bundle:web:prod` first.")
+const appDirectory = path.join(distDirectory, APP_DIR_NAME)
+const siteDirectory = path.join(process.cwd(), "site", "dist")
+if (!fs.existsSync(path.join(appDirectory, "index.html"))) {
+  fail("dist/play/index.html not found. Run `pnpm bundle:web:prod` first.")
+}
+if (!fs.existsSync(path.join(siteDirectory, "index.html"))) {
+  fail("site/dist/index.html not found. Run `pnpm site:build` first.")
+}
+// Without a root 404.html, Pages falls back to SPA mode and serves / for unknown paths.
+if (!fs.existsSync(path.join(siteDirectory, "404.html"))) {
+  fail("site/dist/404.html not found; unknown URLs would fall back to the site's home page.")
 }
 
-const skippedDirectory = path.join(distDirectory, CLOUDFLARE_SKIPPED_DIR)
-const deployableDirectory = path.join(distDirectory, DEPLOYABLE_DIR)
+const skippedDirectory = path.join(appDirectory, CLOUDFLARE_SKIPPED_DIR)
+const deployableDirectory = path.join(appDirectory, DEPLOYABLE_DIR)
 
 if (fs.existsSync(skippedDirectory)) {
   fs.rmSync(deployableDirectory, { force: true, recursive: true })
   fs.renameSync(skippedDirectory, deployableDirectory)
-  console.log(`Moved ${CLOUDFLARE_SKIPPED_DIR} to ${DEPLOYABLE_DIR}`)
+  console.log(`Moved play/${CLOUDFLARE_SKIPPED_DIR} to play/${DEPLOYABLE_DIR}`)
 }
 
 if (!fs.existsSync(deployableDirectory) || fs.readdirSync(deployableDirectory).length === 0) {
-  fail(`${DEPLOYABLE_DIR} is missing or empty; the web export looks incomplete.`)
+  fail(`play/${DEPLOYABLE_DIR} is missing or empty; the web export looks incomplete.`)
 }
 
 let rewrittenFileCount = 0
-for (const file of collectRewritableFiles(distDirectory)) {
+for (const file of collectRewritableFiles(appDirectory)) {
   const contents = fs.readFileSync(file, "utf8")
   if (!contents.includes(CLOUDFLARE_SKIPPED_DIR)) continue
   fs.writeFileSync(file, contents.split(CLOUDFLARE_SKIPPED_DIR).join(DEPLOYABLE_DIR))
@@ -72,7 +85,7 @@ for (const key of GUARDED_KEYS) {
   const expected = productionEnv[key]
   if (!expected) fail(`${key} is missing from the production build environment.`)
   const bundled = new Set()
-  for (const file of collectRewritableFiles(distDirectory))
+  for (const file of collectRewritableFiles(appDirectory))
     for (const [, value] of fs
       .readFileSync(file, "utf8")
       .matchAll(new RegExp(`${key}:\\s*"([^"]*)"`, "g")))
@@ -81,53 +94,24 @@ for (const key of GUARDED_KEYS) {
   const unexpected = [...bundled].filter((value) => value.replace(/\/$/, "") !== expected)
   if (unexpected.length > 0)
     fail(
-      `${key} in dist/ is ${unexpected.map((value) => `"${value}"`).join(", ")} but .env.production expects "${expected}". ` +
+      `${key} in dist/play/ is ${unexpected.map((value) => `"${value}"`).join(", ")} but .env.production expects "${expected}". ` +
         `Re-export with \`pnpm bundle:web:prod\` before deploying.`,
     )
 }
 console.log(`Verified ${GUARDED_KEYS.length} bundled production value(s).`)
 
-const clerkSignInUrl = productionEnv.EXPO_PUBLIC_CLERK_SIGN_IN_URL
-if (!clerkSignInUrl)
-  fail("EXPO_PUBLIC_CLERK_SIGN_IN_URL is missing from the production build environment.")
+// Pages treats unknown paths as 404.html, looking up from the requested directory.
+// The app shell at play/404.html makes any /play/* path without a rewrite rule in
+// web/_redirects (new routes, mistyped URLs) render the app instead of the site's 404 page.
+fs.copyFileSync(path.join(appDirectory, "index.html"), path.join(appDirectory, "404.html"))
 
-const waitlistDirectory = path.join(distDirectory, "waitlist")
-fs.rmSync(waitlistDirectory, { force: true, recursive: true })
-fs.cpSync(WAITLIST_SOURCE, waitlistDirectory, { recursive: true })
+for (const entry of fs.readdirSync(distDirectory)) {
+  if (entry !== APP_DIR_NAME)
+    fs.rmSync(path.join(distDirectory, entry), { force: true, recursive: true })
+}
+fs.cpSync(siteDirectory, distDirectory, { recursive: true })
 fs.copyFileSync(
-  path.join(process.cwd(), "assets", "images", "app-icon-all.png"),
-  path.join(waitlistDirectory, "icon.png"),
+  path.join(process.cwd(), "web", "_redirects"),
+  path.join(distDirectory, "_redirects"),
 )
-fs.copyFileSync(
-  path.join(
-    process.cwd(),
-    "node_modules",
-    "@expo-google-fonts",
-    "space-grotesk",
-    "400Regular",
-    "SpaceGrotesk_400Regular.ttf",
-  ),
-  path.join(waitlistDirectory, "space-grotesk-regular.ttf"),
-)
-fs.copyFileSync(
-  path.join(
-    process.cwd(),
-    "node_modules",
-    "@expo-google-fonts",
-    "space-grotesk",
-    "600SemiBold",
-    "SpaceGrotesk_600SemiBold.ttf",
-  ),
-  path.join(waitlistDirectory, "space-grotesk-semibold.ttf"),
-)
-
-const waitlistHtmlPath = path.join(waitlistDirectory, "index.html")
-const waitlistHtml = fs
-  .readFileSync(waitlistHtmlPath, "utf8")
-  .replaceAll("__CLERK_SIGN_IN_URL__", clerkSignInUrl)
-fs.writeFileSync(waitlistHtmlPath, waitlistHtml)
-fs.copyFileSync(
-  path.join(process.cwd(), "web", "_routes.json"),
-  path.join(distDirectory, "_routes.json"),
-)
-console.log("Prepared the wait-list page and Pages routing rules.")
+console.log("Merged the marketing site and Pages redirects into dist/.")

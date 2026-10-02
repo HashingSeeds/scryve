@@ -88,8 +88,14 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
   const normalizedInviteOrigin = normalizeHttpsOrigin(process.env.EXPO_PUBLIC_INVITE_ORIGIN)
   const inviteUrl = normalizedInviteOrigin ? new URL(normalizedInviteOrigin) : undefined
 
+  const webExportBaseUrl = process.env.SCRYVE_WEB_BASE_URL?.trim()
+
   const expoConfig = {
     ...config,
+    experiments: {
+      ...config.experiments,
+      ...(webExportBaseUrl ? { baseUrl: webExportBaseUrl } : {}),
+    },
     name: getAppName(),
     scheme: [getAppScheme(), getLegacyAppScheme()],
     ios: {

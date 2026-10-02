@@ -1,0 +1,19 @@
+{
+  "name": "scryve-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "check": "tsc --noEmit -p .",
+    "build": "tsc --noEmit -p . && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "7.3.5",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6",
+    "typescript": "~6.0.3"
+  }
+}
