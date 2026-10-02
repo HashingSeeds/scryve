@@ -100,6 +100,9 @@ jobs:
       - name: Build marketing site
         run: pnpm site:build
 
+      - name: Run script tests
+        run: pnpm test:scripts
+
       - name: Restore Jest cache
         uses: actions/cache@v4
         with:
