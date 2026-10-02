@@ -118,15 +118,13 @@ These are explicit release steps. Merging the PRs does not deploy Convex or enab
    `moderationReports.by_retention_expires_at` have finished staging in the
    target deployment before deploying current main.
 2. Deploy current main at or after `25ae2de` as an explicit Convex release. This activates retention enforcement and deploys `games:updateLobbySettings` for the merged PR #107 client. Record the expansion and current-main deployment commits.
-3. Run `pnpm exec convex run --prod moderation:backfillRetention '{}'` against
-   the authorized production target. The first invocation schedules subsequent
-   pages. Wait for those scheduled mutations to finish; an error can be retried
-   from the beginning because records with a deadline are skipped. Verify that
-   resolved reports have deadlines and the daily purge is scheduled.
-4. Confirm `games:updateLobbySettings` is live before publishing any client from PR #107. Publish the updated privacy disclosure only after retention enforcement and the backfill are complete. Follow the OTA or binary release steps above.
+3. The retention backfill was retired on 2026-10-02 after production showed 0
+   documents in `moderationReports` needing it. Reports now receive
+   `retentionExpiresAt` when resolved. Verify that the daily purge is scheduled.
+4. Confirm `games:updateLobbySettings` is live before publishing any client from PR #107. Publish the updated privacy disclosure only after retention enforcement is live. Follow the OTA or binary release steps above.
 
-These are separate authorized release actions. Merging a PR does not run the
-backfill or authorize an incidental production command.
+These are separate authorized release actions. Merging a PR does not authorize
+an incidental production command.
 
 ## Account deletion webhook protection rollout
 
