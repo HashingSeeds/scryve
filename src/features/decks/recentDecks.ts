@@ -6,7 +6,7 @@ const RECENT_DECKS_KEY = "decks.recentIds"
 const RECENT_DECK_LIMIT = 20
 
 function storedRecentDeckIds() {
-  const stored = load<unknown>(RECENT_DECKS_KEY)
+  const stored = load(RECENT_DECKS_KEY)
   if (!Array.isArray(stored)) return []
   return [...new Set(stored.filter((value): value is string => typeof value === "string"))].slice(
     0,
