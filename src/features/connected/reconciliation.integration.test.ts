@@ -76,7 +76,7 @@ const committed: ConnectedProjection = {
   ),
 }
 
-describe("subscription/ack reconciliation ordering", () => {
+describe("connected acknowledgement recovery", () => {
   it("recovers a committed acknowledgement after its operation ages out of recent IDs", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-a")
