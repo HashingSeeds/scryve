@@ -16,6 +16,9 @@ import {
 
 const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
 const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
+// Demo taps land far enough apart that each change shows on its own before the next.
+const DEMO_TAP_MS = 2600
+const PRESS_MS = 220
 // Commander damage the demo player deals to each successive opponent.
 const SAMPLE_COMMANDER_DAMAGE = [6, 3] as const
 
@@ -42,8 +45,8 @@ function query<T extends Element>(selector: string, root: ParentNode = document)
 const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)")
 const narrow = matchMedia("(max-width: 900px)")
 
-// The hero, the Features steps, and connected play all show one game. The pickers and the
-// game menu reset it the way the app would; the pickers follow whatever the game shows.
+// The hero, the Features steps, and connected play all show one game. The pickers reset it
+// the way the app would and follow whatever the game shows.
 function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   const board = query<HTMLElement>("[data-board='features']", stage)
   mountBoard(board, game)
@@ -133,28 +136,68 @@ function setUpStage() {
   setUpConnected(stage, game)
 
   const steps = document.querySelectorAll<HTMLElement>(".steps [data-step]")
+  // Screens CSS fades out stay out of the tab order and the accessibility tree.
+  const screens = stage.querySelectorAll<HTMLElement>("[data-for]")
+  const showScene = (scene: string) => {
+    stage.dataset.scene = scene
+    screens.forEach((screen) => {
+      screen.inert = !screen.dataset.for?.split(" ").includes(scene)
+    })
+  }
   const activate = (step: HTMLElement) => {
     if (stage.dataset.step === step.dataset.step && step.classList.contains("active")) return
-    const scene = step.closest<HTMLElement>("[data-scene]")?.dataset.scene ?? "intro"
-    stage.dataset.scene = scene
+    showScene(step.closest<HTMLElement>("[data-scene]")?.dataset.scene ?? "intro")
     stage.dataset.step = step.dataset.step ?? ""
     steps.forEach((other) => other.classList.toggle("active", other === step))
     onFeatureStep(stage.dataset.step)
   }
-  // On small screens the stage pins over the top half, so steps activate in the lower half.
+  showScene(stage.dataset.scene ?? "intro")
+  setUpDemoTaps(stage, game)
+  // A step activates as it crosses a one pixel line: the middle of the viewport, or the lower
+  // part on small screens where the stage pins over the top. Percentage margins would resolve
+  // against the viewport width, so the line is placed in pixels and moves on resize.
   let observer: IntersectionObserver | undefined
+  let frame = 0
   const observe = () => {
+    frame = 0
     observer?.disconnect()
+    const top = Math.floor(innerHeight * (narrow.matches ? 0.74 : 0.5))
     observer = new IntersectionObserver(
       (entries) =>
         entries.forEach((entry) => entry.isIntersecting && activate(entry.target as HTMLElement)),
-      { rootMargin: narrow.matches ? "-74% 0px -25% 0px" : "-50% 0px -50% 0px" },
+      { rootMargin: `${-top}px 0px ${top + 1 - innerHeight}px 0px` },
     )
     steps.forEach((step) => observer?.observe(step))
   }
-  narrow.addEventListener("change", observe)
+  addEventListener("resize", () => {
+    frame ||= requestAnimationFrame(observe)
+  })
   observe()
   setUpLanding(stage, () => activate(query("[data-step='intro']")))
+}
+
+// Until someone taps a total themselves, one card taps itself every few seconds, alternating
+// plus and minus, so the change shows and the total never drifts. It is the first player's,
+// or on small screens Sam's, whose card runs upright across the bottom of the phone.
+function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
+  let direction: 1 | -1 = 1
+  const timer = window.setInterval(() => {
+    const showing = stage.dataset.scene === "intro" || stage.dataset.scene === "features"
+    if (!showing || stage.dataset.step === "commander") return
+    const sam = NAMES.indexOf("Sam")
+    const seat = narrow.matches && sam < game.setup.names.length ? sam : 0
+    const hit = stage.querySelector<HTMLElement>(
+      `[data-board='features'] .hit[data-seat='${seat}'][data-dir='${direction}']`,
+    )
+    if (!hit) return
+    hit.classList.add("pressed")
+    window.setTimeout(() => hit.classList.remove("pressed"), PRESS_MS)
+    game.change(seat, direction)
+    direction = direction === 1 ? -1 : 1
+  }, DEMO_TAP_MS)
+  stage.addEventListener("click", (event) => {
+    if (event.isTrusted && (event.target as Element).closest(".hit")) window.clearInterval(timer)
+  })
 }
 
 // On wide screens the stage's phone starts out filling the hero, on its side, and shrinks

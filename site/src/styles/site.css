@@ -19,9 +19,11 @@
   box-sizing: border-box;
 }
 
+/* Quick repeat taps on the demo boards change life instead of zooming the page. */
 html {
   scroll-behavior: smooth;
   scroll-padding-top: var(--header);
+  touch-action: manipulation;
 }
 
 html,
@@ -514,6 +516,7 @@ figure {
   border: 0;
   background: none;
   cursor: pointer;
+  transition: background-color 0.25s;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -525,7 +528,8 @@ figure {
   right: 0;
 }
 
-.hit:active {
+.hit:active,
+.hit.pressed {
   background: rgb(0 0 0 / 10%);
 }
 
@@ -586,6 +590,21 @@ figure {
 
 .hero-foot h1 span {
   color: var(--dim);
+}
+
+.smiley {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+  vertical-align: -0.15em;
+}
+
+.smiley .eye {
+  fill: currentColor;
+  stroke: none;
 }
 
 /* ---------- tour: steps on the left, sticky stage on the right ---------- */
