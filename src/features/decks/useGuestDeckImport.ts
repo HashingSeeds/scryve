@@ -48,7 +48,9 @@ export function useGuestDeckImport(access?: CloudAccess) {
     const summary: GuestDeckImportResult = { imported: 0, limitReached: 0 }
     let failure: string | undefined
     try {
-      for (const deck of decks) {
+      for (const queued of decks) {
+        const deck = loadGuestDeck(queued.localId)
+        if (!deck) continue
         try {
           const response = await importGuest({
             ...deck.deck,
@@ -76,7 +78,12 @@ export function useGuestDeckImport(access?: CloudAccess) {
       }
       setResult(summary)
       setError(failure)
-      attempted.current = attemptKey(owner, loadGuestDecks())
+      attempted.current = attemptKey(
+        owner,
+        loadGuestDecks().filter((current) =>
+          decks.some((deck) => deck.localId === current.localId),
+        ),
+      )
     } finally {
       running.current = false
       setImporting(false)

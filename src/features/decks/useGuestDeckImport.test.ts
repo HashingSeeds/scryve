@@ -2,7 +2,13 @@ import { act, renderHook, waitFor } from "@testing-library/react-native"
 
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 
-import { clearGuestDecks, loadGuestDecks, saveGuestDeck } from "./guestDeck"
+import {
+  clearGuestDecks,
+  deleteGuestDeck,
+  loadGuestDecks,
+  replaceGuestDeck,
+  saveGuestDeck,
+} from "./guestDeck"
 import { useGuestDeckImport } from "./useGuestDeckImport"
 
 const mockImport = jest.fn()
@@ -100,6 +106,54 @@ describe("guest deck sign-in import", () => {
       expect.objectContaining({ localId: second.localId }),
     )
     expect(loadGuestDecks()).toEqual([])
+  })
+
+  it("does not import a deleted deck while another import is in flight", async () => {
+    const first = saveGuestDeck({ name: "First", format: "commander", cards: [] })
+    const second = saveGuestDeck({ name: "Second", format: "commander", cards: [] })
+    let resolve!: (value: unknown) => void
+    mockImport.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    const hook = renderHook(() => useGuestDeckImport(access))
+    await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))
+    act(() => deleteGuestDeck(second.localId))
+    await act(async () => {
+      resolve({ status: "imported", deckId: "remote", localUpdatedAt: first.updatedAt })
+    })
+    expect(mockImport).toHaveBeenCalledTimes(1)
+    expect(loadGuestDecks()).toEqual([])
+    expect(hook.result.current.error).toBeUndefined()
+  })
+
+  it("imports a replacement saved while another import is in flight", async () => {
+    const first = saveGuestDeck({ name: "First", format: "commander", cards: [] })
+    const second = saveGuestDeck({ name: "Second", format: "commander", cards: [] })
+    let resolve!: (value: unknown) => void
+    mockImport.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    mockImport.mockImplementation(({ localUpdatedAt }) =>
+      Promise.resolve({ status: "imported", deckId: "remote-2", localUpdatedAt }),
+    )
+    renderHook(() => useGuestDeckImport(access))
+    await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))
+    let replacement!: ReturnType<typeof replaceGuestDeck>
+    act(() => {
+      replacement = replaceGuestDeck({ ...second.deck, name: "Replacement" }, second.localId)
+    })
+    await act(async () => {
+      resolve({ status: "imported", deckId: "remote", localUpdatedAt: first.updatedAt })
+    })
+    await waitFor(() => expect(loadGuestDecks()).toEqual([]))
+    expect(mockImport).toHaveBeenCalledTimes(2)
+    expect(mockImport).toHaveBeenLastCalledWith(
+      expect.objectContaining({ localId: replacement.localId, name: "Replacement" }),
+    )
   })
 
   it("does not delete the local deck if the user signs out during import", async () => {
