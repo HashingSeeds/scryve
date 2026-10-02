@@ -25,14 +25,15 @@ function subscriberResponse({
   sandbox = false,
   expiresDate,
   gracePeriodExpiresDate = null,
+  productIdentifier = "scryve_pro_monthly",
 }: {
   enabled: boolean
   observedAt: number
   sandbox?: boolean
   expiresDate?: string
   gracePeriodExpiresDate?: string | null
+  productIdentifier?: string
 }) {
-  const productIdentifier = "scryve_pro_monthly"
   return new Response(
     JSON.stringify({
       request_date_ms: observedAt,
@@ -298,52 +299,60 @@ describe("RevenueCat entitlement sync", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
-  it("maps subscription, grace-period, sandbox, and expired Count Pro state to server access", async () => {
-    const t = convexTest(schema, modules)
-    const actor = await createUser(t, "clerk_status")
-    const fetchSpy = jest.spyOn(globalThis, "fetch")
-    fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: true, observedAt: 700 }))
-    await actor.action(api.revenuecat.syncCurrent, {})
-    await expect(actor.query(api.entitlements.current, {})).resolves.toEqual({
-      fullHistory: true,
-      proDecksLimit: true,
-      unlimitedDecks: true,
-      deckAnalytics: true,
-      deckVersions: true,
-    })
-    await expect(actor.query(api.decks.listMine, {})).resolves.toMatchObject({
-      capacity: { premium: true, limit: 100 },
-    })
+  it.each(["scryve_pro_monthly", "foil_yearly"])(
+    "maps %s subscription state to the same Pro access",
+    async (productIdentifier) => {
+      const t = convexTest(schema, modules)
+      const actor = await createUser(t, "clerk_status")
+      const fetchSpy = jest.spyOn(globalThis, "fetch")
+      fetchSpy.mockResolvedValueOnce(
+        subscriberResponse({ enabled: true, observedAt: 700, productIdentifier }),
+      )
+      await actor.action(api.revenuecat.syncCurrent, {})
+      await expect(actor.query(api.entitlements.current, {})).resolves.toEqual({
+        fullHistory: true,
+        proDecksLimit: true,
+        unlimitedDecks: true,
+        deckAnalytics: true,
+        deckVersions: true,
+      })
+      await expect(actor.query(api.decks.listMine, {})).resolves.toMatchObject({
+        capacity: { premium: true, limit: 100 },
+      })
 
-    fetchSpy.mockResolvedValueOnce(
-      subscriberResponse({
-        enabled: true,
-        observedAt: 800,
-        expiresDate: new Date(799).toISOString(),
-        gracePeriodExpiresDate: new Date(900).toISOString(),
-      }),
-    )
-    await actor.action(api.revenuecat.syncCurrent, {})
-    await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
-      fullHistory: true,
-    })
+      fetchSpy.mockResolvedValueOnce(
+        subscriberResponse({
+          enabled: true,
+          observedAt: 800,
+          expiresDate: new Date(799).toISOString(),
+          gracePeriodExpiresDate: new Date(900).toISOString(),
+          productIdentifier,
+        }),
+      )
+      await actor.action(api.revenuecat.syncCurrent, {})
+      await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
+        fullHistory: true,
+      })
 
-    fetchSpy.mockResolvedValueOnce(
-      subscriberResponse({ enabled: true, observedAt: 900, sandbox: true }),
-    )
-    await actor.action(api.revenuecat.syncCurrent, {})
-    await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
-      fullHistory: true,
-      proDecksLimit: false,
-    })
+      fetchSpy.mockResolvedValueOnce(
+        subscriberResponse({ enabled: true, observedAt: 900, sandbox: true, productIdentifier }),
+      )
+      await actor.action(api.revenuecat.syncCurrent, {})
+      await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
+        fullHistory: true,
+        proDecksLimit: false,
+      })
 
-    fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: false, observedAt: 1_000 }))
-    await actor.action(api.revenuecat.syncCurrent, {})
-    await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
-      fullHistory: true,
-      proDecksLimit: false,
-    })
-  })
+      fetchSpy.mockResolvedValueOnce(
+        subscriberResponse({ enabled: false, observedAt: 1_000, productIdentifier }),
+      )
+      await actor.action(api.revenuecat.syncCurrent, {})
+      await expect(actor.query(api.entitlements.current, {})).resolves.toMatchObject({
+        fullHistory: true,
+        proDecksLimit: false,
+      })
+    },
+  )
 
   it("requires a matching subscription before granting Pro access", async () => {
     const t = convexTest(schema, modules)

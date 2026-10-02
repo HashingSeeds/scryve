@@ -51,6 +51,10 @@ Existing clients keep their current API contracts and cached offline access.
    packages and make it the default offering. Store product identifiers
    must match the stores; the package identifiers above are RevenueCat identifiers.
    Configure its paywall and Customer Center for the app's existing billing UI.
+   For web, include the `foil_yearly` package with a US$500 auto-renewing yearly
+   subscription attached to the same `Count Pro` entitlement. Present it as an
+   optional supporter subscription with the same Pro features. Keep this product
+   mapped only to the web billing app, so mobile offers remain monthly and yearly.
 2. In each Convex deployment's Settings → Environment Variables, set
    `REVENUECAT_SECRET_API_KEY` to a RevenueCat key that can read v1 subscriber info
    (the Test Store SDK key works for QA; a v1 secret API key also works),
