@@ -1390,11 +1390,13 @@ export const updateMySeat = mutation({
     const { player } = await requireSeatOwner(ctx, game._id, args.seat)
     const displayName = assertDisplayName(args.displayName)
     assertAllowedColor(args.color)
-    const players = await playersForGame(ctx, game._id)
-    const requested = { ...appearanceOf(player), color: args.color.toUpperCase() }
-    if (appearanceIsTaken(takenAppearances(players, player._id), requested))
-      throw new Error("Another player already claimed that color or shape")
-    await ctx.db.patch(player._id, { displayName, ...requested })
+    const color = args.color.toUpperCase()
+    if (color !== player.color.toUpperCase()) {
+      const players = await playersForGame(ctx, game._id)
+      if (players.some((other) => other._id !== player._id && other.color.toUpperCase() === color))
+        throw new Error("Another player already claimed that color or shape")
+    }
+    await ctx.db.patch(player._id, { displayName, color })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
   },
 })

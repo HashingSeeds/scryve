@@ -2008,4 +2008,42 @@ describe("hosted player appearances", () => {
     expect(projection.players[1].color).not.toBe(projection.players[0].color)
     expect(projection.players[1].shape).not.toBe(projection.players[0].shape)
   })
+
+  it("allows legacy lobby renames and color changes despite unchanged duplicate shapes", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await lobby(t)
+    const joiner = await synced(t, "legacy-rename-joiner", "Joiner")
+    const { seat } = await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner" })
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    const [first, second] = projection.players
+    await t.run((ctx) =>
+      ctx.db.patch(second.playerId, { color: first.color.toLowerCase(), shape: first.shape }),
+    )
+
+    await joiner.mutation(api.games.updateMySeat, {
+      publicId: created.publicId,
+      seat,
+      displayName: "Renamed",
+      color: first.color,
+    })
+    await joiner.mutation(api.games.updateMySeat, {
+      publicId: created.publicId,
+      seat,
+      displayName: "Renamed",
+      color: "#117b9c",
+    })
+    expect(await t.run((ctx) => ctx.db.get(second.playerId))).toMatchObject({
+      displayName: "Renamed",
+      color: "#117B9C",
+      shape: first.shape,
+    })
+    await expect(
+      joiner.mutation(api.games.updateMySeat, {
+        publicId: created.publicId,
+        seat,
+        displayName: "Renamed",
+        color: first.color,
+      }),
+    ).rejects.toThrow("color or shape")
+  })
 })

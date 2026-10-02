@@ -471,6 +471,28 @@ describe("NewGameScreen", () => {
     expect(view.getByTestId("appearance-shape-heart")).toBeDisabled()
   })
 
+  it("keeps customized appearances when activating seats with conflicting defaults", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
+
+    fireEvent.press(view.getByTestId("player-appearance-2"))
+    fireEvent.press(view.getByTestId("appearance-color-39755c"))
+    fireEvent.press(view.getByTestId("appearance-shape-square"))
+    fireEvent.press(view.getByTestId("save-local-appearance-button"))
+    for (let count = 2; count < 6; count += 1)
+      fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-decrement"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("start-game-button"))
+
+    const players = onStartLocal.mock.calls[0][0] as Parameters<
+      NewGameScreenProps["onStartLocal"]
+    >[0]
+    expect(players[1]).toMatchObject({ color: "#39755C", shape: "square" })
+    expect(new Set(players.map(({ color }) => color)).size).toBe(6)
+    expect(new Set(players.map(({ shape }) => shape)).size).toBe(6)
+  })
+
   it("uses the Life box as the starting value and saves a per-game change amount", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })

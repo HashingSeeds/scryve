@@ -55,6 +55,7 @@ import { accessibleForeground } from "@/utils/colorContrast"
 
 import {
   PLAYER_MARK_SHAPES,
+  resolveAppearance,
   shapeForSeat,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
@@ -315,6 +316,17 @@ export function NewGameScreen({
   }
 
   function choosePlayerCount(value: number) {
+    if (value > playerCount)
+      setAppearances((current) => {
+        const next = [...current]
+        for (let index = playerCount; index < value; index += 1)
+          next[index] = resolveAppearance({
+            preferred: current[index],
+            taken: next.slice(0, index),
+            seat: index + 1,
+          })
+        return next
+      })
     setPlayerCount(value)
     setLayout((current) => playerGridLayoutForCount(value, current))
   }
