@@ -206,7 +206,6 @@ export const connectedHarness: {
   convexLoading: boolean
   userId?: string
   userLoaded: boolean
-  migrationOwners: Set<string>
   decks: SeatDeck[] | undefined
 } = {
   activeGames: [],
@@ -220,7 +219,6 @@ export const connectedHarness: {
   convexLoading: false,
   userId: "user-a",
   userLoaded: true,
-  migrationOwners: new Set<string>(),
   decks: [],
 }
 
@@ -268,7 +266,6 @@ export function resetConnectedHarness() {
   connectedHarness.convexLoading = false
   connectedHarness.userId = "user-a"
   connectedHarness.userLoaded = true
-  connectedHarness.migrationOwners.clear()
   connectedHarness.decks = []
 }
 
