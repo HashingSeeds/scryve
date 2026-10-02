@@ -8,6 +8,7 @@ const mockOpenAuth = jest.fn()
 const mockPurchase = jest.fn().mockResolvedValue({ status: "purchased" })
 const mockBilling = {
   configured: true,
+  isReady: true,
   isLoading: false,
   isCountPro: false,
   purchase: mockPurchase,
@@ -38,6 +39,7 @@ function renderRoute() {
 beforeEach(() => {
   jest.clearAllMocks()
   mockSignedIn = false
+  mockBilling.isReady = true
   mockBilling.isCountPro = false
 })
 
@@ -54,4 +56,12 @@ it("opens Foil checkout for a signed-in free player", async () => {
   const view = renderRoute()
   await act(async () => fireEvent.press(view.getByText("Choose Foil Supporter")))
   expect(mockPurchase).toHaveBeenCalledWith("foil_yearly")
+})
+
+it("waits for billing to identify the signed-in account", () => {
+  mockSignedIn = true
+  mockBilling.isReady = false
+  const view = renderRoute()
+  fireEvent.press(view.getByText("Choose Foil Supporter"))
+  expect(mockPurchase).not.toHaveBeenCalled()
 })

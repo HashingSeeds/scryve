@@ -37,6 +37,7 @@ export type PurchaseResult =
 
 interface RevenueCatAccess {
   configured: boolean
+  isReady: boolean
   configurationMessage?: string
   isLoading: boolean
   isCountPro: boolean
@@ -53,6 +54,7 @@ interface RevenueCatAccess {
 const unavailable = async () => null
 const RevenueCatContext = createContext<RevenueCatAccess>({
   configured: false,
+  isReady: false,
   isLoading: false,
   isCountPro: false,
   customerInfo: null,
@@ -142,7 +144,9 @@ export function RevenueCatProvider({
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null)
   const [isLoading, setIsLoading] = useState(Boolean(apiKey && appUserID))
   const [error, setError] = useState<string>()
+  const [configuredUserId, setConfiguredUserId] = useState<string>()
   const configured = Boolean(apiKey)
+  const isReady = Boolean(apiKey && appUserID && configuredUserId === appUserID)
   const acceptCustomerInfo = useCallback((next: CustomerInfo) => {
     setCustomerInfo((current) => mostRecentlyFetchedCustomerInfo(current, next))
   }, [])
@@ -165,6 +169,7 @@ export function RevenueCatProvider({
   )
 
   useEffect(() => {
+    setConfiguredUserId(undefined)
     if (!apiKey || !appUserID) {
       setCustomerInfo(null)
       setCurrentOffering(null)
@@ -183,6 +188,7 @@ export function RevenueCatProvider({
     void configureForUser(apiKey, appUserID)
       .then(async () => {
         if (cancelled) return
+        setConfiguredUserId(appUserID)
         Purchases.addCustomerInfoUpdateListener(listener)
         const [, offerings] = await Promise.all([
           Purchases.getCustomerInfo().then((next) => {
@@ -209,6 +215,8 @@ export function RevenueCatProvider({
     async (productId: CountProductId | typeof FOIL_PRODUCT_ID): Promise<PurchaseResult> => {
       try {
         setError(undefined)
+        if (!isReady || (await Purchases.getAppUserID()) !== appUserID)
+          throw new Error("Wait for billing to connect to your account, then try again.")
         if (productId === FOIL_PRODUCT_ID) {
           if (Platform.OS !== "web")
             throw new Error("Foil purchases are only available on the web.")
@@ -235,7 +243,7 @@ export function RevenueCatProvider({
         return { status: "failed", message }
       }
     },
-    [acceptCustomerInfo, currentOffering],
+    [acceptCustomerInfo, appUserID, currentOffering, isReady],
   )
 
   const restorePurchases = useCallback(async (): Promise<PurchaseResult> => {
@@ -254,6 +262,8 @@ export function RevenueCatProvider({
   const presentPaywall = useCallback(async () => {
     try {
       setError(undefined)
+      if (!isReady || (await Purchases.getAppUserID()) !== appUserID)
+        throw new Error("Wait for billing to connect to your account, then try again.")
       const result = await presentCountProPaywall(currentOffering)
       if (result === "error") setError("The Scryve Pro paywall could not complete the request.")
       if (result === "purchased" || result === "restored") await refreshCustomerInfo()
@@ -262,7 +272,7 @@ export function RevenueCatProvider({
       setError(revenueCatErrorMessage(cause))
       return "error" as const
     }
-  }, [currentOffering, refreshCustomerInfo])
+  }, [appUserID, currentOffering, isReady, refreshCustomerInfo])
 
   const presentCustomerCenter = useCallback(async () => {
     try {
@@ -277,6 +287,7 @@ export function RevenueCatProvider({
   const value = useMemo<RevenueCatAccess>(
     () => ({
       configured,
+      isReady,
       configurationMessage,
       isLoading,
       isCountPro: hasCountPro(customerInfo),
@@ -296,6 +307,7 @@ export function RevenueCatProvider({
       currentOffering,
       error,
       isLoading,
+      isReady,
       presentCustomerCenter,
       presentPaywall,
       purchase,

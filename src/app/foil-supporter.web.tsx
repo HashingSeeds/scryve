@@ -65,7 +65,7 @@ export default function FoilSupporterRoute() {
           ) : (
             <Button
               text={purchasing ? "Opening checkout…" : "Choose Foil Supporter"}
-              disabled={!billing.configured || billing.isLoading || purchasing}
+              disabled={!billing.isReady || billing.isLoading || purchasing}
               onPress={() => void purchase()}
             />
           )}

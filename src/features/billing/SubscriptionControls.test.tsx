@@ -10,6 +10,7 @@ const presentCustomerCenter = jest.fn().mockResolvedValue(undefined)
 
 const mockBilling = {
   configured: true,
+  isReady: true,
   configurationMessage: undefined as string | undefined,
   isLoading: false,
   isCountPro: false,

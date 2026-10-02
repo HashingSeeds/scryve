@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from "@testing-library/react-native"
 import Purchases from "react-native-purchases"
 
 import { RevenueCatProvider, useRevenueCat } from "./RevenueCatContext"
+import { presentCountProPaywall } from "./revenueCatUi"
 
 const customerInfo = {
   entitlements: {
@@ -85,6 +86,7 @@ describe("RevenueCatProvider", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     purchasesMock.isConfigured.mockResolvedValue(false)
+    purchasesMock.getAppUserID.mockResolvedValue("user_123")
     purchasesMock.getCustomerInfo.mockResolvedValue(customerInfo)
     purchasesMock.getOfferings.mockResolvedValue({ current: offering, all: {} })
     purchasesMock.purchasePackage.mockResolvedValue({ customerInfo } as never)
@@ -109,6 +111,50 @@ describe("RevenueCatProvider", () => {
       expect(await result.current.purchase("monthly")).toMatchObject({ status: "purchased" })
     })
     expect(Purchases.purchasePackage).toHaveBeenCalledWith(monthlyPackage)
+  })
+
+  it("blocks checkout when the signed-in account has no billing user ID", async () => {
+    const { result } = renderHook(() => useRevenueCat(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RevenueCatProvider apiKey="test_public">{children}</RevenueCatProvider>
+      ),
+    })
+    expect(result.current.isReady).toBe(false)
+    await act(async () => {
+      expect(await result.current.purchase("foil_yearly")).toMatchObject({ status: "failed" })
+      expect(await result.current.presentPaywall()).toBe("error")
+    })
+    expect(Purchases.purchasePackage).not.toHaveBeenCalled()
+    expect(presentCountProPaywall).not.toHaveBeenCalled()
+  })
+
+  it("blocks checkout while RevenueCat is switching away from a stale account", async () => {
+    purchasesMock.isConfigured.mockResolvedValue(true)
+    purchasesMock.getAppUserID.mockResolvedValue("previous_user")
+    let finishLogin!: () => void
+    purchasesMock.logIn.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishLogin = () => resolve({ customerInfo, created: false })
+      }),
+    )
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(Purchases.logIn).toHaveBeenCalledWith("user_123"))
+    expect(result.current.isReady).toBe(false)
+    await act(async () => {
+      expect(await result.current.purchase("monthly")).toMatchObject({ status: "failed" })
+      expect(await result.current.presentPaywall()).toBe("error")
+    })
+    expect(Purchases.purchasePackage).not.toHaveBeenCalled()
+    expect(presentCountProPaywall).not.toHaveBeenCalled()
+
+    purchasesMock.getAppUserID.mockResolvedValue("user_123")
+    await act(async () => finishLogin())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    purchasesMock.getAppUserID.mockResolvedValue("previous_user")
+    await act(async () => {
+      expect(await result.current.purchase("monthly")).toMatchObject({ status: "failed" })
+    })
+    expect(Purchases.purchasePackage).not.toHaveBeenCalled()
   })
 
   it("purchases web Foil only from its separate offering", async () => {

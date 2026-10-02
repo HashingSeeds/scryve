@@ -54,7 +54,7 @@ export function SubscriptionControls() {
               ? `Manage Scryve ${planName} subscription`
               : "View Scryve Pro options"
           }
-          disabled={billing.isLoading}
+          disabled={!billing.isReady || billing.isLoading}
           style={themed($button)}
           textStyle={themed($buttonText)}
           onPress={() =>
