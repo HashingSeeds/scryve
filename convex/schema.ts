@@ -103,7 +103,6 @@ export default defineSchema({
     .index("by_game", ["gameId"])
     .index("by_game_seat", ["gameId", "seat"])
     .index("by_game_user", ["gameId", "userId"])
-    .index("by_game_user_and_device", ["gameId", "userId", "deviceId"])
     .index("by_user", ["userId"])
     .index("by_user_resumable", ["userId", "resumable"]),
 
@@ -163,7 +162,6 @@ export default defineSchema({
   })
     .index("by_game_server_time", ["gameId", "serverCreatedAt"])
     .index("by_game_operation", ["gameId", "operationId"])
-    .index("by_operation_id", ["operationId"])
     .index("by_actor_user", ["actorUserId"]),
 
   // One row per commander/defender pair keeps totals bounded and avoids replaying the event log.
@@ -196,7 +194,6 @@ export default defineSchema({
   })
     .index("by_game_operation", ["gameId", "operationId"])
     .index("by_game_and_status", ["gameId", "status"])
-    .index("by_game_and_to_and_status", ["gameId", "toPlayerId", "status"])
     .index("by_actor_user", ["actorUserId"])
     .index("by_resolved_by_user", ["resolvedByUserId"]),
 
@@ -308,7 +305,6 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_deck_and_version_number", ["deckId", "versionNumber"])
-    .index("by_deck_and_created_at", ["deckId", "createdAt"])
     .index("by_deck_and_archived_at", ["deckId", "archivedAt"]),
 
   deckCards: defineTable({
@@ -335,7 +331,6 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_game_and_identity_namespace_and_card_id", ["game", "identityNamespace", "cardId"])
-    .index("by_game_and_name_normalized", ["game", "nameNormalized"])
     .searchIndex("search_name", { searchField: "name", filterFields: ["game"] }),
 
   cardPrintings: defineTable({
@@ -361,7 +356,6 @@ export default defineSchema({
     ),
     updatedAt: v.number(),
   })
-    .index("by_game_and_provider_and_provider_card_id", ["game", "provider", "providerCardId"])
     .index("by_game_card_id", ["gameCardId"])
     .index("by_game_and_printing_id", ["game", "printingId"]),
 
@@ -385,12 +379,6 @@ export default defineSchema({
     note: v.optional(v.string()),
     updatedAt: v.number(),
   }).index("by_game_and_capability", ["game", "capability"]),
-
-  deckCatalogRefreshes: defineTable({
-    game: v.string(),
-    format: v.string(),
-    scheduledId: v.id("_scheduled_functions"),
-  }).index("by_game_and_format", ["game", "format"]),
 
   deckCatalogs: defineTable({
     game: v.string(),
@@ -443,9 +431,7 @@ export default defineSchema({
     finishedAt: v.number(),
   })
     .index("by_deck_and_finished_at", ["deckId", "finishedAt"])
-    .index("by_version_and_finished_at", ["deckVersionId", "finishedAt"])
-    .index("by_user", ["userId"])
-    .index("by_game_and_player", ["gameId", "playerId"]),
+    .index("by_user", ["userId"]),
 
   deckVersionStats: defineTable({
     deckId: v.id("decks"),
@@ -491,9 +477,7 @@ export default defineSchema({
     collectorNumber: v.optional(v.string()),
     rarity: v.optional(v.string()),
     updatedAt: v.number(),
-  })
-    .index("by_scryfall_id", ["scryfallId"])
-    .index("by_oracle_id", ["oracleId"]),
+  }).index("by_scryfall_id", ["scryfallId"]),
 
   preconCatalogs: defineTable({
     fetchedAt: v.number(),
