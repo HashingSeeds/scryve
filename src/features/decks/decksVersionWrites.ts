@@ -641,13 +641,17 @@ const emptySnapshot: DeckVersionWriteSnapshot = {
   capacityBlocked: false,
 }
 
-export function useDeckVersionWrites(enabled: boolean, ownerId?: string) {
+export function useDeckVersionWrites(
+  enabled: boolean,
+  ownerId: string | undefined,
+  ready: boolean,
+) {
   const client = useConvex()
   const controller = useMemo(
     () => (enabled && ownerId ? getDeckVersionWriteController(client, ownerId) : undefined),
     [client, enabled, ownerId],
   )
-  useEffect(() => controller?.start(), [controller])
+  useEffect(() => (ready ? controller?.start() : undefined), [controller, ready])
   const snapshot = useValue(() => controller?.state$.get() ?? emptySnapshot)
   return {
     ...snapshot,

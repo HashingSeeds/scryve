@@ -268,9 +268,9 @@ function DeckDetailContent({
   const navigation = useNavigation()
   const client = useConvex()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
-  const synced = useDeckSync(syncEnabled, access?.ownerId)
-  const metadataWrites = useDeckMetadataWrites(syncEnabled, access?.ownerId)
-  const versionWrites = useDeckVersionWrites(syncEnabled, access?.ownerId)
+  const synced = useDeckSync(syncEnabled, access?.ownerId, access?.ready ?? false)
+  const metadataWrites = useDeckMetadataWrites(syncEnabled, access?.ownerId, access?.ready ?? false)
+  const versionWrites = useDeckVersionWrites(syncEnabled, access?.ownerId, access?.ready ?? false)
   const knownDeleted = [...synced.metadata, ...metadataWrites.metadata].some(
     (deck) => deck.deckId === deckId && deck.deleted,
   )
