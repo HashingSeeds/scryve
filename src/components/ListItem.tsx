@@ -101,12 +101,6 @@ interface ListItemActionProps {
   side: "left" | "right"
 }
 
-/**
- * A styled row component that can be used in FlatList, SectionList, or by itself.
- * @see [Documentation and Examples]{@link https://docs.infinite.red/ignite-cli/boilerplate/app/components/ListItem/}
- * @param {ListItemProps} props - The props for the `ListItem` component.
- * @returns {JSX.Element} The rendered `ListItem` component.
- */
 export const ListItem = forwardRef<View, ListItemProps>(function ListItem(
   props: ListItemProps,
   ref,
@@ -190,10 +184,6 @@ export const ListItem = forwardRef<View, ListItemProps>(function ListItem(
   )
 })
 
-/**
- * @param {ListItemActionProps} props - The props for the `ListItemAction` component.
- * @returns {JSX.Element | null} The rendered `ListItemAction` component.
- */
 function ListItemAction(props: ListItemActionProps) {
   const { icon, Component, iconColor, size, side } = props
   const { themed } = useAppTheme()

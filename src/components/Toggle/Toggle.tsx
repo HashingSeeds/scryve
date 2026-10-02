@@ -117,12 +117,6 @@ export interface BaseToggleInputProps<T> {
   detailStyle: ViewStyle | ImageStyle
 }
 
-/**
- * Renders a boolean input.
- * This is a controlled component that requires an onValueChange callback that updates the value prop in order for the component to reflect user actions. If the value prop is not updated, the component will continue to render the supplied value prop instead of the expected result of any user actions.
- * @param {ToggleProps} props - The props for the `Toggle` component.
- * @returns {JSX.Element} The rendered `Toggle` component.
- */
 export function Toggle<T>(props: ToggleProps<T>) {
   const {
     editable = true,
@@ -209,10 +203,6 @@ export function Toggle<T>(props: ToggleProps<T>) {
   )
 }
 
-/**
- * @param {ToggleProps} props - The props for the `FieldLabel` component.
- * @returns {JSX.Element} The rendered `FieldLabel` component.
- */
 function FieldLabel<T>(props: ToggleProps<T>) {
   const {
     status,

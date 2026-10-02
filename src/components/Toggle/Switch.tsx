@@ -26,11 +26,6 @@ interface SwitchInputProps extends BaseToggleInputProps<SwitchToggleProps> {
   accessibilityMode?: SwitchToggleProps["accessibilityMode"]
 }
 
-/**
- * @param {SwitchToggleProps} props - The props for the `Switch` component.
- * @see [Documentation and Examples]{@link https://docs.infinite.red/ignite-cli/boilerplate/app/components/Switch}
- * @returns {JSX.Element} The rendered `Switch` component.
- */
 export function Switch(props: SwitchToggleProps) {
   const { accessibilityMode, ...rest } = props
   const switchInput = useCallback(
@@ -175,10 +170,6 @@ function SwitchInput(props: SwitchInputProps) {
   )
 }
 
-/**
- * @param {ToggleInputProps & { role: "on" | "off" }} props - The props for the `SwitchAccessibilityLabel` component.
- * @returns {JSX.Element} The rendered `SwitchAccessibilityLabel` component.
- */
 function SwitchAccessibilityLabel(props: SwitchInputProps & { role: "on" | "off" }) {
   const { on, disabled, status, accessibilityMode, role, innerStyle, detailStyle } = props
 

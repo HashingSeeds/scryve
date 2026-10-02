@@ -42,7 +42,7 @@ describe("Button", () => {
   it("keeps nested text overrides presentation-only", () => {
     const nestedButtonContentIsExcluded: NestedButtonContentIsExcluded = true
 
-    expect(nestedButtonContentIsExcluded).toBe(true)
+    void nestedButtonContentIsExcluded
   })
 
   it("applies a visible default disabled treatment and keeps caller overrides", () => {

@@ -11,10 +11,6 @@ const sadFace = require("@assets/images/sad-face.png")
 
 interface EmptyStateProps {
   /**
-   * An optional prop that specifies the text/image set to use for the empty state.
-   */
-  preset?: "generic"
-  /**
    * Style override for the container.
    */
   style?: StyleProp<ViewStyle>
@@ -103,19 +99,6 @@ interface EmptyStateProps {
   ButtonProps?: ButtonProps
 }
 
-interface EmptyStatePresetItem {
-  imageSource: ImageProps["source"] | null
-  heading: TextProps["text"]
-  content: TextProps["text"]
-  button: TextProps["text"]
-}
-
-/**
- * A component to use when there is no data to display. It can be utilized to direct the user what to do next.
- * @see [Documentation and Examples]{@link https://docs.infinite.red/ignite-cli/boilerplate/app/components/EmptyState/}
- * @param {EmptyStateProps} props - The props for the `EmptyState` component.
- * @returns {JSX.Element} The rendered `EmptyState` component.
- */
 export function EmptyState(props: EmptyStateProps) {
   const {
     theme,
@@ -123,29 +106,18 @@ export function EmptyState(props: EmptyStateProps) {
     theme: { spacing },
   } = useAppTheme()
 
-  const EmptyStatePresets = {
-    generic: {
-      imageSource: sadFace,
-      heading: translate("emptyStateComponent:generic.heading"),
-      content: translate("emptyStateComponent:generic.content"),
-      button: translate("emptyStateComponent:generic.button"),
-    } as EmptyStatePresetItem,
-  } as const
-
-  const preset = EmptyStatePresets[props.preset ?? "generic"]
-
   const {
-    button = preset.button,
+    button = translate("emptyStateComponent:generic.button"),
     buttonTx,
     buttonOnPress,
     buttonTxOptions,
-    content = preset.content,
+    content = translate("emptyStateComponent:generic.content"),
     contentTx,
     contentTxOptions,
-    heading = preset.heading,
+    heading = translate("emptyStateComponent:generic.heading"),
     headingTx,
     headingTxOptions,
-    imageSource = preset.imageSource,
+    imageSource = sadFace,
     style: $containerStyleOverride,
     buttonStyle: $buttonStyleOverride,
     buttonTextStyle: $buttonTextStyleOverride,
