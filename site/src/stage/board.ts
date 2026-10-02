@@ -22,6 +22,10 @@ const SHAPE_PATHS: Record<PlayerMarkShape, string> = {
   diamond: '<path d="M12 .8 23.2 12 12 23.2.8 12z"/>',
   star: '<path d="m12 1.5 3.1 6.9 7.4.7-5.6 5 1.7 7.4L12 17.6l-6.6 3.9 1.7-7.4-5.6-5 7.4-.7z"/>',
   hexagon: '<path d="M6.5 2h11l5.5 10-5.5 10h-11L1 12z"/>',
+  plus: '<path d="M8.4 2h7.2v6.4H22v7.2h-6.4V22H8.4v-6.4H2V8.4h6.4z"/>',
+  shield: '<path d="M12 2l8.6 3.6v7.1c0 4.3-3.6 7.1-8.6 10-5-2.9-8.6-5.7-8.6-10V5.6z"/>',
+  heart:
+    '<path transform="translate(-3.7 -3.7) scale(.714)" d="M22 36 10 24C2 16 8 6 16 10c3 1 5 4 6 6 1-2 3-5 6-6 8-4 14 6 6 14Z"/>',
 }
 
 // The game menu button, ported from the app's dark keystoneIIFlat shape
@@ -189,6 +193,9 @@ const APP_MARK_SHAPES: Record<PlayerMarkShape, string> = {
   diamond: '<polygon points="22,9 35,22 22,35 9,22"/>',
   star: '<path d="M22 8l4.2 8.5 9.4 1.4-6.8 6.6 1.6 9.3-8.4-4.4-8.4 4.4 1.6-9.3-6.8-6.6 9.4-1.4z"/>',
   hexagon: '<polygon points="22,8 34,15 34,29 22,36 10,29 10,15"/>',
+  plus: '<path d="M17 8h10v9h9v10h-9v9H17v-9H8V17h9z"/>',
+  shield: '<path d="M22 8l12 5v10c0 6-5 10-12 14-7-4-12-8-12-14V13z"/>',
+  heart: '<path d="M22 36 10 24C2 16 8 6 16 10c3 1 5 4 6 6 1-2 3-5 6-6 8-4 14 6 6 14Z"/>',
 }
 
 // Where the sword sits inside each shape (PlayerMark's SWORD_INSET_THAT_FITS_SHAPE).
@@ -199,6 +206,9 @@ const SWORD_INSETS: Record<PlayerMarkShape, { centerY: number; size: number }> =
   hexagon: { centerY: 22, size: 16 },
   triangle: { centerY: 25, size: 13 },
   star: { centerY: 22, size: 12 },
+  plus: { centerY: 22, size: 12 },
+  shield: { centerY: 21, size: 15 },
+  heart: { centerY: 22, size: 14 },
 }
 
 // The sword glyph from src/components/Sword.tsx, on a 24 unit box.
