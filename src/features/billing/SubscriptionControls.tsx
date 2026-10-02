@@ -12,6 +12,8 @@ export function SubscriptionControls() {
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
   const entitlement = billing.customerInfo?.entitlements.all[COUNT_PRO_ENTITLEMENT_ID]
+  const planName =
+    billing.isCountPro && entitlement?.productIdentifier === "foil_yearly" ? "Foil" : "Pro"
   const expiration = entitlement?.expirationDate
     ? new Date(entitlement.expirationDate).toLocaleDateString()
     : null
@@ -20,7 +22,7 @@ export function SubscriptionControls() {
     : billing.isCountPro
       ? expiration
         ? `${entitlement?.willRenew ? "Renews" : "Available until"} ${expiration}`
-        : "Pro access active"
+        : `${planName} access active`
       : billing.error
         ? "Status unavailable"
         : "Free plan"
@@ -28,7 +30,7 @@ export function SubscriptionControls() {
   return (
     <View style={themed($container)}>
       <View style={$headingText}>
-        <Text preset="subheading" text="Scryve Pro" accessibilityRole="header" />
+        <Text preset="subheading" text={`Scryve ${planName}`} accessibilityRole="header" />
         {billing.configured ? (
           <Text
             size="xs"
@@ -48,7 +50,9 @@ export function SubscriptionControls() {
           }
           text={billing.isCountPro ? "Manage" : "View options"}
           accessibilityLabel={
-            billing.isCountPro ? "Manage Scryve Pro subscription" : "View Scryve Pro options"
+            billing.isCountPro
+              ? `Manage Scryve ${planName} subscription`
+              : "View Scryve Pro options"
           }
           disabled={billing.isLoading}
           style={themed($button)}

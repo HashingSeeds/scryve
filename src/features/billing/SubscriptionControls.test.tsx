@@ -25,7 +25,11 @@ const mockBilling = {
 
 jest.mock("./RevenueCatContext", () => ({ useRevenueCat: () => mockBilling }))
 
-function entitledCustomerInfo(entitlement: { expirationDate: string | null; willRenew: boolean }) {
+function entitledCustomerInfo(entitlement: {
+  expirationDate: string | null
+  willRenew: boolean
+  productIdentifier?: string
+}) {
   return { entitlements: { all: { [COUNT_PRO_ENTITLEMENT_ID]: entitlement } } }
 }
 
@@ -89,6 +93,38 @@ describe("SubscriptionControls", () => {
     expect(
       view.getByText(`Available until ${new Date("2026-09-01T00:00:00Z").toLocaleDateString()}`),
     ).toBeTruthy()
+  })
+
+  it("labels web Foil access and keeps the Pro renewal and management behavior", () => {
+    mockBilling.isCountPro = true
+    mockBilling.customerInfo = entitledCustomerInfo({
+      productIdentifier: "foil_yearly",
+      expirationDate: "2027-09-01T00:00:00Z",
+      willRenew: true,
+    })
+    const view = renderControls()
+
+    expect(view.getByRole("header", { name: "Scryve Foil" })).toBeTruthy()
+    expect(
+      view.getByText(`Renews ${new Date("2027-09-01T00:00:00Z").toLocaleDateString()}`),
+    ).toBeTruthy()
+    fireEvent.press(view.getByLabelText("Manage Scryve Foil subscription"))
+    expect(presentCustomerCenter).toHaveBeenCalledTimes(1)
+    expect(presentPaywall).not.toHaveBeenCalled()
+  })
+
+  it("does not label expired Foil access as a current subscription", () => {
+    mockBilling.customerInfo = entitledCustomerInfo({
+      productIdentifier: "foil_yearly",
+      expirationDate: "2025-09-01T00:00:00Z",
+      willRenew: false,
+    })
+    const view = renderControls()
+
+    expect(view.queryByText("Scryve Foil")).toBeNull()
+    expect(view.getByText("Free plan")).toBeTruthy()
+    fireEvent.press(view.getByLabelText("View Scryve Pro options"))
+    expect(presentPaywall).toHaveBeenCalledTimes(1)
   })
 
   it("shows active Pro access when no expiration date is available", () => {
