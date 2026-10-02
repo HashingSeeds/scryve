@@ -55,7 +55,7 @@ async function gameByPublicId(ctx: QueryCtx, publicId: string) {
     .query("games")
     .withIndex("by_public_id", (q) => q.eq("publicId", publicId))
     .unique()
-  if (!game) throw new Error("Game not found")
+  if (!game) throw new ConvexError({ code: "game_not_found", message: "Game not found" })
   return game
 }
 
@@ -73,7 +73,10 @@ function assertDeckRequirementSupported(gameSystem: string, deckRequired?: boole
 
 function assertLifeDelta(delta: number) {
   if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 999_999)
-    throw new Error("Life delta must be a non-zero whole number from -999999 to 999999")
+    throw new ConvexError({
+      code: "invalid_life_delta",
+      message: "Life delta must be a non-zero whole number from -999999 to 999999",
+    })
 }
 
 function assertCommanderDelta(delta: number) {
@@ -94,11 +97,13 @@ function assertCommanderGame(game: Doc<"games">) {
 }
 
 function assertOperationId(operationId: string) {
-  if (!/^[A-Za-z0-9_-]{16,128}$/.test(operationId)) throw new Error("Invalid operation identifier")
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(operationId))
+    throw new ConvexError({ code: "invalid_operation_id", message: "Invalid operation identifier" })
 }
 
 function assertDeviceId(deviceId: string) {
-  if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId)) throw new Error("Invalid device identifier")
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId))
+    throw new ConvexError({ code: "invalid_device_id", message: "Invalid device identifier" })
 }
 
 function assertLocalId(localId: string) {
@@ -1454,7 +1459,10 @@ export const changeLife = mutation({
     assertOperationId(args.operationId)
     assertDeviceId(args.deviceId)
     if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-      throw new Error("Invalid client timestamp")
+      throw new ConvexError({
+        code: "invalid_client_timestamp",
+        message: "Invalid client timestamp",
+      })
 
     const game = await gameByPublicId(ctx, args.publicId)
     const user = await requireUser(ctx)
@@ -1462,7 +1470,11 @@ export const changeLife = mutation({
       .query("gamePlayers")
       .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
       .first()
-    if (!membership) throw new Error("Game membership required")
+    if (!membership)
+      throw new ConvexError({
+        code: "game_membership_required",
+        message: "Game membership required",
+      })
     const target = await ctx.db.get(args.playerId)
     if (
       !target ||
@@ -1470,7 +1482,10 @@ export const changeLife = mutation({
       (target.userId === undefined ? game.hostUserId !== user._id : target.userId !== user._id) ||
       (target.deviceId !== undefined && target.deviceId !== args.deviceId)
     )
-      throw new Error("Seat-owner permission required")
+      throw new ConvexError({
+        code: "seat_owner_required",
+        message: "Seat-owner permission required",
+      })
 
     const duplicate = await ctx.db
       .query("gameEvents")
@@ -1486,7 +1501,10 @@ export const changeLife = mutation({
         duplicate.deviceId !== args.deviceId ||
         duplicate.clientCreatedAt !== args.clientCreatedAt
       )
-        throw new Error("Operation identifier was reused with different data")
+        throw new ConvexError({
+          code: "sync_operation_mismatch",
+          message: "Operation identifier was reused with different data",
+        })
       return {
         operationId: duplicate.operationId,
         eventId: duplicate._id,
@@ -1495,7 +1513,8 @@ export const changeLife = mutation({
         deduplicated: true,
       }
     }
-    if (game.status !== "active") throw new Error("Game is not active")
+    if (game.status !== "active")
+      throw new ConvexError({ code: "game_not_active", message: "Game is not active" })
 
     const now = Date.now()
     const currentLife = target.currentLife + args.delta
@@ -1584,13 +1603,17 @@ export const submitCommanderDamage = mutation({
     assertOperationId(args.operationId)
     assertDeviceId(args.deviceId)
     if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-      throw new Error("Invalid client timestamp")
+      throw new ConvexError({
+        code: "invalid_client_timestamp",
+        message: "Invalid client timestamp",
+      })
     if (args.fromPlayerId === args.toPlayerId) throw new Error("A commander cannot damage itself")
 
     const game = await gameByPublicId(ctx, args.publicId)
     assertCommanderGame(game)
     const user = await requireUser(ctx)
-    if (game.status !== "active") throw new Error("Game is not active")
+    if (game.status !== "active")
+      throw new ConvexError({ code: "game_not_active", message: "Game is not active" })
     const source = await commanderPlayerForWrite(
       ctx,
       game,
@@ -1611,7 +1634,10 @@ export const submitCommanderDamage = mutation({
       .unique()
     if (existing) {
       if (!commanderClaimMatches(existing, args, user._id))
-        throw new Error("Operation identifier was reused with different data")
+        throw new ConvexError({
+          code: "sync_operation_mismatch",
+          message: "Operation identifier was reused with different data",
+        })
       return {
         operationId: existing.operationId,
         claimId: existing._id,
@@ -1625,7 +1651,11 @@ export const submitCommanderDamage = mutation({
         q.eq("gameId", game._id).eq("operationId", args.operationId),
       )
       .unique()
-    if (eventWithOperation) throw new Error("Operation identifier was reused with different data")
+    if (eventWithOperation)
+      throw new ConvexError({
+        code: "sync_operation_mismatch",
+        message: "Operation identifier was reused with different data",
+      })
 
     const pair = await ctx.db
       .query("gameCommanderDamage")
@@ -1721,7 +1751,7 @@ async function resolveCommanderClaim(
   if (args.resolutionOperationId !== undefined) assertOperationId(args.resolutionOperationId)
   assertDeviceId(args.deviceId)
   if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
-    throw new Error("Invalid client timestamp")
+    throw new ConvexError({ code: "invalid_client_timestamp", message: "Invalid client timestamp" })
   const game = await gameByPublicId(ctx, args.publicId)
   assertCommanderGame(game)
   const user = await requireUser(ctx)
@@ -1737,7 +1767,10 @@ async function resolveCommanderClaim(
     claim.resolutionOperationId &&
     claim.resolutionOperationId !== args.resolutionOperationId
   )
-    throw new Error("Operation identifier was reused with different data")
+    throw new ConvexError({
+      code: "sync_operation_mismatch",
+      message: "Operation identifier was reused with different data",
+    })
   const target = await commanderPlayerForWrite(
     ctx,
     game,
@@ -1759,12 +1792,18 @@ async function resolveCommanderClaim(
       (existing.claimOperationId !== claim.operationId ||
         existing.kind !== `commanderDamage.${decision}`)
     )
-      throw new Error("Operation identifier was reused with different data")
+      throw new ConvexError({
+        code: "sync_operation_mismatch",
+        message: "Operation identifier was reused with different data",
+      })
   }
   if (claim.status !== "pending") {
     if (args.resolutionOperationId) {
       if (claim.status !== decision)
-        throw new Error("Operation identifier was reused with different data")
+        throw new ConvexError({
+          code: "sync_operation_mismatch",
+          message: "Operation identifier was reused with different data",
+        })
       const event = await commanderResolutionEvent(ctx, claim)
       if (
         !event ||
@@ -1776,7 +1815,10 @@ async function resolveCommanderClaim(
         event.deviceId !== args.deviceId ||
         event.clientCreatedAt !== args.clientCreatedAt
       )
-        throw new Error("Operation identifier was reused with different data")
+        throw new ConvexError({
+          code: "sync_operation_mismatch",
+          message: "Operation identifier was reused with different data",
+        })
       if (!claim.resolutionOperationId)
         await ctx.db.patch(claim._id, { resolutionOperationId: args.resolutionOperationId })
       if (event.operationId !== args.resolutionOperationId)
@@ -1806,7 +1848,8 @@ async function resolveCommanderClaim(
         : {}),
     }
   }
-  if (game.status !== "active") throw new Error("Game is not active")
+  if (game.status !== "active")
+    throw new ConvexError({ code: "game_not_active", message: "Game is not active" })
 
   const now = Date.now()
   const eventOperationId = args.resolutionOperationId ?? `${claim.operationId}_${decision}`
