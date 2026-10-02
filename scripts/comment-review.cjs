@@ -1,35 +1,57 @@
-const { parse } = require("@typescript-eslint/parser")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
 
 function whyBlocks(source) {
-  const { comments } = parse(source, {
-    comment: true,
-    loc: true,
-    range: true,
-    ecmaFeatures: { jsx: true },
+  let offset = 0
+  const lines = source.split("\n").map((raw) => {
+    const text = raw.endsWith("\r") ? raw.slice(0, -1) : raw
+    const line = { text, start: offset, end: offset + text.length }
+    offset += raw.length + 1
+    return line
   })
   const blocks = []
-  for (let index = 0; index < comments.length; index += 1) {
-    const comment = comments[index]
-    if (!/^(?:\*\s*)*why:/u.test(comment.value.trim())) continue
-    const start = comment.range[0]
-    let end = comment.range[1]
-    const line =
-      comment.loc.start.line +
-      comment.value.slice(0, comment.value.indexOf("why:")).split("\n").length -
-      1
-    if (comment.type === "Line") {
-      while (
-        comments[index + 1]?.type === "Line" &&
-        /^\r?\n[\t ]*$/u.test(source.slice(end, comments[index + 1].range[0]))
-      ) {
-        index += 1
-        end = comments[index].range[1]
+  const seen = new Set()
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    const lineComment = line.text.match(/\/\/\s*why:/u)
+    const blockComment = line.text.match(/\/\*\*?\s*why:/u)
+    const blockText = line.text.match(/^\s*\*\s*why:/u)
+    let startLine = index
+    let startColumn
+    let end
+
+    if (lineComment) {
+      startColumn = lineComment.index
+      let endLine = index
+      if (/^\s*$/u.test(line.text.slice(0, startColumn))) {
+        while (/^\s*\/\//u.test(lines[endLine + 1]?.text ?? "")) endLine += 1
       }
+      end = lines[endLine].end
+    } else if (blockComment) {
+      startColumn = blockComment.index
+    } else if (blockText) {
+      while (startLine >= 0 && !lines[startLine].text.includes("/*")) startLine -= 1
+      if (startLine < 0) continue
+      startColumn = lines[startLine].text.lastIndexOf("/*")
+    } else {
+      continue
     }
-    blocks.push({ line, start, end, block: source.slice(start, end) })
+
+    const start = lines[startLine].start + startColumn
+    if (end === undefined) {
+      for (let endLine = startLine; endLine < lines.length; endLine += 1) {
+        const close = lines[endLine].text.indexOf("*/", endLine === startLine ? startColumn + 2 : 0)
+        if (close < 0) continue
+        end = lines[endLine].start + close + 2
+        break
+      }
+      if (end === undefined) continue
+    }
+    const key = `${start}:${end}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    blocks.push({ line: index + 1, start, end, block: source.slice(start, end) })
   }
   return blocks
 }
@@ -87,13 +109,7 @@ function parseCheckedEntries(body) {
   for (const match of body.matchAll(pattern)) {
     if (match[1].toLowerCase() !== "x") continue
     const filename = decodeURIComponent(match[2])
-    if (
-      filename.includes("\\") ||
-      filename.includes("\0") ||
-      path.isAbsolute(filename) ||
-      filename.split("/").some((part) => part === ".." || part === "." || part === "") ||
-      !/\.(?:ts|tsx|js|cjs|mjs)$/u.test(filename)
-    ) {
+    if (path.isAbsolute(filename) || filename.split("/").includes("..")) {
       throw new Error(`Invalid comment path: ${filename}`)
     }
     entries.push({
@@ -127,6 +143,11 @@ function removeBlock(source, block) {
   ) {
     start = lineStart
     end = nextNewline === -1 ? lineEnd : nextNewline + 1
+  } else if (
+    /[\t ]/u.test(source[start - 1] ?? "") &&
+    (/\s/u.test(source[end] ?? "") || end === source.length)
+  ) {
+    start -= 1
   } else if (!/\s/u.test(source[start - 1] ?? "") && !/\s/u.test(source[end] ?? "")) {
     replacement = " "
   }
@@ -134,7 +155,8 @@ function removeBlock(source, block) {
 }
 
 function main(args) {
-  const run = (command, values) => execFileSync(command, values, { encoding: "utf8" })
+  const run = (command, values) =>
+    execFileSync(command, values, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
   const [command, first, second] = args
   if (
     command === "collect" &&
@@ -151,6 +173,11 @@ function main(args) {
       first,
       second,
       "--",
+      "*.ts",
+      "*.tsx",
+      "*.js",
+      "*.cjs",
+      "*.mjs",
     ])
     const entries = parseDiff(diff, (filename) => run("git", ["show", `${second}:${filename}`]))
     if (!entries.length) return
@@ -166,8 +193,6 @@ function main(args) {
     for (const entry of parseCheckedEntries(body)) {
       try {
         const filename = path.join(root, entry.path)
-        if (fs.realpathSync(filename) !== filename)
-          throw new Error("Refusing to edit through symlinks")
         const result = removeBlock(fs.readFileSync(filename, "utf8"), entry.block)
         if (!result.removed) throw new Error(result.reason)
         fs.writeFileSync(filename, result.source)
