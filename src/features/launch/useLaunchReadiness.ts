@@ -5,7 +5,6 @@ import { useFonts } from "@expo-google-fonts/space-grotesk"
 import { initI18n } from "@/i18n"
 import { customFontsToLoad } from "@/theme/typography"
 import { reportCrash } from "@/utils/crashReporting"
-import { loadDateFnsLocale } from "@/utils/formatDate"
 
 export const LAUNCH_DEADLINE_MS = 8000
 export const LAUNCH_FALLBACK_REVEAL_MS = 700
@@ -28,7 +27,6 @@ export function useLaunchReadiness(isConsentResolved: boolean) {
 
   useEffect(() => {
     initI18n()
-      .then(() => loadDateFnsLocale())
       .catch(reportCrash)
       .finally(() => setIsI18nInitialized(true))
   }, [])
