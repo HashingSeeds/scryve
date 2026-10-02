@@ -117,4 +117,5 @@ module.exports = {
     "prefer-self-explanatory-code": preferSelfExplanatoryCode,
   },
   BASELINE_PREFIX,
+  DEFAULT_ALLOWED_PATTERNS,
 }

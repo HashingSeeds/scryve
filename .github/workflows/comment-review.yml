@@ -1,0 +1,45 @@
+name: comment review
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  collect:
+    if: github.event.before != '0000000000000000000000000000000000000000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Queue new why comments
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          body="$RUNNER_TEMP/comment-review.md"
+          git cat-file -e "$BASE_SHA" || exit 0
+          node scripts/comment-review.cjs collect "$BASE_SHA" "$HEAD_SHA" > "$body"
+          if [ ! -s "$body" ]; then
+            exit 0
+          fi
+          gh label create comment-review --force
+          subject="$(git show -s --format=%s "$HEAD_SHA")"
+          gh issue create --title "Comment review: ${HEAD_SHA:0:7} $subject" --label comment-review --body-file "$body"
