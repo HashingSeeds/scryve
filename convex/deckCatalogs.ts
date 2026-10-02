@@ -754,17 +754,3 @@ export const detail = query({
     }
   },
 })
-
-export const scheduleRefresh = internalMutation({
-  args: { game: v.string(), format: v.string() },
-  handler: async (ctx, args) => {
-    await ctx.runMutation(internal.deckCatalogs.requestRefresh, { ...args, background: true })
-  },
-})
-
-export const refreshTopDecks = internalAction({
-  args: { game: v.string(), format: v.string() },
-  handler: async (ctx, args) => {
-    await refreshFeed(ctx, args.game, args.format)
-  },
-})

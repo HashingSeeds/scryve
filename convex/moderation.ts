@@ -28,7 +28,6 @@ export const AUTO_HOLD_REPORT_THRESHOLD = 2
 const HISTORY_RENAME_BATCH_SIZE = 25
 const MAX_NOTE_LENGTH = 500
 const OPEN_REPORT_PAGE_SIZE = 50
-const RETENTION_BACKFILL_PAGE_SIZE = 50
 const RETENTION_PURGE_PAGE_SIZE = 50
 const DELETED_ACCOUNT_LABEL = "(deleted account)"
 
@@ -313,34 +312,6 @@ export const dismissReport = internalMutation({
     )
     if (reported && release) await releaseUsernameHoldFor(ctx, reported)
     return { released: release }
-  },
-})
-
-export const backfillRetention = internalMutation({
-  args: { cursor: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    const page = await ctx.db
-      .query("moderationReports")
-      .order("asc")
-      .paginate({ numItems: RETENTION_BACKFILL_PAGE_SIZE, cursor: args.cursor ?? null })
-    let updated = 0
-    for (const report of page.page) {
-      if (report.status === "open" || report.retentionExpiresAt !== undefined) continue
-      const retentionExpiresAt = moderationRetentionExpiresAt(
-        report.status,
-        report.resolvedAt,
-        report.createdAt,
-      )
-      if (retentionExpiresAt === undefined) continue
-      await ctx.db.patch(report._id, { retentionExpiresAt })
-      updated += 1
-    }
-    if (!page.isDone) {
-      await ctx.scheduler.runAfter(0, internal.moderation.backfillRetention, {
-        cursor: page.continueCursor,
-      })
-    }
-    return { updated, hasMore: !page.isDone }
   },
 })
 
