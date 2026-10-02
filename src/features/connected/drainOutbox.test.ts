@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values"
+
 import { drainConnectedOutbox } from "./drainOutbox"
 import type { PendingLifeAction } from "./model"
 import { ConnectedGameRepository } from "./persistence"
@@ -152,6 +154,21 @@ describe("connected outbox drain", () => {
       reason: "ArgumentValidationError: not a valid ID",
       failedAt: 75,
     })
+  })
+
+  it("stores the message from a coded rejection", async () => {
+    const repository = new ConnectedGameRepository(new MemoryStorage())
+    repository.enqueue(action("operation-coded-error", 1, 1))
+
+    await drainConnectedOutbox({
+      repository,
+      publicId: "game-public",
+      send: async () => {
+        throw new ConvexError({ code: "game_not_active", message: "Game is not active" })
+      },
+    })
+
+    expect(repository.loadFailed("game-public")[0]?.reason).toBe("Game is not active")
   })
 
   it("stops without hiding a permanent rejection when failed-action storage is full", async () => {

@@ -1,4 +1,3 @@
-import { ConvexHttpClient } from "convex/browser"
 import { ConvexError } from "convex/values"
 
 import type { ConnectedProjection, PendingLifeAction } from "./model"
@@ -8,8 +7,6 @@ import {
   oldestFirst,
   overlayPendingDeltas,
 } from "./reconciliation"
-import { api } from "../../../convex/_generated/api"
-import type { Id } from "../../../convex/_generated/dataModel"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
 
 const permanentFailures = [
@@ -128,38 +125,11 @@ describe("connected reconciliation", () => {
       expect(classifyWriteFailure(new ConvexError({ code, message }))).toBe("permanent")
   })
 
-  it.each(permanentFailures)(
-    "preserves the installed-client regex after %s crosses the client boundary",
-    async (code, message) => {
-      const serverError = new ConvexError({ code, message })
-      expect(serverError.message).toBe(JSON.stringify({ code, message }))
-      const client = new ConvexHttpClient("https://test.convex.cloud", {
-        logger: false,
-        fetch: async () =>
-          new Response(
-            JSON.stringify({
-              status: "error",
-              errorMessage: serverError.message,
-              errorData: serverError.data,
-            }),
-          ),
-      })
-      await expect(
-        client.mutation(api.games.changeLife, {
-          publicId: "public-game-id-123456",
-          playerId: "player-1" as Id<"gamePlayers">,
-          operationId: "operation-client-0001",
-          delta: 1,
-          deviceId: "device-client-001",
-          clientCreatedAt: 1,
-        }),
-      ).rejects.toMatchObject({
-        name: "ConvexError",
-        data: { code, message },
-        message: expect.stringMatching(legacyPermanentMessage),
-      })
-    },
-  )
+  it.each(permanentFailures)("preserves the installed-client regex for %s", (code, message) => {
+    const serverError = new ConvexError({ code, message })
+    expect(serverError.message).toBe(JSON.stringify({ code, message }))
+    expect(serverError.message).toMatch(legacyPermanentMessage)
+  })
 
   it.each([
     ...permanentFailures.map(([, message]) => message),

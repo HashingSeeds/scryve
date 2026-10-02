@@ -56,22 +56,21 @@ export function oldestFirst(actions: readonly PendingLifeAction[]): PendingLifeA
 
 export type WriteFailureKind = "retry" | "permanent"
 
+const permanentWriteCodes = new Set([
+  "seat_owner_required",
+  "game_membership_required",
+  "game_not_active",
+  "game_not_found",
+  "sync_operation_mismatch",
+  "invalid_operation_id",
+  "invalid_device_id",
+  "invalid_client_timestamp",
+  "invalid_life_delta",
+])
+
 export function classifyWriteFailure(cause: unknown): WriteFailureKind {
   const code = convexErrorCode(cause)
-  if (code !== undefined)
-    return [
-      "seat_owner_required",
-      "game_membership_required",
-      "game_not_active",
-      "game_not_found",
-      "sync_operation_mismatch",
-      "invalid_operation_id",
-      "invalid_device_id",
-      "invalid_client_timestamp",
-      "invalid_life_delta",
-    ].includes(code)
-      ? "permanent"
-      : "retry"
+  if (code !== undefined) return permanentWriteCodes.has(code) ? "permanent" : "retry"
   const message = cause instanceof Error ? cause.message : String(cause)
   return /Seat-owner permission|Game membership required|Game is not active|Game not found|Operation identifier was reused|Invalid operation|Invalid device identifier|Invalid client timestamp|Life delta|ArgumentValidationError|Invalid argument|not a valid ID|acknowledgement did not match/.test(
     message,

@@ -49,13 +49,16 @@ const MAX_COMMANDER_DAMAGE = 99
 const MAX_PENDING_COMMANDER_CLAIMS = 100
 const NO_GAME_SYSTEM = "none"
 
-async function gameByPublicId(ctx: QueryCtx, publicId: string) {
+async function gameByPublicId(ctx: QueryCtx, publicId: string, coded = false) {
   assertPublicId(publicId)
   const game = await ctx.db
     .query("games")
     .withIndex("by_public_id", (q) => q.eq("publicId", publicId))
     .unique()
-  if (!game) throw new ConvexError({ code: "game_not_found", message: "Game not found" })
+  if (!game)
+    throw coded
+      ? new ConvexError({ code: "game_not_found", message: "Game not found" })
+      : new Error("Game not found")
   return game
 }
 
@@ -71,12 +74,14 @@ function assertDeckRequirementSupported(gameSystem: string, deckRequired?: boole
     })
 }
 
-function assertLifeDelta(delta: number) {
+function assertLifeDelta(delta: number, coded = false) {
   if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 999_999)
-    throw new ConvexError({
-      code: "invalid_life_delta",
-      message: "Life delta must be a non-zero whole number from -999999 to 999999",
-    })
+    throw coded
+      ? new ConvexError({
+          code: "invalid_life_delta",
+          message: "Life delta must be a non-zero whole number from -999999 to 999999",
+        })
+      : new Error("Life delta must be a non-zero whole number from -999999 to 999999")
 }
 
 function assertCommanderDelta(delta: number) {
@@ -96,14 +101,18 @@ function assertCommanderGame(game: Doc<"games">) {
     throw new Error("Commander damage is only available in Commander games")
 }
 
-function assertOperationId(operationId: string) {
+function assertOperationId(operationId: string, coded = false) {
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(operationId))
-    throw new ConvexError({ code: "invalid_operation_id", message: "Invalid operation identifier" })
+    throw coded
+      ? new ConvexError({ code: "invalid_operation_id", message: "Invalid operation identifier" })
+      : new Error("Invalid operation identifier")
 }
 
-function assertDeviceId(deviceId: string) {
+function assertDeviceId(deviceId: string, coded = false) {
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId))
-    throw new ConvexError({ code: "invalid_device_id", message: "Invalid device identifier" })
+    throw coded
+      ? new ConvexError({ code: "invalid_device_id", message: "Invalid device identifier" })
+      : new Error("Invalid device identifier")
 }
 
 function assertLocalId(localId: string) {
@@ -1455,16 +1464,16 @@ export const changeLife = mutation({
     clientCreatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    assertLifeDelta(args.delta)
-    assertOperationId(args.operationId)
-    assertDeviceId(args.deviceId)
+    assertLifeDelta(args.delta, true)
+    assertOperationId(args.operationId, true)
+    assertDeviceId(args.deviceId, true)
     if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
       throw new ConvexError({
         code: "invalid_client_timestamp",
         message: "Invalid client timestamp",
       })
 
-    const game = await gameByPublicId(ctx, args.publicId)
+    const game = await gameByPublicId(ctx, args.publicId, true)
     const user = await requireUser(ctx)
     const membership = await ctx.db
       .query("gamePlayers")
@@ -1600,8 +1609,8 @@ export const submitCommanderDamage = mutation({
   },
   handler: async (ctx, args) => {
     assertCommanderDelta(args.delta)
-    assertOperationId(args.operationId)
-    assertDeviceId(args.deviceId)
+    assertOperationId(args.operationId, true)
+    assertDeviceId(args.deviceId, true)
     if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
       throw new ConvexError({
         code: "invalid_client_timestamp",
@@ -1609,7 +1618,7 @@ export const submitCommanderDamage = mutation({
       })
     if (args.fromPlayerId === args.toPlayerId) throw new Error("A commander cannot damage itself")
 
-    const game = await gameByPublicId(ctx, args.publicId)
+    const game = await gameByPublicId(ctx, args.publicId, true)
     assertCommanderGame(game)
     const user = await requireUser(ctx)
     if (game.status !== "active")
@@ -1747,12 +1756,12 @@ async function resolveCommanderClaim(
   },
   decision: "confirmed" | "declined",
 ) {
-  assertOperationId(args.operationId)
-  if (args.resolutionOperationId !== undefined) assertOperationId(args.resolutionOperationId)
-  assertDeviceId(args.deviceId)
+  assertOperationId(args.operationId, true)
+  if (args.resolutionOperationId !== undefined) assertOperationId(args.resolutionOperationId, true)
+  assertDeviceId(args.deviceId, true)
   if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
     throw new ConvexError({ code: "invalid_client_timestamp", message: "Invalid client timestamp" })
-  const game = await gameByPublicId(ctx, args.publicId)
+  const game = await gameByPublicId(ctx, args.publicId, true)
   assertCommanderGame(game)
   const user = await requireUser(ctx)
   const claim = await ctx.db
