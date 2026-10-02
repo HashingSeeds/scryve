@@ -99,8 +99,23 @@ export function BackendGate({
       ? new ConnectedGameRepository(undefined, offlineProfile.userId).loadProjection(offlineGameId)
       : null
   const hasOwnerScopedCache = Boolean(offlineGameId && cachedProjection?.publicId === offlineGameId)
+  const userShownConnectedContent = useRef<string | undefined>(undefined)
+  const showChildren = (userId: string | undefined) => {
+    userShownConnectedContent.current = userId
+    return children
+  }
+  const profileIsReconnecting =
+    connectedProfile.status === "offline" || connectedProfile.status === "loading"
+  const activeUserId = user?.id ?? offlineProfile?.userId
+  const keepShowingConnectedContent =
+    clerkSignedIn &&
+    profileIsReconnecting &&
+    activeUserId !== undefined &&
+    userShownConnectedContent.current === activeUserId
 
-  if (clerkSignedIn && connectedProfile.status === "offline" && hasOwnerScopedCache) return children
+  if (keepShowingConnectedContent) return children
+  if (clerkSignedIn && connectedProfile.status === "offline" && hasOwnerScopedCache)
+    return showChildren(offlineProfile?.userId)
   if (!clerkLoaded)
     return (
       <GateScreen busy>
@@ -173,7 +188,7 @@ export function BackendGate({
       </GateScreen>
     )
   if (allowPendingProfile && clerkSignedIn && isUserLoaded && user?.id && user.username !== null)
-    return children
+    return showChildren(user.id)
   if (
     isAuthenticated &&
     isUserLoaded &&
@@ -181,7 +196,7 @@ export function BackendGate({
     connectedProfile.status === "ready" &&
     connectedProfile.profile.userId === user.id
   )
-    return children
+    return showChildren(user.id)
   if (connectedProfile.status === "offline")
     return (
       <GateScreen>

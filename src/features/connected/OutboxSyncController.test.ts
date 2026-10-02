@@ -307,7 +307,7 @@ describe("outbox sync controller", () => {
     ])
   })
 
-  it("retries when the projection barrier times out", async () => {
+  it("keeps syncing, not offline, and retries when the projection barrier times out", async () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage, "user-1")
     repository.enqueue(action("operation-barrier-timeout", 5, 1), [])
@@ -327,7 +327,7 @@ describe("outbox sync controller", () => {
     clock.advance(100)
     await settle()
     expect(controller.getSnapshot().pending).toHaveLength(1)
-    expect(controller.getSnapshot().connectionStatus).toBe("offline")
+    expect(controller.getSnapshot().connectionStatus).toBe("syncing")
 
     clock.advance(500)
     await settle()
@@ -424,7 +424,7 @@ describe("outbox sync controller", () => {
     controller.setEnvironment(ONLINE)
     await settle()
     expect(attempts).toHaveLength(1)
-    expect(controller.getSnapshot().connectionStatus).toBe("offline")
+    expect(controller.getSnapshot().connectionStatus).toBe("syncing")
     expect(clock.scheduledDelays).toEqual([500])
 
     clock.advance(500)
