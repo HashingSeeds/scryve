@@ -66,7 +66,15 @@ function AccountDeckCapacityControls({
   }
   return (
     <View style={themed($notice)} testID="account-deck-capacity">
-      <Text weight="bold" text="Your deck slots are full" />
+      <Text
+        weight="bold"
+        accessibilityLiveRegion="polite"
+        text={
+          mine && !mine.capacity.premium
+            ? `You've reached the free account limit of ${mine.capacity.limit} decks.`
+            : "Your deck slots are full"
+        }
+      />
       <Text
         size="sm"
         text={
@@ -76,15 +84,25 @@ function AccountDeckCapacityControls({
         }
       />
       <View style={themed($actions)}>
-        {!mine?.capacity.premium && billing.configured ? (
+        {!mine?.capacity.premium ? (
           <Button
-            text="Get Pro"
-            disabled={billing.isLoading}
+            text="Upgrade to Pro"
+            disabled={!billing.configured || billing.isLoading}
             onPress={() => void billing.presentPaywall()}
           />
         ) : null}
-        <Button text="Choose a deck" disabled={!mine} onPress={() => setChoosing(!choosing)} />
+        <Button
+          text="Replace a deck"
+          disabled={!mine || busy}
+          onPress={() => setChoosing(!choosing)}
+        />
       </View>
+      {!mine?.capacity.premium && !billing.configured ? (
+        <Text
+          size="xs"
+          text={billing.configurationMessage || "Pro purchases are unavailable in this build."}
+        />
+      ) : null}
       {choosing ? (
         <ScrollView style={$deckChoices}>
           {mine?.decks.map((deck) => (
