@@ -281,11 +281,11 @@ describe("NewGameScreen", () => {
 
     fireEvent.press(view.getByTestId("player-count-increment"))
     fireEvent.press(view.getByTestId("player-appearance-1"))
-    fireEvent.press(view.getByTestId("appearance-color-39755c"))
+    fireEvent.press(view.getByTestId("appearance-color-117b9c"))
     expect(onSavePlayers).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByTestId("save-local-appearance-button"))
     expect(onSavePlayers).toHaveBeenLastCalledWith([
-      expect.objectContaining({ name: "Katherine", color: "#39755C" }),
+      expect.objectContaining({ name: "Katherine", color: "#117B9C" }),
       expect.objectContaining({ name: "Grace" }),
     ])
     expect(view.getByLabelText("Players, 3")).toBeTruthy()
@@ -462,12 +462,13 @@ describe("NewGameScreen", () => {
     )
   })
 
-  it("does not offer another local player's color and mark combination", () => {
+  it("does not offer another local player's color or mark", () => {
     const view = setup()
 
     fireEvent.press(view.getByTestId("player-appearance-2"))
+    expect(view.getByTestId("appearance-color-b85636")).toBeDisabled()
     fireEvent.press(view.getByTestId("appearance-color-b85636"))
-    expect(view.getByTestId("appearance-shape-circle")).toBeDisabled()
+    expect(view.getByTestId("appearance-shape-heart")).toBeDisabled()
   })
 
   it("uses the Life box as the starting value and saves a per-game change amount", () => {

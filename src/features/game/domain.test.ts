@@ -75,6 +75,8 @@ describe("local game domain", () => {
     expect(game.players.every(({ life }) => life === 40)).toBe(true)
     expect(game.system).toBeUndefined()
     expect(game.lifeStep).toBe(1)
+    expect(game.players[0].shape).toBe("heart")
+    expect(new Set(game.players.map(({ shape }) => shape)).size).toBe(count)
   })
 
   it("uses the system change amount unless the game overrides it", () => {

@@ -579,7 +579,7 @@ describe("ConnectedLobbyScreen", () => {
     expect(mockAbandon).not.toHaveBeenCalled()
   })
 
-  it("disables appearance combinations claimed by another seat", async () => {
+  it("reserves another seat's color and shape independently", async () => {
     connectedHarness.projection = {
       ...connectedHarness.projection,
       status: "lobby",
@@ -598,7 +598,7 @@ describe("ConnectedLobbyScreen", () => {
           playerId: "player-2",
           seat: 2,
           displayName: "Grace",
-          color: "#B85636",
+          color: "#39755C",
           shape: "square",
           controlledByMe: false,
         },
@@ -608,6 +608,9 @@ describe("ConnectedLobbyScreen", () => {
 
     fireEvent.press(screen.getByTestId("edit-appearance-seat-1"))
     expect(screen.getByTestId("appearance-shape-square")).toBeDisabled()
+    expect(screen.getByTestId("appearance-color-39755c")).toBeDisabled()
+    expect(screen.queryByTestId("appearance-shape-plus")).toBeNull()
+    expect(screen.queryByTestId("appearance-shape-heart")).toBeNull()
     expect(screen.getByTestId("appearance-shape-star")).toBeEnabled()
 
     fireEvent.press(screen.getByTestId("appearance-shape-star"))
@@ -621,7 +624,7 @@ describe("ConnectedLobbyScreen", () => {
 
     fireEvent.press(screen.getByTestId("edit-appearance-seat-1"))
     fireEvent.press(screen.getByTestId("appearance-color-41476e"))
-    expect(screen.getByTestId("appearance-shape-square")).toBeEnabled()
+    expect(screen.getByTestId("appearance-shape-square")).toBeDisabled()
   })
 
   it("explains online-only lobby exits when offline, including a dropped confirmation", () => {

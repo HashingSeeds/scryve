@@ -8,6 +8,18 @@ const MARK_CENTER = 22
 const SWORD_GLYPH_BOUNDS = { left: 6.8, right: 17.2, top: 2.5, bottom: 21.5 }
 
 describe("PlayerMark", () => {
+  it.each(["heart", "plus", "shield"] as const)(
+    "renders the new %s mark and its sword",
+    (shape) => {
+      const view = render(
+        <PlayerMark seatNumber={1} color="#FFFFFF" shape={shape} insetSwordColor="#117B9C" />,
+      )
+      expect(
+        view.getByTestId(`player-mark-shape-${shape}`, { includeHiddenElements: true }),
+      ).toBeTruthy()
+      expect(view.getByTestId("player-mark-sword", { includeHiddenElements: true })).toBeTruthy()
+    },
+  )
   it.each([
     [1, "circle"],
     [2, "triangle"],

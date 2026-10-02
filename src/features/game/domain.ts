@@ -19,7 +19,11 @@ import type {
   OperationId,
   PlayerId,
 } from "./types"
-import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
+import {
+  PLAYER_COLOR_CHOICES,
+  PLAYER_MARK_SHAPES,
+  shapeForSeat,
+} from "../../../convex/lib/appearance"
 
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
 export const LIFE_DELTAS: readonly LifeDelta[] = [-5, -1, 1, 5]
@@ -132,7 +136,7 @@ export function createLocalGame(input: {
     id: asPlayerId(createClientId("player", now + seat)),
     name: validatedNames.names[seat],
     color: player.color || PLAYER_COLORS[seat],
-    ...(player.shape ? { shape: player.shape } : {}),
+    shape: player.shape ?? shapeForSeat(seat + 1, PLAYER_MARK_SHAPES),
     life: input.startingLife,
     seat,
   }))

@@ -118,6 +118,9 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<
   hexagon: { centerX: 22, centerY: 22, size: 16 },
   triangle: { centerX: 22, centerY: 25, size: 13 },
   star: { centerX: 22, centerY: 22, size: 12 },
+  plus: { centerX: 22, centerY: 22, size: 12 },
+  shield: { centerX: 22, centerY: 21, size: 15 },
+  heart: { centerX: 22, centerY: 22, size: 14 },
 }
 
 function CloseIconOverlay({
@@ -191,6 +194,14 @@ function MarkShape({ shape, color }: { shape: PlayerMarkShape; color: string }) 
       )
     case "hexagon":
       return <Polygon {...common} points="22,8 34,15 34,29 22,36 10,29 10,15" />
+    case "plus":
+      return <Path {...common} d="M17 8h10v9h9v10h-9v9H17v-9H8V17h9z" />
+    case "shield":
+      return <Path {...common} d="M22 8l12 5v10c0 6-5 10-12 14-7-4-12-8-12-14V13z" />
+    case "heart":
+      return (
+        <Path {...common} d="M22 36 10 24C2 16 8 6 16 10c3 1 5 4 6 6 1-2 3-5 6-6 8-4 14 6 6 14Z" />
+      )
   }
 }
 

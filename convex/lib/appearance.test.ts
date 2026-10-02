@@ -1,85 +1,105 @@
 import {
   appearanceIsTaken,
+  CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
   PLAYER_COLOR_CHOICES,
   PLAYER_MARK_SHAPES,
   resolveAppearance,
   shapeForSeat,
+  type PlayerAppearance,
 } from "./appearance"
+import { MAX_PLAYERS } from "./policy"
 
 const RED = PLAYER_COLOR_CHOICES[0]
 const BLUE = PLAYER_COLOR_CHOICES[1]
 
 describe("player appearance", () => {
-  it("keeps seat order as the mark for players who never chose one", () => {
+  it("keeps legacy seat defaults readable while offering heart for new local games", () => {
     expect(shapeForSeat(1)).toBe("circle")
     expect(shapeForSeat(2)).toBe("triangle")
     expect(shapeForSeat(7)).toBe(shapeForSeat(1))
-  })
-
-  it("rejects a shape that is not one of the six marks", () => {
+    expect(shapeForSeat(1, PLAYER_MARK_SHAPES)).toBe("heart")
+    expect(PLAYER_MARK_SHAPES).toHaveLength(8)
+    expect(PLAYER_MARK_SHAPES).not.toContain("circle")
     expect(isPlayerMarkShape("circle")).toBe(true)
+    expect(isPlayerMarkShape("heart")).toBe(true)
+    expect(isPlayerMarkShape("plus")).toBe(true)
+    expect(isPlayerMarkShape("shield")).toBe(true)
     expect(isPlayerMarkShape("octagon")).toBe(false)
     expect(isPlayerMarkShape(undefined)).toBe(false)
+    expect(PLAYER_COLOR_CHOICES.length).toBeGreaterThanOrEqual(MAX_PLAYERS)
+    expect(CONNECTED_PLAYER_MARK_SHAPES.length).toBeGreaterThanOrEqual(MAX_PLAYERS)
   })
 
-  it("treats color and shape as one identity when checking collisions", () => {
+  it("reserves colors and shapes independently, ignoring color casing", () => {
     const taken = [{ color: RED, shape: "circle" as const }]
-
-    expect(appearanceIsTaken(taken, { color: RED, shape: "circle" })).toBe(true)
-    expect(appearanceIsTaken(taken, { color: RED, shape: "square" })).toBe(false)
-    expect(appearanceIsTaken(taken, { color: BLUE, shape: "circle" })).toBe(false)
-    expect(appearanceIsTaken(taken, { color: RED.toLowerCase(), shape: "circle" })).toBe(true)
+    expect(appearanceIsTaken(taken, { color: RED, shape: "square" })).toBe(true)
+    expect(appearanceIsTaken(taken, { color: BLUE, shape: "circle" })).toBe(true)
+    expect(appearanceIsTaken(taken, { color: RED.toLowerCase(), shape: "star" })).toBe(true)
+    expect(appearanceIsTaken(taken, { color: BLUE, shape: "star" })).toBe(false)
   })
 
-  it("honors a free request exactly as asked", () => {
+  it("preserves each available preference when the other one conflicts", () => {
+    const taken = [{ color: RED, shape: "circle" as const }]
+    expect(resolveAppearance({ preferred: { color: RED, shape: "star" }, taken, seat: 2 })).toEqual(
+      { color: BLUE, shape: "star" },
+    )
     expect(
-      resolveAppearance({ preferred: { color: BLUE, shape: "star" }, taken: [], seat: 3 }),
-    ).toEqual({ color: BLUE.toUpperCase(), shape: "star" })
+      resolveAppearance({
+        preferred: { color: BLUE, shape: "circle" },
+        taken,
+        seat: 2,
+        shapes: CONNECTED_PLAYER_MARK_SHAPES,
+      }),
+    ).toEqual({ color: BLUE, shape: "triangle" })
   })
 
-  it("keeps the requested color and moves the shape when the pair is claimed", () => {
-    const resolved = resolveAppearance({
-      preferred: { color: RED, shape: "circle" },
-      taken: [{ color: RED, shape: "circle" }],
-      seat: 2,
-    })
-
-    expect(resolved.color).toBe(RED.toUpperCase())
-    expect(resolved.shape).not.toBe("circle")
-  })
-
-  it("moves to another color only once every shape in the requested one is gone", () => {
-    const taken = PLAYER_MARK_SHAPES.map((shape) => ({ color: RED, shape }))
-
-    const resolved = resolveAppearance({
-      preferred: { color: RED, shape: "circle" },
-      taken,
-      seat: 2,
-    })
-
-    expect(resolved.color).not.toBe(RED.toUpperCase())
-    expect(appearanceIsTaken(taken, resolved)).toBe(false)
-  })
-
-  it("falls back to seat defaults when a joiner expresses no preference", () => {
-    expect(resolveAppearance({ taken: [], seat: 2 })).toEqual({
-      color: PLAYER_COLOR_CHOICES[1].toUpperCase(),
-      shape: shapeForSeat(2),
-    })
-  })
-
-  it("never hands two seats the same identity while combinations remain", () => {
-    const taken: { color: string; shape: (typeof PLAYER_MARK_SHAPES)[number] }[] = []
-    for (let seat = 1; seat <= 6; seat += 1) {
-      const resolved = resolveAppearance({
-        preferred: { color: RED, shape: "circle" },
+  it("assigns unique colors and shapes to a full roster with identical preferences", () => {
+    const taken: PlayerAppearance[] = []
+    for (let seat = 1; seat <= MAX_PLAYERS; seat += 1) {
+      const appearance = resolveAppearance({
+        preferred: { color: RED.toLowerCase(), shape: "circle" },
         taken,
         seat,
+        shapes: CONNECTED_PLAYER_MARK_SHAPES,
       })
-      expect(appearanceIsTaken(taken, resolved)).toBe(false)
-      taken.push(resolved)
+      expect(appearanceIsTaken(taken, appearance)).toBe(false)
+      taken.push(appearance)
     }
-    expect(new Set(taken.map((entry) => `${entry.color}:${entry.shape}`)).size).toBe(6)
+    expect(new Set(taken.map(({ color }) => color)).size).toBe(MAX_PLAYERS)
+    expect(new Set(taken.map(({ shape }) => shape)).size).toBe(MAX_PLAYERS)
+  })
+
+  it("uses seat defaults when no preference is supplied", () => {
+    expect(resolveAppearance({ taken: [], seat: 2 })).toEqual({ color: BLUE, shape: "triangle" })
+  })
+
+  it.each(["heart", "plus", "shield"] as const)(
+    "maps local %s to a compatible hosted mark",
+    (shape) => {
+      expect(
+        resolveAppearance({
+          preferred: { color: BLUE, shape },
+          taken: [],
+          seat: 2,
+          shapes: CONNECTED_PLAYER_MARK_SHAPES,
+        }),
+      ).toEqual({ color: BLUE, shape: "circle" })
+    },
+  )
+
+  it("fails instead of reusing an appearance when either catalog is exhausted", () => {
+    const taken = PLAYER_MARK_SHAPES.map((shape, index) => ({
+      color: PLAYER_COLOR_CHOICES[index],
+      shape,
+    }))
+    expect(() => resolveAppearance({ taken, seat: 9 })).toThrow("No unused")
+    expect(() =>
+      resolveAppearance({
+        taken: [{ color: RED, shape: "circle" }],
+        seat: 2,
+        shapes: ["circle"],
+      }),
+    ).toThrow("No unused")
   })
 })
