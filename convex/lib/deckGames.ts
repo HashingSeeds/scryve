@@ -201,10 +201,6 @@ export const PRECON_FORMATS = [
   "constructed",
 ] as const
 
-export function preconSearchFormat(format: string): string | undefined {
-  return format
-}
-
 export function preconstructedFormat(type: string | undefined) {
   const value = type?.toLocaleLowerCase() ?? ""
   if (value.includes("commander")) return "commander"

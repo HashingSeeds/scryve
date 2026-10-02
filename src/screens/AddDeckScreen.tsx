@@ -51,7 +51,6 @@ import {
   deckFormats,
   deckSections,
   defaultDeckFormat,
-  preconSearchFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
 import { FREE_DECK_LIMIT, MAX_DECK_CARDS, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
@@ -441,7 +440,6 @@ export function AddDeckScreen({
     api.deckCatalogs.detail,
     selectedCatalogDeck ? { catalogDeckId: selectedCatalogDeck._id } : "skip",
   )
-  const preconFormat = preconSearchFormat(format)
   const handleCapacity = useCallback(
     (next: DeckCapacity) => setCapacityState({ status: "ready", capacity: next }),
     [],
@@ -539,7 +537,7 @@ export function AddDeckScreen({
             ...(cursor ? { cursor } : {}),
           }),
           game === "mtg" && !cursor
-            ? searchPreconstructed({ query, ...(preconFormat ? { format: preconFormat } : {}) })
+            ? searchPreconstructed({ query, ...(format ? { format } : {}) })
             : Promise.resolve(null),
         ])
         if (searchToken.current !== token) return
@@ -575,7 +573,7 @@ export function AddDeckScreen({
         if (searchToken.current === token) setSearching(false)
       }
     },
-    [format, game, preconFormat, searchPreconstructed, searchTopDecks],
+    [format, game, searchPreconstructed, searchTopDecks],
   )
 
   useEffect(() => {
@@ -703,7 +701,7 @@ export function AddDeckScreen({
     if (guestMode && selectedPrecon && resolvedPrecon && !resolvedPrecon.unresolved.length) {
       saveGuest({
         name: resolvedPrecon.name || selectedPrecon.name,
-        format: preconSearchFormat(format) ? format : preconstructedFormat(selectedPrecon.type),
+        format: format ? format : preconstructedFormat(selectedPrecon.type),
         game,
         cards: importCards(resolvedPrecon.cards),
       })
@@ -726,7 +724,7 @@ export function AddDeckScreen({
       begin()
       const deckId = await createImportedDeck({
         name: resolvedPrecon.name || selectedPrecon.name,
-        format: preconSearchFormat(format) ? format : preconstructedFormat(selectedPrecon.type),
+        format: format ? format : preconstructedFormat(selectedPrecon.type),
         game,
         cards: importCards(resolvedPrecon.cards),
       })
@@ -1486,9 +1484,7 @@ export function AddDeckScreen({
   }
 
   if (selectedPrecon) {
-    const previewFormat = preconSearchFormat(format)
-      ? format
-      : preconstructedFormat(selectedPrecon.type)
+    const previewFormat = format ? format : preconstructedFormat(selectedPrecon.type)
     const cards = (resolvedPrecon?.cards ?? preconOutline?.cards ?? []).map((card) => {
       const details = previewDetailsByKey[card.scryfallId ?? `mtg:${card.name}`]
       return {
