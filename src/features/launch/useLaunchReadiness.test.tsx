@@ -4,7 +4,6 @@ import { act, renderHook, waitFor } from "@testing-library/react-native"
 
 import { initI18n } from "@/i18n"
 import { reportCrash } from "@/utils/crashReporting"
-import { loadDateFnsLocale } from "@/utils/formatDate"
 
 import {
   LAUNCH_DEADLINE_MS,
@@ -17,12 +16,10 @@ jest.mock("expo-router", () => ({
 }))
 jest.mock("@expo-google-fonts/space-grotesk", () => ({ useFonts: jest.fn() }))
 jest.mock("@/i18n", () => ({ initI18n: jest.fn() }))
-jest.mock("@/utils/formatDate", () => ({ loadDateFnsLocale: jest.fn() }))
 jest.mock("@/utils/crashReporting", () => ({ reportCrash: jest.fn() }))
 
 const useFontsMock = jest.mocked(useFonts)
 const initI18nMock = jest.mocked(initI18n)
-const loadDateFnsLocaleMock = jest.mocked(loadDateFnsLocale)
 const reportCrashMock = jest.mocked(reportCrash)
 const hideSplashMock = jest.mocked(SplashScreen.hideAsync)
 
@@ -66,7 +63,6 @@ describe("useLaunchReadiness", () => {
     expect(hook.result.current).toBe(false)
 
     await act(async () => i18n.resolve(undefined as never))
-    expect(loadDateFnsLocaleMock).toHaveBeenCalledTimes(1)
     expect(hook.result.current).toBe(true)
     expect(hideSplashMock).not.toHaveBeenCalled()
 
@@ -127,7 +123,6 @@ describe("useLaunchReadiness", () => {
 
     await waitFor(() => expect(hook.result.current).toBe(true))
     expect(reportCrashMock).toHaveBeenCalledWith(i18nError)
-    expect(loadDateFnsLocaleMock).not.toHaveBeenCalled()
   })
 
   it("never hides the splash until readiness and consent both hold", async () => {
