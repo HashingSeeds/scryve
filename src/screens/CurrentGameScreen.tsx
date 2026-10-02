@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
-import { useWindowDimensions, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
+import Animated from "react-native-reanimated"
 
 import { Button } from "@/components/Button"
 import { DialogCard, $dialogText, type DialogOrigin } from "@/components/DialogCard"
@@ -25,6 +25,10 @@ import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
 import { supportsCommanderDamage } from "@/features/game/playSystems"
 import type { GamePlayer, LocalGame, LocalGameResult, PlayerId } from "@/features/game/types"
+import {
+  rotateGameBoardAnchor,
+  useGameBoardOrientation,
+} from "@/features/game/useGameBoardOrientation"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
@@ -67,7 +71,8 @@ export function CurrentGameScreen({
   const { themed } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)
   const system = runtime.game.system
-  const { width, height, fontScale } = useWindowDimensions()
+  const boardOrientation = useGameBoardOrientation()
+  const { width, height, fontScale, rotation } = boardOrientation
   const [menuOpen, setMenuOpen] = useState(false)
   const isFresh = fresh && !hasLocalGameStarted(runtime.game)
   const [endSource, setEndSource] = useState<GameEndSource | undefined>(
@@ -112,8 +117,8 @@ export function CurrentGameScreen({
     [playerCount, width, height, fontScale, layoutVariant],
   )
   const menuAnchor = useMemo(
-    () => getPlayerGridMenuAnchor(playerCount, gridLayout),
-    [playerCount, gridLayout],
+    () => rotateGameBoardAnchor(getPlayerGridMenuAnchor(playerCount, gridLayout), rotation),
+    [playerCount, gridLayout, rotation],
   )
 
   function confirmEnd(result: LocalGameResult) {
@@ -244,8 +249,14 @@ export function CurrentGameScreen({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <View testID="game-board" style={themed($board)}>
+      <Animated.View
+        ref={boardOrientation.frameRef}
+        collapsable={false}
+        testID="game-board"
+        style={themed($board)}
+      >
         <PlayerGrid
+          boardOrientation={boardOrientation}
           players={runtime.game.players}
           system={system}
           lifeStep={runtime.game.lifeStep}
@@ -272,6 +283,8 @@ export function CurrentGameScreen({
         <GameRadialMenu
           open={menuOpen}
           anchor={menuAnchor}
+          boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
+          nativeFrame={boardOrientation.nativeFrame}
           compact={playerCount > 2}
           actions={radialActions}
           variant={menuButtonStyle}
@@ -289,7 +302,7 @@ export function CurrentGameScreen({
             onAccount={onAccount}
           />
         ) : null}
-      </View>
+      </Animated.View>
 
       {layoutPickerOpen ? (
         <DialogCard

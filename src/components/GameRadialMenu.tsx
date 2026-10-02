@@ -1,4 +1,4 @@
-import { memo, useEffect } from "react"
+import { type ComponentProps, memo, useEffect } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
@@ -9,6 +9,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import {
+  rotateGameBoardAnchor,
+  type useGameBoardOrientation,
+} from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
 import type { GameMenuActionKind } from "@/theme/gameMenu"
 import type { ThemedStyle } from "@/theme/types"
@@ -36,6 +40,8 @@ export interface RadialMenuAction {
 export interface GameRadialMenuProps {
   open: boolean
   anchor: { x: number; y: number }
+  boardAnchor?: { x: number; y: number }
+  nativeFrame?: ReturnType<typeof useGameBoardOrientation>["nativeFrame"]
   compact?: boolean
   actions: readonly RadialMenuAction[]
   onToggle: () => void
@@ -134,6 +140,8 @@ export function getRadialActionStart(pose: RadialActionPose): { x: number; y: nu
 export const GameRadialMenu = memo(function GameRadialMenu({
   open,
   anchor,
+  boardAnchor,
+  nativeFrame,
   compact,
   actions,
   onToggle,
@@ -177,6 +185,13 @@ export const GameRadialMenu = memo(function GameRadialMenu({
     top: `${anchor.y * 100}%`,
   }
 
+  const nativeAnchorStyle = useAnimatedStyle(() => {
+    const frame = nativeFrame?.value
+    if (!boardAnchor || !frame) return { left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }
+    const position = rotateGameBoardAnchor(boardAnchor, frame.rotation)
+    return { left: position.x * frame.width, top: position.y * frame.height }
+  })
+
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {menuOpen ? (
@@ -193,7 +208,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
         <RadialAction
           key={action.kind}
           action={action}
-          anchorStyle={anchorStyle}
+          anchorStyle={[anchorStyle, nativeAnchorStyle]}
           pose={poses[index]}
           reducedMotion={reducedMotion}
           open={menuOpen}
@@ -207,6 +222,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
           themed($anchor),
           compact ? themed($compactAnchor) : themed($largeAnchor),
           anchorStyle,
+          nativeAnchorStyle,
         ]}
       >
         <Pressable
@@ -297,7 +313,7 @@ function RadialAction({
   open,
 }: {
   action: RadialMenuAction
-  anchorStyle: ViewStyle
+  anchorStyle: ComponentProps<typeof Animated.View>["style"]
   pose: RadialActionPose
   reducedMotion: ReducedMotionPreference
   open: boolean
