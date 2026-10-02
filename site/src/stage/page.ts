@@ -121,14 +121,12 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   }
 }
 
-// Both connected phones mount the same game, so a tap on either shows up on both.
 function setUpConnected(stage: HTMLElement, game: DemoGame) {
   stage
     .querySelectorAll<HTMLElement>("[data-board='connected']")
     .forEach((el) => mountBoard(el, game))
 }
 
-// Whichever step crosses the middle of the viewport sets the stage's scene and step.
 function setUpStage() {
   const stage = query<HTMLElement>("[data-stage]")
   const game = createDemoGame(commanderSetup(5))
@@ -253,7 +251,6 @@ function setUpLanding(stage: HTMLElement, showIntro: () => void) {
     const scale = lerp(Math.min(from.width / width, from.height / height), 1)
     const pinnedY = header.offsetHeight + stage.offsetHeight / 2
     const x = lerp(from.left + from.width / 2, stageBox.left + stageBox.width / 2)
-    // Never slide up under the header.
     const y = Math.max(
       lerp(from.top + from.height / 2, pinnedY),
       header.offsetHeight + (height * scale) / 2,

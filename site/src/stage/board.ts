@@ -33,7 +33,7 @@ const PENTAGON_STROKE_WIDTH = 7
 const PENTAGON_BORDER = "#000000"
 const PENTAGON_FACE = { top: "#46434E", bottom: "#26242C" } as const
 const PENTAGON_GLYPH = "#FFFFFF"
-const PENTAGON_GLYPH_PX_PER_UNIT = 0.8 // 80px button over a 100 unit viewBox
+const PENTAGON_GLYPH_PX_PER_UNIT = 0.8
 
 function regularPolygonPoints(radius: number): string {
   const center = PENTAGON_VIEWBOX / 2
@@ -461,7 +461,6 @@ function seatHtml(game: DemoGame, placement: SeatPlacement, interactive: boolean
   </div>`
 }
 
-// Renders a live board into `el` and keeps it in sync with `game`.
 export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true } = {}) {
   const recent = new Map<number, { total: number; timer: number }>()
 
