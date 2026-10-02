@@ -1653,7 +1653,7 @@ describe("connected commander damage claims", () => {
     })
   })
 
-  it("rejects resolution operation IDs reused across claims", async () => {
+  it("returns a mismatch code when a commander resolution operation ID is reused", async () => {
     const t = convexTest(schema, modules)
     const game = await activeGame(t)
     const claimIds = ["commander-unique-claim-one", "commander-unique-claim-two"]
@@ -1689,7 +1689,12 @@ describe("connected commander damage claims", () => {
         ...resolution,
         operationId: claimIds[1],
       }),
-    ).rejects.toThrow("reused with different data")
+    ).rejects.toMatchObject({
+      data: {
+        code: "sync_operation_mismatch",
+        message: "Operation identifier was reused with different data",
+      },
+    })
     await expect(
       game.joiner.mutation(api.games.confirmCommanderDamage, resolution),
     ).resolves.toMatchObject({ deduplicated: true })

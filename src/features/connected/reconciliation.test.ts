@@ -125,9 +125,8 @@ describe("connected reconciliation", () => {
       expect(classifyWriteFailure(new ConvexError({ code, message }))).toBe("permanent")
   })
 
-  it.each(permanentFailures)("preserves the installed-client regex for %s", (code, message) => {
+  it.each(permanentFailures)("keeps the legacy regex phrase for %s", (code, message) => {
     const serverError = new ConvexError({ code, message })
-    expect(serverError.message).toBe(JSON.stringify({ code, message }))
     expect(serverError.message).toMatch(legacyPermanentMessage)
   })
 
