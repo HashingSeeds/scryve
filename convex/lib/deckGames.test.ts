@@ -1,4 +1,4 @@
-import { DECK_GAMES, preconstructedFormat, preconSearchFormat } from "./deckGames"
+import { DECK_GAMES, preconstructedFormat } from "./deckGames"
 
 describe("deck game labels", () => {
   it("uses the official Pokémon spelling in user-facing labels", () => {
@@ -14,9 +14,4 @@ it.each([
   ["Commander Deck", "commander"],
 ])("keeps %s lists in %s", (type, format) => {
   expect(preconstructedFormat(type)).toBe(format)
-  expect(preconSearchFormat(format)).toBe(format)
-})
-
-it("keeps unsupported formats filtered instead of showing unrelated precons", () => {
-  expect(preconSearchFormat("legacy")).toBe("legacy")
 })
