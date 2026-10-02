@@ -2119,6 +2119,8 @@ describe("AddDeckScreen", () => {
     const view = renderAddDeck()
     expect(view.getByText("You've reached the free account limit of 2 decks.")).toBeTruthy()
     expect(view.getByText("Upgrade to Pro")).toBeTruthy()
+    chooseMode(view, "paste")
+    expect(view.getAllByTestId("account-deck-capacity")).toHaveLength(1)
     chooseMode(view, "blank")
     continueSetup(view)
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Blocked Deck")

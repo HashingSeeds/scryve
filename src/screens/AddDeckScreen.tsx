@@ -1874,7 +1874,6 @@ export function AddDeckScreen({
                 }}
               />
             )}
-            {saveRecovery}
             {pastedDraftCurrent ? (
               <Button
                 testID="return-import-review-button"
