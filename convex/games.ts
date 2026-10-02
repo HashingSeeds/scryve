@@ -82,13 +82,17 @@ function assertDeckRequirementSupported(gameSystem: string, deckRequired?: boole
     })
 }
 
+function isValidLifeDelta(delta: number) {
+  return Number.isInteger(delta) && delta !== 0 && Math.abs(delta) <= 999_999
+}
+
 function assertLifeDelta(delta: number) {
-  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 999_999)
+  if (!isValidLifeDelta(delta))
     throw new Error("Life delta must be a non-zero whole number from -999999 to 999999")
 }
 
 function assertGameWriteLifeDelta(delta: number) {
-  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 999_999)
+  if (!isValidLifeDelta(delta))
     throw gameWriteError(
       "invalid_life_delta",
       "Life delta must be a non-zero whole number from -999999 to 999999",
@@ -112,21 +116,29 @@ function assertCommanderGame(game: Doc<"games">) {
     throw new Error("Commander damage is only available in Commander games")
 }
 
+function isValidOperationId(operationId: string) {
+  return /^[A-Za-z0-9_-]{16,128}$/.test(operationId)
+}
+
 function assertOperationId(operationId: string) {
-  if (!/^[A-Za-z0-9_-]{16,128}$/.test(operationId)) throw new Error("Invalid operation identifier")
+  if (!isValidOperationId(operationId)) throw new Error("Invalid operation identifier")
 }
 
 function assertGameWriteOperationId(operationId: string) {
-  if (!/^[A-Za-z0-9_-]{16,128}$/.test(operationId))
+  if (!isValidOperationId(operationId))
     throw gameWriteError("invalid_operation_id", "Invalid operation identifier")
 }
 
+function isValidDeviceId(deviceId: string) {
+  return /^[A-Za-z0-9_-]{8,128}$/.test(deviceId)
+}
+
 function assertDeviceId(deviceId: string) {
-  if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId)) throw new Error("Invalid device identifier")
+  if (!isValidDeviceId(deviceId)) throw new Error("Invalid device identifier")
 }
 
 function assertGameWriteDeviceId(deviceId: string) {
-  if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId))
+  if (!isValidDeviceId(deviceId))
     throw gameWriteError("invalid_device_id", "Invalid device identifier")
 }
 
