@@ -33,7 +33,7 @@ const PENTAGON_STROKE_WIDTH = 7
 const PENTAGON_BORDER = "#000000"
 const PENTAGON_FACE = { top: "#46434E", bottom: "#26242C" } as const
 const PENTAGON_GLYPH = "#FFFFFF"
-const PENTAGON_GLYPH_PX_PER_UNIT = 0.8 // 80px button over a 100 unit viewBox
+const PENTAGON_GLYPH_PX_PER_UNIT = 0.8
 
 function regularPolygonPoints(radius: number): string {
   const center = PENTAGON_VIEWBOX / 2
@@ -272,9 +272,9 @@ function commanderTarget(game: DemoGame, source: SeatPlacement, target: SeatPlac
   </div>`
 }
 
-const COMMANDER_DEMO_START_MS = 450
-const COMMANDER_DEMO_TAP_MS = 120
-const COMMANDER_DEMO_PAUSE_MS = 450
+const COMMANDER_DEMO_START_MS = 700
+const COMMANDER_DEMO_TAP_MS = 240
+const COMMANDER_DEMO_PAUSE_MS = 650
 const COMMANDER_DEMO_FADE_MS = 450
 
 export interface CommanderDemoOptions {
@@ -395,7 +395,8 @@ export function createCommanderDemo(
     ]
     let at = COMMANDER_DEMO_START_MS
     later(at, () => overlays.forEach((el) => el?.classList.add("on")))
-    at += COMMANDER_DEMO_FADE_MS
+    // Let viewers read assignment mode before the first damage tap.
+    at += COMMANDER_DEMO_FADE_MS + COMMANDER_DEMO_PAUSE_MS
     targets.forEach((target, index) => {
       const overlay = overlays[index + 1]
       const total = overlay?.querySelector<HTMLElement>(".cmd-total")
@@ -461,7 +462,6 @@ function seatHtml(game: DemoGame, placement: SeatPlacement, interactive: boolean
   </div>`
 }
 
-// Renders a live board into `el` and keeps it in sync with `game`.
 export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true } = {}) {
   const recent = new Map<number, { total: number; timer: number }>()
 

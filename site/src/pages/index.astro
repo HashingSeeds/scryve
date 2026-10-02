@@ -5,6 +5,7 @@ import appIcon from "../../../assets/images/app-icon-ios.png?url"
 import GetTheApp from "../components/GetTheApp.astro"
 import Base from "../layouts/Base.astro"
 import { APP_LINKS } from "../links"
+import { demoCards } from "../stage/deck-demo"
 
 const qr = await qrcode.toString(new URL("/", Astro.site).href, {
   type: "svg",
@@ -13,11 +14,10 @@ const qr = await qrcode.toString(new URL("/", Astro.site).href, {
 })
 
 const versions = [
-  { name: "Current", record: "6W 1L", rate: 86 },
-  { name: "Proliferate package", record: "5W 3L 1D", rate: 56 },
-  { name: "Budget swap", record: "3W 5L", rate: 38 },
+  { name: "Current", record: "6–1" },
+  { name: "Proliferate package", record: "5–3–1" },
+  { name: "Budget swap", record: "3–5" },
 ]
-const cards = ["Sol Ring", "Arcane Signet", "Fellwar Stone", "Mind Stone", "Cultivate"]
 const plans = [
   ["Life counter for 2 to 6 players", "Yes", "Yes"],
   ["Connected play", "Yes", "Yes"],
@@ -58,64 +58,83 @@ const plans = [
       <div class="steps">
         <section data-scene="intro" aria-label="Platforms">
           <div class="step" data-step="intro">
-            <h2>On the table in seconds.</h2>
-            <p>Open Scryve in your browser, or install it on iPhone, iPad, or Android. Local games need no account.</p>
+            <div class="step-copy">
+              <h2>On the table in seconds.</h2>
+              <p>Open Scryve in your browser, or install it on iPhone, iPad, or Android. Local games need no account.</p>
+            </div>
           </div>
         </section>
 
         <section id="features" data-scene="features" aria-label="Features">
           <div class="step" data-step="players">
-            <h2>Two to six players.</h2>
-            <p>Pick the layout that matches how you sit.</p>
-            <div class="picker" data-pick="count" role="group" aria-label="Players">
-              {[2, 3, 4, 5, 6].map((count) => (
-                <button type="button" data-value={count} aria-pressed={String(count === 5)}>{count}</button>
-              ))}
+            <div class="step-copy">
+              <h2>Two to six players.</h2>
+              <p>Pick the layout that matches how you sit.</p>
+              <div class="picker" data-pick="count" role="group" aria-label="Players">
+                {[2, 3, 4, 5, 6].map((count) => (
+                  <button type="button" data-value={count} aria-pressed={String(count === 5)}>{count}</button>
+                ))}
+              </div>
+              <div class="picker" data-pick="layout" role="group" aria-label="Layout"></div>
             </div>
-            <div class="picker" data-pick="layout" role="group" aria-label="Layout"></div>
           </div>
           <div class="step" data-step="commander">
-            <h2>Commander damage, per opponent.</h2>
-            <p>Every seat tracks damage from each commander at the table. At 21 from one commander, that player is out.</p>
+            <div class="step-copy">
+              <h2>Commander damage, per opponent.</h2>
+              <p>Every seat tracks damage from each commander at the table. At 21 from one commander, that player is out.</p>
+              <button class="demo-replay" type="button" data-commander-replay>Replay demo</button>
+            </div>
           </div>
           <div class="step" data-step="systems">
-            <h2>Magic, Yu-Gi-Oh!, and Pokémon.</h2>
-            <p>Life, Life Points, or prize cards, with each game's formats built in.</p>
-            <div class="picker" data-pick="system" role="group" aria-label="Game"></div>
+            <div class="step-copy">
+              <h2>Magic, Yu-Gi-Oh!, and Pokémon.</h2>
+              <p>Life, Life Points, or prize cards, with each game's formats built in.</p>
+              <div class="picker" data-pick="system" role="group" aria-label="Game"></div>
+            </div>
           </div>
           <div class="step" data-step="offline">
-            <h2>Works offline.</h2>
-            <p>Games live on your device. Sign in when you want sync, your decks on every device, and connected play.</p>
+            <div class="step-copy">
+              <h2>Works offline.</h2>
+              <p>Games live on your device. Sign in when you want sync and connected play.</p>
+            </div>
           </div>
         </section>
 
         <section id="connected" data-scene="connected" aria-label="Connected play">
           <div class="step" data-step="join">
-            <h2>One game, every phone.</h2>
-            <p>Players join from their own phones with a six-character code, a QR code, or a link. Tap either phone.</p>
+            <div class="step-copy">
+              <h2>One game, every phone.</h2>
+              <p>Players join from their own phones with a six-character code, a QR code, or a link. Tap either phone.</p>
+            </div>
           </div>
           <div class="step" data-step="seats">
-            <h2>Seats, colors, and marks.</h2>
-            <p>Everyone signs in, then picks a seat, a color, and a mark before the host starts the game.</p>
+            <div class="step-copy">
+              <h2>Seats, colors, and marks.</h2>
+              <p>Everyone signs in, then picks a seat, a color, and a mark before the host starts the game.</p>
+            </div>
           </div>
         </section>
 
         <section id="pro" data-scene="pro" aria-label="Decks and Scryve Pro">
           <div class="step" data-step="decks">
-            <h2>Decks that keep score.</h2>
-            <p>Create your deck and choose it before the game. Every finished game counts toward its record.</p>
+            <div class="step-copy">
+              <h2>Decks that keep score.</h2>
+              <p>Tap a card to see its details. Tap ••• to compare version records with Pro.</p>
+            </div>
           </div>
           <div class="step" data-step="plans">
-            <h2>Free or Pro</h2>
-            <table class="plans">
-              <thead><tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">Free</th><th scope="col">Scryve Pro</th></tr></thead>
-              <tbody>
-                {plans.map(([feature, free, pro]) => (
-                  <tr><th scope="row">{feature}</th><td>{free}</td><td>{pro}</td></tr>
-                ))}
-              </tbody>
-            </table>
-            <p class="note">Pro is monthly or yearly. Upgrade from Account in the app.</p>
+            <div class="step-copy">
+              <h2>Free or Pro</h2>
+              <table class="plans">
+                <thead><tr><th scope="col"><span class="sr-only">Feature</span></th><th scope="col">Free</th><th scope="col">Scryve Pro</th></tr></thead>
+                <tbody>
+                  {plans.map(([feature, free, pro]) => (
+                    <tr><th scope="row">{feature}</th><td>{free}</td><td>{pro}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              <p class="note">Pro is monthly or yearly. Upgrade from Account in the app.</p>
+            </div>
           </div>
         </section>
       </div>
@@ -131,21 +150,67 @@ const plans = [
               <div class="scene-screen" data-for="connected"><div class="board-holder" data-board="connected"></div></div>
               <div class="scene-screen deck" data-for="pro">
                 <div class="deck-top"><span>Back</span><b>Deck</b><span>Edit</span></div>
-                <div class="deck-name">Atraxa Counters</div>
-                <div class="deck-meta">Magic · Commander · 100 cards</div>
-                <div class="deck-record"><b>58%</b><span>58% win rate · 14W 9L 1D over 24 games</span></div>
-                <div class="deck-label">Versions</div>
-                {versions.map((version) => (
-                  <div class="deck-row version">
-                    <span>{version.name}</span>
-                    <span class="bar"><span style={`width:${version.rate}%`}></span></span>
-                    <em>{version.record}</em>
+                <div class="deck-content">
+                  <div class="deck-name">Atraxa Counters</div>
+                  <div class="deck-meta">Magic · Commander · 100 cards</div>
+                  <div class="deck-tabs" role="group" aria-label="Deck view">
+                    <button type="button" data-deck-tab="cards" aria-pressed="true">Cards</button>
+                    <button type="button" data-deck-tab="notes" aria-pressed="false">Notes</button>
                   </div>
-                ))}
-                <div class="deck-label">Commander</div>
-                <div class="deck-row"><span>Atraxa, Praetors' Voice</span><em>1×</em></div>
-                <div class="deck-label">Main deck <em>99</em></div>
-                {cards.map((card) => <div class="deck-row"><span>{card}</span><em>1×</em></div>)}
+                  <div data-deck-panel="cards">
+                    <div class="deck-label">Commander <em>Change</em></div>
+                    {demoCards.map((card, index) => (
+                      <Fragment>
+                        {index === 1 && <div class="deck-label">Main deck <em>99</em></div>}
+                        <button class="deck-row deck-card" type="button" data-deck-card={index} data-card-board={card.board} aria-label={`1× ${card.name}`}>
+                          <img src={card.thumbnail} alt="" width="32" height="45" loading="lazy" />
+                          <span>{card.name}</span><em>1×</em>
+                        </button>
+                      </Fragment>
+                    ))}
+                  </div>
+                  <div class="deck-notes" data-deck-panel="notes" hidden>No notes yet.</div>
+                </div>
+                <div class="deck-footer"><span>Synced</span><span class="deck-primary">+ Add cards</span></div>
+                <details class="deck-settings">
+                  <summary aria-label="Deck details">•••</summary>
+                  <button class="deck-dismiss" type="button" data-deck-close aria-label="Close deck settings"></button>
+                  <div class="deck-sheet">
+                    <b>Deck details</b>
+                    <div class="deck-field"><span>Deck name</span><div>Atraxa Counters</div></div>
+                    <div class="deck-field"><span>Format</span><div>Commander <span>▾</span></div></div>
+                    <div class="deck-label">Versions <em>New version</em></div>
+                    {versions.map((version, index) => (
+                      <button class="deck-row version" type="button" data-deck-version aria-pressed={String(index === 0)}>
+                        <span class="version-mark" aria-hidden="true"></span>
+                        <span class="version-name">{version.name}</span>
+                        <span class="version-context">{version.record}<small>100 cards</small></span>
+                        <span class="version-menu" aria-hidden="true">•••</span>
+                      </button>
+                    ))}
+                    <button class="deck-primary" type="button" data-deck-close>Save changes</button>
+                    <span class="deck-delete">Delete deck</span>
+                  </div>
+                </details>
+                <dialog class="card-focus" aria-labelledby="card-focus-title">
+                  <div class="card-focus-header">
+                    <b id="card-focus-title"></b>
+                    <button type="button" data-card-close aria-label="Close card details" autofocus>Close</button>
+                  </div>
+                  <div class="card-focus-body" tabindex="0" aria-label="Card information">
+                    {demoCards.map((card, index) => (
+                      <article data-card-details={index} hidden>
+                        <img class="card-focus-image" src={card.image} alt={card.name} width="488" height="680" loading="lazy" />
+                        <p class="card-focus-meta">{card.manaCost}</p>
+                        <p class="card-focus-meta">{card.typeLine}</p>
+                        <p>Color identity: {card.colorIdentity}</p>
+                        <p class="card-focus-rules">{card.oracleText}</p>
+                        <p class="card-focus-meta">{card.setName} · #{card.collectorNumber} · {card.rarity.charAt(0).toUpperCase() + card.rarity.slice(1)}</p>
+                      </article>
+                    ))}
+                  </div>
+                  <div class="card-focus-quantity"></div>
+                </dialog>
               </div>
             </div>
           </div>

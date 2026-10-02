@@ -3,7 +3,7 @@ import { act, fireEvent, render, within } from "@testing-library/react-native"
 
 import * as deckSync from "@/features/decks/decksSync"
 import * as deckWrites from "@/features/decks/decksSyncWrites"
-import { deleteGuestDeck, saveGuestDeck } from "@/features/decks/guestDeck"
+import { clearGuestDecks, guestDeckRouteId, saveGuestDeck } from "@/features/decks/guestDeck"
 import { recordRecentDeck } from "@/features/decks/recentDecks"
 import { colors } from "@/theme/colors"
 import { colors as darkColors } from "@/theme/colorsDark"
@@ -206,8 +206,9 @@ describe("DecksScreen", () => {
     expect(retry).toHaveBeenCalledTimes(1)
   })
 
-  it("opens the local deck while auth is loading without querying the private shelf", () => {
+  it("opens each local deck while auth is loading without querying the private shelf", () => {
     saveGuestDeck({ name: "Guest Commander", format: "commander", game: "mtg", cards: [] })
+    const second = saveGuestDeck({ name: "Guest Modern", format: "modern", game: "mtg", cards: [] })
     mockListMine.error = new Error("Private query must not run")
     const onSelect = jest.fn()
     const view = renderShelf({
@@ -221,8 +222,13 @@ describe("DecksScreen", () => {
     })
     expect(view.getByText("Guest Commander")).toBeTruthy()
     expect(view.queryByText("Existing Deck")).toBeNull()
-    fireEvent.press(view.getByLabelText("Guest Commander"))
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ deckId: "guest" }))
+    fireEvent.press(view.getByLabelText("Guest Modern"))
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ deckId: guestDeckRouteId(second.localId), name: "Guest Modern" }),
+    )
+    fireEvent.changeText(view.getByTestId("deck-search-input"), "modern")
+    expect(view.queryByText("Guest Commander")).toBeNull()
+    expect(view.getByText("Guest Modern")).toBeTruthy()
     fireEvent.changeText(view.getByTestId("deck-search-input"), "no match")
     expect(view.queryByText("Guest Commander")).toBeNull()
     expect(view.queryByText("Nothing matches")).toBeNull()
@@ -240,7 +246,7 @@ describe("DecksScreen", () => {
       reapplyFailure: jest.fn(),
     })
     clear()
-    deleteGuestDeck()
+    clearGuestDecks()
     mockListMine.value = {
       decks: [commanderDeck, standardDeck],
       capacity: { used: 2, limit: 100, premium: true, canCreate: true },

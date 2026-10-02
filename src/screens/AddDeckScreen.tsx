@@ -29,7 +29,12 @@ import { DeckCardRow, DeckCardSectionHeader } from "@/features/decks/DeckCardRow
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
-import { replaceGuestDeck, saveGuestDeck, type GuestDeckPayload } from "@/features/decks/guestDeck"
+import {
+  guestDeckRouteId,
+  replaceGuestDeck,
+  saveGuestDeck,
+  type GuestDeckPayload,
+} from "@/features/decks/guestDeck"
 import { GuestDeckImportNotice } from "@/features/decks/GuestDeckImportNotice"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useGuestDeckImport } from "@/features/decks/useGuestDeckImport"
@@ -49,7 +54,7 @@ import {
   preconSearchFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
-import { MAX_DECK_CARDS } from "../../convex/lib/policy"
+import { FREE_DECK_LIMIT, MAX_DECK_CARDS, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
 
 type CreationMode = "precon" | "paste" | "blank"
 
@@ -399,27 +404,26 @@ export function AddDeckScreen({
   } = useCardDetails(focusedPreviewCard)
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
-  const [saveAttempted, setSaveAttempted] = useState(false)
   const [guestConflict, setGuestConflict] = useState(false)
   const [pendingGuestPayload, setPendingGuestPayload] = useState<GuestDeckPayload>()
   const [confirmGuestReplace, setConfirmGuestReplace] = useState(false)
   const [guestReplacementLocalId, setGuestReplacementLocalId] = useState<string>()
   const transfer = useGuestDeckImport(access)
-  const guestDeck = transfer.guestDeck
+  const guestDecks = transfer.guestDecks
+  const guestFull = guestDecks.length >= FREE_DECK_LIMIT
+  const guestReplacement = guestDecks.find((deck) => deck.localId === guestReplacementLocalId)
   const waitingForGuest = Boolean(
     access?.ready &&
-    guestDeck &&
-    (transfer.importing ||
-      (!transfer.result && !transfer.error) ||
-      transfer.result?.status === "limit_reached"),
+    guestDecks.length &&
+    (transfer.importing || (!transfer.result && !transfer.error) || transfer.result?.limitReached),
   )
-  const guestBlocked = guestMode && guestConflict && Boolean(guestDeck)
+  const guestBlocked = guestMode && guestConflict && guestFull
   useEffect(() => {
-    if (!guestDeck || !guestMode) {
+    if (!guestFull || !guestMode) {
       setGuestConflict(false)
       setConfirmGuestReplace(false)
     }
-  }, [guestDeck, guestMode])
+  }, [guestFull, guestMode])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string>()
   const [previewError, setPreviewError] = useState<string>()
@@ -443,7 +447,6 @@ export function AddDeckScreen({
     [],
   )
   useEffect(() => {
-    setSaveAttempted(false)
     setGuestConflict(false)
     setPendingGuestPayload(undefined)
   }, [mode, game, format, selectedPrecon?.fileName, selectedCatalogDeck?._id])
@@ -458,13 +461,11 @@ export function AddDeckScreen({
   }
 
   function saveGuest(payload: GuestDeckPayload) {
-    setSaveAttempted(true)
     setPendingGuestPayload(payload)
     try {
-      saveGuestDeck(payload)
-      onCreated("guest")
+      onCreated(guestDeckRouteId(saveGuestDeck(payload).localId))
     } catch (cause) {
-      if (guestDeck) {
+      if (guestFull) {
         setGuestConflict(true)
         setError(undefined)
         return
@@ -480,8 +481,7 @@ export function AddDeckScreen({
         mode === "blank" && !selectedPrecon && !selectedCatalogDeck
           ? { ...pendingGuestPayload, name, format, game, note }
           : pendingGuestPayload
-      replaceGuestDeck(payload, guestReplacementLocalId)
-      onCreated("guest")
+      onCreated(guestDeckRouteId(replaceGuestDeck(payload, guestReplacementLocalId).localId))
     } catch (cause) {
       fail(cause, "Could not replace local deck")
     }
@@ -592,7 +592,6 @@ export function AddDeckScreen({
   }, [mode, preconQuery, runCatalogSearch])
 
   async function createBlank() {
-    setSaveAttempted(true)
     if (guestMode) {
       saveGuest({ name, format, game, ...(note.trim() ? { note } : {}), cards: [] })
       return
@@ -701,7 +700,6 @@ export function AddDeckScreen({
   }
 
   async function importPrecon() {
-    setSaveAttempted(true)
     if (guestMode && selectedPrecon && resolvedPrecon && !resolvedPrecon.unresolved.length) {
       saveGuest({
         name: resolvedPrecon.name || selectedPrecon.name,
@@ -741,7 +739,6 @@ export function AddDeckScreen({
   }
 
   async function importTopDeck() {
-    setSaveAttempted(true)
     if (guestMode && selectedCatalogDeck && catalogDetail) {
       saveGuest({
         name: selectedCatalogDeck.name,
@@ -945,7 +942,6 @@ export function AddDeckScreen({
       pastedCards.length === 0
     )
       return
-    setSaveAttempted(true)
     if (!guestMode && access && !access.ready) {
       access.request()
       return
@@ -1029,32 +1025,39 @@ export function AddDeckScreen({
   const guestRecovery = guestBlocked ? (
     <>
       <View style={themed($stack)}>
-        <Text weight="bold" text="One deck saved on this device" />
-        <Button
-          preset="reversed"
-          text="Replace saved deck…"
-          style={themed($previewImportButton)}
-          textStyle={themed($previewImportButtonText)}
-          onPress={() => {
-            setGuestReplacementLocalId(guestDeck?.localId)
-            setConfirmGuestReplace(true)
-          }}
-        />
+        <Text weight="bold" text={`${FREE_DECK_LIMIT} decks saved on this device`} />
+        {guestDecks.map((deck) => (
+          <Button
+            key={deck.localId}
+            preset="reversed"
+            text={`Replace ${deck.deck.name}…`}
+            style={themed($previewImportButton)}
+            textStyle={themed($previewImportButtonText)}
+            onPress={() => {
+              setGuestReplacementLocalId(deck.localId)
+              setConfirmGuestReplace(true)
+            }}
+          />
+        ))}
         {access?.request ? (
           <TouchableOpacity
             accessibilityRole="button"
             style={themed($plainAction)}
             onPress={access.request}
           >
-            <Text text="Sign in to keep both" style={themed($textAction)} />
+            <Text text="Sign in, then upgrade to Pro" style={themed($textAction)} />
           </TouchableOpacity>
         ) : null}
-        <Text size="xs" style={themed($label)} text="Free account · 2 decks + sync" />
+        <Text
+          size="xs"
+          style={themed($label)}
+          text={`Pro is a subscription on your account · ${MAX_PREMIUM_DECKS} decks`}
+        />
       </View>
       <ConfirmDialog
         visible={confirmGuestReplace}
         title="Replace local deck?"
-        message="Your existing local deck will be replaced."
+        message={`${guestReplacement?.deck.name ?? "The selected deck"} will be replaced.`}
         confirmText="Replace"
         dialogTestID="confirm-guest-replace"
         confirmTestID="confirm-guest-replace-action"
@@ -1071,7 +1074,7 @@ export function AddDeckScreen({
   const saveRecovery = (
     <>
       <GuestDeckImportNotice access={access} transfer={transfer} />
-      {atCapacity && saveAttempted && transfer.result?.status !== "limit_reached" ? (
+      {atCapacity && !transfer.result?.limitReached ? (
         <AccountDeckCapacity access={access} />
       ) : null}
       {guestRecovery}
@@ -1301,25 +1304,26 @@ export function AddDeckScreen({
                 style={$flex1}
               />
             ) : null}
-            <Button
-              testID="save-import-button"
-              text={busy ? "Saving…" : guestMode ? "Save on device" : "Save deck"}
-              preset="reversed"
-              style={$flex1}
-              disabled={
-                busy ||
-                resolvingPasted ||
-                !pastedDraftCurrent ||
-                (!pastedDraft.omitted && pastedProblems.length > 0) ||
-                pastedCards.length === 0 ||
-                !name.trim() ||
-                (!capacityReady && !canRequestAccess) ||
-                (atCapacity && saveAttempted) ||
-                guestBlocked ||
-                waitingForGuest
-              }
-              onPress={importPasted}
-            />
+            {!atCapacity ? (
+              <Button
+                testID="save-import-button"
+                text={busy ? "Saving…" : guestMode ? "Save on device" : "Save deck"}
+                preset="reversed"
+                style={$flex1}
+                disabled={
+                  busy ||
+                  resolvingPasted ||
+                  !pastedDraftCurrent ||
+                  (!pastedDraft.omitted && pastedProblems.length > 0) ||
+                  pastedCards.length === 0 ||
+                  !name.trim() ||
+                  (!capacityReady && !canRequestAccess) ||
+                  guestBlocked ||
+                  waitingForGuest
+                }
+                onPress={importPasted}
+              />
+            ) : null}
           </View>
         </BottomActionBar>
         {previewCardDialog}
@@ -1460,7 +1464,7 @@ export function AddDeckScreen({
           ) : null}
           {error ? <AlertNote text={error} /> : null}
           {saveRecovery}
-          {!guestBlocked ? (
+          {!guestBlocked && !atCapacity ? (
             <Button
               testID="import-catalog-deck"
               text={busy ? "Importing…" : guestMode ? "Save deck on this device" : "Import deck"}
@@ -1468,7 +1472,6 @@ export function AddDeckScreen({
               disabled={
                 busy ||
                 (!capacityReady && !canRequestAccess) ||
-                (atCapacity && saveAttempted) ||
                 guestBlocked ||
                 waitingForGuest ||
                 !catalogDetail
@@ -1501,7 +1504,6 @@ export function AddDeckScreen({
     const cannotImport =
       busy ||
       (!capacityReady && !canRequestAccess) ||
-      (atCapacity && saveAttempted) ||
       guestBlocked ||
       waitingForGuest ||
       previewLoading ||
@@ -1621,7 +1623,7 @@ export function AddDeckScreen({
             <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
           ) : null}
           {saveRecovery}
-          {!guestBlocked ? (
+          {!guestBlocked && !atCapacity ? (
             <TouchableOpacity
               testID="import-preview-button"
               accessibilityRole="button"
@@ -1650,6 +1652,7 @@ export function AddDeckScreen({
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
       <Header title="Add deck" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($stack)}>
+        {saveRecovery}
         <Text preset="subheading" text="Deck details" accessibilityRole="header" />
         <View style={themed($configRow)}>
           <View style={$flex1}>
@@ -1881,7 +1884,6 @@ export function AddDeckScreen({
                 }}
               />
             )}
-            {saveRecovery}
             {pastedDraftCurrent ? (
               <Button
                 testID="return-import-review-button"
@@ -1924,20 +1926,20 @@ export function AddDeckScreen({
               onChangeText={setName}
             />
             {noteField}
-            {saveRecovery}
-            <Button
-              text={busy ? "Creating…" : "Create deck"}
-              preset="reversed"
-              disabled={
-                busy ||
-                (!capacityReady && !canRequestAccess) ||
-                (atCapacity && saveAttempted) ||
-                guestBlocked ||
-                waitingForGuest ||
-                !name.trim()
-              }
-              onPress={createBlank}
-            />
+            {!atCapacity ? (
+              <Button
+                text={busy ? "Creating…" : "Create deck"}
+                preset="reversed"
+                disabled={
+                  busy ||
+                  (!capacityReady && !canRequestAccess) ||
+                  guestBlocked ||
+                  waitingForGuest ||
+                  !name.trim()
+                }
+                onPress={createBlank}
+              />
+            ) : null}
           </View>
         ) : null}
 
