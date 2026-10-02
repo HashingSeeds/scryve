@@ -24,7 +24,7 @@ export type RevenueCatConfigResult =
 
 function validPublicApiKey(value: string | undefined): value is string {
   if (!value || value.includes("replace_me")) return false
-  return /^(test|appl|goog|rcb)_[A-Za-z0-9]+$/.test(value)
+  return /^(test|appl|goog|rcb(?:_sb)?)_[A-Za-z0-9]+$/.test(value)
 }
 
 export function validateRevenueCatConfig(
