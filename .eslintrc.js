@@ -21,7 +21,7 @@ module.exports = {
     // typescript-eslint
     "@typescript-eslint/array-type": 0,
     "@typescript-eslint/ban-ts-comment": 0,
-    "@typescript-eslint/no-explicit-any": 0,
+    "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/no-unused-vars": [
       "error",
       {
@@ -112,10 +112,15 @@ module.exports = {
   },
   overrides: [
     {
-      files: ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
-      excludedFiles: ["**/*.test.{ts,tsx}", "convex/_generated/**"],
+      files: ["**/*.test.ts", "**/*.test.tsx", "test/**"],
       rules: {
-        "@typescript-eslint/no-explicit-any": "error",
+        "@typescript-eslint/no-explicit-any": 0,
+      },
+    },
+    {
+      files: ["convex/_generated/**"],
+      rules: {
+        "@typescript-eslint/no-explicit-any": 0,
       },
     },
   ],
