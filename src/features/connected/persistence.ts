@@ -1,6 +1,5 @@
 import { readPublicCloudConfig } from "@/features/auth/config"
 import {
-  DURABLE_OUTBOX_LIMITS,
   DurableOutbox,
   type DurableEnqueueResult,
   type DurableFailResult,
@@ -33,11 +32,6 @@ import {
 import type { LifeChangedEvent } from "../game/types"
 
 export interface ConnectedStringStorage extends DurableStringStorage {}
-
-export const CONNECTED_PERSISTENCE_LIMITS = {
-  schemaVersion: 1,
-  ...DURABLE_OUTBOX_LIMITS,
-} as const
 
 export interface ConnectedPersistenceLimits extends DurableOutboxLimits {}
 

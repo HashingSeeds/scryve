@@ -17,12 +17,7 @@ import Purchases, {
   type PurchasesPackage,
 } from "react-native-purchases"
 
-import {
-  COUNT_PACKAGE_IDS,
-  COUNT_PRODUCT_IDS,
-  COUNT_PRO_ENTITLEMENT_ID,
-  type CountProductId,
-} from "./config"
+import { COUNT_PACKAGE_IDS, COUNT_PRO_ENTITLEMENT_ID, type CountProductId } from "./config"
 import {
   presentCountCustomerCenter,
   presentCountProPaywall,
@@ -301,10 +296,3 @@ export function RevenueCatProvider({
 export function useRevenueCat() {
   return useContext(RevenueCatContext)
 }
-
-export function useCountPro() {
-  const { isCountPro, isLoading, customerInfo, error } = useRevenueCat()
-  return { isCountPro, isLoading, customerInfo, error }
-}
-
-export const COUNT_PRO_PRODUCTS = Object.values(COUNT_PRODUCT_IDS)

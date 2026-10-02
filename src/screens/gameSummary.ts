@@ -10,9 +10,9 @@ import {
 } from "@/features/game/playSystems"
 import type { LifeChangedEvent, LocalGame } from "@/features/game/types"
 
-import type { HistorySource } from "./historyEntries"
+import type { HistoryOutcome, HistorySource } from "./historyEntries"
 
-export type SummaryOutcome = "win" | "loss" | "draw" | "unrecorded"
+export type SummaryOutcome = HistoryOutcome
 
 export interface SummaryPlayer {
   id: string
@@ -220,8 +220,4 @@ export function metaLine(model: GameSummaryModel) {
   ]
     .filter(Boolean)
     .join(" · ")
-}
-
-export function netSwing(player: SummaryPlayer, startingLife?: number) {
-  return startingLife === undefined ? undefined : player.life - startingLife
 }

@@ -19,7 +19,3 @@ export interface LegalDocumentContent {
 export const CONSENT_DOCUMENT_IDS = ["terms", "privacy"] as const
 
 export type ConsentDocumentId = (typeof CONSENT_DOCUMENT_IDS)[number]
-
-export function isConsentDocumentId(value: string): value is ConsentDocumentId {
-  return (CONSENT_DOCUMENT_IDS as readonly string[]).includes(value)
-}

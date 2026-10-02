@@ -2,8 +2,6 @@ import type { PlatformOSType } from "react-native"
 import { Platform } from "react-native"
 
 export const COUNT_PRO_ENTITLEMENT_ID = "Count Pro"
-export const COUNT_PRO_ENTITLEMENT_NAME = "Scryve Pro"
-export const REVENUECAT_OFFERING_ID = "default"
 
 export const COUNT_PRODUCT_IDS = {
   lifetime: "lifetime",

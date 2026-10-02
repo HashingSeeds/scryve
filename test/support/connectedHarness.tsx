@@ -206,7 +206,6 @@ export const connectedHarness: {
   convexLoading: boolean
   userId?: string
   userLoaded: boolean
-  migrationOwners: Set<string>
   decks: SeatDeck[] | undefined
 } = {
   activeGames: [],
@@ -220,7 +219,6 @@ export const connectedHarness: {
   convexLoading: false,
   userId: "user-a",
   userLoaded: true,
-  migrationOwners: new Set<string>(),
   decks: [],
 }
 
@@ -268,7 +266,6 @@ export function resetConnectedHarness() {
   connectedHarness.convexLoading = false
   connectedHarness.userId = "user-a"
   connectedHarness.userLoaded = true
-  connectedHarness.migrationOwners.clear()
   connectedHarness.decks = []
 }
 
@@ -342,15 +339,6 @@ export function createConnectedGameMock() {
   }
 }
 
-export function createConnectedPersistenceMock() {
-  return {
-    ConnectedGameRepository: jest.fn((_storage: unknown, ownerId: string) => ({
-      isMembershipMigrationComplete: () => connectedHarness.migrationOwners.has(ownerId),
-      markMembershipMigrationComplete: () => connectedHarness.migrationOwners.add(ownerId),
-    })),
-  }
-}
-
 export function createAuthConfigMock() {
   return {
     readPublicCloudConfig: () => ({
@@ -364,7 +352,7 @@ export function createAuthConfigMock() {
   }
 }
 
-export const connectedApi = {
+const connectedApi = {
   users: { syncCurrent: "users.syncCurrent" },
   games: {
     claimSeat: "games.claimSeat",
