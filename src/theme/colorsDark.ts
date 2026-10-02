@@ -19,9 +19,6 @@ const palette = {
   primary100: "#A54F31",
 
   secondary500: "#DCDDE9",
-  secondary400: "#BCC0D6",
-  secondary300: "#9196B9",
-  secondary200: "#626894",
   secondary100: "#41476E",
 
   accent500: "#FFEED4",
@@ -37,7 +34,6 @@ const palette = {
   info500: "#77558A",
   destructive500: "#A33A52",
 
-  overlay20: "rgba(25, 16, 21, 0.2)",
   overlay50: "rgba(25, 16, 21, 0.5)",
 } as const
 
@@ -55,10 +51,7 @@ export const colors = {
   error: palette.angry500,
   errorBackground: palette.angry100,
   surface: palette.neutral100,
-  surfaceMuted: palette.neutral200,
   surfaceRaised: palette.neutral300,
-  surfaceInverse: palette.neutral900,
-  textInverse: palette.neutral100,
   overlay: palette.overlay50,
   shadow: palette.neutral100,
   success: palette.success500,
