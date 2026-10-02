@@ -53,7 +53,6 @@ import type * as moderation from "../moderation.js";
 import type * as providerHealth from "../providerHealth.js";
 import type * as revenuecat from "../revenuecat.js";
 import type * as users from "../users.js";
-import type * as waitlist from "../waitlist.js";
 
 import type {
   ApiFromModules,
@@ -107,7 +106,6 @@ declare const fullApi: ApiFromModules<{
   providerHealth: typeof providerHealth;
   revenuecat: typeof revenuecat;
   users: typeof users;
-  waitlist: typeof waitlist;
 }>;
 
 /**

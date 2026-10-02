@@ -11,8 +11,6 @@ import {
 
 const http = httpRouter()
 
-const waitlistPlatforms = ["web", "ios", "android"] as const
-type WaitlistPlatform = (typeof waitlistPlatforms)[number]
 type RevenueCatEvent = {
   id: string
   timestampMs: number
@@ -27,10 +25,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null
-}
-
-function isWaitlistPlatform(value: unknown): value is WaitlistPlatform {
-  return typeof value === "string" && waitlistPlatforms.includes(value as WaitlistPlatform)
 }
 
 function readStringArray(value: unknown) {
@@ -100,17 +94,6 @@ async function fetchTransferSnapshots(
   )
 }
 
-function readWaitlistSubmission(value: unknown) {
-  const record = asRecord(value)
-  if (!record) return null
-  const email = typeof record.email === "string" ? record.email.trim().toLowerCase() : ""
-  const platforms = Array.isArray(record.platforms)
-    ? [...new Set(record.platforms.filter(isWaitlistPlatform))]
-    : []
-  if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254 || platforms.length === 0) return null
-  return { email, platforms }
-}
-
 http.route({
   path: "/revenuecat/webhooks",
   method: "POST",
@@ -170,29 +153,6 @@ http.route({
       console.error("RevenueCat webhook sync failed", cause)
       return new Response("RevenueCat sync failed", { status: 502 })
     }
-  }),
-})
-
-http.route({
-  path: "/waitlist/submissions",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    if (!env.WAITLIST_INGEST_SECRET)
-      return new Response("Wait-list ingestion is not configured", { status: 503 })
-    if (request.headers.get("authorization") !== `Bearer ${env.WAITLIST_INGEST_SECRET}`)
-      return new Response("Unauthorized", { status: 401 })
-
-    let body: unknown
-    try {
-      body = await request.json()
-    } catch {
-      return new Response("Invalid request", { status: 400 })
-    }
-    const submission = readWaitlistSubmission(body)
-    if (!submission) return new Response("Invalid submission", { status: 400 })
-
-    const result = await ctx.runMutation(internal.waitlist.submit, submission)
-    return Response.json(result, { headers: { "cache-control": "no-store" } })
   }),
 })
 
