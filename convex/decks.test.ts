@@ -24,6 +24,45 @@ async function synced(t: ReturnType<typeof convexTest>, subject: string, name: s
 }
 
 describe("premium deck tracking", () => {
+  it.each([
+    { account: "free", used: 1, limit: 2, premium: false, canCreate: true },
+    { account: "Pro", used: 3, limit: 100, premium: true, canCreate: true },
+    { account: "over-limit", used: 3, limit: 2, premium: false, canCreate: false },
+  ])(
+    "returns the same capacity as listMine for a $account account",
+    async ({ account, ...expected }) => {
+      const t = convexTest(schema, modules)
+      const clerkUserId = `capacity-${account}`
+      const actor = await synced(t, clerkUserId, "Capacity Owner")
+      await t.mutation(internal.entitlements.setUserFeature, {
+        clerkUserId,
+        feature: "pro_decks_limit",
+        enabled: true,
+        source: "test",
+      })
+      for (let index = 0; index < expected.used; index++) {
+        await actor.mutation(api.decks.create, { name: `Deck ${index}`, format: "commander" })
+      }
+      await t.mutation(internal.entitlements.setUserFeature, {
+        clerkUserId,
+        feature: "pro_decks_limit",
+        enabled: expected.premium,
+        source: "test",
+      })
+
+      const capacity = await actor.query(api.decks.capacity)
+      expect(capacity).toEqual(expected)
+      expect(capacity).toEqual((await actor.query(api.decks.listMine)).capacity)
+    },
+  )
+
+  it("requires authentication to query deck capacity", async () => {
+    const t = convexTest(schema, modules)
+    await expect(t.query(api.decks.capacity)).rejects.toMatchObject({
+      data: { code: "unauthenticated" },
+    })
+  })
+
   it("preserves a commander's chosen color through imports, version saves, and queued sync", async () => {
     const t = convexTest(schema, modules)
     const owner = await synced(t, "commander-color-owner", "Commander Player")

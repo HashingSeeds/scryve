@@ -339,6 +339,14 @@ function publicDeck(deck: Doc<"decks">) {
   return { ...deck, game: deck.game ?? DEFAULT_DECK_GAME }
 }
 
+export const capacity = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx)
+    return await deckCapacity(ctx, user)
+  },
+})
+
 export const listMine = query({
   args: {},
   handler: async (ctx) => {
