@@ -57,7 +57,7 @@ import { FREE_DECK_LIMIT, MAX_DECK_CARDS, MAX_PREMIUM_DECKS } from "../../convex
 
 type CreationMode = "precon" | "paste" | "blank"
 
-type DeckCapacity = FunctionReturnType<typeof api.decks.listMine>["capacity"]
+type DeckCapacity = FunctionReturnType<typeof api.decks.capacity>
 
 type CapacityState = { status: "checking" } | { status: "ready"; capacity: DeckCapacity }
 
@@ -155,13 +155,13 @@ type CatalogDeck = {
 
 function CapacityQuery({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {
   const { themed } = useAppTheme()
-  const mine = useQuery(api.decks.listMine)
+  const capacity = useQuery(api.decks.capacity)
 
   useEffect(() => {
-    if (mine) onReady(mine.capacity)
-  }, [mine, onReady])
+    if (capacity) onReady(capacity)
+  }, [capacity, onReady])
 
-  return mine ? null : <Text size="xs" style={themed($label)} text="Checking deck limit…" />
+  return capacity ? null : <Text size="xs" style={themed($label)} text="Checking deck limit…" />
 }
 
 function DeckCapacityStatus({ onReady }: { onReady: (capacity: DeckCapacity) => void }) {

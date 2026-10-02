@@ -168,6 +168,7 @@ jest.mock("convex/react", () => ({
   useQuery: (reference: string) => {
     if (reference === "deckCatalogs.detail") return mockCatalogDetail.value
     if (mockListMine.error) throw mockListMine.error
+    if (reference === "decks.capacity") return mockListMine.value?.capacity
     return mockListMine.value
   },
   useMutation: (reference: string) =>
@@ -194,6 +195,7 @@ jest.mock("convex/react", () => ({
 jest.mock("../../convex/_generated/api", () => ({
   api: {
     decks: {
+      capacity: "decks.capacity",
       listMine: "decks.listMine",
       importGuest: "decks.importGuest",
       archive: "decks.archive",
