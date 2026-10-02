@@ -7,6 +7,10 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { AccountDeckCapacity } from "./AccountDeckCapacity"
 import { useGuestDeckImport } from "./useGuestDeckImport"
 
+function deckCount(count: number) {
+  return `${count} ${count === 1 ? "deck" : "decks"}`
+}
+
 export function GuestDeckImportNotice({
   access,
   transfer,
@@ -14,11 +18,20 @@ export function GuestDeckImportNotice({
   access?: CloudAccess
   transfer: ReturnType<typeof useGuestDeckImport>
 }) {
-  if (!transfer.guestDeck || !access?.ready) return null
+  if (!transfer.guestDecks.length || !access?.ready) return null
+  const kept = transfer.result?.limitReached ?? 0
+  const imported = transfer.result?.imported ?? 0
   return (
     <View>
       {transfer.importing ? (
-        <Text accessibilityLiveRegion="polite" text="Syncing your saved deck…" />
+        <Text
+          accessibilityLiveRegion="polite"
+          text={
+            transfer.guestDecks.length > 1
+              ? "Syncing your saved decks…"
+              : "Syncing your saved deck…"
+          }
+        />
       ) : null}
       {transfer.error ? (
         <View>
@@ -30,9 +43,17 @@ export function GuestDeckImportNotice({
           />
         </View>
       ) : null}
-      {transfer.result?.status === "limit_reached" ? (
+      {kept > 0 ? (
         <>
-          <Text size="sm" text="Your deck is still saved on this device." />
+          <Text
+            size="sm"
+            text={[
+              imported > 0 ? `Synced ${deckCount(imported)}.` : undefined,
+              `${deckCount(kept)} did not fit and ${kept > 1 ? "are" : "is"} still saved on this device.`,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          />
           <AccountDeckCapacity access={access} onArchived={() => void transfer.retry()} />
         </>
       ) : null}

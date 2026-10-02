@@ -5,9 +5,11 @@ import type { FunctionArgs } from "convex/server"
 import { saveString, storage } from "@/utils/storage"
 
 import type { api } from "../../../convex/_generated/api"
-import { MAX_DECK_CARDS, MAX_DECK_NOTE_LENGTH } from "../../../convex/lib/policy"
+import { FREE_DECK_LIMIT, MAX_DECK_CARDS, MAX_DECK_NOTE_LENGTH } from "../../../convex/lib/policy"
 
-const GUEST_DECK_KEY = "decks.guest.v1"
+const GUEST_DECKS_KEY = "decks.guest.v2"
+const LEGACY_GUEST_DECK_KEY = "decks.guest.v1"
+const GUEST_ROUTE_PREFIX = "guest-"
 const CARD_STRING_FIELDS = [
   "game",
   "identityNamespace",
@@ -98,28 +100,65 @@ function isGuestDeck(value: unknown): value is GuestDeck {
   )
 }
 
-function readRaw(): string | null {
+function isGuestDeckList(value: unknown): value is GuestDeck[] {
+  return (
+    Array.isArray(value) &&
+    value.every(isGuestDeck) &&
+    new Set(value.map((deck) => deck.localId)).size === value.length
+  )
+}
+
+function readRaw(key: string): string | null {
   try {
-    return storage.getString(GUEST_DECK_KEY) ?? null
+    return storage.getString(key) ?? null
   } catch {
-    throw new GuestDeckStorageError("Unable to read guest deck.")
+    throw new GuestDeckStorageError("Unable to read guest decks.")
   }
 }
 
-function readStored(): GuestDeck | undefined {
-  let raw: string | null
+function parseStored<T>(raw: string, valid: (value: unknown) => value is T): T {
+  let value: unknown
   try {
-    raw = readRaw()
+    value = JSON.parse(raw)
   } catch {
-    return undefined
+    throw new GuestDeckStorageError("Stored guest deck is malformed; delete it explicitly first.")
   }
-  if (raw === null) return undefined
+  if (!valid(value))
+    throw new GuestDeckStorageError("Stored guest deck is unsupported; delete it explicitly first.")
+  return value
+}
+
+function readStore() {
+  const raw = readRaw(GUEST_DECKS_KEY)
+  const legacyRaw = readRaw(LEGACY_GUEST_DECK_KEY)
+  const decks = raw === null ? [] : parseStored(raw, isGuestDeckList)
+  if (legacyRaw === null) return { decks, legacy: false }
+  const legacy = parseStored(legacyRaw, isGuestDeck)
+  return {
+    decks: decks.some((deck) => deck.localId === legacy.localId) ? decks : [...decks, legacy],
+    legacy: true,
+  }
+}
+
+function migrateLegacyDeck(decks: GuestDeck[]) {
+  if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) return false
   try {
-    const value: unknown = JSON.parse(raw)
-    return isGuestDeck(value) ? value : undefined
+    storage.delete(LEGACY_GUEST_DECK_KEY)
+    return true
   } catch {
-    return undefined
+    return false
   }
+}
+
+function readStored(): GuestDeck[] {
+  let store: ReturnType<typeof readStore>
+  try {
+    store = readStore()
+  } catch {
+    return []
+  }
+  if (store.legacy) migrateLegacyDeck(store.decks)
+  return store.decks
 }
 
 let snapshot = readStored()
@@ -129,27 +168,26 @@ function notify() {
   listeners.forEach((listener) => listener())
 }
 
-function assertWritable() {
-  const raw = readRaw()
-  if (raw !== null) {
-    let value: unknown
-    try {
-      value = JSON.parse(raw)
-    } catch {
-      throw new GuestDeckStorageError("Stored guest deck is malformed; delete it explicitly first.")
-    }
-    if (!isGuestDeck(value))
-      throw new GuestDeckStorageError(
-        "Stored guest deck is unsupported; delete it explicitly first.",
-      )
-    return value
-  }
-  return undefined
+function writableDecks() {
+  const store = readStore()
+  if (store.legacy && !migrateLegacyDeck(store.decks))
+    throw new GuestDeckStorageError("Unable to save guest deck.")
+  return store.decks
 }
 
-export function loadGuestDeck() {
+function commit(decks: GuestDeck[], failure: string) {
+  if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) throw new GuestDeckStorageError(failure)
+  snapshot = decks
+  notify()
+}
+
+export function loadGuestDecks() {
   snapshot = readStored()
   return snapshot
+}
+
+export function loadGuestDeck(localId: string) {
+  return loadGuestDecks().find((deck) => deck.localId === localId)
 }
 
 export function saveGuestDeck(
@@ -157,11 +195,16 @@ export function saveGuestDeck(
   options: { localId?: string; now?: number } = {},
 ): GuestDeck {
   if (!isPayload(deck)) throw new GuestDeckStorageError("Guest deck payload is invalid.")
-  const previous = assertWritable()
-  if (previous && !options.localId)
-    throw new GuestDeckStorageError("A guest deck already exists; provide its localId to edit it.")
-  if (options.localId && previous?.localId !== options.localId)
-    throw new GuestDeckStorageError("Guest deck localId does not match the saved deck.")
+  const decks = writableDecks()
+  const previous = options.localId
+    ? decks.find((candidate) => candidate.localId === options.localId)
+    : undefined
+  if (options.localId && !previous)
+    throw new GuestDeckStorageError("Guest deck localId does not match a saved deck.")
+  if (!previous && decks.length >= FREE_DECK_LIMIT)
+    throw new GuestDeckStorageError(
+      `Only ${FREE_DECK_LIMIT} decks can be saved on this device. Replace one to continue.`,
+    )
   const updatedAt = Math.max(options.now ?? Date.now(), (previous?.updatedAt ?? 0) + 1)
   if (!Number.isSafeInteger(updatedAt) || updatedAt < 0)
     throw new GuestDeckStorageError("Guest deck timestamp is invalid.")
@@ -172,26 +215,37 @@ export function saveGuestDeck(
     updatedAt,
     deck,
   }
-  if (!saveString(GUEST_DECK_KEY, JSON.stringify(next)))
-    throw new GuestDeckStorageError("Unable to save guest deck.")
-  snapshot = next
-  notify()
+  commit(
+    previous
+      ? decks.map((candidate) => (candidate.localId === previous.localId ? next : candidate))
+      : [...decks, next],
+    "Unable to save guest deck.",
+  )
   return next
 }
 
-export function deleteGuestDeck() {
+export function deleteGuestDeck(localId: string) {
+  const decks = writableDecks()
+  commit(
+    decks.filter((deck) => deck.localId !== localId),
+    "Unable to delete guest deck.",
+  )
+}
+
+export function clearGuestDecks() {
   try {
-    storage.delete(GUEST_DECK_KEY)
+    storage.delete(GUEST_DECKS_KEY)
+    storage.delete(LEGACY_GUEST_DECK_KEY)
   } catch {
-    throw new GuestDeckStorageError("Unable to delete guest deck.")
+    throw new GuestDeckStorageError("Unable to delete guest decks.")
   }
-  snapshot = undefined
+  snapshot = []
   notify()
 }
 
 export function replaceGuestDeck(deck: GuestDeckPayload, expectedLocalId: string): GuestDeck {
-  const previous = assertWritable()
-  if (previous?.localId !== expectedLocalId)
+  const decks = writableDecks()
+  if (!decks.some((candidate) => candidate.localId === expectedLocalId))
     throw new GuestDeckStorageError("The saved deck changed. Review it before replacing it.")
   if (!isPayload(deck)) throw new GuestDeckStorageError("Guest deck payload is invalid.")
   const now = Date.now()
@@ -202,29 +256,43 @@ export function replaceGuestDeck(deck: GuestDeckPayload, expectedLocalId: string
     updatedAt: now,
     deck,
   }
-  if (!saveString(GUEST_DECK_KEY, JSON.stringify(next)))
-    throw new GuestDeckStorageError("Unable to save guest deck.")
-  snapshot = next
-  notify()
+  commit(
+    decks.map((candidate) => (candidate.localId === expectedLocalId ? next : candidate)),
+    "Unable to save guest deck.",
+  )
   return next
 }
 
 export function acknowledgeGuestDeckImport(localId: string, updatedAt: number | null) {
-  const current = loadGuestDeck()
-  if (current?.localId !== localId || current.updatedAt !== updatedAt) return false
-  deleteGuestDeck()
+  const current = loadGuestDeck(localId)
+  if (!current || current.updatedAt !== updatedAt) return false
+  deleteGuestDeck(localId)
   return true
 }
 
-export function subscribeGuestDeck(listener: () => void) {
+export function guestDeckRouteId(localId: string) {
+  return `${GUEST_ROUTE_PREFIX}${localId}`
+}
+
+export function guestDeckLocalId(routeId: string) {
+  return routeId.startsWith(GUEST_ROUTE_PREFIX)
+    ? routeId.slice(GUEST_ROUTE_PREFIX.length)
+    : undefined
+}
+
+export function subscribeGuestDecks(listener: () => void) {
   listeners.add(listener)
   return () => listeners.delete(listener)
 }
 
-export function useGuestDeck() {
+export function useGuestDecks() {
   return useSyncExternalStore(
-    subscribeGuestDeck,
+    subscribeGuestDecks,
     () => snapshot,
     () => snapshot,
   )
+}
+
+export function useGuestDeck(localId: string | undefined) {
+  return useGuestDecks().find((deck) => deck.localId === localId)
 }

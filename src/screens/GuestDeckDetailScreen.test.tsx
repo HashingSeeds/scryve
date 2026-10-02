@@ -45,8 +45,8 @@ const mockStored = {
 let mockCurrent: GuestDeck | undefined = mockStored
 let mockSaveFailure = false
 jest.mock("@/features/decks/guestDeck", () => ({
-  useGuestDeck: () => mockCurrent,
-  loadGuestDeck: () => mockCurrent,
+  useGuestDeck: (localId: string) => (mockCurrent?.localId === localId ? mockCurrent : undefined),
+  loadGuestDeck: (localId: string) => (mockCurrent?.localId === localId ? mockCurrent : undefined),
   saveGuestDeck: jest.fn((deck: typeof mockStored.deck) => {
     if (mockSaveFailure) throw new Error("Unable to save guest deck.")
     mockCurrent = { ...mockStored, updatedAt: 2, deck }
@@ -61,12 +61,12 @@ const mockSaveGuestDeck = jest.requireMock("@/features/decks/guestDeck").saveGue
 const mockDeleteGuestDeck = jest.requireMock("@/features/decks/guestDeck")
   .deleteGuestDeck as jest.Mock
 
-function renderScreen(onBack = jest.fn()) {
+function renderScreen(onBack = jest.fn(), localId = mockStored.localId) {
   return {
     onBack,
     ...render(
       <ThemeProvider initialContext="dark">
-        <GuestDeckDetailScreen onBack={onBack} />
+        <GuestDeckDetailScreen localId={localId} onBack={onBack} />
       </ThemeProvider>,
     ),
   }
@@ -204,6 +204,13 @@ test("cancel keeps a guest deck and confirm deletes it", () => {
   fireEvent.press(view.getByTestId("delete-deck-button"))
   fireEvent.press(view.getByTestId("guest-deck-confirm-delete"))
   expect(mockDeleteGuestDeck).toHaveBeenCalledTimes(1)
+  expect(mockDeleteGuestDeck).toHaveBeenCalledWith(mockStored.localId)
+})
+
+test("shows only the deck it was opened for", () => {
+  const view = renderScreen(jest.fn(), "22222222-2222-4222-8222-222222222222")
+  expect(view.getByText("Guest deck unavailable")).toBeTruthy()
+  expect(view.queryByText("Offline Commander")).toBeNull()
 })
 
 test("retains a dirty draft on conflict and storage failure", () => {

@@ -2,7 +2,13 @@ import { act, renderHook, waitFor } from "@testing-library/react-native"
 
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 
-import { deleteGuestDeck, loadGuestDeck, saveGuestDeck } from "./guestDeck"
+import {
+  clearGuestDecks,
+  deleteGuestDeck,
+  loadGuestDecks,
+  replaceGuestDeck,
+  saveGuestDeck,
+} from "./guestDeck"
 import { useGuestDeckImport } from "./useGuestDeckImport"
 
 const mockImport = jest.fn()
@@ -18,7 +24,7 @@ const access: CloudAccess = {
 
 describe("guest deck sign-in import", () => {
   beforeEach(() => {
-    deleteGuestDeck()
+    clearGuestDecks()
     mockImport.mockReset()
   })
 
@@ -34,7 +40,7 @@ describe("guest deck sign-in import", () => {
     expect(mockImport).not.toHaveBeenCalled()
     hook.rerender({ current: access })
     await waitFor(() => expect(hook.result.current.error).toBeDefined())
-    expect(loadGuestDeck()).toEqual(deck)
+    expect(loadGuestDecks()).toEqual([deck])
     mockImport.mockResolvedValue({
       status: "imported",
       deckId: "remote",
@@ -48,7 +54,7 @@ describe("guest deck sign-in import", () => {
       localId: deck.localId,
       localUpdatedAt: deck.updatedAt,
     })
-    expect(loadGuestDeck()).toBeUndefined()
+    expect(loadGuestDecks()).toEqual([])
   })
 
   it("retains newer local edits when the server returns an earlier import receipt", async () => {
@@ -61,28 +67,123 @@ describe("guest deck sign-in import", () => {
     })
     const hook = renderHook(() => useGuestDeckImport(access))
     await waitFor(() => expect(hook.result.current.error).toContain("newer edits"))
-    expect(loadGuestDeck()?.deck.name).toBe("Edited")
+    expect(loadGuestDecks()[0]?.deck.name).toBe("Edited")
     expect(mockImport).toHaveBeenCalledTimes(1)
   })
 
-  it("keeps a deck when the account fills up and retries after a slot is freed", async () => {
-    const deck = saveGuestDeck({ name: "Local", format: "commander", cards: [] })
-    mockImport.mockResolvedValueOnce({
-      status: "limit_reached",
-      capacity: { used: 2, limit: 2, premium: false, canCreate: false },
-    })
+  it("imports each deck on its own, keeps the ones without room, and retries them later", async () => {
+    const first = saveGuestDeck({ name: "First", format: "commander", cards: [] })
+    const second = saveGuestDeck({ name: "Second", format: "commander", cards: [] })
+    mockImport.mockImplementation(({ localId, localUpdatedAt }) =>
+      Promise.resolve(
+        localId === first.localId
+          ? { status: "imported", deckId: "remote", localUpdatedAt }
+          : {
+              status: "limit_reached",
+              capacity: { used: 2, limit: 2, premium: false, canCreate: false },
+            },
+      ),
+    )
     const hook = renderHook(() => useGuestDeckImport(access))
-    await waitFor(() => expect(hook.result.current.result?.status).toBe("limit_reached"))
-    expect(loadGuestDeck()).toEqual(deck)
-    mockImport.mockResolvedValue({
-      status: "imported",
-      deckId: "remote",
-      localUpdatedAt: deck.updatedAt,
-    })
+    await waitFor(() =>
+      expect(hook.result.current.result).toEqual({ imported: 1, limitReached: 1 }),
+    )
+    expect(loadGuestDecks()).toEqual([second])
+    expect(hook.result.current.error).toBeUndefined()
+    expect(mockImport).toHaveBeenCalledTimes(2)
+
+    mockImport.mockImplementation(({ localId, localUpdatedAt }) =>
+      Promise.resolve(
+        localId === first.localId
+          ? { status: "already_imported", deckId: "remote", localUpdatedAt }
+          : { status: "imported", deckId: "remote-2", localUpdatedAt },
+      ),
+    )
     await act(async () => {
       await hook.result.current.retry()
     })
-    expect(loadGuestDeck()).toBeUndefined()
+    expect(mockImport).toHaveBeenLastCalledWith(
+      expect.objectContaining({ localId: second.localId }),
+    )
+    expect(loadGuestDecks()).toEqual([])
+  })
+
+  it("does not import a deleted deck while another import is in flight", async () => {
+    const first = saveGuestDeck({ name: "First", format: "commander", cards: [] })
+    const second = saveGuestDeck({ name: "Second", format: "commander", cards: [] })
+    let resolve!: (value: unknown) => void
+    mockImport.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    const hook = renderHook(() => useGuestDeckImport(access))
+    await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))
+    act(() => deleteGuestDeck(second.localId))
+    await act(async () => {
+      resolve({ status: "imported", deckId: "remote", localUpdatedAt: first.updatedAt })
+    })
+    expect(mockImport).toHaveBeenCalledTimes(1)
+    expect(loadGuestDecks()).toEqual([])
+    expect(hook.result.current.error).toBeUndefined()
+  })
+
+  it("imports a replacement saved while another import is in flight", async () => {
+    const first = saveGuestDeck({ name: "First", format: "commander", cards: [] })
+    const second = saveGuestDeck({ name: "Second", format: "commander", cards: [] })
+    let resolve!: (value: unknown) => void
+    mockImport.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    mockImport.mockImplementation(({ localUpdatedAt }) =>
+      Promise.resolve({ status: "imported", deckId: "remote-2", localUpdatedAt }),
+    )
+    renderHook(() => useGuestDeckImport(access))
+    await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))
+    let replacement!: ReturnType<typeof replaceGuestDeck>
+    act(() => {
+      replacement = replaceGuestDeck({ ...second.deck, name: "Replacement" }, second.localId)
+    })
+    await act(async () => {
+      resolve({ status: "imported", deckId: "remote", localUpdatedAt: first.updatedAt })
+    })
+    await waitFor(() => expect(loadGuestDecks()).toEqual([]))
+    expect(mockImport).toHaveBeenCalledTimes(2)
+    expect(mockImport).toHaveBeenLastCalledWith(
+      expect.objectContaining({ localId: replacement.localId, name: "Replacement" }),
+    )
+  })
+
+  it("stops an unmounted batch before acknowledging or dispatching another deck", async () => {
+    const first = saveGuestDeck({ name: "First", format: "commander", cards: [] })
+    const second = saveGuestDeck({ name: "Second", format: "commander", cards: [] })
+    let resolve!: (value: unknown) => void
+    mockImport.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    const hook = renderHook(() => useGuestDeckImport(access))
+    await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))
+    hook.unmount()
+    await act(async () => {
+      resolve({ status: "imported", deckId: "remote", localUpdatedAt: first.updatedAt })
+    })
+    expect(mockImport).toHaveBeenCalledTimes(1)
+    expect(loadGuestDecks()).toEqual([first, second])
+
+    mockImport.mockImplementation(({ localId, localUpdatedAt }) =>
+      Promise.resolve({
+        status: localId === first.localId ? "already_imported" : "imported",
+        deckId: "remote",
+        localUpdatedAt,
+      }),
+    )
+    renderHook(() => useGuestDeckImport(access))
+    await waitFor(() => expect(loadGuestDecks()).toEqual([]))
+    expect(mockImport).toHaveBeenCalledTimes(3)
   })
 
   it("does not delete the local deck if the user signs out during import", async () => {
@@ -104,6 +205,6 @@ describe("guest deck sign-in import", () => {
     await act(async () => {
       resolve({ status: "imported", deckId: "remote", localUpdatedAt: deck.updatedAt })
     })
-    expect(loadGuestDeck()).toEqual(deck)
+    expect(loadGuestDecks()).toEqual([deck])
   })
 })

@@ -25,6 +25,7 @@ jest.mock("@/screens/DeckDetailScreen", () => ({
 describe("deck detail route", () => {
   beforeEach(() => {
     clear()
+    mockDetailScreen.mockClear()
     mockParams = { deckId: "deck-from-route" }
   })
 
@@ -42,5 +43,15 @@ describe("deck detail route", () => {
     await act(async () => undefined)
 
     expect(load("decks.recentIds")).toEqual(["deck-from-route"])
+  })
+
+  it("sends the old single guest deck link to the deck list", async () => {
+    mockParams = { deckId: "guest" }
+    render(<DeckDetailRoute />)
+
+    await act(async () => undefined)
+
+    expect(mockDetailScreen).not.toHaveBeenCalled()
+    expect(load("decks.recentIds")).toBeNull()
   })
 })
