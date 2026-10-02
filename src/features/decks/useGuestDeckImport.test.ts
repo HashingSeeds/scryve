@@ -156,6 +156,36 @@ describe("guest deck sign-in import", () => {
     )
   })
 
+  it("stops an unmounted batch before acknowledging or dispatching another deck", async () => {
+    const first = saveGuestDeck({ name: "First", format: "commander", cards: [] })
+    const second = saveGuestDeck({ name: "Second", format: "commander", cards: [] })
+    let resolve!: (value: unknown) => void
+    mockImport.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    const hook = renderHook(() => useGuestDeckImport(access))
+    await waitFor(() => expect(mockImport).toHaveBeenCalledTimes(1))
+    hook.unmount()
+    await act(async () => {
+      resolve({ status: "imported", deckId: "remote", localUpdatedAt: first.updatedAt })
+    })
+    expect(mockImport).toHaveBeenCalledTimes(1)
+    expect(loadGuestDecks()).toEqual([first, second])
+
+    mockImport.mockImplementation(({ localId, localUpdatedAt }) =>
+      Promise.resolve({
+        status: localId === first.localId ? "already_imported" : "imported",
+        deckId: "remote",
+        localUpdatedAt,
+      }),
+    )
+    renderHook(() => useGuestDeckImport(access))
+    await waitFor(() => expect(loadGuestDecks()).toEqual([]))
+    expect(mockImport).toHaveBeenCalledTimes(3)
+  })
+
   it("does not delete the local deck if the user signs out during import", async () => {
     const deck = saveGuestDeck({ name: "Local", format: "commander", cards: [] })
     let resolve!: (value: unknown) => void

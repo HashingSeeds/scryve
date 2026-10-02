@@ -28,6 +28,9 @@ export function useGuestDeckImport(access?: CloudAccess) {
   const latestAccess = useRef(access)
   useLayoutEffect(() => {
     latestAccess.current = access
+    return () => {
+      latestAccess.current = undefined
+    }
   }, [access])
   const attempted = useRef<string | undefined>(undefined)
   const running = useRef(false)
@@ -49,6 +52,7 @@ export function useGuestDeckImport(access?: CloudAccess) {
     let failure: string | undefined
     try {
       for (const queued of decks) {
+        if (!stillOwner()) return
         const deck = loadGuestDeck(queued.localId)
         if (!deck) continue
         try {
