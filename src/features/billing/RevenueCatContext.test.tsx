@@ -177,6 +177,24 @@ describe("RevenueCatProvider", () => {
     expect(result.current.currentOffering).toBe(offering)
   })
 
+  it("checks the account again after loading the Foil offering", async () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    purchasesMock.getOfferings.mockImplementationOnce(async () => {
+      purchasesMock.getAppUserID.mockResolvedValue("previous_user")
+      return {
+        current: offering,
+        all: { foil_supporter: { availablePackages: [{ identifier: "foil_yearly" }] } },
+      } as never
+    })
+    await act(async () => {
+      expect(await result.current.purchase("foil_yearly")).toMatchObject({ status: "failed" })
+    })
+    expect(Purchases.purchasePackage).not.toHaveBeenCalled()
+  })
+
   it.each(["ios", "android"] as const)("blocks Foil purchases on %s", async (platform) => {
     jest.replaceProperty(Platform, "OS", platform)
     const { result } = renderHook(() => useRevenueCat(), { wrapper })

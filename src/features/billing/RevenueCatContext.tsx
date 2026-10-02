@@ -215,7 +215,7 @@ export function RevenueCatProvider({
     async (productId: CountProductId | typeof FOIL_PRODUCT_ID): Promise<PurchaseResult> => {
       try {
         setError(undefined)
-        if (!isReady || (await Purchases.getAppUserID()) !== appUserID)
+        if (!isReady)
           throw new Error("Wait for billing to connect to your account, then try again.")
         if (productId === FOIL_PRODUCT_ID) {
           if (Platform.OS !== "web")
@@ -231,6 +231,8 @@ export function RevenueCatProvider({
             : packageForProduct(currentOffering, productId)
         if (!selectedPackage)
           throw new Error(`${productId} is not available from the current store.`)
+        if ((await Purchases.getAppUserID()) !== appUserID)
+          throw new Error("Wait for billing to connect to your account, then try again.")
         const result = await Purchases.purchasePackage(selectedPackage)
         acceptCustomerInfo(result.customerInfo)
         return { status: "purchased", customerInfo: result.customerInfo }
