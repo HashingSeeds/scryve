@@ -43,7 +43,12 @@ function query<T extends Element>(selector: string, root: ParentNode = document)
 }
 
 const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)")
-const narrow = matchMedia("(max-width: 900px)")
+const narrow = matchMedia("(max-width: 900px) and (orientation: portrait)")
+
+// Use the copy's CSS pin position for scene changes and the hero's landing animation.
+function stepAnchor() {
+  return Number.parseFloat(getComputedStyle(query<HTMLElement>(".step-copy")).top)
+}
 
 // The hero, the Features steps, and connected play all show one game. The pickers reset it
 // the way the app would and follow whatever the game shows.
@@ -106,6 +111,11 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     reducedMotion: prefersReducedMotion,
   })
   let showingCommander = false
+  const commanderStep = query<HTMLElement>(".steps [data-step='commander']")
+  query<HTMLElement>("[data-commander-replay]", commanderStep).addEventListener("click", () => {
+    if (showingCommander) commander.start()
+    else commanderStep.scrollIntoView({ block: "start", behavior: "instant" })
+  })
   return (step: string) => {
     const wantsCommander = step === "commander"
     if (wantsCommander === showingCommander) return
@@ -127,17 +137,106 @@ function setUpConnected(stage: HTMLElement, game: DemoGame) {
     .forEach((el) => mountBoard(el, game))
 }
 
+// Keep the sample deck's tabs and version picker in the same places as the app.
+function setUpDeck(stage: HTMLElement) {
+  const deck = query<HTMLElement>(".deck", stage)
+  const settings = query<HTMLDetailsElement>(".deck-settings", deck)
+  const cardDialog = query<HTMLDialogElement>(".card-focus", deck)
+  let cardTrigger: HTMLButtonElement | undefined
+  // Native dialog supplies focus trapping and Escape. Keep its sheet over the demo phone.
+  const placeCardDialog = () => {
+    if (!cardDialog.open) return
+    const bounds = deck.getBoundingClientRect()
+    Object.assign(cardDialog.style, {
+      left: `${bounds.left}px`,
+      top: `${bounds.top + bounds.height * 0.12}px`,
+      width: `${bounds.width}px`,
+      height: `${bounds.height * 0.88}px`,
+    })
+  }
+  cardDialog.addEventListener("close", () => cardTrigger?.focus({ preventScroll: true }))
+  cardDialog.addEventListener("click", (event) => {
+    if (event.target !== cardDialog) return
+    const bounds = cardDialog.getBoundingClientRect()
+    if (
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom
+    )
+      cardDialog.close()
+  })
+  addEventListener("resize", placeCardDialog)
+  addEventListener("scroll", placeCardDialog, { passive: true })
+  const close = () => {
+    settings.open = false
+    query<HTMLElement>("summary", settings).focus({ preventScroll: true })
+  }
+  settings.addEventListener("toggle", () => {
+    query<HTMLElement>(".deck-content", deck).inert = settings.open
+  })
+  deck.addEventListener("click", (event) => {
+    const button = (event.target as Element).closest<HTMLButtonElement>("button")
+    if (!button) return
+    if (button.hasAttribute("data-card-close")) return cardDialog.close()
+    if (button.dataset.deckCard !== undefined) {
+      cardTrigger = button
+      deck.querySelectorAll<HTMLElement>("[data-card-details]").forEach((details) => {
+        details.hidden = details.dataset.cardDetails !== button.dataset.deckCard
+      })
+      query<HTMLElement>("#card-focus-title", cardDialog).textContent = query<HTMLElement>(
+        "span",
+        button,
+      ).textContent
+      query<HTMLElement>(".card-focus-quantity", cardDialog).textContent =
+        `1× in ${button.dataset.cardBoard}`
+      cardDialog.showModal()
+      placeCardDialog()
+      query<HTMLElement>(".card-focus-body", cardDialog).scrollTop = 0
+      return
+    }
+    if (button.hasAttribute("data-deck-close")) return close()
+    if (button.hasAttribute("data-deck-version")) {
+      settings.querySelectorAll<HTMLButtonElement>("[data-deck-version]").forEach((version) => {
+        version.setAttribute("aria-pressed", String(version === button))
+      })
+      return close()
+    }
+    if (!button.dataset.deckTab) return
+    deck.querySelectorAll<HTMLButtonElement>("[data-deck-tab]").forEach((tab) => {
+      tab.setAttribute("aria-pressed", String(tab === button))
+    })
+    deck.querySelectorAll<HTMLElement>("[data-deck-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.deckPanel !== button.dataset.deckTab
+    })
+  })
+  settings.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && settings.open) close()
+  })
+  return () => {
+    settings.open = false
+    if (cardDialog.open) cardDialog.close()
+  }
+}
+
+// The next section takes over as its heading reaches the copy's pin position.
 function setUpStage() {
   const stage = query<HTMLElement>("[data-stage]")
   const game = createDemoGame(commanderSetup(5))
   const onFeatureStep = setUpFeatures(stage, game)
   setUpConnected(stage, game)
+  const closeDeckSettings = setUpDeck(stage)
 
   const steps = document.querySelectorAll<HTMLElement>(".steps [data-step]")
   // Screens CSS fades out stay out of the tab order and the accessibility tree.
   const screens = stage.querySelectorAll<HTMLElement>("[data-for]")
+  const syncStageVisibility = () => {
+    stage.inert = narrow.matches && stage.dataset.step === "plans"
+    if (stage.inert) closeDeckSettings()
+  }
   const showScene = (scene: string) => {
     stage.dataset.scene = scene
+    if (scene !== "pro") closeDeckSettings()
     screens.forEach((screen) => {
       screen.inert = !screen.dataset.for?.split(" ").includes(scene)
     })
@@ -146,31 +245,36 @@ function setUpStage() {
     if (stage.dataset.step === step.dataset.step && step.classList.contains("active")) return
     showScene(step.closest<HTMLElement>("[data-scene]")?.dataset.scene ?? "intro")
     stage.dataset.step = step.dataset.step ?? ""
+    syncStageVisibility()
     steps.forEach((other) => other.classList.toggle("active", other === step))
     onFeatureStep(stage.dataset.step)
   }
   showScene(stage.dataset.scene ?? "intro")
   setUpDemoTaps(stage, game)
-  // A step activates as it crosses a one pixel line: the middle of the viewport, or the lower
-  // part on small screens where the stage pins over the top. Percentage margins would resolve
-  // against the viewport width, so the line is placed in pixels and moves on resize.
-  let observer: IntersectionObserver | undefined
+  // Read section positions once per frame so a fast scroll can skip several headings safely.
   let frame = 0
-  const observe = () => {
+  const updateStep = () => {
     frame = 0
-    observer?.disconnect()
-    const top = Math.floor(innerHeight * (narrow.matches ? 0.74 : 0.5))
-    observer = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((entry) => entry.isIntersecting && activate(entry.target as HTMLElement)),
-      { rootMargin: `${-top}px 0px ${top + 1 - innerHeight}px 0px` },
-    )
-    steps.forEach((step) => observer?.observe(step))
+    const top = stepAnchor()
+    let next = steps[0]
+    for (const step of steps) {
+      // Native anchor scrolling rounds to whole pixels, so allow its fractional remainder.
+      if (step.getBoundingClientRect().top <= top + 1) next = step
+      const offset = query<HTMLElement>(".step-copy", step).getBoundingClientRect().top - top
+      // The final comparison table stays bright while it scrolls through the viewport.
+      const distance = step.dataset.step === "plans" ? Math.max(0, offset) : Math.abs(offset)
+      const brightness = 1 - Math.min(distance / 120, 1)
+      step.style.setProperty("--step-opacity", String(0.35 + brightness * 0.65))
+    }
+    if (next) activate(next)
+    syncStageVisibility()
   }
-  addEventListener("resize", () => {
-    frame ||= requestAnimationFrame(observe)
-  })
-  observe()
+  const scheduleStep = () => {
+    frame ||= requestAnimationFrame(updateStep)
+  }
+  addEventListener("scroll", scheduleStep, { passive: true })
+  addEventListener("resize", scheduleStep)
+  updateStep()
   setUpLanding(stage, () => activate(query("[data-step='intro']")))
 }
 
@@ -199,15 +303,14 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
 }
 
 // On wide screens the stage's phone starts out filling the hero, on its side, and shrinks
-// into the stage over the first screen of scrolling, standing up as it lands so it is upright
-// by the time the players step activates. Until it lands it always shows the intro.
+// into the stage without turning. It then rotates in place, finishing just before the first
+// heading pins. Until the stage itself pins it always shows the intro.
 function setUpLanding(stage: HTMLElement, showIntro: () => void) {
   const slot = query<HTMLElement>("[data-hero-slot]")
   const tour = query<HTMLElement>(".tour")
   const header = query<HTMLElement>(".header")
   const rig = query<HTMLElement>(".rig", stage)
   const phone = query<HTMLElement>(".phone.main", stage)
-  const players = query<HTMLElement>(".steps [data-step='players']")
   let frame = 0
   const clamp = (value: number) => Math.min(1, Math.max(0, value))
 
@@ -220,21 +323,22 @@ function setUpLanding(stage: HTMLElement, showIntro: () => void) {
       rig.style.translate = ""
       rig.style.scale = ""
       phone.style.removeProperty("--turn")
-      if (intro.getBoundingClientRect().top > innerHeight * 0.75) showIntro()
+      if (intro.getBoundingClientRect().top > stepAnchor()) showIntro()
       return
     }
     const landed = tour.offsetTop - header.offsetHeight
-    const progress = clamp(scrollY / landed)
-    if (progress < 1) showIntro()
-    // Start turning before it lands so the two motions blend instead of stopping in between.
-    const turnFrom = landed * 0.6
-    const upright = players.getBoundingClientRect().top + scrollY - innerHeight / 2
+    const headingPins = intro.getBoundingClientRect().top + scrollY - stepAnchor()
+    const turnFrom = headingPins * 0.6
+    const upright = headingPins - 48
+    const progress = clamp(scrollY / turnFrom)
+    if (scrollY < landed) showIntro()
+    // Park in landscape, then finish the turn 48px before the heading reaches its pin.
     const standing = clamp((scrollY - turnFrom) / (upright - turnFrom))
-    const turn = narrow.matches ? 0 : -90 * (1 - standing * standing * (3 - 2 * standing))
+    const turn = -90 * (1 - standing * standing * (3 - 2 * standing))
     phone.style.setProperty("--turn", `${turn}deg`)
     // Once landed the stage's own sticky positioning takes over, so the phone scrolls away
     // with the tour instead of staying pinned over the closing section.
-    if (progress === 1) {
+    if (scrollY >= landed) {
       rig.style.translate = ""
       rig.style.scale = ""
       return

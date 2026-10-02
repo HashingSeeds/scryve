@@ -272,9 +272,9 @@ function commanderTarget(game: DemoGame, source: SeatPlacement, target: SeatPlac
   </div>`
 }
 
-const COMMANDER_DEMO_START_MS = 450
-const COMMANDER_DEMO_TAP_MS = 120
-const COMMANDER_DEMO_PAUSE_MS = 450
+const COMMANDER_DEMO_START_MS = 700
+const COMMANDER_DEMO_TAP_MS = 240
+const COMMANDER_DEMO_PAUSE_MS = 650
 const COMMANDER_DEMO_FADE_MS = 450
 
 export interface CommanderDemoOptions {
@@ -395,7 +395,8 @@ export function createCommanderDemo(
     ]
     let at = COMMANDER_DEMO_START_MS
     later(at, () => overlays.forEach((el) => el?.classList.add("on")))
-    at += COMMANDER_DEMO_FADE_MS
+    // Let viewers read assignment mode before the first damage tap.
+    at += COMMANDER_DEMO_FADE_MS + COMMANDER_DEMO_PAUSE_MS
     targets.forEach((target, index) => {
       const overlay = overlays[index + 1]
       const total = overlay?.querySelector<HTMLElement>(".cmd-total")

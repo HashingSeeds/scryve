@@ -574,9 +574,10 @@ figure {
 .hero-foot {
   display: flex;
   height: 96px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
   padding: 0 var(--gutter);
 }
 
@@ -618,22 +619,48 @@ figure {
 }
 
 .steps {
+  --step-anchor: max(calc(var(--header) + 24px), 30svh);
   padding: 8svh 0 24svh;
 }
 
+.steps > section[id],
 .step {
-  display: flex;
-  min-height: 72svh;
-  max-width: 34rem;
-  flex-direction: column;
-  justify-content: center;
-  gap: 18px;
-  opacity: 0.35;
-  transition: opacity 0.35s;
+  scroll-margin-top: calc(var(--step-anchor) - var(--header));
 }
 
-.step.active {
+.step {
+  display: block;
+  min-height: 72svh;
+  max-width: 34rem;
+  padding-bottom: min(48px, 6svh);
+  opacity: var(--step-opacity, 0.35);
+}
+
+.step:has(:focus-visible) {
   opacity: 1;
+}
+
+.step[data-step="plans"] {
+  padding-bottom: 0;
+}
+
+.demo-replay {
+  min-height: 44px;
+  align-self: flex-start;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tint);
+  cursor: pointer;
+}
+
+.step-copy {
+  position: sticky;
+  top: var(--step-anchor);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 .step h2 {
@@ -827,8 +854,10 @@ figure {
 
 .deck-top {
   display: flex;
+  flex-shrink: 0;
   justify-content: space-between;
   margin-bottom: 1.385em;
+  padding-right: 2.462em;
 }
 
 .deck-top span:first-child {
@@ -847,29 +876,41 @@ figure {
   font-size: 0.923em;
 }
 
-.deck-record {
-  display: grid;
-  gap: 0.308em;
-  padding-bottom: 1.077em;
+.deck-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.deck-tabs {
+  display: flex;
+  gap: 1.846em;
   border-bottom: 1px solid var(--raised);
 }
 
-.deck-record b {
-  font-size: 3.077em;
-  font-weight: 500;
-  letter-spacing: -0.03em;
-  line-height: 1;
+.deck-tabs button {
+  min-height: 3.385em;
+  padding: 0 0.308em;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
 }
 
-.deck-record span {
-  color: var(--dim);
-  font-size: 0.923em;
+.deck-tabs button[aria-pressed="true"] {
+  border-bottom-color: var(--tint);
+  color: var(--text);
+}
+
+.deck-notes {
+  padding-top: 1.846em;
 }
 
 .deck-label {
   display: flex;
   justify-content: space-between;
-  margin: 1.077em 0 0.308em;
+  margin: 1.846em 0 0.615em;
   font-weight: 700;
 }
 
@@ -884,26 +925,254 @@ figure {
   align-items: center;
   justify-content: space-between;
   gap: 0.769em;
+  min-height: 5.077em;
   padding: 0.615em 0;
   border-bottom: 1px solid var(--raised);
 }
 
-.deck-row.version span:first-child {
+.deck-footer {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.615em;
+  margin-top: 0.615em;
+  padding-top: 0.615em;
+  border-top: 1px solid var(--raised);
+}
+
+.deck-card {
+  width: 100%;
+  min-height: max(44px, 5.077em);
+  border-width: 0 0 1px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.deck-card img {
+  width: 2.462em;
+  height: 3.462em;
+  flex-shrink: 0;
+  border-radius: 0.154em;
+  object-fit: cover;
+}
+
+.deck-card > span {
   flex: 1;
 }
 
-.deck-row .bar {
-  width: 22%;
-  height: 0.462em;
-  border-radius: 0.231em;
-  background: var(--raised);
+.card-focus {
+  position: fixed;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 1.231em;
+  overflow: hidden;
+  border: 1px solid var(--raised);
+  border-radius: 1.846em 1.846em 2.6em 2.6em;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
 }
 
-.deck-row .bar span {
+.card-focus[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-focus::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+.card-focus-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.615em;
+  border-bottom: 1px solid var(--raised);
+}
+
+.card-focus-header button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tint);
+  cursor: pointer;
+}
+
+.card-focus-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.card-focus-image {
   display: block;
-  height: 100%;
-  border-radius: 0.231em;
+  width: 52%;
+  max-width: 180px;
+  height: auto;
+  margin: 0.923em auto;
+  border-radius: 0.308em;
+}
+
+.card-focus-body p {
+  margin: 0.615em 0;
+}
+
+.card-focus-meta {
+  color: var(--dim);
+  font-size: 0.923em;
+}
+
+.card-focus-rules {
+  white-space: pre-line;
+}
+
+.card-focus-quantity {
+  flex-shrink: 0;
+  padding-top: 0.615em;
+  border-top: 1px solid var(--raised);
+  color: var(--dim);
+}
+
+.deck-footer > span:first-child {
+  flex: 1;
+  color: var(--dim);
+  font-size: 0.846em;
+}
+
+.deck-primary,
+.deck-delete {
+  display: block;
+  padding: 1.077em;
+  border: 0;
+  border-radius: 0.308em;
   background: var(--tint);
+  color: var(--bg);
+  font-weight: 500;
+  text-align: center;
+}
+
+.deck-footer .deck-primary {
+  width: 65%;
+}
+
+.deck-settings > summary {
+  position: absolute;
+  z-index: 3;
+  top: calc(4.077em - 22px);
+  right: 0;
+  display: grid;
+  width: 3.385em;
+  min-width: 44px;
+  height: 44px;
+  place-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.deck-settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.deck-dismiss {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgb(25 16 21 / 50%);
+  cursor: pointer;
+}
+
+.deck-sheet {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  max-height: 88%;
+  overflow-y: auto;
+  gap: 1.231em;
+  padding: 1.846em;
+  border: 1px solid var(--raised);
+  border-bottom: 0;
+  border-radius: 1.846em 1.846em 0 0;
+  background: var(--bg);
+}
+
+.deck-field > span {
+  display: block;
+  margin-bottom: 0.615em;
+  color: var(--dim);
+}
+
+.deck-field > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.923em;
+  border: 1px solid var(--raised);
+  border-radius: 0.308em;
+}
+
+.deck-sheet .deck-label {
+  margin: 0;
+}
+
+.deck-row.version {
+  width: 100%;
+  min-height: 5.538em;
+  padding: 0.308em 0;
+  border: 0;
+  border-bottom: 1px solid var(--raised);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.version-mark {
+  width: 0.385em;
+  height: 2.615em;
+  border-radius: 0.231em;
+}
+
+.version[aria-pressed="true"] .version-mark {
+  background: #d98cb9;
+}
+
+.version-name {
+  flex: 1;
+}
+
+.version-context {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.version-context small {
+  display: block;
+  margin-top: 0.308em;
+  color: var(--dim);
+  font-size: 0.769em;
+}
+
+.version[aria-pressed="false"] .version-menu {
+  visibility: hidden;
+}
+
+.deck-sheet .deck-primary {
+  cursor: pointer;
+}
+
+.deck-delete {
+  background: #f2d6cd;
+  color: #c03403;
 }
 
 /* ---------- closing ---------- */
@@ -994,12 +1263,15 @@ figure {
   .header-nav {
     display: none;
   }
+}
 
+@media (max-width: 900px) and (orientation: portrait) {
   /* The phone pins under the header from the very top and everything scrolls beneath it,
      with plain sticky positioning and no scroll script. The stage spans the first three
      rows so it lets go before the closing section. */
   main {
-    --stage-height: 60svh;
+    /* Leave room for the step copy below the pinned phone on short screens. */
+    --stage-height: min(60svh, calc(100svh - var(--header) - 256px));
     display: grid;
     grid-template-columns: 100%;
     grid-template-rows: var(--stage-height) auto auto auto;
@@ -1026,6 +1298,7 @@ figure {
     height: auto;
     flex-direction: column;
     align-items: stretch;
+    gap: 24px;
     padding-top: 16px;
     padding-bottom: 16px;
     grid-column: 1;
@@ -1033,6 +1306,7 @@ figure {
   }
 
   .steps {
+    --step-anchor: calc(var(--header) + var(--stage-height) + 2svh);
     padding: 0 var(--gutter) 24svh;
     grid-column: 1;
     grid-row: 3;
@@ -1068,10 +1342,20 @@ figure {
   }
 
   .step {
+    min-height: max(44svh, 300px);
+    padding-bottom: 24px;
+  }
+
+  .step[data-step="plans"] {
     min-height: 50svh;
-    justify-content: flex-start;
+  }
+
+  .step[data-step="plans"] .step-copy {
+    position: static;
+  }
+
+  .step-copy {
     gap: 10px;
-    padding-top: 2svh;
   }
 
   .step h2 {
