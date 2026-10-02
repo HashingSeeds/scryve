@@ -342,15 +342,6 @@ export function createConnectedGameMock() {
   }
 }
 
-export function createConnectedPersistenceMock() {
-  return {
-    ConnectedGameRepository: jest.fn((_storage: unknown, ownerId: string) => ({
-      isMembershipMigrationComplete: () => connectedHarness.migrationOwners.has(ownerId),
-      markMembershipMigrationComplete: () => connectedHarness.migrationOwners.add(ownerId),
-    })),
-  }
-}
-
 export function createAuthConfigMock() {
   return {
     readPublicCloudConfig: () => ({
@@ -364,7 +355,7 @@ export function createAuthConfigMock() {
   }
 }
 
-export const connectedApi = {
+const connectedApi = {
   users: { syncCurrent: "users.syncCurrent" },
   games: {
     claimSeat: "games.claimSeat",

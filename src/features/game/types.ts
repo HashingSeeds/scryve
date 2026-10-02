@@ -11,7 +11,6 @@ export type ActorId = Brand<string, "ActorId">
 export type DeviceId = Brand<string, "DeviceId">
 
 export type LifeDelta = number
-export type StartingLife = 20 | 30 | 40 | number
 export type GameStatus = "active" | "finished" | "abandoned"
 
 export interface GamePlayer {

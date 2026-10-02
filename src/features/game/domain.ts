@@ -26,9 +26,7 @@ import {
 } from "../../../convex/lib/appearance"
 
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
-export const LIFE_DELTAS: readonly LifeDelta[] = [-5, -1, 1, 5]
 export const MAX_LIFE_DELTA = 999_999
-export const STARTING_LIFE_PRESETS = [20, 30, 40] as const
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
 export const MAX_PLAYER_NAME_LENGTH = 24
@@ -301,10 +299,6 @@ export function sanitizeGameResult(
   const playerIds = new Set(game.players.map(({ id }) => id))
   const winnerPlayerIds = [...new Set(result.winnerPlayerIds)].filter((id) => playerIds.has(id))
   return winnerPlayerIds.length > 0 ? { kind: "win", winnerPlayerIds } : undefined
-}
-
-export function reduceGameEvents(game: LocalGame, events: readonly GameEvent[]): LocalGame {
-  return events.reduce(reduceGameEvent, game)
 }
 
 export function commandToEvent(

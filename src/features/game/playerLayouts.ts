@@ -13,10 +13,6 @@ export interface PlayerGridLayoutOption {
   label: string
 }
 
-export function isPlayerGridLayoutVariant(value: unknown): value is PlayerGridLayoutVariant {
-  return PLAYER_GRID_LAYOUT_VARIANTS.some((variant) => variant === value)
-}
-
 export function getPlayerGridLayoutOptions(playerCount: number): PlayerGridLayoutOption[] {
   if (playerCount === 2) return [{ variant: "auto", label: "Balanced" }]
   if (playerCount === 3)
