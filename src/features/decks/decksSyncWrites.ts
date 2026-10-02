@@ -446,13 +446,17 @@ const emptySnapshot: DeckSyncWriteSnapshot = {
   capacityBlocked: false,
 }
 
-export function useDeckMetadataWrites(enabled: boolean, ownerId?: string) {
+export function useDeckMetadataWrites(
+  enabled: boolean,
+  ownerId: string | undefined,
+  ready: boolean,
+) {
   const client = useConvex()
   const controller = useMemo(
     () => (enabled && ownerId ? getDeckMetadataWriteController(client, ownerId) : undefined),
     [client, enabled, ownerId],
   )
-  useEffect(() => controller?.start(), [controller])
+  useEffect(() => (ready ? controller?.start() : undefined), [controller, ready])
   const snapshot = useValue(() => controller?.state$.get() ?? emptySnapshot)
   return {
     ...snapshot,

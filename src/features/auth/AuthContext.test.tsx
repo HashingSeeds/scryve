@@ -47,6 +47,7 @@ jest.mock("convex/react", () => ({
   ConvexProviderWithAuth: ({ children }: { children: ReactNode }) => children,
   ConvexReactClient: jest.fn(),
   useConvex: () => mockConvexClient,
+  useMutation: () => jest.fn(),
   useConvexAuth: () => ({ isAuthenticated: false, isLoading: true }),
   useConvexConnectionState: () => ({ isWebSocketConnected: false }),
 }))

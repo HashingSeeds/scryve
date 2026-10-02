@@ -404,7 +404,6 @@ export function AddDeckScreen({
   } = useCardDetails(focusedPreviewCard)
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
-  const [saveAttempted, setSaveAttempted] = useState(false)
   const [guestConflict, setGuestConflict] = useState(false)
   const [pendingGuestPayload, setPendingGuestPayload] = useState<GuestDeckPayload>()
   const [confirmGuestReplace, setConfirmGuestReplace] = useState(false)
@@ -448,7 +447,6 @@ export function AddDeckScreen({
     [],
   )
   useEffect(() => {
-    setSaveAttempted(false)
     setGuestConflict(false)
     setPendingGuestPayload(undefined)
   }, [mode, game, format, selectedPrecon?.fileName, selectedCatalogDeck?._id])
@@ -463,7 +461,6 @@ export function AddDeckScreen({
   }
 
   function saveGuest(payload: GuestDeckPayload) {
-    setSaveAttempted(true)
     setPendingGuestPayload(payload)
     try {
       onCreated(guestDeckRouteId(saveGuestDeck(payload).localId))
@@ -595,7 +592,6 @@ export function AddDeckScreen({
   }, [mode, preconQuery, runCatalogSearch])
 
   async function createBlank() {
-    setSaveAttempted(true)
     if (guestMode) {
       saveGuest({ name, format, game, ...(note.trim() ? { note } : {}), cards: [] })
       return
@@ -704,7 +700,6 @@ export function AddDeckScreen({
   }
 
   async function importPrecon() {
-    setSaveAttempted(true)
     if (guestMode && selectedPrecon && resolvedPrecon && !resolvedPrecon.unresolved.length) {
       saveGuest({
         name: resolvedPrecon.name || selectedPrecon.name,
@@ -744,7 +739,6 @@ export function AddDeckScreen({
   }
 
   async function importTopDeck() {
-    setSaveAttempted(true)
     if (guestMode && selectedCatalogDeck && catalogDetail) {
       saveGuest({
         name: selectedCatalogDeck.name,
@@ -948,7 +942,6 @@ export function AddDeckScreen({
       pastedCards.length === 0
     )
       return
-    setSaveAttempted(true)
     if (!guestMode && access && !access.ready) {
       access.request()
       return
@@ -1081,7 +1074,7 @@ export function AddDeckScreen({
   const saveRecovery = (
     <>
       <GuestDeckImportNotice access={access} transfer={transfer} />
-      {atCapacity && saveAttempted && !transfer.result?.limitReached ? (
+      {atCapacity && !transfer.result?.limitReached ? (
         <AccountDeckCapacity access={access} />
       ) : null}
       {guestRecovery}
@@ -1311,25 +1304,26 @@ export function AddDeckScreen({
                 style={$flex1}
               />
             ) : null}
-            <Button
-              testID="save-import-button"
-              text={busy ? "Saving…" : guestMode ? "Save on device" : "Save deck"}
-              preset="reversed"
-              style={$flex1}
-              disabled={
-                busy ||
-                resolvingPasted ||
-                !pastedDraftCurrent ||
-                (!pastedDraft.omitted && pastedProblems.length > 0) ||
-                pastedCards.length === 0 ||
-                !name.trim() ||
-                (!capacityReady && !canRequestAccess) ||
-                (atCapacity && saveAttempted) ||
-                guestBlocked ||
-                waitingForGuest
-              }
-              onPress={importPasted}
-            />
+            {!atCapacity ? (
+              <Button
+                testID="save-import-button"
+                text={busy ? "Saving…" : guestMode ? "Save on device" : "Save deck"}
+                preset="reversed"
+                style={$flex1}
+                disabled={
+                  busy ||
+                  resolvingPasted ||
+                  !pastedDraftCurrent ||
+                  (!pastedDraft.omitted && pastedProblems.length > 0) ||
+                  pastedCards.length === 0 ||
+                  !name.trim() ||
+                  (!capacityReady && !canRequestAccess) ||
+                  guestBlocked ||
+                  waitingForGuest
+                }
+                onPress={importPasted}
+              />
+            ) : null}
           </View>
         </BottomActionBar>
         {previewCardDialog}
@@ -1470,7 +1464,7 @@ export function AddDeckScreen({
           ) : null}
           {error ? <AlertNote text={error} /> : null}
           {saveRecovery}
-          {!guestBlocked ? (
+          {!guestBlocked && !atCapacity ? (
             <Button
               testID="import-catalog-deck"
               text={busy ? "Importing…" : guestMode ? "Save deck on this device" : "Import deck"}
@@ -1478,7 +1472,6 @@ export function AddDeckScreen({
               disabled={
                 busy ||
                 (!capacityReady && !canRequestAccess) ||
-                (atCapacity && saveAttempted) ||
                 guestBlocked ||
                 waitingForGuest ||
                 !catalogDetail
@@ -1511,7 +1504,6 @@ export function AddDeckScreen({
     const cannotImport =
       busy ||
       (!capacityReady && !canRequestAccess) ||
-      (atCapacity && saveAttempted) ||
       guestBlocked ||
       waitingForGuest ||
       previewLoading ||
@@ -1631,7 +1623,7 @@ export function AddDeckScreen({
             <DeckCapacityStatus key={access?.ownerId} onReady={handleCapacity} />
           ) : null}
           {saveRecovery}
-          {!guestBlocked ? (
+          {!guestBlocked && !atCapacity ? (
             <TouchableOpacity
               testID="import-preview-button"
               accessibilityRole="button"
@@ -1660,6 +1652,7 @@ export function AddDeckScreen({
     <Screen preset="scroll" safeAreaEdges={["bottom"]} contentInset="standard">
       <Header title="Add deck" leftTx="common:back" onLeftPress={onBack} />
       <View style={themed($stack)}>
+        {saveRecovery}
         <Text preset="subheading" text="Deck details" accessibilityRole="header" />
         <View style={themed($configRow)}>
           <View style={$flex1}>
@@ -1891,7 +1884,6 @@ export function AddDeckScreen({
                 }}
               />
             )}
-            {saveRecovery}
             {pastedDraftCurrent ? (
               <Button
                 testID="return-import-review-button"
@@ -1934,20 +1926,20 @@ export function AddDeckScreen({
               onChangeText={setName}
             />
             {noteField}
-            {saveRecovery}
-            <Button
-              text={busy ? "Creating…" : "Create deck"}
-              preset="reversed"
-              disabled={
-                busy ||
-                (!capacityReady && !canRequestAccess) ||
-                (atCapacity && saveAttempted) ||
-                guestBlocked ||
-                waitingForGuest ||
-                !name.trim()
-              }
-              onPress={createBlank}
-            />
+            {!atCapacity ? (
+              <Button
+                text={busy ? "Creating…" : "Create deck"}
+                preset="reversed"
+                disabled={
+                  busy ||
+                  (!capacityReady && !canRequestAccess) ||
+                  guestBlocked ||
+                  waitingForGuest ||
+                  !name.trim()
+                }
+                onPress={createBlank}
+              />
+            ) : null}
           </View>
         ) : null}
 

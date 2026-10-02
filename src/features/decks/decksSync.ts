@@ -313,7 +313,8 @@ const emptySnapshot: DeckSyncSnapshot = { decks: [], metadata: [], loading: true
 
 export function useDeckSync(
   enabled: boolean,
-  ownerId?: string,
+  ownerId: string | undefined,
+  ready: boolean,
   shelf?: { ownerId: string; decks: readonly MineDeck[] },
 ) {
   const client = useConvex()
@@ -321,10 +322,10 @@ export function useDeckSync(
     () => (enabled && ownerId ? getDeckSyncController(client, ownerId) : undefined),
     [client, enabled, ownerId],
   )
-  useEffect(() => controller?.start(), [controller])
+  useEffect(() => (ready ? controller?.start() : undefined), [controller, ready])
   useEffect(() => {
     if (shelf && shelf.ownerId === ownerId) controller?.saveShelf(shelf.decks)
   }, [controller, ownerId, shelf])
   const snapshot = useValue(() => controller?.state$.get() ?? emptySnapshot)
-  return { ...snapshot, retry: () => controller?.refresh() }
+  return { ...snapshot, retry: () => (ready ? controller?.refresh() : undefined) }
 }

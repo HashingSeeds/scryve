@@ -20,6 +20,7 @@ import { AddDeckScreen, catalogPreviewSections } from "./AddDeckScreen"
 const mockCreate = jest.fn()
 const mockGuestImport = jest.fn()
 const mockArchive = jest.fn(async () => null)
+const mockPresentPaywall = jest.fn()
 const mockImport = jest.fn(async () => "deck-imported")
 const mockSearch = jest.fn(async () => [
   {
@@ -152,6 +153,14 @@ const mockListMine: {
   value: readyShelf,
   error: undefined,
 }
+
+jest.mock("@/features/billing/RevenueCatContext", () => ({
+  useRevenueCat: () => ({
+    configured: true,
+    isLoading: false,
+    presentPaywall: mockPresentPaywall,
+  }),
+}))
 
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvexState.client,
@@ -2168,16 +2177,16 @@ describe("AddDeckScreen", () => {
   it("resolves a full account inline without losing the new deck draft", async () => {
     atCapacity()
     const view = renderAddDeck()
-    expect(view.queryByText("Your deck slots are full")).toBeNull()
-    expect(view.queryByText(/Premium/)).toBeNull()
+    expect(view.getByText("You've reached the free account limit of 2 decks.")).toBeTruthy()
+    expect(view.getByText("Upgrade to Pro")).toBeTruthy()
+    chooseMode(view, "paste")
+    expect(view.getAllByTestId("account-deck-capacity")).toHaveLength(1)
     chooseMode(view, "blank")
     continueSetup(view)
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Blocked Deck")
-    fireEvent.press(view.getByText("Create deck"))
     expect(mockCreate).not.toHaveBeenCalled()
-    expect(view.getByText("Your deck slots are full")).toBeTruthy()
-    expect(view.getByText("Create deck")).toBeDisabled()
-    fireEvent.press(view.getByText("Choose a deck"))
+    expect(view.queryByText("Create deck")).toBeNull()
+    fireEvent.press(view.getByText("Replace a deck"))
     fireEvent.press(view.getByText("Archive Existing Deck"))
     fireEvent.press(view.getByText("Keep deck"))
     expect(mockArchive).not.toHaveBeenCalled()
@@ -2195,6 +2204,20 @@ describe("AddDeckScreen", () => {
     )
     expect(view.getByTestId("deck-name-input").props.value).toBe("Blocked Deck")
     expect(view.getByText("Create deck")).toBeEnabled()
+  })
+
+  it("lets a full free account browse a deck with upgrade and replacement actions", async () => {
+    atCapacity()
+    const view = renderAddDeck()
+    await act(async () => jest.advanceTimersByTime(400))
+    fireEvent.press(view.getByText("Explorers of the Deep"))
+    await waitFor(() => expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy())
+    expect(view.getByText("Upgrade to Pro")).toBeTruthy()
+    expect(view.getByText("Replace a deck")).toBeTruthy()
+    fireEvent.press(view.getByText("Upgrade to Pro"))
+    expect(mockPresentPaywall).toHaveBeenCalledTimes(1)
+    expect(view.queryByTestId("import-preview-button")).toBeNull()
+    expect(mockImport).not.toHaveBeenCalled()
   })
 
   it("keeps entered data while the deck limit is still loading", () => {
