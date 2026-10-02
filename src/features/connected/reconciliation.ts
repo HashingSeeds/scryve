@@ -1,9 +1,4 @@
-import {
-  CONNECTED_RECENT_OPERATION_LIMIT,
-  type ConnectedDisplayProjection,
-  type ConnectedProjection,
-  type PendingLifeAction,
-} from "./model"
+import type { ConnectedDisplayProjection, ConnectedProjection, PendingLifeAction } from "./model"
 
 export function mergeConfirmedProjection(
   current: ConnectedProjection | null,
@@ -55,29 +50,6 @@ export function oldestFirst(actions: readonly PendingLifeAction[]): PendingLifeA
       left.event.clientCreatedAt - right.event.clientCreatedAt ||
       left.event.operationId.localeCompare(right.event.operationId),
   )
-}
-
-export function optimisticallyApplyLife<T extends ConnectedProjection>(
-  projection: T,
-  args: { publicId: string; playerId: string; operationId: string; delta: number },
-): T & { __optimisticOperationIds: string[] } {
-  if (projection.publicId !== args.publicId) return { ...projection, __optimisticOperationIds: [] }
-  const alreadyConfirmed = projection.recentOperationIds.includes(args.operationId)
-  return {
-    ...projection,
-    recentOperationIds: alreadyConfirmed
-      ? projection.recentOperationIds
-      : [args.operationId, ...projection.recentOperationIds].slice(
-          0,
-          CONNECTED_RECENT_OPERATION_LIMIT,
-        ),
-    players: projection.players.map((player) =>
-      !alreadyConfirmed && player.playerId === args.playerId
-        ? { ...player, currentLife: player.currentLife + args.delta }
-        : player,
-    ),
-    __optimisticOperationIds: [args.operationId],
-  }
 }
 
 export type WriteFailureKind = "retry" | "permanent"

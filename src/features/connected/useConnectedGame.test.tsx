@@ -43,12 +43,7 @@ const mockRemoteProjection = {
   ],
 } as const
 let mockRemote: unknown = mockRemoteProjection
-const mockChangeMutation = Object.assign(
-  jest.fn(async (args: any) => args),
-  {
-    withOptimisticUpdate: jest.fn(),
-  },
-)
+const mockChangeMutation = jest.fn(async (args: any) => args)
 const mockRepository = {
   loadProjection: jest.fn((): any => null),
   saveProjection: jest.fn(),
@@ -95,7 +90,6 @@ jest.mock("convex/react", () => ({
   useQuery: () => mockRemote,
   useMutation: (reference: string) => {
     if (reference === "finishGame") return mockFinishMutation
-    mockChangeMutation.withOptimisticUpdate.mockReturnValue(mockChangeMutation)
     return mockChangeMutation
   },
 }))

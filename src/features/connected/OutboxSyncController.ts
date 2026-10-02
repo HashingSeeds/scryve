@@ -186,10 +186,7 @@ export class OutboxSyncController {
   onRemoteProjection(remote: unknown, status?: ConnectedOperationStatus): void {
     let incoming = toConnectedProjection(remote)
     if (!incoming) return
-    const optimistic = Array.isArray(
-      (remote as { __optimisticOperationIds?: unknown } | null)?.__optimisticOperationIds,
-    )
-    if (!optimistic && status?.operationId === this.pending[0]?.event.operationId) {
+    if (status?.operationId === this.pending[0]?.event.operationId) {
       this.operationStatus = status ?? null
       if (status?.status === "acknowledged") {
         incoming = {
@@ -199,25 +196,23 @@ export class OutboxSyncController {
       }
     }
     const merged = mergeConfirmedProjection(this.confirmed, incoming)
-    if (!optimistic) this.options.repository.saveProjection(merged)
+    this.options.repository.saveProjection(merged)
     this.confirmed = merged
     this.observeResumeProjection(merged)
-    if (!optimistic) {
-      const observed = new Set(incoming.recentOperationIds)
-      const remaining: PendingLifeAction[] = []
-      for (const action of this.pending) {
-        const operationId = action.event.operationId
-        if (observed.has(operationId) && !this.inFlight.has(operationId))
-          this.options.repository.acknowledge(this.options.publicId, operationId)
-        else remaining.push(action)
-      }
-      this.offline = false
-      if (this.environment.isWebSocketConnected && this.reconnectPending) {
-        this.reconnectPending = false
-        emitTelemetry("reconnect.ready", { outcome: "success", pendingCount: this.pending.length })
-      }
-      this.pending = remaining
+    const observed = new Set(incoming.recentOperationIds)
+    const remaining: PendingLifeAction[] = []
+    for (const action of this.pending) {
+      const operationId = action.event.operationId
+      if (observed.has(operationId) && !this.inFlight.has(operationId))
+        this.options.repository.acknowledge(this.options.publicId, operationId)
+      else remaining.push(action)
     }
+    this.offline = false
+    if (this.environment.isWebSocketConnected && this.reconnectPending) {
+      this.reconnectPending = false
+      emitTelemetry("reconnect.ready", { outcome: "success", pendingCount: this.pending.length })
+    }
+    this.pending = remaining
     this.publish()
     this.resolveProjectionWaiter()
   }

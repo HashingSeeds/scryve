@@ -3,7 +3,6 @@ import {
   classifyWriteFailure,
   mergeConfirmedProjection,
   oldestFirst,
-  optimisticallyApplyLife,
   overlayPendingDeltas,
 } from "./reconciliation"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
@@ -95,43 +94,6 @@ describe("connected reconciliation", () => {
         (item) => item.event.operationId,
       ),
     ).toEqual(["operation-a", "operation-b"])
-  })
-
-  it("scopes optimistic updates and prevents a pending overlay from applying twice", () => {
-    const optimistic = optimisticallyApplyLife(projection, {
-      publicId: "game-public",
-      playerId: "player-1",
-      operationId: "operation-optimistic",
-      delta: 5,
-    })
-    expect(optimistic.players.map((player) => player.currentLife)).toEqual([25, 20])
-    expect(
-      overlayPendingDeltas(optimistic, [action("operation-optimistic", 5, 1)]).players[0]
-        .currentLife,
-    ).toBe(25)
-    expect(
-      optimisticallyApplyLife(projection, {
-        publicId: "different-game",
-        playerId: "player-1",
-        operationId: "operation-other",
-        delta: 5,
-      }).players,
-    ).toEqual(projection.players)
-    const committed = {
-      ...projection,
-      recentOperationIds: ["operation-optimistic"],
-      players: projection.players.map((player, index) =>
-        index === 0 ? { ...player, currentLife: 25 } : player,
-      ),
-    }
-    expect(
-      optimisticallyApplyLife(committed, {
-        publicId: "game-public",
-        playerId: "player-1",
-        operationId: "operation-optimistic",
-        delta: 5,
-      }).players[0].currentLife,
-    ).toBe(25)
   })
 
   it("retains authorization/game-state failures but retries auth expiry and network loss", () => {

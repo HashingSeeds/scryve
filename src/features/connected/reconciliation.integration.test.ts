@@ -1,7 +1,7 @@
 import { drainConnectedOutbox } from "./drainOutbox"
 import type { ConnectedProjection, PendingLifeAction } from "./model"
 import { ConnectedGameRepository } from "./persistence"
-import { optimisticallyApplyLife, overlayPendingDeltas } from "./reconciliation"
+import { overlayPendingDeltas } from "./reconciliation"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
 
 class MemoryStorage {
@@ -104,50 +104,6 @@ describe("subscription/ack reconciliation ordering", () => {
     expect(result.acknowledged).toEqual([operationId])
     expect(restarted.cleanupTerminalGame(terminal, result.pending, result.failures)).toBe(true)
     expect(restarted.loadProjection("game-public")).toBeNull()
-  })
-
-  it("keeps exactly one delta when subscription arrives before acknowledgement", () => {
-    const storage = new MemoryStorage()
-    const repository = new ConnectedGameRepository(storage, "user-a")
-    repository.enqueue(pending)
-    expect(
-      overlayPendingDeltas(base, repository.loadOutbox("game-public")).players[0].currentLife,
-    ).toBe(25)
-    expect(
-      optimisticallyApplyLife(committed, {
-        publicId: "game-public",
-        playerId: "player-1",
-        operationId,
-        delta: 5,
-      }).players[0].currentLife,
-    ).toBe(25)
-    repository.acknowledge("game-public", operationId)
-    repository.saveProjection(committed)
-    expect(new ConnectedGameRepository(storage, "user-a").loadOutbox("game-public")).toEqual([])
-    expect(
-      new ConnectedGameRepository(storage, "user-a").loadProjection("game-public")?.players[0]
-        .currentLife,
-    ).toBe(25)
-  })
-
-  it("keeps optimistic life until subscription when acknowledgement arrives first", () => {
-    const storage = new MemoryStorage()
-    const repository = new ConnectedGameRepository(storage, "user-a")
-    repository.enqueue(pending)
-    const optimistic = optimisticallyApplyLife(base, {
-      publicId: "game-public",
-      playerId: "player-1",
-      operationId,
-      delta: 5,
-    })
-    repository.acknowledge("game-public", operationId)
-    expect(optimistic.players[0].currentLife).toBe(25)
-    repository.saveProjection(committed)
-    expect(overlayPendingDeltas(committed, []).players[0].currentLife).toBe(25)
-    expect(
-      new ConnectedGameRepository(storage, "user-a").loadProjection("game-public")?.players[0]
-        .currentLife,
-    ).toBe(25)
   })
 
   it.each([
