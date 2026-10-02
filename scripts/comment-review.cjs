@@ -1,63 +1,88 @@
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
+const ts = require("typescript")
 
-function whyBlocks(source) {
-  let offset = 0
-  const lines = source.split("\n").map((raw) => {
-    const text = raw.endsWith("\r") ? raw.slice(0, -1) : raw
-    const line = { text, start: offset, end: offset + text.length }
-    offset += raw.length + 1
-    return line
-  })
+const DIRECTIVE_PATTERNS = [
+  /^eslint(?:-env|-disable(?:-next-line|-line)?|-enable)?\b/u,
+  /^global(?:s)?\b/u,
+  /^exported\b/u,
+  /^@ts-(?:check|nocheck|ignore|expect-error)\b/u,
+  /^@(?:jsx|jsxFrag|jsxImportSource|jsxRuntime)\b/u,
+  /^(?:prettier|biome|oxlint)-ignore\b/u,
+  /^(?:istanbul|c8)\s+ignore\b/u,
+  /^webpack(?:ChunkName|Mode|Prefetch|Preload|FetchPriority|Include|Exclude|Exports):/u,
+  /^#__PURE__$/u,
+  /^@__PURE__$/u,
+  /^@(?:license|preserve)\b/u,
+  /^!\s*@preserve\b/u,
+]
+const ISSUE_INTRO =
+  "New why comments landed in main. Unchecked means keep. Check `drop` for any you want removed, then close the issue. An agent applies drops with `pnpm comments:apply <issue>`."
+const MAX_ISSUE_LENGTH = 60_000
+const WHY_PATTERN = /^(?:\*\s*)*why:/u
+
+function whyBlocks(source, filename = "") {
+  const variant = /\.[jt]sx$/u.test(filename) ? ts.LanguageVariant.JSX : ts.LanguageVariant.Standard
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, variant, source)
+  const comments = []
+  const templateBraces = []
+  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+    if (
+      kind === ts.SyntaxKind.SingleLineCommentTrivia ||
+      kind === ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      comments.push({ kind, start: scanner.getTokenPos(), end: scanner.getTextPos() })
+    } else if (kind === ts.SyntaxKind.TemplateHead) {
+      templateBraces.push(0)
+    } else if (templateBraces.length && kind === ts.SyntaxKind.OpenBraceToken) {
+      templateBraces[templateBraces.length - 1] += 1
+    } else if (templateBraces.length && kind === ts.SyntaxKind.CloseBraceToken) {
+      const depth = templateBraces.length - 1
+      if (templateBraces[depth]) templateBraces[depth] -= 1
+      else if (scanner.reScanTemplateToken(false) === ts.SyntaxKind.TemplateTail)
+        templateBraces.pop()
+    }
+  }
+
   const blocks = []
-  const seen = new Set()
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]
-    const lineComment = line.text.match(/\/\/\s*why:/u)
-    const blockComment = line.text.match(/\/\*\*?\s*why:/u)
-    const blockText = line.text.match(/^\s*\*\s*why:/u)
-    let startLine = index
-    let startColumn
-    let end
+  for (let index = 0; index < comments.length; index += 1) {
+    const comment = comments[index]
+    const text = source.slice(comment.start, comment.end)
+    const value = text
+      .slice(2, comment.kind === ts.SyntaxKind.MultiLineCommentTrivia ? -2 : undefined)
+      .trim()
+    if (!WHY_PATTERN.test(value)) continue
 
-    if (lineComment) {
-      startColumn = lineComment.index
-      let endLine = index
-      if (/^\s*$/u.test(line.text.slice(0, startColumn))) {
-        while (/^\s*\/\//u.test(lines[endLine + 1]?.text ?? "")) endLine += 1
+    let end = comment.end
+    const lineStart = source.lastIndexOf("\n", comment.start - 1) + 1
+    if (
+      comment.kind === ts.SyntaxKind.SingleLineCommentTrivia &&
+      /^\s*$/u.test(source.slice(lineStart, comment.start))
+    ) {
+      while (comments[index + 1]?.kind === ts.SyntaxKind.SingleLineCommentTrivia) {
+        const next = comments[index + 1]
+        const nextText = source.slice(next.start, next.end)
+        if (!/^\r?\n[\t ]*$/u.test(source.slice(end, next.start))) break
+        if (DIRECTIVE_PATTERNS.some((pattern) => pattern.test(nextText.slice(2).trim()))) break
+        index += 1
+        end = next.end
       }
-      end = lines[endLine].end
-    } else if (blockComment) {
-      startColumn = blockComment.index
-    } else if (blockText) {
-      while (startLine >= 0 && !lines[startLine].text.includes("/*")) startLine -= 1
-      if (startLine < 0) continue
-      startColumn = lines[startLine].text.lastIndexOf("/*")
-    } else {
-      continue
     }
-
-    const start = lines[startLine].start + startColumn
-    if (end === undefined) {
-      for (let endLine = startLine; endLine < lines.length; endLine += 1) {
-        const close = lines[endLine].text.indexOf("*/", endLine === startLine ? startColumn + 2 : 0)
-        if (close < 0) continue
-        end = lines[endLine].start + close + 2
-        break
-      }
-      if (end === undefined) continue
-    }
-    const key = `${start}:${end}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    blocks.push({ line: index + 1, start, end, block: source.slice(start, end) })
+    const why = comment.start + text.indexOf("why:")
+    blocks.push({
+      line: source.slice(0, why).split("\n").length,
+      start: comment.start,
+      end,
+      block: source.slice(comment.start, end),
+    })
   }
   return blocks
 }
 
 function parseDiff(diff, readHeadFile) {
   const files = new Map()
+  const candidates = new Set()
   let filename
   let line
   for (const text of diff.split("\n")) {
@@ -68,7 +93,7 @@ function parseDiff(diff, readHeadFile) {
       let destination = text.slice(4)
       if (destination.startsWith('"')) destination = JSON.parse(destination)
       filename = destination.startsWith("b/") ? destination.slice(2) : undefined
-      if (filename && /\.(?:ts|tsx|js|cjs|mjs)$/u.test(filename)) {
+      if (filename && /\.(?:ts|tsx|js|jsx|cjs|mjs)$/u.test(filename)) {
         if (!files.has(filename)) files.set(filename, new Set())
       } else {
         filename = undefined
@@ -76,17 +101,39 @@ function parseDiff(diff, readHeadFile) {
     } else if (text.startsWith("@@ ")) {
       line = Number(text.match(/\+(\d+)/u)[1])
     } else if (line !== undefined && filename) {
-      if (text.startsWith("+")) files.get(filename).add(line++)
-      else if (text.startsWith(" ")) line += 1
+      if (text.startsWith("+")) {
+        files.get(filename).add(line++)
+        if (text.includes("why:")) candidates.add(filename)
+      } else if (text.startsWith(" ")) line += 1
     }
   }
   return [...files]
-    .filter(([, added]) => added.size)
+    .filter(([file, added]) => added.size && candidates.has(file))
     .flatMap(([file, added]) =>
-      whyBlocks(readHeadFile(file))
+      whyBlocks(readHeadFile(file), file)
         .filter(({ line }) => added.has(line))
         .map(({ line, block }) => ({ path: file, line, block })),
     )
+}
+
+function formatIssue(entries, repo, headSha) {
+  const sections = entries.map((entry) => formatEntries([entry], repo, headSha))
+  let body = ISSUE_INTRO
+  let included = 0
+  for (const section of sections) {
+    const candidate = `${body}\n\n${section}`
+    const omitted = sections.length - included - 1
+    const note = omitted
+      ? `\n\n${omitted} comment review entries omitted because the issue body reached 60,000 characters.`
+      : ""
+    if (`${candidate}${note}`.length > MAX_ISSUE_LENGTH) break
+    body = candidate
+    included += 1
+  }
+  const omitted = sections.length - included
+  return omitted
+    ? `${body}\n\n${omitted} comment review entries omitted because the issue body reached 60,000 characters.`
+    : body
 }
 
 function formatEntries(entries, repo, headSha) {
@@ -121,8 +168,8 @@ function parseCheckedEntries(body) {
   return entries
 }
 
-function removeBlock(source, block) {
-  const matches = whyBlocks(source).filter(
+function removeBlock(source, block, filename) {
+  const matches = whyBlocks(source, filename).filter(
     (entry) => entry.block.replace(/\r\n/gu, "\n") === block.replace(/\r\n/gu, "\n"),
   )
   if (matches.length !== 1) {
@@ -176,6 +223,7 @@ function main(args) {
       "*.ts",
       "*.tsx",
       "*.js",
+      "*.jsx",
       "*.cjs",
       "*.mjs",
     ])
@@ -184,7 +232,7 @@ function main(args) {
     const repo =
       process.env.GITHUB_REPOSITORY ||
       JSON.parse(run("gh", ["repo", "view", "--json", "nameWithOwner"])).nameWithOwner
-    process.stdout.write(`${formatEntries(entries, repo, second)}\n`)
+    process.stdout.write(formatIssue(entries, repo, second))
   } else if (command === "apply" && /^[1-9]\d*$/u.test(first ?? "")) {
     const { body } = JSON.parse(run("gh", ["issue", "view", first, "--json", "body"]))
     const root = fs.realpathSync(run("git", ["rev-parse", "--show-toplevel"]).trim())
@@ -193,7 +241,7 @@ function main(args) {
     for (const entry of parseCheckedEntries(body)) {
       try {
         const filename = path.join(root, entry.path)
-        const result = removeBlock(fs.readFileSync(filename, "utf8"), entry.block)
+        const result = removeBlock(fs.readFileSync(filename, "utf8"), entry.block, entry.path)
         if (!result.removed) throw new Error(result.reason)
         fs.writeFileSync(filename, result.source)
         removed += 1
@@ -209,7 +257,7 @@ function main(args) {
   }
 }
 
-module.exports = { parseDiff, formatEntries, parseCheckedEntries, removeBlock }
+module.exports = { parseDiff, formatEntries, formatIssue, parseCheckedEntries, removeBlock }
 
 if (require.main === module) {
   try {

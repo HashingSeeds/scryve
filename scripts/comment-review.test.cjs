@@ -10,6 +10,7 @@ const config = require("../.eslintrc.js")
 const {
   parseDiff,
   formatEntries,
+  formatIssue,
   parseCheckedEntries,
   removeBlock,
 } = require("./comment-review.cjs")
@@ -114,12 +115,73 @@ test("ordinary comments do not enter the queue", () => {
     .map((line) => `+${line}`)
     .join("\n")}`
   assert.deepEqual(
-    parseDiff(diff, () => source),
+    parseDiff(diff, () => assert.fail("must not read files without added why lines")),
     [],
   )
   assert.equal(formatEntries([], repo, sha), "")
   assert.deepEqual(
     parseDiff("", () => assert.fail("must not read files")),
+    [],
+  )
+})
+
+test("comment-like text in strings, templates and regex literals is ignored", () => {
+  const source = [
+    'const url = "https://x.dev// why: nope"',
+    "const template = `// why: ${url}`",
+    "const regex = /\\/\\/ why: nope/u",
+    "// why: this one is a comment",
+    "run()",
+    "",
+  ].join("\n")
+  const diff = `diff --git a/a.ts b/a.ts\n+++ b/a.ts\n@@ -0,0 +1,5 @@\n${source
+    .trimEnd()
+    .split("\n")
+    .map((line) => `+${line}`)
+    .join("\n")}`
+  assert.deepEqual(
+    parseDiff(diff, () => source),
+    [{ path: "a.ts", line: 4, block: "// why: this one is a comment" }],
+  )
+})
+
+test("directive comments end a why comment block", () => {
+  const source =
+    "// why: runtime support ships before its types\n// @ts-expect-error -- lib types lag\nfoo.bar()\n"
+  const diff = [
+    "diff --git a/a.ts b/a.ts",
+    "+++ b/a.ts",
+    "@@ -0,0 +1,3 @@",
+    "+// why: runtime support ships before its types",
+    "+// @ts-expect-error -- lib types lag",
+    "+foo.bar()",
+  ].join("\n")
+  const [entry] = parseDiff(diff, () => source)
+  assert.deepEqual(entry, {
+    path: "a.ts",
+    line: 1,
+    block: "// why: runtime support ships before its types",
+  })
+  assert.equal(
+    removeBlock(source, entry.block).source,
+    "// @ts-expect-error -- lib types lag\nfoo.bar()\n",
+  )
+})
+
+test("JSDoc why comments are only collected as the first text line", () => {
+  const source = "/**\n * Loads x.\n * why: this rationale came later\n */\nfunction load() {}\n"
+  const diff = [
+    "diff --git a/a.ts b/a.ts",
+    "+++ b/a.ts",
+    "@@ -0,0 +1,5 @@",
+    "+/**",
+    "+ * Loads x.",
+    "+ * why: this rationale came later",
+    "+ */",
+    "+function load() {}",
+  ].join("\n")
+  assert.deepEqual(
+    parseDiff(diff, () => source),
     [],
   )
 })
@@ -219,6 +281,18 @@ test("checked issue entries round-trip fenced blocks and only selected drops app
   })
   assert.deepEqual(parseCheckedEntries(body.replace("[x]", "[X]").replace(/\n/gu, "\r\n")), checked)
   assert.deepEqual(parseCheckedEntries(formatEntries(entries, repo, sha)), [])
+})
+
+test("issue bodies stop at 60,000 characters and report omitted entries", () => {
+  const entries = Array.from({ length: 4 }, (_, index) => ({
+    path: `src/${index}.ts`,
+    line: 1,
+    block: `// why: ${"x".repeat(20_000)}`,
+  }))
+  const body = formatIssue(entries, repo, sha)
+  assert.ok(body.length <= 60_000)
+  assert.match(body, /^New why comments landed in main\./u)
+  assert.match(body, /\d+ comment review entries omitted/u)
 })
 
 test("removal preserves executable code, indentation and CRLF line endings", () => {
