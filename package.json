@@ -34,6 +34,7 @@
     "deps:graph": "depcruise src convex --include-only \"^(src|convex)\" --config .dependency-cruiser.js --output-type dot > app-dependency-graph.dot && dot -T svg app-dependency-graph.dot -o app-dependency-graph.svg && dot -T png app-dependency-graph.dot -o app-dependency-graph.png && rm app-dependency-graph.dot",
     "align-deps": "expo install --fix",
     "test": "jest",
+    "test:scripts": "node --test scripts/*.test.cjs",
     "test:watch": "jest --watch",
     "test:ygo-worker": "jest workers/ygo-image-mirror/src/index.test.ts workers/ygo-image-mirror/sync/index.test.ts --runInBand && vitest run --config workers/ygo-image-mirror/vitest.config.mts",
     "check:ygo-worker": "wrangler types --check --cwd workers/ygo-image-mirror && tsc --noEmit -p workers/ygo-image-mirror/tsconfig.json && tsc --noEmit -p workers/ygo-image-mirror/sync/tsconfig.json && tsc --noEmit -p workers/ygo-image-mirror/test/tsconfig.json && pnpm test:ygo-worker && wrangler deploy --dry-run --cwd workers/ygo-image-mirror --env= --outdir .wrangler/dry-run-preview && wrangler deploy --dry-run --cwd workers/ygo-image-mirror --env production --outdir .wrangler/dry-run-production",
