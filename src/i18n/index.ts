@@ -4,7 +4,6 @@ import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
 import "intl-pluralrules"
 
-// if English isn't your default language, move Translations to the appropriate language file.
 import ar from "./ar"
 import en, { Translations } from "./en"
 import es from "./es"
@@ -20,7 +19,6 @@ const systemLocales = Localization.getLocales()
 const resources = { ar, en, ko, es, fr, ja, hi }
 const supportedTags = Object.keys(resources)
 
-// Checks to see if the device locale matches any of the supported locales
 // Device locale may be more specific and still match (e.g., en-US matches en)
 const systemTagMatchesSupportedTags = (deviceTag: string) => {
   const primaryTag = deviceTag.split("-")[0]
@@ -57,10 +55,6 @@ export const initI18n = async () => {
 
   return i18n
 }
-
-/**
- * Builds up valid keypaths for translations.
- */
 
 export type TxKeyPath = RecursiveKeyOf<Translations>
 
