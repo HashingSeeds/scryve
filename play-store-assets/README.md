@@ -20,4 +20,4 @@ All files are PNGs and are comfortably below the Google Play file-size limits.
 - Video is optional and is not included. A public or unlisted, ad-free, non-age-restricted YouTube upload is still needed if a promo video is desired.
 - Reproducible Maestro capture flows live in `.maestro/store-assets/`.
 - The final screenshot sets prioritize live 2-, 5-, and 6-player boards. The phone set also includes the six-player controls overlay.
-- Captures rejected during visual QA are retained in `working/` and are not intended for upload.
+- Captures rejected during visual QA are kept locally in `working/` (gitignored) and are not intended for upload.

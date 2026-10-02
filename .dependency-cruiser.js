@@ -38,8 +38,6 @@ module.exports = {
           "\\.d\\.ts$",
           "(^|/)tsconfig\\.json$",
           "(^|/)(babel|webpack)\\.config\\.(js|cjs|mjs|ts|json)$",
-          "crashReporting\\.ts$", // Boilerplate file for future crash reporting setup
-          "utils/delay\\.ts$", // Utility function for delaying execution
           "features/auth/resourceCache\\.ts$", // Platform fallback selected by Metro
           "src/app/\\+native-intent\\.tsx$", // Expo Router native-intent entry point
         ],

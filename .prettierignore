@@ -3,7 +3,5 @@ ios
 android
 .expo
 .vscode
-ignite/ignite.json
 package.json
 .eslintignore
-*.ejs
