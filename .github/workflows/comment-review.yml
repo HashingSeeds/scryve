@@ -26,7 +26,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Queue new why comments
         env:
@@ -35,6 +35,7 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: |
           body="$RUNNER_TEMP/comment-review.md"
+          git cat-file -e "$BASE_SHA" || exit 0
           node scripts/comment-review.cjs collect "$BASE_SHA" "$HEAD_SHA" > "$body"
           if [ ! -s "$body" ]; then
             exit 0

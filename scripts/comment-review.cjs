@@ -3,20 +3,10 @@ const fs = require("node:fs")
 const path = require("node:path")
 const ts = require("typescript")
 
-const DIRECTIVE_PATTERNS = [
-  /^eslint(?:-env|-disable(?:-next-line|-line)?|-enable)?\b/u,
-  /^global(?:s)?\b/u,
-  /^exported\b/u,
-  /^@ts-(?:check|nocheck|ignore|expect-error)\b/u,
-  /^@(?:jsx|jsxFrag|jsxImportSource|jsxRuntime)\b/u,
-  /^(?:prettier|biome|oxlint)-ignore\b/u,
-  /^(?:istanbul|c8)\s+ignore\b/u,
-  /^webpack(?:ChunkName|Mode|Prefetch|Preload|FetchPriority|Include|Exclude|Exports):/u,
-  /^#__PURE__$/u,
-  /^@__PURE__$/u,
-  /^@(?:license|preserve)\b/u,
-  /^!\s*@preserve\b/u,
-]
+const {
+  DEFAULT_ALLOWED_PATTERNS,
+} = require("../tools/eslint-plugin-self-explanatory-code/index.cjs")
+
 const ISSUE_INTRO =
   "New why comments landed in main. Unchecked means keep. Check `drop` for any you want removed, then close the issue. An agent applies drops with `pnpm comments:apply <issue>`."
 const MAX_ISSUE_LENGTH = 60_000
@@ -24,6 +14,7 @@ const WHY_PATTERN = /^(?:\*\s*)*why:/u
 
 function whyBlocks(source, filename = "") {
   const variant = /\.[jt]sx$/u.test(filename) ? ts.LanguageVariant.JSX : ts.LanguageVariant.Standard
+  // why: createScanner can miss comments after ambiguous regex or backtick boundaries; rare misses are acceptable.
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, variant, source)
   const comments = []
   const templateBraces = []
@@ -64,7 +55,8 @@ function whyBlocks(source, filename = "") {
         const next = comments[index + 1]
         const nextText = source.slice(next.start, next.end)
         if (!/^\r?\n[\t ]*$/u.test(source.slice(end, next.start))) break
-        if (DIRECTIVE_PATTERNS.some((pattern) => pattern.test(nextText.slice(2).trim()))) break
+        if (DEFAULT_ALLOWED_PATTERNS.some((pattern) => pattern.test(nextText.slice(2).trim())))
+          break
         index += 1
         end = next.end
       }
@@ -118,22 +110,22 @@ function parseDiff(diff, readHeadFile) {
 
 function formatIssue(entries, repo, headSha) {
   const sections = entries.map((entry) => formatEntries([entry], repo, headSha))
+  const fullBody = [ISSUE_INTRO, ...sections].join("\n\n")
+  if (fullBody.length <= MAX_ISSUE_LENGTH) return fullBody
+
+  const noteSuffix =
+    " comment review entries omitted because the issue body reached 60,000 characters."
+  const reserve = `\n\n${sections.length}${noteSuffix}`.length
   let body = ISSUE_INTRO
   let included = 0
   for (const section of sections) {
     const candidate = `${body}\n\n${section}`
-    const omitted = sections.length - included - 1
-    const note = omitted
-      ? `\n\n${omitted} comment review entries omitted because the issue body reached 60,000 characters.`
-      : ""
-    if (`${candidate}${note}`.length > MAX_ISSUE_LENGTH) break
+    if (candidate.length + reserve > MAX_ISSUE_LENGTH) break
     body = candidate
     included += 1
   }
   const omitted = sections.length - included
-  return omitted
-    ? `${body}\n\n${omitted} comment review entries omitted because the issue body reached 60,000 characters.`
-    : body
+  return `${body}\n\n${omitted}${noteSuffix}`
 }
 
 function formatEntries(entries, repo, headSha) {

@@ -1,3 +1,5 @@
+/* global __dirname */
+
 const { Linter } = require("eslint")
 const assert = require("node:assert/strict")
 const { execFileSync } = require("node:child_process")
@@ -205,7 +207,7 @@ test("TypeScript generic arrow functions do not break comment scanning", () => {
 
 test("large non-code diffs do not reach collect", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-comment-review-"))
-  const script = path.resolve("scripts/comment-review.cjs")
+  const script = path.join(__dirname, "comment-review.cjs")
   const run = (command, args, options = {}) =>
     execFileSync(command, args, { cwd: directory, encoding: "utf8", ...options })
   const git = (...args) =>
@@ -214,6 +216,8 @@ test("large non-code diffs do not reach collect", () => {
       "user.name=Comment review test",
       "-c",
       "user.email=comment-review@example.com",
+      "-c",
+      "commit.gpgsign=false",
       ...args,
     ])
   try {
