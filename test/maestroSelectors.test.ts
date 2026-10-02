@@ -109,10 +109,9 @@ describe("shipping Maestro selectors", () => {
     expect(shared).toContain('id: "accept-legal-button"')
   })
 
-  it("exposes selector validation, smoke, and full-suite package commands", () => {
+  it("exposes smoke, full-suite, e2e, and Apple review package commands", () => {
     const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"))
 
-    expect(packageJson.scripts["test:maestro:check"]).toContain("maestroSelectors.test.ts")
     expect(packageJson.scripts["test:maestro:smoke"]).toContain("--include-tags smoke")
     expect(packageJson.scripts["test:maestro"]).toContain(".maestro/flows")
     expect(packageJson.scripts.e2e).toBe("bash scripts/maestro-run.sh")

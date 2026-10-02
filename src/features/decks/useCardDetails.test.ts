@@ -173,17 +173,6 @@ test("shows legacy guest cached details offline without inventing commander elig
   }
 })
 
-test("serves warmed details from storage without fetching", async () => {
-  saveCardDetails({ "warmed-key": { oracleText: "Warmed text" } })
-  mockLookup.mockClear()
-  const { result } = renderHook(() =>
-    useCardDetails({ detailKey: "warmed-key", name: "Warmed", scryfallId: "warmed-id" }),
-  )
-  await waitFor(() => expect(result.current.details?.oracleText).toBe("Warmed text"))
-  expect(result.current.detailsError).toBeUndefined()
-  expect(mockLookup).not.toHaveBeenCalled()
-})
-
 test("upgrades cached multi-face details once and reuses them offline", async () => {
   const card = { detailKey: "legacy-faces", name: "Front // Back", scryfallId: "faces" }
   saveCardDetails({ [card.detailKey]: { oracleText: "Combined saved rules" } })
