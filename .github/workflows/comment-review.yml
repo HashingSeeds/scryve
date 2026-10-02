@@ -1,0 +1,48 @@
+name: comment review
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  collect:
+    if: github.event.before != '0000000000000000000000000000000000000000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Queue new why comments
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          entries="$RUNNER_TEMP/comment-review-entries.md"
+          body="$RUNNER_TEMP/comment-review.md"
+          node scripts/comment-review.cjs collect "$BASE_SHA" "$HEAD_SHA" > "$entries"
+          if [ ! -s "$entries" ]; then
+            exit 0
+          fi
+          printf '%s\n\n' 'New why comments landed in main. Unchecked means keep. Check `drop` for any you want removed, then close the issue. An agent applies drops with `pnpm comments:apply <issue>`.' > "$body"
+          cat "$entries" >> "$body"
+          gh label create comment-review --force
+          subject="$(git show -s --format=%s "$HEAD_SHA")"
+          gh issue create --title "Comment review: ${HEAD_SHA:0:7} $subject" --label comment-review --body-file "$body"

@@ -73,8 +73,12 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 
 - Complexity belongs at the adapter boundary. Orchestration stays pure, UI stays dumb.
 - Inferred types over annotations. `any` is the enemy.
-- Comments describe how a thing is used, and move when the code moves. To be used mostly to describe functions, not to annotate every line of behavior.
 - If a rule here fights the task in front of you, say so loudly and get a human sign-off before breaking it.
+
+## Comments
+
+Make code self-explanatory first through names, extraction, and types. When code cannot express a constraint or rationale, write a `// why:` comment, or `/** why: ... */` above a function for non-obvious usage. This never blocks your work.
+After merge, new why comments are surfaced to Matt in a `comment-review` issue. Unchecked means keep. Apply checked drops from closed issues with `pnpm comments:apply <n>` in a small PR.
 
 ## Additional tips
 

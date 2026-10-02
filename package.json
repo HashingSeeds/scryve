@@ -28,6 +28,7 @@
     "lint:check": "eslint .",
     "export:check": "expo export --platform ios --platform android --platform web --output-dir dist-export-check",
     "lint:comments:baseline": "node scripts/generate-comment-baseline.cjs",
+    "comments:apply": "node scripts/comment-review.cjs apply",
     "deps:check": "depcruise src convex --config .dependency-cruiser.js",
     "deps:graph": "depcruise src convex --include-only \"^(src|convex)\" --config .dependency-cruiser.js --output-type dot > app-dependency-graph.dot && dot -T svg app-dependency-graph.dot -o app-dependency-graph.svg && dot -T png app-dependency-graph.dot -o app-dependency-graph.png && rm app-dependency-graph.dot",
     "align-deps": "expo install --fix",
