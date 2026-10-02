@@ -561,9 +561,15 @@ figure {
 
 /* ---------- hero: an empty slot the stage's phone fills until it lands (stage/page.ts) ---------- */
 
+/* The foot sizes to its copy, which wraps differently per width, and the hero takes the rest
+   of the first screen so the phone never covers the heading. */
+.landing {
+  display: grid;
+  min-height: calc(100svh - var(--header));
+  grid-template-rows: minmax(440px, 1fr) auto;
+}
+
 .hero {
-  height: calc(100svh - var(--header) - 96px);
-  min-height: 440px;
   padding: 12px var(--gutter) 0;
 }
 
@@ -573,12 +579,12 @@ figure {
 
 .hero-foot {
   display: flex;
-  height: 96px;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 var(--gutter);
+  min-height: 96px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 12px var(--gutter);
 }
 
 .hero-foot h1 {
@@ -1277,6 +1283,10 @@ figure {
     grid-template-rows: var(--stage-height) auto auto auto;
   }
 
+  .landing {
+    display: contents;
+  }
+
   .hero {
     display: none;
   }
@@ -1295,7 +1305,7 @@ figure {
   }
 
   .hero-foot {
-    height: auto;
+    min-height: 0;
     flex-direction: column;
     align-items: stretch;
     gap: 24px;
