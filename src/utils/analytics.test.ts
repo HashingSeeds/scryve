@@ -23,7 +23,6 @@ it("only uploads allowlisted, opted-in events and discards the offline queue on 
   process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-key"
   process.env.EXPO_PUBLIC_POSTHOG_HOST = "https://analytics.invalid"
   fetchMock.mockRejectedValue(new Error("offline"))
-  expect(require("posthog-react-native").default).toBeDefined()
   const analytics: typeof import("./analytics") = require("./analytics")
   analytics.initAnalytics()
   analytics.captureAnalytics("game_started", { mode: "local", player_count: 2 })

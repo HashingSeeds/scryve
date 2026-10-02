@@ -283,7 +283,7 @@ describe("deck sync", () => {
     expect(rows.map((row) => row.deleted)).toEqual([true, true, false])
     await expect(
       owner.query(api.decks.syncPage, { paginationOpts: { numItems: 101, cursor: null } }),
-    ).rejects.toBeDefined()
+    ).rejects.toMatchObject({ data: { code: "invalid_page_size" } })
   })
 
   it.each([
@@ -366,7 +366,7 @@ const syncCard = {
   quantity: 4,
 }
 const otherCard = { ...syncCard, name: "Other", quantity: 2 }
-const oversized = Array.from({ length: 301 }, (unused, index) => ({
+const oversized = Array.from({ length: 301 }, (_unused, index) => ({
   ...syncCard,
   scryfallId: `aaaaaaaa-aaaa-4aaa-8aaa-${(index + 1).toString().padStart(12, "0")}`,
 }))

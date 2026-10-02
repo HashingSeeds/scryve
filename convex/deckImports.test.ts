@@ -841,7 +841,7 @@ describe("preconstructed catalog caching", () => {
         actor.action(api.deckImports.resolvePreconstructed, {
           fileName: "AvengersAssemble",
         }),
-      ).rejects.toBeDefined()
+      ).rejects.toMatchObject({ data: { code: "precon_import_unavailable" } })
       await expect(
         actor.action(api.deckImports.resolvePreconstructed, {
           fileName: "AvengersAssemble",
@@ -965,7 +965,7 @@ describe("preconstructed catalog caching", () => {
           fileName: "RetryRefresh.json",
           claimId: "claim-a",
         }),
-      ).rejects.toBeDefined()
+      ).rejects.toMatchObject({ data: { code: "precon_import_unavailable" } })
       await expect(
         t.mutation(internal.deckImports.claimResolvedPreconstructedRefresh, {
           fileName: "RetryRefresh.json",
