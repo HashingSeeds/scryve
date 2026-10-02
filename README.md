@@ -98,7 +98,7 @@ development build installed, and start Metro before running:
 ```bash
 pnpm run test:maestro:check  # fast Jest validation of flow selectors
 pnpm run test:maestro:smoke  # one local-game journey
-pnpm run test:maestro        # all flows
+pnpm run test:maestro        # all configured flows
 ```
 
 The flows, conventions, and troubleshooting notes live in [`.maestro/README.md`](.maestro/README.md).
