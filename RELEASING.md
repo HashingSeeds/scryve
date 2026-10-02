@@ -55,6 +55,9 @@ Existing clients keep their current API contracts and cached offline access.
    subscription attached to the same `Count Pro` entitlement. Present it as an
    optional supporter subscription with the same Pro features. Keep this product
    mapped only to the web billing app, so mobile offers remain monthly and yearly.
+   Set `EXPO_PUBLIC_REVENUECAT_WEB_API_KEY` in the web build environment to the
+   RevenueCat Billing public key. Use its `rcb_sb_` sandbox key for isolated web
+   purchase testing; the shared Test Store key does not load web billing products.
 2. In each Convex deployment's Settings → Environment Variables, set
    `REVENUECAT_SECRET_API_KEY` to a RevenueCat key that can read v1 subscriber info
    (the Test Store SDK key works for QA; a v1 secret API key also works),
