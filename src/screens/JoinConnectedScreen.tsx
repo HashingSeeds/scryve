@@ -27,11 +27,7 @@ import { emitTelemetry } from "@/utils/telemetry"
 
 import { InviteScannerScreen } from "./InviteScannerScreen"
 import { api } from "../../convex/_generated/api"
-import {
-  PLAYER_COLOR_CHOICES,
-  shapeForSeat,
-  type PlayerAppearance,
-} from "../../convex/lib/appearance"
+import { PLAYER_COLOR_CHOICES } from "../../convex/lib/appearance"
 
 export function JoinConnectedScreen({
   inviteToken,
@@ -77,10 +73,6 @@ export function JoinConnectedScreen({
     setScannedToken(value)
     setOpenSeats(undefined)
   }
-  const [appearance] = useState<PlayerAppearance>({
-    color: PLAYER_COLOR_CHOICES[0],
-    shape: shapeForSeat(1),
-  })
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [openSeats, setOpenSeats] = useState<number[]>()
@@ -149,8 +141,7 @@ export function JoinConnectedScreen({
         manualCode: manualCode ?? undefined,
         ...(seat === undefined ? {} : { seat }),
         displayName: profileName,
-        color: appearance.color.toUpperCase(),
-        shape: appearance.shape,
+        color: PLAYER_COLOR_CHOICES[0],
         deviceId,
       })
       requestSucceeded = true

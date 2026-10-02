@@ -53,7 +53,12 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
-import { shapeForSeat, type PlayerAppearance } from "../../convex/lib/appearance"
+import {
+  PLAYER_MARK_SHAPES,
+  resolveAppearance,
+  shapeForSeat,
+  type PlayerAppearance,
+} from "../../convex/lib/appearance"
 
 export type NewGameMode = "local" | "connected"
 
@@ -154,7 +159,9 @@ export function NewGameScreen({
   const [appearances, setAppearances] = useState<PlayerAppearance[]>(() =>
     Array.from({ length: MAX_SEATS }, (_, index) => ({
       color: initialGame?.players[index]?.color ?? PLAYER_COLORS[index],
-      shape: initialGame?.players[index]?.shape ?? shapeForSeat(index + 1),
+      shape:
+        initialGame?.players[index]?.shape ??
+        shapeForSeat(index + 1, initialGame?.players[index] ? undefined : PLAYER_MARK_SHAPES),
     })),
   )
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
@@ -204,7 +211,7 @@ export function NewGameScreen({
       nameValidation.names.map((name, index) => ({
         name,
         color: appearances[index]?.color ?? PLAYER_COLORS[index],
-        shape: appearances[index]?.shape ?? shapeForSeat(index + 1),
+        shape: appearances[index]?.shape ?? shapeForSeat(index + 1, PLAYER_MARK_SHAPES),
       })),
     [appearances, nameValidation.names],
   )
@@ -309,6 +316,17 @@ export function NewGameScreen({
   }
 
   function choosePlayerCount(value: number) {
+    if (value > playerCount)
+      setAppearances((current) => {
+        const next = [...current]
+        for (let index = playerCount; index < value; index += 1)
+          next[index] = resolveAppearance({
+            preferred: current[index],
+            taken: next.slice(0, index),
+            seat: index + 1,
+          })
+        return next
+      })
     setPlayerCount(value)
     setLayout((current) => playerGridLayoutForCount(value, current))
   }

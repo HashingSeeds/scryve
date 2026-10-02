@@ -49,7 +49,12 @@ import { convexErrorMessage, isGameUnavailableError } from "@/utils/convexError"
 
 import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
-import { isPlayerMarkShape, shapeForSeat, type PlayerAppearance } from "../../convex/lib/appearance"
+import {
+  CONNECTED_PLAYER_MARK_SHAPES,
+  isPlayerMarkShape,
+  shapeForSeat,
+  type PlayerAppearance,
+} from "../../convex/lib/appearance"
 import { versionLabel } from "../../convex/lib/deckVersions"
 
 const LOBBY_TITLE = "Lobby"
@@ -616,6 +621,7 @@ function ConnectedLobbyContent({
           <AppearancePicker
             value={appearanceDraft}
             taken={takenAppearances}
+            shapes={CONNECTED_PLAYER_MARK_SHAPES}
             onChange={setAppearanceDraft}
           />
           <View style={themed($dialogActions)}>

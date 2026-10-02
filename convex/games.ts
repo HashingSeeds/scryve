@@ -6,8 +6,10 @@ import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { internalMutation, mutation, query } from "./_generated/server"
 import {
   appearanceIsTaken,
+  CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
   resolveAppearance,
+  resolvePlayerAppearances,
   shapeForSeat,
   type PlayerAppearance,
   type PlayerMarkShape,
@@ -554,7 +556,8 @@ export const createLobby = mutation({
     assertInviteToken(args.inviteToken)
     assertManualCodeCandidates(args.manualCodeCandidates)
     assertAllowedColor(args.hostColor)
-    if (args.hostShape !== undefined) assertAllowedShape(args.hostShape)
+    if (args.hostShape !== undefined)
+      assertAllowedShape(args.hostShape, CONNECTED_PLAYER_MARK_SHAPES)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const ruleset = assertRuleset(args.ruleset)
     const format = noSystem
@@ -605,7 +608,7 @@ export const createLobby = mutation({
       ...(args.deviceId ? { deviceId: args.deviceId } : {}),
       displayName: hostDisplayName,
       usernameAtJoin: user.username,
-      color: args.hostColor,
+      color: args.hostColor.toUpperCase(),
       shape: resolveAppearance({
         preferred: {
           color: args.hostColor,
@@ -613,6 +616,7 @@ export const createLobby = mutation({
         },
         taken: [],
         seat: 1,
+        shapes: CONNECTED_PLAYER_MARK_SHAPES,
       }).shape,
       currentLife: args.startingLife,
       eventCount: 0,
@@ -710,7 +714,6 @@ export const claimSeat = mutation({
     manualCode: v.optional(v.string()),
     /** Required for a lobby claim. Imported seats keep the name the host gave them. */
     displayName: v.optional(v.string()),
-    /** Required for a lobby claim. Imported seats keep their published appearance. */
     color: v.optional(v.string()),
     shape: v.optional(v.string()),
     deviceId: v.optional(v.string()),
@@ -721,7 +724,7 @@ export const claimSeat = mutation({
     const user = await requireUser(ctx)
     await consumeJoinAttempt(ctx, String(user.clerkUserId))
     if (args.color !== undefined) assertAllowedColor(args.color)
-    if (args.shape !== undefined) assertAllowedShape(args.shape)
+    if (args.shape !== undefined) assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const invite = await findInvite(ctx, args)
     if (!invite) throw new Error("Invite is invalid, expired, or revoked")
@@ -751,8 +754,8 @@ export const claimSeat = mutation({
         ...(args.deviceId ? { deviceId: args.deviceId } : {}),
         ...(claimedName === undefined ? {} : { displayName: claimedName }),
       })
-    if (claimedName === undefined || args.color === undefined)
-      throw new Error("A display name and color are required to claim a lobby seat")
+    if (claimedName === undefined)
+      throw new Error("A display name is required to claim a lobby seat")
     const displayName = claimedName
     const duplicate = existingPlayers.find(
       (candidate) =>
@@ -767,11 +770,12 @@ export const claimSeat = mutation({
     if (seat > game.playerCount) throw new Error("Lobby is full")
     const appearance = resolveAppearance({
       preferred: {
-        color: args.color,
+        ...(args.color ? { color: args.color } : {}),
         ...(args.shape ? { shape: args.shape as PlayerMarkShape } : {}),
       },
       taken: takenAppearances(players),
       seat,
+      shapes: CONNECTED_PLAYER_MARK_SHAPES,
     })
     await ctx.db.insert("gamePlayers", {
       gameId: game._id,
@@ -959,7 +963,7 @@ export const publishLocalGame = mutation({
     })
     const mapping: { localId: string; playerId: Id<"gamePlayers">; seat: number }[] = []
     const playerIdsBySeat = new Map<number, Id<"gamePlayers">>()
-    for (const player of [...args.players].sort((left, right) => left.seat - right.seat)) {
+    for (const player of resolvePlayerAppearances(args.players, CONNECTED_PLAYER_MARK_SHAPES)) {
       const isHost = player.localId === args.hostLocalId
       const playerId = await ctx.db.insert("gamePlayers", {
         gameId,
@@ -969,7 +973,7 @@ export const publishLocalGame = mutation({
         displayName: assertDisplayName(player.displayName),
         ...(isHost ? { usernameAtJoin: user.username } : {}),
         color: player.color,
-        shape: player.shape ?? shapeForSeat(player.seat),
+        shape: player.shape,
         currentLife: player.currentLife,
         eventCount: 0,
         resumable: true,
@@ -1281,14 +1285,14 @@ export const setMyAppearance = mutation({
   },
   handler: async (ctx, args) => {
     assertAllowedColor(args.color)
-    assertAllowedShape(args.shape)
+    assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
     const game = await gameByPublicId(ctx, args.publicId)
     if (game.status !== "lobby") throw new Error("Appearance can only change in a lobby")
     const { player } = await requireSeatOwner(ctx, game._id, args.seat)
     const players = await playersForGame(ctx, game._id)
     const requested = { color: args.color.toUpperCase(), shape: args.shape as PlayerMarkShape }
     if (appearanceIsTaken(takenAppearances(players, player._id), requested))
-      throw new Error("Another player already claimed that color and shape")
+      throw new Error("Another player already claimed that color or shape")
     await ctx.db.patch(player._id, { color: requested.color, shape: requested.shape })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
     return requested
@@ -1358,12 +1362,14 @@ export const startGame = mutation({
     }
     const now = Date.now()
     await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
-    for (const player of players) {
+    for (const player of resolvePlayerAppearances(players, CONNECTED_PLAYER_MARK_SHAPES)) {
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
       await ctx.db.patch(player._id, {
         resumable: true,
+        color: player.color,
+        shape: player.shape,
         ...(invalidSinceSelection ? { deckVersionId: undefined } : {}),
       })
     }
@@ -1384,7 +1390,13 @@ export const updateMySeat = mutation({
     const { player } = await requireSeatOwner(ctx, game._id, args.seat)
     const displayName = assertDisplayName(args.displayName)
     assertAllowedColor(args.color)
-    await ctx.db.patch(player._id, { displayName, color: args.color })
+    const color = args.color.toUpperCase()
+    if (color !== player.color.toUpperCase()) {
+      const players = await playersForGame(ctx, game._id)
+      if (players.some((other) => other._id !== player._id && other.color.toUpperCase() === color))
+        throw new Error("Another player already claimed that color or shape")
+    }
+    await ctx.db.patch(player._id, { displayName, color })
     await ctx.db.patch(game._id, { updatedAt: Date.now() })
   },
 })

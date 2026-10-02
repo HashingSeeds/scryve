@@ -157,9 +157,7 @@ describe("JoinConnectedScreen", () => {
       fireEvent.press(screen.getByTestId("claim-seat-button"))
     })
 
-    expect(mockClaimSeat).toHaveBeenLastCalledWith(
-      expect.objectContaining({ color: "#B85636", shape: "circle" }),
-    )
+    expect(mockClaimSeat).toHaveBeenLastCalledWith(expect.objectContaining({ color: "#B85636" }))
   })
 
   it("requires a usable invitation code before claiming a seat", () => {

@@ -334,7 +334,7 @@ describe("claiming an imported seat through claimSeat", () => {
         seat: 2,
         token: "l".repeat(43),
       }),
-    ).rejects.toThrow("A display name and color are required to claim a lobby seat")
+    ).rejects.toThrow("A display name is required to claim a lobby seat")
     // A lobby claim auto-assigns the lowest free seat; `seat` is an imported-game
     // concept and must not let a joiner pick their seat in a normal lobby.
     await expect(
@@ -604,5 +604,43 @@ describe("imported game invite renewal and discovery", () => {
       deviceId: hostDevice,
     })
     expect(projection.players[1].currentLife).toBe(22)
+  })
+})
+
+describe("published player appearances", () => {
+  it("resolves duplicate colors and shapes while preserving seats, life, and retries", async () => {
+    const t = convexTest(schema, modules)
+    const args = snapshotArgs({
+      players: baseSnapshot.players.map((player) => ({
+        ...player,
+        color: "#7c3aed",
+        shape: "circle",
+      })),
+    })
+    const host = await signedIn(t, "publish-appearances-host", "Host")
+    const created = await host.mutation(api.games.publishLocalGame, args)
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    expect(projection.players[0]).toMatchObject({
+      seat: 1,
+      color: "#7C3AED",
+      shape: "circle",
+      currentLife: 33,
+    })
+    expect(projection.players[1]).toMatchObject({ seat: 2, currentLife: 17 })
+    expect(projection.players[1].color).not.toBe(projection.players[0].color)
+    expect(projection.players[1].shape).not.toBe(projection.players[0].shape)
+    await expect(host.mutation(api.games.publishLocalGame, args)).resolves.toEqual(created)
+  })
+
+  it("maps new local marks to distinct marks supported by installed clients", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await published(t, {
+      players: baseSnapshot.players.map((player, index) => ({
+        ...player,
+        shape: index ? "plus" : "heart",
+      })),
+    })
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    expect(projection.players.map(({ shape }) => shape)).toEqual(["circle", "triangle"])
   })
 })
