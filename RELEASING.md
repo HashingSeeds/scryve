@@ -51,12 +51,14 @@ Existing clients keep their current API contracts and cached offline access.
    packages and make it the default offering. Store product identifiers
    must match the stores; the package identifiers above are RevenueCat identifiers.
    Configure its paywall and Customer Center for the app's existing billing UI.
-   For web, include the `foil_yearly` package with a US$500 auto-renewing yearly
-   subscription attached to the same `Count Pro` entitlement. Present it as an
-   optional Foil Supporter subscription with the same Pro features. The account
+   Keep `default` and its published paywall limited to monthly and regular yearly.
+   In a separate non-default `foil_supporter` offering, include only the
+   `foil_yearly` package with a US$500 auto-renewing yearly web subscription
+   attached to the same `Count Pro` entitlement. Its unlisted web entry is
+   `/play/foil-supporter/`, with no links in ordinary app navigation. The account
    screen labels active `foil_yearly` access as Scryve Foil on web and mobile.
-   Keep this product mapped only to the web billing app, so mobile offers remain
-   monthly and yearly.
+   Keep this product mapped only to the web billing app. Never add a Foil product
+   to Apple, Google Play, or the Test Store, or target this offering as the default.
    Set `EXPO_PUBLIC_REVENUECAT_WEB_API_KEY` in the web build environment to the
    RevenueCat Billing public key. Use its `rcb_sb_` sandbox key for isolated web
    purchase testing; the shared Test Store key does not load web billing products.

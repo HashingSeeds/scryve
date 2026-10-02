@@ -2,6 +2,8 @@ import type { PlatformOSType } from "react-native"
 import { Platform } from "react-native"
 
 export const COUNT_PRO_ENTITLEMENT_ID = "Count Pro"
+export const FOIL_SUPPORTER_OFFERING_ID = "foil_supporter"
+export const FOIL_PRODUCT_ID = "foil_yearly"
 
 export const COUNT_PRODUCT_IDS = {
   yearly: "yearly",

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { Platform } from "react-native"
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 import Purchases from "react-native-purchases"
 
@@ -90,6 +91,8 @@ describe("RevenueCatProvider", () => {
     purchasesMock.restorePurchases.mockResolvedValue(customerInfo)
   })
 
+  afterEach(() => jest.restoreAllMocks())
+
   it("identifies the Clerk user and derives Scryve Pro from CustomerInfo", async () => {
     const { result } = renderHook(() => useRevenueCat(), { wrapper })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
@@ -106,6 +109,59 @@ describe("RevenueCatProvider", () => {
       expect(await result.current.purchase("monthly")).toMatchObject({ status: "purchased" })
     })
     expect(Purchases.purchasePackage).toHaveBeenCalledWith(monthlyPackage)
+  })
+
+  it("purchases web Foil only from its separate offering", async () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    const foilPackage = { identifier: "foil_yearly" } as never
+    purchasesMock.getCustomerInfo.mockResolvedValue(expiredCustomerInfo)
+    purchasesMock.getOfferings.mockResolvedValue({
+      current: offering,
+      all: { foil_supporter: { availablePackages: [foilPackage] } },
+    } as never)
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      expect(await result.current.purchase("foil_yearly")).toMatchObject({ status: "purchased" })
+    })
+
+    expect(Purchases.purchasePackage).toHaveBeenCalledWith(foilPackage)
+    expect(result.current.isCountPro).toBe(true)
+    expect(result.current.currentOffering).toBe(offering)
+  })
+
+  it.each(["ios", "android"] as const)("blocks Foil purchases on %s", async (platform) => {
+    jest.replaceProperty(Platform, "OS", platform)
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    await act(async () => {
+      expect(await result.current.purchase("foil_yearly")).toEqual({
+        status: "failed",
+        message: "Foil purchases are only available on the web.",
+      })
+    })
+
+    expect(Purchases.purchasePackage).not.toHaveBeenCalled()
+    expect(Purchases.getOfferings).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not buy another subscription for an existing Pro subscriber", async () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    purchasesMock.getCustomerInfo.mockResolvedValueOnce(expiredCustomerInfo)
+    const { result } = renderHook(() => useRevenueCat(), { wrapper })
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.isCountPro).toBe(false)
+
+    await act(async () => {
+      expect(await result.current.purchase("foil_yearly")).toEqual({
+        status: "failed",
+        message: "Manage your existing subscription before switching to Foil.",
+      })
+    })
+
+    expect(Purchases.purchasePackage).not.toHaveBeenCalled()
   })
 
   it("keeps a newer listener update when stale customer info resolves later", async () => {

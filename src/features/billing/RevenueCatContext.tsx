@@ -17,7 +17,13 @@ import Purchases, {
   type PurchasesPackage,
 } from "react-native-purchases"
 
-import { COUNT_PACKAGE_IDS, COUNT_PRO_ENTITLEMENT_ID, type CountProductId } from "./config"
+import {
+  COUNT_PACKAGE_IDS,
+  COUNT_PRO_ENTITLEMENT_ID,
+  FOIL_PRODUCT_ID,
+  FOIL_SUPPORTER_OFFERING_ID,
+  type CountProductId,
+} from "./config"
 import {
   presentCountCustomerCenter,
   presentCountProPaywall,
@@ -38,7 +44,7 @@ interface RevenueCatAccess {
   currentOffering: PurchasesOffering | null
   error?: string
   refreshCustomerInfo: (force?: boolean) => Promise<CustomerInfo | null>
-  purchase: (productId: CountProductId) => Promise<PurchaseResult>
+  purchase: (productId: CountProductId | typeof FOIL_PRODUCT_ID) => Promise<PurchaseResult>
   restorePurchases: () => Promise<PurchaseResult>
   presentPaywall: () => Promise<CountPaywallResult>
   presentCustomerCenter: () => Promise<void>
@@ -200,15 +206,23 @@ export function RevenueCatProvider({
   }, [acceptCustomerInfo, apiKey, appUserID])
 
   const purchase = useCallback(
-    async (productId: CountProductId): Promise<PurchaseResult> => {
-      const selectedPackage: PurchasesPackage | null = packageForProduct(currentOffering, productId)
-      if (!selectedPackage) {
-        const message = `${productId} is missing from the current RevenueCat offering.`
-        setError(message)
-        return { status: "failed", message }
-      }
+    async (productId: CountProductId | typeof FOIL_PRODUCT_ID): Promise<PurchaseResult> => {
       try {
         setError(undefined)
+        if (productId === FOIL_PRODUCT_ID) {
+          if (Platform.OS !== "web")
+            throw new Error("Foil purchases are only available on the web.")
+          if (hasCountPro(await Purchases.getCustomerInfo()))
+            throw new Error("Manage your existing subscription before switching to Foil.")
+        }
+        const selectedPackage: PurchasesPackage | null | undefined =
+          productId === FOIL_PRODUCT_ID
+            ? (await Purchases.getOfferings()).all[
+                FOIL_SUPPORTER_OFFERING_ID
+              ]?.availablePackages.find((candidate) => candidate.identifier === FOIL_PRODUCT_ID)
+            : packageForProduct(currentOffering, productId)
+        if (!selectedPackage)
+          throw new Error(`${productId} is not available from the current store.`)
         const result = await Purchases.purchasePackage(selectedPackage)
         acceptCustomerInfo(result.customerInfo)
         return { status: "purchased", customerInfo: result.customerInfo }
