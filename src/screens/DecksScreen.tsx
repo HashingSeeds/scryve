@@ -235,8 +235,8 @@ function DeckShelf({
   const { themed } = useAppTheme()
   const syncEnabled = useMemo(() => isDeckSyncEnabled(), [])
   const onlineMine = useQuery(api.decks.listMine, access && !access.ready ? "skip" : {})
-  const synced = useDeckSync(syncEnabled, access?.ownerId, onlineMine)
-  const writes = useDeckMetadataWrites(syncEnabled, access?.ownerId)
+  const synced = useDeckSync(syncEnabled, access?.ownerId, access?.ready ?? false, onlineMine)
+  const writes = useDeckMetadataWrites(syncEnabled, access?.ownerId, access?.ready ?? false)
   const failedDeckIds = useMemo(
     () => new Set(writes.failures.map((failure) => String(failure.action.deckId))),
     [writes.failures],
