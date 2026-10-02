@@ -152,6 +152,19 @@ describe("connected cold-offline and authentication gate", () => {
     expect(screen.queryByText("Connecting… Local play remains available.")).toBeNull()
   })
 
+  it("does not skip the gate after signing out and back in as the same user", async () => {
+    const child = <Button testID="signed-out-board" text="Board" />
+    const view = render(gate(child))
+    await waitFor(() => expect(screen.getByTestId("signed-out-board")).toBeTruthy())
+    mockClerkSignedIn = false
+    view.rerender(gate(child))
+    expect(screen.queryByTestId("signed-out-board")).toBeNull()
+    mockClerkSignedIn = true
+    mockConvexLoading = true
+    view.rerender(gate(child))
+    expect(screen.queryByTestId("signed-out-board")).toBeNull()
+  })
+
   it("still replaces an established board when the server rejects the session", async () => {
     const child = <Button testID="rejected-board" text="Board" />
     const view = render(gate(child))

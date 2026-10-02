@@ -1,4 +1,11 @@
-import { ReactNode, useEffect, useRef, useState } from "react"
+import {
+  type MutableRefObject,
+  ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import type { ViewStyle } from "react-native"
 import { ActivityIndicator, Animated } from "react-native"
 import { useUser } from "@clerk/expo"
@@ -29,6 +36,24 @@ function useRevealAfterDelay(delayMs: number) {
     return () => clearTimeout(timer)
   }, [delayMs])
   return revealed
+}
+
+function ConnectedContentShownTo({
+  userId,
+  shownToRef,
+  children,
+}: {
+  userId: string | undefined
+  shownToRef: MutableRefObject<string | undefined>
+  children: ReactNode
+}) {
+  useLayoutEffect(() => {
+    shownToRef.current = userId
+    return () => {
+      if (shownToRef.current === userId) shownToRef.current = undefined
+    }
+  }, [shownToRef, userId])
+  return children
 }
 
 function GateScreen({ busy = false, children }: { busy?: boolean; children: ReactNode }) {
@@ -100,10 +125,11 @@ export function BackendGate({
       : null
   const hasOwnerScopedCache = Boolean(offlineGameId && cachedProjection?.publicId === offlineGameId)
   const userShownConnectedContent = useRef<string | undefined>(undefined)
-  const showChildren = (userId: string | undefined) => {
-    userShownConnectedContent.current = userId
-    return children
-  }
+  const showChildren = (userId: string | undefined) => (
+    <ConnectedContentShownTo userId={userId} shownToRef={userShownConnectedContent}>
+      {children}
+    </ConnectedContentShownTo>
+  )
   const profileIsReconnecting =
     connectedProfile.status === "offline" || connectedProfile.status === "loading"
   const activeUserId = user?.id ?? offlineProfile?.userId
@@ -113,7 +139,7 @@ export function BackendGate({
     activeUserId !== undefined &&
     userShownConnectedContent.current === activeUserId
 
-  if (keepShowingConnectedContent) return children
+  if (keepShowingConnectedContent) return showChildren(activeUserId)
   if (clerkSignedIn && connectedProfile.status === "offline" && hasOwnerScopedCache)
     return showChildren(offlineProfile?.userId)
   if (!clerkLoaded)
