@@ -7,20 +7,16 @@ function isSafeInternalPath(path: string): boolean {
   return /^\/(?:[A-Za-z0-9_-]+\/?)+$/.test(path)
 }
 
-const DEV_SEED_ROUTE = /^\/dev\/seed\/[a-z]+$/
-
 /**
- * why: seed links carry their state in the query, which the warm route grammar
- * rejects, and arrive as `scryve-dev://dev/seed/...` where the host is the first segment.
+ * why: seed links carry their state in the query, which the warm route grammar rejects.
+ * Matching the raw link, not a normalized URL, keeps `//`, `..`, and other schemes out.
  */
+const DEV_SEED_LINK =
+  /^(?:(?:scryve|count)(?:-dev|-preview)?:\/\/\/?|\/)dev\/seed\/([a-z]+)(\?[^#\s\u0000-\u001F\u007F]*)?$/
+
 function devSeedPath(path: string): string | null {
-  try {
-    const url = new URL(path, "scryve-dev:///")
-    const route = url.host ? `/${url.host}${url.pathname}` : url.pathname
-    return DEV_SEED_ROUTE.test(route) ? `${route}${url.search}` : null
-  } catch {
-    return null
-  }
+  const match = DEV_SEED_LINK.exec(path)
+  return match ? `/dev/seed/${match[1]}${match[2] ?? ""}` : null
 }
 
 export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {

@@ -19,7 +19,12 @@ export default function DevSeedRoute() {
     const [seedKind, seedParams] = JSON.parse(request) as [string, typeof params]
     let current = true
     runSeed(seedKind, seedParams).then(
-      (href) => current && router.replace(href),
+      (href) => {
+        if (!current) return
+        // why: a warm link lands on Play, whose stale board would save over the seed after Back.
+        if (router.canDismiss()) router.dismissAll()
+        router.replace(href)
+      },
       (failure: unknown) =>
         current && setError(failure instanceof Error ? failure.message : String(failure)),
     )

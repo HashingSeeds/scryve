@@ -2,6 +2,7 @@ import type { Href } from "expo-router"
 
 import {
   applyGameCommand,
+  commanderDamageBetween,
   createLocalGame,
   defaultCommandContext,
   MAX_COMMANDER_DAMAGE,
@@ -115,19 +116,17 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
     const delta = integer("cmd damage", amount)
     if (delta < 1 || delta > MAX_COMMANDER_DAMAGE)
       throw new SeedError(`cmd damage must be 1-${MAX_COMMANDER_DAMAGE}, got "${entry}".`)
-    const next = applyGameCommand(
+    const fromPlayerId = seat(from).id
+    const toPlayerId = seat(to).id
+    const before = commanderDamageBetween(game, fromPlayerId, toPlayerId)
+    game = applyGameCommand(
       game,
-      {
-        type: "commanderDamage.assign",
-        fromPlayerId: seat(from).id,
-        toPlayerId: seat(to).id,
-        delta,
-      },
+      { type: "commanderDamage.assign", fromPlayerId, toPlayerId, delta },
       context,
     )
-    // why: the reducer drops self damage and totals over the cap without saying so.
-    if (next === game) throw new SeedError(`cmd "${entry}" was rejected by the game rules.`)
-    game = next
+    // why: the domain silently drops self damage and clamps totals at the cap.
+    if (commanderDamageBetween(game, fromPlayerId, toPlayerId) !== before + delta)
+      throw new SeedError(`cmd "${entry}" was rejected by the game rules.`)
   }
 
   // why: life is the final value per seat, so commander damage above is already counted.

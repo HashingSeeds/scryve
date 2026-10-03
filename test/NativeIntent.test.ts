@@ -59,9 +59,17 @@ describe("connected invite native intent", () => {
     )
   })
 
-  it.each(["scryve-dev://dev/settings?x=1", "scryve-dev://dev/seed/game/extra?x=1"])(
-    "drops non-seed dev link %s",
-    (path) => expect(redirectSystemPath({ path, initial: true })).toBe("/"),
+  it.each([
+    "scryve-dev://dev/settings?x=1",
+    "scryve-dev://dev/seed/game/extra?x=1",
+    "//dev/seed/game?players=6",
+    "/settings/../dev/seed/game?players=6",
+    "https://evil.example/dev/seed/game?players=6",
+    "evil://dev/seed/game?players=6",
+    "/dev/seed/game?players=6#x",
+    "/dev/seed/game?players=6\tx",
+  ])("drops non-seed dev link %s", (path) =>
+    expect(redirectSystemPath({ path, initial: true })).toBe("/"),
   )
 
   it("drops seed links outside development builds", () => {
