@@ -46,6 +46,9 @@ describe("shipping Maestro selectors", () => {
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("end-game-button"))
     rememberMountedIds()
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    rememberMountedIds()
     view.unmount()
 
     const setup = render(

@@ -1,5 +1,5 @@
 # flow: Complete local-game smoke test
-# intent: Start, play, undo, finish, and inspect a local game without an account.
+# intent: Start, play, undo, finish, land on the rematch, and inspect the finished game without an account.
 
 appId: ${MAESTRO_APP_ID}
 tags: [smoke, local]
@@ -29,5 +29,10 @@ onFlowStart:
     id: "end-game-winner-0"
 - tapOn:
     id: "confirm-end-game-button"
+- assertVisible:
+    id: "game-saved-toast"
+- assertVisible: "Seat 1, Player 1, 20 life"
+- tapOn:
+    id: "game-saved-summary-button"
 - assertVisible: "Finished"
 - assertVisible: "Result"
