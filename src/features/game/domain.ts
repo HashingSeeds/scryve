@@ -154,6 +154,18 @@ export function createLocalGame(input: {
   }
 }
 
+export function createRematch(game: LocalGame, now?: number): LocalGame {
+  return createLocalGame({
+    players: game.players.map(({ name, color, shape }) => ({ name, color, shape })),
+    startingLife: game.startingLife,
+    system: game.system,
+    format: game.format,
+    layout: game.layout,
+    lifeStep: game.lifeStep,
+    now,
+  })
+}
+
 export const commanderDamageKey = (fromPlayerId: PlayerId, toPlayerId: PlayerId): string =>
   `${fromPlayerId}>${toPlayerId}`
 
