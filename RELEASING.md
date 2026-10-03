@@ -47,10 +47,21 @@ updates all Pro features together, including the legacy `unlimited_decks` flag.
 Existing clients keep their current API contracts and cached offline access.
 
 1. In RevenueCat, attach every Pro store product to the exact entitlement identifier
-   `Count Pro`. Configure the `default` offering with `$rc_monthly`, `$rc_annual`, and
-   `$rc_lifetime` packages and make it the default offering. Store product identifiers
+   `Count Pro`. Configure the `default` offering with `$rc_monthly` and `$rc_annual`
+   packages and make it the default offering. Store product identifiers
    must match the stores; the package identifiers above are RevenueCat identifiers.
    Configure its paywall and Customer Center for the app's existing billing UI.
+   Keep `default` and its published paywall limited to monthly and regular yearly.
+   In a separate non-default `foil_supporter` offering, include only the
+   `foil_yearly` package with a US$500 auto-renewing yearly web subscription
+   attached to the same `Count Pro` entitlement. Its unlisted web entry is
+   `/play/foil-supporter/`, with no links in ordinary app navigation. The account
+   screen labels active `foil_yearly` access as Scryve Foil on web and mobile.
+   Keep this product mapped only to the web billing app. Never add a Foil product
+   to Apple, Google Play, or the Test Store, or target this offering as the default.
+   Set `EXPO_PUBLIC_REVENUECAT_WEB_API_KEY` in the web build environment to the
+   RevenueCat Billing public key. Use its `rcb_sb_` sandbox key for isolated web
+   purchase testing; the shared Test Store key does not load web billing products.
 2. In each Convex deployment's Settings → Environment Variables, set
    `REVENUECAT_SECRET_API_KEY` to a RevenueCat key that can read v1 subscriber info
    (the Test Store SDK key works for QA; a v1 secret API key also works),

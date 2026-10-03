@@ -2,9 +2,10 @@ import type { PlatformOSType } from "react-native"
 import { Platform } from "react-native"
 
 export const COUNT_PRO_ENTITLEMENT_ID = "Count Pro"
+export const FOIL_SUPPORTER_OFFERING_ID = "foil_supporter"
+export const FOIL_PRODUCT_ID = "foil_yearly"
 
 export const COUNT_PRODUCT_IDS = {
-  lifetime: "lifetime",
   yearly: "yearly",
   monthly: "monthly",
 } as const
@@ -12,7 +13,6 @@ export const COUNT_PRODUCT_IDS = {
 export type CountProductId = (typeof COUNT_PRODUCT_IDS)[keyof typeof COUNT_PRODUCT_IDS]
 
 export const COUNT_PACKAGE_IDS: Record<CountProductId, string> = {
-  lifetime: "$rc_lifetime",
   yearly: "$rc_annual",
   monthly: "$rc_monthly",
 }
@@ -26,7 +26,7 @@ export type RevenueCatConfigResult =
 
 function validPublicApiKey(value: string | undefined): value is string {
   if (!value || value.includes("replace_me")) return false
-  return /^(test|appl|goog|rcb)_[A-Za-z0-9]+$/.test(value)
+  return /^(test|appl|goog|rcb(?:_sb)?)_[A-Za-z0-9]+$/.test(value)
 }
 
 export function validateRevenueCatConfig(

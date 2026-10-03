@@ -36,18 +36,7 @@ function matchesEnvironment(
 ) {
   const subscriptions = asRecord(subscriber.subscriptions)
   const subscription = subscriptions ? asRecord(subscriptions[productIdentifier]) : null
-  if (subscription && typeof subscription.is_sandbox === "boolean")
-    return subscription.is_sandbox === (environment === "SANDBOX")
-
-  const nonSubscriptions = asRecord(subscriber.non_subscriptions)
-  const purchases = nonSubscriptions?.[productIdentifier]
-  return (
-    Array.isArray(purchases) &&
-    purchases.some((purchase) => {
-      const record = asRecord(purchase)
-      return record?.is_sandbox === (environment === "SANDBOX")
-    })
-  )
+  return subscription?.is_sandbox === (environment === "SANDBOX")
 }
 
 export function readRevenueCatSnapshot(

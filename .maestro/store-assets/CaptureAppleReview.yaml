@@ -21,6 +21,5 @@ onFlowStart:
     visible: "Monthly"
     timeout: 15000
 - assertVisible: "Yearly"
-- assertVisible: "Lifetime"
 - waitForAnimationToEnd
 - takeScreenshot: screenshots/apple-review/count-pro-paywall

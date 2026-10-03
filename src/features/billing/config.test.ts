@@ -1,6 +1,15 @@
 import { validateRevenueCatConfig } from "./config"
 
 describe("RevenueCat public configuration", () => {
+  it.each(["rcb_webbilling", "rcb_sb_webbilling"])("accepts the web billing key %s", (apiKey) => {
+    expect(validateRevenueCatConfig({ EXPO_PUBLIC_REVENUECAT_WEB_API_KEY: apiKey }, "web")).toEqual(
+      {
+        configured: true,
+        value: { apiKey },
+      },
+    )
+  })
+
   it("accepts the shared Test Store key", () => {
     expect(
       validateRevenueCatConfig(

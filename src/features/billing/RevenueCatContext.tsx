@@ -17,7 +17,13 @@ import Purchases, {
   type PurchasesPackage,
 } from "react-native-purchases"
 
-import { COUNT_PACKAGE_IDS, COUNT_PRO_ENTITLEMENT_ID, type CountProductId } from "./config"
+import {
+  COUNT_PACKAGE_IDS,
+  COUNT_PRO_ENTITLEMENT_ID,
+  FOIL_PRODUCT_ID,
+  FOIL_SUPPORTER_OFFERING_ID,
+  type CountProductId,
+} from "./config"
 import {
   presentCountCustomerCenter,
   presentCountProPaywall,
@@ -31,6 +37,7 @@ export type PurchaseResult =
 
 interface RevenueCatAccess {
   configured: boolean
+  isReady: boolean
   configurationMessage?: string
   isLoading: boolean
   isCountPro: boolean
@@ -38,7 +45,7 @@ interface RevenueCatAccess {
   currentOffering: PurchasesOffering | null
   error?: string
   refreshCustomerInfo: (force?: boolean) => Promise<CustomerInfo | null>
-  purchase: (productId: CountProductId) => Promise<PurchaseResult>
+  purchase: (productId: CountProductId | typeof FOIL_PRODUCT_ID) => Promise<PurchaseResult>
   restorePurchases: () => Promise<PurchaseResult>
   presentPaywall: () => Promise<CountPaywallResult>
   presentCustomerCenter: () => Promise<void>
@@ -47,6 +54,7 @@ interface RevenueCatAccess {
 const unavailable = async () => null
 const RevenueCatContext = createContext<RevenueCatAccess>({
   configured: false,
+  isReady: false,
   isLoading: false,
   isCountPro: false,
   customerInfo: null,
@@ -136,7 +144,9 @@ export function RevenueCatProvider({
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null)
   const [isLoading, setIsLoading] = useState(Boolean(apiKey && appUserID))
   const [error, setError] = useState<string>()
+  const [configuredUserId, setConfiguredUserId] = useState<string>()
   const configured = Boolean(apiKey)
+  const isReady = Boolean(apiKey && appUserID && configuredUserId === appUserID)
   const acceptCustomerInfo = useCallback((next: CustomerInfo) => {
     setCustomerInfo((current) => mostRecentlyFetchedCustomerInfo(current, next))
   }, [])
@@ -159,6 +169,7 @@ export function RevenueCatProvider({
   )
 
   useEffect(() => {
+    setConfiguredUserId(undefined)
     if (!apiKey || !appUserID) {
       setCustomerInfo(null)
       setCurrentOffering(null)
@@ -177,6 +188,7 @@ export function RevenueCatProvider({
     void configureForUser(apiKey, appUserID)
       .then(async () => {
         if (cancelled) return
+        setConfiguredUserId(appUserID)
         Purchases.addCustomerInfoUpdateListener(listener)
         const [, offerings] = await Promise.all([
           Purchases.getCustomerInfo().then((next) => {
@@ -200,15 +212,27 @@ export function RevenueCatProvider({
   }, [acceptCustomerInfo, apiKey, appUserID])
 
   const purchase = useCallback(
-    async (productId: CountProductId): Promise<PurchaseResult> => {
-      const selectedPackage: PurchasesPackage | null = packageForProduct(currentOffering, productId)
-      if (!selectedPackage) {
-        const message = `${productId} is missing from the current RevenueCat offering.`
-        setError(message)
-        return { status: "failed", message }
-      }
+    async (productId: CountProductId | typeof FOIL_PRODUCT_ID): Promise<PurchaseResult> => {
       try {
         setError(undefined)
+        if (!isReady)
+          throw new Error("Wait for billing to connect to your account, then try again.")
+        if (productId === FOIL_PRODUCT_ID) {
+          if (Platform.OS !== "web")
+            throw new Error("Foil purchases are only available on the web.")
+          if (hasCountPro(await Purchases.getCustomerInfo()))
+            throw new Error("Manage your existing subscription before switching to Foil.")
+        }
+        const selectedPackage: PurchasesPackage | null | undefined =
+          productId === FOIL_PRODUCT_ID
+            ? (await Purchases.getOfferings()).all[
+                FOIL_SUPPORTER_OFFERING_ID
+              ]?.availablePackages.find((candidate) => candidate.identifier === FOIL_PRODUCT_ID)
+            : packageForProduct(currentOffering, productId)
+        if (!selectedPackage)
+          throw new Error(`${productId} is not available from the current store.`)
+        if ((await Purchases.getAppUserID()) !== appUserID)
+          throw new Error("Wait for billing to connect to your account, then try again.")
         const result = await Purchases.purchasePackage(selectedPackage)
         acceptCustomerInfo(result.customerInfo)
         return { status: "purchased", customerInfo: result.customerInfo }
@@ -221,7 +245,7 @@ export function RevenueCatProvider({
         return { status: "failed", message }
       }
     },
-    [acceptCustomerInfo, currentOffering],
+    [acceptCustomerInfo, appUserID, currentOffering, isReady],
   )
 
   const restorePurchases = useCallback(async (): Promise<PurchaseResult> => {
@@ -240,6 +264,8 @@ export function RevenueCatProvider({
   const presentPaywall = useCallback(async () => {
     try {
       setError(undefined)
+      if (!isReady || (await Purchases.getAppUserID()) !== appUserID)
+        throw new Error("Wait for billing to connect to your account, then try again.")
       const result = await presentCountProPaywall(currentOffering)
       if (result === "error") setError("The Scryve Pro paywall could not complete the request.")
       if (result === "purchased" || result === "restored") await refreshCustomerInfo()
@@ -248,7 +274,7 @@ export function RevenueCatProvider({
       setError(revenueCatErrorMessage(cause))
       return "error" as const
     }
-  }, [currentOffering, refreshCustomerInfo])
+  }, [appUserID, currentOffering, isReady, refreshCustomerInfo])
 
   const presentCustomerCenter = useCallback(async () => {
     try {
@@ -263,6 +289,7 @@ export function RevenueCatProvider({
   const value = useMemo<RevenueCatAccess>(
     () => ({
       configured,
+      isReady,
       configurationMessage,
       isLoading,
       isCountPro: hasCountPro(customerInfo),
@@ -282,6 +309,7 @@ export function RevenueCatProvider({
       currentOffering,
       error,
       isLoading,
+      isReady,
       presentCustomerCenter,
       presentPaywall,
       purchase,
