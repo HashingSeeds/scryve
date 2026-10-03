@@ -83,6 +83,7 @@ export type MockConnectedRuntime = {
     startingLife: number
     ruleset: string
     isHost: boolean
+    rematchPublicId?: string
     eventSequence: number
     serverUpdatedAt: number
     recentOperationIds: string[]
