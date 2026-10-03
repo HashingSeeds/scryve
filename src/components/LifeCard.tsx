@@ -21,6 +21,7 @@ import type { LifeDelta } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
+import { useElapsedSince } from "@/utils/useElapsedSince"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
@@ -101,11 +102,26 @@ export interface LifeCardProps {
   lifeStep?: number
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
-  pendingCount?: number
+  staleSince?: number
   commanderDamage?: LifeCardCommanderDamage
   eliminated?: boolean
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
+}
+
+function UpdatedAgo({ since, color }: { since: number; color: string }) {
+  const { themed } = useAppTheme()
+  const elapsed = useElapsedSince(since)
+  return (
+    <Text
+      text={`Updated ${elapsed} ago`}
+      weight="bold"
+      size="xxs"
+      maxFontSizeMultiplier={1.3}
+      numberOfLines={1}
+      style={[themed($status), { color }]}
+    />
+  )
 }
 
 export function LifeCard({
@@ -125,7 +141,7 @@ export function LifeCard({
   lifeStep,
   disabled,
   ownership,
-  pendingCount = 0,
+  staleSince,
   commanderDamage,
   eliminated,
   onChange,
@@ -299,7 +315,6 @@ export function LifeCard({
         : ownership === "disabled"
           ? "Controls unavailable"
           : undefined
-  const statusLabel = pendingCount ? `${pendingCount} pending` : ""
   const pendingClaim = commanderDamage?.pendingClaims?.[0]
   const armedCommanderId = commanderDamage?.armedPlayerId
   const commanderCardMode: CommanderDamageCardMode | undefined = pendingClaim
@@ -349,7 +364,7 @@ export function LifeCard({
     statusEdgeInset -
     cardPadding -
     21 -
-    (statusLabel ? spacing.xxxs + 18 : 0)
+    (staleSince !== undefined ? spacing.xxxs + 18 : 0)
   const nameInCorner = !!commanderDamage?.inspection
   const showStatus =
     !nameInCorner && (statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0)
@@ -405,6 +420,7 @@ export function LifeCard({
         themed($card),
         compact && themed($compactCard),
         ownership === "disabled" && themed($disabledCard),
+        staleSince !== undefined && themed($staleCard),
         { backgroundColor: color },
         style,
       ]}
@@ -503,15 +519,8 @@ export function LifeCard({
                   numberOfLines={1}
                   style={[themed($name), { color: foreground }]}
                 />
-                {statusLabel ? (
-                  <Text
-                    text={statusLabel}
-                    weight="bold"
-                    size="xxs"
-                    maxFontSizeMultiplier={1.3}
-                    numberOfLines={1}
-                    style={[themed($status), { color: foreground }]}
-                  />
+                {staleSince !== undefined ? (
+                  <UpdatedAgo since={staleSince} color={foreground} />
                 ) : null}
               </View>
             ) : null}
@@ -678,7 +687,7 @@ export function LifeCard({
             testID={`commander-mark-seat-${seatNumber}`}
             accessibilityRole="button"
             accessibilityLabel={`Assign commander damage from ${identity}${
-              statusLabel ? `, ${statusLabel}` : ""
+              staleSince !== undefined ? ", out of date" : ""
             }`}
             accessibilityState={{ disabled: !!disabled }}
             disabled={disabled}
@@ -708,15 +717,8 @@ export function LifeCard({
                 numberOfLines={1}
                 style={{ color: foreground }}
               />
-              {statusLabel ? (
-                <Text
-                  text={statusLabel}
-                  weight="bold"
-                  size="xxs"
-                  maxFontSizeMultiplier={1.3}
-                  numberOfLines={1}
-                  style={[themed($status), { color: foreground }]}
-                />
+              {staleSince !== undefined ? (
+                <UpdatedAgo since={staleSince} color={foreground} />
               ) : null}
             </View>
           </Pressable>
@@ -939,6 +941,7 @@ const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
 })
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
+const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
 
 const $overviewReadout: ViewStyle = { zIndex: 8 }

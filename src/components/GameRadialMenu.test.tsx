@@ -17,7 +17,11 @@ describe("GameRadialMenu", () => {
     { kind: "end-game", label: "End game", onPress: callbacks[4] },
   ]
 
-  function menu(open: boolean, onClose = jest.fn()) {
+  function menu(
+    open: boolean,
+    onClose = jest.fn(),
+    extra: Partial<Parameters<typeof GameRadialMenu>[0]> = {},
+  ) {
     return (
       <ThemeProvider initialContext="light">
         <GameRadialMenu
@@ -26,6 +30,7 @@ describe("GameRadialMenu", () => {
           actions={actions}
           onToggle={jest.fn()}
           onClose={onClose}
+          {...extra}
         />
       </ThemeProvider>
     )
@@ -146,6 +151,53 @@ describe("GameRadialMenu", () => {
 
     expect(onExit).toHaveBeenCalledTimes(1)
     expect(onToggle).not.toHaveBeenCalled()
+  })
+
+  it("colors the whole pentagon border and badges it only while a sync signal is set", () => {
+    const signal = {
+      tone: "offline",
+      badge: "3",
+      accessibilityText: "Offline, 3 changes saved on this device",
+    } as const
+    const border = (view: ReturnType<typeof render>) =>
+      view.UNSAFE_getAllByType(Polygon).find((polygon) => polygon.props.strokeWidth === 7)
+    const view = render(menu(false, jest.fn(), { signal }))
+
+    expect(border(view)!.props.stroke).toBe(lightTheme.colors.gameMenu.signal.offline)
+    expect(view.getByTestId("game-menu-signal-badge")).toHaveTextContent("3")
+    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
+      "Game options. Offline, 3 changes saved on this device",
+    )
+
+    view.rerender(menu(false))
+    expect(border(view)!.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
+    expect(view.queryByTestId("game-menu-signal-badge")).toBeNull()
+  })
+
+  it("offers the sync status line only while open and keeps a blocked action pressable", () => {
+    const onStatus = jest.fn()
+    const onEnd = jest.fn()
+    const blockedActions: RadialMenuAction[] = actions.map((action) =>
+      action.kind === "end-game"
+        ? { ...action, detail: "needs connection", blocked: true, onPress: onEnd }
+        : action,
+    )
+    const statusLine = {
+      text: "Offline · 3 changes saved",
+      tone: "offline",
+      onPress: onStatus,
+    } as const
+    const view = render(menu(false, jest.fn(), { statusLine, actions: blockedActions }))
+    expect(view.queryByTestId("game-menu-status-line")).toBeNull()
+
+    view.rerender(menu(true, jest.fn(), { statusLine, actions: blockedActions }))
+    fireEvent.press(view.getByTestId("game-menu-status-line"))
+    expect(onStatus).toHaveBeenCalledTimes(1)
+
+    const end = view.getByTestId("end-game-button")
+    expect(end.props.accessibilityLabel).toBe("End game, needs connection")
+    fireEvent.press(end)
+    expect(onEnd).toHaveBeenCalledTimes(1)
   })
 
   it("runs radial actions and closes from the dimmed board", () => {

@@ -63,6 +63,13 @@ export const colors = {
     text: palette.neutral900,
   },
   gameMenu: {
+    signal: {
+      slow: "#E8C1B4",
+      offline: "#FFBB50",
+      catchingUp: "#FFFFFF",
+      caughtUp: "#55C894",
+      attention: "#E5482A",
+    },
     backdrop: "rgba(0, 0, 0, 0.64)",
     anchor: palette.neutral300,
     anchorBorder: palette.neutral100,

@@ -1,4 +1,4 @@
-import { memo, useEffect } from "react"
+import { memo, useEffect, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
@@ -29,8 +29,24 @@ import { Text } from "./Text"
 export interface RadialMenuAction {
   kind: GameMenuActionKind
   label: string
+  detail?: string
   disabled?: boolean
+  blocked?: boolean
   onPress: (event?: GestureResponderEvent) => void
+}
+
+export type GameMenuSignalTone = "slow" | "offline" | "catchingUp" | "caughtUp" | "attention"
+
+export interface GameMenuSignal {
+  tone: GameMenuSignalTone
+  badge?: string
+  accessibilityText?: string
+}
+
+export interface GameMenuStatusLine {
+  text: string
+  tone: GameMenuSignalTone
+  onPress: () => void
 }
 
 export interface GameRadialMenuProps {
@@ -43,6 +59,8 @@ export interface GameRadialMenuProps {
   variant?: MenuButtonStyle
   seatColors?: readonly string[]
   exitAction?: { label: string; onPress: () => void }
+  signal?: GameMenuSignal
+  statusLine?: GameMenuStatusLine
 }
 
 export interface RadialActionPose {
@@ -61,6 +79,12 @@ export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
 
 const ACTION_WIDTH = 116
 const ACTION_HEIGHT = 52
+
+const BORDER_CHASE_STEP_MS = 180
+const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
+const STATUS_LINE_DISTANCE = 128
+const STATUS_LINE_HEIGHT = 40
+const ANCHOR_LOW_ON_SCREEN = 0.6
 
 const ACTION_STAGGER_MS = 35
 const ACTION_START_DISTANCE = 40
@@ -141,6 +165,8 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   variant = DEFAULT_MENU_BUTTON_STYLE,
   seatColors,
   exitAction,
+  signal,
+  statusLine,
 }: GameRadialMenuProps) {
   const {
     themed,
@@ -212,9 +238,12 @@ export const GameRadialMenu = memo(function GameRadialMenu({
         <Pressable
           testID="game-menu-button"
           accessibilityRole="button"
-          accessibilityLabel={
-            exitAction ? exitAction.label : menuOpen ? "Close game options" : "Game options"
-          }
+          accessibilityLabel={[
+            exitAction ? exitAction.label : menuOpen ? "Close game options" : "Game options",
+            signal?.accessibilityText,
+          ]
+            .filter(Boolean)
+            .join(". ")}
           accessibilityHint={
             exitAction
               ? undefined
@@ -227,11 +256,12 @@ export const GameRadialMenu = memo(function GameRadialMenu({
           onPress={exitAction ? exitAction.onPress : onToggle}
         >
           <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
-            <GameMenuButtonShape
+            <SignalledMenuButtonShape
               variant={variant}
               isDark={isDark}
-              boardBackgroundColor={colors.gameMenu.anchorBorder}
               seatColors={seatColors}
+              tone={signal?.tone}
+              reducedMotion={reducedMotion}
             />
           </Animated.View>
           <MenuGlyph
@@ -241,10 +271,107 @@ export const GameRadialMenu = memo(function GameRadialMenu({
             reducedMotion={reducedMotion}
           />
         </Pressable>
+        {signal?.badge ? (
+          <View
+            testID="game-menu-signal-badge"
+            pointerEvents="none"
+            style={[themed($signalBadge), { backgroundColor: colors.gameMenu.signal[signal.tone] }]}
+          >
+            <Text
+              text={signal.badge}
+              weight="bold"
+              maxFontSizeMultiplier={1.2}
+              style={[
+                themed($signalBadgeText),
+                { color: accessibleForeground(colors.gameMenu.signal[signal.tone]) },
+              ]}
+            />
+          </View>
+        ) : null}
       </Animated.View>
+
+      {menuOpen && statusLine ? (
+        <View
+          pointerEvents="box-none"
+          style={[
+            themed($statusLineRow),
+            {
+              top: `${anchor.y * 100}%`,
+              marginTop:
+                anchor.y > ANCHOR_LOW_ON_SCREEN
+                  ? -STATUS_LINE_DISTANCE - STATUS_LINE_HEIGHT
+                  : STATUS_LINE_DISTANCE,
+            },
+          ]}
+        >
+          <Pressable
+            testID="game-menu-status-line"
+            accessibilityRole="button"
+            accessibilityLabel={statusLine.text}
+            accessibilityHint="Shows connection details"
+            style={({ pressed }) => [themed($statusLine), pressed && themed($pressedAction)]}
+            onPress={statusLine.onPress}
+          >
+            <View
+              style={[
+                themed($statusDot),
+                { backgroundColor: colors.gameMenu.signal[statusLine.tone] },
+              ]}
+            />
+            <Text text={statusLine.text} weight="medium" size="xs" style={themed($statusText)} />
+            <Text text="›" size="xs" style={themed($statusText)} />
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   )
 })
+
+function useChasingSide(active: boolean): number | undefined {
+  const [side, setSide] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    const timer = setInterval(() => setSide((current) => (current + 1) % 5), BORDER_CHASE_STEP_MS)
+    return () => clearInterval(timer)
+  }, [active])
+  return active ? side : undefined
+}
+
+function SignalledMenuButtonShape({
+  variant,
+  isDark,
+  seatColors,
+  tone,
+  reducedMotion,
+}: {
+  variant: MenuButtonStyle
+  isDark: boolean
+  seatColors?: readonly string[]
+  tone?: GameMenuSignalTone
+  reducedMotion: ReducedMotionPreference
+}) {
+  const {
+    theme: { colors },
+  } = useAppTheme()
+  const moving = tone !== undefined && MOVING_SIGNAL_TONES.includes(tone)
+  const animateMovement = moving && reducedMotion === false
+  const litSideIndex = useChasingSide(animateMovement)
+  const toneColor = tone ? colors.gameMenu.signal[tone] : undefined
+  return (
+    <GameMenuButtonShape
+      variant={variant}
+      isDark={isDark}
+      boardBackgroundColor={colors.gameMenu.anchorBorder}
+      borderColor={moving && animateMovement ? undefined : toneColor}
+      litSide={
+        toneColor && litSideIndex !== undefined
+          ? { index: litSideIndex, color: toneColor }
+          : undefined
+      }
+      seatColors={seatColors}
+    />
+  )
+}
 
 const GLYPH_MORPH_SPRING = { damping: 16, stiffness: 220, mass: 0.5 } as const
 
@@ -344,12 +471,12 @@ function RadialAction({
         testID={open ? `${action.kind}-button` : undefined}
         disabled={action.disabled}
         accessibilityRole="button"
-        accessibilityLabel={action.label}
+        accessibilityLabel={action.detail ? `${action.label}, ${action.detail}` : action.label}
         accessibilityState={{ disabled: !!action.disabled }}
         style={({ pressed }) => [
           themed($action),
           { backgroundColor: background },
-          action.disabled && themed($disabledAction),
+          (action.disabled || action.blocked) && themed($disabledAction),
           pressed && !action.disabled && themed($pressedAction),
         ]}
         onPress={action.onPress}
@@ -361,6 +488,15 @@ function RadialAction({
           maxFontSizeMultiplier={1.2}
           style={[themed($actionText), { color: foreground }]}
         />
+        {action.detail ? (
+          <Text
+            text={action.detail}
+            size="xxs"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.1}
+            style={[themed($actionDetail), { color: foreground }]}
+          />
+        ) : null}
       </Pressable>
     </Animated.View>
   )
@@ -433,5 +569,48 @@ const $actionText: ThemedStyle<TextStyle> = () => ({
   letterSpacing: 0.3,
   textAlign: "center",
 })
+const $actionDetail: ThemedStyle<TextStyle> = () => ({
+  fontSize: 10,
+  lineHeight: 12,
+  textAlign: "center",
+})
+const $signalBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: "absolute",
+  top: -4,
+  right: -4,
+  minWidth: 22,
+  height: 22,
+  paddingHorizontal: 5,
+  borderRadius: 11,
+  borderWidth: 2,
+  borderColor: colors.board.background,
+  alignItems: "center",
+  justifyContent: "center",
+})
+const $signalBadgeText: ThemedStyle<TextStyle> = () => ({
+  fontSize: 12,
+  lineHeight: 15,
+})
+const $statusLineRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  zIndex: 25,
+  left: spacing.lg,
+  right: spacing.lg,
+  height: STATUS_LINE_HEIGHT,
+  alignItems: "center",
+})
+const $statusLine: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  height: STATUS_LINE_HEIGHT,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.xs,
+  paddingHorizontal: spacing.md,
+  borderRadius: STATUS_LINE_HEIGHT / 2,
+  borderWidth: 1,
+  borderColor: colors.board.border,
+  backgroundColor: colors.board.surface,
+})
+const $statusDot: ThemedStyle<ViewStyle> = () => ({ width: 9, height: 9, borderRadius: 4.5 })
+const $statusText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.board.text })
 const $disabledAction: ThemedStyle<ViewStyle> = () => ({ opacity: 0.42 })
 const $pressedAction: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })

@@ -385,7 +385,7 @@ describe("LifeCard", () => {
             life={20}
             color="#41476E"
             contentRotation={contentRotation}
-            pendingCount={1}
+            staleSince={Date.now() - 42_000}
             onChange={jest.fn()}
           />
         </ThemeProvider>,

@@ -72,7 +72,12 @@ function openConnectedPlayers() {
 }
 
 function reviewSyncIssues() {
-  fireEvent.press(screen.getByTestId("review-connected-sync-button"))
+  openConnectedMenu()
+  fireEvent.press(screen.getByTestId("game-menu-status-line"))
+}
+
+function menuButtonLabel() {
+  return screen.getByTestId("game-menu-button").props.accessibilityLabel as string
 }
 
 function openConnectedFinish() {
@@ -270,9 +275,10 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     expect(screen.getByTestId("connected-game-board")).toBeTruthy()
-    expect(screen.getByText("1 change needs attention")).toBeTruthy()
-    fireEvent.press(screen.getByTestId("review-connected-sync-button"))
-    expect(screen.getByLabelText("Needs attention, 1 failed change, 1 change pending")).toBeTruthy()
+    expect(screen.getByTestId("game-menu-signal-badge")).toHaveTextContent("!")
+    expect(menuButtonLabel()).toBe("Game options. 1 change not accepted")
+    reviewSyncIssues()
+    expect(screen.getByText("1 change not accepted")).toBeTruthy()
     expect(screen.getByTestId("connected-failed-action").props.accessibilityRole).toBe("alert")
     fireEvent.press(screen.getByText("Dismiss after reviewing"))
     expect(mockDismissFailed).toHaveBeenCalledWith("operation-2")
@@ -285,13 +291,13 @@ describe("ConnectedBoardScreen", () => {
         "The offline queue for pending changes is full. Reconnect and sync before making more changes.",
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByTestId("connected-sync-toast").props.accessibilityRole).toBe("alert")
-    fireEvent.press(screen.getByTestId("review-connected-sync-button"))
+    expect(menuButtonLabel()).toBe("Game options. Changes need attention")
+    reviewSyncIssues()
     expect(screen.getByTestId("connected-change-error").props.accessibilityRole).toBe("alert")
     expect(screen.getByText(/Reconnect and sync/i)).toBeTruthy()
   })
 
-  it("layers queued and syncing status over the board, then dismisses sync success", () => {
+  it("signals offline on the menu button, then catching up, then a brief caught-up state", () => {
     jest.useFakeTimers()
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -301,16 +307,14 @@ describe("ConnectedBoardScreen", () => {
       ],
     }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(
-      StyleSheet.flatten(screen.getByTestId("connected-sync-toast-layer").props.style),
-    ).toMatchObject({ position: "absolute" })
-    expect(screen.getByText("1 change queued")).toBeTruthy()
+    expect(screen.queryByTestId("game-menu-signal-badge")).toBeNull()
+    act(() => jest.advanceTimersByTime(2_000))
+    expect(screen.getByTestId("game-menu-signal-badge")).toHaveTextContent("1")
+    expect(menuButtonLabel()).toBe("Game options. Offline, 1 change saved on this device")
 
     connectedHarness.runtime = { ...connectedHarness.runtime, connectionStatus: "syncing" }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.queryByText("Syncing 1 change\u2026")).toBeNull()
-    act(() => jest.advanceTimersByTime(1_500))
-    expect(screen.getByText("Syncing 1 change\u2026")).toBeTruthy()
+    expect(menuButtonLabel()).toBe("Game options. Back online, sending 1 change")
 
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -318,9 +322,9 @@ describe("ConnectedBoardScreen", () => {
       pending: [],
     }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.getByText("Changes synced")).toBeTruthy()
-    act(() => jest.advanceTimersByTime(2_500))
-    expect(screen.queryByTestId("connected-sync-toast")).toBeNull()
+    expect(screen.queryByTestId("game-menu-signal-badge")).toBeNull()
+    act(() => jest.advanceTimersByTime(700))
+    expect(menuButtonLabel()).toBe("Game options")
     jest.useRealTimers()
   })
 
@@ -334,7 +338,7 @@ describe("ConnectedBoardScreen", () => {
       ],
     }
     const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.queryByText("Syncing 1 change\u2026")).toBeNull()
+    expect(menuButtonLabel()).toBe("Game options")
 
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
@@ -342,13 +346,14 @@ describe("ConnectedBoardScreen", () => {
       pending: [],
     }
     view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
-    expect(screen.queryByText("Changes synced")).toBeNull()
     act(() => jest.advanceTimersByTime(5_000))
-    expect(screen.queryByTestId("connected-sync-toast")).toBeNull()
+    expect(menuButtonLabel()).toBe("Game options")
+    expect(screen.queryByTestId("game-menu-signal-badge")).toBeNull()
     jest.useRealTimers()
   })
 
-  it("keeps an owner-scoped cached board usable offline with sync status over the grid", () => {
+  it("keeps an owner-scoped cached board usable offline and dims the other seats", () => {
+    jest.useFakeTimers()
     connectedHarness.runtime = {
       ...connectedHarness.runtime,
       status: "ready",
@@ -363,10 +368,11 @@ describe("ConnectedBoardScreen", () => {
 
     expect(screen.getByTestId("life-card-seat-2").props.accessibilityLabel).toContain("Ada")
     expect(screen.getByTestId("life-seat-2-1").props.accessibilityState.disabled).toBe(false)
-    expect(screen.getByText("1 change queued")).toBeTruthy()
-    expect(
-      StyleSheet.flatten(screen.getByTestId("connected-sync-toast-layer").props.style),
-    ).toMatchObject({ position: "absolute" })
+    expect(screen.queryByText(/Updated .* ago/)).toBeNull()
+    act(() => jest.advanceTimersByTime(3_000))
+    expect(screen.getByTestId("life-status-seat-1")).toHaveTextContent(/Updated 0:0\d ago/)
+    expect(screen.getByTestId("life-status-seat-2")).not.toHaveTextContent(/Updated/)
+    jest.useRealTimers()
   })
 
   it("renders a resumed finished summary read-only with the shared menu actions disabled", () => {
@@ -610,10 +616,13 @@ describe("ConnectedBoardScreen", () => {
     }
     const offline = render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
-    expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
-    fireEvent.press(screen.getByTestId("game-menu-backdrop"))
-    reviewSyncIssues()
-    expect(screen.getByText(/Reconnect before finishing/i)).toBeTruthy()
+    expect(screen.getByTestId("end-game-button").props.accessibilityLabel).toBe(
+      "End, needs connection",
+    )
+    fireEvent.press(screen.getByTestId("end-game-button"))
+    expect(screen.getByTestId("connected-status-dialog")).toBeTruthy()
+    expect(screen.getByText("Needs a connection")).toBeTruthy()
+    expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull()
     offline.unmount()
 
     connectedHarness.runtime = {
@@ -627,11 +636,25 @@ describe("ConnectedBoardScreen", () => {
     }
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
     openConnectedMenu()
-    expect(screen.getByTestId("end-game-button").props.accessibilityState.disabled).toBe(true)
-    fireEvent.press(screen.getByTestId("game-menu-backdrop"))
-    reviewSyncIssues()
-    expect(screen.getByText(/Wait for 1 pending change/i)).toBeTruthy()
-    expect(screen.getByText("1 pending")).toBeTruthy()
+    expect(screen.getByTestId("end-game-button").props.accessibilityLabel).toBe(
+      "End, sending changes",
+    )
+    fireEvent.press(screen.getByTestId("end-game-button"))
+    expect(screen.getByText("After your changes send")).toBeTruthy()
+    expect(screen.queryByText("1 pending")).toBeNull()
+  })
+
+  it("does not explain a blocked End to a player who cannot end the game", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      connectionStatus: "offline",
+      projection: { ...connectedHarness.runtime.projection, isHost: false },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
+    const end = screen.getByTestId("end-game-button")
+    expect(end.props.accessibilityLabel).toBe("End")
+    expect(end.props.accessibilityState.disabled).toBe(true)
   })
 
   it("does not imply an in-flight connected finish can be cancelled", () => {
