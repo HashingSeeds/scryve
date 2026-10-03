@@ -139,6 +139,21 @@ describe("useConnectedGame connection readiness", () => {
     expect(result.current.finishError).toBe("Connect and sign in before finishing this game.")
   })
 
+  it("asks for a rematch when the host finishes", async () => {
+    mockSocketConnected = true
+    const { result } = renderHook(() => useConnectedGame("game-public", "user-1"))
+    await act(async () => result.current.finish({ kind: "draw" }))
+    expect(mockFinishMutation).toHaveBeenCalledWith({
+      publicId: "game-public",
+      result: { kind: "draw" },
+      rematch: {
+        publicId: expect.any(String),
+        inviteToken: expect.any(String),
+        manualCodeCandidates: expect.any(Array),
+      },
+    })
+  })
+
   it("skips the projection while auth is down and keeps showing the cached board", () => {
     mockSocketConnected = true
     mockConvexAuthenticated = false

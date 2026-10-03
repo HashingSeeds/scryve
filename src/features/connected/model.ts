@@ -92,6 +92,7 @@ export interface ConnectedProjection {
   lifeStep?: number
   ruleset: string
   isHost: boolean
+  rematchPublicId?: string
   eventSequence: number
   serverUpdatedAt: number
   recentOperationIds: string[]
@@ -291,6 +292,9 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       : {}),
     ruleset: value.ruleset,
     isHost: value.isHost,
+    ...(typeof value.rematchPublicId === "string" && value.rematchPublicId
+      ? { rematchPublicId: value.rematchPublicId }
+      : {}),
     eventSequence: value.eventSequence,
     serverUpdatedAt: value.serverUpdatedAt,
     recentOperationIds: value.recentOperationIds
