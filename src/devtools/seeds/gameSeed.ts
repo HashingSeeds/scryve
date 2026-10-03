@@ -68,9 +68,10 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
   const format = params.format
 
   const life = list(params.life).map((value) => integer("life", value))
-  const playerCount = params.players
-    ? integer("players", params.players)
-    : life.length || DEFAULT_LOCAL_SETTINGS.defaultPlayerCount
+  const playerCount =
+    params.players !== undefined
+      ? integer("players", params.players)
+      : life.length || DEFAULT_LOCAL_SETTINGS.defaultPlayerCount
   if (playerCount < MIN_PLAYERS || playerCount > MAX_PLAYERS)
     throw new SeedError(`players must be ${MIN_PLAYERS}-${MAX_PLAYERS}.`)
   if (life.length > 0 && life.length !== playerCount)
@@ -88,9 +89,10 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
         name: `Player ${index + 1}`,
         color: PLAYER_COLORS[index],
       })),
-      startingLife: params.start
-        ? integer("start", params.start)
-        : defaultStartingLife(system, format),
+      startingLife:
+        params.start !== undefined
+          ? integer("start", params.start)
+          : defaultStartingLife(system, format),
       system,
       format,
       layout,

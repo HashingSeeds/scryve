@@ -141,7 +141,7 @@ adb shell "am start -a android.intent.action.VIEW -d '$link'"
 ```
 
 An unknown seed kind or bad param shows `Seed failed` with the reason. A link
-that is not shaped like `/dev/seed/<kind>` opens Play instead. Consent and auth
+that is not shaped like `/dev/seed/<kind>` opens the root route (`/`) instead. Consent and auth
 still go through the real flows.
 
 ## Drive with agent-device

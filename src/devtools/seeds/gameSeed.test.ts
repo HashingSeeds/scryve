@@ -52,6 +52,8 @@ describe("game seed", () => {
     [{ format: "commander", cmd: "1>2:60,1>2:60" }, /"1>2:60" was rejected/],
     [{ format: "commander", players: "2", cmd: "1>3:5" }, /seat 3 is not in a 2 player game/],
     [{ life: "20,abc" }, /life must be a whole number/],
+    [{ players: "" }, /players must be a whole number/],
+    [{ start: "" }, /start must be a whole number/],
   ])("explains a bad link %j", (params, message) => {
     expect(() => buildSeededGame(params, repository())).toThrow(message)
   })
