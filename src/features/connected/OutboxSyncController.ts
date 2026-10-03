@@ -99,7 +99,6 @@ export class OutboxSyncController {
   private confirmed: ConnectedProjection | null
   private pending: PendingLifeAction[]
   private failed: FailedLifeAction[]
-  private offline = false
   private changeError: string | undefined
   private finishError: string | undefined
   private finishing = false
@@ -207,7 +206,6 @@ export class OutboxSyncController {
         this.options.repository.acknowledge(this.options.publicId, operationId)
       else remaining.push(action)
     }
-    this.offline = false
     if (this.environment.isWebSocketConnected && this.reconnectPending) {
       this.reconnectPending = false
       emitTelemetry("reconnect.ready", { outcome: "success", pendingCount: this.pending.length })
@@ -409,7 +407,7 @@ export class OutboxSyncController {
       pending: this.pending,
       failed: this.failed,
       connectionStatus:
-        this.offline || !isAuthenticated || !isWebSocketConnected
+        !isAuthenticated || !isWebSocketConnected
           ? "offline"
           : this.pending.length > 0 || isLoading
             ? "syncing"
@@ -479,7 +477,6 @@ export class OutboxSyncController {
           drainStartPending.filter((action) => !settledIds.has(action.event.operationId)),
         failures: result.failures ?? this.failed,
       })
-      this.offline = result.stoppedForRetry
       if (result.blockedByFailureCapacity)
         this.changeError =
           "Failed changes need review before more rejected changes can be retained. Dismiss reviewed failures, then retry syncing."

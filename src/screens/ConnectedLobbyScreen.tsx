@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, Share, View } from "react-native"
-import { useConvexConnectionState, useMutation, useQuery } from "convex/react"
+import { useMutation, useQuery } from "convex/react"
 
 import { AlertNote } from "@/components/AlertNote"
 import { BottomActionBar } from "@/components/BottomActionBar"
@@ -39,6 +39,7 @@ import {
   PlayerActionsDialog,
   type ReportablePlayer,
 } from "@/features/connected/PlayerActionsDialog"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
@@ -145,7 +146,7 @@ function ConnectedLobbyContent({
     deviceId,
     includeRecentOperationIds: false,
   })
-  const { isWebSocketConnected } = useConvexConnectionState()
+  const isWebSocketConnected = useConvexOnline()
   const updateSettings = useMutation(api.games.updateLobbySettings)
   const [savingSettings, setSavingSettings] = useState(false)
   const settingsInFlight = useRef(false)

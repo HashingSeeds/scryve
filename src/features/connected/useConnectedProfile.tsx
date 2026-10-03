@@ -8,8 +8,9 @@ import {
   useState,
 } from "react"
 import { useUser } from "@clerk/expo"
-import { useConvexAuth, useConvexConnectionState, useMutation } from "convex/react"
+import { useConvexAuth, useMutation } from "convex/react"
 
+import { useConvexOnline } from "./useConvexOnline"
 import { api } from "../../../convex/_generated/api"
 import { MAX_DISPLAY_NAME_LENGTH } from "../../../convex/lib/policy"
 
@@ -107,7 +108,7 @@ export function ConnectedProfileProvider({ children }: { children: ReactNode }) 
     isLoading: isAuthenticationLoading,
     isRefreshing: isAuthenticationRefreshing,
   } = useConvexAuth()
-  const { isWebSocketConnected } = useConvexConnectionState()
+  const isWebSocketConnected = useConvexOnline()
   const syncCurrent = useMutation(api.users.syncCurrent)
   const [readyUserId, setReadyUserId] = useState<string | undefined>(bootstrapCache.profile?.userId)
   const [failure, setFailure] = useState<{ userId: string; message: string }>()

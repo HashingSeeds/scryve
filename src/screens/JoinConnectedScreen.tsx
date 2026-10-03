@@ -2,7 +2,7 @@ import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, View } from "react-native"
 import { useUser } from "@clerk/expo"
-import { useConvexConnectionState, useMutation } from "convex/react"
+import { useMutation } from "convex/react"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -17,6 +17,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { onlineOnlyNotice } from "@/features/connected/connectedCopy"
 import { normalizeManualCode } from "@/features/connected/inviteLinks"
 import { connectedProfileName } from "@/features/connected/useConnectedProfile"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { hasLocalGameStarted } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
@@ -55,7 +56,7 @@ export function JoinConnectedScreen({
   const { bottom } = useSafeAreaInsets()
   const { titleVisible, onScroll } = useCollapsingTitle()
   const { user } = useUser()
-  const { isWebSocketConnected } = useConvexConnectionState()
+  const isWebSocketConnected = useConvexOnline()
   const syncUser = useMutation(api.users.syncCurrent)
   const claimSeat = useMutation(api.games.claimSeat)
   const claimableSeats = useMutation(api.games.claimableSeats)

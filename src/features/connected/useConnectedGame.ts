@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useValue } from "@legendapp/state/react"
-import { useConvexAuth, useConvexConnectionState, useMutation, useQuery } from "convex/react"
+import { useConvexAuth, useMutation, useQuery } from "convex/react"
 
 import type { ConnectionStatus } from "@/components/ConnectionBadge"
 import { asDeviceId } from "@/features/game/domain"
@@ -22,6 +22,7 @@ import { toConnectedProjection } from "./model"
 import { OutboxSyncController } from "./OutboxSyncController"
 import type { ConnectedGameResult } from "./OutboxSyncController"
 import { connectedDeploymentScope, ConnectedGameRepository } from "./persistence"
+import { useConvexOnline } from "./useConvexOnline"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -98,7 +99,7 @@ function acknowledgementForQueuedResolution(
 
 export function useConnectedGame(publicId: string, ownerId = "anonymous"): ConnectedGameRuntime {
   const { isAuthenticated, isLoading, isRefreshing } = useConvexAuth()
-  const { isWebSocketConnected } = useConvexConnectionState()
+  const isWebSocketConnected = useConvexOnline()
   const deployment = useMemo(() => connectedDeploymentScope(), [])
   const repository = useMemo(
     () => new ConnectedGameRepository(undefined, ownerId, {}, deployment),
@@ -191,12 +192,15 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
   )
   const snapshot = useValue(() => controller.state$.get())
   const head = snapshot.pending[0]?.event
-  const remote = useQuery(api.games.lobbyProjection, {
-    publicId,
-    deviceId,
-    includeRecentOperationIds: false,
-    ...(head ? { operation: operationCheckFor(head) } : {}),
-  })
+  const projectionArgsWhileSignedIn = isAuthenticated
+    ? {
+        publicId,
+        deviceId,
+        includeRecentOperationIds: false,
+        ...(head ? { operation: operationCheckFor(head) } : {}),
+      }
+    : "skip"
+  const remote = useQuery(api.games.lobbyProjection, projectionArgsWhileSignedIn)
   const remoteReady = toConnectedProjection(remote) !== null
   const unreachableWithoutCache =
     !snapshot.projection && !remoteReady && !isWebSocketConnected && !isLoading && !isRefreshing

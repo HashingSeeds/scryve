@@ -1,4 +1,11 @@
-import { ReactNode, useEffect, useRef, useState } from "react"
+import {
+  type MutableRefObject,
+  ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import type { ViewStyle } from "react-native"
 import { ActivityIndicator, Animated } from "react-native"
 import { useUser } from "@clerk/expo"
@@ -29,6 +36,24 @@ function useRevealAfterDelay(delayMs: number) {
     return () => clearTimeout(timer)
   }, [delayMs])
   return revealed
+}
+
+function ConnectedContentShownTo({
+  userId,
+  shownToRef,
+  children,
+}: {
+  userId: string | undefined
+  shownToRef: MutableRefObject<string | undefined>
+  children: ReactNode
+}) {
+  useLayoutEffect(() => {
+    shownToRef.current = userId
+    return () => {
+      if (shownToRef.current === userId) shownToRef.current = undefined
+    }
+  }, [shownToRef, userId])
+  return children
 }
 
 function GateScreen({ busy = false, children }: { busy?: boolean; children: ReactNode }) {
@@ -99,8 +124,24 @@ export function BackendGate({
       ? new ConnectedGameRepository(undefined, offlineProfile.userId).loadProjection(offlineGameId)
       : null
   const hasOwnerScopedCache = Boolean(offlineGameId && cachedProjection?.publicId === offlineGameId)
+  const userShownConnectedContent = useRef<string | undefined>(undefined)
+  const showChildren = (userId: string | undefined) => (
+    <ConnectedContentShownTo userId={userId} shownToRef={userShownConnectedContent}>
+      {children}
+    </ConnectedContentShownTo>
+  )
+  const profileIsReconnecting =
+    connectedProfile.status === "offline" || connectedProfile.status === "loading"
+  const activeUserId = user?.id ?? offlineProfile?.userId
+  const keepShowingConnectedContent =
+    clerkSignedIn &&
+    profileIsReconnecting &&
+    activeUserId !== undefined &&
+    userShownConnectedContent.current === activeUserId
 
-  if (clerkSignedIn && connectedProfile.status === "offline" && hasOwnerScopedCache) return children
+  if (keepShowingConnectedContent) return showChildren(activeUserId)
+  if (clerkSignedIn && connectedProfile.status === "offline" && hasOwnerScopedCache)
+    return showChildren(offlineProfile?.userId)
   if (!clerkLoaded)
     return (
       <GateScreen busy>
@@ -173,7 +214,7 @@ export function BackendGate({
       </GateScreen>
     )
   if (allowPendingProfile && clerkSignedIn && isUserLoaded && user?.id && user.username !== null)
-    return children
+    return showChildren(user.id)
   if (
     isAuthenticated &&
     isUserLoaded &&
@@ -181,7 +222,7 @@ export function BackendGate({
     connectedProfile.status === "ready" &&
     connectedProfile.profile.userId === user.id
   )
-    return children
+    return showChildren(user.id)
   if (connectedProfile.status === "offline")
     return (
       <GateScreen>

@@ -138,6 +138,43 @@ describe("connected cold-offline and authentication gate", () => {
     expect(onTap).toHaveBeenCalledTimes(1)
   })
 
+  it("keeps an established board mounted while a reconnect re-authenticates", async () => {
+    const child = <Button testID="reconnecting-board" text="Board" />
+    const view = render(gate(child))
+    await waitFor(() => expect(screen.getByTestId("reconnecting-board")).toBeTruthy())
+    mockSocketConnected = false
+    view.rerender(gate(child))
+    expect(screen.getByTestId("reconnecting-board")).toBeTruthy()
+    mockSocketConnected = true
+    mockConvexLoading = true
+    view.rerender(gate(child))
+    expect(screen.getByTestId("reconnecting-board")).toBeTruthy()
+    expect(screen.queryByText("Connecting… Local play remains available.")).toBeNull()
+  })
+
+  it("does not skip the gate after signing out and back in as the same user", async () => {
+    const child = <Button testID="signed-out-board" text="Board" />
+    const view = render(gate(child))
+    await waitFor(() => expect(screen.getByTestId("signed-out-board")).toBeTruthy())
+    mockClerkSignedIn = false
+    view.rerender(gate(child))
+    expect(screen.queryByTestId("signed-out-board")).toBeNull()
+    mockClerkSignedIn = true
+    mockConvexLoading = true
+    view.rerender(gate(child))
+    expect(screen.queryByTestId("signed-out-board")).toBeNull()
+  })
+
+  it("still replaces an established board when the server rejects the session", async () => {
+    const child = <Button testID="rejected-board" text="Board" />
+    const view = render(gate(child))
+    await waitFor(() => expect(screen.getByTestId("rejected-board")).toBeTruthy())
+    mockConvexAuthenticated = false
+    view.rerender(gate(child))
+    expect(screen.queryByTestId("rejected-board")).toBeNull()
+    expect(screen.getByText("We couldn’t connect your account. Try signing in again.")).toBeTruthy()
+  })
+
   it("renders the known owner's cached board before Convex finishes cold offline auth", () => {
     mockSocketConnected = false
     mockConvexLoading = true
