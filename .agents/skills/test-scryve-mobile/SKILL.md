@@ -82,7 +82,8 @@ on an implicit session when checking persistence.
 ## Establish the required app state
 
 Use the real consent and Clerk flows. Do not inject MMKV or SecureStore data,
-fake authentication, or add a bypass to the app.
+fake authentication, or add a bypass to the app. The one exception is local game
+state: open a dev seed link (below) instead of tapping through setup.
 
 Preserve the installed app's state by default. A prior test session and legal
 acceptance are useful shared development prerequisites. Clear app data or the
@@ -125,6 +126,22 @@ the affected flow needs:
 The test addresses and fixed OTP work only with Clerk test mode. Never enable
 Clerk test mode in production and never request or store a Clerk secret key in
 the app, repository, screenshots, or report.
+
+## Seed a local game
+
+Development builds accept `scryve-dev://dev/seed/game?...` cold or warm. The
+link replaces the active local game, replays the requested state through real
+game commands, and opens it on Play. Params are documented on
+`buildSeededGame` in `src/devtools/seeds/gameSeed.ts`.
+
+```bash
+link='scryve-dev://dev/seed/game?format=commander&players=4&life=40,31,12,40&cmd=2>3:9'
+xcrun simctl openurl booted "$link"
+adb shell "am start -a android.intent.action.VIEW -d '$link'"
+```
+
+A bad link shows `Seed failed` with the reason. Consent and auth still go
+through the real flows.
 
 ## Drive with agent-device
 

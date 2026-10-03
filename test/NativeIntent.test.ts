@@ -47,4 +47,30 @@ describe("connected invite native intent", () => {
     "preserves safe absolute internal warm route %s",
     (path) => expect(redirectSystemPath({ path, initial: false })).toBe(path),
   )
+
+  it.each([
+    ["scryve-dev://dev/seed/game?format=commander&cmd=2%3E3:9", true],
+    ["count-dev://dev/seed/game?players=6", false],
+    ["scryve-dev:///dev/seed/game?players=6", true],
+    ["/dev/seed/game?players=6", false],
+  ])("keeps dev seed link %s with its query", (path, initial) => {
+    expect(redirectSystemPath({ path, initial })).toBe(
+      `/dev/seed/game${path.slice(path.indexOf("?"))}`,
+    )
+  })
+
+  it.each(["scryve-dev://dev/settings?x=1", "scryve-dev://dev/seed/game/extra?x=1"])(
+    "drops non-seed dev link %s",
+    (path) => expect(redirectSystemPath({ path, initial: true })).toBe("/"),
+  )
+
+  it("drops seed links outside development builds", () => {
+    const development = __DEV__
+    Reflect.set(globalThis, "__DEV__", false)
+    try {
+      expect(redirectSystemPath({ path: "scryve-dev://dev/seed/game", initial: false })).toBe("/")
+    } finally {
+      Reflect.set(globalThis, "__DEV__", development)
+    }
+  })
 })

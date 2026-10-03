@@ -46,7 +46,12 @@ Development identity:
 ## Establish the required app state
 
 Use the real consent and Clerk flows. Do not write browser storage directly,
-fake authentication, or add a bypass to the app.
+fake authentication, or add a bypass to the app. The one exception is local game
+state: open `/dev/seed/game?...` on the dev server, for example
+`/dev/seed/game?format=commander&players=4&life=40,31,12,40&cmd=2>3:9`. It
+replaces the active local game through real game commands and opens it on
+Play. Params are documented on `buildSeededGame` in
+`src/devtools/seeds/gameSeed.ts`.
 
 Reuse the browser profile's session and legal acceptance by default. Clear site
 data only when the changed behavior requires a clean install, signed-out state,
