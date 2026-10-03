@@ -58,7 +58,7 @@ export interface PlayerGridProps {
   disabled?: boolean
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
-  getPendingCount?: (player: GamePlayer) => number
+  getStaleSince?: (player: GamePlayer) => number | undefined
   isPlayerEliminated?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
@@ -73,7 +73,7 @@ export function PlayerGrid({
   disabled,
   isPlayerDisabled,
   isPlayerOwned,
-  getPendingCount,
+  getStaleSince,
   isPlayerEliminated,
   commanderDamage,
   onChange,
@@ -213,7 +213,7 @@ export function PlayerGrid({
                   lifeStep={lifeStep}
                   disabled={disabled || playerDisabled}
                   ownership={ownership}
-                  pendingCount={getPendingCount?.(player)}
+                  staleSince={getStaleSince?.(player)}
                   eliminated={isPlayerEliminated?.(player)}
                   commanderDamage={
                     commanderDamage && boardSeats

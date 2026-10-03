@@ -213,10 +213,34 @@ function PentagonHairline({ color }: { color: string }): ReactElement {
   )
 }
 
+const OUTLINE_CORNERS = PENTAGON_POINTS.split(" ")
+
+export interface LitBorderSide {
+  index: number
+  color: string
+}
+
+function LitSide({ side }: { side: LitBorderSide }): ReactElement {
+  const from = OUTLINE_CORNERS[side.index % PENTAGON_SIDES]
+  const to = OUTLINE_CORNERS[(side.index + 1) % PENTAGON_SIDES]
+  return (
+    <Polyline
+      testID="game-menu-lit-side"
+      points={`${from} ${to}`}
+      fill="none"
+      stroke={side.color}
+      strokeWidth={PENTAGON_STROKE_WIDTH}
+      strokeLinecap="round"
+    />
+  )
+}
+
 export interface GameMenuButtonShapeProps {
   variant: MenuButtonStyle
   isDark: boolean
   boardBackgroundColor: string
+  borderColor?: string
+  litSide?: LitBorderSide
   seatColors?: readonly string[]
 }
 
@@ -224,6 +248,8 @@ export function GameMenuButtonShape({
   variant,
   isDark,
   boardBackgroundColor,
+  borderColor = boardBackgroundColor,
+  litSide,
   seatColors,
 }: GameMenuButtonShapeProps): ReactElement {
   return (
@@ -237,11 +263,17 @@ export function GameMenuButtonShape({
         <PrismShape
           isDark={isDark}
           boardBackgroundColor={boardBackgroundColor}
+          borderColor={borderColor}
           seatColors={seatColors}
         />
       ) : (
-        <KeystoneTwoShape isDark={isDark} boardBackgroundColor={boardBackgroundColor} />
+        <KeystoneTwoShape
+          isDark={isDark}
+          boardBackgroundColor={boardBackgroundColor}
+          borderColor={borderColor}
+        />
       )}
+      {litSide ? <LitSide side={litSide} /> : null}
     </Svg>
   )
 }
@@ -249,9 +281,11 @@ export function GameMenuButtonShape({
 function KeystoneTwoShape({
   isDark,
   boardBackgroundColor,
+  borderColor,
 }: {
   isDark: boolean
   boardBackgroundColor: string
+  borderColor: string
 }): ReactElement {
   const face = isDark ? KEYSTONE_II_FACE.dark : KEYSTONE_II_FACE.light
   return (
@@ -268,7 +302,7 @@ function KeystoneTwoShape({
       <Polygon
         points={PENTAGON_POINTS}
         fill="url(#keystoneTwoFill)"
-        stroke={boardBackgroundColor}
+        stroke={borderColor}
         strokeWidth={PENTAGON_STROKE_WIDTH}
         strokeLinejoin="round"
       />
@@ -281,10 +315,12 @@ function KeystoneTwoShape({
 function PrismShape({
   isDark,
   boardBackgroundColor,
+  borderColor,
   seatColors,
 }: {
   isDark: boolean
   boardBackgroundColor: string
+  borderColor: string
   seatColors?: readonly string[]
 }): ReactElement {
   const palette = seatColors && seatColors.length > 0 ? seatColors : PLAYER_COLORS
@@ -329,7 +365,7 @@ function PrismShape({
       <Polygon
         points={PENTAGON_POINTS}
         fill="none"
-        stroke={boardBackgroundColor}
+        stroke={borderColor}
         strokeWidth={PENTAGON_STROKE_WIDTH}
         strokeLinejoin="round"
       />

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useValue } from "@legendapp/state/react"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 
-import type { ConnectionStatus } from "@/components/ConnectionBadge"
 import { asDeviceId } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import type { LifeDelta } from "@/features/game/types"
@@ -11,6 +10,7 @@ import { captureGame } from "@/utils/analytics"
 import { recordReviewCompletion } from "@/utils/storeReview"
 
 import type {
+  ConnectionStatus,
   ConnectedActionEvent,
   ConnectedCommanderDamageChange,
   ConnectedCommanderDamageClaim,

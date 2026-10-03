@@ -7,7 +7,6 @@ import { useUser } from "@clerk/expo"
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
-import { ConnectionBadge } from "@/components/ConnectionBadge"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
@@ -20,10 +19,14 @@ import {
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
-import { Text } from "@/components/Text"
+import { Text, type TextProps } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import { readPublicCloudConfig } from "@/features/auth/config"
-import { ConnectedBoardSyncToast } from "@/features/connected/ConnectedBoardSyncToast"
+import {
+  boardSyncMenuSignal,
+  boardSyncStatusText,
+  useBoardSyncSignal,
+} from "@/features/connected/boardSyncSignal"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
 import type { ConnectedPlayerProjection } from "@/features/connected/model"
@@ -47,6 +50,7 @@ import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { isGameUnavailableError } from "@/utils/convexError"
+import { useElapsedSince } from "@/utils/useElapsedSince"
 import { useStoreReview } from "@/utils/useStoreReview"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
@@ -454,14 +458,26 @@ function ConnectedBoardReady({
   }
   const finishResultSelected = winnerPlayerIds.length > 0 || drawSelected
 
-  const finishBlockedReason =
+  const finishBlocker =
     runtime.connectionStatus === "offline"
-      ? "Reconnect before finishing; this operation is online-only."
+      ? FINISH_BLOCKERS.offline
       : runtime.pending.length > 0
-        ? `Wait for ${runtime.pending.length} pending ${runtime.pending.length === 1 ? "change" : "changes"} to sync before finishing.`
+        ? FINISH_BLOCKERS.sending
         : runtime.failed.length > 0
-          ? `Review failed ${counter.label} changes before finishing.`
+          ? FINISH_BLOCKERS.rejected
           : undefined
+  const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
+    connectionStatus: runtime.connectionStatus,
+    unsent: runtime.pending.length,
+    oldestUnsentAt: runtime.pending[0]?.queuedAt,
+    rejected: runtime.failed.length,
+    needsAttention: Boolean(runtime.changeError),
+  })
+  const syncStatusText = boardSyncStatusText(syncSignal)
+  const openSyncStatus = useCallback(() => {
+    setMenuOpen(false)
+    setStatusOpen(true)
+  }, [])
   const layoutOptions = getPlayerGridLayoutOptions(players.length)
   const gridLayout = useMemo(
     () =>
@@ -508,6 +524,7 @@ function ConnectedBoardReady({
     else onBack?.()
   }
 
+  const canEnd = active && game.isHost && !runtime.finishing
   const radialActions: RadialMenuAction[] = useMemo(
     () => [
       {
@@ -550,24 +567,18 @@ function ConnectedBoardReady({
       {
         kind: "end-game",
         label: "End",
-        disabled: !active || !game.isHost || runtime.finishing || Boolean(finishBlockedReason),
+        detail: canEnd ? finishBlocker?.petal : undefined,
+        blocked: canEnd && Boolean(finishBlocker),
+        disabled: !canEnd,
         onPress: (event) => {
           captureMenuDialogOrigin(event)
           setMenuOpen(false)
-          setConfirmingFinish(true)
+          if (finishBlocker) setStatusOpen(true)
+          else setConfirmingFinish(true)
         },
       },
     ],
-    [
-      active,
-      captureMenuDialogOrigin,
-      finishBlockedReason,
-      game.isHost,
-      layoutOptions.length,
-      onHistory,
-      onSetup,
-      runtime.finishing,
-    ],
+    [canEnd, captureMenuDialogOrigin, finishBlocker, layoutOptions.length, onHistory, onSetup],
   )
   const seatColors = useMemo(() => players.map((player) => player.color), [players])
   const exitAction = useMemo(
@@ -619,15 +630,7 @@ function ConnectedBoardReady({
                 ?.eliminatedByCommanderDamage,
             )
           }
-          getPendingCount={(player) =>
-            runtime.pending.filter((action) =>
-              action.event.type === "life.changed"
-                ? action.event.playerId === player.id
-                : action.event.type === "commanderDamage.submitted"
-                  ? action.event.fromPlayerId === player.id
-                  : action.event.toPlayerId === player.id,
-            ).length
-          }
+          getStaleSince={(player) => (controlled.has(player.id) ? undefined : offlineSince)}
           commanderDamage={
             commanderDamageEnabled
               ? {
@@ -669,6 +672,12 @@ function ConnectedBoardReady({
           variant={menuButtonStyle}
           seatColors={seatColors}
           exitAction={exitAction}
+          signal={boardSyncMenuSignal(syncSignal)}
+          statusLine={
+            syncStatusText && syncSignal.kind !== "live"
+              ? { text: syncStatusText, tone: syncSignal.kind, onPress: openSyncStatus }
+              : undefined
+          }
           onToggle={toggleMenu}
           onClose={closeMenu}
         />
@@ -681,16 +690,6 @@ function ConnectedBoardReady({
             onAccount={onAccount}
           />
         ) : null}
-        <ConnectedBoardSyncToast
-          connectionStatus={runtime.connectionStatus}
-          pendingCount={runtime.pending.length}
-          failedCount={runtime.failed.length}
-          changeError={runtime.changeError}
-          onReview={() => {
-            setMenuOpen(false)
-            setStatusOpen(true)
-          }}
-        />
       </View>
 
       {inviteDialogOpen && invitation ? (
@@ -754,15 +753,23 @@ function ConnectedBoardReady({
           wide
           style={themed($boardDialog)}
         >
-          <Text
-            text={finished ? "Connected summary" : "Connected game"}
+          <ElapsedText
+            since={finished ? undefined : offlineSince}
+            text={(elapsed) =>
+              finished
+                ? "Connected summary"
+                : elapsed !== undefined
+                  ? `Offline for ${elapsed}`
+                  : syncSignal.kind === "slow"
+                    ? "Slow connection"
+                    : syncSignal.kind === "catchingUp"
+                      ? "Back online"
+                      : syncSignal.kind === "attention"
+                        ? (syncStatusText ?? "Connected game")
+                        : "Connected"
+            }
             preset="subheading"
             style={themed($dialogText)}
-          />
-          <ConnectionBadge
-            status={runtime.connectionStatus}
-            pendingCount={runtime.pending.length}
-            failedCount={runtime.failed.length}
           />
           <Text
             text={
@@ -773,6 +780,32 @@ function ConnectedBoardReady({
             size="xs"
             style={themed($muted)}
           />
+          {finished ? null : (
+            <View testID="connected-sync-details" style={themed($syncRows)}>
+              <SyncRow
+                label="Your changes"
+                value={() =>
+                  runtime.pending.length === 0
+                    ? "All sent"
+                    : syncSignal.kind === "offline"
+                      ? `${runtime.pending.length} saved on this device. They send when you reconnect.`
+                      : `Sending ${runtime.pending.length}`
+                }
+              />
+              <SyncRow
+                label="Other players"
+                since={offlineSince}
+                value={(elapsed) =>
+                  elapsed !== undefined
+                    ? `Updated ${elapsed} ago`
+                    : syncSignal.kind === "slow"
+                      ? "May arrive late"
+                      : "Live"
+                }
+              />
+              <SyncRow label="Finish game" value={() => finishBlocker?.detail ?? "Available"} />
+            </View>
+          )}
           <ScrollView style={themed($statusScroll)} contentContainerStyle={themed($statusList)}>
             {runtime.failed.map((failure) => (
               <View
@@ -807,9 +840,6 @@ function ConnectedBoardReady({
                 accessibilityRole="alert"
                 text={`This game is ${game.status} and is read-only on the board.`}
               />
-            ) : null}
-            {finishBlockedReason ? (
-              <Text accessibilityRole="alert" text={finishBlockedReason} />
             ) : null}
           </ScrollView>
           <Button text="Close" onPress={() => setStatusOpen(false)} />
@@ -927,7 +957,7 @@ function ConnectedBoardReady({
                     : "game:abandon"
               }
               preset={finishResultSelected ? "reversed" : "filled"}
-              disabled={runtime.finishing || Boolean(finishBlockedReason)}
+              disabled={runtime.finishing || Boolean(finishBlocker)}
               style={themed($dialogAction)}
               onPress={async () => {
                 if (finishSubmitInFlight.current) return
@@ -1032,6 +1062,60 @@ const $dialogAction: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   minHeight: 48,
   borderRadius: CHOICE_RADIUS,
+})
+const FINISH_BLOCKERS = {
+  offline: { petal: "needs connection", detail: "Needs a connection" },
+  sending: { petal: "sending changes", detail: "After your changes send" },
+  rejected: { petal: "review first", detail: "Review the changes below first" },
+} as const
+
+function ElapsedText({
+  since,
+  text,
+  ...props
+}: Omit<TextProps, "text"> & {
+  since: number | undefined
+  text: (elapsed: string | undefined) => string
+}) {
+  const elapsed = useElapsedSince(since)
+  return <Text {...props} text={text(elapsed)} />
+}
+
+function SyncRow({
+  label,
+  since,
+  value,
+}: {
+  label: string
+  since?: number
+  value: (elapsed: string | undefined) => string
+}) {
+  const { themed } = useAppTheme()
+  return (
+    <View style={themed($syncRow)}>
+      <Text text={label} size="xs" style={[themed($muted), $syncLabel]} />
+      <ElapsedText since={since} text={value} size="xs" style={themed($syncValue)} />
+    </View>
+  )
+}
+
+const $syncRows: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  borderTopWidth: 1,
+  borderTopColor: colors.board.border,
+})
+const $syncRow: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "space-between",
+  gap: spacing.md,
+  paddingVertical: spacing.xs,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.board.border,
+})
+const $syncLabel: TextStyle = { flexShrink: 0 }
+const $syncValue: ThemedStyle<TextStyle> = ({ colors }) => ({
+  flexShrink: 1,
+  textAlign: "right",
+  color: colors.board.text,
 })
 const $statusScroll: ThemedStyle<ViewStyle> = () => ({ flexGrow: 0 })
 const $statusList: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.sm })

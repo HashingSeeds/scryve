@@ -301,3 +301,5 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     players,
   }
 }
+
+export type ConnectionStatus = "connected" | "syncing" | "offline"

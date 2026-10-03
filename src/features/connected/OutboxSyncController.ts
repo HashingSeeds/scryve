@@ -1,4 +1,3 @@
-import type { ConnectionStatus } from "@/components/ConnectionBadge"
 import {
   asActorId,
   asGameId,
@@ -15,6 +14,7 @@ import { emitTelemetry } from "@/utils/telemetry"
 import type { DrainOutboxSnapshot, OutboxAcknowledgement } from "./drainOutbox"
 import { drainConnectedOutbox } from "./drainOutbox"
 import type {
+  ConnectionStatus,
   ConnectedCommanderDamageChange,
   ConnectedCommanderDamageClaim,
   ConnectedDisplayProjection,
