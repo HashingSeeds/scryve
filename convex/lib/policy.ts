@@ -18,6 +18,7 @@ export const MAX_DECK_NOTE_LENGTH = 1000
 export const MAX_VERSION_NAME_LENGTH = 40
 export const STALE_GAME_INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000
 export const STALE_GAME_CLEANUP_BATCH_SIZE = 25
+export const UNTOUCHED_REMATCH_LIFETIME_MS = 12 * 60 * 60 * 1000
 
 export function assertPlayerCount(count: number) {
   if (!Number.isInteger(count) || count < MIN_PLAYERS || count > MAX_PLAYERS) {
