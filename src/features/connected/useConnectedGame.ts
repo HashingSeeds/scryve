@@ -9,6 +9,7 @@ import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { captureGame } from "@/utils/analytics"
 import { recordReviewCompletion } from "@/utils/storeReview"
 
+import { createLobbyIdentifiers } from "./identifiers"
 import type {
   ConnectionStatus,
   ConnectedActionEvent,
@@ -170,9 +171,10 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
             acknowledgementForQueuedResolution(claimAcknowledgement, event.operationId),
           )
         },
-        finishGame: (result) =>
+        finishGame: async (result) =>
           mutations.current.finishMutation({
             publicId,
+            rematch: await createLobbyIdentifiers(),
             ...(result
               ? {
                   result:

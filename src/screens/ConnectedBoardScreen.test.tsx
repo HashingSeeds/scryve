@@ -548,6 +548,30 @@ describe("ConnectedBoardScreen", () => {
     }
   })
 
+  it("follows the table to its rematch instead of the summary", () => {
+    const onGameEnded = jest.fn()
+    const onRematch = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        status: "finished",
+        rematchPublicId: "rematch-public",
+      },
+    }
+    render(
+      themed(
+        <ConnectedBoardScreen
+          publicId="game-public"
+          onGameEnded={onGameEnded}
+          onRematch={onRematch}
+        />,
+      ),
+    )
+    expect(onRematch).toHaveBeenCalledWith("rematch-public")
+    expect(onGameEnded).not.toHaveBeenCalled()
+  })
+
   it("navigates back to fresh connected setup after abandoning without a result", async () => {
     jest.useFakeTimers()
     try {
