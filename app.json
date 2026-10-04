@@ -34,15 +34,7 @@
       "ITSAppUsesNonExemptEncryption": false
     },
     "bundleIdentifier": "com.sowinghope.count",
-    "associatedDomains": [],
-    "privacyManifests": {
-      "NSPrivacyAccessedAPITypes": [
-        {
-          "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-          "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
-        }
-      ]
-    }
+    "associatedDomains": []
   },
   "web": {
     "favicon": "./assets/images/app-icon-web-favicon.png",
