@@ -308,6 +308,34 @@ describe("CurrentGameScreen", () => {
     jest.useRealTimers()
   })
 
+  it("keeps the end dialog open to show a failed rematch save", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const save = repository.saveActiveGame.bind(repository)
+    jest.spyOn(repository, "saveActiveGame").mockImplementation((next) => {
+      if (next.id !== initial.id) throw new Error("Storage is full")
+      save(next)
+    })
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    expect(view.getByTestId("end-game-dialog")).toBeTruthy()
+    expect(view.getByText("Storage is full")).toBeTruthy()
+  })
+
   it("discards an abandoned game without adding it to history", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()

@@ -121,9 +121,13 @@ export function CurrentGameScreen({
 
   function confirmEnd(result: LocalGameResult) {
     const ended = runtime.finish(result, endSource)
-    setEndSource(undefined)
-    if (ended.status === "active") return
+    if (ended.status === "active") {
+      setEndSource(undefined)
+      return
+    }
+    // why: a failed rematch save throws here, and the open dialog shows the error.
     runtime.rematch()
+    setEndSource(undefined)
     setFreshBoard(true)
     setSavedGameId(ended.id)
   }
