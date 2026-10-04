@@ -59,6 +59,7 @@ type ConnectedBoardScreenProps = {
   publicId: string
   initialInviteOpen?: boolean
   onGameEnded?: (publicId: string) => void
+  onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
   onSetup?: () => void
   onBack?: () => void
@@ -210,6 +211,7 @@ type ConnectedBoardReadyProps = {
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
   onGameEnded?: (publicId: string) => void
+  onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
   runtime: Extract<ConnectedGameRuntime, { status: "ready" }>
 }
@@ -229,6 +231,7 @@ function ConnectedBoardRuntime({
   publicId,
   initialInviteOpen,
   onGameEnded,
+  onRematch,
   onGameAbandoned,
   onSetup,
   onBack,
@@ -242,6 +245,7 @@ function ConnectedBoardRuntime({
   publicId: string
   initialInviteOpen?: boolean
   onGameEnded?: (publicId: string) => void
+  onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
   onSetup?: () => void
   onBack?: () => void
@@ -280,6 +284,7 @@ function ConnectedBoardRuntime({
       onAccount={onAccount}
       accountLabel={accountLabel}
       onGameEnded={onGameEnded}
+      onRematch={onRematch}
       onGameAbandoned={onGameAbandoned}
       runtime={runtime}
     />
@@ -297,6 +302,7 @@ function ConnectedBoardReady({
   onAccount,
   accountLabel,
   onGameEnded,
+  onRematch,
   onGameAbandoned,
   runtime,
 }: ConnectedBoardReadyProps) {
@@ -329,15 +335,17 @@ function ConnectedBoardReady({
   const [abandonedOpen, setAbandonedOpen] = useState(false)
   const navigatedTerminal = useRef(false)
   const terminalStatus = runtime.status === "ready" ? runtime.projection.status : undefined
+  const rematchPublicId = runtime.projection.rematchPublicId
   useEffect(() => {
     if (terminalStatus === "finished") {
       if (navigatedTerminal.current) return
       navigatedTerminal.current = true
-      onGameEnded?.(publicId)
+      if (rematchPublicId && onRematch) onRematch(rematchPublicId)
+      else onGameEnded?.(publicId)
     } else if (terminalStatus === "abandoned" && !navigatedTerminal.current) {
       setAbandonedOpen(true)
     }
-  }, [terminalStatus, onGameEnded, publicId])
+  }, [terminalStatus, rematchPublicId, onRematch, onGameEnded, publicId])
   useStoreReview(
     runtime.projection.status === "finished" &&
       !menuOpen &&
@@ -973,6 +981,8 @@ function ConnectedBoardReady({
                     : await runtime.abandon()
                   if (!ended) return
                   setConfirmingFinish(false)
+                  // why: the finished projection carries any rematch, so the host follows it like every other board.
+                  if (withResult && onRematch) return
                   navigatedTerminal.current = true
                   if (withResult) {
                     if (onGameEnded) setTimeout(() => onGameEnded(publicId), 0)

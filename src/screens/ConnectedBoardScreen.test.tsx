@@ -548,6 +548,65 @@ describe("ConnectedBoardScreen", () => {
     }
   })
 
+  it("follows the table to its rematch instead of the summary", () => {
+    const onGameEnded = jest.fn()
+    const onRematch = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        status: "finished",
+        rematchPublicId: "rematch-public",
+      },
+    }
+    render(
+      themed(
+        <ConnectedBoardScreen
+          publicId="game-public"
+          onGameEnded={onGameEnded}
+          onRematch={onRematch}
+        />,
+      ),
+    )
+    expect(onRematch).toHaveBeenCalledWith("rematch-public")
+    expect(onGameEnded).not.toHaveBeenCalled()
+  })
+
+  it("sends the host to the rematch the finish started", async () => {
+    const onGameEnded = jest.fn()
+    const onRematch = jest.fn()
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, isHost: true },
+    }
+    const board = () =>
+      themed(
+        <ConnectedBoardScreen
+          publicId="game-public"
+          onGameEnded={onGameEnded}
+          onRematch={onRematch}
+        />,
+      )
+    const view = render(board())
+    openConnectedFinish()
+    fireEvent.press(within(screen.getByTestId("connected-finish-confirmation")).getByText("Ada"))
+    fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+    await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
+
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        status: "finished",
+        rematchPublicId: "rematch-public",
+      },
+    }
+    view.rerender(board())
+    await waitFor(() => expect(onRematch).toHaveBeenCalledWith("rematch-public"))
+    expect(onGameEnded).not.toHaveBeenCalled()
+  })
+
   it("navigates back to fresh connected setup after abandoning without a result", async () => {
     jest.useFakeTimers()
     try {
