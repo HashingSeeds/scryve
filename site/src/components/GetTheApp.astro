@@ -4,10 +4,17 @@ import { Image } from "astro:assets"
 import appStoreBadge from "../assets/app-store-badge.svg"
 import googlePlayBadge from "../assets/google-play-badge.png"
 import { APP_LINKS, STORE_LINKS } from "../links"
+
+interface Props {
+  // Hide the browser button where the header already shows one nearby.
+  play?: boolean
+}
+
+const { play = true } = Astro.props
 ---
 
 <div class="get">
-  <a class="button" href={APP_LINKS.play}>Play in browser</a>
+  {play && <a class="button" href={APP_LINKS.play}>Play in browser</a>}
   <a class="badge-link" href={STORE_LINKS.appStore}>
     <Image src={appStoreBadge} alt="Download on the App Store" height={44} loading="eager" />
   </a>
