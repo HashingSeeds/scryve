@@ -21,6 +21,7 @@ import {
   incomingCommanderDamage,
   isEliminatedByCommanderDamage,
 } from "@/features/game/domain"
+import { GameSavedToast } from "@/features/game/GameSavedToast"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
 import { supportsCommanderDamage } from "@/features/game/playSystems"
@@ -42,7 +43,7 @@ export interface CurrentGameScreenProps {
   onSettings?: () => void
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
-  onGameEnded: (gameId: string) => void
+  onViewSummary: (gameId: string) => void
   onGameAbandoned?: () => void
   repository?: LocalGameRepository
 }
@@ -58,7 +59,7 @@ export function CurrentGameScreen({
   onSettings,
   onAccount,
   accountLabel = "Account",
-  onGameEnded,
+  onViewSummary,
   onGameAbandoned,
   repository,
 }: CurrentGameScreenProps) {
@@ -69,7 +70,9 @@ export function CurrentGameScreen({
   const system = runtime.game.system
   const { width, height, fontScale } = useWindowDimensions()
   const [menuOpen, setMenuOpen] = useState(false)
-  const isFresh = fresh && !hasLocalGameStarted(runtime.game)
+  const [freshBoard, setFreshBoard] = useState(fresh)
+  const [savedGameId, setSavedGameId] = useState<string>()
+  const isFresh = freshBoard && !hasLocalGameStarted(runtime.game)
   const [endSource, setEndSource] = useState<GameEndSource | undefined>(
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
@@ -118,9 +121,18 @@ export function CurrentGameScreen({
 
   function confirmEnd(result: LocalGameResult) {
     const ended = runtime.finish(result, endSource)
+    if (ended.status === "active") {
+      setEndSource(undefined)
+      return
+    }
+    // why: a failed rematch save throws here, and the open dialog shows the error.
+    runtime.rematch()
     setEndSource(undefined)
-    if (ended.status !== "active") setTimeout(() => onGameEnded(ended.id), 0)
+    setFreshBoard(true)
+    setSavedGameId(ended.id)
   }
+
+  const dismissSavedToast = useCallback(() => setSavedGameId(undefined), [])
 
   function abandonGame() {
     if (!onGameAbandoned) return
@@ -323,6 +335,14 @@ export function CurrentGameScreen({
           onClose={() => setEndSource(undefined)}
           onEnd={confirmEnd}
           onAbandon={onGameAbandoned ? abandonGame : undefined}
+        />
+      ) : null}
+
+      {savedGameId ? (
+        <GameSavedToast
+          key={savedGameId}
+          onViewSummary={() => onViewSummary(savedGameId)}
+          onDismiss={dismissSavedToast}
         />
       ) : null}
     </Screen>

@@ -1,7 +1,7 @@
 import { StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
@@ -45,7 +45,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
+        <CurrentGameScreen initialGame={game()} repository={repository} onViewSummary={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent(view.getByTestId("life-seat-1--1"), "longPress")
@@ -78,7 +78,7 @@ describe("CurrentGameScreen", () => {
           onDecks={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
-          onGameEnded={jest.fn()}
+          onViewSummary={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -92,7 +92,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
+        <CurrentGameScreen initialGame={game()} repository={repository} onViewSummary={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("life-seat-1-1"))
@@ -103,7 +103,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen initialGame={game()} repository={repository} onGameEnded={jest.fn()} />
+        <CurrentGameScreen initialGame={game()} repository={repository} onViewSummary={jest.fn()} />
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("life-seat-1-1"))
@@ -119,7 +119,7 @@ describe("CurrentGameScreen", () => {
           onDecks={jest.fn()}
           onSettings={jest.fn()}
           onAccount={jest.fn()}
-          onGameEnded={jest.fn()}
+          onViewSummary={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -149,7 +149,7 @@ describe("CurrentGameScreen", () => {
           fresh
           initialGame={game()}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onGameEnded={jest.fn()}
+          onViewSummary={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -173,7 +173,7 @@ describe("CurrentGameScreen", () => {
         <CurrentGameScreen
           initialGame={game(6)}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onGameEnded={jest.fn()}
+          onViewSummary={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -195,7 +195,7 @@ describe("CurrentGameScreen", () => {
         <CurrentGameScreen
           initialGame={game(5)}
           repository={new LocalGameRepository(new MemoryStorage())}
-          onGameEnded={jest.fn()}
+          onViewSummary={jest.fn()}
         />
       </ThemeProvider>,
     )
@@ -220,7 +220,11 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen initialGame={game(4)} repository={repository} onGameEnded={jest.fn()} />
+        <CurrentGameScreen
+          initialGame={game(4)}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
       </ThemeProvider>,
     )
 
@@ -233,6 +237,105 @@ describe("CurrentGameScreen", () => {
     await waitFor(() => expect(repository.loadActiveGame()?.layout).toBe("tabletop"))
   })
 
+  it("starts a rematch for the same table when a game ends", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const onViewSummary = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={onViewSummary}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    expect(repository.loadHistory().map(({ id }) => id)).toEqual([initial.id])
+    const rematch = repository.loadActiveGame()
+    expect(rematch?.id).not.toBe(initial.id)
+    expect(rematch?.players.map(({ name, color }) => [name, color])).toEqual(
+      initial.players.map(({ name, color }) => [name, color]),
+    )
+    expect(view.getByTestId("player-name-seat-1")).toHaveTextContent("Ada")
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("2")
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.getByTestId("connect-button")).toBeTruthy()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+
+    fireEvent.press(view.getByTestId("game-saved-summary-button"))
+    expect(onViewSummary).toHaveBeenCalledWith(initial.id)
+    expect(view.queryByTestId("game-saved-toast")).toBeNull()
+  })
+
+  it("gives each saved game its own Summary toast timer", () => {
+    jest.useFakeTimers()
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const onViewSummary = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={onViewSummary}
+        />
+      </ThemeProvider>,
+    )
+    const endGame = () => {
+      fireEvent.press(view.getByTestId("life-seat-1-1"))
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      fireEvent.press(view.getByTestId("end-game-button"))
+      fireEvent.press(view.getByTestId("end-game-winner-0"))
+      fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    }
+
+    endGame()
+    act(() => jest.advanceTimersByTime(4_000))
+    const second = repository.loadActiveGame()
+    endGame()
+    act(() => jest.advanceTimersByTime(4_000))
+
+    fireEvent.press(view.getByTestId("game-saved-summary-button"))
+    expect(onViewSummary).toHaveBeenCalledWith(second?.id)
+    jest.useRealTimers()
+  })
+
+  it("keeps the end dialog open to show a failed rematch save", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const save = repository.saveActiveGame.bind(repository)
+    jest.spyOn(repository, "saveActiveGame").mockImplementation((next) => {
+      if (next.id !== initial.id) throw new Error("Storage is full")
+      save(next)
+    })
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+
+    expect(view.getByTestId("end-game-dialog")).toBeTruthy()
+    expect(view.getByText("Storage is full")).toBeTruthy()
+  })
+
   it("discards an abandoned game without adding it to history", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const initial = game()
@@ -243,7 +346,7 @@ describe("CurrentGameScreen", () => {
         <CurrentGameScreen
           initialGame={initial}
           repository={repository}
-          onGameEnded={jest.fn()}
+          onViewSummary={jest.fn()}
           onGameAbandoned={onGameAbandoned}
         />
       </ThemeProvider>,
@@ -275,7 +378,11 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
       </ThemeProvider>,
     )
 
@@ -305,7 +412,11 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
       </ThemeProvider>,
     )
 
@@ -332,7 +443,11 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
       </ThemeProvider>,
     )
 
@@ -351,7 +466,11 @@ describe("CurrentGameScreen", () => {
     repository.saveActiveGame(initial)
     const view = render(
       <ThemeProvider initialContext="light">
-        <CurrentGameScreen initialGame={initial} repository={repository} onGameEnded={jest.fn()} />
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
       </ThemeProvider>,
     )
 
@@ -386,7 +505,7 @@ describe("CurrentGameScreen", () => {
           <CurrentGameScreen
             initialGame={initialGame}
             repository={new LocalGameRepository(new MemoryStorage())}
-            onGameEnded={jest.fn()}
+            onViewSummary={jest.fn()}
           />
         </ThemeProvider>,
       )
@@ -553,7 +672,7 @@ describe("CurrentGameScreen", () => {
             fresh
             initialGame={commanderGame()}
             repository={new LocalGameRepository(new MemoryStorage())}
-            onGameEnded={jest.fn()}
+            onViewSummary={jest.fn()}
           />
         </ThemeProvider>,
       )
@@ -598,7 +717,7 @@ it.each([false, true])(
           initialGame={game()}
           initialEndOpen
           repository={repository}
-          onGameEnded={jest.fn()}
+          onViewSummary={jest.fn()}
         />
       </ThemeProvider>,
     )

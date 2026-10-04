@@ -4,7 +4,13 @@ import * as Haptics from "expo-haptics"
 import { captureGame, type GameEndSource } from "@/utils/analytics"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
-import { applyGameCommand, canUndo, defaultCommandContext, hasLocalGameStarted } from "./domain"
+import {
+  applyGameCommand,
+  canUndo,
+  createRematch,
+  defaultCommandContext,
+  hasLocalGameStarted,
+} from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { GameCommand, LifeDelta, LocalGame, LocalGameResult, PlayerId } from "./types"
@@ -71,6 +77,14 @@ export function useLocalGame(
     [dispatch, reduceMotion, settings.hapticsEnabled],
   )
 
+  const rematch = useCallback(() => {
+    const next = createRematch(gameRef.current)
+    repository.saveActiveGame(next)
+    gameRef.current = next
+    setGame(next)
+    return next
+  }, [repository])
+
   return {
     game,
     canUndo: canUndo(game, context.actorId),
@@ -81,6 +95,7 @@ export function useLocalGame(
     finish: (result?: LocalGameResult, endSource?: GameEndSource) =>
       dispatch({ type: "game.finish", result }, endSource),
     abandon: () => dispatch({ type: "game.abandon" }),
+    rematch,
     discard: () => {
       repository.clearActiveGame()
       return gameRef.current
