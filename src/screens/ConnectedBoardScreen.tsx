@@ -981,6 +981,8 @@ function ConnectedBoardReady({
                     : await runtime.abandon()
                   if (!ended) return
                   setConfirmingFinish(false)
+                  // why: the finished projection carries any rematch, so the host follows it like every other board.
+                  if (withResult && onRematch) return
                   navigatedTerminal.current = true
                   if (withResult) {
                     if (onGameEnded) setTimeout(() => onGameEnded(publicId), 0)
