@@ -21,8 +21,21 @@ export function GameSavedToast({
   const insets = useSafeAreaInsets()
   useEffect(() => {
     if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility("Game saved")
-    const timeout = setTimeout(onDismiss, VISIBLE_MS)
-    return () => clearTimeout(timeout)
+    let active = true
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const schedule = (ms: number) => {
+      if (active) timeout = setTimeout(onDismiss, ms)
+    }
+    // why: Android users can ask for more time to act on notifications; react-native-web lacks this API.
+    if (Platform.OS === "android")
+      AccessibilityInfo.getRecommendedTimeoutMillis(VISIBLE_MS).then(schedule, () =>
+        schedule(VISIBLE_MS),
+      )
+    else schedule(VISIBLE_MS)
+    return () => {
+      active = false
+      clearTimeout(timeout)
+    }
   }, [onDismiss])
 
   return (

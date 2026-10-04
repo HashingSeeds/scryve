@@ -336,6 +336,7 @@ export function CurrentGameScreen({
 
       {savedGameId ? (
         <GameSavedToast
+          key={savedGameId}
           onViewSummary={() => onViewSummary(savedGameId)}
           onDismiss={dismissSavedToast}
         />

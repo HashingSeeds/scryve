@@ -1,7 +1,7 @@
 import { StyleSheet } from "react-native"
 import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
 import { commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
@@ -272,6 +272,40 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("game-saved-summary-button"))
     expect(onViewSummary).toHaveBeenCalledWith(initial.id)
     expect(view.queryByTestId("game-saved-toast")).toBeNull()
+  })
+
+  it("gives each saved game its own Summary toast timer", () => {
+    jest.useFakeTimers()
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = game()
+    repository.saveActiveGame(initial)
+    const onViewSummary = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={initial}
+          repository={repository}
+          onViewSummary={onViewSummary}
+        />
+      </ThemeProvider>,
+    )
+    const endGame = () => {
+      fireEvent.press(view.getByTestId("life-seat-1-1"))
+      fireEvent.press(view.getByTestId("game-menu-button"))
+      fireEvent.press(view.getByTestId("end-game-button"))
+      fireEvent.press(view.getByTestId("end-game-winner-0"))
+      fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    }
+
+    endGame()
+    act(() => jest.advanceTimersByTime(4_000))
+    const second = repository.loadActiveGame()
+    endGame()
+    act(() => jest.advanceTimersByTime(4_000))
+
+    fireEvent.press(view.getByTestId("game-saved-summary-button"))
+    expect(onViewSummary).toHaveBeenCalledWith(second?.id)
+    jest.useRealTimers()
   })
 
   it("discards an abandoned game without adding it to history", async () => {
