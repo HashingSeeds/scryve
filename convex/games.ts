@@ -467,6 +467,9 @@ async function terminalizeGame(
   const playerIds = new Set(players.map((player) => player._id))
   if (status !== "finished") result = { kind: "unknown" }
   const recordsHistory = !(status === "abandoned" && isUntouchedRematch(game, players))
+  // why: boards that wake on the finished game should open its summary, not a discarded rematch.
+  if (!recordsHistory && game.rematchOfGameId)
+    await ctx.db.patch(game.rematchOfGameId, { rematchPublicId: undefined })
   if (result.kind === "win") {
     if (result.winnerPlayerIds.length < 1) throw new Error("Choose at least one winner")
     if (new Set(result.winnerPlayerIds).size !== result.winnerPlayerIds.length)

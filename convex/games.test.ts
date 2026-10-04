@@ -2245,6 +2245,10 @@ describe("connected rematch", () => {
     await expect(
       game.joiner.query(api.games.lobbyProjection, { publicId: rematch.publicId }),
     ).resolves.toMatchObject({ status: "abandoned" })
+    const finished = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(finished.rematchPublicId).toBeUndefined()
     const history = await game.joiner.query(api.games.connectedHistory, {
       paginationOpts: { numItems: 10, cursor: null },
     })
