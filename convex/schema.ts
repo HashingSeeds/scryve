@@ -72,6 +72,8 @@ export default defineSchema({
     startedAt: v.optional(v.number()),
     updatedAt: v.number(),
     currentInvitationId: v.optional(v.id("invitations")),
+    rematchPublicId: v.optional(v.string()),
+    rematchOfGameId: v.optional(v.id("games")),
     // Reserved for a future event stream without enabling connected mutations in Phase 2.
     // Legacy event-count base. New life writes never patch this shared row.
     eventSequence: v.optional(v.number()),

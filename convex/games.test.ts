@@ -2149,3 +2149,129 @@ describe("hosted player appearances", () => {
     ).rejects.toThrow("color or shape")
   })
 })
+
+describe("connected rematch", () => {
+  const rematch = {
+    publicId: "rematch-public-game-123",
+    inviteToken: "r".repeat(43),
+    manualCodeCandidates: ["REM234"],
+  }
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => jest.useRealTimers())
+
+  it("seats the same table in a new game when the host finishes with a rematch", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await game.host.mutation(
+      api.games.changeLife,
+      lifeArgs(game.publicId, game.hostPlayerId, "operation-before-rematch", -5),
+    )
+
+    await expect(
+      game.host.mutation(api.games.finishGame, {
+        publicId: game.publicId,
+        result: { kind: "win", winnerPlayerIds: [game.hostPlayerId] },
+        rematch,
+      }),
+    ).resolves.toMatchObject({ rematchPublicId: rematch.publicId })
+
+    const finished = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(finished).toMatchObject({ status: "finished", rematchPublicId: rematch.publicId })
+    const next = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: rematch.publicId,
+    })
+    expect(next).toMatchObject({ status: "active", isHost: false, startingLife: 40 })
+    expect(
+      next.players.map(({ seat, displayName, color, currentLife }) => ({
+        seat,
+        displayName,
+        color,
+        currentLife,
+      })),
+    ).toEqual(
+      finished.players.map(({ seat, displayName, color }) => ({
+        seat,
+        displayName,
+        color,
+        currentLife: 40,
+      })),
+    )
+    expect(next.invitation).toBeNull()
+    const history = await game.joiner.query(api.games.connectedHistory, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(history.page.map(({ publicId }) => publicId)).toEqual([game.publicId])
+  })
+
+  it("finishes without a rematch when players at the table have blocked each other", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await t.run(async (ctx) => {
+      const players = await ctx.db.query("gamePlayers").collect()
+      await ctx.db.insert("userBlocks", {
+        blockerUserId: players[1].userId!,
+        blockedUserId: players[0].userId!,
+        createdAt: Date.now(),
+      })
+    })
+
+    const result = await game.host.mutation(api.games.finishGame, {
+      publicId: game.publicId,
+      rematch,
+    })
+    expect(result.rematchPublicId).toBeUndefined()
+    await expect(
+      game.host.query(api.games.lobbyProjection, { publicId: game.publicId }),
+    ).resolves.toMatchObject({ status: "finished" })
+  })
+
+  it("discards an untouched rematch without history when the host starts another game", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await game.host.mutation(api.games.finishGame, { publicId: game.publicId, rematch })
+
+    await game.host.mutation(api.games.createLobby, {
+      publicId: "after-rematch-game-12345",
+      playerCount: 2,
+      startingLife: 20,
+      ruleset: "standard",
+      inviteToken: "a".repeat(43),
+      manualCodeCandidates: ["AFT234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+    })
+    await expect(
+      game.joiner.query(api.games.lobbyProjection, { publicId: rematch.publicId }),
+    ).resolves.toMatchObject({ status: "abandoned" })
+    const finished = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(finished.rematchPublicId).toBeUndefined()
+    const history = await game.joiner.query(api.games.connectedHistory, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(history.page.map(({ publicId }) => publicId)).toEqual([game.publicId])
+    const active = await game.joiner.query(api.games.activeConnectedGames, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(active.page).toEqual([])
+  })
+
+  it("keeps a rematch once anyone has played in it", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    await game.host.mutation(api.games.finishGame, { publicId: game.publicId, rematch })
+    const next = await game.host.query(api.games.lobbyProjection, { publicId: rematch.publicId })
+    await game.host.mutation(
+      api.games.changeLife,
+      lifeArgs(rematch.publicId, next.players[0].playerId, "operation-in-rematch-01", -1),
+    )
+
+    await t.finishAllScheduledFunctions(() => jest.runAllTimers())
+    await expect(
+      game.host.query(api.games.lobbyProjection, { publicId: rematch.publicId }),
+    ).resolves.toMatchObject({ status: "active" })
+  })
+})

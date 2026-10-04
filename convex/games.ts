@@ -1,6 +1,7 @@
 import { paginationOptsValidator } from "convex/server"
 import { ConvexError, v, type Infer } from "convex/values"
 
+import { internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { internalMutation, mutation, query } from "./_generated/server"
@@ -41,6 +42,7 @@ import {
   normalizeManualCode,
   STALE_GAME_CLEANUP_BATCH_SIZE,
   STALE_GAME_INACTIVITY_MS,
+  UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 
 const MAX_PLAYERS_PER_GAME_READ = 7
@@ -335,6 +337,28 @@ function totalEventCount(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
   )
 }
 
+function isUntouchedRematch(game: Doc<"games">, players: Doc<"gamePlayers">[]) {
+  return game.rematchOfGameId !== undefined && totalEventCount(game, players) === 0
+}
+
+async function clearWayToHost(ctx: MutationCtx, hostUserId: Id<"users">) {
+  for (const status of ["lobby", "active"] as const) {
+    const existingHostedGame = await ctx.db
+      .query("games")
+      .withIndex("by_host_status", (q) => q.eq("hostUserId", hostUserId).eq("status", status))
+      .first()
+    if (!existingHostedGame) continue
+    if (
+      status === "active" &&
+      isUntouchedRematch(existingHostedGame, await playersForGame(ctx, existingHostedGame._id))
+    ) {
+      await terminalizeGame(ctx, existingHostedGame, "abandoned", "host_abandoned", hostUserId)
+      continue
+    }
+    throw new Error("You already host a lobby or active game; resume it before hosting another")
+  }
+}
+
 async function findInvite(
   ctx: QueryCtx,
   args: { token?: string; manualCode?: string },
@@ -442,6 +466,10 @@ async function terminalizeGame(
   const players = await playersForGame(ctx, game._id)
   const playerIds = new Set(players.map((player) => player._id))
   if (status !== "finished") result = { kind: "unknown" }
+  const recordsHistory = !(status === "abandoned" && isUntouchedRematch(game, players))
+  // why: boards that wake on the finished game should open its summary, not a discarded rematch.
+  if (!recordsHistory && game.rematchOfGameId)
+    await ctx.db.patch(game.rematchOfGameId, { rematchPublicId: undefined })
   if (result.kind === "win") {
     if (result.winnerPlayerIds.length < 1) throw new Error("Choose at least one winner")
     if (new Set(result.winnerPlayerIds).size !== result.winnerPlayerIds.length)
@@ -501,7 +529,7 @@ async function terminalizeGame(
   })
   const summary = (await ctx.db.get(summaryId))!
   const playersByUser = new Map<Id<"users">, typeof summaryPlayers>()
-  for (const player of summaryPlayers) {
+  for (const player of recordsHistory ? summaryPlayers : []) {
     if (!player.userId) continue
     const group = playersByUser.get(player.userId) ?? []
     group.push(player)
@@ -523,7 +551,7 @@ async function terminalizeGame(
       outcome,
     })
   }
-  for (const player of summaryPlayers) {
+  for (const player of recordsHistory ? summaryPlayers : []) {
     if (!player.userId || !player.deckId || !player.deckVersionId) continue
     await ctx.db.insert("deckGameResults", {
       deckId: player.deckId,
@@ -615,14 +643,7 @@ export const createLobby = mutation({
         : assertDeckGameFormat(gameSystem, args.format)
     const hostDisplayName = assertDisplayName(args.hostDisplayName)
     assertPublicId(args.publicId)
-    for (const status of ["lobby", "active"] as const) {
-      const existingHostedGame = await ctx.db
-        .query("games")
-        .withIndex("by_host_status", (q) => q.eq("hostUserId", user._id).eq("status", status))
-        .first()
-      if (existingHostedGame)
-        throw new Error("You already host a lobby or active game; resume it before hosting another")
-    }
+    await clearWayToHost(ctx, user._id)
     if (
       await ctx.db
         .query("games")
@@ -974,14 +995,7 @@ export const publishLocalGame = mutation({
         players: receipt.players,
       }
     }
-    for (const status of ["lobby", "active"] as const) {
-      const existingHostedGame = await ctx.db
-        .query("games")
-        .withIndex("by_host_status", (q) => q.eq("hostUserId", user._id).eq("status", status))
-        .first()
-      if (existingHostedGame)
-        throw new Error("You already host a lobby or active game; resume it before hosting another")
-    }
+    await clearWayToHost(ctx, user._id)
     if (
       await ctx.db
         .query("games")
@@ -1179,6 +1193,7 @@ export const lobbyProjection = query({
       system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
       format: game.format ?? game.ruleset,
       isHost,
+      ...(game.rematchPublicId ? { rematchPublicId: game.rematchPublicId } : {}),
       eventSequence: eventCount,
       ...(args.operation
         ? { operationStatus: await statusForOperation(ctx, game, user, eventCount, args.operation) }
@@ -1968,6 +1983,116 @@ export const declineCommanderDamage = mutation({
   handler: async (ctx, args) => resolveCommanderClaim(ctx, args, "declined"),
 })
 
+const rematchRequest = v.object({
+  publicId: v.string(),
+  inviteToken: v.string(),
+  manualCodeCandidates: v.array(v.string()),
+})
+
+async function startRematch(
+  ctx: MutationCtx,
+  finished: Doc<"games">,
+  hostUserId: Id<"users">,
+  request: Infer<typeof rematchRequest>,
+) {
+  assertPublicId(request.publicId)
+  assertInviteToken(request.inviteToken)
+  assertManualCodeCandidates(request.manualCodeCandidates)
+  const players = await playersForGame(ctx, finished._id)
+  if (players.some((player) => player.deletedAt !== undefined)) return null
+  const userIds = [...new Set(players.flatMap((player) => player.userId ?? []))]
+  for (const [index, userId] of userIds.entries()) {
+    for (const otherUserId of userIds.slice(index + 1)) {
+      if (await isBlockedBetween(ctx, userId, otherUserId)) return null
+    }
+  }
+  for (const status of ["lobby", "active"] as const) {
+    const hosted = await ctx.db
+      .query("games")
+      .withIndex("by_host_status", (q) => q.eq("hostUserId", hostUserId).eq("status", status))
+      .first()
+    if (hosted) return null
+  }
+  if (
+    await ctx.db
+      .query("games")
+      .withIndex("by_public_id", (q) => q.eq("publicId", request.publicId))
+      .unique()
+  )
+    throw new Error("Game identifier collision; retry")
+  const now = Date.now()
+  const gameId = await ctx.db.insert("games", {
+    publicId: request.publicId,
+    hostUserId,
+    mode: "connected",
+    status: "active",
+    playerCount: players.length,
+    startingLife: finished.startingLife,
+    ...(finished.lifeStep === undefined ? {} : { lifeStep: finished.lifeStep }),
+    ruleset: finished.ruleset,
+    ...(finished.deckRequired === undefined ? {} : { deckRequired: finished.deckRequired }),
+    ...(finished.game === undefined ? {} : { game: finished.game }),
+    ...(finished.system === undefined ? {} : { system: finished.system }),
+    ...(finished.format === undefined ? {} : { format: finished.format }),
+    rematchOfGameId: finished._id,
+    createdAt: now,
+    startedAt: now,
+    updatedAt: now,
+    eventSequence: 0,
+  })
+  const game = (await ctx.db.get(gameId))!
+  for (const player of players.sort((left, right) => left.seat - right.seat)) {
+    const deckVersionId =
+      player.deckVersionId && (await deckSelectionIsPlayable(ctx, player.deckVersionId, game))
+        ? player.deckVersionId
+        : undefined
+    await ctx.db.insert("gamePlayers", {
+      gameId,
+      seat: player.seat,
+      ...(player.userId ? { userId: player.userId } : {}),
+      ...(player.deviceId ? { deviceId: player.deviceId } : {}),
+      displayName: player.displayName,
+      ...(player.avatarUrl ? { avatarUrl: player.avatarUrl } : {}),
+      ...(player.usernameAtJoin ? { usernameAtJoin: player.usernameAtJoin } : {}),
+      ...(deckVersionId ? { deckVersionId } : {}),
+      color: player.color,
+      ...(player.shape ? { shape: player.shape } : {}),
+      currentLife: finished.startingLife,
+      eventCount: 0,
+      resumable: true,
+      joinedAt: now,
+    })
+  }
+  if (players.some((player) => player.userId === undefined)) {
+    const manualCode = await allocateInvite(ctx, request.inviteToken, request.manualCodeCandidates)
+    const invitationId = await ctx.db.insert("invitations", {
+      gameId,
+      token: request.inviteToken,
+      manualCode,
+      expiresAt: now + INVITE_LIFETIME_MS,
+      createdAt: now,
+    })
+    await ctx.db.patch(gameId, { currentInvitationId: invitationId })
+  }
+  await ctx.db.patch(finished._id, { rematchPublicId: request.publicId })
+  await ctx.scheduler.runAfter(
+    UNTOUCHED_REMATCH_LIFETIME_MS,
+    internal.games.discardUntouchedRematch,
+    { gameId },
+  )
+  return request.publicId
+}
+
+export const discardUntouchedRematch = internalMutation({
+  args: { gameId: v.id("games") },
+  handler: async (ctx, args) => {
+    const game = await ctx.db.get(args.gameId)
+    if (game?.status !== "active" || !isUntouchedRematch(game, await playersForGame(ctx, game._id)))
+      return
+    await terminalizeGame(ctx, game, "abandoned", "stale_inactivity")
+  },
+})
+
 export const finishGame = mutation({
   args: {
     publicId: v.string(),
@@ -1978,6 +2103,7 @@ export const finishGame = mutation({
         v.object({ kind: v.literal("unknown") }),
       ),
     ),
+    rematch: v.optional(rematchRequest),
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
@@ -1991,7 +2117,15 @@ export const finishGame = mutation({
       user._id,
       args.result ?? { kind: "unknown" },
     )
-    return { publicId: game.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
+    const rematchPublicId = args.rematch
+      ? await startRematch(ctx, game, user._id, args.rematch)
+      : null
+    return {
+      publicId: game.publicId,
+      summaryId: summary._id,
+      finishedAt: summary.finishedAt,
+      ...(rematchPublicId ? { rematchPublicId } : {}),
+    }
   },
 })
 
