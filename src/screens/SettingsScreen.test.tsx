@@ -39,6 +39,8 @@ jest.mock("expo-updates", () => ({
   __esModule: true,
   useUpdates: () => mockUpdatesHook,
   reloadAsync: jest.fn(() => Promise.resolve()),
+  setUpdateRequestHeadersOverride: jest.fn(),
+  checkForUpdateAsync: jest.fn(() => Promise.resolve({ isAvailable: false })),
   get isEnabled() {
     return mockUpdates.isEnabled
   },
@@ -249,6 +251,72 @@ describe("SettingsScreen", () => {
     } finally {
       platform.restore()
     }
+  })
+
+  describe("beta updates", () => {
+    const development = __DEV__
+    const renderSettings = () =>
+      render(
+        <ThemeProvider initialContext="dark">
+          <SettingsScreen
+            initialSettings={DEFAULT_LOCAL_SETTINGS}
+            onBack={jest.fn()}
+            onSettingsChange={jest.fn()}
+          />
+        </ThemeProvider>,
+      )
+    const tapVersion = (view: ReturnType<typeof renderSettings>, times: number) => {
+      for (let tap = 0; tap < times; tap++) fireEvent.press(view.getByText("Version: 1.2.3"))
+    }
+
+    beforeEach(() => {
+      Reflect.set(globalThis, "__DEV__", false)
+      jest.mocked(Updates.setUpdateRequestHeadersOverride).mockClear()
+    })
+    afterEach(() => Reflect.set(globalThis, "__DEV__", development))
+
+    it("unlocks from the version row and shows the pending channel in debug info", () => {
+      mockUpdates.channel = "production"
+      const view = renderSettings()
+      tapVersion(view, 4)
+      expect(view.queryByTestId("beta-updates-switch")).toBeNull()
+      tapVersion(view, 1)
+
+      fireEvent(view.getByTestId("beta-updates-switch"), "valueChange", true)
+      expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith({
+        "expo-channel-name": "beta",
+      })
+      expect(view.getByText("Channel: production (beta after restart)")).toBeTruthy()
+
+      fireEvent(view.getByTestId("beta-updates-switch"), "valueChange", false)
+      expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith(null)
+      expect(view.getByText("Channel: production")).toBeTruthy()
+    })
+
+    it("stays on production when the build rejects the channel override", () => {
+      mockUpdates.channel = "production"
+      jest.mocked(Updates.setUpdateRequestHeadersOverride).mockImplementationOnce(() => {
+        throw new Error("Invalid update requestHeaders override")
+      })
+      const view = renderSettings()
+      tapVersion(view, 5)
+      fireEvent(view.getByTestId("beta-updates-switch"), "valueChange", true)
+      expect(view.getByTestId("beta-updates-switch")).not.toBeChecked()
+      expect(view.getByText("Channel: production")).toBeTruthy()
+    })
+
+    it("stays visible on the beta channel so players can switch back", () => {
+      mockUpdates.channel = "beta"
+      const view = renderSettings()
+      expect(view.getByText("Channel: beta")).toBeTruthy()
+      expect(view.getByTestId("beta-updates-switch")).toBeChecked()
+    })
+
+    it("is never offered on preview builds", () => {
+      const view = renderSettings()
+      tapVersion(view, 5)
+      expect(view.queryByTestId("beta-updates-switch")).toBeNull()
+    })
   })
 
   it("exposes the two shipping menu button treatments", () => {

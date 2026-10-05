@@ -48,6 +48,46 @@ export function useForegroundUpdateChecks() {
   }, [])
 }
 
+const BETA_CHANNEL = "beta"
+const SWITCHABLE_CHANNELS = ["production", BETA_CHANNEL]
+
+// why: the native override persists, but `Updates.channel` only reflects it after a relaunch.
+let switchedChannel: string | undefined
+
+export function canSwitchToBeta() {
+  return (
+    Platform.OS !== "web" &&
+    Updates.isEnabled &&
+    !__DEV__ &&
+    SWITCHABLE_CHANNELS.includes(Updates.channel ?? "")
+  )
+}
+
+export function betaUpdatesChosen() {
+  return (switchedChannel ?? Updates.channel) === BETA_CHANNEL
+}
+
+export function updateChannelLabel() {
+  const running = Updates.channel
+  if (!running) return null
+  return switchedChannel ? `${running} (${switchedChannel} after restart)` : running
+}
+
+// why: overriding works on existing store builds because EAS Build embeds this header key.
+export function setBetaUpdates(enabled: boolean) {
+  try {
+    Updates.setUpdateRequestHeadersOverride(enabled ? { "expo-channel-name": BETA_CHANNEL } : null)
+  } catch {
+    return false
+  }
+  const next = enabled ? BETA_CHANNEL : "production"
+  switchedChannel = next === Updates.channel ? undefined : next
+  Updates.checkForUpdateAsync()
+    .then((result) => (result.isAvailable ? Updates.fetchUpdateAsync() : undefined))
+    .catch(() => undefined)
+  return true
+}
+
 export function restartToUpdate() {
   Updates.reloadAsync().catch(() => undefined)
 }

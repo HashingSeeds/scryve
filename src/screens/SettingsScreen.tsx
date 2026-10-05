@@ -27,6 +27,12 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
+import {
+  betaUpdatesChosen,
+  canSwitchToBeta,
+  setBetaUpdates,
+  updateChannelLabel,
+} from "@/features/updates/appUpdate"
 import { AppUpdateStatus } from "@/features/updates/AppUpdateStatus"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -38,6 +44,7 @@ import {
 } from "@/utils/analytics"
 
 const MIN_STARTING_LIFE = 1
+const BETA_UNLOCK_TAPS = 5
 
 export interface SettingsScreenProps {
   initialSettings: LocalSettings
@@ -71,6 +78,8 @@ export function SettingsScreen({
   const [copyStatus, setCopyStatus] = useState("")
   const [sharing, setSharing] = useState(analyticsEnabled)
   const [analyticsError, setAnalyticsError] = useState("")
+  const [beta, setBeta] = useState(betaUpdatesChosen)
+  const [versionTaps, setVersionTaps] = useState(0)
   const unavailable = Platform.OS === "web" ? "Not applicable" : "Unavailable"
   const appInfo = {
     Version:
@@ -89,7 +98,7 @@ export function SettingsScreen({
           : __DEV__
             ? "Development"
             : "Bundled",
-    Channel: Updates.channel || unavailable,
+    Channel: updateChannelLabel() || unavailable,
     Platform: Platform.OS,
   }
   const copyDebugInfo = async () => {
@@ -381,9 +390,25 @@ export function SettingsScreen({
                 selectable
                 accessibilityLabel={`${label}: ${value}`}
                 text={`${label}: ${shorten ? `${value.slice(0, 12)}…` : value}`}
+                onPress={
+                  label === "Version" && canSwitchToBeta()
+                    ? () => setVersionTaps((taps) => taps + 1)
+                    : undefined
+                }
               />
             )
           })}
+          {canSwitchToBeta() && (beta || versionTaps >= BETA_UNLOCK_TAPS) ? (
+            <Switch
+              testID="beta-updates-switch"
+              label="Beta updates"
+              helper="Gets unreleased updates before everyone else. They may be unstable."
+              value={beta}
+              onValueChange={(value) => {
+                if (setBetaUpdates(value)) setBeta(value)
+              }}
+            />
+          ) : null}
           <Button
             testID="copy-debug-info-button"
             preset="primary"

@@ -12,6 +12,17 @@ This app uses two release paths: OTA updates for JS and asset changes within an 
 
 Do not republish a preview update group to production. If a future staging build uses the same native configuration, runtime, environment, and code signing as production, promote its tested group with `eas update:republish --group <update-group-id> --destination-channel production`.
 
+## Beta updates (opt-in OTA)
+
+Production builds have a hidden Beta updates switch: tap Version in Settings five times. It points that install at the `beta` channel, which runs the production build, runtime, and Convex backend. Settings and Sentry show `beta` as the channel after a restart.
+
+1. Create the channel once: `eas channel:create beta`.
+2. Deploy any Convex change the update needs to production first.
+3. Publish: `pnpm ota:beta --message "..."`. `RELEASE_NOTES` works the same as for production.
+4. When it is ready for everyone, publish the same commit with `pnpm ota:prod`, or promote the tested group with `eas update:republish --group <update-group-id> --destination-channel production`.
+
+If a beta update crashes during launch, expo-updates falls back to the previous working update, and the player can turn the switch off. For any other bad beta update, roll it back with `eas update:rollback <beta-update-group-id>`.
+
 ## Native releases (fingerprint changed)
 
 1. Build preview binaries: `eas build --profile preview` and `eas build --profile preview:device`.
