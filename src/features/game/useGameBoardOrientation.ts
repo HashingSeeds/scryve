@@ -82,14 +82,15 @@ export function useGameBoardOrientation() {
       )
         return
       if (!active) return
+      // why: LANDSCAPE_RIGHT and Android's -90 mean the device top turned left, so seats need -90deg.
       const landscapeRotation =
         androidRotationDegrees === undefined
           ? orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT
-            ? 90
-            : -90
+            ? -90
+            : 90
           : androidRotationDegrees === 0 || androidRotationDegrees === -90
-            ? 90
-            : -90
+            ? -90
+            : 90
       const rotation = landscape && screenLandscape ? landscapeRotation : 0
       setBoard({ ...dimensions, screen, rotation })
     }
@@ -162,5 +163,6 @@ export function nativeGameBoardRotation(interfaceOrientation: number, naturalLan
   "worklet"
   const sideways = interfaceOrientation === 90 || interfaceOrientation === 270
   if (sideways === naturalLandscape) return 0
-  return interfaceOrientation === 0 || interfaceOrientation === 90 ? 90 : -90
+  // why: Reanimated reports 90 when the top of the device turned left, matching LANDSCAPE_RIGHT above.
+  return interfaceOrientation === 0 || interfaceOrientation === 90 ? -90 : 90
 }

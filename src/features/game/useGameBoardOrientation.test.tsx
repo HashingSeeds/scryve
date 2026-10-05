@@ -26,10 +26,13 @@ it("preserves portrait board dimensions and maps its menu junction in both lands
     .mocked(ScreenOrientation.getOrientationAsync)
     .mockResolvedValue(ScreenOrientation.Orientation.LANDSCAPE_LEFT)
   const view = renderHook(useGameBoardOrientation)
-  await waitFor(() => expect(view.result.current.rotation).toBe(-90))
+  await waitFor(() => expect(view.result.current.rotation).toBe(90))
   expect(view.result.current).toMatchObject({ width: 390, height: 844 })
   const anchor = { x: 0.5, y: 5 / 14 }
-  expect(rotateGameBoardAnchor(anchor, view.result.current.rotation)).toEqual({ x: 5 / 14, y: 0.5 })
+  expect(rotateGameBoardAnchor(anchor, view.result.current.rotation)).toEqual({
+    x: expect.closeTo(9 / 14),
+    y: 0.5,
+  })
   const listener = jest.mocked(ScreenOrientation.addOrientationChangeListener).mock.calls[0][0]
   act(() =>
     listener({
@@ -37,7 +40,7 @@ it("preserves portrait board dimensions and maps its menu junction in both lands
       orientationLock: ScreenOrientation.OrientationLock.DEFAULT,
     }),
   )
-  expect(view.result.current.rotation).toBe(90)
+  expect(view.result.current.rotation).toBe(-90)
   expect(rotateGameBoardAnchor(anchor, 90)).toEqual({ x: expect.closeTo(9 / 14), y: 0.5 })
   act(() => {
     Dimensions.set({ window, screen })
@@ -66,12 +69,12 @@ it("refreshes Android landscape direction even when the window size stays the sa
     .mocked(ScreenOrientation.getOrientationAsync)
     .mockResolvedValue(ScreenOrientation.Orientation.LANDSCAPE_LEFT)
   const view = renderHook(useGameBoardOrientation)
-  await waitFor(() => expect(view.result.current.rotation).toBe(-90))
+  await waitFor(() => expect(view.result.current.rotation).toBe(90))
   jest
     .mocked(ScreenOrientation.getOrientationAsync)
     .mockResolvedValue(ScreenOrientation.Orientation.LANDSCAPE_RIGHT)
   act(() => DeviceEventEmitter.emit("namedOrientationDidChange", { rotationDegrees: -90 }))
-  await waitFor(() => expect(view.result.current.rotation).toBe(90))
+  await waitFor(() => expect(view.result.current.rotation).toBe(-90))
   view.unmount()
   Dimensions.set({ window, screen })
   jest.restoreAllMocks()
@@ -116,8 +119,8 @@ it.each(["dimensions-first", "orientation-first"])(
     view.unmount()
     act(() => Dimensions.set({ window, screen }))
     expect(intermediate).toMatchObject({ rotation: 0, screenWidth: 390, screenHeight: 844 })
-    expect(finalRotation).toBe(90)
-    expect(rotations).not.toContain(-90)
+    expect(finalRotation).toBe(-90)
+    expect(rotations).not.toContain(90)
   },
 )
 
@@ -172,7 +175,7 @@ it.each([-90, 90])(
     Dimensions.set({ window, screen })
     jest.restoreAllMocks()
     expect(beforeResize).toMatchObject({ rotation: 0, screenWidth: 390 })
-    expect(landscape).toMatchObject({ rotation: -rotationDegrees, screenWidth: 844 })
+    expect(landscape).toMatchObject({ rotation: rotationDegrees, screenWidth: 844 })
     expect(beforeReturn).toEqual(landscape)
     expect(portrait).toMatchObject({ rotation: 0, screenWidth: 390 })
   },
@@ -189,7 +192,7 @@ it("handles an Android tablet with a naturally landscape display", async () => {
   const view = renderHook(useGameBoardOrientation)
   await act(async () => {})
   act(() => DeviceEventEmitter.emit("namedOrientationDidChange", { rotationDegrees: 180 }))
-  await waitFor(() => expect(view.result.current.rotation).toBe(-90))
+  await waitFor(() => expect(view.result.current.rotation).toBe(90))
   const board = view.result.current
   view.unmount()
   Dimensions.set({ window, screen })
@@ -199,12 +202,12 @@ it("handles an Android tablet with a naturally landscape display", async () => {
 
 it.each([
   [false, 0, 0],
-  [false, 90, 90],
+  [false, 90, -90],
   [false, 180, 0],
-  [false, 270, -90],
-  [true, 0, 90],
+  [false, 270, 90],
+  [true, 0, -90],
   [true, 90, 0],
-  [true, 180, -90],
+  [true, 180, 90],
   [true, 270, 0],
 ])(
   "maps native rotation on naturalLandscape=%s at %i° to %i°",
