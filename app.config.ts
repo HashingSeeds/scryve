@@ -4,6 +4,12 @@ import { CodeGenerator, withMainActivity } from "expo/config-plugins"
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
 
+// why: safe only because fingerprint.config.js skips ExpoConfigExtraSection; otherwise notes change the runtime.
+const RELEASE_NOTES = (process.env.RELEASE_NOTES ?? "")
+  .split("\n")
+  .map((line) => line.trim())
+  .filter(Boolean)
+
 function normalizeHttpsOrigin(value: string | undefined): string | null {
   if (!value) return null
   try {
@@ -134,6 +140,10 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
         : [],
     },
     plugins,
+    extra: {
+      ...config.extra,
+      ...(RELEASE_NOTES.length > 0 ? { releaseNotes: RELEASE_NOTES } : {}),
+    },
   }
 
   return withMainActivity(expoConfig, (config) => {
