@@ -405,8 +405,7 @@ export function SettingsScreen({
               helper="Gets unreleased updates before everyone else. They may be unstable."
               value={beta}
               onValueChange={(value) => {
-                setBetaUpdates(value)
-                setBeta(value)
+                if (setBetaUpdates(value)) setBeta(value)
               }}
             />
           ) : null}

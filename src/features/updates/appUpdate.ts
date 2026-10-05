@@ -75,12 +75,17 @@ export function updateChannelLabel() {
 
 // why: overriding works on existing store builds because EAS Build embeds this header key.
 export function setBetaUpdates(enabled: boolean) {
-  Updates.setUpdateRequestHeadersOverride(enabled ? { "expo-channel-name": BETA_CHANNEL } : null)
+  try {
+    Updates.setUpdateRequestHeadersOverride(enabled ? { "expo-channel-name": BETA_CHANNEL } : null)
+  } catch {
+    return false
+  }
   const next = enabled ? BETA_CHANNEL : "production"
   switchedChannel = next === Updates.channel ? undefined : next
   Updates.checkForUpdateAsync()
     .then((result) => (result.isAvailable ? Updates.fetchUpdateAsync() : undefined))
     .catch(() => undefined)
+  return true
 }
 
 export function restartToUpdate() {

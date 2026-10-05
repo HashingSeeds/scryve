@@ -293,6 +293,18 @@ describe("SettingsScreen", () => {
       expect(view.getByText("Channel: production")).toBeTruthy()
     })
 
+    it("stays on production when the build rejects the channel override", () => {
+      mockUpdates.channel = "production"
+      jest.mocked(Updates.setUpdateRequestHeadersOverride).mockImplementationOnce(() => {
+        throw new Error("Invalid update requestHeaders override")
+      })
+      const view = renderSettings()
+      tapVersion(view, 5)
+      fireEvent(view.getByTestId("beta-updates-switch"), "valueChange", true)
+      expect(view.getByTestId("beta-updates-switch")).not.toBeChecked()
+      expect(view.getByText("Channel: production")).toBeTruthy()
+    })
+
     it("stays visible on the beta channel so players can switch back", () => {
       mockUpdates.channel = "beta"
       const view = renderSettings()
