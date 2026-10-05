@@ -82,6 +82,7 @@
     "expo-localization": "~57.0.2",
     "expo-observe": "~57.0.24",
     "expo-router": "~57.0.24",
+    "expo-screen-orientation": "~57.0.2",
     "expo-secure-store": "57.0.4",
     "expo-splash-screen": "~57.0.9",
     "expo-store-review": "~57.0.3",

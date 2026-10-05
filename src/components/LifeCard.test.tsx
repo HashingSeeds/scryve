@@ -884,6 +884,42 @@ describe("LifeCard", () => {
     expect(view.getByText("21")).toBeTruthy()
   })
 
+  it.each([
+    [90, 0, 0, 5],
+    [90, 90, -5, 0],
+    [90, -90, 5, 0],
+    [90, 180, 0, -5],
+    [-90, 0, 0, -5],
+    [-90, 90, 5, 0],
+    [-90, -90, -5, 0],
+    [-90, 180, 0, 5],
+  ] as const)(
+    "scrubs toward plus with board %i° and seat %i°",
+    (boardRotation, contentRotation, dx, dy) => {
+      const onChange = jest.fn()
+      const view = render(
+        <ThemeProvider initialContext="dark">
+          <LifeCard
+            playerName="Ada"
+            seatNumber={1}
+            life={20}
+            color="#41476E"
+            boardRotation={boardRotation}
+            contentRotation={contentRotation}
+            onChange={onChange}
+          />
+        </ThemeProvider>,
+      )
+      fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+      const slider = view.getByTestId("life-editor-slider-seat-1")
+      fireEvent(slider, "layout", { nativeEvent: { layout: { width: 200 } } })
+      fireEvent(slider, "responderGrant", { nativeEvent: { pageX: 100, pageY: 100 } })
+      fireEvent(slider, "responderMove", { nativeEvent: { pageX: 100 + dx, pageY: 100 + dy } })
+      fireEvent(slider, "responderRelease")
+      expect(onChange).toHaveBeenCalledWith(1)
+    },
+  )
+
   it("keeps the drag delta when the saved life changes mid-drag", () => {
     const onChange = jest.fn()
     const view = render(interactiveCard(20, onChange))

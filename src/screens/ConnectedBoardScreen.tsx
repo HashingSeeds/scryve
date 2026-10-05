@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ActivityIndicator, ScrollView, Share, useWindowDimensions, View } from "react-native"
+import { ActivityIndicator, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
+import Animated from "react-native-reanimated"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
@@ -46,6 +47,10 @@ import {
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
+import {
+  rotateGameBoardAnchor,
+  useGameBoardOrientation,
+} from "@/features/game/useGameBoardOrientation"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -311,7 +316,8 @@ function ConnectedBoardReady({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const { width, height, fontScale } = useWindowDimensions()
+  const boardOrientation = useGameBoardOrientation()
+  const { width, height, fontScale, rotation } = boardOrientation
   const [menuOpen, setMenuOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
@@ -499,8 +505,8 @@ function ConnectedBoardReady({
     [players.length, width, height, fontScale, layoutVariant],
   )
   const menuAnchor = useMemo(
-    () => getPlayerGridMenuAnchor(players.length, gridLayout),
-    [players.length, gridLayout],
+    () => rotateGameBoardAnchor(getPlayerGridMenuAnchor(players.length, gridLayout), rotation),
+    [players.length, gridLayout, rotation],
   )
 
   /**
@@ -622,8 +628,14 @@ function ConnectedBoardReady({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <View testID="connected-game-board" style={themed($board)}>
+      <Animated.View
+        ref={boardOrientation.frameRef}
+        collapsable={false}
+        testID="connected-game-board"
+        style={themed($board)}
+      >
         <PlayerGrid
+          boardOrientation={boardOrientation}
           players={players}
           system={system}
           lifeStep={game.lifeStep}
@@ -675,6 +687,8 @@ function ConnectedBoardReady({
         <GameRadialMenu
           open={menuOpen}
           anchor={menuAnchor}
+          boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
+          nativeFrame={boardOrientation.nativeFrame}
           compact={players.length > 2}
           actions={radialActions}
           variant={menuButtonStyle}
@@ -698,7 +712,7 @@ function ConnectedBoardReady({
             onAccount={onAccount}
           />
         ) : null}
-      </View>
+      </Animated.View>
 
       {inviteDialogOpen && invitation ? (
         <DialogCard

@@ -1,11 +1,13 @@
 import { useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { useWindowDimensions, View } from "react-native"
+import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { type PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
+import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -52,6 +54,8 @@ export interface CommanderDamageGridBinding {
 
 export interface PlayerGridProps {
   players: GamePlayer[]
+  boardOrientation?: Omit<ReturnType<typeof useGameBoardOrientation>, "frameRef" | "nativeFrame"> &
+    Partial<Pick<ReturnType<typeof useGameBoardOrientation>, "nativeFrame">>
   system?: PlaySystemId
   lifeStep?: number
   layoutVariant?: PlayerGridLayoutVariant
@@ -67,6 +71,7 @@ export interface PlayerGridProps {
 
 export function PlayerGrid({
   players,
+  boardOrientation,
   system,
   lifeStep,
   layoutVariant = "auto",
@@ -79,8 +84,44 @@ export function PlayerGrid({
   onChange,
   style,
 }: PlayerGridProps) {
-  const { width, height, fontScale } = useWindowDimensions()
-  const insets = useSafeAreaInsets()
+  const dimensions = useWindowDimensions()
+  const boardRotation = boardOrientation?.rotation ?? 0
+  const { width, height, fontScale } = boardOrientation ?? dimensions
+  const nativeFrame = boardOrientation?.nativeFrame
+  const nativeBoardStyle = useAnimatedStyle(() => {
+    if (!boardOrientation) return {}
+    const frame = nativeFrame?.value ?? {
+      width: boardOrientation.screenWidth,
+      height: boardOrientation.screenHeight,
+      rotation: boardRotation,
+    }
+    const width = Math.min(frame.width, frame.height)
+    const height = Math.max(frame.width, frame.height)
+    return {
+      width,
+      height,
+      left: (frame.width - width) / 2,
+      top: (frame.height - height) / 2,
+      transform: [{ rotate: `${frame.rotation}deg` }],
+    }
+  })
+  const screenInsets = useSafeAreaInsets()
+  const insets =
+    boardRotation === 90
+      ? {
+          top: screenInsets.right,
+          right: screenInsets.bottom,
+          bottom: screenInsets.left,
+          left: screenInsets.top,
+        }
+      : boardRotation === -90
+        ? {
+            top: screenInsets.left,
+            right: screenInsets.top,
+            bottom: screenInsets.right,
+            left: screenInsets.bottom,
+          }
+        : screenInsets
   const {
     themed,
     theme: { spacing },
@@ -124,148 +165,167 @@ export function PlayerGrid({
   const armedPlayer = players.find(({ id }) => id === commanderDamage?.armedPlayerId)
 
   return (
-    <View
-      testID="player-grid"
-      accessibilityLabel={`${players.length} player ${counter.label} grid`}
-      onLayout={measureBoard}
-      style={[
-        themed($grid),
-        style,
-        (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
-      ]}
-    >
-      {rows.map((row, rowIndex) => (
-        <View
-          key={rowIndex}
-          testID={`player-grid-row-${rowIndex}`}
-          style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}
-        >
-          {row.map((index, columnIndex) => {
-            if (index === null) {
+    <View testID="player-grid-frame" style={$frame}>
+      <Animated.View
+        testID="player-grid"
+        accessibilityLabel={`${players.length} player ${counter.label} grid`}
+        onLayout={measureBoard}
+        style={[
+          themed($grid),
+          style,
+          boardOrientation && $fixedGrid,
+          boardOrientation && {
+            width,
+            height,
+            transform: [
+              { translateX: -width / 2 },
+              { translateY: -height / 2 },
+              { rotate: `${boardRotation}deg` },
+            ],
+          },
+          nativeBoardStyle,
+          (cellSize.cellWidth <= 0 || cellSize.cellHeight <= 0) && $unmeasured,
+        ]}
+      >
+        {rows.map((row, rowIndex) => (
+          <View
+            key={rowIndex}
+            testID={`player-grid-row-${rowIndex}`}
+            style={[themed($row), { flex: getPlayerGridRowFlex(row, layout) }]}
+          >
+            {row.map((index, columnIndex) => {
+              if (index === null) {
+                return (
+                  <View
+                    key={`empty-${rowIndex}-${columnIndex}`}
+                    testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                    style={themed($cell)}
+                  />
+                )
+              }
+              const player = players[index]
+              const seatNumber = index + 1
+              const playerDisabled = Boolean(isPlayerDisabled?.(player))
+              const playerOwned = Boolean(isPlayerOwned?.(player))
+              const contentRotation = getPlayerContentRotation({
+                playerCount: players.length,
+                layout,
+                row,
+                rowIndex,
+                columnIndex,
+                playerIndex: index,
+              })
+              const ownership = isPlayerOwned
+                ? playerOwned
+                  ? "owned"
+                  : "unowned"
+                : disabled
+                  ? "disabled"
+                  : isPlayerDisabled
+                    ? playerDisabled
+                      ? "unowned"
+                      : "owned"
+                    : undefined
+              const screenEdges = {
+                top: rowIndex === 0,
+                bottom: rowIndex === rows.length - 1,
+                left: columnIndex === 0,
+                right: columnIndex === row.length - 1,
+              }
+              const contentInsets = {
+                top: screenEdges.top ? insets.top : 0,
+                bottom: screenEdges.bottom ? insets.bottom : 0,
+                left: screenEdges.left ? insets.left : 0,
+                right: screenEdges.right ? insets.right : 0,
+              }
+              const fallbackMenu =
+                fallbackMenuBoundary === null
+                  ? undefined
+                  : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
+              const menuCorner =
+                menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
               return (
                 <View
-                  key={`empty-${rowIndex}-${columnIndex}`}
-                  testID={`player-grid-empty-${rowIndex}-${columnIndex}`}
+                  key={player.id}
+                  testID={`player-cell-seat-${seatNumber}`}
                   style={themed($cell)}
-                />
+                >
+                  <LifeCard
+                    playerName={player.name}
+                    seatNumber={seatNumber}
+                    shape={player.shape}
+                    life={player.life}
+                    color={player.color}
+                    compact={layout.compact}
+                    contentRotation={contentRotation}
+                    boardRotation={boardRotation}
+                    contentInsets={contentInsets}
+                    screenEdges={screenEdges}
+                    menuCorner={menuCorner}
+                    menuEdgeCenter={fallbackMenu?.edgeCenter}
+                    lifeFontSize={getLifeFontSize({
+                      ...lifeFontSizeInput,
+                      digits: String(player.life).length,
+                    })}
+                    system={system}
+                    lifeStep={lifeStep}
+                    disabled={disabled || playerDisabled}
+                    ownership={ownership}
+                    staleSince={getStaleSince?.(player)}
+                    eliminated={isPlayerEliminated?.(player)}
+                    commanderDamage={
+                      commanderDamage && boardSeats
+                        ? {
+                            ownerPlayerId: player.id,
+                            players: commanderDamage.inspection ? players : undefined,
+                            inspection: commanderDamage.inspection
+                              ? {
+                                  open: commanderDamage.inspection.playerId === player.id,
+                                  onToggle: () =>
+                                    commanderDamage.inspection?.onChange(
+                                      commanderDamage.inspection.playerId === player.id
+                                        ? null
+                                        : player.id,
+                                    ),
+                                }
+                              : undefined,
+                            seats: boardSeats.seats,
+                            rows: boardSeats.rows,
+                            columns: boardSeats.columns,
+                            incoming: commanderDamage.incomingFor(player),
+                            armedPlayerId: commanderDamage.armedPlayerId,
+                            attackerName: armedPlayer?.name,
+                            attacker: armedPlayer && {
+                              color: armedPlayer.color,
+                              shape: armedPlayer.shape,
+                              seatNumber: players.indexOf(armedPlayer) + 1,
+                            },
+                            stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
+                            pendingClaims: commanderDamage.pendingFor?.(player),
+                            onPressSword: () => commanderDamage.onPressSword(player),
+                            onStage: (step) => commanderDamage.onStage(player, step),
+                            ...(commanderDamage.staging &&
+                            commanderDamage.armedPlayerId === player.id
+                              ? {
+                                  armBar: {
+                                    stagedTargets: commanderDamage.staging.stagedTargets,
+                                    onSend: commanderDamage.staging.onSend,
+                                    onCancel: commanderDamage.staging.onCancel,
+                                  },
+                                }
+                              : {}),
+                          }
+                        : undefined
+                    }
+                    onChange={(delta) => onChange(player.id, delta)}
+                    style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
+                  />
+                </View>
               )
-            }
-            const player = players[index]
-            const seatNumber = index + 1
-            const playerDisabled = Boolean(isPlayerDisabled?.(player))
-            const playerOwned = Boolean(isPlayerOwned?.(player))
-            const contentRotation = getPlayerContentRotation({
-              playerCount: players.length,
-              layout,
-              row,
-              rowIndex,
-              columnIndex,
-              playerIndex: index,
-            })
-            const ownership = isPlayerOwned
-              ? playerOwned
-                ? "owned"
-                : "unowned"
-              : disabled
-                ? "disabled"
-                : isPlayerDisabled
-                  ? playerDisabled
-                    ? "unowned"
-                    : "owned"
-                  : undefined
-            const screenEdges = {
-              top: rowIndex === 0,
-              bottom: rowIndex === rows.length - 1,
-              left: columnIndex === 0,
-              right: columnIndex === row.length - 1,
-            }
-            const contentInsets = {
-              top: screenEdges.top ? insets.top : 0,
-              bottom: screenEdges.bottom ? insets.bottom : 0,
-              left: screenEdges.left ? insets.left : 0,
-              right: screenEdges.right ? insets.right : 0,
-            }
-            const fallbackMenu =
-              fallbackMenuBoundary === null
-                ? undefined
-                : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
-            const menuCorner =
-              menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
-            return (
-              <View key={player.id} testID={`player-cell-seat-${seatNumber}`} style={themed($cell)}>
-                <LifeCard
-                  playerName={player.name}
-                  seatNumber={seatNumber}
-                  shape={player.shape}
-                  life={player.life}
-                  color={player.color}
-                  compact={layout.compact}
-                  contentRotation={contentRotation}
-                  contentInsets={contentInsets}
-                  screenEdges={screenEdges}
-                  menuCorner={menuCorner}
-                  menuEdgeCenter={fallbackMenu?.edgeCenter}
-                  lifeFontSize={getLifeFontSize({
-                    ...lifeFontSizeInput,
-                    digits: String(player.life).length,
-                  })}
-                  system={system}
-                  lifeStep={lifeStep}
-                  disabled={disabled || playerDisabled}
-                  ownership={ownership}
-                  staleSince={getStaleSince?.(player)}
-                  eliminated={isPlayerEliminated?.(player)}
-                  commanderDamage={
-                    commanderDamage && boardSeats
-                      ? {
-                          ownerPlayerId: player.id,
-                          players: commanderDamage.inspection ? players : undefined,
-                          inspection: commanderDamage.inspection
-                            ? {
-                                open: commanderDamage.inspection.playerId === player.id,
-                                onToggle: () =>
-                                  commanderDamage.inspection?.onChange(
-                                    commanderDamage.inspection.playerId === player.id
-                                      ? null
-                                      : player.id,
-                                  ),
-                              }
-                            : undefined,
-                          seats: boardSeats.seats,
-                          rows: boardSeats.rows,
-                          columns: boardSeats.columns,
-                          incoming: commanderDamage.incomingFor(player),
-                          armedPlayerId: commanderDamage.armedPlayerId,
-                          attackerName: armedPlayer?.name,
-                          attacker: armedPlayer && {
-                            color: armedPlayer.color,
-                            shape: armedPlayer.shape,
-                            seatNumber: players.indexOf(armedPlayer) + 1,
-                          },
-                          stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
-                          pendingClaims: commanderDamage.pendingFor?.(player),
-                          onPressSword: () => commanderDamage.onPressSword(player),
-                          onStage: (step) => commanderDamage.onStage(player, step),
-                          ...(commanderDamage.staging && commanderDamage.armedPlayerId === player.id
-                            ? {
-                                armBar: {
-                                  stagedTargets: commanderDamage.staging.stagedTargets,
-                                  onSend: commanderDamage.staging.onSend,
-                                  onCancel: commanderDamage.staging.onCancel,
-                                },
-                              }
-                            : {}),
-                        }
-                      : undefined
-                  }
-                  onChange={(delta) => onChange(player.id, delta)}
-                  style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
-                />
-              </View>
-            )
-          })}
-        </View>
-      ))}
+            })}
+          </View>
+        ))}
+      </Animated.View>
     </View>
   )
 }
@@ -391,5 +451,9 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 
 const $cell: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+
+const $fixedGrid: ViewStyle = { position: "absolute", left: "50%", top: "50%" }
+
+const $frame: ViewStyle = { flex: 1, width: "100%" }
 
 const $unmeasured: ViewStyle = { opacity: 0 }
