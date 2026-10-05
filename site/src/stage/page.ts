@@ -13,6 +13,7 @@ import {
   type DemoGame,
   type DemoGameSetup,
 } from "./board"
+import { center, HINT_PRESS_MS, seatAxis, showTapHint } from "./hint"
 
 const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
 const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
@@ -276,27 +277,67 @@ function setUpStage() {
   addEventListener("resize", scheduleStep)
   updateStep()
   setUpLanding(stage, () => activate(query("[data-step='intro']")))
+  setUpFullScreen(stage)
 }
 
-// Until someone taps a total themselves, one card taps itself every few seconds, alternating
-// plus and minus, so the change shows and the total never drifts. It is the first player's,
-// or on small screens Sam's, whose card runs upright across the bottom of the phone.
+// On small screens the deck screen stands up in a strip too short to use, so tapping it opens
+// the same phone full screen.
+function setUpFullScreen(stage: HTMLElement) {
+  const toggle = (open: boolean) => {
+    if (stage.classList.contains("full") === open) return
+    const apply = () => stage.classList.toggle("full", open)
+    if (prefersReducedMotion.matches || !("startViewTransition" in document)) return apply()
+    document.startViewTransition(apply)
+  }
+  query("[data-try-close]", stage).addEventListener("click", () => toggle(false))
+  // Capture so a tap on the preview opens it instead of changing a total.
+  query(".rig", stage).addEventListener(
+    "click",
+    (event) => {
+      if (!narrow.matches || stage.dataset.scene !== "pro" || stage.classList.contains("full"))
+        return
+      event.stopPropagation()
+      toggle(true)
+    },
+    { capture: true },
+  )
+  addEventListener("keydown", (event) => event.key === "Escape" && toggle(false))
+  narrow.addEventListener("change", () => narrow.matches || toggle(false))
+}
+
+// Until someone taps a total themselves, a ghostly hand taps a card every few seconds,
+// alternating plus and minus, so the change shows and the total never drifts. It taps the
+// lowest card that faces the viewer: Maya's with the phone on its side, Sam's standing up. While
+// the phone turns no card faces the viewer, so the demo waits.
 function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   let direction: 1 | -1 = 1
-  const timer = window.setInterval(() => {
+  const tap = () => {
     const showing = stage.dataset.scene === "intro" || stage.dataset.scene === "features"
-    if (!showing || stage.dataset.step === "commander") return
-    const sam = NAMES.indexOf("Sam")
-    const seat = narrow.matches && sam < game.setup.names.length ? sam : 0
-    const hit = stage.querySelector<HTMLElement>(
-      `[data-board='features'] .hit[data-seat='${seat}'][data-dir='${direction}']`,
+    // Full screen is for the visitor's own taps.
+    if (!showing || stage.dataset.step === "commander" || stage.classList.contains("full")) return
+    const board = query<HTMLElement>("[data-board='features']", stage)
+    const facing = [...board.querySelectorAll<HTMLElement>(".seat[data-player]")]
+      .filter((seat) => Math.abs(seatAxis(seat) ?? 90) < 1)
+      .sort((a, b) => center(b).y - center(a).y)[0]
+    if (!facing) return
+    const seat = Number(facing.dataset.player)
+    const hit = board.querySelector<HTMLElement>(
+      `.hit[data-seat='${seat}'][data-dir='${direction}']`,
     )
-    if (!hit) return
-    hit.classList.add("pressed")
-    window.setTimeout(() => hit.classList.remove("pressed"), PRESS_MS)
-    game.change(seat, direction)
+    const glyph = board.querySelector<HTMLElement>(`[data-glyph='${seat}:${direction}']`)
+    if (!hit || !glyph) return
+    const change = direction
     direction = direction === 1 ? -1 : 1
-  }, DEMO_TAP_MS)
+    const press = () => {
+      hit.classList.add("pressed")
+      window.setTimeout(() => hit.classList.remove("pressed"), PRESS_MS)
+      game.change(seat, change)
+    }
+    if (prefersReducedMotion.matches) return press()
+    showTapHint(glyph)
+    window.setTimeout(press, HINT_PRESS_MS)
+  }
+  const timer = window.setInterval(tap, DEMO_TAP_MS)
   stage.addEventListener("click", (event) => {
     if (event.isTrusted && (event.target as Element).closest(".hit")) window.clearInterval(timer)
   })
@@ -336,6 +377,9 @@ function setUpLanding(stage: HTMLElement, showIntro: () => void) {
     const standing = clamp((scrollY - turnFrom) / (upright - turnFrom))
     const turn = -90 * (1 - standing * standing * (3 - 2 * standing))
     phone.style.setProperty("--turn", `${turn}deg`)
+    // A tap hint is drawn inside its seat, so it would spin along with the phone.
+    if (turn !== 0 && turn !== -90)
+      stage.querySelectorAll(".tap-hint").forEach((hint) => hint.remove())
     // Once landed the stage's own sticky positioning takes over, so the phone scrolls away
     // with the tour instead of staying pinned over the closing section.
     if (scrollY >= landed) {
