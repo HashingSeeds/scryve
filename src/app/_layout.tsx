@@ -3,6 +3,7 @@ import "react-native-url-polyfill/auto"
 import { useCallback, useEffect, useState } from "react"
 import { AppMetrics, ObserveRoot } from "expo-observe"
 import { SplashScreen, Stack, type ErrorBoundaryProps } from "expo-router"
+import { setOptions as setSplashScreenOptions } from "expo-splash-screen"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
@@ -21,6 +22,8 @@ import { initObservability } from "@/utils/observability"
 initObservability()
 
 SplashScreen.preventAutoHideAsync()
+// why: Android's default 400ms exit fade was ~80% of a warm launch on a Pixel 6a; this matches iOS's instant hide.
+setSplashScreenOptions({ duration: 0 })
 
 if (__DEV__) {
   // Load Reactotron configuration in development. We don't want to
