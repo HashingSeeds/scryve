@@ -11,7 +11,6 @@ import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
-import { useBoardPortraitLock } from "@/features/game/useBoardPortraitLock"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -51,7 +50,6 @@ function resumeRedirectFor(
 }
 
 export default function Index() {
-  useBoardPortraitLock()
   const { prepared, destination } = useLocalSearchParams<{
     prepared?: string
     destination?: string

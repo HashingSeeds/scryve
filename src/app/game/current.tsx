@@ -4,11 +4,9 @@ import { EmptyState } from "@/components/EmptyState"
 import { Screen } from "@/components/Screen"
 import { hasLocalGameStarted } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
-import { useBoardPortraitLock } from "@/features/game/useBoardPortraitLock"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 
 export default function CurrentLocalGameRoute() {
-  useBoardPortraitLock()
   const game = localGameRepository.loadActiveGame()
   if (!game) {
     return (
