@@ -58,7 +58,7 @@ export function CurrentGameScreen({
   onGameAbandoned,
   repository,
 }: CurrentGameScreenProps) {
-  useKeepAwake("count-local-game")
+  useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
   const menuButtonStyle = useMenuButtonStyle()
   const { themed } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)

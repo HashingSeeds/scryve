@@ -57,7 +57,9 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("2")
     fireEvent.press(view.getByTestId("game-menu-button"))
     expect(view.getByTestId("undo-button").props.accessibilityState.disabled).toBe(true)
-    expect(useKeepAwake).toHaveBeenCalledWith("count-local-game")
+    expect(useKeepAwake).toHaveBeenCalledWith("count-local-game", {
+      suppressDeactivateWarnings: true,
+    })
   })
 
   it.each(["commander", "standard"])("applies one navigation bottom inset in %s", (format) => {
