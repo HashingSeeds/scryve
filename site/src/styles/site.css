@@ -845,25 +845,6 @@ figure {
   translate: -26% -4%;
 }
 
-.offline {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  padding: 6px 12px;
-  border-radius: 99px;
-  background: #000;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
-  opacity: 0;
-  transition: opacity 0.3s;
-  translate: -50% 140%;
-}
-
-.stage[data-step="offline"] .offline {
-  opacity: 1;
-}
-
 /* Deck screen, drawn with the app's dark tokens. Sizes are in em off a base that follows the
    phone's width, so the screen scales with the phone like a screenshot would. */
 .phone .screen {
