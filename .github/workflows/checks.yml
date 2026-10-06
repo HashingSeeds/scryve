@@ -59,8 +59,12 @@ jobs:
 
   ygo-image-mirror:
     needs: changes
-    if: needs.changes.outputs.ygo == 'true'
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -84,7 +88,11 @@ jobs:
         run: pnpm check:ygo-worker
 
   checks:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -154,8 +162,12 @@ jobs:
   export:
     needs: changes
     # Pushes to main skip the changes job and always export, to seed the Metro cache.
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.exportable == 'true') }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - name: Check out repository
