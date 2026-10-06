@@ -109,10 +109,7 @@ export function analyticsProperties(event: string, properties: Record<string, un
 async function getClient() {
   if (!loading) {
     loading = (async () => {
-      const {
-        default: SDK,
-        PostHogPersistedProperty,
-      }: typeof import("posthog-react-native") = require("posthog-react-native")
+      const { default: SDK, PostHogPersistedProperty } = await import("posthog-react-native")
       // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code
       // The SDK's optOut/reset retain queued events. Gate the transport too, including retries.
       class ConsentedPostHog extends SDK {
