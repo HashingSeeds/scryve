@@ -129,6 +129,10 @@ export function PlayerGrid({
     themed,
     theme: { spacing },
   } = useAppTheme()
+  const topEdgeBand =
+    STANDALONE_WEB_APP && boardRotation === 0 && dimensions.height > dimensions.width
+      ? TOP_EDGE_BAND
+      : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const counter = playSystemRules(system).counter
   const layout = getPlayerGridLayout({
@@ -138,7 +142,11 @@ export function PlayerGrid({
     fontScale,
     layoutVariant,
   })
-  const cellSize = getCellSize({ board, layout, gap: spacing.xxs })
+  const cellSize = getCellSize({
+    board: { width: board.width, height: board.height - topEdgeBand },
+    layout,
+    gap: spacing.xxs,
+  })
   const lifeFontSizeInput = {
     ...cellSize,
     fontScale,
@@ -175,6 +183,7 @@ export function PlayerGrid({
         onLayout={measureBoard}
         style={[
           themed($grid),
+          topEdgeBand ? { paddingTop: topEdgeBand } : null,
           style,
           boardOrientation && $fixedGrid,
           boardOrientation && {
@@ -455,6 +464,11 @@ export function getScreenCornerSquaringStyle(input: {
   }
   return Object.keys(squared).length ? squared : undefined
 }
+
+// why: index.html paints a 12px band over the top edge of a portrait home screen app to stop iOS 26 blurring the board there.
+const TOP_EDGE_BAND = 12
+const STANDALONE_WEB_APP =
+  Platform.OS === "web" && window.matchMedia("(display-mode: standalone)").matches
 
 const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
