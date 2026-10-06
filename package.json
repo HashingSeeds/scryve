@@ -14,7 +14,7 @@
     "site:build": "pnpm --filter scryve-site build",
     "bundle:web": "set -a && . ./.env.development && set +a && env APP_VARIANT=development SCRYVE_WEB_BASE_URL=/play npx expo export --platform web --clear --output-dir dist/play",
     "bundle:web:prod": "set -a && . ./.env.local && . ./.env.production && set +a && env SCRYVE_WEB_BASE_URL=/play npx expo export --platform web --clear --output-dir dist/play",
-    "build:web:pages": "pnpm site:build && APP_VARIANT=production SCRYVE_WEB_BASE_URL=/play npx expo export --platform web --clear --output-dir dist/play && node scripts/prepare-web-deploy.cjs",
+    "build:web:pages": "pnpm site:build && APP_VARIANT=production SCRYVE_WEB_BASE_URL=/play EXPO_PUBLIC_SENTRY_ENVIRONMENT=$([ \"${CF_PAGES_BRANCH:-main}\" = main ] && echo production || echo development) npx expo export --platform web --clear --output-dir dist/play && node scripts/prepare-web-deploy.cjs",
     "deploy:web:prod": "node scripts/prepare-web-deploy.cjs && wrangler pages deploy \"$PWD/dist\" --project-name=scryve --branch=main",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
