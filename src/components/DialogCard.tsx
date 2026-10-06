@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
+import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 export interface DialogOrigin {
   x: number
@@ -55,8 +56,9 @@ export function DialogCard({
 }: DialogCardProps) {
   const { theme, themed } = useAppTheme()
   const safeAreaInsets = useSafeAreaInsets()
+  const topEdgeBand = useTopEdgeBand()
   const safeAreaMarginStyle = {
-    marginTop: safeAreaInsets.top,
+    marginTop: safeAreaInsets.top + topEdgeBand,
     marginBottom: placement === "bottom" ? 0 : safeAreaInsets.bottom,
   }
   const bottomSafeAreaStyle = {

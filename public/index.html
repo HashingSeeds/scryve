@@ -9,6 +9,7 @@
       if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) {
         document.querySelector('meta[name="viewport"]').content += ", viewport-fit=cover"
       }
+      if (navigator.standalone) document.documentElement.classList.add("ios-home-screen-app")
     </script>
     <!-- Every web build is served from /play (SCRYVE_WEB_BASE_URL); scope keeps the home screen app on all of it. -->
     <link rel="manifest" href="/play/manifest.webmanifest" />
@@ -31,12 +32,12 @@
         height: 100%;
         flex: 1;
       }
-      /* why: iOS 26 blurs the top of a home screen app unless a fixed, solid, full-width box over 10px tall covers the top edge. useTopEdgeBand (12px) keeps content below it. */
+      /* why: iOS 26 blurs the top of a home screen app unless a fixed, solid, full-width box over 10px tall covers the top edge. useTopEdgeBand (12px) checks the same conditions and keeps content below it. */
       #top-edge-band {
         display: none;
       }
-      @media (display-mode: standalone) and (orientation: portrait) {
-        #top-edge-band {
+      @media (orientation: portrait) {
+        .ios-home-screen-app #top-edge-band {
           display: block;
           position: fixed;
           top: 0;

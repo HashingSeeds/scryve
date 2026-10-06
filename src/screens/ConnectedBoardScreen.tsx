@@ -58,6 +58,7 @@ import { isGameUnavailableError } from "@/utils/convexError"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 import { usePageBackgroundColor } from "@/utils/usePageBackgroundColor"
 import { useStoreReview } from "@/utils/useStoreReview"
+import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -509,9 +510,18 @@ function ConnectedBoardReady({
       }),
     [players.length, width, height, fontScale, layoutVariant],
   )
+  const topEdgeBand = useTopEdgeBand()
   const menuAnchor = useMemo(
-    () => rotateGameBoardAnchor(getPlayerGridMenuAnchor(players.length, gridLayout), rotation),
-    [players.length, gridLayout, rotation],
+    () =>
+      rotateGameBoardAnchor(
+        getPlayerGridMenuAnchor(
+          players.length,
+          gridLayout,
+          rotation === 0 ? topEdgeBand / height : 0,
+        ),
+        rotation,
+      ),
+    [players.length, gridLayout, rotation, topEdgeBand, height],
   )
 
   /**

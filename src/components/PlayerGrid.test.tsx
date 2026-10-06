@@ -424,6 +424,12 @@ describe("PlayerGrid", () => {
     expect(getPlayerGridMenuAnchor(4, fourPlayerLayout)).toEqual({ x: 0.5, y: 0.5 })
   })
 
+  it("moves the game menu anchor down with a padded board top", () => {
+    const layout = getPlayerGridLayout({ playerCount: 4, width: 390, height: 844 })
+
+    expect(getPlayerGridMenuAnchor(4, layout, 0.2)).toEqual({ x: 0.5, y: expect.closeTo(0.6) })
+  })
+
   it("does not offer a forced wide layout at any player count", () => {
     for (const playerCount of [2, 3, 4, 5, 6]) {
       expect(getPlayerGridLayoutOptions(playerCount).map(({ variant }) => variant)).not.toContain(
