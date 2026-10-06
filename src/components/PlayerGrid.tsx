@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
-import { useWindowDimensions, View } from "react-native"
+import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -20,6 +20,7 @@ import {
   getLifeTargetTextSpace,
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
+  TUCKS_INTO_SCREEN_CORNERS,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
@@ -122,6 +123,9 @@ export function PlayerGrid({
             left: screenInsets.bottom,
           }
         : screenInsets
+  // why: a browser tab keeps the page between its bars and reports no insets; only a home screen web app reaches the rounded screen corners.
+  const squaresScreenCorners =
+    Platform.OS !== "web" || Object.values(screenInsets).some((inset) => inset > 0)
   const {
     themed,
     theme: { spacing },
@@ -260,7 +264,7 @@ export function PlayerGrid({
                     contentRotation={contentRotation}
                     boardRotation={boardRotation}
                     contentInsets={contentInsets}
-                    screenEdges={screenEdges}
+                    screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
                     menuCorner={menuCorner}
                     menuEdgeCenter={fallbackMenu?.edgeCenter}
                     lifeFontSize={getLifeFontSize({
@@ -318,7 +322,11 @@ export function PlayerGrid({
                         : undefined
                     }
                     onChange={(delta) => onChange(player.id, delta)}
-                    style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
+                    style={
+                      squaresScreenCorners
+                        ? getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })
+                        : undefined
+                    }
                   />
                 </View>
               )

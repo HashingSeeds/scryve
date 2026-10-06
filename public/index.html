@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <!-- viewport-fit=cover lets the board reach the screen edges; PlayerGrid pads them by the safe-area insets. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+    />
+    <!-- Every web build is served from /play (SCRYVE_WEB_BASE_URL); scope keeps the home screen app on all of it. -->
+    <link rel="manifest" href="/play/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/play/app-icon.png" />
+    <!-- In the home screen app, draw under the status bar; PlayerGrid pads by the reported insets. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>%WEB_TITLE%</title>
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+        /* why: in a home screen web app, 100% stops short by the status bar height */
+        height: 100dvh;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript> You need to enable JavaScript to run this app. </noscript>
+    <div id="root"></div>
+  </body>
+</html>

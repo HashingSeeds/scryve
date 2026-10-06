@@ -46,9 +46,11 @@ import {
   LIFE_TARGET_SIZE,
   PLAYER_MARK_MUTED_OPACITY,
   PLAYER_MARK_SIZE,
+  TUCKS_INTO_SCREEN_CORNERS,
   cornerOffset,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
+  type LifeCardEdge,
   type LifeCardScreenEdges,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
@@ -284,7 +286,11 @@ export function LifeCard({
       },
     ],
   }))
-  const markStyle = getPlayerMarkCorner(contentRotation, cardPadding)
+  const markStyle = getPlayerMarkCorner(
+    contentRotation,
+    cardPadding,
+    TUCKS_INTO_SCREEN_CORNERS ? undefined : contentInsets,
+  )
   const commanderOverviewEntering =
     reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
   const commanderOverviewExiting =
@@ -786,11 +792,16 @@ const $name: ThemedStyle<TextStyle> = () => ({
   textAlign: "center",
 })
 
-export function getPlayerMarkCorner(rotation: LifeCardContentRotation, padding: number): ViewStyle {
-  if (rotation === 90) return { left: padding, bottom: padding }
-  if (rotation === -90) return { right: padding, top: padding }
-  if (rotation === 180) return { left: padding, top: padding }
-  return { right: padding, bottom: padding }
+export function getPlayerMarkCorner(
+  rotation: LifeCardContentRotation,
+  padding: number,
+  insets?: LifeCardContentInsets,
+): ViewStyle {
+  const offset = (edge: LifeCardEdge) => padding + (insets?.[edge] ?? 0)
+  if (rotation === 90) return { left: offset("left"), bottom: offset("bottom") }
+  if (rotation === -90) return { right: offset("right"), top: offset("top") }
+  if (rotation === 180) return { left: offset("left"), top: offset("top") }
+  return { right: offset("right"), bottom: offset("bottom") }
 }
 
 const $life: ThemedStyle<TextStyle> = () => ({

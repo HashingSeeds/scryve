@@ -56,6 +56,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { isGameUnavailableError } from "@/utils/convexError"
 import { useElapsedSince } from "@/utils/useElapsedSince"
+import { usePageBackgroundColor } from "@/utils/usePageBackgroundColor"
 import { useStoreReview } from "@/utils/useStoreReview"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
@@ -262,6 +263,10 @@ function ConnectedBoardRuntime({
   ownerId: string
 }) {
   useKeepAwake("count-connected-game")
+  const {
+    theme: { colors },
+  } = useAppTheme()
+  usePageBackgroundColor(colors.board.background)
   const runtime = useConnectedGame(publicId, ownerId)
   if (runtime.status === "loading")
     return (
