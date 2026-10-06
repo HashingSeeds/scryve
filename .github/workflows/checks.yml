@@ -144,7 +144,7 @@ jobs:
 
       - name: Run Jest tests
         id: jest
-        run: CI=1 pnpm exec jest --ci --silent
+        run: CI=1 pnpm exec jest --ci --silent --maxWorkers=2
 
       - name: Add Jest result to job summary
         if: always()
