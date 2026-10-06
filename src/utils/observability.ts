@@ -27,6 +27,8 @@ export function initObservability(
 
   Sentry.init({
     dsn,
+    // The SDK default labels every non-__DEV__ build "production", which mixes in preview builds.
+    environment: Updates.channel ?? (__DEV__ ? "development" : "production"),
     sendDefaultPii: false,
     enableLogs: false,
     replaysSessionSampleRate: 0,
