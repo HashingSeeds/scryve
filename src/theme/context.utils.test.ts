@@ -10,12 +10,11 @@ const lastColor = () => jest.mocked(setBackgroundColorAsync).mock.lastCall?.[0]
 describe("overrideSystemUIBackgroundColor", () => {
   it("holds the override across theme changes and restores the current theme", () => {
     setImperativeTheming(lightTheme)
-    const restore = overrideSystemUIBackgroundColor("#000000")
+    const restore = overrideSystemUIBackgroundColor("#123456")
     setImperativeTheming(darkTheme)
-    expect(lastColor()).toBe("#000000")
-    setImperativeTheming(lightTheme)
+    expect(lastColor()).toBe("#123456")
     restore()
-    expect(lastColor()).toBe(lightTheme.colors.background)
+    expect(lastColor()).toBe(darkTheme.colors.background)
   })
 
   it("ignores a stale restore once a newer override is active", () => {
