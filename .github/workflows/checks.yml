@@ -155,7 +155,8 @@ jobs:
     needs: changes
     # Pushes to main skip the changes job and always export, to seed the Metro cache.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.exportable == 'true') }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # Free on this public repo and only about 15s slower than Blacksmith for this job.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out repository
