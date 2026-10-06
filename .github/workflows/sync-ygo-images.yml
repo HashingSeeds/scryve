@@ -25,7 +25,7 @@ permissions:
 jobs:
   sync:
     if: github.event_name == 'workflow_dispatch' || vars.YGO_IMAGE_SYNC_ENABLED == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 360
     environment: ygo-image-mirror-production
     steps:

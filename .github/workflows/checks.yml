@@ -2,6 +2,21 @@ name: checks
 
 on:
   pull_request:
+  # Pull requests can only restore caches saved by their own runs or by main. Running on
+  # main whenever a cache key input changes gives each new pull request a warm first run.
+  # Keep this list in sync with the hashFiles() inputs of the cache keys below.
+  push:
+    branches: [main]
+    paths:
+      - "pnpm-lock.yaml"
+      - ".eslintrc.js"
+      - ".eslint-comments-baseline.json"
+      - ".prettierrc"
+      - "tools/eslint-plugin-self-explanatory-code/**"
+      - "babel.config.js"
+      - "metro.config.js"
+      - "app.json"
+      - "app.config.ts"
 
 concurrency:
   group: checks-${{ github.ref }}
@@ -12,6 +27,7 @@ permissions:
 
 jobs:
   changes:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -44,7 +60,7 @@ jobs:
   ygo-image-mirror:
     needs: changes
     if: needs.changes.outputs.ygo == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
       - name: Check out repository
@@ -88,8 +104,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ESLint does not notice changes to plugin code or to the comment baseline the
+      # self-explanatory-code rule reads, so those files are part of the key.
+      - name: Restore ESLint cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/eslint
+          key: eslint-${{ hashFiles('pnpm-lock.yaml', '.eslintrc.js', '.eslint-comments-baseline.json', '.prettierrc', 'tools/eslint-plugin-self-explanatory-code/**') }}-${{ github.sha }}
+          restore-keys: eslint-${{ hashFiles('pnpm-lock.yaml', '.eslintrc.js', '.eslint-comments-baseline.json', '.prettierrc', 'tools/eslint-plugin-self-explanatory-code/**') }}-
+
       - name: Check lint
         run: pnpm lint:check
+
+      # tsc's build info tracks file hashes and compiler options itself, so any older entry is safe.
+      - name: Restore TypeScript build info
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/tsc
+          key: tsc-${{ github.sha }}
+          restore-keys: tsc-
 
       - name: Type-check app and tests
         run: pnpm compile
@@ -120,7 +153,8 @@ jobs:
 
   export:
     needs: changes
-    if: needs.changes.outputs.exportable == 'true'
+    # Pushes to main skip the changes job and always export, to seed the Metro cache.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.exportable == 'true') }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
@@ -141,5 +175,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # An exact key with no fallback keeps the cache from growing. Metro stores
+      # transformed modules by content hash, so source files changed since the save are
+      # simply transformed again.
+      - name: Restore Metro cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/metro-cache
+          key: metro-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'babel.config.js', 'metro.config.js', 'app.json', 'app.config.ts') }}
+
+      # Metro writes its cache to $TMPDIR/metro-cache.
       - name: Export production-like JS bundles
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: CI=1 pnpm export:check
