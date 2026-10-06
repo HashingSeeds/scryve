@@ -4,10 +4,12 @@ on:
   pull_request:
   # Pull requests can only restore caches saved by their own runs or by main. Running on
   # main whenever a cache key input changes gives each new pull request a warm first run.
-  # Keep this list in sync with the hashFiles() inputs of the cache keys below.
+  # Keep this list in sync with the hashFiles() inputs of the cache keys below. This file
+  # is listed because it defines the keys.
   push:
     branches: [main]
     paths:
+      - ".github/workflows/checks.yml"
       - "pnpm-lock.yaml"
       - ".eslintrc.js"
       - ".eslint-comments-baseline.json"
