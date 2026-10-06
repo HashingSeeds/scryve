@@ -13,6 +13,8 @@
   --header: 64px;
   --gutter: clamp(16px, 2.4vw, 32px);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The demo phones' scene moves: a soft start and landing, without --ease's long crawl. */
+  --move: cubic-bezier(0.45, 0, 0.2, 1);
 }
 
 * {
@@ -616,16 +618,20 @@ figure {
 
 /* ---------- tour: steps on the left, sticky stage on the right ---------- */
 
+/* The copy column is as wide as the copy and the stage as wide as the phone, centered as one
+   pair so no column holds empty space. */
 .tour {
   display: grid;
-  width: min(1240px, 100% - 2 * var(--gutter));
+  width: min(1440px, 100% - 2 * var(--gutter));
+  justify-content: center;
   margin: 0 auto;
-  gap: 6vw;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(56px, 6vw, 120px);
+  grid-template-columns: minmax(0, 32rem) auto;
 }
 
+/* The copy pins near the middle of the screen, level with the phone. */
 .steps {
-  --step-anchor: max(calc(var(--header) + 24px), 30svh);
+  --step-anchor: max(calc(var(--header) + 24px), calc(50svh - 6rem));
   padding: 8svh 0 24svh;
 }
 
@@ -753,7 +759,7 @@ figure {
 
 .rig {
   position: relative;
-  height: min(78svh, 760px);
+  height: min(82svh, 880px);
   aspect-ratio: 9 / 19.5;
 }
 
@@ -766,7 +772,8 @@ figure {
   background: #000;
   box-shadow: 0 30px 80px rgb(0 0 0 / 70%);
   transition:
-    translate 0.8s var(--ease),
+    translate 0.7s var(--move),
+    scale 0.7s var(--move),
     opacity 0.5s,
     box-shadow 0.25s;
 }
@@ -788,12 +795,15 @@ figure {
   inset: 0;
 }
 
+/* Each screen keeps its own layer so it's already drawn when its scene fades in. Safari
+   otherwise paints it on the first frame of the change, and the phones lurch. */
 .scene-screen {
   position: absolute;
   inset: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.4s;
+  will-change: opacity;
 }
 
 .stage[data-scene="intro"] [data-for~="intro"],
@@ -806,42 +816,53 @@ figure {
 
 /* Scroll sets --turn: on its side in the hero, standing up during the intro. */
 .phone.main {
+  z-index: 1;
   rotate: var(--turn, 0deg);
 }
 
+/* The second phone waits tucked behind the first, dimmed. For connected play the two slide
+   apart, the second to the left: that's where Maya sits, whose total the demo changes. On the
+   way out they slide back together, and the second hides only once it's covered. */
 .phone.second {
   opacity: 0;
   pointer-events: none;
-  translate: 130% 0;
+  scale: 0.92;
+  transition:
+    translate 0.7s var(--move),
+    rotate 0.7s var(--move),
+    opacity 0s 0.7s;
+}
+
+/* Dims the second phone. A brightness filter would look the same, but Safari repaints it on
+   the main thread whenever the board changes. */
+.phone.second::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(0 0 0 / 40%);
+  content: "";
+  pointer-events: none;
+}
+
+/* The landing animation scales the rig every frame during the intro, so only later scenes ease
+   the change. */
+.stage:not([data-scene="intro"]) .rig {
+  transition: scale 0.7s var(--move);
+}
+
+.stage[data-scene="connected"] .rig {
+  scale: 0.9;
 }
 
 .stage[data-scene="connected"] .phone.main {
-  translate: -56% 0;
+  translate: 12% 2%;
 }
 
 .stage[data-scene="connected"] .phone.second {
   opacity: 1;
   pointer-events: auto;
-  translate: 56% 0;
-}
-
-.offline {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  padding: 6px 12px;
-  border-radius: 99px;
-  background: #000;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
-  opacity: 0;
-  transition: opacity 0.3s;
-  translate: -50% 140%;
-}
-
-.stage[data-step="offline"] .offline {
-  opacity: 1;
+  transition-delay: 0s;
+  translate: -26% -4%;
 }
 
 /* Deck screen, drawn with the app's dark tokens. Sizes are in em off a base that follows the
@@ -886,6 +907,13 @@ figure {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* Phones overlay their scrollbars; desktop browsers would draw a classic one inside the demo. */
+.deck-content,
+.deck-sheet,
+.card-focus-body {
+  scrollbar-width: none;
 }
 
 .deck-tabs {
@@ -1259,6 +1287,113 @@ figure {
   font-size: 18px;
 }
 
+/* ---------- tap hint: a ghostly hand that shows where to tap ---------- */
+
+/* stage/hint.ts places it in the board's layout above the seats and pentagon, sizes it to its
+   seat, sets the fingertip (--tip-x, --tip-y) as a fraction of the hand's box, turns it (rotate,
+   scale) so it leans the same way on screen whichever way its seat faces, and animates it. */
+.tap-hint {
+  position: absolute;
+  z-index: 4;
+  color: #fff;
+  filter: drop-shadow(0 0 3px rgb(255 255 255 / 80%)) drop-shadow(0 0 10px rgb(232 193 180 / 60%));
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: calc(var(--tip-x) * 100%) calc(var(--tip-y) * 100%);
+  translate: calc(var(--tip-x) * -100%) calc(var(--tip-y) * -100%);
+}
+
+/* The wrist fades out like a spirit. The mask sits on the drawing so the glow isn't clipped. */
+.tap-hint svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  mask-image: linear-gradient(#000 40%, transparent 92%);
+}
+
+.tap-hint .tap-lines {
+  opacity: 0;
+}
+
+/* ---------- full screen demo (small screens, stage/page.ts) ---------- */
+
+.full-bar {
+  display: none;
+}
+
+.stage.full {
+  z-index: 30;
+}
+
+/* Beats the Pro scene's shrunken rig, at once: a scaled rig would contain the fixed phone. */
+.stage.full[data-scene] .rig {
+  scale: none;
+  transition: none;
+}
+
+.stage.full .phone.main {
+  position: fixed;
+  z-index: 31;
+  inset: var(--header) 0 0;
+  padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  rotate: none;
+  transition: none;
+  translate: none;
+}
+
+.stage.full .phone.main .screen {
+  border-radius: 0;
+}
+
+/* The second phone stays behind in the rig, which full screen no longer shrinks. */
+.stage.full .phone.second {
+  visibility: hidden;
+}
+
+/* The bar above the screen replaces the notch the deck's top padding leaves room for. */
+.stage.full .deck {
+  padding-top: 1.385em;
+}
+
+.stage.full .deck-settings > summary {
+  top: calc(2.077em - 22px);
+}
+
+.stage.full .phone.main .board {
+  --board-gap: 6px;
+  --seat-radius: 22px;
+}
+
+.stage.full .full-bar {
+  position: fixed;
+  z-index: 31;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  height: var(--header);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--gutter);
+  background: var(--bg);
+}
+
+.full-bar .quiet {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+html:has(.stage.full) {
+  overflow: hidden;
+}
+
 /* ---------- small screens: the stage pins above the steps ---------- */
 
 @media (max-width: 900px) {
@@ -1276,8 +1411,9 @@ figure {
      with plain sticky positioning and no scroll script. The stage spans the first three
      rows so it lets go before the closing section. */
   main {
-    /* Leave room for the step copy below the pinned phone on short screens. */
-    --stage-height: min(60svh, calc(100svh - var(--header) - 256px));
+    /* The phone lies on its side across the full width. */
+    --phone-long: calc(100vw - 2 * var(--gutter));
+    --stage-height: calc(var(--phone-long) * 9 / 19.5 + 28px);
     display: grid;
     grid-template-columns: 100%;
     grid-template-rows: var(--stage-height) auto auto auto;
@@ -1298,6 +1434,7 @@ figure {
   .stage {
     z-index: 4;
     height: var(--stage-height);
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
     align-self: start;
     background: linear-gradient(#000 90%, transparent);
     grid-column: 1;
@@ -1327,19 +1464,63 @@ figure {
     grid-row: 4;
   }
 
+  /* The rig keeps its portrait box, so its height is the phone's long side, and it overflows
+     the strip evenly until the phone turns onto its side. */
   .rig {
-    height: calc(var(--stage-height) - 5svh);
-    transition: scale 0.8s var(--ease);
+    height: var(--phone-long);
+    place-self: unsafe center;
+    transition: scale 0.7s var(--move);
   }
 
-  /* Two phones side by side need to be smaller to fit the width. */
+  /* No shadow: it can't show on the black page, and blurring it is costly on phones. */
+  .phone {
+    --turn: -90deg;
+    padding: 5px;
+    border-radius: 24px;
+    box-shadow: none;
+    rotate: var(--turn);
+    transition:
+      translate 0.7s var(--move),
+      rotate 0.7s var(--move),
+      scale 0.7s var(--move),
+      opacity 0.5s;
+  }
+
+  /* Here the second phone always turns with the first, so it can stay drawn behind it rather
+     than appear when the scene changes. */
+  .phone.second {
+    opacity: 1;
+    transition:
+      translate 0.7s var(--move),
+      rotate 0.7s var(--move);
+  }
+
+  .phone.main {
+    view-transition-name: demo-phone;
+  }
+
+  /* On its side the phone needs to shrink for the second to peek out from behind. Translations
+     are in the portrait box: x in its width, y in its height. */
   .stage[data-scene="connected"] .rig {
     scale: 0.78;
   }
 
-  .phone {
-    padding: 5px;
-    border-radius: 24px;
+  .stage[data-scene="connected"] .phone.main {
+    translate: 32% 3%;
+  }
+
+  .stage[data-scene="connected"] .phone.second {
+    translate: -36% -5%;
+  }
+
+  /* The deck screen is portrait only, so the phones stand up and shrink to the strip. Tapping
+     it opens it full screen (stage/page.ts). */
+  .stage[data-scene="pro"] .phone {
+    --turn: 0deg;
+  }
+
+  .stage[data-scene="pro"] .rig {
+    scale: calc(9 / 19.5);
   }
 
   .phone .screen {

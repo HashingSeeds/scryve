@@ -14,6 +14,7 @@ import {
   PLAYER_MARK_SHAPES,
   type PlayerMarkShape,
 } from "../../../convex/lib/appearance"
+import { HINT_PRESS_MS, showTapHint } from "./hint"
 
 const SHAPE_PATHS: Record<PlayerMarkShape, string> = {
   circle: '<circle cx="12" cy="12" r="10"/>',
@@ -273,7 +274,7 @@ function commanderTarget(game: DemoGame, source: SeatPlacement, target: SeatPlac
     seatColor(source.seat),
   )
   return `<div class="cmd-overlay cmd-target" aria-hidden="true">
-    <span class="cmd-zone">−</span><span class="cmd-zone" data-plus>+</span>
+    <span class="cmd-zone">−</span><span class="cmd-zone" data-plus><span class="cmd-plus">+</span></span>
     <span class="cmd-summary"><span class="cmd-count">
       <span class="cmd-attacker" style="--attacker:${seatColor(source.seat)}">${mark}</span>
       <b class="cmd-total">0</b>
@@ -283,7 +284,7 @@ function commanderTarget(game: DemoGame, source: SeatPlacement, target: SeatPlac
 }
 
 const COMMANDER_DEMO_START_MS = 700
-const COMMANDER_DEMO_TAP_MS = 240
+const COMMANDER_DEMO_TAP_MS = 300
 const COMMANDER_DEMO_PAUSE_MS = 650
 const COMMANDER_DEMO_FADE_MS = 450
 
@@ -318,6 +319,8 @@ export function createCommanderDemo(
     timers.clear()
   }
   const layers = () => board.querySelectorAll<HTMLElement>(".cmd-overlay, .cmd-strip")
+  // The hand fades on its own, so leftovers are simply dropped.
+  const dropHints = () => board.querySelectorAll(".tap-hint").forEach((hint) => hint.remove())
   const seatEl = (seat: number) => board.querySelector<HTMLElement>(`.seat[data-player="${seat}"]`)
 
   // Mounts markup hidden, then fades it in on the next style flush.
@@ -352,6 +355,7 @@ export function createCommanderDemo(
   function play() {
     clearTimers()
     layers().forEach((el) => el.remove())
+    dropHints()
     while (owed.size > 0) giveBack()
     const rows = seatRows(game)
     const seats = rows.flat()
@@ -403,7 +407,14 @@ export function createCommanderDemo(
         mount(target.seat, commanderTarget(game, source, target), "inner"),
       ),
     ]
+    // The hand taps the attacker's mark to start assigning, as in the app, taps + on each
+    // opponent for their damage, then taps Done. Each step lands on one of its presses.
+    const hint = (at: number, target: Element | null | undefined, presses = 1) =>
+      later(at - HINT_PRESS_MS, () => {
+        if (target) showTapHint(target, { presses, every: COMMANDER_DEMO_TAP_MS })
+      })
     let at = COMMANDER_DEMO_START_MS
+    hint(at, seatEl(source.seat)?.querySelector(".who svg"))
     later(at, () => overlays.forEach((el) => el?.classList.add("on")))
     // Let viewers read assignment mode before the first damage tap.
     at += COMMANDER_DEMO_FADE_MS + COMMANDER_DEMO_PAUSE_MS
@@ -412,6 +423,7 @@ export function createCommanderDemo(
       const total = overlay?.querySelector<HTMLElement>(".cmd-total")
       const life = overlay?.querySelector<HTMLElement>(".cmd-life")
       const plus = overlay?.querySelector<HTMLElement>("[data-plus]")
+      hint(at, plus?.querySelector(".cmd-plus"), damage[index])
       for (let tap = 0; tap < (damage[index] ?? 0); tap++) {
         later(at, () => {
           if (!deal(target.seat)) return
@@ -424,6 +436,7 @@ export function createCommanderDemo(
       }
       at += COMMANDER_DEMO_PAUSE_MS
     })
+    hint(at, overlays[0]?.querySelector(".cmd-done svg"))
     later(at, () => overlays[0]?.classList.add("pressed"))
     at += COMMANDER_DEMO_TAP_MS * 1.5
     later(at, () => {
@@ -448,6 +461,7 @@ export function createCommanderDemo(
     stop() {
       active = false
       clearTimers()
+      dropHints()
       layers().forEach(fadeOut)
       drain()
     },

@@ -13,6 +13,7 @@ import {
   type DemoGame,
   type DemoGameSetup,
 } from "./board"
+import { center, HINT_PRESS_MS, seatAxis, showTapHint } from "./hint"
 
 const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
 const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
@@ -219,7 +220,7 @@ function setUpDeck(stage: HTMLElement) {
   }
 }
 
-// The next section takes over as its heading reaches the copy's pin position.
+// The next section takes over as its heading nears the copy's pin position.
 function setUpStage() {
   const stage = query<HTMLElement>("[data-stage]")
   const game = createDemoGame(commanderSetup(5))
@@ -252,17 +253,19 @@ function setUpStage() {
   showScene(stage.dataset.scene ?? "intro")
   setUpDemoTaps(stage, game)
   // Read section positions once per frame so a fast scroll can skip several headings safely.
+  // The step whose copy is nearest its pinned spot, the brightest one, drives the phone, so the
+  // phone changes as the new heading lights up rather than once it has fully arrived.
   let frame = 0
   const updateStep = () => {
     frame = 0
     const top = stepAnchor()
     let next = steps[0]
+    let nearest = Infinity
     for (const step of steps) {
-      // Native anchor scrolling rounds to whole pixels, so allow its fractional remainder.
-      if (step.getBoundingClientRect().top <= top + 1) next = step
       const offset = query<HTMLElement>(".step-copy", step).getBoundingClientRect().top - top
       // The final comparison table stays bright while it scrolls through the viewport.
       const distance = step.dataset.step === "plans" ? Math.max(0, offset) : Math.abs(offset)
+      if (distance < nearest) [next, nearest] = [step, distance]
       const brightness = 1 - Math.min(distance / 120, 1)
       step.style.setProperty("--step-opacity", String(0.35 + brightness * 0.65))
     }
@@ -276,29 +279,76 @@ function setUpStage() {
   addEventListener("resize", scheduleStep)
   updateStep()
   setUpLanding(stage, () => activate(query("[data-step='intro']")))
+  setUpFullScreen(stage)
 }
 
-// Until someone taps a total themselves, one card taps itself every few seconds, alternating
-// plus and minus, so the change shows and the total never drifts. It is the first player's,
-// or on small screens Sam's, whose card runs upright across the bottom of the phone.
+// On small screens the deck screen stands up in a strip too short to use, so tapping it opens
+// the same phone full screen.
+function setUpFullScreen(stage: HTMLElement) {
+  const toggle = (open: boolean) => {
+    if (stage.classList.contains("full") === open) return
+    const apply = () => stage.classList.toggle("full", open)
+    if (prefersReducedMotion.matches || !("startViewTransition" in document)) return apply()
+    document.startViewTransition(apply)
+  }
+  query("[data-try-close]", stage).addEventListener("click", () => toggle(false))
+  // Capture so a tap on the preview opens it instead of changing a total.
+  query(".rig", stage).addEventListener(
+    "click",
+    (event) => {
+      if (!narrow.matches || stage.dataset.scene !== "pro" || stage.classList.contains("full"))
+        return
+      event.stopPropagation()
+      toggle(true)
+    },
+    { capture: true },
+  )
+  addEventListener("keydown", (event) => event.key === "Escape" && toggle(false))
+  narrow.addEventListener("change", () => narrow.matches || toggle(false))
+}
+
+// Until someone taps a total themselves, a ghostly hand taps a card every few seconds,
+// alternating plus and minus, so the change shows and the total never drifts. It taps the
+// lowest card that faces the viewer: Maya's with the phone on its side, Sam's standing up. While
+// the phone turns no card faces the viewer, so the demo waits.
 function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   let direction: 1 | -1 = 1
-  const timer = window.setInterval(() => {
-    const showing = stage.dataset.scene === "intro" || stage.dataset.scene === "features"
-    if (!showing || stage.dataset.step === "commander") return
-    const sam = NAMES.indexOf("Sam")
-    const seat = narrow.matches && sam < game.setup.names.length ? sam : 0
-    const hit = stage.querySelector<HTMLElement>(
-      `[data-board='features'] .hit[data-seat='${seat}'][data-dir='${direction}']`,
+  let pending: number | undefined
+  // Full screen is for the visitor's own taps.
+  const showing = () =>
+    (stage.dataset.scene === "intro" || stage.dataset.scene === "features") &&
+    stage.dataset.step !== "commander" &&
+    !stage.classList.contains("full")
+  const tap = () => {
+    if (!showing()) return
+    const board = query<HTMLElement>("[data-board='features']", stage)
+    const facing = [...board.querySelectorAll<HTMLElement>(".seat[data-player]")]
+      .filter((seat) => Math.abs(seatAxis(seat) ?? 90) < 1)
+      .sort((a, b) => center(b).y - center(a).y)[0]
+    if (!facing) return
+    const seat = Number(facing.dataset.player)
+    const hit = board.querySelector<HTMLElement>(
+      `.hit[data-seat='${seat}'][data-dir='${direction}']`,
     )
-    if (!hit) return
-    hit.classList.add("pressed")
-    window.setTimeout(() => hit.classList.remove("pressed"), PRESS_MS)
-    game.change(seat, direction)
+    const glyph = board.querySelector<HTMLElement>(`[data-glyph='${seat}:${direction}']`)
+    if (!hit || !glyph) return
+    const change = direction
     direction = direction === 1 ? -1 : 1
-  }, DEMO_TAP_MS)
+    const press = () => {
+      if (!showing()) return
+      hit.classList.add("pressed")
+      window.setTimeout(() => hit.classList.remove("pressed"), PRESS_MS)
+      game.change(seat, change)
+    }
+    if (prefersReducedMotion.matches) return press()
+    showTapHint(glyph)
+    pending = window.setTimeout(press, HINT_PRESS_MS)
+  }
+  const timer = window.setInterval(tap, DEMO_TAP_MS)
   stage.addEventListener("click", (event) => {
-    if (event.isTrusted && (event.target as Element).closest(".hit")) window.clearInterval(timer)
+    if (!event.isTrusted || !(event.target as Element).closest(".hit")) return
+    window.clearInterval(timer)
+    window.clearTimeout(pending)
   })
 }
 
@@ -336,6 +386,9 @@ function setUpLanding(stage: HTMLElement, showIntro: () => void) {
     const standing = clamp((scrollY - turnFrom) / (upright - turnFrom))
     const turn = -90 * (1 - standing * standing * (3 - 2 * standing))
     phone.style.setProperty("--turn", `${turn}deg`)
+    // A tap hint is drawn inside its seat, so it would spin along with the phone.
+    if (turn !== 0 && turn !== -90)
+      stage.querySelectorAll(".tap-hint").forEach((hint) => hint.remove())
     // Once landed the stage's own sticky positioning takes over, so the phone scrolls away
     // with the tour instead of staying pinned over the closing section.
     if (scrollY >= landed) {
