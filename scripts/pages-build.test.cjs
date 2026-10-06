@@ -23,13 +23,14 @@ test("only branches whose backend matches main use staging", () => {
   )
 })
 
-test("a staging key for any other deployment type is rejected", () => {
-  assert.throws(
-    () =>
-      deployTarget(
-        { CF_PAGES_BRANCH: "fix/x", CONVEX_STAGING_DEPLOY_KEY: "prod:dashing-curlew-34|secret" },
-        () => true,
-      ),
-    /dev deployment key/,
+test("a staging key for any other deployment type is rejected only when staging is needed", () => {
+  const branch = {
+    CF_PAGES_BRANCH: "fix/x",
+    CONVEX_STAGING_DEPLOY_KEY: "prod:dashing-curlew-34|secret",
+  }
+  assert.throws(() => deployTarget(branch, () => true), /dev deployment key/)
+  assert.equal(
+    deployTarget(branch, () => false),
+    "default",
   )
 })

@@ -9,10 +9,10 @@ const BACKEND_PATHS = ["convex", "package.json", "pnpm-lock.yaml"]
 function deployTarget(env, backendMatchesMain) {
   const branch = env.CF_PAGES_BRANCH
   const stagingKey = env.CONVEX_STAGING_DEPLOY_KEY
-  if (!branch || branch === "main" || !stagingKey) return "default"
+  if (!branch || branch === "main" || !stagingKey || !backendMatchesMain()) return "default"
   if (!stagingKey.startsWith("dev:"))
     throw new Error("CONVEX_STAGING_DEPLOY_KEY must be a dev deployment key")
-  return backendMatchesMain() ? "staging" : "default"
+  return "staging"
 }
 
 // why: Pages clones shallowly, so compare tree tips instead of a merge base. Any git failure falls back to a per-branch preview.
