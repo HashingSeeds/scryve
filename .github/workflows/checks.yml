@@ -84,7 +84,7 @@ jobs:
         run: pnpm check:ygo-worker
 
   checks:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -155,7 +155,7 @@ jobs:
     needs: changes
     # Pushes to main skip the changes job and always export, to seed the Metro cache.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.exportable == 'true') }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
       - name: Check out repository
