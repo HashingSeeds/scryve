@@ -5,9 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { TurnedBoardContext } from "@/components/BoardPressable"
 import {
-  GameMenuAnchor,
   GameMenuBackdrop,
-  GameRadialFan,
+  GameMenuCluster,
   GameRadialMenu,
   type GameRadialMenuProps,
 } from "@/components/GameRadialMenu"
@@ -71,7 +70,7 @@ function PinnedGameBoardStage({
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
-  const windowAnchor = boardPointToWindowPoint(boardAnchor, { width, height }, holderAngle)
+  const holderAnchor = boardPointToWindowPoint(boardAnchor, { width, height }, holderAngle)
   const boardOrientation = useMemo(
     () =>
       pinned
@@ -97,23 +96,22 @@ function PinnedGameBoardStage({
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             {renderGrid(boardOrientation)}
             <GameMenuBackdrop open={menuOpen} onClose={menu.onClose} />
-            <GameMenuAnchor
-              open={menuOpen}
+            <GameMenuCluster
+              open={menu.open}
               anchor={boardAnchor}
+              holderAnchor={holderAnchor}
+              facingAngle={holderAngle}
+              actions={menu.actions}
               compact={playerCount > 2}
               variant={menu.variant}
               seatColors={menu.seatColors}
               exitAction={menu.exitAction}
               signal={menu.signal}
-              facingAngle={holderAngle}
               onToggle={menu.onToggle}
             />
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
-      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-        <GameRadialFan open={menuOpen} anchor={windowAnchor} actions={menu.actions} />
-      </View>
       {windowOverlay}
     </View>
   )

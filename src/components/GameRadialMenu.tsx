@@ -155,7 +155,8 @@ export function getRadialActionPoses(
   return CENTER_ACTION_POSES
 }
 
-export function getRadialActionStart(pose: RadialActionPose): { x: number; y: number } {
+export function getRadialActionStart(pose: { x: number; y: number }): { x: number; y: number } {
+  "worklet"
   const distance = Math.hypot(pose.x, pose.y) || 1
   return {
     x: (pose.x / distance) * ACTION_START_DISTANCE,
@@ -271,16 +272,18 @@ export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: ()
   )
 }
 
-export function GameRadialFan({
+function GameRadialFan({
   open,
   anchor,
   anchorStyle = percentAnchorStyle(anchor),
   actions,
+  poseTurnMs = 0,
 }: {
   open: boolean
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
   actions: readonly RadialMenuAction[]
+  poseTurnMs?: number
 }) {
   const reducedMotion = useReducedMotion()
   const poses = getRadialActionPoses(anchor, actions.length)
@@ -294,6 +297,7 @@ export function GameRadialFan({
           pose={poses[index]}
           reducedMotion={reducedMotion}
           open={open}
+          poseTurnMs={poseTurnMs}
         />
       ))}
     </>
@@ -301,20 +305,9 @@ export function GameRadialFan({
 }
 
 const FACING_TURN_MS = 260
+const CLUSTER_SIZE = 2 * (EDGE_POSE_DISTANCE + ACTION_WIDTH)
 
-/** why: a hardware-pinned board does not turn with the window, so `facingAngle` (clockwise degrees) turns the pentagon to face whoever holds the device. */
-export function GameMenuAnchor({
-  open,
-  anchor,
-  anchorStyle = percentAnchorStyle(anchor),
-  compact,
-  variant = DEFAULT_MENU_BUTTON_STYLE,
-  seatColors,
-  exitAction,
-  signal,
-  facingAngle = 0,
-  onToggle,
-}: {
+type GameMenuAnchorProps = {
   open: boolean
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
@@ -323,9 +316,62 @@ export function GameMenuAnchor({
   seatColors?: readonly string[]
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
-  facingAngle?: number
   onToggle: () => void
+}
+
+/** why: a hardware-pinned board does not turn with the window, so the pentagon and its fan stay put through the system rotation and then turn together about the anchor to face the holder (`facingAngle`, clockwise degrees). `holderAnchor` is where the anchor sits in the holder's view and picks the side the fan opens toward. The box is large enough to contain the fan, because Android drops touches outside a parent's bounds. */
+export function GameMenuCluster({
+  holderAnchor,
+  facingAngle,
+  actions,
+  ...anchorProps
+}: Omit<GameMenuAnchorProps, "anchorStyle"> & {
+  holderAnchor: { x: number; y: number }
+  facingAngle: number
+  actions: readonly RadialMenuAction[]
 }) {
+  const reducedMotion = useReducedMotion()
+  const animateFully = reducedMotion === false
+  const facing = useSharedValue(facingAngle)
+
+  useEffect(() => {
+    const target = nearestEquivalentAngle(facing.value, facingAngle)
+    facing.value = animateFully ? withTiming(target, { duration: FACING_TURN_MS }) : target
+  }, [animateFully, facing, facingAngle])
+
+  const facingStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${facing.value}deg` }],
+  }))
+
+  return (
+    <Animated.View
+      testID="game-menu-cluster"
+      pointerEvents="box-none"
+      style={[$cluster, percentAnchorStyle(anchorProps.anchor), facingStyle]}
+    >
+      <GameRadialFan
+        open={anchorProps.open && !anchorProps.exitAction}
+        anchor={holderAnchor}
+        anchorStyle={$clusterCenter}
+        actions={actions}
+        poseTurnMs={FACING_TURN_MS}
+      />
+      <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
+    </Animated.View>
+  )
+}
+
+function GameMenuAnchor({
+  open,
+  anchor,
+  anchorStyle = percentAnchorStyle(anchor),
+  compact,
+  variant = DEFAULT_MENU_BUTTON_STYLE,
+  seatColors,
+  exitAction,
+  signal,
+  onToggle,
+}: GameMenuAnchorProps) {
   const {
     themed,
     theme: { colors, isDark },
@@ -337,8 +383,6 @@ export function GameMenuAnchor({
   const pentagonRotation = useSharedValue(
     menuOpen ? PENTAGON_OPEN_ROTATION_DEG : suppressed ? -PENTAGON_OPEN_ROTATION_DEG : 0,
   )
-  const facing = useSharedValue(facingAngle)
-
   useEffect(() => {
     const spinTarget = menuOpen
       ? PENTAGON_OPEN_ROTATION_DEG
@@ -352,18 +396,9 @@ export function GameMenuAnchor({
         })
   }, [animateFully, menuOpen, suppressed, pentagonRotation, reducedMotion])
 
-  useEffect(() => {
-    const target = nearestEquivalentAngle(facing.value, facingAngle)
-    facing.value = animateFully ? withTiming(target, { duration: FACING_TURN_MS }) : target
-  }, [animateFully, facing, facingAngle])
-
   const pentagonSpinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${pentagonRotation.value}deg` }],
   }))
-  const facingStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${facing.value}deg` }],
-  }))
-
   return (
     <Animated.View
       testID="game-menu-anchor"
@@ -372,7 +407,6 @@ export function GameMenuAnchor({
         themed($anchor),
         compact ? themed($compactAnchor) : themed($largeAnchor),
         anchorStyle,
-        facingStyle,
       ]}
     >
       <BoardPressable
@@ -527,12 +561,14 @@ function RadialAction({
   pose,
   reducedMotion,
   open,
+  poseTurnMs,
 }: {
   action: RadialMenuAction
   anchorStyle: ComponentProps<typeof Animated.View>["style"]
   pose: RadialActionPose
   reducedMotion: ReducedMotionPreference
   open: boolean
+  poseTurnMs: number
 }) {
   const {
     themed,
@@ -542,7 +578,18 @@ function RadialAction({
   const foreground = accessibleForeground(background)
   const animateFully = reducedMotion === false
   const arrive = useSharedValue(0)
-  const start = getRadialActionStart(pose)
+  const poseX = useSharedValue(pose.x)
+  const poseY = useSharedValue(pose.y)
+  const poseRotation = useSharedValue(pose.rotationDeg)
+
+  useEffect(() => {
+    const duration = animateFully ? poseTurnMs : 0
+    poseX.value = withTiming(pose.x, { duration })
+    poseY.value = withTiming(pose.y, { duration })
+    poseRotation.value = withTiming(nearestEquivalentAngle(poseRotation.value, pose.rotationDeg), {
+      duration,
+    })
+  }, [animateFully, pose.x, pose.y, pose.rotationDeg, poseRotation, poseTurnMs, poseX, poseY])
 
   useEffect(() => {
     if (!open) {
@@ -556,15 +603,21 @@ function RadialAction({
         })
   }, [animateFully, arrive, open, pose.delayMs, reducedMotion])
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: arrive.value,
-    transform: [
-      { translateX: start.x + (pose.x - start.x) * arrive.value },
-      { translateY: start.y + (pose.y - start.y) * arrive.value },
-      { rotate: `${pose.rotationDeg - ACTION_START_ROTATION_LAG_DEG * (1 - arrive.value)}deg` },
-      { scale: ACTION_START_SCALE + (1 - ACTION_START_SCALE) * arrive.value },
-    ],
-  }))
+  const animatedStyle = useAnimatedStyle(() => {
+    const target = { x: poseX.value, y: poseY.value }
+    const start = getRadialActionStart(target)
+    return {
+      opacity: arrive.value,
+      transform: [
+        { translateX: start.x + (target.x - start.x) * arrive.value },
+        { translateY: start.y + (target.y - start.y) * arrive.value },
+        {
+          rotate: `${poseRotation.value - ACTION_START_ROTATION_LAG_DEG * (1 - arrive.value)}deg`,
+        },
+        { scale: ACTION_START_SCALE + (1 - ACTION_START_SCALE) * arrive.value },
+      ],
+    }
+  })
 
   return (
     <Animated.View
@@ -572,7 +625,7 @@ function RadialAction({
       pointerEvents={open ? "auto" : "none"}
       aria-hidden={!open}
     >
-      <Pressable
+      <BoardPressable
         testID={open ? `${action.kind}-button` : undefined}
         disabled={action.disabled}
         accessibilityRole="button"
@@ -602,11 +655,20 @@ function RadialAction({
             style={[themed($actionDetail), { color: foreground }]}
           />
         ) : null}
-      </Pressable>
+      </BoardPressable>
     </Animated.View>
   )
 }
 
+const $cluster: ViewStyle = {
+  position: "absolute",
+  zIndex: 30,
+  width: CLUSTER_SIZE,
+  height: CLUSTER_SIZE,
+  marginLeft: -CLUSTER_SIZE / 2,
+  marginTop: -CLUSTER_SIZE / 2,
+}
+const $clusterCenter: ViewStyle = { left: CLUSTER_SIZE / 2, top: CLUSTER_SIZE / 2 }
 const $backdrop: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,
   zIndex: 10,
