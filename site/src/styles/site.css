@@ -812,18 +812,26 @@ figure {
 
 /* Scroll sets --turn: on its side in the hero, standing up during the intro. */
 .phone.main {
+  z-index: 1;
   rotate: var(--turn, 0deg);
 }
 
+/* The second phone waits tucked behind the first, dimmed. For connected play the two slide
+   apart, the second to the left: that's where Maya sits, whose total the demo changes. On the
+   way out they slide back together, and the second hides only once it's covered. */
 .phone.second {
+  filter: brightness(0.6);
   opacity: 0;
   pointer-events: none;
-  translate: -60% 0;
+  scale: 0.92;
+  transition:
+    translate 0.8s var(--ease),
+    rotate 0.6s var(--ease),
+    opacity 0s 0.8s;
 }
 
-/* The second phone slides in behind the first, dimmed, its left column showing: that's where
-   Maya sits, whose total the demo changes. The landing animation scales the rig every frame
-   during the intro, so only later scenes ease the change. */
+/* The landing animation scales the rig every frame during the intro, so only later scenes ease
+   the change. */
 .stage:not([data-scene="intro"]) .rig {
   transition: scale 0.8s var(--ease);
 }
@@ -833,15 +841,13 @@ figure {
 }
 
 .stage[data-scene="connected"] .phone.main {
-  z-index: 1;
   translate: 12% 2%;
 }
 
 .stage[data-scene="connected"] .phone.second {
-  filter: brightness(0.6);
   opacity: 1;
   pointer-events: auto;
-  scale: 0.92;
+  transition-delay: 0s;
   translate: -26% -4%;
 }
 
@@ -1460,6 +1466,13 @@ html:has(.stage.full) {
       filter 0.5s;
   }
 
+  .phone.second {
+    transition:
+      translate 0.8s var(--ease),
+      rotate 0.6s var(--ease),
+      opacity 0s 0.8s;
+  }
+
   .phone.main {
     view-transition-name: demo-phone;
   }
@@ -1480,7 +1493,8 @@ html:has(.stage.full) {
 
   /* The deck screen is portrait only, so the phone stands up and shrinks to the strip. Tapping
      it opens it full screen (stage/page.ts). */
-  .stage[data-scene="pro"] .phone.main {
+  /* The second phone turns with the first so it stays covered while it hides. */
+  .stage[data-scene="pro"] .phone {
     --turn: 0deg;
   }
 
