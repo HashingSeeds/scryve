@@ -123,7 +123,7 @@ export function PlayerGrid({
             left: screenInsets.bottom,
           }
         : screenInsets
-  // why: a browser tab keeps the page between its bars and reports no insets; only a home screen web app reaches the rounded screen corners.
+  // why: index.html only extends the page to the screen edges in a home screen web app, so a browser tab reports no insets and never reaches the rounded corners.
   const squaresScreenCorners =
     Platform.OS !== "web" || Object.values(screenInsets).some((inset) => inset > 0)
   const {

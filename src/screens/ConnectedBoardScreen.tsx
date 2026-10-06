@@ -154,6 +154,10 @@ function ConnectedBoardShell({
 }
 
 export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
+  const {
+    theme: { colors },
+  } = useAppTheme()
+  usePageBackgroundColor(colors.board.background)
   const { isLoaded, user } = useUser()
   if (!isLoaded)
     return (
@@ -263,10 +267,6 @@ function ConnectedBoardRuntime({
   ownerId: string
 }) {
   useKeepAwake("count-connected-game")
-  const {
-    theme: { colors },
-  } = useAppTheme()
-  usePageBackgroundColor(colors.board.background)
   const runtime = useConnectedGame(publicId, ownerId)
   if (runtime.status === "loading")
     return (

@@ -3,15 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <!-- viewport-fit=cover lets the board reach the screen edges; PlayerGrid pads them by the safe-area insets. -->
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <script>
+      // why: only the home screen app may reach the screen edges; in a browser tab, the browser's margins keep every screen clear of the notch.
+      if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) {
+        document.querySelector('meta[name="viewport"]').content += ", viewport-fit=cover"
+      }
+    </script>
     <!-- Every web build is served from /play (SCRYVE_WEB_BASE_URL); scope keeps the home screen app on all of it. -->
     <link rel="manifest" href="/play/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/play/app-icon.png" />
-    <!-- In the home screen app, draw under the status bar; PlayerGrid pads by the reported insets. -->
+    <!-- In the home screen app, draw under the status bar; PlayerGrid pads the board by the reported insets. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>%WEB_TITLE%</title>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
