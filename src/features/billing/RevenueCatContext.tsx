@@ -205,6 +205,7 @@ export function RevenueCatProvider({
     }
 
     let cancelled = false
+    let subscribedSdk: Awaited<ReturnType<typeof loadPurchases>> | undefined
     setCustomerInfo(null)
     const listener: CustomerInfoUpdateListener = (next) => {
       if (!cancelled) acceptCustomerInfo(next)
@@ -217,6 +218,7 @@ export function RevenueCatProvider({
         if (cancelled) return
         setConfiguredUserId(appUserID)
         Purchases.addCustomerInfoUpdateListener(listener)
+        subscribedSdk = Purchases
         const [, offerings] = await Promise.all([
           Purchases.getCustomerInfo().then((next) => {
             if (!cancelled) acceptCustomerInfo(next)
@@ -234,7 +236,7 @@ export function RevenueCatProvider({
 
     return () => {
       cancelled = true
-      void loadPurchases().then((Purchases) => Purchases.removeCustomerInfoUpdateListener(listener))
+      subscribedSdk?.removeCustomerInfoUpdateListener(listener)
     }
   }, [acceptCustomerInfo, apiKey, appUserID])
 
