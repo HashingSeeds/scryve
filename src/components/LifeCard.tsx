@@ -6,7 +6,7 @@ import type {
   TextStyle,
   ViewStyle,
 } from "react-native"
-import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from "react-native"
+import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native"
 import Animated, {
   FadeIn,
   FadeOut,
@@ -24,6 +24,7 @@ import { accessibleForeground } from "@/utils/colorContrast"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
+import { BoardPressable } from "./BoardPressable"
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
   CommanderDamageCardControls,
@@ -598,7 +599,7 @@ export function LifeCard({
           </View>
           {!localCommander ? (
             <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-              <Pressable
+              <BoardPressable
                 testID={`commander-overview-close-seat-${seatNumber}`}
                 accessibilityRole="button"
                 accessibilityLabel={`Close commander damage for ${identity}`}
@@ -615,7 +616,7 @@ export function LifeCard({
                   closeIcon
                   size={markSize}
                 />
-              </Pressable>
+              </BoardPressable>
             </View>
           ) : null}
         </Animated.View>
@@ -646,7 +647,7 @@ export function LifeCard({
         />
       ) : null}
       {commanderDamage && !localCommander && !commanderCardMode && !commanderOverviewOpen ? (
-        <Pressable
+        <BoardPressable
           testID={`commander-mark-seat-${seatNumber}`}
           accessibilityRole="button"
           accessibilityLabel={`Show commander damage for ${identity}`}
@@ -691,7 +692,7 @@ export function LifeCard({
             { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
-          <Pressable
+          <BoardPressable
             testID={`commander-mark-seat-${seatNumber}`}
             accessibilityRole="button"
             accessibilityLabel={`Assign commander damage from ${identity}${
@@ -729,7 +730,7 @@ export function LifeCard({
                 <UpdatedAgo since={staleSince} color={foreground} />
               ) : null}
             </View>
-          </Pressable>
+          </BoardPressable>
         </View>
       ) : null}
       {editorOpen ? (

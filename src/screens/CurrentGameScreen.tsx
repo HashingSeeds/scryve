@@ -1,18 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
-import Animated from "react-native-reanimated"
 
 import { Button } from "@/components/Button"
 import { DialogCard, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
-import {
-  getPlayerGridLayoutOptions,
-  getPlayerGridLayout,
-  getPlayerGridMenuAnchor,
-  PlayerGrid,
-} from "@/components/PlayerGrid"
+import { type RadialMenuAction } from "@/components/GameRadialMenu"
+import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
@@ -21,21 +15,17 @@ import {
   incomingCommanderDamage,
   isEliminatedByCommanderDamage,
 } from "@/features/game/domain"
+import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
 import { supportsCommanderDamage } from "@/features/game/playSystems"
 import type { GamePlayer, LocalGame, LocalGameResult, PlayerId } from "@/features/game/types"
-import {
-  rotateGameBoardAnchor,
-  useGameBoardOrientation,
-} from "@/features/game/useGameBoardOrientation"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
-import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
@@ -73,8 +63,6 @@ export function CurrentGameScreen({
   const { themed } = useAppTheme()
   const runtime = useLocalGame(initialGame, repository)
   const system = runtime.game.system
-  const boardOrientation = useGameBoardOrientation()
-  const { width, height, fontScale, rotation } = boardOrientation
   const [menuOpen, setMenuOpen] = useState(false)
   const [freshBoard, setFreshBoard] = useState(fresh)
   const [savedGameId, setSavedGameId] = useState<string>()
@@ -109,26 +97,6 @@ export function CurrentGameScreen({
   const playerCount = runtime.game.players.length
   const layoutVariant = runtime.game.layout ?? "auto"
   const layoutOptions = getPlayerGridLayoutOptions(playerCount)
-  const gridLayout = useMemo(
-    () =>
-      getPlayerGridLayout({
-        playerCount,
-        width,
-        height,
-        fontScale,
-        layoutVariant,
-      }),
-    [playerCount, width, height, fontScale, layoutVariant],
-  )
-  const topEdgeBand = useTopEdgeBand()
-  const menuAnchor = useMemo(
-    () =>
-      rotateGameBoardAnchor(
-        getPlayerGridMenuAnchor(playerCount, gridLayout, rotation === 0 ? topEdgeBand / height : 0),
-        rotation,
-      ),
-    [playerCount, gridLayout, rotation, topEdgeBand, height],
-  )
 
   function confirmEnd(result: LocalGameResult) {
     const ended = runtime.finish(result, endSource)
@@ -267,60 +235,57 @@ export function CurrentGameScreen({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <Animated.View
-        ref={boardOrientation.frameRef}
-        collapsable={false}
-        testID="game-board"
-        style={themed($board)}
-      >
-        <PlayerGrid
-          boardOrientation={boardOrientation}
-          players={runtime.game.players}
-          system={system}
-          lifeStep={runtime.game.lifeStep}
-          layoutVariant={layoutVariant}
-          disabled={menuOpen}
-          isPlayerEliminated={
-            commanderDamageEnabled
-              ? (player) => isEliminatedByCommanderDamage(runtime.game, player.id)
-              : undefined
-          }
-          commanderDamage={
-            commanderDamageEnabled
-              ? {
-                  incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
-                  armedPlayerId,
-                  inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
-                  onPressSword: toggleSword,
-                  onStage: assignCommanderDamage,
-                }
-              : undefined
-          }
-          onChange={runtime.changeLife}
-        />
-        <GameRadialMenu
-          open={menuOpen}
-          anchor={menuAnchor}
-          boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
-          nativeFrame={boardOrientation.nativeFrame}
-          compact={playerCount > 2}
-          actions={radialActions}
-          variant={menuButtonStyle}
-          seatColors={seatColors}
-          exitAction={exitAction}
-          onToggle={toggleMenu}
-          onClose={closeMenu}
-        />
-        {menuOpen && onDecks && onSettings && onAccount ? (
-          <FloatingAppNavigation
-            destinationLabel="Decks"
-            accountLabel={accountLabel}
-            onDestination={onDecks}
-            onSettings={onSettings}
-            onAccount={onAccount}
+      <GameBoardStage
+        playerCount={playerCount}
+        layoutVariant={layoutVariant}
+        renderGrid={(boardOrientation) => (
+          <PlayerGrid
+            boardOrientation={boardOrientation}
+            players={runtime.game.players}
+            system={system}
+            lifeStep={runtime.game.lifeStep}
+            layoutVariant={layoutVariant}
+            disabled={menuOpen}
+            isPlayerEliminated={
+              commanderDamageEnabled
+                ? (player) => isEliminatedByCommanderDamage(runtime.game, player.id)
+                : undefined
+            }
+            commanderDamage={
+              commanderDamageEnabled
+                ? {
+                    incomingFor: (player) => incomingCommanderDamage(runtime.game, player.id),
+                    armedPlayerId,
+                    inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
+                    onPressSword: toggleSword,
+                    onStage: assignCommanderDamage,
+                  }
+                : undefined
+            }
+            onChange={runtime.changeLife}
           />
-        ) : null}
-      </Animated.View>
+        )}
+        menu={{
+          open: menuOpen,
+          actions: radialActions,
+          variant: menuButtonStyle,
+          seatColors,
+          exitAction,
+          onToggle: toggleMenu,
+          onClose: closeMenu,
+        }}
+        windowOverlay={
+          menuOpen && onDecks && onSettings && onAccount ? (
+            <FloatingAppNavigation
+              destinationLabel="Decks"
+              accountLabel={accountLabel}
+              onDestination={onDecks}
+              onSettings={onSettings}
+              onAccount={onAccount}
+            />
+          ) : null
+        }
+      />
 
       {layoutPickerOpen ? (
         <DialogCard
@@ -373,5 +338,4 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   width: "100%",
   justifyContent: "flex-start",
 })
-const $board: ThemedStyle<ViewStyle> = () => ({ flex: 1, width: "100%" })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })

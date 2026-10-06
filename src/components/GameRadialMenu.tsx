@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated"
 
+import { nearestEquivalentAngle } from "@/features/game/pinnedBoardGeometry"
 import {
   rotateGameBoardAnchor,
   type useGameBoardOrientation,
@@ -23,6 +24,7 @@ import {
   type ReducedMotionPreference,
 } from "@/utils/useReducedMotion"
 
+import { BoardPressable } from "./BoardPressable"
 import {
   DEFAULT_MENU_BUTTON_STYLE,
   GameMenuButtonShape,
@@ -153,7 +155,8 @@ export function getRadialActionPoses(
   return CENTER_ACTION_POSES
 }
 
-export function getRadialActionStart(pose: RadialActionPose): { x: number; y: number } {
+export function getRadialActionStart(pose: { x: number; y: number }): { x: number; y: number } {
+  "worklet"
   const distance = Math.hypot(pose.x, pose.y) || 1
   return {
     x: (pose.x / distance) * ACTION_START_DISTANCE,
@@ -178,38 +181,11 @@ export const GameRadialMenu = memo(function GameRadialMenu({
 }: GameRadialMenuProps) {
   const {
     themed,
-    theme: { colors, isDark },
+    theme: { colors },
   } = useAppTheme()
-  const reducedMotion = useReducedMotion()
-  const animateFully = reducedMotion === false
-  const suppressed = !!exitAction
-  const menuOpen = open && !suppressed
-  const pentagonRotation = useSharedValue(
-    menuOpen ? PENTAGON_OPEN_ROTATION_DEG : suppressed ? -PENTAGON_OPEN_ROTATION_DEG : 0,
-  )
-  const poses = getRadialActionPoses(anchor, actions.length)
+  const menuOpen = open && !exitAction
 
-  useEffect(() => {
-    const spinTarget = menuOpen
-      ? PENTAGON_OPEN_ROTATION_DEG
-      : suppressed
-        ? -PENTAGON_OPEN_ROTATION_DEG
-        : 0
-    pentagonRotation.value = animateFully
-      ? withSpring(spinTarget, PENTAGON_SPIN_SPRING)
-      : withTiming(spinTarget, {
-          duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS),
-        })
-  }, [animateFully, menuOpen, suppressed, pentagonRotation, reducedMotion])
-
-  const pentagonSpinStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${pentagonRotation.value}deg` }],
-  }))
-
-  const anchorStyle: ViewStyle = {
-    left: `${anchor.x * 100}%`,
-    top: `${anchor.y * 100}%`,
-  }
+  const anchorStyle = percentAnchorStyle(anchor)
 
   const nativeAnchorStyle = useAnimatedStyle(() => {
     const frame = nativeFrame?.value
@@ -220,91 +196,24 @@ export const GameRadialMenu = memo(function GameRadialMenu({
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      {menuOpen ? (
-        <Pressable
-          testID="game-menu-backdrop"
-          accessibilityRole="button"
-          accessibilityLabel="Close game options"
-          style={themed($backdrop)}
-          onPress={onClose}
-        />
-      ) : null}
-
-      {actions.slice(0, poses.length).map((action, index) => (
-        <RadialAction
-          key={action.kind}
-          action={action}
-          anchorStyle={[anchorStyle, nativeAnchorStyle]}
-          pose={poses[index]}
-          reducedMotion={reducedMotion}
-          open={menuOpen}
-        />
-      ))}
-
-      <Animated.View
-        testID="game-menu-anchor"
-        pointerEvents="box-none"
-        style={[
-          themed($anchor),
-          compact ? themed($compactAnchor) : themed($largeAnchor),
-          anchorStyle,
-          nativeAnchorStyle,
-        ]}
-      >
-        <Pressable
-          testID="game-menu-button"
-          accessibilityRole="button"
-          accessibilityLabel={[
-            exitAction ? exitAction.label : menuOpen ? "Close game options" : "Game options",
-            signal?.accessibilityText,
-          ]
-            .filter(Boolean)
-            .join(". ")}
-          accessibilityHint={
-            exitAction
-              ? undefined
-              : menuOpen
-                ? "Collapses the game controls"
-                : "Expands the game controls"
-          }
-          accessibilityState={{ expanded: menuOpen }}
-          style={({ pressed }) => [themed($menuButton), pressed && $menuButtonPressed]}
-          onPress={exitAction ? exitAction.onPress : onToggle}
-        >
-          <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
-            <SignalledMenuButtonShape
-              variant={variant}
-              isDark={isDark}
-              seatColors={seatColors}
-              tone={signal?.tone}
-              reducedMotion={reducedMotion}
-            />
-          </Animated.View>
-          <MenuGlyph
-            color={colors.gameMenu.anchorGlyph}
-            pose={menuOpen ? 1 : exitAction ? -1 : 0}
-            animateFully={animateFully}
-            reducedMotion={reducedMotion}
-          />
-        </Pressable>
-        {signal?.badge ? (
-          <View
-            testID="game-menu-signal-badge"
-            pointerEvents="none"
-            style={[themed($signalBadge), { backgroundColor: colors.gameMenu.signal[signal.tone] }]}
-          >
-            <Text
-              text={signal.badge}
-              weight="bold"
-              maxFontSizeMultiplier={1.2}
-              style={[
-                themed($signalBadgeText),
-                { color: accessibleForeground(colors.gameMenu.signal[signal.tone]) },
-              ]}
-            />
-          </View>
-        ) : null}
-      </Animated.View>
+      <GameMenuBackdrop open={menuOpen} onClose={onClose} />
+      <GameRadialFan
+        open={menuOpen}
+        anchor={anchor}
+        anchorStyle={[anchorStyle, nativeAnchorStyle]}
+        actions={actions}
+      />
+      <GameMenuAnchor
+        open={menuOpen}
+        anchor={anchor}
+        anchorStyle={[anchorStyle, nativeAnchorStyle]}
+        compact={compact}
+        variant={variant}
+        seatColors={seatColors}
+        exitAction={exitAction}
+        signal={signal}
+        onToggle={onToggle}
+      />
 
       {menuOpen && statusLine ? (
         <View
@@ -342,6 +251,220 @@ export const GameRadialMenu = memo(function GameRadialMenu({
     </View>
   )
 })
+
+type AnchorStyle = ComponentProps<typeof Animated.View>["style"]
+
+function percentAnchorStyle(anchor: { x: number; y: number }): ViewStyle {
+  return { left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }
+}
+
+export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { themed } = useAppTheme()
+  if (!open) return null
+  return (
+    <BoardPressable
+      testID="game-menu-backdrop"
+      accessibilityRole="button"
+      accessibilityLabel="Close game options"
+      style={themed($backdrop)}
+      onPress={onClose}
+    />
+  )
+}
+
+function GameRadialFan({
+  open,
+  anchor,
+  anchorStyle = percentAnchorStyle(anchor),
+  actions,
+  poseTurnMs = 0,
+}: {
+  open: boolean
+  anchor: { x: number; y: number }
+  anchorStyle?: AnchorStyle
+  actions: readonly RadialMenuAction[]
+  poseTurnMs?: number
+}) {
+  const reducedMotion = useReducedMotion()
+  const poses = getRadialActionPoses(anchor, actions.length)
+  return (
+    <>
+      {actions.slice(0, poses.length).map((action, index) => (
+        <RadialAction
+          key={action.kind}
+          action={action}
+          anchorStyle={anchorStyle}
+          pose={poses[index]}
+          reducedMotion={reducedMotion}
+          open={open}
+          poseTurnMs={poseTurnMs}
+        />
+      ))}
+    </>
+  )
+}
+
+const FACING_TURN_MS = 260
+const CLUSTER_SIZE = 2 * (EDGE_POSE_DISTANCE + ACTION_WIDTH)
+
+type GameMenuAnchorProps = {
+  open: boolean
+  anchor: { x: number; y: number }
+  anchorStyle?: AnchorStyle
+  compact?: boolean
+  variant?: MenuButtonStyle
+  seatColors?: readonly string[]
+  exitAction?: { label: string; onPress: () => void }
+  signal?: GameMenuSignal
+  onToggle: () => void
+}
+
+/** why: a hardware-pinned board does not turn with the window, so the pentagon and its fan stay put through the system rotation and then turn together about the anchor to face the holder (`facingAngle`, clockwise degrees). `holderAnchor` is where the anchor sits in the holder's view and picks the side the fan opens toward. The box is large enough to contain the fan, because Android drops touches outside a parent's bounds. */
+export function GameMenuCluster({
+  holderAnchor,
+  facingAngle,
+  actions,
+  ...anchorProps
+}: Omit<GameMenuAnchorProps, "anchorStyle"> & {
+  holderAnchor: { x: number; y: number }
+  facingAngle: number
+  actions: readonly RadialMenuAction[]
+}) {
+  const reducedMotion = useReducedMotion()
+  const animateFully = reducedMotion === false
+  const facing = useSharedValue(facingAngle)
+
+  useEffect(() => {
+    const target = nearestEquivalentAngle(facing.value, facingAngle)
+    facing.value = animateFully ? withTiming(target, { duration: FACING_TURN_MS }) : target
+  }, [animateFully, facing, facingAngle])
+
+  const facingStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${facing.value}deg` }],
+  }))
+
+  return (
+    <Animated.View
+      testID="game-menu-cluster"
+      pointerEvents="box-none"
+      style={[$cluster, percentAnchorStyle(anchorProps.anchor), facingStyle]}
+    >
+      <GameRadialFan
+        open={anchorProps.open && !anchorProps.exitAction}
+        anchor={holderAnchor}
+        anchorStyle={$clusterCenter}
+        actions={actions}
+        poseTurnMs={FACING_TURN_MS}
+      />
+      <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
+    </Animated.View>
+  )
+}
+
+function GameMenuAnchor({
+  open,
+  anchor,
+  anchorStyle = percentAnchorStyle(anchor),
+  compact,
+  variant = DEFAULT_MENU_BUTTON_STYLE,
+  seatColors,
+  exitAction,
+  signal,
+  onToggle,
+}: GameMenuAnchorProps) {
+  const {
+    themed,
+    theme: { colors, isDark },
+  } = useAppTheme()
+  const reducedMotion = useReducedMotion()
+  const animateFully = reducedMotion === false
+  const suppressed = !!exitAction
+  const menuOpen = open && !suppressed
+  const pentagonRotation = useSharedValue(
+    menuOpen ? PENTAGON_OPEN_ROTATION_DEG : suppressed ? -PENTAGON_OPEN_ROTATION_DEG : 0,
+  )
+  useEffect(() => {
+    const spinTarget = menuOpen
+      ? PENTAGON_OPEN_ROTATION_DEG
+      : suppressed
+        ? -PENTAGON_OPEN_ROTATION_DEG
+        : 0
+    pentagonRotation.value = animateFully
+      ? withSpring(spinTarget, PENTAGON_SPIN_SPRING)
+      : withTiming(spinTarget, {
+          duration: motionDuration(reducedMotion, MENU_FALLBACK_ANIMATION_MS),
+        })
+  }, [animateFully, menuOpen, suppressed, pentagonRotation, reducedMotion])
+
+  const pentagonSpinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${pentagonRotation.value}deg` }],
+  }))
+  return (
+    <Animated.View
+      testID="game-menu-anchor"
+      pointerEvents="box-none"
+      style={[
+        themed($anchor),
+        compact ? themed($compactAnchor) : themed($largeAnchor),
+        anchorStyle,
+      ]}
+    >
+      <BoardPressable
+        testID="game-menu-button"
+        accessibilityRole="button"
+        accessibilityLabel={[
+          exitAction ? exitAction.label : menuOpen ? "Close game options" : "Game options",
+          signal?.accessibilityText,
+        ]
+          .filter(Boolean)
+          .join(". ")}
+        accessibilityHint={
+          exitAction
+            ? undefined
+            : menuOpen
+              ? "Collapses the game controls"
+              : "Expands the game controls"
+        }
+        accessibilityState={{ expanded: menuOpen }}
+        style={({ pressed }) => [themed($menuButton), pressed && $menuButtonPressed]}
+        onPress={exitAction ? exitAction.onPress : onToggle}
+      >
+        <Animated.View style={[StyleSheet.absoluteFill, pentagonSpinStyle]}>
+          <SignalledMenuButtonShape
+            variant={variant}
+            isDark={isDark}
+            seatColors={seatColors}
+            tone={signal?.tone}
+            reducedMotion={reducedMotion}
+          />
+        </Animated.View>
+        <MenuGlyph
+          color={colors.gameMenu.anchorGlyph}
+          pose={menuOpen ? 1 : exitAction ? -1 : 0}
+          animateFully={animateFully}
+          reducedMotion={reducedMotion}
+        />
+      </BoardPressable>
+      {signal?.badge ? (
+        <View
+          testID="game-menu-signal-badge"
+          pointerEvents="none"
+          style={[themed($signalBadge), { backgroundColor: colors.gameMenu.signal[signal.tone] }]}
+        >
+          <Text
+            text={signal.badge}
+            weight="bold"
+            maxFontSizeMultiplier={1.2}
+            style={[
+              themed($signalBadgeText),
+              { color: accessibleForeground(colors.gameMenu.signal[signal.tone]) },
+            ]}
+          />
+        </View>
+      ) : null}
+    </Animated.View>
+  )
+}
 
 function useChasingSide(active: boolean): number | undefined {
   const [side, setSide] = useState(0)
@@ -438,12 +561,14 @@ function RadialAction({
   pose,
   reducedMotion,
   open,
+  poseTurnMs,
 }: {
   action: RadialMenuAction
   anchorStyle: ComponentProps<typeof Animated.View>["style"]
   pose: RadialActionPose
   reducedMotion: ReducedMotionPreference
   open: boolean
+  poseTurnMs: number
 }) {
   const {
     themed,
@@ -453,7 +578,18 @@ function RadialAction({
   const foreground = accessibleForeground(background)
   const animateFully = reducedMotion === false
   const arrive = useSharedValue(0)
-  const start = getRadialActionStart(pose)
+  const poseX = useSharedValue(pose.x)
+  const poseY = useSharedValue(pose.y)
+  const poseRotation = useSharedValue(pose.rotationDeg)
+
+  useEffect(() => {
+    const duration = animateFully ? poseTurnMs : 0
+    poseX.value = withTiming(pose.x, { duration })
+    poseY.value = withTiming(pose.y, { duration })
+    poseRotation.value = withTiming(nearestEquivalentAngle(poseRotation.value, pose.rotationDeg), {
+      duration,
+    })
+  }, [animateFully, pose.x, pose.y, pose.rotationDeg, poseRotation, poseTurnMs, poseX, poseY])
 
   useEffect(() => {
     if (!open) {
@@ -467,15 +603,21 @@ function RadialAction({
         })
   }, [animateFully, arrive, open, pose.delayMs, reducedMotion])
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: arrive.value,
-    transform: [
-      { translateX: start.x + (pose.x - start.x) * arrive.value },
-      { translateY: start.y + (pose.y - start.y) * arrive.value },
-      { rotate: `${pose.rotationDeg - ACTION_START_ROTATION_LAG_DEG * (1 - arrive.value)}deg` },
-      { scale: ACTION_START_SCALE + (1 - ACTION_START_SCALE) * arrive.value },
-    ],
-  }))
+  const animatedStyle = useAnimatedStyle(() => {
+    const target = { x: poseX.value, y: poseY.value }
+    const start = getRadialActionStart(target)
+    return {
+      opacity: arrive.value,
+      transform: [
+        { translateX: start.x + (target.x - start.x) * arrive.value },
+        { translateY: start.y + (target.y - start.y) * arrive.value },
+        {
+          rotate: `${poseRotation.value - ACTION_START_ROTATION_LAG_DEG * (1 - arrive.value)}deg`,
+        },
+        { scale: ACTION_START_SCALE + (1 - ACTION_START_SCALE) * arrive.value },
+      ],
+    }
+  })
 
   return (
     <Animated.View
@@ -483,7 +625,7 @@ function RadialAction({
       pointerEvents={open ? "auto" : "none"}
       aria-hidden={!open}
     >
-      <Pressable
+      <BoardPressable
         testID={open ? `${action.kind}-button` : undefined}
         disabled={action.disabled}
         accessibilityRole="button"
@@ -513,11 +655,20 @@ function RadialAction({
             style={[themed($actionDetail), { color: foreground }]}
           />
         ) : null}
-      </Pressable>
+      </BoardPressable>
     </Animated.View>
   )
 }
 
+const $cluster: ViewStyle = {
+  position: "absolute",
+  zIndex: 30,
+  width: CLUSTER_SIZE,
+  height: CLUSTER_SIZE,
+  marginLeft: -CLUSTER_SIZE / 2,
+  marginTop: -CLUSTER_SIZE / 2,
+}
+const $clusterCenter: ViewStyle = { left: CLUSTER_SIZE / 2, top: CLUSTER_SIZE / 2 }
 const $backdrop: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,
   zIndex: 10,

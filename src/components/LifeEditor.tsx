@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { GestureResponderEvent, ViewStyle } from "react-native"
-import { Pressable, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -16,6 +16,7 @@ import { useAppTheme } from "@/theme/context"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
+import { BoardPressable } from "./BoardPressable"
 import { mixColorsInLinearLight } from "./GameMenuButtonShape"
 import type {
   LifeCardContentInsets,
@@ -280,7 +281,7 @@ export function LifeEditor({
           numberOfLines={1}
           style={[styles.title, { color: ink, maxWidth: titleWidth }]}
         />
-        <Pressable
+        <BoardPressable
           testID={`life-editor-close-seat-${seatNumber}`}
           accessibilityRole="button"
           accessibilityLabel="Close life controls"
@@ -297,7 +298,7 @@ export function LifeEditor({
               { backgroundColor: ink, transform: [{ rotate: "-45deg" }] },
             ]}
           />
-        </Pressable>
+        </BoardPressable>
       </View>
       <Animated.View
         testID={`life-editor-value-seat-${seatNumber}`}
@@ -417,7 +418,7 @@ export function LifeEditor({
         style={[styles.actions, compact && styles.compactActions]}
       >
         {actions.map((amount) => (
-          <Pressable
+          <BoardPressable
             key={amount}
             testID={`life-editor-step-${seatNumber}-${amount}`}
             accessibilityRole="button"
@@ -435,7 +436,7 @@ export function LifeEditor({
               size={compact ? "xs" : "sm"}
               style={{ color: ink }}
             />
-          </Pressable>
+          </BoardPressable>
         ))}
       </View>
     </Animated.View>

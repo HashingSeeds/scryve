@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ScreenPinnedViewModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.screenpinnedview.ScreenPinnedViewModule"]
+  }
+}

@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { Pressable, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
 
 import { MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
@@ -9,6 +9,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
+import { BoardPressable } from "./BoardPressable"
 import { overlayTint } from "./LifeControls"
 import {
   lifeCardContentInsetStyle,
@@ -304,7 +305,7 @@ function CommanderAction({
 }) {
   const { themed } = useAppTheme()
   return (
-    <Pressable
+    <BoardPressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -341,7 +342,7 @@ function CommanderAction({
           ]}
         />
       </View>
-    </Pressable>
+    </BoardPressable>
   )
 }
 
