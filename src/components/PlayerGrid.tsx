@@ -10,6 +10,7 @@ import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
@@ -129,10 +130,8 @@ export function PlayerGrid({
     themed,
     theme: { spacing },
   } = useAppTheme()
-  const topEdgeBand =
-    STANDALONE_WEB_APP && boardRotation === 0 && dimensions.height > dimensions.width
-      ? TOP_EDGE_BAND
-      : 0
+  const screenTopEdgeBand = useTopEdgeBand()
+  const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const counter = playSystemRules(system).counter
   const layout = getPlayerGridLayout({
@@ -464,11 +463,6 @@ export function getScreenCornerSquaringStyle(input: {
   }
   return Object.keys(squared).length ? squared : undefined
 }
-
-// why: index.html paints a 12px band over the top edge of a portrait home screen app to stop iOS 26 blurring the board there.
-const TOP_EDGE_BAND = 12
-const STANDALONE_WEB_APP =
-  Platform.OS === "web" && window.matchMedia("(display-mode: standalone)").matches
 
 const $grid: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
