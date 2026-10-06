@@ -21,6 +21,8 @@ import {
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
   TUCKS_INTO_SCREEN_CORNERS,
+  type LifeCardContentInsets,
+  type LifeCardEdge,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
@@ -123,9 +125,6 @@ export function PlayerGrid({
             left: screenInsets.bottom,
           }
         : screenInsets
-  // why: index.html only extends the page to the screen edges in a home screen web app, so a browser tab reports no insets and never reaches the rounded corners.
-  const squaresScreenCorners =
-    Platform.OS !== "web" || Object.values(screenInsets).some((inset) => inset > 0)
   const {
     themed,
     theme: { spacing },
@@ -322,11 +321,12 @@ export function PlayerGrid({
                         : undefined
                     }
                     onChange={(delta) => onChange(player.id, delta)}
-                    style={
-                      squaresScreenCorners
-                        ? getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })
-                        : undefined
-                    }
+                    style={getScreenCornerSquaringStyle({
+                      rows,
+                      rowIndex,
+                      columnIndex,
+                      insets: Platform.OS === "web" ? insets : undefined,
+                    })}
                   />
                 </View>
               )
@@ -426,20 +426,32 @@ function fallbackMenuAt(
   return undefined
 }
 
+/** why: on web, pass the insets. The page only reaches a rounded screen corner where the browser reports an inset; a browser tab or a solid status bar strip reports none. */
 export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number
   columnIndex: number
+  insets?: LifeCardContentInsets
 }): ViewStyle | undefined {
+  const reachesCorner = (edge: LifeCardEdge, side: LifeCardEdge) =>
+    !input.insets || input.insets[edge] > 0 || input.insets[side] > 0
   const touchesTopEdge = input.rowIndex === 0
   const touchesBottomEdge = input.rowIndex === input.rows.length - 1
   const touchesLeftEdge = input.columnIndex === 0
   const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
   const squared: ViewStyle = {
-    ...(touchesTopEdge && touchesLeftEdge ? { borderTopLeftRadius: 0 } : null),
-    ...(touchesTopEdge && touchesRightEdge ? { borderTopRightRadius: 0 } : null),
-    ...(touchesBottomEdge && touchesLeftEdge ? { borderBottomLeftRadius: 0 } : null),
-    ...(touchesBottomEdge && touchesRightEdge ? { borderBottomRightRadius: 0 } : null),
+    ...(touchesTopEdge && touchesLeftEdge && reachesCorner("top", "left")
+      ? { borderTopLeftRadius: 0 }
+      : null),
+    ...(touchesTopEdge && touchesRightEdge && reachesCorner("top", "right")
+      ? { borderTopRightRadius: 0 }
+      : null),
+    ...(touchesBottomEdge && touchesLeftEdge && reachesCorner("bottom", "left")
+      ? { borderBottomLeftRadius: 0 }
+      : null),
+    ...(touchesBottomEdge && touchesRightEdge && reachesCorner("bottom", "right")
+      ? { borderBottomRightRadius: 0 }
+      : null),
   }
   return Object.keys(squared).length ? squared : undefined
 }

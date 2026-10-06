@@ -13,8 +13,6 @@
     <!-- Every web build is served from /play (SCRYVE_WEB_BASE_URL); scope keeps the home screen app on all of it. -->
     <link rel="manifest" href="/play/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/play/app-icon.png" />
-    <!-- In the home screen app, draw under the status bar; PlayerGrid pads the board by the reported insets. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>%WEB_TITLE%</title>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
@@ -22,8 +20,6 @@
       html,
       body {
         height: 100%;
-        /* why: in a home screen web app, 100% stops short by the status bar height */
-        height: 100dvh;
       }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {

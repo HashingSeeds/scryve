@@ -20,6 +20,7 @@ import {
   getPlayerGridMenuAnchor,
   getPlayerGridRowFlex,
   getPlayerGridRows,
+  getScreenCornerSquaringStyle,
   PlayerGrid,
 } from "./PlayerGrid"
 import { PlayerMark } from "./PlayerMark"
@@ -639,5 +640,22 @@ describe("PlayerGrid", () => {
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
       "Seat 1, Player 1, now 21 life",
     )
+  })
+
+  it("squares only the corners next to a reported inset when given insets", () => {
+    const rows = [
+      [0, 1],
+      [2, 3],
+    ]
+    const insets = { top: 0, bottom: 34, left: 0, right: 0 }
+    expect(
+      getScreenCornerSquaringStyle({ rows, rowIndex: 0, columnIndex: 0, insets }),
+    ).toBeUndefined()
+    expect(getScreenCornerSquaringStyle({ rows, rowIndex: 1, columnIndex: 0, insets })).toEqual({
+      borderBottomLeftRadius: 0,
+    })
+    expect(getScreenCornerSquaringStyle({ rows, rowIndex: 0, columnIndex: 0 })).toEqual({
+      borderTopLeftRadius: 0,
+    })
   })
 })
