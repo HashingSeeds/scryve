@@ -59,7 +59,11 @@ export interface CommanderDamageGridBinding {
 export interface PlayerGridProps {
   players: GamePlayer[]
   boardOrientation?: Omit<ReturnType<typeof useGameBoardOrientation>, "frameRef" | "nativeFrame"> &
-    Partial<Pick<ReturnType<typeof useGameBoardOrientation>, "nativeFrame">>
+    Partial<Pick<ReturnType<typeof useGameBoardOrientation>, "nativeFrame">> & {
+      // why: a hardware-pinned board lays out at rotation 0 but sits turned in window space, so it supplies board-space insets and the angle touches arrive at.
+      insets?: LifeCardContentInsets
+      touchRotation?: number
+    }
   system?: PlaySystemId
   lifeStep?: number
   layoutVariant?: PlayerGridLayoutVariant
@@ -110,8 +114,9 @@ export function PlayerGrid({
     }
   })
   const screenInsets = useSafeAreaInsets()
-  const insets =
-    boardRotation === 90
+  const insets = boardOrientation?.insets
+    ? boardOrientation.insets
+    : boardRotation === 90
       ? {
           top: screenInsets.right,
           right: screenInsets.bottom,
@@ -269,7 +274,7 @@ export function PlayerGrid({
                     color={player.color}
                     compact={layout.compact}
                     contentRotation={contentRotation}
-                    boardRotation={boardRotation}
+                    boardRotation={boardOrientation?.touchRotation ?? boardRotation}
                     contentInsets={contentInsets}
                     screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
                     menuCorner={menuCorner}
