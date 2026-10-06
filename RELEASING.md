@@ -49,7 +49,21 @@ sentry-release:
 
 ## Convex deploys
 
-Production Convex deploys are an explicit release step (`npx convex deploy` against production), performed before publishing the client update or binary that depends on them. Never an incidental side effect of local development. Convex schema and function changes must follow the compatibility rules in AGENTS.md.
+Cloudflare Pages deploys Convex as part of every web build. The build command is `npx convex deploy --cmd "pnpm build:web:pages" --cmd-url-env-var-name EXPO_PUBLIC_CONVEX_URL`, and the `CONVEX_DEPLOY_KEY` in each Pages environment decides the target:
+
+- **Production (main):** pushes `convex/` to production, then builds the web app against it. Merging to main is a production backend release. If the push fails, the build fails and nothing is published.
+- **Preview (other branches):** pushes to a preview deployment named after the branch and builds against it. Previews start with no data and are deleted 5 days after creation. Push the branch again to recreate one.
+
+Convex schema and function changes must follow the compatibility rules in AGENTS.md. Because every merge deploys:
+
+- Give each step of an expand-and-contract rollout its own PR and merge them in order. A squash merge cannot preserve an intermediate checkpoint.
+- Check removed or renamed functions against installed clients before merging. Convex does not block them.
+- Use staged indexes on large tables. Pages builds time out after 20 minutes, and a blocking index backfill fails the deploy.
+- Before publishing an OTA update or binary, confirm the Pages build for the backend it needs succeeded.
+- Undo a bad deploy by merging a revert or forward fix. Server data does not roll back.
+- Run `npx convex deploy` against production by hand only to recover from a failed Pages build.
+
+`convex-deploy-commit` in the release record is the main commit whose Pages build deployed the backend.
 
 ## Scryve Pro rollout
 
@@ -84,8 +98,6 @@ Existing clients keep their current API contracts and cached offline access.
    `revenueCatCustomerStates` and `revenueCatWebhookEvents` tables and their indexes.
    Preserve this checkpoint when merging. Then deploy the backend code
    before releasing the client. No existing fields or functions are removed.
-   Follow the explicit Convex release procedure above; configuring environment
-   variables or merging code does not deploy the backend.
 4. In RevenueCat → Integrations → Webhooks, add a configuration pointing to
    `https://<deployment>.convex.site/revenuecat/webhooks`. Set its Authorization
    header to the **exact** `REVENUECAT_WEBHOOK_AUTH` value, including `Bearer ` if
@@ -130,7 +142,7 @@ Setup references: [RevenueCat webhooks](https://www.revenuecat.com/docs/integrat
 3. Keep the client flag disabled until a development-device pass verifies offline metadata edits, restart with pending writes, reconnect, conflicting edits, remote deletion, and account switching. Offline creation, deletion, and card/version editing are outside this rollout.
 4. Retain operation receipts for as long as a client can replay pending writes. Do not add a time-based purge without defining a supported offline/retry window. Account deletion removes the owner's receipts in batches.
 
-These are explicit release steps. Merging the PRs does not deploy Convex or enable client sync.
+Merging deploys Convex but does not enable client sync.
 
 ## Moderation retention rollout
 
