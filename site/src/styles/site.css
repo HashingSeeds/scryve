@@ -1332,8 +1332,10 @@ figure {
   z-index: 30;
 }
 
-.stage.full .rig {
+/* Beats the Pro scene's shrunken rig, at once: a scaled rig would contain the fixed phone. */
+.stage.full[data-scene] .rig {
   scale: none;
+  transition: none;
 }
 
 .stage.full .phone.main {

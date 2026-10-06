@@ -311,10 +311,14 @@ function setUpFullScreen(stage: HTMLElement) {
 // the phone turns no card faces the viewer, so the demo waits.
 function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   let direction: 1 | -1 = 1
+  let pending: number | undefined
+  // Full screen is for the visitor's own taps.
+  const showing = () =>
+    (stage.dataset.scene === "intro" || stage.dataset.scene === "features") &&
+    stage.dataset.step !== "commander" &&
+    !stage.classList.contains("full")
   const tap = () => {
-    const showing = stage.dataset.scene === "intro" || stage.dataset.scene === "features"
-    // Full screen is for the visitor's own taps.
-    if (!showing || stage.dataset.step === "commander" || stage.classList.contains("full")) return
+    if (!showing()) return
     const board = query<HTMLElement>("[data-board='features']", stage)
     const facing = [...board.querySelectorAll<HTMLElement>(".seat[data-player]")]
       .filter((seat) => Math.abs(seatAxis(seat) ?? 90) < 1)
@@ -329,17 +333,20 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
     const change = direction
     direction = direction === 1 ? -1 : 1
     const press = () => {
+      if (!showing()) return
       hit.classList.add("pressed")
       window.setTimeout(() => hit.classList.remove("pressed"), PRESS_MS)
       game.change(seat, change)
     }
     if (prefersReducedMotion.matches) return press()
     showTapHint(glyph)
-    window.setTimeout(press, HINT_PRESS_MS)
+    pending = window.setTimeout(press, HINT_PRESS_MS)
   }
   const timer = window.setInterval(tap, DEMO_TAP_MS)
   stage.addEventListener("click", (event) => {
-    if (event.isTrusted && (event.target as Element).closest(".hit")) window.clearInterval(timer)
+    if (!event.isTrusted || !(event.target as Element).closest(".hit")) return
+    window.clearInterval(timer)
+    window.clearTimeout(pending)
   })
 }
 

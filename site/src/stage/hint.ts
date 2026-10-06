@@ -118,7 +118,7 @@ export function showTapHint(target: Element, { presses = 1, every = 300 } = {}) 
   const seatIn = target.closest<HTMLElement>(".seat-in")
   const screen = target.closest(".screen")
   const axis = seat ? seatAxis(seat) : undefined
-  if (!seat || !seatIn || !screen || axis === undefined) return
+  if (presses < 1 || !seat || !seatIn || !screen || axis === undefined) return
   const spot = center(target)
   const local = toSeat(seatIn, spot, axis)
   if (!local) return
