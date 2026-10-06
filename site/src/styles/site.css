@@ -794,12 +794,15 @@ figure {
   inset: 0;
 }
 
+/* Each screen keeps its own layer so it's already drawn when its scene fades in. Safari
+   otherwise paints it on the first frame of the change, and the phones lurch. */
 .scene-screen {
   position: absolute;
   inset: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.4s;
+  will-change: opacity;
 }
 
 .stage[data-scene="intro"] [data-for~="intro"],
@@ -1334,6 +1337,11 @@ figure {
   border-radius: 0;
 }
 
+/* The second phone stays behind in the rig, which full screen no longer shrinks. */
+.stage.full .phone.second {
+  visibility: hidden;
+}
+
 /* The bar above the screen replaces the notch the deck's top padding leaves room for. */
 .stage.full .deck {
   padding-top: 1.385em;
@@ -1466,11 +1474,13 @@ html:has(.stage.full) {
       filter 0.5s;
   }
 
+  /* Here the second phone always turns with the first, so it can stay drawn behind it rather
+     than appear when the scene changes. */
   .phone.second {
+    opacity: 1;
     transition:
       translate 0.8s var(--ease),
-      rotate 0.6s var(--ease),
-      opacity 0s 0.8s;
+      rotate 0.6s var(--ease);
   }
 
   .phone.main {
@@ -1491,9 +1501,8 @@ html:has(.stage.full) {
     translate: -36% -5%;
   }
 
-  /* The deck screen is portrait only, so the phone stands up and shrinks to the strip. Tapping
+  /* The deck screen is portrait only, so the phones stand up and shrink to the strip. Tapping
      it opens it full screen (stage/page.ts). */
-  /* The second phone turns with the first so it stays covered while it hides. */
   .stage[data-scene="pro"] .phone {
     --turn: 0deg;
   }
