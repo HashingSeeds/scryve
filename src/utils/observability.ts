@@ -20,6 +20,12 @@ export interface ObservabilityOptions {
   getAnalyticsId?: () => string | undefined
 }
 
+function buildEnvironment() {
+  const webBuildEnvironment = process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT
+  const sdkDefaultEnvironment = __DEV__ ? "development" : "production"
+  return webBuildEnvironment ?? Updates.channel ?? sdkDefaultEnvironment
+}
+
 export function initObservability(
   options: ObservabilityOptions = {},
 ): BatchingTelemetryAdapter | undefined {
@@ -27,6 +33,7 @@ export function initObservability(
 
   Sentry.init({
     dsn,
+    environment: buildEnvironment(),
     sendDefaultPii: false,
     enableLogs: false,
     replaysSessionSampleRate: 0,

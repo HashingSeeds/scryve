@@ -72,6 +72,29 @@ describe("observability initialization", () => {
     )
   })
 
+  it.each([
+    ["preview", "preview"],
+    [null, "development"],
+  ] as const)("sets the Sentry environment from update channel %s", (channel, environment) => {
+    mockUpdatesState.channel = channel
+    initObservability()
+
+    expect(Sentry.init).toHaveBeenCalledWith(expect.objectContaining({ environment }))
+  })
+
+  it("prefers the build's Sentry environment over the update channel", () => {
+    process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT = "development"
+    try {
+      initObservability()
+    } finally {
+      delete process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT
+    }
+
+    expect(Sentry.init).toHaveBeenCalledWith(
+      expect.objectContaining({ environment: "development" }),
+    )
+  })
+
   it("passes masking configuration to mobileReplayIntegration", () => {
     initObservability()
 
