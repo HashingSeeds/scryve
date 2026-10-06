@@ -4,9 +4,11 @@ import { router, useLocalSearchParams } from "expo-router"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ConnectedGate } from "@/features/connected/ConnectedGate"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
+import { useBoardPortraitLock } from "@/features/game/useBoardPortraitLock"
 import { ConnectedBoardScreen } from "@/screens/ConnectedBoardScreen"
 
 export default function ConnectedGameRoute() {
+  useBoardPortraitLock()
   const { gameId, invite, savedGameId } = useLocalSearchParams<{
     gameId: string
     invite?: string

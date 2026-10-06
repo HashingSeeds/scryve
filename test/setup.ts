@@ -128,4 +128,6 @@ jest.mock("expo-screen-orientation", () => ({
   ...jest.requireActual("expo-screen-orientation"),
   getOrientationAsync: jest.fn(async () => 0),
   addOrientationChangeListener: jest.fn(() => ({ remove: jest.fn() })),
+  lockAsync: jest.fn(async () => undefined),
+  unlockAsync: jest.fn(async () => undefined),
 }))
