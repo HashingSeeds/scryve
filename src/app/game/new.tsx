@@ -22,6 +22,7 @@ import {
   type LocalConnectFeed,
   type NewGameMode,
 } from "@/screens/NewGameScreen"
+import { goBack } from "@/utils/navigation"
 
 function openLobby(lobby: Pick<CreatedLobby, "publicId">) {
   router.replace({ pathname: "/connected/lobby/[gameId]", params: { gameId: lobby.publicId } })
@@ -115,7 +116,7 @@ export default function NewLocalGameRoute() {
             : undefined
         }
         onModeChange={setMode}
-        onBack={() => router.back()}
+        onBack={() => goBack({ pathname: "/", params: { destination: "play" } })}
         onStartLocal={(players, startingLife, setup) => {
           const current = localGameRepository.loadActiveGame()
           if (current && hasLocalGameStarted(current)) {
