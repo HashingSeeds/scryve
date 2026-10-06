@@ -267,7 +267,7 @@ function ConnectedBoardRuntime({
   accountLabel?: "Account" | "Sign in"
   ownerId: string
 }) {
-  useKeepAwake("count-connected-game")
+  useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
   const runtime = useConnectedGame(publicId, ownerId)
   if (runtime.status === "loading")
     return (
