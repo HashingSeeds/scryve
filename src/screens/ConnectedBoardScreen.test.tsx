@@ -25,6 +25,7 @@ import {
 } from "../../test/support/connectedHarness"
 
 jest.mock("@/utils/useStoreReview", () => ({ useStoreReview: jest.fn() }))
+jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }))
 
 jest.mock("@clerk/expo", () =>
   jest

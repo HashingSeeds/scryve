@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <script>
+      // why: only the home screen app may reach the screen edges; in a browser tab, the browser's margins keep every screen clear of the notch.
+      if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) {
+        document.querySelector('meta[name="viewport"]').content += ", viewport-fit=cover"
+      }
+      if (navigator.standalone) document.documentElement.classList.add("ios-home-screen-app")
+    </script>
+    <!-- Every web build is served from /play (SCRYVE_WEB_BASE_URL); scope keeps the home screen app on all of it. -->
+    <link rel="manifest" href="/play/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/play/app-icon.png" />
+    <title>%WEB_TITLE%</title>
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+      /* why: iOS 26 blurs the top of a home screen app unless a fixed, solid, full-width box over 10px tall covers the top edge. useTopEdgeBand (12px) checks the same conditions and keeps content below it. */
+      #top-edge-band {
+        display: none;
+      }
+      @media (orientation: portrait) {
+        .ios-home-screen-app #top-edge-band {
+          display: block;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 12px;
+          background-color: inherit;
+          z-index: 1;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript> You need to enable JavaScript to run this app. </noscript>
+    <div id="top-edge-band"></div>
+    <div id="root"></div>
+  </body>
+</html>

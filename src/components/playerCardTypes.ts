@@ -1,3 +1,5 @@
+import { Platform } from "react-native"
+
 export type LifeCardContentRotation = -90 | 0 | 90 | 180
 export type LifeCardMenuCorner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight"
 export type LifeCardMenuEdge = "top" | "bottom" | "left" | "right"
@@ -39,6 +41,8 @@ export const LIFE_FONT_SIZE = 120
 export const COMPACT_LIFE_FONT_SIZE = 84
 
 export const SCREEN_CORNER_CLEARANCE = 24
+// why: native hides the status bar over the board, so card corners only need to clear the display rounding. Web cannot hide it.
+export const TUCKS_INTO_SCREEN_CORNERS = Platform.OS !== "web"
 
 export function cornerOffset(
   gap: number,

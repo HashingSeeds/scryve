@@ -1,5 +1,7 @@
 import { Edge, useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { useTopEdgeBand } from "./useTopEdgeBand"
+
 export type ExtendedEdge = Edge | "start" | "end"
 
 const propertySuffixMap = {
@@ -38,9 +40,11 @@ export function useSafeAreaInsetsStyle<
   property: Property = "padding" as Property,
 ): SafeAreaInsetsStyle<Property, Edges> {
   const insets = useSafeAreaInsets()
+  const topEdgeBand = useTopEdgeBand()
 
   return safeAreaEdges.reduce((acc, e) => {
     const value = edgeInsetMap[e] ?? e
-    return { ...acc, [`${property}${propertySuffixMap[e]}`]: insets[value] }
+    const inset = insets[value] + (value === "top" ? topEdgeBand : 0)
+    return { ...acc, [`${property}${propertySuffixMap[e]}`]: inset }
   }, {}) as SafeAreaInsetsStyle<Property, Edges>
 }

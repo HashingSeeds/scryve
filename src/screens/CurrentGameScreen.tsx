@@ -35,6 +35,7 @@ import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
+import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 export interface CurrentGameScreenProps {
   initialGame: LocalGame
@@ -119,9 +120,14 @@ export function CurrentGameScreen({
       }),
     [playerCount, width, height, fontScale, layoutVariant],
   )
+  const topEdgeBand = useTopEdgeBand()
   const menuAnchor = useMemo(
-    () => rotateGameBoardAnchor(getPlayerGridMenuAnchor(playerCount, gridLayout), rotation),
-    [playerCount, gridLayout, rotation],
+    () =>
+      rotateGameBoardAnchor(
+        getPlayerGridMenuAnchor(playerCount, gridLayout, rotation === 0 ? topEdgeBand / height : 0),
+        rotation,
+      ),
+    [playerCount, gridLayout, rotation, topEdgeBand, height],
   )
 
   function confirmEnd(result: LocalGameResult) {

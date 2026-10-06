@@ -6,6 +6,7 @@ import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 export function AccountConsentSyncStatus({
   isSyncing,
@@ -21,6 +22,7 @@ export function AccountConsentSyncStatus({
     theme: { spacing },
   } = useAppTheme()
   const insets = useSafeAreaInsets()
+  const topEdgeBand = useTopEdgeBand()
   const message = isSyncing
     ? "Syncing your agreement…"
     : retryFailed
@@ -31,7 +33,7 @@ export function AccountConsentSyncStatus({
     <View
       testID="account-consent-sync-layer"
       pointerEvents="box-none"
-      style={[themed($layer), { top: insets.top + spacing.xs }]}
+      style={[themed($layer), { top: insets.top + topEdgeBand + spacing.xs }]}
     >
       <View
         testID="account-consent-sync-status"

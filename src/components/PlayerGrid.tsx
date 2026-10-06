@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
-import { useWindowDimensions, View } from "react-native"
+import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -10,6 +10,7 @@ import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
@@ -20,6 +21,9 @@ import {
   getLifeTargetTextSpace,
   LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
+  TUCKS_INTO_SCREEN_CORNERS,
+  type LifeCardContentInsets,
+  type LifeCardEdge,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
@@ -126,6 +130,8 @@ export function PlayerGrid({
     themed,
     theme: { spacing },
   } = useAppTheme()
+  const screenTopEdgeBand = useTopEdgeBand()
+  const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
   const counter = playSystemRules(system).counter
   const layout = getPlayerGridLayout({
@@ -135,7 +141,11 @@ export function PlayerGrid({
     fontScale,
     layoutVariant,
   })
-  const cellSize = getCellSize({ board, layout, gap: spacing.xxs })
+  const cellSize = getCellSize({
+    board: { width: board.width, height: board.height - topEdgeBand },
+    layout,
+    gap: spacing.xxs,
+  })
   const lifeFontSizeInput = {
     ...cellSize,
     fontScale,
@@ -172,6 +182,7 @@ export function PlayerGrid({
         onLayout={measureBoard}
         style={[
           themed($grid),
+          topEdgeBand ? { paddingTop: topEdgeBand } : null,
           style,
           boardOrientation && $fixedGrid,
           boardOrientation && {
@@ -260,7 +271,7 @@ export function PlayerGrid({
                     contentRotation={contentRotation}
                     boardRotation={boardRotation}
                     contentInsets={contentInsets}
-                    screenEdges={screenEdges}
+                    screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
                     menuCorner={menuCorner}
                     menuEdgeCenter={fallbackMenu?.edgeCenter}
                     lifeFontSize={getLifeFontSize({
@@ -318,7 +329,12 @@ export function PlayerGrid({
                         : undefined
                     }
                     onChange={(delta) => onChange(player.id, delta)}
-                    style={getScreenCornerSquaringStyle({ rows, rowIndex, columnIndex })}
+                    style={getScreenCornerSquaringStyle({
+                      rows,
+                      rowIndex,
+                      columnIndex,
+                      insets: Platform.OS === "web" ? insets : undefined,
+                    })}
                   />
                 </View>
               )
@@ -418,20 +434,32 @@ function fallbackMenuAt(
   return undefined
 }
 
+/** why: on web, pass the insets. The page only reaches a rounded screen corner where the browser reports an inset; a browser tab or a solid status bar strip reports none. */
 export function getScreenCornerSquaringStyle(input: {
   rows: (number | null)[][]
   rowIndex: number
   columnIndex: number
+  insets?: LifeCardContentInsets
 }): ViewStyle | undefined {
+  const reachesCorner = (edge: LifeCardEdge, side: LifeCardEdge) =>
+    !input.insets || input.insets[edge] > 0 || input.insets[side] > 0
   const touchesTopEdge = input.rowIndex === 0
   const touchesBottomEdge = input.rowIndex === input.rows.length - 1
   const touchesLeftEdge = input.columnIndex === 0
   const touchesRightEdge = input.columnIndex === input.rows[input.rowIndex].length - 1
   const squared: ViewStyle = {
-    ...(touchesTopEdge && touchesLeftEdge ? { borderTopLeftRadius: 0 } : null),
-    ...(touchesTopEdge && touchesRightEdge ? { borderTopRightRadius: 0 } : null),
-    ...(touchesBottomEdge && touchesLeftEdge ? { borderBottomLeftRadius: 0 } : null),
-    ...(touchesBottomEdge && touchesRightEdge ? { borderBottomRightRadius: 0 } : null),
+    ...(touchesTopEdge && touchesLeftEdge && reachesCorner("top", "left")
+      ? { borderTopLeftRadius: 0 }
+      : null),
+    ...(touchesTopEdge && touchesRightEdge && reachesCorner("top", "right")
+      ? { borderTopRightRadius: 0 }
+      : null),
+    ...(touchesBottomEdge && touchesLeftEdge && reachesCorner("bottom", "left")
+      ? { borderBottomLeftRadius: 0 }
+      : null),
+    ...(touchesBottomEdge && touchesRightEdge && reachesCorner("bottom", "right")
+      ? { borderBottomRightRadius: 0 }
+      : null),
   }
   return Object.keys(squared).length ? squared : undefined
 }

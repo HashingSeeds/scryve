@@ -22,9 +22,11 @@ export function getPlayerGridRows(
   return chunkSeats(seats, layout.columnCount)
 }
 
+/** why: pass topInset (a fraction of board height) when PlayerGrid pads the board top, so the anchor still lands on the card seam. */
 export function getPlayerGridMenuAnchor(
   playerCount: number,
   layout: ReturnType<typeof getPlayerGridLayout>,
+  topInset = 0,
 ): { x: number; y: number } {
   const rows = getPlayerGridRows(playerCount, layout)
   const rowFlexes = rows.map((row) => getPlayerGridRowFlex(row, layout))
@@ -32,7 +34,7 @@ export function getPlayerGridMenuAnchor(
   let cumulativeFlex = 0
   const boundaryPositions = rowFlexes.slice(0, -1).map((flex) => {
     cumulativeFlex += flex
-    return cumulativeFlex / totalRowFlex
+    return topInset + (cumulativeFlex / totalRowFlex) * (1 - topInset)
   })
   const junction = getFourCardMenuJunction(rows)
   if (junction)
@@ -40,7 +42,10 @@ export function getPlayerGridMenuAnchor(
       x: junction.column / junction.columnCount,
       y: boundaryPositions[junction.boundary - 1],
     }
-  return { x: 0.5, y: boundaryPositions[getCentralMenuBoundary(rows, layout) - 1] ?? 0.5 }
+  return {
+    x: 0.5,
+    y: boundaryPositions[getCentralMenuBoundary(rows, layout) - 1] ?? topInset + (1 - topInset) / 2,
+  }
 }
 
 export function getCentralMenuBoundary(

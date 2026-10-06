@@ -374,6 +374,13 @@ describe("LifeCard", () => {
     expect(getPlayerMarkCorner(-90, 8)).toMatchObject({ right: 8, top: 8 })
   })
 
+  it("keeps the player marker inside the insets it is given", () => {
+    expect(getPlayerMarkCorner(180, 8, { top: 47, bottom: 0, left: 0, right: 0 })).toEqual({
+      left: 8,
+      top: 55,
+    })
+  })
+
   it.each([0, 90, -90, 180] as const)(
     "keeps life status below the total at %s degrees",
     (contentRotation) => {
