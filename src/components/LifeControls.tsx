@@ -1,12 +1,13 @@
 import { useRef } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
-import { Pressable, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
 
 import { counterValueLabel, playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { LifeDelta } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
+import { BoardPressable } from "./BoardPressable"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
   LIFE_GLYPH_LINE_HEIGHT,
@@ -98,7 +99,7 @@ export function LifeControls({
                 : `-${Math.abs(recentDelta)}`
               : glyph
           return (
-            <Pressable
+            <BoardPressable
               key={delta}
               testID={lifeControlTestId(seatNumber, delta)}
               disabled={disabled}
@@ -150,7 +151,7 @@ export function LifeControls({
                   { color: foreground },
                 ]}
               />
-            </Pressable>
+            </BoardPressable>
           )
         })}
       </View>

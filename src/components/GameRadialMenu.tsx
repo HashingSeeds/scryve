@@ -24,6 +24,7 @@ import {
   type ReducedMotionPreference,
 } from "@/utils/useReducedMotion"
 
+import { BoardPressable } from "./BoardPressable"
 import {
   DEFAULT_MENU_BUTTON_STYLE,
   GameMenuButtonShape,
@@ -260,7 +261,7 @@ export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: ()
   const { themed } = useAppTheme()
   if (!open) return null
   return (
-    <Pressable
+    <BoardPressable
       testID="game-menu-backdrop"
       accessibilityRole="button"
       accessibilityLabel="Close game options"
@@ -374,7 +375,7 @@ export function GameMenuAnchor({
         facingStyle,
       ]}
     >
-      <Pressable
+      <BoardPressable
         testID="game-menu-button"
         accessibilityRole="button"
         accessibilityLabel={[
@@ -409,7 +410,7 @@ export function GameMenuAnchor({
           animateFully={animateFully}
           reducedMotion={reducedMotion}
         />
-      </Pressable>
+      </BoardPressable>
       {signal?.badge ? (
         <View
           testID="game-menu-signal-badge"

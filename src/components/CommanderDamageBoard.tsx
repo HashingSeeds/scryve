@@ -1,5 +1,5 @@
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
-import { Pressable, View } from "react-native"
+import { View } from "react-native"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
@@ -7,6 +7,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
+import { BoardPressable } from "./BoardPressable"
 import {
   COMMANDER_CELL_SIZE,
   COMMANDER_COMPACT_CELL_SIZE,
@@ -158,7 +159,7 @@ export function CommanderDamageBoard({
 
             if (playerId === ownerPlayerId)
               return (
-                <Pressable
+                <BoardPressable
                   key={columnIndex}
                   testID={commanderSwordTestId(seatNumber)}
                   accessibilityRole="button"
@@ -179,7 +180,7 @@ export function CommanderDamageBoard({
                   <View style={seatedGlyphRotation}>
                     <Sword size={size * 0.72} color={foreground} />
                   </View>
-                </Pressable>
+                </BoardPressable>
               )
 
             const total = incoming[playerId] ?? 0

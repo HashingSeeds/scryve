@@ -3,6 +3,7 @@ import { Dimensions, StyleSheet, useWindowDimensions, View, type ViewStyle } fro
 import Animated from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { TurnedBoardContext } from "@/components/BoardPressable"
 import {
   GameMenuAnchor,
   GameMenuBackdrop,
@@ -92,21 +93,23 @@ function PinnedGameBoardStage({
   return (
     <View testID="game-board" style={$stage}>
       <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
-        <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
-          {renderGrid(boardOrientation)}
-          <GameMenuBackdrop open={menuOpen} onClose={menu.onClose} />
-          <GameMenuAnchor
-            open={menuOpen}
-            anchor={boardAnchor}
-            compact={playerCount > 2}
-            variant={menu.variant}
-            seatColors={menu.seatColors}
-            exitAction={menu.exitAction}
-            signal={menu.signal}
-            facingAngle={holderAngle}
-            onToggle={menu.onToggle}
-          />
-        </View>
+        <TurnedBoardContext.Provider value={holderAngle !== 0}>
+          <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
+            {renderGrid(boardOrientation)}
+            <GameMenuBackdrop open={menuOpen} onClose={menu.onClose} />
+            <GameMenuAnchor
+              open={menuOpen}
+              anchor={boardAnchor}
+              compact={playerCount > 2}
+              variant={menu.variant}
+              seatColors={menu.seatColors}
+              exitAction={menu.exitAction}
+              signal={menu.signal}
+              facingAngle={holderAngle}
+              onToggle={menu.onToggle}
+            />
+          </View>
+        </TurnedBoardContext.Provider>
       </ScreenPinnedView>
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
         <GameRadialFan open={menuOpen} anchor={windowAnchor} actions={menu.actions} />

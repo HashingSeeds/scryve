@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentProps } from "react"
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
-import { Pressable, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import Animated from "react-native-reanimated"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
@@ -9,6 +9,7 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
+import { BoardPressable } from "./BoardPressable"
 import type { CommanderBoardSeat } from "./commanderDamageLayout"
 import { Icon } from "./Icon"
 import { overlayTint } from "./LifeControls"
@@ -102,7 +103,7 @@ export function CommanderStrip({
         },
       ]}
     >
-      <Pressable
+      <BoardPressable
         testID={`commander-${open ? "strip-close" : "map"}-seat-${seatNumber}`}
         onLayout={(event) => setMapBounds(event.nativeEvent.layout)}
         accessibilityRole="button"
@@ -195,7 +196,7 @@ export function CommanderStrip({
         >
           <Icon icon="x" color={foreground} size={18} />
         </Animated.View>
-      </Pressable>
+      </BoardPressable>
     </View>
   )
 }
