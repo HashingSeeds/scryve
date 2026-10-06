@@ -34,22 +34,23 @@ export function seatAxis(seat: Element) {
   return (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI
 }
 
-// Where a point on screen falls in the seat's own unrotated, unscaled layout. The − and +
-// glyphs give the seat's angle and scale on screen; turning and scaling keep its center put.
-function toSeat(seatIn: HTMLElement, point: Point, axis: number) {
-  const glyphs = [...seatIn.querySelectorAll<HTMLElement>(".glyph")]
-  const [minus, plus] = glyphs
+// How much a seat is scaled on screen, from the distance between its − and + glyphs.
+function seatScale(seat: Element) {
+  const [minus, plus] = seat.querySelectorAll<HTMLElement>(".glyph")
   if (!minus || !plus) return
   const span = Math.hypot(center(plus).x - center(minus).x, center(plus).y - center(minus).y)
-  const scale =
-    span / (plus.offsetLeft - minus.offsetLeft + (plus.offsetWidth - minus.offsetWidth) / 2)
-  const middle = center(seatIn)
+  return span / (plus.offsetLeft - minus.offsetLeft + (plus.offsetWidth - minus.offsetWidth) / 2)
+}
+
+// Where a point on screen falls in an element's own unrotated, unscaled layout, given the
+// element's angle and scale on screen. Turning and scaling keep its center put.
+function toLocal(el: HTMLElement, point: Point, axis: number, scale: number): Point {
+  const middle = center(el)
   const [dx, dy] = [(point.x - middle.x) / scale, (point.y - middle.y) / scale]
   const turn = (-axis * Math.PI) / 180
   return {
-    x: seatIn.offsetWidth / 2 + dx * Math.cos(turn) - dy * Math.sin(turn),
-    y: seatIn.offsetHeight / 2 + dx * Math.sin(turn) + dy * Math.cos(turn),
-    scale,
+    x: el.offsetWidth / 2 + dx * Math.cos(turn) - dy * Math.sin(turn),
+    y: el.offsetHeight / 2 + dx * Math.sin(turn) + dy * Math.cos(turn),
   }
 }
 
@@ -110,32 +111,38 @@ function lineFrames(presses: number, every: number, total: number): Keyframe[] {
 }
 
 // Shows the hand pressing `target`, a part of a seat, `presses` times `every` ms apart. The first
-// press lands HINT_PRESS_MS from now. The hand lives in the seat's own layout so it stays put as
-// the page scrolls, but its angle is set on screen: it reaches up and to the right, or mirrored
-// on the left half of the phone, so its wrist never hangs off the screen's side edge.
+// press lands HINT_PRESS_MS from now. The hand lives in the board's layout, above the seats and
+// the pentagon, so it stays put as the page scrolls without lifting its seat over the pentagon.
+// Its angle is set on screen: it reaches up and to the right, or mirrored on the left half of
+// the phone, so its wrist never hangs off the screen's side edge.
 export function showTapHint(target: Element, { presses = 1, every = 300 } = {}) {
-  const seat = target.closest(".seat")
-  const seatIn = target.closest<HTMLElement>(".seat-in")
+  const seat = target.closest<HTMLElement>(".seat")
+  const board = target.closest<HTMLElement>(".board")
   const screen = target.closest(".screen")
-  const axis = seat ? seatAxis(seat) : undefined
-  if (presses < 1 || !seat || !seatIn || !screen || axis === undefined) return
+  const seatTurn = seat ? seatAxis(seat) : undefined
+  const scale = seat ? seatScale(seat) : undefined
+  if (presses < 1 || !seat || !board || !screen || seatTurn === undefined || !scale) return
+  // The seat turns within the board, so the board's own angle on screen is the rest.
+  const axis = seatTurn - Number(seat.dataset.rotation ?? 0)
   const spot = center(target)
-  const local = toSeat(seatIn, spot, axis)
-  if (!local) return
+  const local = toLocal(board, spot, axis, scale)
   const mirror = spot.x < center(screen).x
   const [x, y] = HAND.tip
-  seat.querySelector(".tap-hint")?.remove()
+  board.querySelector(".tap-hint")?.remove()
   const hint = document.createElement("span")
   hint.className = "tap-hint"
   hint.setAttribute("aria-hidden", "true")
   hint.innerHTML = HAND.svg
+  // Sized to the seat it taps, like the seat's own controls.
+  const size = Math.min(seat.offsetWidth, seat.offsetHeight) * 0.55
+  hint.style.width = `${Math.min(120, Math.max(52, size))}px`
   hint.style.left = `${local.x}px`
   hint.style.top = `${local.y}px`
   hint.style.setProperty("--tip-x", String(x))
   hint.style.setProperty("--tip-y", String(y))
-  seatIn.append(hint)
+  board.append(hint)
   // How far the hand hangs below the fingertip when it leans the usual way.
-  const drop = hint.offsetHeight * local.scale * Math.cos((HINT_ANGLE.up * Math.PI) / 180)
+  const drop = hint.offsetHeight * scale * Math.cos((HINT_ANGLE.up * Math.PI) / 180)
   const lean =
     screen.getBoundingClientRect().bottom - spot.y < drop ? HINT_ANGLE.down : HINT_ANGLE.up
   hint.style.rotate = `${(mirror ? -lean : lean) - axis}deg`

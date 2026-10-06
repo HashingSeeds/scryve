@@ -1288,13 +1288,12 @@ figure {
 
 /* ---------- tap hint: a ghostly hand that shows where to tap ---------- */
 
-/* stage/hint.ts places it in the seat's layout, sets the fingertip (--tip-x, --tip-y) as a
-   fraction of the hand's box, turns it (rotate, scale) so it leans the same way on screen
-   whichever way its seat faces, and animates it. */
+/* stage/hint.ts places it in the board's layout above the seats and pentagon, sizes it to its
+   seat, sets the fingertip (--tip-x, --tip-y) as a fraction of the hand's box, turns it (rotate,
+   scale) so it leans the same way on screen whichever way its seat faces, and animates it. */
 .tap-hint {
   position: absolute;
-  z-index: 3;
-  width: clamp(52px, min(100cqw, 100cqh) * 0.55, 120px);
+  z-index: 4;
   color: #fff;
   filter: drop-shadow(0 0 3px rgb(255 255 255 / 80%)) drop-shadow(0 0 10px rgb(232 193 180 / 60%));
   opacity: 0;
@@ -1313,13 +1312,6 @@ figure {
 
 .tap-hint .tap-lines {
   opacity: 0;
-}
-
-/* The hand can reach past its seat's edge, so the seat lifts above its neighbors and the
-   pentagon while it shows. */
-.seat:has(.tap-hint) {
-  z-index: 4;
-  overflow: visible;
 }
 
 /* ---------- full screen demo (small screens, stage/page.ts) ---------- */
