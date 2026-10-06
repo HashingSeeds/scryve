@@ -253,17 +253,19 @@ function setUpStage() {
   showScene(stage.dataset.scene ?? "intro")
   setUpDemoTaps(stage, game)
   // Read section positions once per frame so a fast scroll can skip several headings safely.
+  // The step whose copy is nearest its pinned spot, the brightest one, drives the phone, so the
+  // phone changes as the new heading lights up rather than once it has fully arrived.
   let frame = 0
   const updateStep = () => {
     frame = 0
     const top = stepAnchor()
     let next = steps[0]
+    let nearest = Infinity
     for (const step of steps) {
-      // Native anchor scrolling rounds to whole pixels, so allow its fractional remainder.
-      if (step.getBoundingClientRect().top <= top + 1) next = step
       const offset = query<HTMLElement>(".step-copy", step).getBoundingClientRect().top - top
       // The final comparison table stays bright while it scrolls through the viewport.
       const distance = step.dataset.step === "plans" ? Math.max(0, offset) : Math.abs(offset)
+      if (distance < nearest) [next, nearest] = [step, distance]
       const brightness = 1 - Math.min(distance / 120, 1)
       step.style.setProperty("--step-opacity", String(0.35 + brightness * 0.65))
     }
