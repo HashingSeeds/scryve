@@ -84,7 +84,7 @@ jobs:
         run: pnpm check:ygo-worker
 
   checks:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -144,7 +144,7 @@ jobs:
 
       - name: Run Jest tests
         id: jest
-        run: CI=1 pnpm exec jest --ci --silent --maxWorkers=2
+        run: CI=1 pnpm exec jest --ci --silent
 
       - name: Add Jest result to job summary
         if: always()
