@@ -2,6 +2,7 @@ package expo.modules.screenpinnedview
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Point
 import android.os.Build
 import android.view.Surface
@@ -32,8 +33,18 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
   val rotor = ScreenPinnedRotor(context)
   private var observedTree: ViewTreeObserver? = null
   private var seamlessActivity: Activity? = null
-  private var lastMetrics: Map<String, Any>? = null
   private val windowLocation = IntArray(2)
+
+  /** Panel facts read once per attach or configuration change instead of every frame. */
+  private var panel: Panel? = null
+
+  // Last reported state, so unchanged frames skip building the event.
+  private var reported = false
+  private var reportedPinned = false
+  private var reportedHolderAngle = 0
+  private var reportedWidth = 0
+  private var reportedHeight = 0
+  private var reportedInsets: WindowInsets? = null
 
   init {
     clipChildren = false
@@ -52,8 +63,15 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
     pin()
   }
 
+  override fun onConfigurationChanged(newConfig: Configuration?) {
+    super.onConfigurationChanged(newConfig)
+    panel = null
+    reported = false
+  }
+
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
+    panel = null
     observedTree = viewTreeObserver.also { it.addOnPreDrawListener(this) }
     appContext.currentActivity?.let {
       SeamlessRotation.acquire(it)
@@ -67,7 +85,8 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
     observedTree = null
     seamlessActivity?.let { SeamlessRotation.release(it) }
     seamlessActivity = null
-    lastMetrics = null
+    reported = false
+    reportedInsets = null
     super.onDetachedFromWindow()
   }
 
@@ -83,9 +102,9 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
     val windowHeight = root.height
     if (windowWidth == 0 || windowHeight == 0) return
 
-    val hardware = realDisplaySize()
-    val shortSide = min(hardware.x, hardware.y)
-    val longSide = max(hardware.x, hardware.y)
+    val panel = panel ?: readPanel(display).also { panel = it }
+    val shortSide = panel.shortSide
+    val longSide = panel.longSide
     val multiWindow = appContext.currentActivity?.isInMultiWindowMode == true
     val fullScreen = !multiWindow &&
       abs(min(windowWidth, windowHeight) - shortSide) <= 2 &&
@@ -97,12 +116,10 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
       return
     }
 
-    // Display.Mode reports the panel in its natural orientation, so naturally landscape
-    // tablets pin to their portrait rotation (270 unless the OEM reverses it) instead of 0.
-    val mode = display.mode
-    val naturalLandscape = mode.physicalWidth > mode.physicalHeight
+    // Naturally landscape tablets pin to their portrait rotation (270 unless the OEM
+    // reverses it) instead of 0.
     val holderAngle = normalizedDegrees(
-      rotationDegrees(display.rotation) - if (naturalLandscape) 270 else 0
+      rotationDegrees(display.rotation) - if (panel.naturalLandscape) 270 else 0
     )
     // display.rotation can change a frame before the window is resized; wait until they agree.
     if ((holderAngle % 180 != 0) != (windowWidth > windowHeight)) return
@@ -128,8 +145,24 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
   }
 
   private fun report(pinned: Boolean, holderAngle: Int, root: android.view.View) {
+    val rootInsets = root.rootWindowInsets
+    if (
+      reported &&
+      pinned == reportedPinned &&
+      holderAngle == reportedHolderAngle &&
+      rotor.width == reportedWidth &&
+      rotor.height == reportedHeight &&
+      rootInsets == reportedInsets
+    ) return
+    reported = true
+    reportedPinned = pinned
+    reportedHolderAngle = holderAngle
+    reportedWidth = rotor.width
+    reportedHeight = rotor.height
+    reportedInsets = rootInsets
+
     val density = resources.displayMetrics.density
-    val window = windowInsets(root)
+    val window = windowInsets(rootInsets)
     // Rotor edge i faces window edge (i + quarter turns) in [top, right, bottom, left] order.
     val turns = ((-holderAngle / 90) % 4 + 4) % 4
     val edge = { index: Int -> window[(index + turns) % 4] / density }
@@ -145,14 +178,12 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
         "left" to edge(3)
       )
     )
-    if (metrics == lastMetrics) return
-    lastMetrics = metrics
     onOrientationChange(metrics)
   }
 
   /** Window insets in px, ordered [top, right, bottom, left]. */
-  private fun windowInsets(root: android.view.View): IntArray {
-    val insets = root.rootWindowInsets ?: return IntArray(4)
+  private fun windowInsets(insets: WindowInsets?): IntArray {
+    if (insets == null) return IntArray(4)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
       return intArrayOf(bars.top, bars.right, bars.bottom, bars.left)
@@ -163,6 +194,19 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
       insets.systemWindowInsetRight,
       insets.systemWindowInsetBottom,
       insets.systemWindowInsetLeft
+    )
+  }
+
+  private class Panel(val shortSide: Int, val longSide: Int, val naturalLandscape: Boolean)
+
+  /** Display.Mode reports the panel in its natural orientation. */
+  private fun readPanel(display: android.view.Display): Panel {
+    val hardware = realDisplaySize()
+    val mode = display.mode
+    return Panel(
+      shortSide = min(hardware.x, hardware.y),
+      longSide = max(hardware.x, hardware.y),
+      naturalLandscape = mode.physicalWidth > mode.physicalHeight
     )
   }
 

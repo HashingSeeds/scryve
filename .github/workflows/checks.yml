@@ -49,6 +49,7 @@ jobs:
               - 'package.json'
             exportable:
               - 'src/**'
+              - 'modules/**'
               - 'app.config.ts'
               - 'app.json'
               - 'assets/**'

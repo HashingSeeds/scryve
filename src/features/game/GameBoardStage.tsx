@@ -30,7 +30,10 @@ export interface GameBoardStageProps {
   playerCount: number
   layoutVariant: PlayerGridLayoutVariant
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
-  menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
+  menu: Omit<
+    GameRadialMenuProps,
+    "anchor" | "boardAnchor" | "nativeFrame" | "compact" | "statusLine"
+  >
   windowOverlay?: ReactNode
 }
 

@@ -18,7 +18,10 @@ describe("boardPointToWindowPoint", () => {
   })
 
   it("mirrors both axes upside down", () => {
-    expect(boardPointToWindowPoint({ x: 0.25, y: 0.125 }, board, 180)).toEqual({ x: 0.75, y: 0.875 })
+    expect(boardPointToWindowPoint({ x: 0.25, y: 0.125 }, board, 180)).toEqual({
+      x: 0.75,
+      y: 0.875,
+    })
   })
 
   it("keeps the center fixed", () => {
