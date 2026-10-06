@@ -36,7 +36,7 @@ export function FloatingAppNavigation({
         { bottom: Math.max(insets.bottom, theme.spacing.md) },
       ]}
     >
-      <View style={$utility}>
+      <View style={$utilityAboveDestination}>
         <AppUtilityMenu
           compact
           placement="bottomLeft"
@@ -69,7 +69,7 @@ const $navigation: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "flex-end",
 })
 const $expandedNavigation: ViewStyle = { height: 108 }
-const $utility: ViewStyle = { position: "absolute", left: 0, bottom: 0 }
+const $utilityAboveDestination: ViewStyle = { position: "absolute", left: 0, bottom: 0, zIndex: 1 }
 const $destination: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   minWidth: 92,
   height: 44,
