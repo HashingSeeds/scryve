@@ -106,6 +106,34 @@ it("only uploads allowlisted, opted-in events and discards the offline queue on 
   jest.useRealTimers()
 })
 
+it("retries loading the SDK after a failed download instead of disabling analytics", async () => {
+  jest.useFakeTimers()
+  global.fetch = fetchMock
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue({ status: 200, text: async () => "{}", json: async () => ({}) })
+  jest.spyOn(console, "error").mockImplementation(() => undefined)
+  process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-key"
+  process.env.EXPO_PUBLIC_POSTHOG_HOST = "https://analytics.invalid"
+  let sdkLoads = 0
+  await jest.isolateModulesAsync(async () => {
+    jest.doMock("posthog-react-native", () => {
+      sdkLoads += 1
+      if (sdkLoads === 1) throw new Error("chunk download failed")
+      return jest.requireActual("posthog-react-native")
+    })
+    const analytics: typeof import("./analytics") = require("./analytics")
+    require("@/utils/storage").storage.clearAll()
+    expect(analytics.setAnalyticsEnabled(true, "first_use")).toBe(true)
+    await tick()
+    expect(sdkLoads).toBe(1)
+
+    analytics.captureAnalytics("stats_viewed", { surface: "history" })
+    await tick(31_000)
+    expect(sdkLoads).toBe(2)
+    expect(String(fetchMock.mock.calls.at(-1)?.[1].body)).toContain("stats_viewed")
+  })
+})
+
 it("drops unexpected events, free text, SDK metadata, and unknown catalog values", async () => {
   const { analyticsProperties }: typeof import("./analytics") = require("./analytics")
   expect(analyticsProperties("$autocapture", { text: "private" })).toBeNull()

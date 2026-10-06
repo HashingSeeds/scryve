@@ -108,11 +108,8 @@ export function analyticsProperties(event: string, properties: Record<string, un
 
 async function getClient() {
   if (!loading) {
-    loading = (async () => {
-      const {
-        default: SDK,
-        PostHogPersistedProperty,
-      }: typeof import("posthog-react-native") = require("posthog-react-native")
+    const attempt = (async () => {
+      const { default: SDK, PostHogPersistedProperty } = await import("posthog-react-native")
       // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code
       // The SDK's optOut/reset retain queued events. Gate the transport too, including retries.
       class ConsentedPostHog extends SDK {
@@ -185,6 +182,11 @@ async function getClient() {
       clearQueue = () => sdk.setPersistedProperty(PostHogPersistedProperty.Queue, [])
       return sdk
     })()
+    loading = attempt
+    // why: on web the SDK is a separate download; a failed fetch must not disable analytics for the whole session.
+    attempt.catch(() => {
+      if (loading === attempt) loading = undefined
+    })
   }
   return loading
 }
