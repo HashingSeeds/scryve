@@ -40,13 +40,6 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return <RootErrorFallback error={error} onRetry={retry} />
 }
 
-// why: a rotating window flashes the board while React Native relays it out; useGameBoardOrientation still counter-rotates where the lock is ignored.
-const BOARD_SCREEN_OPTIONS = {
-  statusBarHidden: true,
-  gestureEnabled: false,
-  orientation: "portrait_up",
-} as const
-
 function Root() {
   const [isConsentResolved, setIsConsentResolved] = useState(false)
   const resolveConsent = useCallback(() => setIsConsentResolved(true), [])
@@ -71,9 +64,18 @@ function Root() {
             <LegalConsentGate onResolved={resolveConsent}>
               <AccountDeletionSessionGuard />
               <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="index" options={BOARD_SCREEN_OPTIONS} />
-                <Stack.Screen name="game/current" options={BOARD_SCREEN_OPTIONS} />
-                <Stack.Screen name="connected/game/[gameId]" options={BOARD_SCREEN_OPTIONS} />
+                <Stack.Screen
+                  name="index"
+                  options={{ statusBarHidden: true, gestureEnabled: false }}
+                />
+                <Stack.Screen
+                  name="game/current"
+                  options={{ statusBarHidden: true, gestureEnabled: false }}
+                />
+                <Stack.Screen
+                  name="connected/game/[gameId]"
+                  options={{ statusBarHidden: true, gestureEnabled: false }}
+                />
               </Stack>
               <UpdateReadyToastWithForegroundChecks />
             </LegalConsentGate>
