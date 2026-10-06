@@ -122,5 +122,8 @@ pnpm site:build  # build it to site/dist
 root, the Expo export under `dist/play/`, and `web/_redirects` as `dist/_redirects`. Add a rewrite
 for any new top-level route in `src/app` to `web/_redirects` so deep links return 200.
 
-For a Git-connected Cloudflare Pages project, use `pnpm build:web:pages` as the build command and
-`dist` as the build output directory.
+The Git-connected Cloudflare Pages project builds with
+`npx convex deploy --cmd "pnpm build:web:pages" --cmd-url-env-var-name EXPO_PUBLIC_CONVEX_URL` and
+outputs `dist`. Set `CONVEX_DEPLOY_KEY` to a production deploy key in the Production environment and a
+preview deploy key in the Preview environment. The deploy injects the matching Convex URLs, so do not
+set `EXPO_PUBLIC_CONVEX_URL` in Pages. See [RELEASING.md](RELEASING.md#convex-deploys).
