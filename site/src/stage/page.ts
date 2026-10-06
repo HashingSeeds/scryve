@@ -220,7 +220,7 @@ function setUpDeck(stage: HTMLElement) {
   }
 }
 
-// The next section takes over as its heading reaches the copy's pin position.
+// The next section takes over as its heading nears the copy's pin position.
 function setUpStage() {
   const stage = query<HTMLElement>("[data-stage]")
   const game = createDemoGame(commanderSetup(5))

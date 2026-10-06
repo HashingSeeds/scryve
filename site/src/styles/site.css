@@ -773,7 +773,6 @@ figure {
     translate 0.8s var(--ease),
     scale 0.8s var(--ease),
     opacity 0.5s,
-    filter 0.5s,
     box-shadow 0.25s;
 }
 
@@ -823,7 +822,6 @@ figure {
    apart, the second to the left: that's where Maya sits, whose total the demo changes. On the
    way out they slide back together, and the second hides only once it's covered. */
 .phone.second {
-  filter: brightness(0.6);
   opacity: 0;
   pointer-events: none;
   scale: 0.92;
@@ -831,6 +829,17 @@ figure {
     translate 0.8s var(--ease),
     rotate 0.6s var(--ease),
     opacity 0s 0.8s;
+}
+
+/* Dims the second phone. A brightness filter would look the same, but Safari repaints it on
+   the main thread whenever the board changes. */
+.phone.second::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(0 0 0 / 40%);
+  content: "";
+  pointer-events: none;
 }
 
 /* The landing animation scales the rig every frame during the intro, so only later scenes ease
@@ -1461,17 +1470,18 @@ html:has(.stage.full) {
     transition: scale 0.8s var(--ease);
   }
 
+  /* No shadow: it can't show on the black page, and blurring it is costly on phones. */
   .phone {
     --turn: -90deg;
     padding: 5px;
     border-radius: 24px;
+    box-shadow: none;
     rotate: var(--turn);
     transition:
       translate 0.8s var(--ease),
       rotate 0.6s var(--ease),
       scale 0.8s var(--ease),
-      opacity 0.5s,
-      filter 0.5s;
+      opacity 0.5s;
   }
 
   /* Here the second phone always turns with the first, so it can stay drawn behind it rather
