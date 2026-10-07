@@ -617,6 +617,23 @@ describe("LegalConsentGate", () => {
     await act(async () => secondWrite.resolve({ acceptedAt: 1 }))
   })
 
+  it("never records one account's consent under another account that signed in mid-sync", async () => {
+    const firstWrite = deferred<{ acceptedAt: number }>()
+    mockRecordAcceptance.mockReturnValueOnce(firstWrite.promise)
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }
+    const view = renderGate()
+
+    fireEvent.press(view.getByTestId("accept-legal-button"))
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-b" }
+    mockAccountAcceptances = [{ document: "terms", version: REQUIRED_CONSENT_VERSIONS.terms }]
+    view.rerender(gateTree())
+    await act(async () => firstWrite.resolve({ acceptedAt: 1 }))
+
+    expect(mockRecordAcceptance).toHaveBeenCalledTimes(1)
+    expect(accountConsentSyncStore.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+  })
+
   it("caches what the backend reports so the next launch is immediate", () => {
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-b" }
     mockAccountAcceptances = [
