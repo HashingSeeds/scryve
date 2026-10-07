@@ -51,7 +51,10 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
   const auth = useAuthAccess()
   const pathname = usePathname()
   const readingDocument = READABLE_WHILE_GATED.has(pathname)
-  const isLoadingAuth = auth.configured && !auth.isLoaded && !readingDocument
+  // why: before any account signs in here, Clerk can only answer "signed out", so waiting just delays the first prompt.
+  const anAccountHasUsedThisDevice = accountAcceptanceCache.hasAccountsOtherThan(undefined)
+  const isLoadingAuth =
+    auth.configured && !auth.isLoaded && !readingDocument && anAccountHasUsedThisDevice
   const deviceConsentIsCurrent =
     missingConsent(REQUIRED_CONSENT_VERSIONS, deviceAcceptanceStore.read()).length === 0
   const [authUnreachable, setAuthUnreachable] = useState(false)
@@ -78,9 +81,7 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
       <ConfiguredConsentGate
         userId={auth.userId}
         signedIn={auth.isSignedIn}
-        bypass={
-          readingDocument || (waitingForAuth && (deviceConsentIsCurrent || !behindSplashScreen))
-        }
+        bypass={readingDocument || (waitingForAuth && deviceConsentIsCurrent)}
         waitingForAuth={waitingForAuth}
         onResolved={resolve}
         behindSplashScreen={behindSplashScreen}
@@ -390,8 +391,14 @@ function ConfiguredConsentGate({
   const deviceOutstanding = missingConsent(REQUIRED_CONSENT_VERSIONS, deviceAccepted)
   const visibleOutstanding = signedIn ? outstanding : deviceOutstanding
   const loading = waitingForAuth || isLoadingAccount
-  const showContent = bypass || (loading ? !behindSplashScreen : visibleOutstanding.length === 0)
-  const needsConsent = !showContent && !loading
+  // why: only consent this device already gave may keep the app visible while an account loads; otherwise keep asking.
+  const loadingAfterLaunch = loading && !behindSplashScreen
+  const showContent =
+    bypass ||
+    (loading
+      ? loadingAfterLaunch && deviceOutstanding.length === 0
+      : visibleOutstanding.length === 0)
+  const needsConsent = !showContent && (!loading || loadingAfterLaunch)
   const keepMounted = showContent || needsConsent
 
   return (
@@ -399,7 +406,7 @@ function ConfiguredConsentGate({
       {keepMounted ? (
         <View style={[styles.fill, needsConsent && styles.hidden]}>{children}</View>
       ) : null}
-      {!showContent && loading ? <LaunchFallback /> : null}
+      {!showContent && !needsConsent ? <LaunchFallback /> : null}
       {needsConsent ? (
         <ConsentPrompt
           documents={visibleOutstanding}
