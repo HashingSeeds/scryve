@@ -199,14 +199,18 @@ class ScreenPinnedView(context: Context, appContext: AppContext) :
 
   private class Panel(val shortSide: Int, val longSide: Int, val naturalLandscape: Boolean)
 
-  /** Display.Mode reports the panel in its natural orientation. */
+  /**
+   * The natural orientation comes from the current rotation and size. Display.Mode is not enough:
+   * it can stay landscape when the natural orientation is portrait, for example under a display
+   * size override, and then the rotation check in pin() never passes.
+   */
   private fun readPanel(display: android.view.Display): Panel {
     val hardware = realDisplaySize()
-    val mode = display.mode
+    val turned = display.rotation == Surface.ROTATION_90 || display.rotation == Surface.ROTATION_270
     return Panel(
       shortSide = min(hardware.x, hardware.y),
       longSide = max(hardware.x, hardware.y),
-      naturalLandscape = mode.physicalWidth > mode.physicalHeight
+      naturalLandscape = (hardware.x > hardware.y) != turned
     )
   }
 
