@@ -268,6 +268,7 @@ function ConfiguredConsentGate({
           document,
           version: REQUIRED_CONSENT_VERSIONS[document],
           platform: Platform.OS,
+          intendedAccount: forUserId,
         })
       }
     },

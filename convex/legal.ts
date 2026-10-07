@@ -1,4 +1,4 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import { mutation, query } from "./_generated/server"
 import { requireIdentity } from "./lib/auth"
@@ -27,9 +27,16 @@ export const recordAcceptance = mutation({
     document: consentDocument,
     version: v.string(),
     platform: v.string(),
+    // why: optional so installed apps keep working; it can only reject a write, never authorize one.
+    intendedAccount: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
+    if (args.intendedAccount !== undefined && args.intendedAccount !== identity.subject)
+      throw new ConvexError({
+        code: "account_changed",
+        message: "Consent was given by a different account",
+      })
     const version = args.version.trim()
     if (!version) throw new Error("A document version is required")
     const existing = await ctx.db

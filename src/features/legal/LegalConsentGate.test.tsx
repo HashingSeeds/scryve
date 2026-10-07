@@ -215,6 +215,7 @@ describe("LegalConsentGate", () => {
       document: "terms",
       version: REQUIRED_CONSENT_VERSIONS.terms,
       platform: expect.any(String),
+      intendedAccount: "user-a",
     })
     expect(accountAcceptanceCache.read("user-a")).toEqual(REQUIRED_CONSENT_VERSIONS)
   })
