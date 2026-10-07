@@ -1,5 +1,5 @@
 import { type ComponentProps, memo, useEffect, useState } from "react"
-import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
+import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { Pressable, StyleSheet, View } from "react-native"
 import Animated, {
   useAnimatedStyle,
@@ -92,6 +92,9 @@ const BORDER_CHASE_STEP_MS = 180
 const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
 const STATUS_LINE_DISTANCE = 128
 const STATUS_LINE_HEIGHT = 40
+const STATUS_LINE_REACH = STATUS_LINE_DISTANCE + STATUS_LINE_HEIGHT
+// why: the app navigation shown with the menu sits along the bottom of the window, so the status line must not land there.
+const APP_NAVIGATION_CLEARANCE = 96
 const ANCHOR_LOW_ON_SCREEN = 0.6
 
 const ACTION_STAGGER_MS = 35
@@ -179,10 +182,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   signal,
   statusLine,
 }: GameRadialMenuProps) {
-  const {
-    themed,
-    theme: { colors },
-  } = useAppTheme()
+  const { themed } = useAppTheme()
   const menuOpen = open && !exitAction
 
   const anchorStyle = percentAnchorStyle(anchor)
@@ -216,41 +216,57 @@ export const GameRadialMenu = memo(function GameRadialMenu({
       />
 
       {menuOpen && statusLine ? (
-        <View
-          pointerEvents="box-none"
-          style={[
-            themed($statusLineRow),
-            {
-              top: `${anchor.y * 100}%`,
-              marginTop:
-                anchor.y > ANCHOR_LOW_ON_SCREEN
-                  ? -STATUS_LINE_DISTANCE - STATUS_LINE_HEIGHT
-                  : STATUS_LINE_DISTANCE,
-            },
-          ]}
-        >
-          <Pressable
-            testID="game-menu-status-line"
-            accessibilityRole="button"
-            accessibilityLabel={statusLine.text}
-            accessibilityHint="Shows connection details"
-            style={({ pressed }) => [themed($statusLine), pressed && themed($pressedAction)]}
-            onPress={statusLine.onPress}
-          >
-            <View
-              style={[
-                themed($statusDot),
-                { backgroundColor: colors.gameMenu.signal[statusLine.tone] },
-              ]}
-            />
-            <Text text={statusLine.text} weight="medium" size="xs" style={themed($statusText)} />
-            <Text text="›" size="xs" style={themed($statusText)} />
-          </Pressable>
-        </View>
+        <GameMenuStatusRow
+          statusLine={statusLine}
+          above={anchor.y > ANCHOR_LOW_ON_SCREEN}
+          atAnchorStyle={[themed($statusLineInset), { top: `${anchor.y * 100}%` }]}
+        />
       ) : null}
     </View>
   )
 })
+
+function GameMenuStatusRow({
+  statusLine,
+  above,
+  atAnchorStyle,
+}: {
+  statusLine: GameMenuStatusLine
+  above: boolean
+  atAnchorStyle: StyleProp<ViewStyle>
+}) {
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[
+        themed($statusLineRow),
+        atAnchorStyle,
+        {
+          marginTop: above ? -STATUS_LINE_REACH : STATUS_LINE_DISTANCE,
+        },
+      ]}
+    >
+      <Pressable
+        testID="game-menu-status-line"
+        accessibilityRole="button"
+        accessibilityLabel={statusLine.text}
+        accessibilityHint="Shows connection details"
+        style={({ pressed }) => [themed($statusLine), pressed && themed($pressedAction)]}
+        onPress={statusLine.onPress}
+      >
+        <View
+          style={[themed($statusDot), { backgroundColor: colors.gameMenu.signal[statusLine.tone] }]}
+        />
+        <Text text={statusLine.text} weight="medium" size="xs" style={themed($statusText)} />
+        <Text text="›" size="xs" style={themed($statusText)} />
+      </Pressable>
+    </View>
+  )
+}
 
 type AnchorStyle = ComponentProps<typeof Animated.View>["style"]
 
@@ -322,14 +338,19 @@ type GameMenuAnchorProps = {
 /** why: a hardware-pinned board does not turn with the window, so the pentagon and its fan stay put through the system rotation and then turn together about the anchor to face the holder (`facingAngle`, clockwise degrees). `holderAnchor` is where the anchor sits in the holder's view and picks the side the fan opens toward. The box is large enough to contain the fan, because Android drops touches outside a parent's bounds. */
 export function GameMenuCluster({
   holderAnchor,
+  holderHeight,
   facingAngle,
   actions,
+  statusLine,
   ...anchorProps
 }: Omit<GameMenuAnchorProps, "anchorStyle"> & {
   holderAnchor: { x: number; y: number }
+  holderHeight: number
   facingAngle: number
   actions: readonly RadialMenuAction[]
+  statusLine?: GameMenuStatusLine
 }) {
+  const menuOpen = anchorProps.open && !anchorProps.exitAction
   const reducedMotion = useReducedMotion()
   const animateFully = reducedMotion === false
   const facing = useSharedValue(facingAngle)
@@ -350,13 +371,23 @@ export function GameMenuCluster({
       style={[$cluster, percentAnchorStyle(anchorProps.anchor), facingStyle]}
     >
       <GameRadialFan
-        open={anchorProps.open && !anchorProps.exitAction}
+        open={menuOpen}
         anchor={holderAnchor}
         anchorStyle={$clusterCenter}
         actions={actions}
         poseTurnMs={FACING_TURN_MS}
       />
       <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
+      {menuOpen && statusLine ? (
+        <GameMenuStatusRow
+          statusLine={statusLine}
+          above={
+            holderAnchor.y > ANCHOR_LOW_ON_SCREEN ||
+            (1 - holderAnchor.y) * holderHeight < STATUS_LINE_REACH + APP_NAVIGATION_CLEARANCE
+          }
+          atAnchorStyle={$clusterStatusRow}
+        />
+      ) : null}
     </Animated.View>
   )
 }
@@ -669,6 +700,8 @@ const $cluster: ViewStyle = {
   marginTop: -CLUSTER_SIZE / 2,
 }
 const $clusterCenter: ViewStyle = { left: CLUSTER_SIZE / 2, top: CLUSTER_SIZE / 2 }
+// why: the row stays inside the cluster box (half the box is larger than the status line's reach), because Android drops touches outside it.
+const $clusterStatusRow: ViewStyle = { left: 0, right: 0, top: CLUSTER_SIZE / 2 }
 const $backdrop: ThemedStyle<ViewStyle> = ({ colors }) => ({
   ...StyleSheet.absoluteFill,
   zIndex: 10,
@@ -758,13 +791,15 @@ const $signalBadgeText: ThemedStyle<TextStyle> = () => ({
   fontSize: 12,
   lineHeight: 15,
 })
-const $statusLineRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $statusLineRow: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
   zIndex: 25,
-  left: spacing.lg,
-  right: spacing.lg,
   height: STATUS_LINE_HEIGHT,
   alignItems: "center",
+})
+const $statusLineInset: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  left: spacing.lg,
+  right: spacing.lg,
 })
 const $statusLine: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   height: STATUS_LINE_HEIGHT,

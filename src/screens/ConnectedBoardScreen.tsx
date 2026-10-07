@@ -3,20 +3,14 @@ import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useUser } from "@clerk/expo"
-import Animated from "react-native-reanimated"
 
 import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import { GameRadialMenu, type RadialMenuAction } from "@/components/GameRadialMenu"
-import {
-  getPlayerGridLayout,
-  getPlayerGridLayoutOptions,
-  getPlayerGridMenuAnchor,
-  PlayerGrid,
-} from "@/components/PlayerGrid"
+import type { RadialMenuAction } from "@/components/GameRadialMenu"
+import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -38,6 +32,7 @@ import {
 } from "@/features/connected/PlayerActionsDialog"
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
+import { GameBoardStage } from "@/features/game/GameBoardStage"
 import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
@@ -47,10 +42,6 @@ import {
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
-import {
-  rotateGameBoardAnchor,
-  useGameBoardOrientation,
-} from "@/features/game/useGameBoardOrientation"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -58,7 +49,6 @@ import { isGameUnavailableError } from "@/utils/convexError"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 import { usePageBackgroundColor } from "@/utils/usePageBackgroundColor"
 import { useStoreReview } from "@/utils/useStoreReview"
-import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -322,8 +312,6 @@ function ConnectedBoardReady({
     themed,
     theme: { colors },
   } = useAppTheme()
-  const boardOrientation = useGameBoardOrientation()
-  const { width, height, fontScale, rotation } = boardOrientation
   const [menuOpen, setMenuOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
@@ -499,30 +487,6 @@ function ConnectedBoardReady({
     setStatusOpen(true)
   }, [])
   const layoutOptions = getPlayerGridLayoutOptions(players.length)
-  const gridLayout = useMemo(
-    () =>
-      getPlayerGridLayout({
-        playerCount: players.length,
-        width,
-        height,
-        fontScale,
-        layoutVariant,
-      }),
-    [players.length, width, height, fontScale, layoutVariant],
-  )
-  const topEdgeBand = useTopEdgeBand()
-  const menuAnchor = useMemo(
-    () =>
-      rotateGameBoardAnchor(
-        getPlayerGridMenuAnchor(
-          players.length,
-          gridLayout,
-          rotation === 0 ? topEdgeBand / height : 0,
-        ),
-        rotation,
-      ),
-    [players.length, gridLayout, rotation, topEdgeBand, height],
-  )
 
   /**
    * Only the host is served an invitation, and only while seats are still open, so the
@@ -643,91 +607,88 @@ function ConnectedBoardReady({
       SystemBarsProps={{ hidden: true }}
       contentContainerStyle={themed($screen)}
     >
-      <Animated.View
-        ref={boardOrientation.frameRef}
-        collapsable={false}
+      <GameBoardStage
         testID="connected-game-board"
-        style={themed($board)}
-      >
-        <PlayerGrid
-          boardOrientation={boardOrientation}
-          players={players}
-          system={system}
-          lifeStep={game.lifeStep}
-          layoutVariant={layoutVariant}
-          disabled={!active || overlayOpen}
-          isPlayerDisabled={(player) => !controlled.has(player.id)}
-          isPlayerOwned={(player) => controlled.has(player.id)}
-          isPlayerEliminated={(player) =>
-            commanderDamageEnabled &&
-            Boolean(
-              game.players.find((candidate) => candidate.playerId === player.id)
-                ?.eliminatedByCommanderDamage,
-            )
-          }
-          getStaleSince={(player) => (controlled.has(player.id) ? undefined : offlineSince)}
-          commanderDamage={
-            commanderDamageEnabled
-              ? {
-                  incomingFor: incomingCommanderDamage,
-                  armedPlayerId: armedCommander?.playerId ?? null,
-                  inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
-                  staging: {
-                    stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
-                    stagedTargets: armedCommander
-                      ? Object.values(armedCommander.staged).filter((delta) => delta !== 0).length
-                      : 0,
-                    onSend: sendCommanderDamage,
-                    onCancel: () => setArmedCommander(null),
-                  },
-                  pendingFor: (player) =>
-                    controlled.has(player.id)
-                      ? (game.commanderDamage?.pendingClaims ?? [])
-                          .filter((claim) => claim.toPlayerId === player.id)
-                          .map((claim) => ({
-                            claimId: claim.claimId,
-                            attackerName: displayNameOf(claim.fromPlayerId),
-                            delta: claim.delta,
-                            onConfirm: () => runtime.resolveCommanderDamageClaim(claim, true),
-                            onDecline: () => runtime.resolveCommanderDamageClaim(claim, false),
-                          }))
-                      : [],
-                  onPressSword: toggleCommanderSword,
-                  onStage: stageCommanderDamage,
-                }
-              : undefined
-          }
-          onChange={(playerId, delta) => runtime.changeLife(playerId, delta)}
-        />
-        <GameRadialMenu
-          open={menuOpen}
-          anchor={menuAnchor}
-          boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
-          nativeFrame={boardOrientation.nativeFrame}
-          compact={players.length > 2}
-          actions={radialActions}
-          variant={menuButtonStyle}
-          seatColors={seatColors}
-          exitAction={exitAction}
-          signal={boardSyncMenuSignal(syncSignal)}
-          statusLine={
+        playerCount={players.length}
+        layoutVariant={layoutVariant}
+        renderGrid={(boardOrientation) => (
+          <PlayerGrid
+            boardOrientation={boardOrientation}
+            players={players}
+            system={system}
+            lifeStep={game.lifeStep}
+            layoutVariant={layoutVariant}
+            disabled={!active || overlayOpen}
+            isPlayerDisabled={(player) => !controlled.has(player.id)}
+            isPlayerOwned={(player) => controlled.has(player.id)}
+            isPlayerEliminated={(player) =>
+              commanderDamageEnabled &&
+              Boolean(
+                game.players.find((candidate) => candidate.playerId === player.id)
+                  ?.eliminatedByCommanderDamage,
+              )
+            }
+            getStaleSince={(player) => (controlled.has(player.id) ? undefined : offlineSince)}
+            commanderDamage={
+              commanderDamageEnabled
+                ? {
+                    incomingFor: incomingCommanderDamage,
+                    armedPlayerId: armedCommander?.playerId ?? null,
+                    inspection: { playerId: inspectedPlayerId, onChange: setInspectedPlayerId },
+                    staging: {
+                      stagedFor: (player) => armedCommander?.staged[player.id] ?? 0,
+                      stagedTargets: armedCommander
+                        ? Object.values(armedCommander.staged).filter((delta) => delta !== 0).length
+                        : 0,
+                      onSend: sendCommanderDamage,
+                      onCancel: () => setArmedCommander(null),
+                    },
+                    pendingFor: (player) =>
+                      controlled.has(player.id)
+                        ? (game.commanderDamage?.pendingClaims ?? [])
+                            .filter((claim) => claim.toPlayerId === player.id)
+                            .map((claim) => ({
+                              claimId: claim.claimId,
+                              attackerName: displayNameOf(claim.fromPlayerId),
+                              delta: claim.delta,
+                              onConfirm: () => runtime.resolveCommanderDamageClaim(claim, true),
+                              onDecline: () => runtime.resolveCommanderDamageClaim(claim, false),
+                            }))
+                        : [],
+                    onPressSword: toggleCommanderSword,
+                    onStage: stageCommanderDamage,
+                  }
+                : undefined
+            }
+            onChange={(playerId, delta) => runtime.changeLife(playerId, delta)}
+          />
+        )}
+        menu={{
+          open: menuOpen,
+          actions: radialActions,
+          variant: menuButtonStyle,
+          seatColors,
+          exitAction,
+          signal: boardSyncMenuSignal(syncSignal),
+          statusLine:
             syncStatusText && syncSignal.kind !== "live"
               ? { text: syncStatusText, tone: syncSignal.kind, onPress: openSyncStatus }
-              : undefined
-          }
-          onToggle={toggleMenu}
-          onClose={closeMenu}
-        />
-        {menuOpen && onDecks && onSettings && onAccount ? (
-          <FloatingAppNavigation
-            destinationLabel="Decks"
-            accountLabel={accountLabel}
-            onDestination={onDecks}
-            onSettings={onSettings}
-            onAccount={onAccount}
-          />
-        ) : null}
-      </Animated.View>
+              : undefined,
+          onToggle: toggleMenu,
+          onClose: closeMenu,
+        }}
+        windowOverlay={
+          menuOpen && onDecks && onSettings && onAccount ? (
+            <FloatingAppNavigation
+              destinationLabel="Decks"
+              accountLabel={accountLabel}
+              onDestination={onDecks}
+              onSettings={onSettings}
+              onAccount={onAccount}
+            />
+          ) : null
+        }
+      />
 
       {inviteDialogOpen && invitation ? (
         <DialogCard
