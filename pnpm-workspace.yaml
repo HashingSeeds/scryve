@@ -17,3 +17,7 @@ patchedDependencies:
   # react-native-screens 4.26.2 misses the screens stack when expo-dev-launcher wraps it, so
   # statusBarHidden is ignored in iOS dev builds.
   react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
+  # react-native 0.86.3 spreads BridgelessUIManager into UIManager, which builds constants for
+  # every native view manager at launch (~30ms on a Pixel 6a). JS-only patches live in js-patches/
+  # because the native fingerprint hashes patches/, which would block OTA updates.
+  react-native@0.86.3: js-patches/react-native@0.86.3.patch
