@@ -3,6 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
+  "expo": {
+    "autolinking": {
+      "android": {
+        "exclude": [
+          "@expo/ui",
+          "@solana-mobile/mobile-wallet-adapter-protocol"
+        ]
+      }
+    }
+  },
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "start": "node scripts/dev.cjs",
