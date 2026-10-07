@@ -49,10 +49,11 @@ sentry-release:
 
 ## Convex deploys
 
-Cloudflare Pages deploys Convex as part of every web build. The build command is `npx convex deploy --cmd "pnpm build:web:pages" --cmd-url-env-var-name EXPO_PUBLIC_CONVEX_URL`, and the `CONVEX_DEPLOY_KEY` in each Pages environment decides the target:
+Cloudflare Pages deploys Convex as part of every web build. The build command is `pnpm build:pages` (`scripts/pages-build.cjs`), which runs `convex deploy --cmd "pnpm build:web:pages" --cmd-url-env-var-name EXPO_PUBLIC_CONVEX_URL` with a deploy key chosen per build:
 
-- **Production (main):** pushes `convex/` to production, then builds the web app against it. Merging to main is a production backend release. If the push fails, the build fails and nothing is published.
-- **Preview (other branches):** pushes to a preview deployment named after the branch and builds against it. Previews start with no data and are deleted 5 days after creation. Push the branch again to recreate one.
+- **Production (main):** pushes `convex/` to production with `CONVEX_DEPLOY_KEY`, then builds the web app against it. Merging to main is a production backend release. If the push fails, the build fails and nothing is published.
+- **Preview, backend changed:** when `convex/`, `package.json`, or `pnpm-lock.yaml` differs from main's tip, pushes to a preview deployment named after the branch with the preview `CONVEX_DEPLOY_KEY`. Previews start with no data and are deleted 5 days after creation. Push the branch again to recreate one.
+- **Preview, backend matches main:** pushes to the shared staging dev deployment with `CONVEX_STAGING_DEPLOY_KEY` (Preview environment only, scoped to `deployment:deploy`). Staging keeps its data and does not count against the deployment cap. Without that variable, every branch gets its own preview.
 
 Convex schema and function changes must follow the compatibility rules in AGENTS.md. Because every merge deploys:
 
