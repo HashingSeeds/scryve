@@ -1,6 +1,6 @@
 import { type ComponentProps, memo, useEffect, useState } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
-import { Pressable, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -250,7 +250,7 @@ function GameMenuStatusRow({
         },
       ]}
     >
-      <Pressable
+      <BoardPressable
         testID="game-menu-status-line"
         accessibilityRole="button"
         accessibilityLabel={statusLine.text}
@@ -263,7 +263,7 @@ function GameMenuStatusRow({
         />
         <Text text={statusLine.text} weight="medium" size="xs" style={themed($statusText)} />
         <Text text="›" size="xs" style={themed($statusText)} />
-      </Pressable>
+      </BoardPressable>
     </View>
   )
 }
