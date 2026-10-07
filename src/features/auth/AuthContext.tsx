@@ -83,8 +83,9 @@ export function ConfiguredAuth({
     <ConvexProviderWithAuth client={client} useAuth={convexUseAuth}>
       <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
+      {/* why: keyed on the hinted user too, so Clerk confirming that user at launch does not remount the app. */}
       <RevenueCatProvider
-        key={user?.id}
+        key={user?.id ?? sessionHint?.userId ?? undefined}
         apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
         appUserID={user?.id}
         configurationMessage={revenueCat.configured ? undefined : revenueCat.message}
