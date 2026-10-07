@@ -15,10 +15,6 @@ final class ScreenPinnedView: ExpoView {
   private var transitioning = false
   private var lastMetrics: NSDictionary?
 
-  /// Hardware portrait insets seen while the interface was upright. iOS reports symmetric
-  /// landscape insets, so converting those would move the board's padding on every rotation.
-  nonisolated(unsafe) private static var uprightInsets: UIEdgeInsets?
-
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
     clipsToBounds = false
@@ -154,9 +150,11 @@ final class ScreenPinnedView: ExpoView {
       insets = window.safeAreaInsets
     } else if steps == 0 {
       insets = window.safeAreaInsets
-      Self.uprightInsets = insets
+      UprightInsets.remember(insets, screen: rotor.bounds.size)
     } else {
-      insets = Self.uprightInsets ?? rotated(window.safeAreaInsets, quarterTurns: steps)
+      insets =
+        UprightInsets.recall(screen: rotor.bounds.size)
+        ?? UprightInsets.estimate(turned: window.safeAreaInsets)
     }
     let holderAngle = pinned ? -steps * 90 : 0
     let metrics: [String: Any] = [
@@ -174,13 +172,6 @@ final class ScreenPinnedView: ExpoView {
     if lastMetrics?.isEqual(to: metrics) == true { return }
     lastMetrics = metrics as NSDictionary
     onOrientationChange(metrics)
-  }
-
-  /// Window insets seen from a rotor turned clockwise by `quarterTurns` quarter turns.
-  private func rotated(_ insets: UIEdgeInsets, quarterTurns: Int) -> UIEdgeInsets {
-    let window = [insets.top, insets.right, insets.bottom, insets.left]
-    let edge = { (index: Int) in window[((index + quarterTurns) % 4 + 4) % 4] }
-    return UIEdgeInsets(top: edge(0), left: edge(3), bottom: edge(2), right: edge(1))
   }
 
   /// Quarter turns in -1...2, so -90 degrees is -1 and 180 degrees is 2.
@@ -226,6 +217,40 @@ final class ScreenPinnedView: ExpoView {
     }
     return nil
   }
+}
+
+/// Insets of the upright hardware, which the pinned board keeps in every orientation. iOS reports
+/// symmetric landscape insets, so converting those would move the board's padding on every
+/// rotation. Saved per device so a game opened while the phone is turned uses them too.
+private enum UprightInsets {
+  static func remember(_ insets: UIEdgeInsets, screen: CGSize) {
+    let value = NSCoder.string(for: insets)
+    if UserDefaults.standard.string(forKey: key(screen)) != value {
+      UserDefaults.standard.set(value, forKey: key(screen))
+    }
+  }
+
+  static func recall(screen: CGSize) -> UIEdgeInsets? {
+    UserDefaults.standard.string(forKey: key(screen)).map(NSCoder.uiEdgeInsets(for:))
+  }
+
+  /// Before the phone has ever been upright: the sensor housing takes the larger side inset and
+  /// the home indicator keeps the bottom one.
+  static func estimate(turned insets: UIEdgeInsets) -> UIEdgeInsets {
+    UIEdgeInsets(top: max(insets.left, insets.right), left: 0, bottom: insets.bottom, right: 0)
+  }
+
+  /// Includes the hardware model because a backup can be restored onto a phone with the same point
+  /// size but a different notch, and the screen size because Display Zoom changes both.
+  private static func key(_ screen: CGSize) -> String {
+    "ScreenPinnedView.uprightInsets.\(model).\(Int(screen.width))x\(Int(screen.height))"
+  }
+
+  private static let model: String = {
+    var info = utsname()
+    uname(&info)
+    return withUnsafeBytes(of: &info.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+  }()
 }
 
 /// Holds the React children. Never a touch target itself, like `pointerEvents="box-none"`.
