@@ -5,15 +5,26 @@ import { remove, save } from "@/utils/storage"
 import { readSessionHint, useSessionHint, writeSessionHint } from "./sessionHint"
 
 const KEY = "count.auth.session-hint.v1"
+let mockConvexUrl = "https://dev.convex.cloud"
+jest.mock("./config", () => ({
+  readPublicCloudConfig: () => ({
+    configured: true,
+    value: { clerkPublishableKey: "pk_test_scope", convexUrl: mockConvexUrl },
+  }),
+}))
 
 describe("session hint", () => {
-  beforeEach(() => remove(KEY))
+  beforeEach(() => {
+    remove(KEY)
+    mockConvexUrl = "https://dev.convex.cloud"
+  })
 
   it.each([
     ["missing", undefined],
     ["an empty id", { userId: "" }],
     ["a non-string id", { userId: 7 }],
     ["a malformed record", "user-1"],
+    ["an unscoped record", { userId: "user-1" }],
   ])("ignores %s", (_, stored) => {
     if (stored !== undefined) save(KEY, stored)
     expect(readSessionHint()).toBeUndefined()
@@ -26,6 +37,12 @@ describe("session hint", () => {
     expect(readSessionHint()).toEqual({ userId: null })
   })
 
+  it("ignores a hint written for another Clerk instance or Convex deployment", () => {
+    writeSessionHint({ userId: "user-1" })
+    mockConvexUrl = "https://prod.convex.cloud"
+    expect(readSessionHint()).toBeUndefined()
+  })
+
   it("offers the launch hint only until Clerk loads", () => {
     writeSessionHint({ userId: "user-1" })
     const { result, rerender } = renderHook(useSessionHint, {
@@ -34,6 +51,16 @@ describe("session hint", () => {
     expect(result.current).toEqual({ userId: "user-1" })
 
     rerender({ isLoaded: true, isSignedIn: true, userId: "user-1" })
+    expect(result.current).toBeUndefined()
+  })
+
+  it("never offers the launch hint again once Clerk has loaded, as during a sign-out", () => {
+    writeSessionHint({ userId: "user-1" })
+    const { result, rerender } = renderHook(useSessionHint, {
+      initialProps: { isLoaded: false, isSignedIn: false, userId: undefined as string | undefined },
+    })
+    rerender({ isLoaded: true, isSignedIn: true, userId: "user-2" })
+    rerender({ isLoaded: false, isSignedIn: false, userId: undefined })
     expect(result.current).toBeUndefined()
   })
 

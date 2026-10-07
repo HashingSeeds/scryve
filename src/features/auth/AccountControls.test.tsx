@@ -5,6 +5,10 @@ import { ThemeProvider } from "@/theme/context"
 import { AccountProfile } from "./AccountControls"
 
 const mockSignOut = jest.fn(async () => undefined)
+const mockWriteSessionHint = jest.fn()
+jest.mock("./sessionHint", () => ({
+  writeSessionHint: (hint: unknown) => mockWriteSessionHint(hint),
+}))
 
 jest.mock("@clerk/expo", () => ({
   useClerk: () => ({ signOut: mockSignOut }),
@@ -63,5 +67,9 @@ describe("AccountControls", () => {
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1))
     expect(onSignedOut).toHaveBeenCalledTimes(1)
+    expect(mockWriteSessionHint).toHaveBeenCalledWith({ userId: null })
+    expect(mockWriteSessionHint.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0],
+    )
   })
 })

@@ -6,6 +6,7 @@ import { UserProfileView } from "@clerk/expo/native"
 import { AccountScreen } from "@/screens/AccountScreen"
 
 import type { AccountProfileProps } from "./accountProfileProps"
+import { writeSessionHint } from "./sessionHint"
 
 export function AccountProfile({
   onBack,
@@ -25,6 +26,7 @@ export function AccountProfile({
     try {
       setError(undefined)
       setIsSigningOut(true)
+      writeSessionHint({ userId: null })
       await clerk.signOut()
       onSignedOut?.()
     } catch {
