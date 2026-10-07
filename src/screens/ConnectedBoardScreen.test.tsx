@@ -999,9 +999,9 @@ describe("ConnectedBoardScreen", () => {
       render(themed(<ConnectedBoardScreen publicId="game-public" onBack={onBack} />))
       expect(screen.getByText("This game no longer exists.")).toBeTruthy()
       expect(screen.queryByTestId("retry-connected-board-button")).toBeNull()
-      expect(loadNewestResumeGame()?.publicId).toBe("game-public")
+      expect(loadNewestResumeGame("user-1")?.publicId).toBe("game-public")
       fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
-      expect(loadNewestResumeGame()).toBeNull()
+      expect(loadNewestResumeGame("user-1")).toBeNull()
       expect(onBack).toHaveBeenCalledTimes(1)
     } finally {
       consoleError.mockRestore()

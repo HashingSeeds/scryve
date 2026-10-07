@@ -19,7 +19,7 @@ export default function ConnectedGameRoute() {
     <ConnectedGate
       allowOfflineBootstrap
       offlineGameId={gameId}
-      onBack={() => router.replace("/game/new?mode=connected")}
+      onBack={() => router.replace({ pathname: "/", params: { destination: "play" } })}
     >
       <ConnectedBoardScreen
         publicId={gameId}

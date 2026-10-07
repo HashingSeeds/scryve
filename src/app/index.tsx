@@ -72,8 +72,9 @@ export default function Index() {
     activeGame?.updatedAt,
     destination,
     prepared,
-    newestResumeGame,
+    newestResumeGame ?? null,
   )
+  const restoringAccount = newestResumeGame === undefined && destination !== "play" && !prepared
   const freshGame = useMemo(() => {
     const preparedGame = createPreparedGame(prepared)
     if (preparedGame) return preparedGame
@@ -98,6 +99,7 @@ export default function Index() {
   const stale = activeGame && started ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
 
   if (resumeRedirect) return <Redirect href={resumeRedirect} />
+  if (restoringAccount) return null
 
   if (destination !== "play" && (!activeGame || stale) && settings.launchDestination === "decks") {
     return <Redirect href="/connected/decks" />

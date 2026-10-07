@@ -3,6 +3,7 @@ import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { CHOICE_RADIUS } from "@/components/ChoiceButton"
+import { AUTH_LOAD_TIMEOUT_MS } from "@/features/auth/authLoadTimeout"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRepository, connectedDeploymentScope } from "@/features/connected/persistence"
 import {
@@ -23,6 +24,10 @@ const mockOpenAuth = jest.fn()
 const mockRedirect = jest.fn()
 const mockFocusEffects: (() => void)[] = []
 let mockSearchParams: Record<string, string> = {}
+let mockAuth: { isLoaded: boolean; isSignedIn: boolean; userId?: string } = {
+  isLoaded: true,
+  isSignedIn: false,
+}
 
 function refocusAfter(mutate: () => void) {
   act(() => {
@@ -44,10 +49,11 @@ jest.mock("expo-router", () => ({
   },
 }))
 jest.mock("@/features/auth/AuthContext", () => ({
-  useAuthAccess: () => ({ isSignedIn: false, openAuth: mockOpenAuth }),
+  useAuthAccess: () => ({ ...mockAuth, openAuth: mockOpenAuth }),
 }))
 
 const RESUME_OWNER = "resume-test-user"
+const signedInAs = (userId: string) => ({ isLoaded: true, isSignedIn: true, userId })
 const RESUME_PUBLIC_IDS = ["resume-newer", "resume-older", "resume-lobby"] as const
 
 function resumeRepository() {
@@ -69,6 +75,7 @@ describe("shipping index route", () => {
     localGameRepository.saveSettings(DEFAULT_LOCAL_SETTINGS)
     mockFocusEffects.length = 0
     mockSearchParams = {}
+    mockAuth = signedInAs(RESUME_OWNER)
     jest.clearAllMocks()
     clearResume()
   })
@@ -284,6 +291,90 @@ describe("shipping index route", () => {
         params: { gameId: "resume-newer" },
       },
     })
+  })
+
+  it.each([
+    ["nobody is signed in", { isLoaded: true, isSignedIn: false }],
+    ["another account is signed in", signedInAs("someone-else")],
+  ])("stays on local play when %s", (_, auth) => {
+    mockAuth = auth
+    seedResume({
+      publicId: "resume-newer",
+      status: "active",
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: Date.now(),
+    })
+
+    const view = renderIndex()
+
+    expect(mockRedirect).not.toHaveBeenCalled()
+    expect(view.getByTestId("game-board")).toBeTruthy()
+  })
+
+  it("waits for the session to restore before resuming instead of flashing local play", () => {
+    mockAuth = { isLoaded: false, isSignedIn: false }
+    seedResume({
+      publicId: "resume-newer",
+      status: "active",
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: Date.now(),
+    })
+
+    const view = renderIndex()
+    expect(view.queryByTestId("game-board")).toBeNull()
+    expect(mockRedirect).not.toHaveBeenCalled()
+
+    mockAuth = signedInAs(RESUME_OWNER)
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <Index />
+      </ThemeProvider>,
+    )
+
+    expect(mockRedirect).toHaveBeenCalledWith({
+      href: {
+        pathname: "/connected/game/[gameId]",
+        params: { gameId: "resume-newer" },
+      },
+    })
+  })
+
+  it.each([
+    ["never loads", { isLoaded: false, isSignedIn: false }],
+    ["never reports a user id", { isLoaded: true, isSignedIn: true }],
+  ])("falls back to local play when the session %s", (_, auth) => {
+    jest.useFakeTimers()
+    try {
+      mockAuth = auth
+      seedResume({
+        publicId: "resume-newer",
+        status: "active",
+        isHost: true,
+        playerCount: 2,
+        ruleset: "standard",
+        updatedAt: Date.now(),
+      })
+
+      const view = renderIndex()
+      expect(view.queryByTestId("game-board")).toBeNull()
+
+      act(() => void jest.advanceTimersByTime(AUTH_LOAD_TIMEOUT_MS))
+
+      expect(view.getByTestId("game-board")).toBeTruthy()
+      expect(mockRedirect).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("shows local play while the session restores when no game can be resumed", () => {
+    mockAuth = { isLoaded: false, isSignedIn: false }
+
+    expect(renderIndex().getByTestId("game-board")).toBeTruthy()
   })
 
   it("never redirects explicit play intent", () => {
