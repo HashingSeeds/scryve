@@ -393,8 +393,14 @@ function ConfiguredConsentGate({
   const deviceOutstanding = missingConsent(REQUIRED_CONSENT_VERSIONS, deviceAccepted)
   const visibleOutstanding = signedIn ? outstanding : deviceOutstanding
   const loading = waitingForAuth || isLoadingAccount
-  const showContent = bypass || (loading ? !behindSplashScreen : visibleOutstanding.length === 0)
-  const needsConsent = !showContent && !loading
+  // why: only consent this device already gave may keep the app visible while an account loads; otherwise keep asking.
+  const loadingAfterLaunch = loading && !behindSplashScreen
+  const showContent =
+    bypass ||
+    (loading
+      ? loadingAfterLaunch && deviceOutstanding.length === 0
+      : visibleOutstanding.length === 0)
+  const needsConsent = !showContent && (!loading || loadingAfterLaunch)
   const keepMounted = showContent || needsConsent
 
   return (
@@ -402,7 +408,7 @@ function ConfiguredConsentGate({
       {keepMounted ? (
         <View style={[styles.fill, needsConsent && styles.hidden]}>{children}</View>
       ) : null}
-      {!showContent && loading ? <LaunchFallback /> : null}
+      {!showContent && !needsConsent ? <LaunchFallback /> : null}
       {needsConsent ? (
         <ConsentPrompt
           documents={visibleOutstanding}

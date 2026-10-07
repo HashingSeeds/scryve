@@ -265,6 +265,7 @@ describe("LegalConsentGate", () => {
     const view = renderGate(onResolved)
 
     expect(view.getByText("Before you start")).toBeTruthy()
+    expect(view.queryByText("APP CONTENT")).toBeNull()
     expect(view.queryByTestId("launch-fallback")).toBeNull()
     expect(onResolved).toHaveBeenCalled()
   })
@@ -284,6 +285,21 @@ describe("LegalConsentGate", () => {
 
     expect(view.queryByText("Before you start")).toBeNull()
     expect(view.getByText("APP CONTENT")).toBeTruthy()
+  })
+
+  it("keeps the early prompt up while a restored account's acceptance is still loading", () => {
+    clearAccountAcceptanceCache()
+    mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
+    const view = renderGate()
+    expect(view.getByText("Before you start")).toBeTruthy()
+
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-c" }
+    mockConvexAuth = { isAuthenticated: false, isLoading: true }
+    mockAccountAcceptances = undefined
+    view.rerender(gateTree())
+
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+    expect(view.getByText("Before you start")).toBeTruthy()
   })
 
   it("holds behind the splash screen while the account acceptances are still loading", () => {
