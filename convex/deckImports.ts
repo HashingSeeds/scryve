@@ -933,9 +933,13 @@ async function preconCatalog(ctx: ActionCtx) {
   return decks
 }
 
+function withPreconstructedExtension(fileName: string) {
+  return fileName.endsWith(".json") ? fileName : `${fileName}.json`
+}
+
 async function assertGuestPreconstructedInCatalog(ctx: ActionCtx, fileName: string) {
   const decks = await preconCatalog(ctx)
-  if (!decks.some((deck) => normalizedPreconstructedFileName(deck.fileName) === fileName))
+  if (!decks.some((deck) => withPreconstructedExtension(deck.fileName) === fileName))
     throw new ConvexError({
       code: "catalog_deck_not_found",
       message: "Preconstructed deck not found",
@@ -943,9 +947,9 @@ async function assertGuestPreconstructedInCatalog(ctx: ActionCtx, fileName: stri
 }
 
 function normalizedPreconstructedFileName(fileName: string) {
-  if (!/^[A-Za-z0-9_.-]{1,200}$/.test(fileName))
+  if (!/^[\p{L}\p{N}_.-]{1,200}$/u.test(fileName))
     throw new ConvexError({ code: "invalid_deck_identifier", message: "Invalid deck identifier" })
-  return fileName.endsWith(".json") ? fileName : `${fileName}.json`
+  return withPreconstructedExtension(fileName)
 }
 
 async function cachedPreconstructedOutline(

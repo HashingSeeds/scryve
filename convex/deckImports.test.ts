@@ -746,6 +746,75 @@ describe("preconstructed catalog caching", () => {
     }
   })
 
+  it("serves a guest preview when a non-ASCII catalog entry is listed first", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) => resolvedPreconResponse(String(input)))
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: [
+          { fileName: "DandânDeck_SLD", name: "Dandân Deck" },
+          { fileName: "HatsuneMiku_SLD", name: "Hatsune Miku" },
+        ],
+      })
+      const outline = await t.action(api.deckImports.previewPreconstructed, {
+        fileName: "HatsuneMiku_SLD",
+      })
+      expect(outline).toMatchObject({
+        name: "Avengers Assemble",
+        cards: [{ name: "Captain America, Team Leader", quantity: 1 }],
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("serves a guest preview of a non-ASCII deck identifier", async () => {
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockImplementation((input) => resolvedPreconResponse(String(input)))
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: [{ fileName: "DandânDeck_SLD", name: "Dandân Deck" }],
+      })
+      const outline = await t.action(api.deckImports.previewPreconstructed, {
+        fileName: "DandânDeck_SLD",
+      })
+      expect(outline).toMatchObject({
+        name: "Avengers Assemble",
+        cards: [{ name: "Captain America, Team Leader", quantity: 1 }],
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("rejects deck identifiers containing slashes", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("network unavailable"))
+    try {
+      const t = convexTest(schema, modules)
+      registerRateLimiter(t)
+      await t.mutation(internal.deckImports.storeCatalog, {
+        decks: [{ fileName: "AtraxaInfect", name: "Atraxa Infect" }],
+      })
+      await expect(
+        t.action(api.deckImports.previewPreconstructed, { fileName: "a/b" }),
+      ).rejects.toMatchObject({ data: { code: "invalid_deck_identifier" } })
+      await expect(
+        t.action(api.deckImports.previewPreconstructed, { fileName: "../x" }),
+      ).rejects.toMatchObject({ data: { code: "invalid_deck_identifier" } })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it("coalesces concurrent cold outline requests", async () => {
     const fetchSpy = jest
       .spyOn(global, "fetch")
