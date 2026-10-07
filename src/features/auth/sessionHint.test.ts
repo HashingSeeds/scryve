@@ -1,5 +1,6 @@
 import { renderHook } from "@testing-library/react-native"
 
+import * as storage from "@/utils/storage"
 import { remove, save } from "@/utils/storage"
 
 import { readSessionHint, useSessionHint, writeSessionHint } from "./sessionHint"
@@ -35,6 +36,17 @@ describe("session hint", () => {
     expect(readSessionHint()).toEqual({ userId: "user-1" })
     writeSessionHint({ userId: null })
     expect(readSessionHint()).toEqual({ userId: null })
+  })
+
+  it("drops the previous hint when a write fails", () => {
+    writeSessionHint({ userId: "user-1" })
+    const failingSave = jest.spyOn(storage, "save").mockReturnValue(false)
+    try {
+      writeSessionHint({ userId: null })
+    } finally {
+      failingSave.mockRestore()
+    }
+    expect(readSessionHint()).toBeUndefined()
   })
 
   it("ignores a hint written for another Clerk instance or Convex deployment", () => {

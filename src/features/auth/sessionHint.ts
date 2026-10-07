@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 
-import { load, save } from "@/utils/storage"
+import { load, remove, save } from "@/utils/storage"
 
 import { readPublicCloudConfig } from "./config"
 
@@ -30,7 +30,8 @@ export function readSessionHint(): SessionHint | undefined {
 export function writeSessionHint(hint: SessionHint): void {
   const scope = currentScope()
   if (!scope || readSessionHint()?.userId === hint.userId) return
-  save(SESSION_HINT_KEY, { ...hint, scope })
+  // why: a failed write must not leave the previous account's hint behind; no hint falls back to waiting for Clerk.
+  if (!save(SESSION_HINT_KEY, { ...hint, scope })) remove(SESSION_HINT_KEY)
 }
 
 // why: only the launch before Clerk's first load may use the hint; Clerk also reports "not loaded" mid sign-out, when the old account must not come back.
