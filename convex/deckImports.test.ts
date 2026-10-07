@@ -755,6 +755,7 @@ describe("preconstructed catalog caching", () => {
       registerRateLimiter(t)
       await t.mutation(internal.deckImports.storeCatalog, {
         decks: [
+          { fileName: "Bad Name_SLD", name: "Bad Name" },
           { fileName: "DandânDeck_SLD", name: "Dandân Deck" },
           { fileName: "HatsuneMiku_SLD", name: "Hatsune Miku" },
         ],
