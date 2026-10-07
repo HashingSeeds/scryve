@@ -22,6 +22,17 @@ export function AccountProfile({
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [error, setError] = useState<string>()
 
+  // why: Clerk's profile sheet can sign out on its own, so the hint stays cleared while it is open.
+  function openProfile() {
+    writeSessionHint({ userId: null })
+    setProfileOpen(true)
+  }
+
+  function closeProfile() {
+    setProfileOpen(false)
+    if (user?.id) writeSessionHint({ userId: user.id })
+  }
+
   async function signOut() {
     try {
       setError(undefined)
@@ -46,7 +57,7 @@ export function AccountProfile({
         error={error}
         accountControls={accountControls}
         onBack={onBack}
-        onManageProfile={() => setProfileOpen(true)}
+        onManageProfile={openProfile}
         onOpenTerms={onOpenTerms}
         onOpenPrivacy={onOpenPrivacy}
         onOpenGameContentNotices={onOpenGameContentNotices}
@@ -56,9 +67,9 @@ export function AccountProfile({
         visible={profileOpen}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setProfileOpen(false)}
+        onRequestClose={closeProfile}
       >
-        <UserProfileView style={$fill} onDismiss={() => setProfileOpen(false)} />
+        <UserProfileView style={$fill} onDismiss={closeProfile} />
       </Modal>
     </View>
   )

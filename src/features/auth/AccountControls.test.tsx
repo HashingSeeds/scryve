@@ -14,6 +14,7 @@ jest.mock("@clerk/expo", () => ({
   useClerk: () => ({ signOut: mockSignOut }),
   useUser: () => ({
     user: {
+      id: "user_ada",
       fullName: "Ada Lovelace",
       username: "ada",
       imageUrl: "https://example.com/ada.png",
@@ -53,6 +54,20 @@ describe("AccountControls", () => {
 
     expect(view.getByTestId("native-user-profile")).toHaveStyle({ flex: 1 })
     expect(view.getByTestId("native-user-profile").props.isDismissible).toBeUndefined()
+  })
+
+  it("clears the session hint while Clerk's profile sheet can sign out, then restores it", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <AccountProfile onBack={jest.fn()} {...legalProps} />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("manage-profile-item"))
+    expect(mockWriteSessionHint).toHaveBeenLastCalledWith({ userId: null })
+
+    fireEvent(view.getByTestId("native-user-profile"), "dismiss")
+    expect(mockWriteSessionHint).toHaveBeenLastCalledWith({ userId: "user_ada" })
   })
 
   it("owns sign out and reports it to the route", async () => {
