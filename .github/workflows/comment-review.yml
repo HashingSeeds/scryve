@@ -3,14 +3,16 @@ name: comment review
 on:
   push:
     branches: [main]
+  issue_comment:
+    types: [edited]
 
 permissions:
   contents: read
   issues: write
 
 jobs:
-  collect:
-    if: github.event.before != '0000000000000000000000000000000000000000'
+  sync:
+    if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,18 +30,37 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Queue new why comments
+      - name: Queue new why comments and hide settled ones
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.before }}
           HEAD_SHA: ${{ github.sha }}
         run: |
-          body="$RUNNER_TEMP/comment-review.md"
           git cat-file -e "$BASE_SHA" || exit 0
-          node scripts/comment-review.cjs collect "$BASE_SHA" "$HEAD_SHA" > "$body"
-          if [ ! -s "$body" ]; then
-            exit 0
-          fi
           gh label create comment-review --force
-          subject="$(git show -s --format=%s "$HEAD_SHA")"
-          gh issue create --title "Comment review: ${HEAD_SHA:0:7} $subject" --label comment-review --body-file "$body"
+          node scripts/comment-review.cjs sync "$BASE_SHA" "$HEAD_SHA"
+
+  # Hides a kept entry as soon as its box is checked. sync also hides any this misses.
+  keep:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.title == 'Comment review' &&
+      (github.event.comment.user.login == 'github-actions[bot]' ||
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Hide kept entry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BODY: ${{ github.event.comment.body }}
+          COMMENT_ID: ${{ github.event.comment.node_id }}
+        run: |
+          grep -q '^<!-- comment-review:' <<<"$BODY" || exit 0
+          grep -qiE '^- \[x\] keep\s*$' <<<"$BODY" || exit 0
+          grep -qiE '^- \[x\] drop\s*$' <<<"$BODY" && exit 0
+          gh api graphql -f id="$COMMENT_ID" -f query='
+            mutation($id: ID!) {
+              minimizeComment(input: { subjectId: $id, classifier: RESOLVED }) { clientMutationId }
+            }'

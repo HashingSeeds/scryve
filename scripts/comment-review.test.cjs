@@ -2,6 +2,7 @@
 
 const { Linter } = require("eslint")
 const assert = require("node:assert/strict")
+const { Buffer } = require("node:buffer")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const os = require("node:os")
@@ -11,9 +12,9 @@ const { test } = require("node:test")
 const config = require("../.eslintrc.js")
 const {
   parseDiff,
-  formatEntries,
-  formatIssue,
-  parseCheckedEntries,
+  formatEntry,
+  parseEntry,
+  hasBlock,
   removeBlock,
 } = require("./comment-review.cjs")
 const plugin = require("../tools/eslint-plugin-self-explanatory-code/index.cjs")
@@ -107,7 +108,10 @@ test("diff parsing collects complete added blocks across files and ignores uncha
     { path: "scripts/b.mjs", line: 1, block: "/** why: single-line usage */" },
     { path: "src/path with spaces.js", line: 1, block: "/* why: block constraint */" },
   ])
-  assert.match(formatEntries(entries, repo, sha), /path%20with%20spaces\.js#L1/u)
+  assert.match(
+    formatEntry(entries[4], sources["src/path with spaces.js"], { repo, sha, origin: "#1" }),
+    /path%20with%20spaces\.js#L1\)/u,
+  )
 })
 
 test("ordinary comments do not enter the queue", () => {
@@ -120,7 +124,6 @@ test("ordinary comments do not enter the queue", () => {
     parseDiff(diff, () => assert.fail("must not read files without added why lines")),
     [],
   )
-  assert.equal(formatEntries([], repo, sha), "")
   assert.deepEqual(
     parseDiff("", () => assert.fail("must not read files")),
     [],
@@ -263,40 +266,68 @@ test("a trailing why comment does not absorb the next standalone comment", () =>
   assert.equal(removeBlock(source, entry.block).source, "foo()\n// unrelated\nbar()\n")
 })
 
-test("checked issue entries round-trip fenced blocks and only selected drops apply", () => {
-  const entries = [
-    { path: "src/a.ts", line: 2, block: "// why: keep this" },
-    {
-      path: "src/b.ts",
-      line: 3,
-      block: "/**\n * why: upstream requires ```\n * keep this whole block together\n */",
-    },
-  ]
-  const body = `New why comments landed in main.\n\n${formatEntries(entries, repo, sha)}`.replace(
-    "- [ ] drop [src/b.ts",
-    "- [x] drop [src/b.ts",
-  )
-  const checked = parseCheckedEntries(body)
-  assert.deepEqual(checked, [entries[1]])
-  const source = `const x = 1\n\n${entries[1].block}\nfunction load() {}\n`
-  assert.deepEqual(removeBlock(source, checked[0].block), {
-    source: "const x = 1\n\nfunction load() {}\n",
-    removed: true,
-  })
-  assert.deepEqual(parseCheckedEntries(body.replace("[x]", "[X]").replace(/\n/gu, "\r\n")), checked)
-  assert.deepEqual(parseCheckedEntries(formatEntries(entries, repo, sha)), [])
+test("entries show the why lines in context with a permalink to the same range", () => {
+  const source = [
+    "function load() {",
+    "  const a = 1",
+    "  const b = 2",
+    "  const c = 3",
+    "  /**",
+    "   * why: callers must preload",
+    "   */",
+    "  return a + b + c",
+    "}",
+    "",
+    "",
+  ].join("\n")
+  const entry = { path: "src/a.ts", line: 6, block: "/**\n   * why: callers must preload\n   */" }
+  const body = formatEntry(entry, source, { repo, sha, origin: "#292" })
+  assert.match(body, /^\*\*\[src\/a\.ts:6\]\(.+#L6\)\*\* from #292$/mu)
+  const diff = [
+    "```diff",
+    "   const a = 1",
+    "   const b = 2",
+    "   const c = 3",
+    "+  /**",
+    "+   * why: callers must preload",
+    "+   */",
+    "   return a + b + c",
+    " }",
+    "```",
+  ].join("\n")
+  assert.ok(body.includes(diff), body)
+  assert.match(body, new RegExp(`/blob/${sha}/src/a\\.ts#L2-L9\\n`, "u"))
 })
 
-test("issue bodies stop at 60,000 characters and report omitted entries", () => {
-  const entries = Array.from({ length: 4 }, (_, index) => ({
-    path: `src/${index}.ts`,
-    line: 1,
-    block: `// why: ${"x".repeat(20_000)}`,
-  }))
-  const body = formatIssue(entries, repo, sha)
-  assert.ok(body.length <= 60_000)
-  assert.match(body, /^New why comments landed in main\./u)
-  assert.match(body, /\d+ comment review entries omitted/u)
+test("checked boxes and the original block round-trip through an entry", () => {
+  const entry = {
+    path: "src/b.ts",
+    line: 2,
+    block: "/**\n * why: upstream requires ```\n * keep this whole block together\n */",
+  }
+  const source = `const x = 1\n${entry.block}\nfunction load() {}\n`
+  const body = formatEntry(entry, source, { repo, sha, origin: "aaaaaaa" })
+  assert.deepEqual(parseEntry(body), { ...entry, sha, keep: false, drop: false })
+  assert.equal(parseEntry(body.replace("- [ ] drop", "- [x] drop")).drop, true)
+  assert.equal(
+    parseEntry(body.replace("- [ ] keep", "- [X] keep").replace(/\n/gu, "\r\n")).keep,
+    true,
+  )
+  assert.equal(parseEntry("a regular comment"), undefined)
+
+  assert.equal(hasBlock(source, entry), true)
+  const { source: removed } = removeBlock(source, entry.block)
+  assert.equal(removed, "const x = 1\nfunction load() {}\n")
+  assert.equal(hasBlock(removed, entry), false)
+})
+
+test("entries pointing outside the repo are ignored", () => {
+  for (const filename of ["../secrets.ts", "/etc/passwd"]) {
+    const marker = Buffer.from(
+      JSON.stringify({ path: filename, line: 1, sha, block: "// why: x" }),
+    ).toString("base64")
+    assert.equal(parseEntry(`- [x] drop\n\n<!-- comment-review:${marker} -->`), undefined)
+  }
 })
 
 test("removal preserves executable code, indentation and CRLF line endings", () => {

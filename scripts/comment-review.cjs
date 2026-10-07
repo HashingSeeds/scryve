@@ -1,3 +1,4 @@
+const { Buffer } = require("node:buffer")
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
@@ -7,9 +8,26 @@ const {
   DEFAULT_ALLOWED_PATTERNS,
 } = require("../tools/eslint-plugin-self-explanatory-code/index.cjs")
 
-const ISSUE_INTRO =
-  "New why comments landed in main. Unchecked means keep. Check `drop` for any you want removed, then close the issue. An agent applies drops with `pnpm comments:apply <issue>`."
-const MAX_ISSUE_LENGTH = 60_000
+const TRACKER_TITLE = "Comment review"
+const TRACKER_BODY =
+  "Each comment below is a new `why:` comment that landed in main. Check `keep` and the entry hides itself. Check `drop` and an agent removes it with `pnpm comments:apply`; the entry hides once that removal reaches main."
+const MARKER_PATTERN = /^<!-- comment-review:([A-Za-z\d+/=]+) -->$/mu
+const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"])
+const CONTEXT_BEFORE = 3
+const CONTEXT_AFTER = 6
+const COMMENTS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      comments(first: 100, after: $endCursor) {
+        nodes { id isMinimized body authorAssociation author { login } }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}`
+const MINIMIZE_MUTATION = `mutation($id: ID!, $classifier: ReportedContentClassifiers!) {
+  minimizeComment(input: { subjectId: $id, classifier: $classifier }) { clientMutationId }
+}`
 const WHY_PATTERN = /^(?:\*\s*)*why:/u
 
 function whyBlocks(source, filename = "") {
@@ -108,56 +126,74 @@ function parseDiff(diff, readHeadFile) {
     )
 }
 
-function formatIssue(entries, repo, headSha) {
-  const sections = entries.map((entry) => formatEntries([entry], repo, headSha))
-  const fullBody = [ISSUE_INTRO, ...sections].join("\n\n")
-  if (fullBody.length <= MAX_ISSUE_LENGTH) return fullBody
-
-  const noteSuffix =
-    " comment review entries omitted because the issue body reached 60,000 characters."
-  const reserve = `\n\n${sections.length}${noteSuffix}`.length
-  let body = ISSUE_INTRO
-  let included = 0
-  for (const section of sections) {
-    const candidate = `${body}\n\n${section}`
-    if (candidate.length + reserve > MAX_ISSUE_LENGTH) break
-    body = candidate
-    included += 1
-  }
-  const omitted = sections.length - included
-  return `${body}\n\n${omitted}${noteSuffix}`
-}
-
-function formatEntries(entries, repo, headSha) {
-  return entries
-    .map(({ path: filename, line, block }) => {
-      const urlPath = filename.split("/").map(encodeURIComponent).join("/")
-      const url = `https://github.com/${repo}/blob/${headSha}/${urlPath}#L${line}`
-      const fence = "`".repeat(
-        Math.max(3, ...(block.match(/`+/gu) ?? []).map((run) => run.length + 1)),
-      )
-      return `- [ ] drop [${filename}:${line}](${url})\n\n${fence}js\n${block}\n${fence}`
+function formatEntry({ path: filename, line, block }, source, { repo, sha, origin }) {
+  const sourceLines = source.replace(/\r\n/gu, "\n").split("\n")
+  const firstLine = line - block.slice(0, block.indexOf("why:")).split("\n").length + 1
+  const lastLine = firstLine + block.split("\n").length - 1
+  const from = Math.max(1, firstLine - CONTEXT_BEFORE)
+  let to = Math.min(sourceLines.length, lastLine + CONTEXT_AFTER)
+  while (to > lastLine && !sourceLines[to - 1].trim()) to -= 1
+  const snippet = sourceLines.slice(from - 1, to)
+  const indent = Math.min(
+    ...snippet.filter((text) => text.trim()).map((text) => text.match(/^[\t ]*/u)[0].length),
+  )
+  const diff = snippet
+    .map((text, index) => {
+      const isWhy = from + index >= firstLine && from + index <= lastLine
+      return `${isWhy ? "+" : " "}${text.slice(indent)}`
     })
-    .join("\n\n")
+    .join("\n")
+  const fence = "`".repeat(Math.max(3, ...(diff.match(/`+/gu) ?? []).map((run) => run.length + 1)))
+  const urlPath = filename.split("/").map(encodeURIComponent).join("/")
+  const blobUrl = `https://github.com/${repo}/blob/${sha}/${urlPath}`
+  const marker = Buffer.from(JSON.stringify({ path: filename, line, sha, block })).toString(
+    "base64",
+  )
+  return [
+    `**[${filename}:${line}](${blobUrl}#L${line})** from ${origin}`,
+    "- [ ] keep\n- [ ] drop",
+    `${fence}diff\n${diff}\n${fence}`,
+    `<details><summary>Permalink</summary>\n\n${blobUrl}#L${from}-L${to}\n\n</details>`,
+    `<!-- comment-review:${marker} -->`,
+  ].join("\n\n")
 }
 
-function parseCheckedEntries(body) {
-  const entries = []
-  const pattern =
-    /^- \[([ xX])\] drop \[.*\]\(https:\/\/github\.com\/[^/\n]+\/[^/\n]+\/blob\/[^/\n]+\/(.+)#L(\d+)\)\r?\n\r?\n(`{3,})[^\n]*\r?\n([\s\S]*?)\r?\n\4[\t ]*$/gmu
-  for (const match of body.matchAll(pattern)) {
-    if (match[1].toLowerCase() !== "x") continue
-    const filename = decodeURIComponent(match[2])
-    if (path.isAbsolute(filename) || filename.split("/").includes("..")) {
-      throw new Error(`Invalid comment path: ${filename}`)
-    }
-    entries.push({
+function parseEntry(body) {
+  const match = body.match(MARKER_PATTERN)
+  if (!match) return undefined
+  try {
+    const {
       path: filename,
-      line: Number(match[3]),
-      block: match[5].replace(/\r\n/gu, "\n"),
-    })
+      line,
+      sha,
+      block,
+    } = JSON.parse(Buffer.from(match[1], "base64").toString("utf8"))
+    if (
+      typeof filename !== "string" ||
+      typeof block !== "string" ||
+      path.isAbsolute(filename) ||
+      filename.split("/").includes("..")
+    ) {
+      return undefined
+    }
+    return {
+      path: filename,
+      line,
+      sha,
+      block,
+      keep: /^- \[[xX]\] keep[\t ]*\r?$/mu.test(body),
+      drop: /^- \[[xX]\] drop[\t ]*\r?$/mu.test(body),
+    }
+  } catch {
+    return undefined
   }
-  return entries
+}
+
+function hasBlock(source, { path: filename, block }) {
+  const normalized = block.replace(/\r\n/gu, "\n")
+  return whyBlocks(source, filename).some(
+    (entry) => entry.block.replace(/\r\n/gu, "\n") === normalized,
+  )
 }
 
 function removeBlock(source, block, filename) {
@@ -194,14 +230,21 @@ function removeBlock(source, block, filename) {
 }
 
 function main(args) {
-  const run = (command, values) =>
-    execFileSync(command, values, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
-  const [command, first, second] = args
-  if (
-    command === "collect" &&
-    /^[a-f\d]{40}$/u.test(first ?? "") &&
-    /^[a-f\d]{40}$/u.test(second ?? "")
-  ) {
+  const run = (command, values, input) =>
+    execFileSync(command, values, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, input })
+  const [command, base, head] = args
+  const hasRange = /^[a-f\d]{40}$/u.test(base ?? "") && /^[a-f\d]{40}$/u.test(head ?? "")
+  let repo = process.env.GITHUB_REPOSITORY
+  const repoName = () =>
+    (repo ||= JSON.parse(run("gh", ["repo", "view", "--json", "nameWithOwner"])).nameWithOwner)
+
+  const sources = new Map()
+  const readHead = (filename) => {
+    if (!sources.has(filename)) sources.set(filename, run("git", ["show", `${head}:${filename}`]))
+    return sources.get(filename)
+  }
+
+  const collect = () => {
     const diff = run("git", [
       "-c",
       "core.quotePath=false",
@@ -209,8 +252,8 @@ function main(args) {
       "--no-ext-diff",
       "--no-textconv",
       "--unified=0",
-      first,
-      second,
+      base,
+      head,
       "--",
       "*.ts",
       "*.tsx",
@@ -219,18 +262,136 @@ function main(args) {
       "*.cjs",
       "*.mjs",
     ])
-    const entries = parseDiff(diff, (filename) => run("git", ["show", `${second}:${filename}`]))
-    if (!entries.length) return
-    const repo =
-      process.env.GITHUB_REPOSITORY ||
-      JSON.parse(run("gh", ["repo", "view", "--json", "nameWithOwner"])).nameWithOwner
-    process.stdout.write(formatIssue(entries, repo, second))
-  } else if (command === "apply" && /^[1-9]\d*$/u.test(first ?? "")) {
-    const { body } = JSON.parse(run("gh", ["issue", "view", first, "--json", "body"]))
+    const entries = parseDiff(diff, readHead)
+    if (!entries.length) return []
+    const subject = run("git", ["show", "-s", "--format=%s", head]).trim()
+    const origin = subject.match(/\((#\d+)\)$/u)?.[1] ?? head.slice(0, 7)
+    return entries.map((entry) => ({
+      entry: { ...entry, sha: head },
+      body: formatEntry(entry, readHead(entry.path), { repo: repoName(), sha: head, origin }),
+    }))
+  }
+
+  const findTracker = ({ create }) => {
+    const issues = JSON.parse(
+      run("gh", [
+        "issue",
+        "list",
+        "--label",
+        "comment-review",
+        "--state",
+        "open",
+        "--limit",
+        "200",
+        "--json",
+        "number,title",
+      ]),
+    )
+    const existing = issues.find((issue) => issue.title === TRACKER_TITLE)
+    if (existing || !create) return existing?.number
+    const url = run("gh", [
+      "issue",
+      "create",
+      "--title",
+      TRACKER_TITLE,
+      "--label",
+      "comment-review",
+      "--body",
+      TRACKER_BODY,
+    ])
+    const number = Number(url.trim().split("/").pop())
+    try {
+      run("gh", ["issue", "pin", String(number)])
+    } catch (error) {
+      process.stderr.write(`Could not pin #${number}: ${error.message}\n`)
+    }
+    return number
+  }
+
+  const trackerEntries = (number) => {
+    const [owner, name] = repoName().split("/")
+    return run("gh", [
+      "api",
+      "graphql",
+      "--paginate",
+      "-f",
+      `query=${COMMENTS_QUERY}`,
+      "-f",
+      `owner=${owner}`,
+      "-f",
+      `name=${name}`,
+      "-F",
+      `number=${number}`,
+      "--jq",
+      ".data.repository.issue.comments.nodes[]",
+    ])
+      .split("\n")
+      .filter(Boolean)
+      .flatMap((line) => {
+        const comment = JSON.parse(line)
+        const trusted =
+          comment.author?.login === "github-actions" ||
+          TRUSTED_ASSOCIATIONS.has(comment.authorAssociation)
+        const entry = trusted ? parseEntry(comment.body) : undefined
+        return entry ? [{ ...entry, id: comment.id, hidden: comment.isMinimized }] : []
+      })
+  }
+
+  const hide = (id, classifier) =>
+    run("gh", [
+      "api",
+      "graphql",
+      "-f",
+      `query=${MINIMIZE_MUTATION}`,
+      "-f",
+      `id=${id}`,
+      "-f",
+      `classifier=${classifier}`,
+    ])
+
+  const entryKey = ({ sha, path: filename, line }) => `${sha}:${filename}:${line}`
+
+  if (command === "collect" && hasRange) {
+    process.stdout.write(
+      collect()
+        .map(({ body }) => body)
+        .join("\n\n---\n\n"),
+    )
+  } else if (command === "sync" && hasRange) {
+    const posts = collect()
+    const number = findTracker({ create: posts.length > 0 })
+    if (!number) return
+    const entries = trackerEntries(number)
+    const posted = new Set(entries.map(entryKey))
+    for (const { entry, body } of posts) {
+      if (posted.has(entryKey(entry))) continue
+      run(
+        "gh",
+        ["api", `repos/${repoName()}/issues/${number}/comments`, "--input", "-"],
+        JSON.stringify({ body }),
+      )
+      process.stdout.write(`Queued ${entry.path}:${entry.line}\n`)
+    }
+    for (const entry of entries.filter(({ hidden }) => !hidden)) {
+      let source
+      try {
+        source = readHead(entry.path)
+      } catch {
+        source = undefined
+      }
+      if (source === undefined || !hasBlock(source, entry)) {
+        hide(entry.id, entry.drop ? "RESOLVED" : "OUTDATED")
+      } else if (entry.keep && !entry.drop) {
+        hide(entry.id, "RESOLVED")
+      }
+    }
+  } else if (command === "apply") {
+    const number = findTracker({ create: false })
+    if (!number) throw new Error(`No open "${TRACKER_TITLE}" issue`)
     const root = fs.realpathSync(run("git", ["rev-parse", "--show-toplevel"]).trim())
     let removed = 0
     let skipped = 0
-    for (const entry of parseCheckedEntries(body)) {
+    for (const entry of trackerEntries(number).filter(({ hidden, drop }) => !hidden && drop)) {
       try {
         const filename = path.join(root, entry.path)
         const result = removeBlock(fs.readFileSync(filename, "utf8"), entry.block, entry.path)
@@ -245,11 +406,11 @@ function main(args) {
     }
     process.stdout.write(`Removed ${removed} comment blocks; skipped ${skipped}.\n`)
   } else {
-    throw new Error("Usage: comment-review.cjs collect <baseSha> <headSha> | apply <issueNumber>")
+    throw new Error("Usage: comment-review.cjs collect|sync <baseSha> <headSha> | apply")
   }
 }
 
-module.exports = { parseDiff, formatEntries, formatIssue, parseCheckedEntries, removeBlock }
+module.exports = { parseDiff, formatEntry, parseEntry, hasBlock, removeBlock }
 
 if (require.main === module) {
   try {

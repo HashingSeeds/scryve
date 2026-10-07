@@ -78,7 +78,7 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 ## Comments
 
 Make code self-explanatory first through names, extraction, and types. When code cannot express a constraint or rationale, write a `// why:` comment, or `/** why: ... */` above a function for non-obvious usage. This never blocks your work.
-After merge, new why comments are surfaced to Matt in a `comment-review` issue. Unchecked means keep. Apply checked drops from closed issues with `pnpm comments:apply <n>` in a small PR.
+After merge, each new why comment is posted to Matt as an entry on the pinned `Comment review` issue. Kept entries hide themselves. Apply entries checked `drop` with `pnpm comments:apply` in a small PR; they hide once it merges.
 
 ## Additional tips
 
