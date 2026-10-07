@@ -1,5 +1,5 @@
 import { StyleSheet, View, type ViewProps } from "react-native"
-import { act, render, screen } from "@testing-library/react-native"
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native"
 
 import type { PlayerGridProps } from "@/components/PlayerGrid"
 import { ThemeProvider } from "@/theme/context"
@@ -56,5 +56,31 @@ describe("GameBoardStage on a pinned screen", () => {
     expect(StyleSheet.flatten(screen.getByTestId("game-menu-cluster").props.style)).toEqual(
       expect.objectContaining({ transform: [{ rotate: "90deg" }] }),
     )
+  })
+
+  it("turns the connected sync status with the menu so the holder can read it", () => {
+    const onPress = jest.fn()
+    render(
+      <ThemeProvider initialContext="dark">
+        <GameBoardStage
+          playerCount={2}
+          layoutVariant="auto"
+          renderGrid={() => <View testID="grid" />}
+          menu={{
+            open: true,
+            actions: [],
+            statusLine: { text: "Offline for 2m", tone: "offline", onPress },
+            onToggle: jest.fn(),
+            onClose: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    const cluster = screen.getByTestId("game-menu-cluster")
+    const statusLine = within(cluster).getByTestId("game-menu-status-line")
+    expect(statusLine.props.accessibilityLabel).toBe("Offline for 2m")
+    fireEvent.press(statusLine)
+    expect(onPress).toHaveBeenCalled()
   })
 })

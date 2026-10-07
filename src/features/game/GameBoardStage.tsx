@@ -30,11 +30,9 @@ export interface GameBoardStageProps {
   playerCount: number
   layoutVariant: PlayerGridLayoutVariant
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
-  menu: Omit<
-    GameRadialMenuProps,
-    "anchor" | "boardAnchor" | "nativeFrame" | "compact" | "statusLine"
-  >
+  menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   windowOverlay?: ReactNode
+  testID?: string
 }
 
 /** why: where the native module exists the board is pinned to the screen hardware so seats never move when the phone turns; web and older binaries keep the JS counter-rotation. */
@@ -46,6 +44,7 @@ function PinnedGameBoardStage({
   renderGrid,
   menu,
   windowOverlay,
+  testID = "game-board",
 }: GameBoardStageProps) {
   const window = useWindowDimensions()
   const safeArea = useSafeAreaInsets()
@@ -93,7 +92,7 @@ function PinnedGameBoardStage({
   const menuOpen = menu.open && !menu.exitAction
 
   return (
-    <View testID="game-board" style={$stage}>
+    <View testID={testID} style={$stage}>
       <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
@@ -103,6 +102,7 @@ function PinnedGameBoardStage({
               open={menu.open}
               anchor={boardAnchor}
               holderAnchor={holderAnchor}
+              holderHeight={holderAngle % 180 === 0 ? height : width}
               facingAngle={holderAngle}
               actions={menu.actions}
               compact={playerCount > 2}
@@ -110,6 +110,7 @@ function PinnedGameBoardStage({
               seatColors={menu.seatColors}
               exitAction={menu.exitAction}
               signal={menu.signal}
+              statusLine={menu.statusLine}
               onToggle={menu.onToggle}
             />
           </View>
@@ -126,6 +127,7 @@ function LegacyGameBoardStage({
   renderGrid,
   menu,
   windowOverlay,
+  testID = "game-board",
 }: GameBoardStageProps) {
   const boardOrientation = useGameBoardOrientation()
   const { width, height, fontScale, rotation } = boardOrientation
@@ -147,7 +149,7 @@ function LegacyGameBoardStage({
     <Animated.View
       ref={boardOrientation.frameRef}
       collapsable={false}
-      testID="game-board"
+      testID={testID}
       style={$stage}
     >
       {renderGrid(boardOrientation)}
