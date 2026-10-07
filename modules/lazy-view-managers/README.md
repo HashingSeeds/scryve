@@ -4,7 +4,8 @@ Android launch-time work. Pixel 6a release build, cold launch, board interactive
 
 - `LazyViewManagers.kt` + `app.plugin.js`: React Native builds view manager constants for every
   "eager" package before the first render. The plugin wraps each package in `MainApplication` so
-  those view managers are created when JS first renders them. The build fails if Expo's
+  each view manager's constants are built when JS first renders it (the manager objects are still
+  created at launch; they are cheap). The build fails if Expo's
   `MainApplication` template stops matching.
 - `package.json` → `expo.autolinking.android.exclude`: native code Scryve never calls, which still
   cost ~20ms per launch to register.

@@ -10,11 +10,12 @@ import com.facebook.react.uimanager.ViewManager
 import java.lang.ref.WeakReference
 
 /**
- * Lets React Native create each package's view managers on first use instead of at launch.
+ * Lets React Native build each view manager's constants on first use instead of at launch.
  *
- * Packages that only implement `createViewManagers` are "eager": React Native asks every one of
- * them for its view managers, and their constants, before the first screen renders. Reporting them
- * through [ViewManagerOnDemandReactPackage] instead defers that work until JS renders a component.
+ * Packages that only implement `createViewManagers` are "eager": React Native builds constants for
+ * every one of their view managers before the first screen renders. Reporting them through
+ * [ViewManagerOnDemandReactPackage] defers that, the expensive part, until JS renders a component.
+ * The manager objects themselves are still created up front, when React Native asks for names.
  * Wired into MainApplication by this module's app.plugin.js.
  */
 fun withLazyViewManagers(reactPackage: ReactPackage): ReactPackage =
