@@ -302,6 +302,18 @@ describe("LegalConsentGate", () => {
     expect(view.getByText("Before you start")).toBeTruthy()
   })
 
+  it("does not let a trip to a legal page skip stale consent while authentication loads", () => {
+    deviceAcceptanceStore.write({ ...REQUIRED_CONSENT_VERSIONS, terms: "0.0.1" })
+    mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
+    mockPathname = "/terms"
+    const view = renderGate()
+
+    mockPathname = "/"
+    view.rerender(gateTree())
+
+    expect(view.queryByText("APP CONTENT")).toBeNull()
+  })
+
   it("holds behind the splash screen while the account acceptances are still loading", () => {
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }

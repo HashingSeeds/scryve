@@ -81,9 +81,7 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
       <ConfiguredConsentGate
         userId={auth.userId}
         signedIn={auth.isSignedIn}
-        bypass={
-          readingDocument || (waitingForAuth && (deviceConsentIsCurrent || !behindSplashScreen))
-        }
+        bypass={readingDocument || (waitingForAuth && deviceConsentIsCurrent)}
         waitingForAuth={waitingForAuth}
         onResolved={resolve}
         behindSplashScreen={behindSplashScreen}
