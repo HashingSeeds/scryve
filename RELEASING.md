@@ -13,7 +13,7 @@ OTA releases run as a train: every merge ships to beta, and promotion ships what
 
 For a hotfix, promote with `--soak-minutes 0`. Avoid `pnpm ota:prod`: it skips beta and leaves the web app behind. An update only reaches installs with a matching runtime, so after a native change merges, installs need new binaries before they get updates again. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
 
-Do not republish a preview update group to production. Preview has its own runtime fingerprint, so `pnpm ota:preview` checks behavior but does not prove production compatibility.
+Do not republish a preview update group to production. Preview has its own app identifier, runtime fingerprint, and RevenueCat Test Store key, so it installs beside the store app and `pnpm ota:preview` checks behavior but does not prove production compatibility. Test real store purchases with a TestFlight or Play internal production build.
 
 ## Beta updates (opt-in OTA)
 
