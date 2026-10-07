@@ -258,6 +258,34 @@ describe("LegalConsentGate", () => {
     expect(onResolved).not.toHaveBeenCalled()
   })
 
+  it("asks right away on an install no account has used, without waiting for authentication", () => {
+    clearAccountAcceptanceCache()
+    mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
+    const onResolved = jest.fn()
+    const view = renderGate(onResolved)
+
+    expect(view.getByText("Before you start")).toBeTruthy()
+    expect(view.queryByTestId("launch-fallback")).toBeNull()
+    expect(onResolved).toHaveBeenCalled()
+  })
+
+  it("closes the early prompt when Clerk restores an account that already accepted", () => {
+    clearAccountAcceptanceCache()
+    mockAuth = { configured: true, isLoaded: false, isSignedIn: false }
+    const view = renderGate()
+    expect(view.getByText("Before you start")).toBeTruthy()
+
+    mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-c" }
+    mockAccountAcceptances = [
+      { document: "terms", version: REQUIRED_CONSENT_VERSIONS.terms },
+      { document: "privacy", version: REQUIRED_CONSENT_VERSIONS.privacy },
+    ]
+    view.rerender(gateTree())
+
+    expect(view.queryByText("Before you start")).toBeNull()
+    expect(view.getByText("APP CONTENT")).toBeTruthy()
+  })
+
   it("holds behind the splash screen while the account acceptances are still loading", () => {
     deviceAcceptanceStore.write(REQUIRED_CONSENT_VERSIONS)
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "user-a" }

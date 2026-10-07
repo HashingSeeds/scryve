@@ -51,7 +51,10 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
   const auth = useAuthAccess()
   const pathname = usePathname()
   const readingDocument = READABLE_WHILE_GATED.has(pathname)
-  const isLoadingAuth = auth.configured && !auth.isLoaded && !readingDocument
+  // why: before any account signs in here, Clerk can only answer "signed out", so waiting just delays the first prompt.
+  const anAccountHasUsedThisDevice = accountAcceptanceCache.hasAccountsOtherThan(undefined)
+  const isLoadingAuth =
+    auth.configured && !auth.isLoaded && !readingDocument && anAccountHasUsedThisDevice
   const deviceConsentIsCurrent =
     missingConsent(REQUIRED_CONSENT_VERSIONS, deviceAcceptanceStore.read()).length === 0
   const [authUnreachable, setAuthUnreachable] = useState(false)
