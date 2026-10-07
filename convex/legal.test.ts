@@ -59,6 +59,27 @@ describe("legal acceptances", () => {
     ).resolves.toEqual([])
   })
 
+  it("refuses to record consent for a different account than the one that gave it", async () => {
+    const t = convexTest(schema, modules)
+    const second = t.withIdentity({ subject: "second" })
+    await expect(
+      second.mutation(api.legal.recordAcceptance, {
+        document: "terms",
+        version: "2026-08-18",
+        platform: "ios",
+        intendedAccount: "first",
+      }),
+    ).rejects.toMatchObject({ data: { code: "account_changed" } })
+    await expect(second.query(api.legal.currentAcceptances, {})).resolves.toEqual([])
+    await second.mutation(api.legal.recordAcceptance, {
+      document: "terms",
+      version: "2026-08-18",
+      platform: "ios",
+      intendedAccount: "second",
+    })
+    await expect(second.query(api.legal.currentAcceptances, {})).resolves.toHaveLength(1)
+  })
+
   it("rejects an acceptance from a signed-out visitor", async () => {
     const t = convexTest(schema, modules)
     await expect(

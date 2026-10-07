@@ -258,14 +258,22 @@ function ConfiguredConsentGate({
     userId,
   ])
 
-  const sendAcceptance = useCallback(async () => {
-    for (const document of CONSENT_DOCUMENT_IDS)
-      await recordAcceptance({
-        document,
-        version: REQUIRED_CONSENT_VERSIONS[document],
-        platform: Platform.OS,
-      })
-  }, [recordAcceptance])
+  const sendAcceptance = useCallback(
+    async (forUserId: string | undefined) => {
+      for (const document of CONSENT_DOCUMENT_IDS) {
+        // why: the backend records consent for whoever is signed in now, so a switch must stop the sync.
+        if (currentUserId.current !== forUserId)
+          throw new Error("The signed-in account changed during consent sync")
+        await recordAcceptance({
+          document,
+          version: REQUIRED_CONSENT_VERSIONS[document],
+          platform: Platform.OS,
+          intendedAccount: forUserId,
+        })
+      }
+    },
+    [recordAcceptance],
+  )
 
   const trustsLocalAcceptance =
     inheritsDeviceAcceptance || pendingSyncIsCurrent || recentlySyncedCurrentUser
@@ -298,10 +306,9 @@ function ConfiguredConsentGate({
     if (!backendReady) throw new Error("The account backend is not authenticated yet")
     const syncingUserId = userId
     if (syncingUserId) syncAttemptedUserIds.current.add(syncingUserId)
-    await sendAcceptance()
-    if (!syncingUserId) return
+    await sendAcceptance(syncingUserId)
+    if (!syncingUserId || currentUserId.current !== syncingUserId) return
     accountConsentSyncStore.clear(syncingUserId)
-    if (currentUserId.current !== syncingUserId) return
     setPendingSync({})
     setRecentlySyncedUserId(syncingUserId)
   }, [backendReady, sendAcceptance, setPendingSync, userId])
