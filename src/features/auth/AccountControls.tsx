@@ -22,15 +22,10 @@ export function AccountProfile({
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [error, setError] = useState<string>()
 
-  // why: Clerk's profile sheet can sign out on its own, so the hint stays cleared while it is open.
+  // why: Clerk's profile sheet can sign out on its own and reports it to JS late, so the hint stays cleared until Clerk next confirms a session.
   function openProfile() {
     writeSessionHint({ userId: null })
     setProfileOpen(true)
-  }
-
-  function closeProfile() {
-    setProfileOpen(false)
-    if (user?.id) writeSessionHint({ userId: user.id })
   }
 
   async function signOut() {
@@ -67,9 +62,9 @@ export function AccountProfile({
         visible={profileOpen}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={closeProfile}
+        onRequestClose={() => setProfileOpen(false)}
       >
-        <UserProfileView style={$fill} onDismiss={closeProfile} />
+        <UserProfileView style={$fill} onDismiss={() => setProfileOpen(false)} />
       </Modal>
     </View>
   )

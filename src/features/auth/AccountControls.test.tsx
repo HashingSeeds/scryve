@@ -56,7 +56,7 @@ describe("AccountControls", () => {
     expect(view.getByTestId("native-user-profile").props.isDismissible).toBeUndefined()
   })
 
-  it("clears the session hint while Clerk's profile sheet can sign out, then restores it", () => {
+  it("clears the session hint before opening Clerk's profile sheet, which can sign out on its own", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <AccountProfile onBack={jest.fn()} {...legalProps} />
@@ -67,7 +67,7 @@ describe("AccountControls", () => {
     expect(mockWriteSessionHint).toHaveBeenLastCalledWith({ userId: null })
 
     fireEvent(view.getByTestId("native-user-profile"), "dismiss")
-    expect(mockWriteSessionHint).toHaveBeenLastCalledWith({ userId: "user_ada" })
+    expect(mockWriteSessionHint).toHaveBeenCalledTimes(1)
   })
 
   it("owns sign out and reports it to the route", async () => {
