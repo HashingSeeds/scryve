@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import { Pressable } from "react-native"
 import { fireEvent, render, screen } from "@testing-library/react-native"
 
@@ -6,9 +6,10 @@ import { Text } from "@/components/Text"
 import { ThemeProvider } from "@/theme/context"
 
 import { CloudProviders, useAuthAccess } from "./AuthContext"
+import { writeSessionHint } from "./sessionHint"
 
 const mockUseAuth = jest.fn((_options?: unknown) => ({ isLoaded: true, isSignedIn: false }))
-const mockUseUser = jest.fn(() => ({ user: { id: "user_test" } }))
+const mockUseUser = jest.fn((): { user: { id: string } | null } => ({ user: { id: "user_test" } }))
 const mockClerkProvider = jest.fn(({ children }: { children: ReactNode }) => children)
 const mockConvexClient = { url: "https://example.convex.cloud" }
 jest.mock("react-native/Libraries/Modal/Modal", () => {
@@ -98,5 +99,47 @@ describe("native auth experience", () => {
         tokenCache: {},
       }),
     )
+  })
+
+  describe("launch with a session hint", () => {
+    const mounts = jest.fn()
+    function MountProbe() {
+      useEffect(() => mounts(), [])
+      return null
+    }
+    const app = () => (
+      <ThemeProvider initialContext="light">
+        <CloudProviders>
+          <MountProbe />
+        </CloudProviders>
+      </ThemeProvider>
+    )
+
+    beforeEach(() => {
+      mounts.mockClear()
+      writeSessionHint({ userId: "user_test" })
+      mockUseAuth.mockReturnValue({ isLoaded: false, isSignedIn: false })
+      mockUseUser.mockReturnValue({ user: null })
+    })
+    afterEach(() => {
+      mockUseAuth.mockReset().mockReturnValue({ isLoaded: true, isSignedIn: false })
+      mockUseUser.mockReset().mockReturnValue({ user: { id: "user_test" } })
+    })
+
+    it("keeps the app mounted when Clerk confirms the hinted user", () => {
+      const view = render(app())
+      mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: true })
+      mockUseUser.mockReturnValue({ user: { id: "user_test" } })
+      view.rerender(app())
+      expect(mounts).toHaveBeenCalledTimes(1)
+    })
+
+    it("starts the app fresh when Clerk confirms a different user", () => {
+      const view = render(app())
+      mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: true })
+      mockUseUser.mockReturnValue({ user: { id: "user_other" } })
+      view.rerender(app())
+      expect(mounts).toHaveBeenCalledTimes(2)
+    })
   })
 })
