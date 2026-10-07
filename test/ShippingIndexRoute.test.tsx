@@ -24,7 +24,12 @@ const mockOpenAuth = jest.fn()
 const mockRedirect = jest.fn()
 const mockFocusEffects: (() => void)[] = []
 let mockSearchParams: Record<string, string> = {}
-let mockAuth: { isLoaded: boolean; isSignedIn: boolean; userId?: string } = {
+let mockAuth: {
+  isLoaded: boolean
+  isSignedIn: boolean
+  userId?: string
+  sessionHint?: { userId: string | null }
+} = {
   isLoaded: true,
   isSignedIn: false,
 }
@@ -341,6 +346,44 @@ describe("shipping index route", () => {
         params: { gameId: "resume-newer" },
       },
     })
+  })
+
+  it("resumes the hinted account's game on the first render while Clerk loads", () => {
+    mockAuth = { isLoaded: false, isSignedIn: false, sessionHint: { userId: RESUME_OWNER } }
+    seedResume({
+      publicId: "resume-newer",
+      status: "active",
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: Date.now(),
+    })
+
+    renderIndex()
+
+    expect(mockRedirect).toHaveBeenCalledWith({
+      href: {
+        pathname: "/connected/game/[gameId]",
+        params: { gameId: "resume-newer" },
+      },
+    })
+  })
+
+  it("shows local play at once when the last session signed out, even with saved games", () => {
+    mockAuth = { isLoaded: false, isSignedIn: false, sessionHint: { userId: null } }
+    seedResume({
+      publicId: "resume-newer",
+      status: "active",
+      isHost: true,
+      playerCount: 2,
+      ruleset: "standard",
+      updatedAt: Date.now(),
+    })
+
+    const view = renderIndex()
+
+    expect(view.getByTestId("game-board")).toBeTruthy()
+    expect(mockRedirect).not.toHaveBeenCalled()
   })
 
   it.each([

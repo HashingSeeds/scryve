@@ -3,6 +3,10 @@ import { render } from "@testing-library/react-native"
 import { AccountDeletionSessionGuard } from "./AccountDeletionSessionGuard"
 
 const mockSignOut = jest.fn(async () => undefined)
+const mockWriteSessionHint = jest.fn()
+jest.mock("@/features/auth/sessionHint", () => ({
+  writeSessionHint: (hint: unknown) => mockWriteSessionHint(hint),
+}))
 const mockSaveReceiptToken = jest.fn((_token: string) => true)
 const mockResetAnalyticsId = jest.fn(() => "analytics-id")
 let mockAuth = { configured: true, isLoaded: true, isSignedIn: true }
@@ -44,6 +48,7 @@ describe("AccountDeletionSessionGuard", () => {
     expect(mockSaveReceiptToken).toHaveBeenCalledWith("f".repeat(64))
     expect(mockResetAnalyticsId).toHaveBeenCalledTimes(1)
     expect(mockSignOut).toHaveBeenCalledTimes(1)
+    expect(mockWriteSessionHint).toHaveBeenCalledWith({ userId: null })
   })
 
   it("rotates once when the receipt is already saved", () => {

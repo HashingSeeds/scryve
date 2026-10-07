@@ -8,6 +8,7 @@ import {
   saveAccountDeletionReceiptToken,
 } from "@/features/auth/accountDeletionReceiptStore"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { writeSessionHint } from "@/features/auth/sessionHint"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 
 import { api } from "../../../convex/_generated/api"
@@ -35,6 +36,7 @@ function SignedInDeletionGuard() {
       new LocalGameRepository().resetAnalyticsId()
       saveAccountDeletionReceiptToken(deletion.receiptToken)
     }
+    writeSessionHint({ userId: null })
     void clerk.signOut().catch(() => undefined)
   }, [auth.isSignedIn, clerk, deletion])
 

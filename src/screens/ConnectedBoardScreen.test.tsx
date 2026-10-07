@@ -34,6 +34,16 @@ jest.mock("@clerk/expo", () =>
     )
     .createClerkMock(),
 )
+let mockSessionHint: { userId: string | null } | undefined
+jest.mock("@/features/auth/AuthContext", () => {
+  const actual = jest.requireActual<typeof import("@/features/auth/AuthContext")>(
+    "@/features/auth/AuthContext",
+  )
+  return {
+    ...actual,
+    useAuthAccess: () => ({ ...actual.useAuthAccess(), sessionHint: mockSessionHint }),
+  }
+})
 jest.mock("convex/react", () =>
   jest
     .requireActual<typeof import("../../test/support/connectedHarness")>(
@@ -1019,6 +1029,19 @@ describe("ConnectedBoardScreen", () => {
     fireEvent.press(screen.getByTestId("back-from-connected-board-button"))
     expect(onBack).toHaveBeenCalledTimes(1)
     expect(mockUseConnectedGame).not.toHaveBeenCalled()
+  })
+
+  it("runs the hinted owner's board while Clerk hydrates", () => {
+    connectedHarness.userLoaded = false
+    connectedHarness.userId = undefined
+    mockSessionHint = { userId: "user-hinted" }
+    try {
+      render(themed(<ConnectedBoardScreen publicId="game-public" />))
+      expect(screen.queryByText("Checking connected session…")).toBeNull()
+      expect(mockUseConnectedGame).toHaveBeenCalledWith("game-public", "user-hinted")
+    } finally {
+      mockSessionHint = undefined
+    }
   })
 
   it("does not mount a runtime before Clerk hydration and keeps the board shell stable", () => {

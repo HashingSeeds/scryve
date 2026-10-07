@@ -6,6 +6,7 @@ import { UserProfileView } from "@clerk/expo/native"
 import { AccountScreen } from "@/screens/AccountScreen"
 
 import type { AccountProfileProps } from "./accountProfileProps"
+import { writeSessionHint } from "./sessionHint"
 
 export function AccountProfile({
   onBack,
@@ -21,10 +22,17 @@ export function AccountProfile({
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [error, setError] = useState<string>()
 
+  // why: Clerk's profile sheet can sign out on its own and reports it to JS late, so the hint stays cleared until Clerk next confirms a session.
+  function openProfile() {
+    writeSessionHint({ userId: null })
+    setProfileOpen(true)
+  }
+
   async function signOut() {
     try {
       setError(undefined)
       setIsSigningOut(true)
+      writeSessionHint({ userId: null })
       await clerk.signOut()
       onSignedOut?.()
     } catch {
@@ -44,7 +52,7 @@ export function AccountProfile({
         error={error}
         accountControls={accountControls}
         onBack={onBack}
-        onManageProfile={() => setProfileOpen(true)}
+        onManageProfile={openProfile}
         onOpenTerms={onOpenTerms}
         onOpenPrivacy={onOpenPrivacy}
         onOpenGameContentNotices={onOpenGameContentNotices}

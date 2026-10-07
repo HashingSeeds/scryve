@@ -23,12 +23,14 @@ const mockSyncCurrent = jest.fn(async () => "user")
 const mockUsernameCheck = jest.fn(async () => ({ acceptable: true }))
 const mockCachedGames = new Set<string>()
 let mockCachedProjectionPublicId: string | undefined
+let mockSessionHint: { userId: string | null } | undefined
 
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({
     configured: true,
     isLoaded: mockClerkLoaded,
     isSignedIn: mockClerkSignedIn,
+    sessionHint: mockSessionHint,
     openAuth: mockOpenAuth,
   }),
 }))
@@ -88,6 +90,7 @@ describe("connected cold-offline and authentication gate", () => {
     resetConnectedProfileBootstrapForTests()
     mockCachedGames.clear()
     mockCachedProjectionPublicId = undefined
+    mockSessionHint = undefined
     mockSocketConnected = true
     mockConvexAuthenticated = true
     mockConvexLoading = false
@@ -203,6 +206,71 @@ describe("connected cold-offline and authentication gate", () => {
       screen.getByText("Connected play is offline. Local play remains available."),
     ).toBeTruthy()
     expect(screen.queryByText(/issuer|deployment/i)).toBeNull()
+  })
+
+  describe("while Clerk restores a hinted session", () => {
+    beforeEach(() => {
+      mockClerkLoaded = false
+      mockClerkSignedIn = false
+      mockUserLoaded = false
+      mockUserId = undefined
+      mockConvexLoading = true
+      mockConvexAuthenticated = false
+    })
+
+    it("shows the hinted owner's cached board instead of waiting on Clerk", () => {
+      mockSessionHint = { userId: "user-a" }
+      mockCachedGames.add("user-a:game-public")
+      render(gate(<Button testID="hinted-board" text="+1" />))
+      expect(screen.getByTestId("hinted-board")).toBeTruthy()
+    })
+
+    it.each([
+      ["no cached copy of this game", { userId: "user-a" }, "user-b:game-public"],
+      ["a hint for a different account", { userId: "user-b" }, "user-a:game-public"],
+      ["a signed-out hint", { userId: null }, "user-a:game-public"],
+    ])("keeps checking the session with %s", (_, hint, cached) => {
+      mockSessionHint = hint
+      mockCachedGames.add(cached)
+      render(gate(<Button testID="hinted-board" text="+1" />))
+      expect(screen.queryByTestId("hinted-board")).toBeNull()
+    })
+
+    it("keeps the board mounted when Clerk confirms the same account", () => {
+      function Counter() {
+        const [taps, setTaps] = useState(0)
+        return <Button text={`Taps ${taps}`} onPress={() => setTaps(taps + 1)} />
+      }
+      mockSessionHint = { userId: "user-a" }
+      mockCachedGames.add("user-a:game-public")
+      const view = render(gate(<Counter />))
+      fireEvent.press(screen.getByText("Taps 0"))
+
+      mockClerkLoaded = true
+      mockClerkSignedIn = true
+      mockUserLoaded = true
+      mockUserId = "user-a"
+      mockSessionHint = undefined
+      view.rerender(gate(<Counter />))
+
+      expect(screen.getByText("Taps 1")).toBeTruthy()
+    })
+
+    it("hands over to the sign-in gate when Clerk reports the session ended", () => {
+      mockSessionHint = { userId: "user-a" }
+      mockCachedGames.add("user-a:game-public")
+      const view = render(gate(<Button testID="hinted-board" text="+1" />))
+
+      mockClerkLoaded = true
+      mockUserLoaded = true
+      mockSessionHint = undefined
+      view.rerender(gate(<Button testID="hinted-board" text="+1" />))
+
+      expect(screen.queryByTestId("hinted-board")).toBeNull()
+      expect(
+        screen.getByText("Sign in to play across devices. Local games remain available."),
+      ).toBeTruthy()
+    })
   })
 
   it("does not bootstrap a route from a cached projection for a different game", () => {

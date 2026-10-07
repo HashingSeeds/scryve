@@ -98,6 +98,7 @@ export function BackendGate({
   offlineGameId,
   clerkLoaded,
   clerkSignedIn,
+  hintedUserId,
   onBack,
   onReauthenticate,
 }: {
@@ -107,6 +108,7 @@ export function BackendGate({
   offlineGameId?: string
   clerkLoaded: boolean
   clerkSignedIn: boolean
+  hintedUserId?: string
   onBack?: () => void
   onReauthenticate: () => void
 }) {
@@ -119,9 +121,11 @@ export function BackendGate({
   const [savingUsername, setSavingUsername] = useState(false)
   const offlineProfile =
     connectedProfile.status === "offline" ? connectedProfile.profile : undefined
+  const restoringUserId = clerkLoaded ? undefined : hintedUserId
+  const cacheOwnerId = isUserLoaded ? offlineProfile?.userId : restoringUserId
   const cachedProjection =
-    allowOfflineBootstrap && offlineGameId && isUserLoaded && offlineProfile
-      ? new ConnectedGameRepository(undefined, offlineProfile.userId).loadProjection(offlineGameId)
+    allowOfflineBootstrap && offlineGameId && cacheOwnerId
+      ? new ConnectedGameRepository(undefined, cacheOwnerId).loadProjection(offlineGameId)
       : null
   const hasOwnerScopedCache = Boolean(offlineGameId && cachedProjection?.publicId === offlineGameId)
   const userShownConnectedContent = useRef<string | undefined>(undefined)
@@ -142,6 +146,7 @@ export function BackendGate({
   if (keepShowingConnectedContent) return showChildren(activeUserId)
   if (clerkSignedIn && connectedProfile.status === "offline" && hasOwnerScopedCache)
     return showChildren(offlineProfile?.userId)
+  if (restoringUserId && hasOwnerScopedCache) return showChildren(restoringUserId)
   if (!clerkLoaded)
     return (
       <GateScreen busy>
@@ -304,6 +309,7 @@ export function ConnectedGate({
           offlineGameId={offlineGameId}
           clerkLoaded={auth.isLoaded}
           clerkSignedIn={auth.isSignedIn}
+          hintedUserId={auth.sessionHint?.userId ?? undefined}
           onBack={onBack}
           onReauthenticate={auth.openAuth}
         >

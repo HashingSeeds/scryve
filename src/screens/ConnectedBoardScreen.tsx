@@ -16,6 +16,7 @@ import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
 import { Text, type TextProps } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { useAuthAccess } from "@/features/auth/AuthContext"
 import { readPublicCloudConfig } from "@/features/auth/config"
 import {
   boardSyncMenuSignal,
@@ -150,21 +151,23 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
   } = useAppTheme()
   usePageBackgroundColor(colors.board.background)
   const { isLoaded, user } = useUser()
-  if (!isLoaded)
+  const { sessionHint } = useAuthAccess()
+  const hintedUserId = isLoaded ? undefined : sessionHint?.userId
+  if (!isLoaded && !hintedUserId)
     return (
       <ConnectedBoardShell
         state={{ status: "loading", message: "Checking connected session…" }}
         onBack={props.onBack}
       />
     )
-  if (!user?.id)
+  const ownerId = user?.id ?? hintedUserId
+  if (!ownerId)
     return (
       <ConnectedBoardShell
         state={{ status: "unavailable", message: "Connected session unavailable" }}
         onBack={props.onBack}
       />
     )
-  const ownerId = user.id
   const runtimeKey = `${ownerId}:${props.publicId}`
   return (
     <ConvexQueryBoundary

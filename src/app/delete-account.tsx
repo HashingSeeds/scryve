@@ -14,6 +14,7 @@ import {
   saveAccountDeletionReceiptToken,
 } from "@/features/auth/accountDeletionReceiptStore"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { writeSessionHint } from "@/features/auth/sessionHint"
 import { LocalGameRepository } from "@/features/game/localPersistence"
 import { AccountDeletionReceiptScreen, DeleteAccountScreen } from "@/screens/DeleteAccountScreen"
 
@@ -157,6 +158,7 @@ function AuthenticatedDeleteAccountRoute({ onReceipt }: { onReceipt: (token: str
     try {
       const result = await requestDeletion({ confirmation: "DELETE" })
       onReceipt(result.receiptToken)
+      writeSessionHint({ userId: null })
       await clerk.signOut()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not submit the deletion request")

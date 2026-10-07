@@ -12,6 +12,7 @@ import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { ClerkAuthModal } from "./ClerkAuthModal"
 import { ConvexAuthReconnect, createConvexAuthHook } from "./convexAuth"
 import { resourceCache } from "./resourceCache"
+import { type SessionHint, useSessionHint } from "./sessionHint"
 
 interface AuthAccess {
   configured: boolean
@@ -19,6 +20,7 @@ interface AuthAccess {
   isLoaded: boolean
   isSignedIn: boolean
   userId?: string
+  sessionHint?: SessionHint
   openAuth: () => void
   closeAuth: () => void
 }
@@ -48,16 +50,22 @@ export function ConfiguredAuth({
   const revenueCat = readRevenueCatConfig()
   const [visible, setVisible] = useState(false)
   const [convexAuthRetryKey, setConvexAuthRetryKey] = useState(0)
+  const sessionHint = useSessionHint({
+    isLoaded: Boolean(isLoaded),
+    isSignedIn: Boolean(isSignedIn),
+    userId: user?.id,
+  })
   const value = useMemo<AuthAccess>(
     () => ({
       configured: true,
       isLoaded,
       isSignedIn: Boolean(isSignedIn),
       userId: user?.id,
+      sessionHint,
       openAuth: () => setVisible(true),
       closeAuth: () => setVisible(false),
     }),
-    [isLoaded, isSignedIn, user?.id],
+    [isLoaded, isSignedIn, user?.id, sessionHint],
   )
   const client = useMemo(
     () => new ConvexReactClient(convexUrl, { initialAuthTokenReuse: true }),
@@ -75,8 +83,9 @@ export function ConfiguredAuth({
     <ConvexProviderWithAuth client={client} useAuth={convexUseAuth}>
       <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
+      {/* why: keyed on the hinted user too, so Clerk confirming that user at launch does not remount the app. */}
       <RevenueCatProvider
-        key={user?.id}
+        key={user?.id ?? sessionHint?.userId ?? undefined}
         apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
         appUserID={user?.id}
         configurationMessage={revenueCat.configured ? undefined : revenueCat.message}
