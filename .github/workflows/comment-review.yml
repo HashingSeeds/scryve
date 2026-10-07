@@ -13,6 +13,11 @@ permissions:
 jobs:
   sync:
     if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+    # Parallel runs could create two trackers. queue: max keeps every pending run, not just the newest.
+    concurrency:
+      group: comment-review-sync
+      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
