@@ -715,9 +715,9 @@ describe("ConnectedLobbyScreen", () => {
       )
       expect(screen.getByText("This game no longer exists.")).toBeTruthy()
       expect(screen.queryByTestId("retry-lobby-button")).toBeNull()
-      expect(loadNewestResumeGame()?.publicId).toBe("game-public")
+      expect(loadNewestResumeGame("user-1")?.publicId).toBe("game-public")
       view.UNSAFE_getByType(Header).props.onLeftPress()
-      expect(loadNewestResumeGame()).toBeNull()
+      expect(loadNewestResumeGame("user-1")).toBeNull()
     } finally {
       spy.mockRestore()
       consoleError.mockRestore()

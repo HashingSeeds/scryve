@@ -275,19 +275,35 @@ function parseResumeIndex(stored: unknown): ResumableGame[] {
   return filteredResumeBound(stored.games.map(parseResumeEntry))
 }
 
+function resumeIndexKeys(storage: ConnectedStringStorage, deployment: string): string[] {
+  const prefix = `count.connected.resume.v1.${deployment}.`
+  return storage
+    .getAllKeys()
+    .filter((key) => key.startsWith(prefix) && /^\d+:/.test(key.slice(prefix.length)))
+}
+
 export function loadNewestResumeGame(
+  ownerId: string,
   storage: ConnectedStringStorage = mmkvStorage,
   deployment = connectedDeploymentScope(),
 ): ResumableGame | null {
-  const prefix = `count.connected.resume.v1.${deployment}.`
-  let newest: ResumableGame | null = null
-  for (const key of storage.getAllKeys()) {
-    if (!key.startsWith(prefix) || !/^\d+:/.test(key.slice(prefix.length))) continue
-    for (const game of parseResumeIndex(parseJson(storage.getString(key)))) {
-      if (!newest || game.updatedAt > newest.updatedAt) newest = game
-    }
-  }
-  return newest
+  const games = parseResumeIndex(
+    parseJson(storage.getString(CONNECTED_KEYS.resumeIndex(ownerId, deployment))),
+  )
+  return games.reduce<ResumableGame | null>(
+    (newest, game) => (newest && newest.updatedAt >= game.updatedAt ? newest : game),
+    null,
+  )
+}
+
+// why: launch must decide whether to wait for Clerk before it knows which account is active.
+export function hasAnyResumeGame(
+  storage: ConnectedStringStorage = mmkvStorage,
+  deployment = connectedDeploymentScope(),
+): boolean {
+  return resumeIndexKeys(storage, deployment).some(
+    (key) => parseResumeIndex(parseJson(storage.getString(key))).length > 0,
+  )
 }
 
 export function removeResumeEntryEverywhere(
@@ -295,9 +311,7 @@ export function removeResumeEntryEverywhere(
   storage: ConnectedStringStorage = mmkvStorage,
   deployment = connectedDeploymentScope(),
 ): void {
-  const prefix = `count.connected.resume.v1.${deployment}.`
-  for (const key of storage.getAllKeys()) {
-    if (!key.startsWith(prefix) || !/^\d+:/.test(key.slice(prefix.length))) continue
+  for (const key of resumeIndexKeys(storage, deployment)) {
     const remaining = parseResumeIndex(parseJson(storage.getString(key))).filter(
       (game) => game.publicId !== publicId,
     )

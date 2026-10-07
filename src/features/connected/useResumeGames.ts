@@ -1,8 +1,11 @@
 import { useMemo, useSyncExternalStore } from "react"
 
+import { useAuthAccess } from "@/features/auth/AuthContext"
+
 import {
   type ConnectedGameRepository,
   getResumeIndexRevision,
+  hasAnyResumeGame,
   loadNewestResumeGame,
   subscribeResumeIndex,
 } from "./persistence"
@@ -17,7 +20,14 @@ export function useResumeGames(repository: ConnectedGameRepository) {
     .games
 }
 
-export function useNewestResumeGame() {
+// why: `undefined` means Clerk is still restoring a device with saved games, so wait rather than flash local play.
+export function useNewestResumeGame(): ReturnType<typeof loadNewestResumeGame> | undefined {
   const revision = useResumeRevision()
-  return useMemo(() => ({ revision, game: loadNewestResumeGame() }), [revision]).game
+  const { isLoaded, isSignedIn, userId } = useAuthAccess()
+  const restoring = !isLoaded || (isSignedIn && !userId)
+  const ownerId = isSignedIn ? userId : undefined
+  return useMemo(() => {
+    if (restoring) return { revision, game: hasAnyResumeGame() ? undefined : null }
+    return { revision, game: ownerId ? loadNewestResumeGame(ownerId) : null }
+  }, [ownerId, restoring, revision]).game
 }

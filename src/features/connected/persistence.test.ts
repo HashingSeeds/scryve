@@ -4,6 +4,7 @@ import {
   CONNECTED_KEYS,
   ConnectedGameRepository,
   RESUME_INDEX_LIMIT,
+  hasAnyResumeGame,
   loadNewestResumeGame,
   removeResumeEntryEverywhere,
   subscribeResumeIndex,
@@ -713,36 +714,43 @@ describe("connected resume index", () => {
     expect(repository.loadResumeIndex()).toEqual([])
   })
 
-  it("finds the newest resume across accounts and deployments stay separate", () => {
+  it("finds the newest resume for one account only, per deployment", () => {
     const storage = new MemoryStorage()
     const deployment = "small-ibis-123.convex.cloud"
     new ConnectedGameRepository(storage, "user-1", {}, deployment).syncResumeIndex(
-      [resumeEntry("game-older", 1)],
+      [resumeEntry("game-older", 1), resumeEntry("game-newer", 5)],
       true,
     )
     new ConnectedGameRepository(storage, "user-2", {}, deployment).syncResumeIndex(
-      [resumeEntry("game-newer", 9)],
+      [resumeEntry("game-other-account", 9)],
       true,
     )
     new ConnectedGameRepository(storage, "user-1", {}, "other.convex.cloud").syncResumeIndex(
       [resumeEntry("game-other-deployment", 50)],
       true,
     )
+    expect(loadNewestResumeGame("user-1", storage, deployment)?.publicId).toBe("game-newer")
+    expect(loadNewestResumeGame("user-1", storage, "other.convex.cloud")?.publicId).toBe(
+      "game-other-deployment",
+    )
+    expect(loadNewestResumeGame("user-3", storage, deployment)).toBeNull()
+  })
+
+  it("reports whether any account has a resumable game before the account is known", () => {
+    const storage = new MemoryStorage()
+    const deployment = "small-ibis-123.convex.cloud"
+    expect(hasAnyResumeGame(storage, deployment)).toBe(false)
     storage.set(
       `count.connected.resume.v1.${deployment}.evil.6:user-3`,
-      JSON.stringify({
-        schemaVersion: 1,
-        games: [{ ...resumeEntry("game-evil", 99) }],
-      }),
+      JSON.stringify({ schemaVersion: 1, games: [resumeEntry("game-evil", 99)] }),
     )
-    expect(loadNewestResumeGame(storage, deployment)).toMatchObject({
-      publicId: "game-newer",
-      updatedAt: 9,
-    })
-    expect(loadNewestResumeGame(storage, "other.convex.cloud")).toMatchObject({
-      publicId: "game-other-deployment",
-    })
-    expect(loadNewestResumeGame(storage, "missing.convex.cloud")).toBeNull()
+    expect(hasAnyResumeGame(storage, deployment)).toBe(false)
+    new ConnectedGameRepository(storage, "user-2", {}, deployment).syncResumeIndex(
+      [resumeEntry("game-saved", 1)],
+      true,
+    )
+    expect(hasAnyResumeGame(storage, deployment)).toBe(true)
+    expect(hasAnyResumeGame(storage, "other.convex.cloud")).toBe(false)
   })
 
   it("removes a single entry without touching the rest and ignores anonymous writes", () => {
@@ -784,8 +792,11 @@ describe("connected resume index", () => {
     const unsubscribe = subscribeResumeIndex(listener)
     try {
       removeResumeEntryEverywhere("game-gone", storage, deployment)
-      expect(loadNewestResumeGame(storage, deployment)?.publicId).toBe("game-kept")
-      expect(loadNewestResumeGame(storage, "other.convex.cloud")?.publicId).toBe("game-gone")
+      expect(loadNewestResumeGame("user-1", storage, deployment)?.publicId).toBe("game-kept")
+      expect(loadNewestResumeGame("user-2", storage, deployment)).toBeNull()
+      expect(loadNewestResumeGame("user-1", storage, "other.convex.cloud")?.publicId).toBe(
+        "game-gone",
+      )
       expect(listener).toHaveBeenCalled()
     } finally {
       unsubscribe()
