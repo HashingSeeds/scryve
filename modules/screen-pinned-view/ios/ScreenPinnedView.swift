@@ -221,7 +221,7 @@ final class ScreenPinnedView: ExpoView {
 
 /// Insets of the upright hardware, which the pinned board keeps in every orientation. iOS reports
 /// symmetric landscape insets, so converting those would move the board's padding on every
-/// rotation. Saved per screen size so a game opened while the phone is turned uses them too.
+/// rotation. Saved per device so a game opened while the phone is turned uses them too.
 private enum UprightInsets {
   static func remember(_ insets: UIEdgeInsets, screen: CGSize) {
     let value = NSCoder.string(for: insets)
@@ -240,9 +240,17 @@ private enum UprightInsets {
     UIEdgeInsets(top: max(insets.left, insets.right), left: 0, bottom: insets.bottom, right: 0)
   }
 
+  /// Includes the hardware model because a backup can be restored onto a phone with the same point
+  /// size but a different notch, and the screen size because Display Zoom changes both.
   private static func key(_ screen: CGSize) -> String {
-    "ScreenPinnedView.uprightInsets.\(Int(screen.width))x\(Int(screen.height))"
+    "ScreenPinnedView.uprightInsets.\(model).\(Int(screen.width))x\(Int(screen.height))"
   }
+
+  private static let model: String = {
+    var info = utsname()
+    uname(&info)
+    return withUnsafeBytes(of: &info.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+  }()
 }
 
 /// Holds the React children. Never a touch target itself, like `pointerEvents="box-none"`.
