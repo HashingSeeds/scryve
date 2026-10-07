@@ -74,7 +74,6 @@ export default function Index() {
     prepared,
     newestResumeGame ?? null,
   )
-  // why: Clerk restores from its on-device resource cache, so this wait is brief and works offline.
   const restoringAccount = newestResumeGame === undefined && destination !== "play" && !prepared
   const freshGame = useMemo(() => {
     const preparedGame = createPreparedGame(prepared)

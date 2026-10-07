@@ -3,6 +3,7 @@ import { router } from "expo-router"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { CHOICE_RADIUS } from "@/components/ChoiceButton"
+import { AUTH_LOAD_TIMEOUT_MS } from "@/features/auth/authLoadTimeout"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRepository, connectedDeploymentScope } from "@/features/connected/persistence"
 import {
@@ -340,6 +341,34 @@ describe("shipping index route", () => {
         params: { gameId: "resume-newer" },
       },
     })
+  })
+
+  it.each([
+    ["never loads", { isLoaded: false, isSignedIn: false }],
+    ["never reports a user id", { isLoaded: true, isSignedIn: true }],
+  ])("falls back to local play when the session %s", (_, auth) => {
+    jest.useFakeTimers()
+    try {
+      mockAuth = auth
+      seedResume({
+        publicId: "resume-newer",
+        status: "active",
+        isHost: true,
+        playerCount: 2,
+        ruleset: "standard",
+        updatedAt: Date.now(),
+      })
+
+      const view = renderIndex()
+      expect(view.queryByTestId("game-board")).toBeNull()
+
+      act(() => void jest.advanceTimersByTime(AUTH_LOAD_TIMEOUT_MS))
+
+      expect(view.getByTestId("game-board")).toBeTruthy()
+      expect(mockRedirect).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it("shows local play while the session restores when no game can be resumed", () => {

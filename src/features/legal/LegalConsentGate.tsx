@@ -16,6 +16,7 @@ import { CONSENT_DOCUMENT_IDS, type ConsentDocumentId } from "@/content/legal"
 import { privacyContent } from "@/content/privacy"
 import { termsContent } from "@/content/terms"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { AUTH_LOAD_TIMEOUT_MS } from "@/features/auth/authLoadTimeout"
 import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { LegalConsentScreen } from "@/screens/LegalConsentScreen"
 
@@ -33,7 +34,6 @@ import { api } from "../../../convex/_generated/api"
 const READABLE_WHILE_GATED = new Set(["/terms", "/privacy", "/cookie-policy", "/support"])
 
 export const ACCOUNT_CONSENT_TIMEOUT_MS = 4000
-export const AUTH_LOAD_TIMEOUT_MS = 4000
 
 interface GateProps {
   children: ReactNode

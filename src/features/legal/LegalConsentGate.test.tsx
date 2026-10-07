@@ -4,6 +4,7 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { privacyContent } from "@/content/privacy"
+import { AUTH_LOAD_TIMEOUT_MS } from "@/features/auth/authLoadTimeout"
 import { ThemeProvider } from "@/theme/context"
 import { analyticsEnabled } from "@/utils/analytics"
 import { storage } from "@/utils/storage"
@@ -16,11 +17,7 @@ import {
   LEGAL_ACCOUNT_PENDING_CONSENT_KEY,
 } from "./acceptanceStore"
 import { REQUIRED_CONSENT_VERSIONS } from "./consent"
-import {
-  ACCOUNT_CONSENT_TIMEOUT_MS,
-  AUTH_LOAD_TIMEOUT_MS,
-  LegalConsentGate,
-} from "./LegalConsentGate"
+import { ACCOUNT_CONSENT_TIMEOUT_MS, LegalConsentGate } from "./LegalConsentGate"
 
 const mockPush = jest.fn()
 let mockPathname = "/"
