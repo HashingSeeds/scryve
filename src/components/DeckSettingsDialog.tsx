@@ -12,6 +12,7 @@ import { SelectField } from "./SelectField"
 import { Text } from "./Text"
 import { TextField } from "./TextField"
 import { deckFormats } from "../../convex/lib/deckGames"
+import { deckNameWarning } from "../features/decks/deckCopy"
 
 export type DeckSettingsDraft = { name: string; format: string }
 
@@ -59,6 +60,7 @@ export function DeckSettingsDialog({
           label="Deck name"
           value={name}
           maxLength={80}
+          helper={deckNameWarning(name)}
           onChangeText={setName}
         />
         <SelectField

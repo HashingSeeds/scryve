@@ -87,8 +87,13 @@ function matchesFor(variants: string[]) {
   return [...words]
 }
 
-export function usernameFailsGate(username: string) {
-  return matchesFor(gateVariantsOf(username)).length > 0
+/**
+ * why: one gate covers every name another player can see. A failing username is held behind a
+ * placeholder; a failing deck or guest seat name reaches other players as a neutral label, and the
+ * app warns its owner so they can rename it.
+ */
+export function nameFailsGate(name: string) {
+  return matchesFor(gateVariantsOf(name)).length > 0
 }
 
 export function usernameFailsReportThreshold(username: string) {
@@ -98,3 +103,5 @@ export function usernameFailsReportThreshold(username: string) {
 export function describeUsernameMatches(username: string) {
   return matchesFor(reportVariantsOf(username))
 }
+
+export const HIDDEN_DECK_NAME = "Deck"

@@ -1,8 +1,4 @@
-import {
-  describeUsernameMatches,
-  usernameFailsGate,
-  usernameFailsReportThreshold,
-} from "./nameFilter"
+import { describeUsernameMatches, nameFailsGate, usernameFailsReportThreshold } from "./nameFilter"
 import { assertUsername } from "./policy"
 
 /**
@@ -37,7 +33,7 @@ describe("username filter", () => {
         "hancock",
         "dickens",
       ]) {
-        expect({ username, blocked: usernameFailsGate(username) }).toEqual({
+        expect({ username, blocked: nameFailsGate(username) }).toEqual({
           username,
           blocked: false,
         })
@@ -61,7 +57,7 @@ describe("username filter", () => {
         "n1gger",
         "c-u-n-t",
       ]) {
-        expect({ username, blocked: usernameFailsGate(username) }).toEqual({
+        expect({ username, blocked: nameFailsGate(username) }).toEqual({
           username,
           blocked: true,
         })
@@ -83,7 +79,7 @@ describe("username filter", () => {
      */
     it("documents the surnames the dataset does not whitelist", () => {
       for (const username of ["dickinson", "dickson", "cummings", "penistone", "shiitake"])
-        expect(usernameFailsGate(username)).toBe(true)
+        expect(nameFailsGate(username)).toBe(true)
     })
   })
 
@@ -97,7 +93,7 @@ describe("username filter", () => {
       // This is the whole reason for the second threshold. A digit wedged mid-word defeats the
       // leetspeak transformer, and stripping digits at signup would reject "classic7".
       for (const username of ["fu3ck", "sh4it", "b2itch", "c9unt"]) {
-        expect({ username, gate: usernameFailsGate(username) }).toEqual({ username, gate: false })
+        expect({ username, gate: nameFailsGate(username) }).toEqual({ username, gate: false })
         expect({ username, held: usernameFailsReportThreshold(username) }).toEqual({
           username,
           held: true,
@@ -131,7 +127,7 @@ describe("username filter", () => {
         "wetback",
         "pedophile-hunter",
       ]) {
-        expect({ username, blocked: usernameFailsGate(username) }).toEqual({
+        expect({ username, blocked: nameFailsGate(username) }).toEqual({
           username,
           blocked: true,
         })
@@ -155,7 +151,7 @@ describe("username filter", () => {
         "banzai",
         "wetbackpack",
       ]) {
-        expect({ username, blocked: usernameFailsGate(username) }).toEqual({
+        expect({ username, blocked: nameFailsGate(username) }).toEqual({
           username,
           blocked: false,
         })
@@ -182,7 +178,7 @@ describe("username filter", () => {
 
     it("says nothing for an account that has no username yet", () => {
       expect(describeUsernameMatches("")).toEqual([])
-      expect(usernameFailsGate("")).toBe(false)
+      expect(nameFailsGate("")).toBe(false)
     })
   })
 })

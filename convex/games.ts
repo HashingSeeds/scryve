@@ -21,6 +21,7 @@ import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
+import { HIDDEN_DECK_NAME, nameFailsGate } from "./lib/nameFilter"
 import {
   boundedPaginationOptions,
   CONNECTED_EVENT_PAGE_MAX_ITEMS,
@@ -191,28 +192,34 @@ function seatLabelFor(player: { seat: number }) {
 function displayNameForViewer(
   player: Doc<"gamePlayers">,
   user: Doc<"users"> | null,
-  blocked: boolean,
+  { blocked, viewerIsHost }: { blocked: boolean; viewerIsHost: boolean },
 ) {
   if (blocked) return seatLabelFor(player)
-  return (
-    (user ? publicUsernameFor(user) : undefined) ??
-    player.usernameAtJoin ??
-    (player.deletedAt || player.userId === undefined ? player.displayName : seatLabelFor(player))
-  )
+  const resolved = (user ? publicUsernameFor(user) : undefined) ?? player.usernameAtJoin
+  if (resolved !== undefined) return resolved
+  if (player.deletedAt) return player.displayName
+  if (player.userId !== undefined) return seatLabelFor(player)
+  // why: a guest seat name is free text its host typed, so only the host sees it when it fails the filter.
+  return viewerIsHost || !nameFailsGate(player.displayName)
+    ? player.displayName
+    : seatLabelFor(player)
 }
 
 async function displayNamesForViewer(
   ctx: QueryCtx,
-  viewerUserId: Id<"users">,
+  viewer: { userId: Id<"users">; isHost: boolean },
   players: Doc<"gamePlayers">[],
 ) {
-  const blocked = await blockedUserIdsFor(ctx, viewerUserId)
+  const blocked = await blockedUserIdsFor(ctx, viewer.userId)
   const names = new Map<Id<"gamePlayers">, string>()
   for (const player of players) {
     const user = player.userId ? await ctx.db.get(player.userId) : null
     names.set(
       player._id,
-      displayNameForViewer(player, user, Boolean(player.userId && blocked.has(player.userId))),
+      displayNameForViewer(player, user, {
+        blocked: Boolean(player.userId && blocked.has(player.userId)),
+        viewerIsHost: viewer.isHost,
+      }),
     )
   }
   return names
@@ -232,9 +239,17 @@ function summaryIdentitySnapshotFor(
 
 function maskSummaryPlayersForViewer(
   players: Doc<"gameSummaries">["players"],
+  viewerUserId: Id<"users">,
   blocked: Set<Id<"users">>,
 ) {
-  return players.map((player) => {
+  return players.map((rawPlayer) => {
+    // why: deck names are free text, so only the owner sees one that fails the filter.
+    const player =
+      rawPlayer.deckNameAtFinish !== undefined &&
+      rawPlayer.userId !== viewerUserId &&
+      nameFailsGate(rawPlayer.deckNameAtFinish)
+        ? { ...rawPlayer, deckNameAtFinish: HIDDEN_DECK_NAME }
+        : rawPlayer
     if (player.userId && blocked.has(player.userId)) {
       const { usernameAtFinish: _, ...masked } = player
       return { ...masked, displayName: seatLabelFor(player) }
@@ -1172,7 +1187,7 @@ export const lobbyProjection = query({
             .take(100)
         : []
     const invite = isHost ? await currentUsableInvite(ctx, game, Date.now()) : null
-    const displayNames = await displayNamesForViewer(ctx, user._id, players)
+    const displayNames = await displayNamesForViewer(ctx, { userId: user._id, isHost }, players)
     const commanderDamage = await commanderDamageProjection(ctx, game, user, players)
     const eliminatedPlayerIds = new Set(commanderDamage?.eliminatedPlayerIds ?? [])
     const eventCount = totalEventCount(game, players)
@@ -2330,7 +2345,7 @@ export const connectedHistory = query({
           outcome: entry.outcome,
           terminalStatus: summary.terminalStatus ?? "finished",
           terminalReason: summary.terminalReason,
-          players: maskSummaryPlayersForViewer(summary.players, blocked),
+          players: maskSummaryPlayersForViewer(summary.players, user._id, blocked),
         })
       }
     }
@@ -2512,7 +2527,7 @@ export const connectedSummary = query({
       game: summary.game ?? DEFAULT_DECK_GAME,
       system: summary.system ?? summary.game ?? DEFAULT_DECK_GAME,
       format: summary.format ?? summary.ruleset,
-      players: maskSummaryPlayersForViewer(summary.players, blocked),
+      players: maskSummaryPlayersForViewer(summary.players, viewer._id, blocked),
       viewerPlayerIds: summary.players
         .filter((player) => player.userId === viewer._id)
         .map((player) => player.playerId),

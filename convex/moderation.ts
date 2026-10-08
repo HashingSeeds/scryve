@@ -20,7 +20,7 @@ import {
 import { moderationRetentionExpiresAt } from "./lib/moderationRetention"
 import {
   describeUsernameMatches,
-  usernameFailsGate,
+  nameFailsGate,
   usernameFailsReportThreshold,
 } from "./lib/nameFilter"
 
@@ -198,7 +198,7 @@ export const usernameIsAcceptable = query({
     // Deliberately `requireIdentity`, not `requireUser`: the gate asks this before the user row
     // exists, since a username has to be chosen before the profile can sync.
     await requireIdentity(ctx)
-    return { acceptable: !usernameFailsGate(args.username.trim()) }
+    return { acceptable: !nameFailsGate(args.username.trim()) }
   },
 })
 
