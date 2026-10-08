@@ -6,7 +6,7 @@ This app uses two release paths: OTA updates for JS and asset changes within an 
 
 OTA releases run as a train: every merge ships to beta, and promotion ships what beta proved to production.
 
-1. Merge to main. `.github/workflows/beta.yml` deploys Convex to production, then publishes the commit to the `beta` channel. Its player notes come from the `feat`, `fix`, and `perf` PR titles since the last promotion.
+1. Merge to main. `.github/workflows/beta.yml` deploys Convex to production, then publishes the commit to the `beta` channel. Its player notes are the newest eight `feat`, `fix`, and `perf` PR titles on main. Each build and update records its commit, so an install shows only the notes newer than what it runs.
 2. Let it soak on beta. The lab devices and beta players run it, and Sentry tags every event with its `updateId`.
 3. Promote: `pnpm release:promote` reports, and `pnpm release:promote --yes` promotes. The `promote` workflow does the same without local secrets (`gh workflow run promote -f promote=true`). It takes the newest beta update that has been live for 60 minutes (`--soak-minutes`), stops if Sentry has new unresolved issues from it, republishes that same update group to production, and fast-forwards the `production` branch so Cloudflare Pages ships the matching web app.
 4. If beta shows a problem, revert or fix forward on main. Production never received it.

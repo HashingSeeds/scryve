@@ -5,7 +5,7 @@
  * that has soaked without new Sentry issues to production, and fast-forwards the
  * `production` branch, which Cloudflare Pages builds as the production web app.
  *
- *   node scripts/release-train.cjs notes                  player notes for main since the last promotion
+ *   node scripts/release-train.cjs notes                  player notes for main's newest changes, as JSON
  *   node scripts/release-train.cjs promote                report the candidate and whether it is clean
  *   node scripts/release-train.cjs promote --yes          promote it
  *   node scripts/release-train.cjs promote --soak-minutes 30
@@ -53,23 +53,42 @@ function isAncestor(ancestor, commit) {
 }
 
 // Turns squash-merge subjects like "fix(decks): pasted cards match again (#303)" into
-// player-facing notes, skipping internal work. Newest first, as `git log` lists them.
-function releaseNotes(subjects) {
-  const notes = []
-  for (const subject of subjects) {
-    const match = /^(\w+)(?:\(([^)]+)\))?!?:\s*(.+?)(?:\s+\(#\d+\))?$/.exec(subject)
-    if (!match) continue
-    const [, type, scope, summary] = match
-    if (!PLAYER_FACING_TYPES.has(type) || INTERNAL_SCOPES.has(scope)) continue
-    const note = summary[0].toUpperCase() + summary.slice(1)
-    if (!notes.includes(note)) notes.push(note)
-  }
-  return notes.slice(0, MAX_NOTES)
+// player-facing notes, or null for internal work.
+function playerNote(subject) {
+  const match = /^(\w+)(?:\(([^)]+)\))?!?:\s*(.+?)(?:\s+\(#\d+\))?$/.exec(subject)
+  if (!match) return null
+  const [, type, scope, summary] = match
+  if (!PLAYER_FACING_TYPES.has(type) || INTERNAL_SCOPES.has(scope)) return null
+  return summary[0].toUpperCase() + summary.slice(1)
 }
 
-function subjectsSinceProduction(head) {
-  const range = refExists(PRODUCTION_REF) ? `${PRODUCTION_REF}..${head}` : `${head}~1..${head}`
-  return git("log", "--no-merges", "--format=%s", range).split("\n").filter(Boolean)
+// why: the newest notes on main, newest first. `newSince` maps every commit they span to how many
+// notes came after it, so an install running one of those commits shows only what it lacks.
+// Installs older than the window, or without a commit, show every note.
+function releaseNotes(commits) {
+  const notes = []
+  const newSince = {}
+  for (const { commit, subject } of commits) {
+    if (notes.length === MAX_NOTES) break
+    newSince[commit] = notes.length
+    const note = playerNote(subject)
+    if (note && !notes.includes(note)) notes.push(note)
+  }
+  return { notes, newSince }
+}
+
+// why: a merge commit's subject is "Merge pull request #N from ..."; GitHub puts the PR title on
+// the first line of its body.
+function recentCommits(head) {
+  return git("log", "--first-parent", "--max-count=200", "--format=%H%x1f%s%x1f%b%x1e", head)
+    .split("\x1e")
+    .map((record) => record.trim())
+    .filter(Boolean)
+    .map((record) => {
+      const [commit, subject, body] = record.split("\x1f")
+      const title = subject.startsWith("Merge pull request") ? body.split("\n")[0] : subject
+      return { commit, subject: title }
+    })
 }
 
 // `eas update:view` returns the updates in one group.
@@ -222,8 +241,7 @@ async function main() {
     },
   })
   const [command] = positionals
-  if (command === "notes")
-    return console.log(releaseNotes(subjectsSinceProduction("HEAD")).join("\n"))
+  if (command === "notes") return console.log(JSON.stringify(releaseNotes(recentCommits("HEAD"))))
   const soakMinutes = Number(values["soak-minutes"])
   if (command === "promote" && Number.isFinite(soakMinutes))
     return promote({ yes: values.yes, soakMinutes })

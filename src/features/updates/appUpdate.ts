@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { AppState, Platform } from "react-native"
+import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 
 import { loadString, saveString } from "@/utils/storage"
@@ -12,11 +13,28 @@ export type AppUpdate =
   | { status: "downloading"; progress?: number }
   | { status: "ready"; updateId: string; notes: string[] }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+/**
+ * why: an update lists main's newest notes; `releaseNotesNewSince` says how many are newer than the
+ * commit this install runs (app.config.ts), so the player sees only what the update adds.
+ */
+export function newReleaseNotes(update: unknown, runningCommit: unknown): string[] {
+  if (!isRecord(update)) return []
+  const notes = Array.isArray(update.releaseNotes)
+    ? update.releaseNotes.filter((note) => typeof note === "string")
+    : []
+  const newSince = update.releaseNotesNewSince
+  const count =
+    isRecord(newSince) && typeof runningCommit === "string" ? newSince[runningCommit] : undefined
+  return typeof count === "number" ? notes.slice(0, count) : notes
+}
+
 function releaseNotesFromUpdateManifest(manifest: Partial<Updates.Manifest> | undefined): string[] {
   const extra = manifest && "extra" in manifest ? manifest.extra : undefined
-  const notes: unknown =
-    extra && "expoClient" in extra ? extra.expoClient?.extra?.releaseNotes : undefined
-  return Array.isArray(notes) ? notes.filter((note) => typeof note === "string") : []
+  const update: unknown = extra && "expoClient" in extra ? extra.expoClient?.extra : undefined
+  return newReleaseNotes(update, Constants.expoConfig?.extra?.releaseCommit)
 }
 
 export function useAppUpdate(): AppUpdate {
