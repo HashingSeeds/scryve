@@ -2,11 +2,13 @@ import { router } from "expo-router"
 
 import { EmptyState } from "@/components/EmptyState"
 import { Screen } from "@/components/Screen"
+import { useAuthAccess } from "@/features/auth/AuthContext"
 import { hasLocalGameStarted } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 
 export default function CurrentLocalGameRoute() {
+  const auth = useAuthAccess()
   const game = localGameRepository.loadActiveGame()
   if (!game) {
     return (
@@ -32,6 +34,7 @@ export default function CurrentLocalGameRoute() {
       onAccount={() => router.push("/account")}
       onViewSummary={(gameId) => router.push({ pathname: "/history/[gameId]", params: { gameId } })}
       onGameAbandoned={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+      ownerId={auth.isSignedIn ? auth.userId : undefined}
     />
   )
 }

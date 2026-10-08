@@ -246,7 +246,8 @@ export function HistoryScreen({
   const entries = useMemo(() => {
     const unique = new Map<string, HistoryEntry>()
     const connectedEntries = connectedPage?.status === "ready" ? connectedPage.items : []
-    for (const entry of [...games.map(localHistoryEntry), ...connectedEntries])
+    // why: the device copy of a published game keeps its winner line and seat outcome, so it overrides the server row.
+    for (const entry of [...connectedEntries, ...games.map(localHistoryEntry)])
       unique.set(entry.key, entry)
     return sortedByRecency([...unique.values()])
   }, [games, connectedPage])

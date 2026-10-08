@@ -119,6 +119,17 @@ export function manualHistoryEntry(match: {
   }
 }
 
+// why: the account's own seat turns a table result into a personal win or loss, like the server does; an owned game with no seat stays unrecorded so the tally matches the server's unknown outcome.
+function localOutcome(game: LocalGameSummary, winnerNames: string[]): HistoryOutcome {
+  const result = game.result
+  const me = game.account?.mePlayerId
+  if (game.account && !me) return "unrecorded"
+  if (result?.kind === "draw") return "draw"
+  if (result?.kind !== "win" || winnerNames.length === 0) return "unrecorded"
+  if (!me) return "win"
+  return result.winnerPlayerIds.includes(me) ? "win" : "loss"
+}
+
 export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
   const system = isPlaySystemId(game.system) ? game.system : undefined
   const result = game.result
@@ -134,7 +145,7 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
     routeId: game.id,
     finishedAt: game.finishedAt,
     status: game.status,
-    outcome: result?.kind === "draw" ? "draw" : winnerNames.length > 0 ? "win" : "unrecorded",
+    outcome: localOutcome(game, winnerNames),
     ...(winnerNames.length > 0 ? { winnerNames } : {}),
     eventCount: game.eventCount,
     system,
@@ -142,6 +153,9 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
       id: player.id,
       name: player.name,
       color: player.color,
+      ...(player.id === game.account?.mePlayerId && game.account.deckName
+        ? { deckName: game.account.deckName }
+        : {}),
     })),
     format:
       system && game.format
@@ -152,6 +166,8 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
 
 export function connectedHistoryEntry(game: {
   publicId: string
+  /** why: a published local game keys as `local:<id>` so the device's own copy folds into it. */
+  source?: "local" | "connected"
   outcome?: "win" | "loss" | "draw" | "unknown"
   eventCount: number
   finishedAt: number
@@ -168,9 +184,10 @@ export function connectedHistoryEntry(game: {
   }[]
 }): HistoryEntry {
   const system = game.system === NO_PLAY_SYSTEM ? undefined : playSystemId(game.system)
+  const source = game.source ?? "connected"
   return {
-    key: `connected:${game.publicId}`,
-    source: "connected",
+    key: `${source}:${game.publicId}`,
+    source,
     routeId: game.publicId,
     finishedAt: game.finishedAt,
     status: game.terminalStatus === "abandoned" ? "abandoned" : "finished",

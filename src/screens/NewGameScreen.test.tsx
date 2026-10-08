@@ -7,7 +7,12 @@ import {
   ConnectedProfileProvider,
   resetConnectedProfileBootstrapForTests,
 } from "@/features/connected/useConnectedProfile"
-import { createLocalGame } from "@/features/game/domain"
+import {
+  applyGameCommand,
+  asDeviceId,
+  createLocalGame,
+  defaultCommandContext,
+} from "@/features/game/domain"
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -274,20 +279,23 @@ describe("NewGameScreen", () => {
     fireEvent.changeText(view.getByTestId("player-name-1"), "Katherine")
     expect(onSavePlayers).not.toHaveBeenCalled()
     fireEvent(view.getByTestId("player-name-1"), "blur")
-    expect(onSavePlayers).toHaveBeenLastCalledWith([
-      expect.objectContaining({ name: "Katherine" }),
-      expect.objectContaining({ name: "Grace" }),
-    ])
+    expect(onSavePlayers).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ name: "Katherine" }), expect.objectContaining({ name: "Grace" })],
+      undefined,
+    )
 
     fireEvent.press(view.getByTestId("player-count-increment"))
     fireEvent.press(view.getByTestId("player-appearance-1"))
     fireEvent.press(view.getByTestId("appearance-color-117b9c"))
     expect(onSavePlayers).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByTestId("save-local-appearance-button"))
-    expect(onSavePlayers).toHaveBeenLastCalledWith([
-      expect.objectContaining({ name: "Katherine", color: "#117B9C" }),
-      expect.objectContaining({ name: "Grace" }),
-    ])
+    expect(onSavePlayers).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({ name: "Katherine", color: "#117B9C" }),
+        expect.objectContaining({ name: "Grace" }),
+      ],
+      undefined,
+    )
     expect(view.getByLabelText("Players, 3")).toBeTruthy()
   })
 
@@ -962,5 +970,134 @@ describe("NewGameScreen", () => {
 
     await waitFor(() => expect(screen.getByText("Checking your games…")).toBeTruthy())
     expect(screen.getByTestId("host-connected-button")).toBeDisabled()
+  })
+
+  it("hides the account seat while signed out", () => {
+    setup()
+    expect(screen.queryByTestId("me-seat")).toBeNull()
+  })
+
+  it("pre-marks the account's seat, offers matching decks, and starts the game with both", () => {
+    const onStartLocal = jest.fn()
+    setup({
+      onStartLocal,
+      account: {
+        ownerId: "owner-a",
+        defaultMeSeat: 1,
+        decks: [
+          { versionId: "v-commander", name: "Atraxa", system: "mtg", format: "commander" },
+          { versionId: "v-standard", name: "Mono Red", system: "mtg", format: "standard" },
+        ],
+      },
+    })
+    expect(screen.getByLabelText("This is me, Player 2")).toBeTruthy()
+    expect(screen.queryByTestId("me-deck")).toBeNull()
+
+    fireEvent.press(screen.getByTestId("play-system-mtg"))
+    fireEvent.press(screen.getByTestId("play-format"))
+    fireEvent.press(screen.getByTestId("play-format-option-commander"))
+    fireEvent.press(screen.getByTestId("me-deck"))
+    expect(screen.queryByTestId("me-deck-option-v-standard")).toBeNull()
+    fireEvent.press(screen.getByTestId("me-deck-option-v-commander"))
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      40,
+      expect.objectContaining({
+        system: "mtg",
+        format: "commander",
+        account: {
+          ownerId: "owner-a",
+          meSeat: 1,
+          deckVersionId: "v-commander",
+          deckName: "Atraxa",
+        },
+      }),
+    )
+  })
+
+  it("drops the previous account's seat and deck when the signed-in owner changes", () => {
+    const onStartLocal = jest.fn()
+    const decks = [{ versionId: "v-standard", name: "Mono Red", system: "mtg", format: "standard" }]
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="local"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={onStartLocal}
+          account={{ ownerId: "owner-a", defaultMeSeat: 1, decks }}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(screen.getByTestId("play-system-mtg"))
+    fireEvent.press(screen.getByTestId("me-deck"))
+    fireEvent.press(screen.getByTestId("me-deck-option-v-standard"))
+    expect(screen.getByLabelText("Your deck, Mono Red")).toBeTruthy()
+
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="local"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={onStartLocal}
+          account={{ ownerId: "owner-b", defaultMeSeat: 0, decks: [] }}
+        />
+      </ThemeProvider>,
+    )
+    expect(screen.getByLabelText("This is me, Player 1")).toBeTruthy()
+    expect(screen.getByLabelText("Your deck, No matching decks")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      20,
+      expect.objectContaining({ account: { ownerId: "owner-b", meSeat: 0 } }),
+    )
+  })
+
+  it("keeps a running game's owner when another account renames a player", () => {
+    const onSavePlayers = jest.fn()
+    const fresh = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000" },
+        { name: "Grace", color: "#0000FF" },
+      ],
+      startingLife: 20,
+      account: { ownerId: "owner-a", meSeat: 1 },
+    })
+    const initialGame = applyGameCommand(
+      fresh,
+      { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+      defaultCommandContext(asDeviceId("device_test")),
+    )
+    setup({ initialGame, onSavePlayers, account: { ownerId: "owner-b", decks: [] } })
+    expect(screen.getByLabelText("This is me, Grace")).toBeTruthy()
+    fireEvent.changeText(screen.getByTestId("player-name-1"), "Katherine")
+    fireEvent(screen.getByTestId("player-name-1"), "blur")
+    expect(onSavePlayers).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ name: "Katherine" }), expect.objectContaining({ name: "Grace" })],
+      undefined,
+    )
+  })
+
+  it("saves a changed account seat for a running game instead of pre-marking one", () => {
+    const onSavePlayers = jest.fn()
+    const fresh = runningLocalGame()
+    const initialGame = applyGameCommand(
+      fresh,
+      { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+      defaultCommandContext(asDeviceId("device_test")),
+    )
+    setup({ initialGame, onSavePlayers, account: { ownerId: "owner-a", decks: [] } })
+    expect(screen.getByLabelText("This is me, No seat")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("me-seat"))
+    fireEvent.press(screen.getByTestId("me-seat-option-0"))
+    expect(onSavePlayers).toHaveBeenLastCalledWith(expect.any(Array), {
+      ownerId: "owner-a",
+      meSeat: 0,
+    })
   })
 })

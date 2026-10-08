@@ -225,13 +225,15 @@ async function displayNamesForViewer(
   return names
 }
 
+// why: a local game's names were typed by its only viewer, so they survive where a connected guest becomes a seat label.
 function summaryIdentitySnapshotFor(
   player: Doc<"gamePlayers">,
   user: Doc<"users"> | null,
+  localGame = false,
 ): { displayName: string; usernameAtFinish?: string } {
   const resolved = user ? publicUsernameFor(user) : undefined
   if (resolved) return { displayName: resolved, usernameAtFinish: resolved }
-  if (player.deletedAt) return { displayName: player.displayName }
+  if (player.deletedAt || localGame) return { displayName: player.displayName }
   if (player.usernameAtJoin)
     return { displayName: player.usernameAtJoin, usernameAtFinish: player.usernameAtJoin }
   return { displayName: seatLabelFor(player) }
@@ -241,6 +243,7 @@ export function maskSummaryPlayersForViewer(
   players: Doc<"gameSummaries">["players"],
   viewerUserId: Id<"users">,
   blocked: Set<Id<"users">>,
+  options: { localGame?: boolean } = {},
 ) {
   return players.map((rawPlayer) => {
     // why: deck names are free text, so only the owner sees one that fails the filter.
@@ -257,7 +260,8 @@ export function maskSummaryPlayersForViewer(
     return {
       ...player,
       displayName:
-        player.usernameAtFinish ?? (player.deletedAt ? player.displayName : seatLabelFor(player)),
+        player.usernameAtFinish ??
+        (player.deletedAt || options.localGame ? player.displayName : seatLabelFor(player)),
     }
   })
 }
@@ -468,6 +472,8 @@ async function terminalizeGame(
     | { kind: "unknown" } = {
     kind: "unknown",
   },
+  // why: a published local game finished on the device, so its records keep that moment and source.
+  options: { finishedAt?: number; historySource?: "local" } = {},
 ): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
     .query("gameSummaries")
@@ -502,6 +508,7 @@ async function terminalizeGame(
           ? "win"
           : "loss"
   const now = Date.now()
+  const finishedAt = options.finishedAt ?? now
   const summaryPlayers = await Promise.all(
     players
       .sort((a, b) => a.seat - b.seat)
@@ -512,7 +519,7 @@ async function terminalizeGame(
         return {
           playerId: player._id,
           seat: player.seat,
-          ...summaryIdentitySnapshotFor(player, user),
+          ...summaryIdentitySnapshotFor(player, user, game.mode === "local"),
           ...(player.userId ? { userId: player.userId } : {}),
           ...(deck ? { deckId: deck._id, deckNameAtFinish: deck.name } : {}),
           ...(version
@@ -537,7 +544,7 @@ async function terminalizeGame(
     system: game.system ?? game.game ?? DEFAULT_DECK_GAME,
     format: game.format ?? game.ruleset,
     eventCount: totalEventCount(game, players),
-    finishedAt: now,
+    finishedAt,
     players: summaryPlayers,
     resultKind: result.kind,
     ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
@@ -560,9 +567,10 @@ async function terminalizeGame(
           : "loss"
     await ctx.db.insert("gameHistoryEntries", {
       userId,
+      ...(options.historySource ? { source: options.historySource } : {}),
       gameId: game._id,
       summaryId,
-      finishedAt: now,
+      finishedAt,
       outcome,
     })
   }
@@ -575,7 +583,7 @@ async function terminalizeGame(
       playerId: player.playerId,
       userId: player.userId,
       outcome: player.outcome,
-      finishedAt: now,
+      finishedAt,
     })
     const stats = await ctx.db
       .query("deckStats")
@@ -880,6 +888,72 @@ export const claimSeat = mutation({
   },
 })
 
+const localSnapshotPlayer = v.object({
+  localId: v.string(),
+  seat: v.number(),
+  displayName: v.string(),
+  color: v.string(),
+  shape: v.optional(v.string()),
+  currentLife: v.number(),
+})
+
+async function resolveLocalGameSetup(
+  ctx: QueryCtx,
+  args: {
+    system?: string
+    format?: string
+    ruleset: string
+    startingLife: number
+    lifeStep?: number
+  },
+) {
+  const gameSystem =
+    args.system === undefined || args.system === NO_GAME_SYSTEM
+      ? NO_GAME_SYSTEM
+      : assertGameSystem(args.system)
+  const noSystem = gameSystem === NO_GAME_SYSTEM
+  if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
+  assertStartingLife(
+    args.startingLife,
+    gameSystem === "pokemon" ? 99 : gameSystem === "ygo" ? 999_999 : 999,
+  )
+  if (args.lifeStep !== undefined) {
+    assertLifeDelta(args.lifeStep)
+    if (args.lifeStep < 1) throw new Error("Life step must be positive")
+  }
+  const ruleset = assertRuleset(args.ruleset)
+  const format = noSystem
+    ? undefined
+    : args.format === undefined
+      ? ruleset
+      : assertDeckGameFormat(gameSystem, args.format)
+  return { gameSystem, ruleset, format }
+}
+
+function assertSnapshotPlayers(players: Infer<typeof localSnapshotPlayer>[]) {
+  assertPlayerCount(players.length)
+  const localIds = new Set<string>()
+  const seats = new Set<number>()
+  for (const player of players) {
+    assertLocalId(player.localId)
+    assertDisplayName(player.displayName)
+    assertAllowedColor(player.color)
+    if (player.shape !== undefined) assertAllowedShape(player.shape)
+    assertSnapshotLife(player.currentLife)
+    if (localIds.has(player.localId)) throw new Error("Local player identifiers must be unique")
+    localIds.add(player.localId)
+    if (
+      !Number.isInteger(player.seat) ||
+      player.seat < 1 ||
+      player.seat > players.length ||
+      seats.has(player.seat)
+    )
+      throw new Error("Snapshot seats must be unique numbers from 1 to the player count")
+    seats.add(player.seat)
+  }
+  return { localIds, seats }
+}
+
 export const publishLocalGame = mutation({
   args: {
     operationId: v.string(),
@@ -893,16 +967,7 @@ export const publishLocalGame = mutation({
     manualCodeCandidates: v.array(v.string()),
     deviceId: v.optional(v.string()),
     hostLocalId: v.string(),
-    players: v.array(
-      v.object({
-        localId: v.string(),
-        seat: v.number(),
-        displayName: v.string(),
-        color: v.string(),
-        shape: v.optional(v.string()),
-        currentLife: v.number(),
-      }),
-    ),
+    players: v.array(localSnapshotPlayer),
     commanderTotals: v.optional(
       v.array(v.object({ fromSeat: v.number(), toSeat: v.number(), total: v.number() })),
     ),
@@ -915,46 +980,8 @@ export const publishLocalGame = mutation({
     assertManualCodeCandidates(args.manualCodeCandidates)
     if (args.deviceId) assertDeviceId(args.deviceId)
     assertLocalId(args.hostLocalId)
-    assertPlayerCount(args.players.length)
-    const gameSystem =
-      args.system === undefined || args.system === NO_GAME_SYSTEM
-        ? NO_GAME_SYSTEM
-        : assertGameSystem(args.system)
-    const noSystem = gameSystem === NO_GAME_SYSTEM
-    if (!noSystem) await requireReleasedCapability(ctx, gameSystem, "playTracking")
-    assertStartingLife(
-      args.startingLife,
-      gameSystem === "pokemon" ? 99 : gameSystem === "ygo" ? 999_999 : 999,
-    )
-    if (args.lifeStep !== undefined) {
-      assertLifeDelta(args.lifeStep)
-      if (args.lifeStep < 1) throw new Error("Life step must be positive")
-    }
-    const ruleset = assertRuleset(args.ruleset)
-    const format = noSystem
-      ? undefined
-      : args.format === undefined
-        ? ruleset
-        : assertDeckGameFormat(gameSystem, args.format)
-    const localIds = new Set<string>()
-    const seats = new Set<number>()
-    for (const player of args.players) {
-      assertLocalId(player.localId)
-      assertDisplayName(player.displayName)
-      assertAllowedColor(player.color)
-      if (player.shape !== undefined) assertAllowedShape(player.shape)
-      assertSnapshotLife(player.currentLife)
-      if (localIds.has(player.localId)) throw new Error("Local player identifiers must be unique")
-      localIds.add(player.localId)
-      if (
-        !Number.isInteger(player.seat) ||
-        player.seat < 1 ||
-        player.seat > args.players.length ||
-        seats.has(player.seat)
-      )
-        throw new Error("Snapshot seats must be unique numbers from 1 to the player count")
-      seats.add(player.seat)
-    }
+    const { gameSystem, ruleset, format } = await resolveLocalGameSetup(ctx, args)
+    const { localIds, seats } = assertSnapshotPlayers(args.players)
     if (!localIds.has(args.hostLocalId))
       throw new Error("Host seat must be one of the snapshot players")
     const commanderGame = gameSystem === "mtg" && (format ?? ruleset) === "commander"
@@ -1086,6 +1113,158 @@ export const publishLocalGame = mutation({
       players: mapping,
     })
     return { publicId: args.publicId, manualCode, expiresAt, players: mapping }
+  },
+})
+
+const MAX_LOCAL_EVENT_COUNT = 100_000
+const LOCAL_FINISH_CLOCK_SKEW_MS = 5 * 60 * 1000
+
+// why: the local game id doubles as the public id, so a retry by the same account returns the first publish instead of a duplicate.
+export const publishFinishedLocalGame = mutation({
+  args: {
+    publicId: v.string(),
+    system: v.optional(v.string()),
+    format: v.optional(v.string()),
+    ruleset: v.string(),
+    startingLife: v.number(),
+    lifeStep: v.optional(v.number()),
+    startedAt: v.number(),
+    finishedAt: v.number(),
+    eventCount: v.number(),
+    players: v.array(
+      localSnapshotPlayer.extend({
+        me: v.optional(v.boolean()),
+        deckVersionId: v.optional(v.id("deckVersions")),
+      }),
+    ),
+    result: v.union(
+      v.object({ kind: v.literal("win"), winnerLocalIds: v.array(v.string()) }),
+      v.object({ kind: v.literal("draw") }),
+      v.object({ kind: v.literal("unknown") }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    assertPublicId(args.publicId)
+    const { gameSystem, ruleset, format } = await resolveLocalGameSetup(ctx, args)
+    const { localIds } = assertSnapshotPlayers(args.players)
+    const now = Date.now()
+    if (
+      !Number.isInteger(args.startedAt) ||
+      !Number.isInteger(args.finishedAt) ||
+      args.startedAt < 1 ||
+      args.finishedAt < args.startedAt ||
+      args.finishedAt > now + LOCAL_FINISH_CLOCK_SKEW_MS
+    )
+      throw new Error("A published game must start before it finishes, and finish in the past")
+    if (
+      !Number.isInteger(args.eventCount) ||
+      args.eventCount < 0 ||
+      args.eventCount > MAX_LOCAL_EVENT_COUNT
+    )
+      throw new Error("Event count is out of range")
+    const meSeats = args.players.filter((player) => player.me)
+    if (meSeats.length > 1) throw new Error("Only one seat can be yours")
+    if (args.players.some((player) => player.deckVersionId && !player.me))
+      throw new Error("Only your seat can record a deck")
+    if (args.result.kind === "win") {
+      const winners = args.result.winnerLocalIds
+      if (winners.length < 1) throw new Error("Choose at least one winner")
+      if (new Set(winners).size !== winners.length)
+        throw new Error("A winning seat may only be selected once")
+      if (winners.some((localId) => !localIds.has(localId)))
+        throw new Error("Winner must belong to this game")
+    }
+    const existing = await findGameByPublicId(ctx, args.publicId)
+    if (existing) {
+      if (existing.mode !== "local" || existing.hostUserId !== user._id)
+        throw new Error("Game identifier collision; retry")
+      const summary = await ctx.db
+        .query("gameSummaries")
+        .withIndex("by_game", (q) => q.eq("gameId", existing._id))
+        .unique()
+      if (!summary) throw new Error("Published game is missing its summary")
+      return { publicId: existing.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
+    }
+    const me = meSeats[0]
+    if (me?.deckVersionId) {
+      const version = await ctx.db.get(me.deckVersionId)
+      const deck = version ? await ctx.db.get(version.deckId) : null
+      if (!version || !deck || deck.ownerUserId !== user._id)
+        throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+      if ((deck.game ?? DEFAULT_DECK_GAME) !== gameSystem)
+        throw new ConvexError({
+          code: "deck_system_mismatch",
+          message: "This deck belongs to another game system",
+        })
+      if (deck.format !== (format ?? ruleset))
+        throw new ConvexError({
+          code: "deck_format_mismatch",
+          message: "Choose a deck matching the game format",
+        })
+    }
+    const gameId = await ctx.db.insert("games", {
+      publicId: args.publicId,
+      hostUserId: user._id,
+      mode: "local",
+      status: "active",
+      playerCount: args.players.length,
+      startingLife: args.startingLife,
+      ...(args.lifeStep === undefined ? {} : { lifeStep: args.lifeStep }),
+      ruleset,
+      game: gameSystem,
+      system: gameSystem,
+      ...(format ? { format } : {}),
+      createdAt: args.startedAt,
+      startedAt: args.startedAt,
+      updatedAt: now,
+      // why: the device counted its own events; the summary reads this base plus per-seat counts.
+      eventSequence: args.eventCount,
+    })
+    const playerIdsByLocalId = new Map<string, Id<"gamePlayers">>()
+    for (const player of resolvePlayerAppearances(args.players, CONNECTED_PLAYER_MARK_SHAPES)) {
+      const playerId = await ctx.db.insert("gamePlayers", {
+        gameId,
+        seat: player.seat,
+        ...(player.me ? { userId: user._id, usernameAtJoin: user.username } : {}),
+        ...(player.me && player.deckVersionId ? { deckVersionId: player.deckVersionId } : {}),
+        displayName: assertDisplayName(player.displayName),
+        color: player.color,
+        shape: player.shape,
+        currentLife: player.currentLife,
+        eventCount: 0,
+        resumable: false,
+        joinedAt: args.startedAt,
+      })
+      playerIdsByLocalId.set(player.localId, playerId)
+    }
+    const game = (await ctx.db.get(gameId))!
+    const summary = await terminalizeGame(
+      ctx,
+      game,
+      "finished",
+      "host_finished",
+      user._id,
+      args.result.kind === "win"
+        ? {
+            kind: "win",
+            winnerPlayerIds: args.result.winnerLocalIds.map((localId) =>
+              playerIdsByLocalId.get(localId)!,
+            ),
+          }
+        : args.result,
+      { finishedAt: args.finishedAt, historySource: "local" },
+    )
+    if (!me)
+      await ctx.db.insert("gameHistoryEntries", {
+        userId: user._id,
+        source: "local",
+        gameId,
+        summaryId: summary._id,
+        finishedAt: args.finishedAt,
+        outcome: "unknown",
+      })
+    return { publicId: args.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
   },
 })
 
@@ -2345,9 +2524,12 @@ export const connectedHistory = query({
           format: summary.format ?? summary.ruleset,
           finishedAt: summary.finishedAt,
           outcome: entry.outcome,
+          source: entry.source ?? "connected",
           terminalStatus: summary.terminalStatus ?? "finished",
           terminalReason: summary.terminalReason,
-          players: maskSummaryPlayersForViewer(summary.players, user._id, blocked),
+          players: maskSummaryPlayersForViewer(summary.players, user._id, blocked, {
+            localGame: entry.source === "local",
+          }),
         })
       }
     }
@@ -2511,11 +2693,17 @@ export const activeConnectedGames = query({
   },
 })
 
+// why: a published local game with no seat of the owner's has no membership row, only a host.
+async function requireSummaryAccess(ctx: QueryCtx, game: Doc<"games">) {
+  if (game.mode === "local") await requireHost(ctx, game)
+  else await requireMembership(ctx, game._id)
+}
+
 export const connectedSummary = query({
   args: { publicId: v.string() },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    await requireMembership(ctx, game._id)
+    await requireSummaryAccess(ctx, game)
     if (game.status !== "finished" && game.status !== "abandoned") return null
     const summary = await ctx.db
       .query("gameSummaries")
@@ -2529,7 +2717,9 @@ export const connectedSummary = query({
       game: summary.game ?? DEFAULT_DECK_GAME,
       system: summary.system ?? summary.game ?? DEFAULT_DECK_GAME,
       format: summary.format ?? summary.ruleset,
-      players: maskSummaryPlayersForViewer(summary.players, viewer._id, blocked),
+      players: maskSummaryPlayersForViewer(summary.players, viewer._id, blocked, {
+        localGame: game.mode === "local",
+      }),
       viewerPlayerIds: summary.players
         .filter((player) => player.userId === viewer._id)
         .map((player) => player.playerId),
@@ -2541,7 +2731,7 @@ export const connectedEvents = query({
   args: { publicId: v.string(), paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    await requireMembership(ctx, game._id)
+    await requireSummaryAccess(ctx, game)
     const result = await ctx.db
       .query("gameEvents")
       .withIndex("by_game_server_time", (q) => q.eq("gameId", game._id))

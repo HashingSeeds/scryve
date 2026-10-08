@@ -13,6 +13,25 @@ let mockLocalConnectFeed: Record<string, unknown> = {}
 const mockPublish = jest.fn()
 let publishedReporter: ((published: { publicId: string; manualCode: string }) => void) | undefined
 
+let mockSignedInAs: string | undefined
+jest.mock("@/features/auth/AuthContext", () => ({
+  useAuthAccess: () =>
+    mockSignedInAs
+      ? { configured: true, isLoaded: true, isSignedIn: true, userId: mockSignedInAs }
+      : { configured: false, isLoaded: true, isSignedIn: false },
+}))
+jest.mock("@/features/decks/LocalDeckChoicesSource", () => ({
+  LocalDeckChoicesSource: ({ onChange }: { onChange: (decks: unknown) => void }) => {
+    jest
+      .requireActual<typeof import("react")>("react")
+      .useEffect(
+        () =>
+          onChange([{ versionId: "v-atraxa", name: "Atraxa", system: "mtg", format: "commander" }]),
+        [onChange],
+      )
+    return null
+  },
+}))
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => mockSearchParams,
@@ -80,6 +99,7 @@ describe("new local game route", () => {
     mockSearchParams = {}
     mockConnectedFeed = {}
     mockLocalConnectFeed = {}
+    mockSignedInAs = undefined
     publishedReporter = undefined
   })
   afterEach(() => localGameRepository.clearActiveGame())
@@ -342,6 +362,88 @@ describe("new local game route", () => {
     expect(router.replace).toHaveBeenCalledWith({
       pathname: "/connected/game/[gameId]",
       params: { gameId: "published-public-id", invite: "1" },
+    })
+  })
+})
+
+describe("new local game route while signed in", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockSearchParams = {}
+    mockSignedInAs = "owner-a"
+  })
+  afterEach(() => {
+    localGameRepository.clearActiveGame()
+    localGameRepository.saveMeSeat(undefined)
+  })
+
+  it("carries the picked seat and deck from a fresh New Game into the started game", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("play-system-mtg"))
+    fireEvent.press(view.getByTestId("play-format"))
+    fireEvent.press(view.getByTestId("play-format-option-commander"))
+    fireEvent.press(view.getByTestId("me-seat"))
+    fireEvent.press(view.getByTestId("me-seat-option-1"))
+    fireEvent.press(view.getByTestId("me-deck"))
+    fireEvent.press(view.getByTestId("me-deck-option-v-atraxa"))
+    fireEvent.press(view.getByTestId("start-game-button"))
+
+    const call = (router.replace as jest.Mock).mock.calls.at(-1)?.[0] as {
+      params: { prepared: string }
+    }
+    const prepared = JSON.parse(call.params.prepared) as Parameters<typeof createLocalGame>[0]
+    expect(prepared).toMatchObject({
+      system: "mtg",
+      format: "commander",
+      account: { ownerId: "owner-a", meSeat: 1, deckVersionId: "v-atraxa", deckName: "Atraxa" },
+    })
+    // why: Play builds the game from this payload exactly as the index route does.
+    const game = createLocalGame(prepared)
+    expect(game.account).toEqual({
+      ownerId: "owner-a",
+      mePlayerId: game.players[1].id,
+      deckVersionId: "v-atraxa",
+      deckName: "Atraxa",
+    })
+    expect(localGameRepository.loadMeSeat()).toBe(1)
+  })
+
+  it("persists seat and deck picks for a running game opened without the setup flag", () => {
+    const game = createLocalGame({
+      startingLife: 40,
+      system: "mtg",
+      format: "commander",
+      players: [
+        { name: "One", color: "#000" },
+        { name: "Two", color: "#111" },
+      ],
+    })
+    game.players[0].life = 37
+    localGameRepository.saveActiveGame(game)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("me-seat"))
+    fireEvent.press(view.getByTestId("me-seat-option-0"))
+    fireEvent.press(view.getByTestId("me-deck"))
+    fireEvent.press(view.getByTestId("me-deck-option-v-atraxa"))
+    expect(localGameRepository.loadActiveGame()?.account).toEqual({
+      ownerId: "owner-a",
+      mePlayerId: game.players[0].id,
+      deckVersionId: "v-atraxa",
+      deckName: "Atraxa",
+    })
+    fireEvent.changeText(view.getByTestId("player-name-2"), "Grace")
+    fireEvent(view.getByTestId("player-name-2"), "blur")
+    expect(localGameRepository.loadActiveGame()).toMatchObject({
+      players: [{ name: "One", life: 37 }, { name: "Grace" }],
+      account: { ownerId: "owner-a", mePlayerId: game.players[0].id },
     })
   })
 })

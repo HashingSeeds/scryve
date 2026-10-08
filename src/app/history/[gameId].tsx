@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router"
 
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
+import { useAuthAccess } from "@/features/auth/AuthContext"
 import { ConnectedGate } from "@/features/connected/ConnectedGate"
 import { ConnectedSummarySource } from "@/features/connected/ConnectedSummarySource"
 import { localGameRepository } from "@/features/game/localPersistence"
@@ -9,35 +10,53 @@ import { GameSummaryScreen } from "@/screens/GameSummaryScreen"
 
 export default function GameSummaryRoute() {
   const { gameId, source } = useLocalSearchParams<{ gameId?: string; source?: string }>()
+  const auth = useAuthAccess()
   const onBack = () =>
     router.canGoBack()
       ? router.back()
       : router.replace({ pathname: "/", params: { destination: "play" } })
 
-  if (source === "connected" && typeof gameId === "string") {
+  const stored =
+    source !== "connected" && typeof gameId === "string"
+      ? localGameRepository.loadHistoryDetail(gameId)
+      : null
+  // why: same rule as the list, so a deep link cannot open another account's game on a shared device.
+  const detail =
+    stored &&
+    (stored.game.account === undefined ||
+      (auth.isSignedIn && stored.game.account.ownerId === auth.userId))
+      ? stored
+      : null
+  // why: a local game published from another device only exists on the server.
+  const connectedId =
+    typeof gameId === "string" && (source === "connected" || (!detail && auth.isSignedIn))
+      ? gameId
+      : undefined
+
+  if (connectedId) {
     return (
       <ConnectedGate onBack={onBack}>
         <ConvexQueryBoundary
-          resetKey={gameId}
+          resetKey={connectedId}
           fallback={({ retry }) => (
             <GameSummaryScreen
               summary={{ status: "unavailable", retry }}
               timeline={{ status: "unavailable" }}
               onBack={onBack}
-              gameId={gameId}
+              gameId={connectedId}
               onOpenSupport={() => router.push("/support")}
             />
           )}
         >
-          <ConnectedSummarySource publicId={gameId}>
+          <ConnectedSummarySource publicId={connectedId}>
             {({ summary, timeline, viewerPlayerIds }) => (
               <GameSummaryScreen
                 summary={summary}
                 timeline={timeline}
                 onBack={onBack}
-                gameId={gameId}
+                gameId={connectedId}
                 onOpenSupport={() => router.push("/support")}
-                moderation={{ publicId: gameId, viewerPlayerIds }}
+                moderation={{ publicId: connectedId, viewerPlayerIds }}
               />
             )}
           </ConnectedSummarySource>
@@ -46,7 +65,6 @@ export default function GameSummaryRoute() {
     )
   }
 
-  const detail = typeof gameId === "string" ? localGameRepository.loadHistoryDetail(gameId) : null
   return (
     <GameSummaryScreen
       summary={{ status: "ready", value: detail ? localSummaryModel(detail.game) : null }}

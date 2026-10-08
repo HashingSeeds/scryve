@@ -1,5 +1,43 @@
 import { NO_PLAY_SYSTEM, supportsCommanderDamage } from "@/features/game/playSystems"
-import type { LocalGame, PlayerId } from "@/features/game/types"
+import type { LocalGame, LocalGameSummary, PlayerId } from "@/features/game/types"
+
+import type { Id } from "../../../convex/_generated/dataModel"
+
+// why: seats rebase to 1..n like `buildLocalGameSnapshot`, and local ids double as winner references so the server needs no id translation.
+export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
+  const ordered = [...game.players].sort((left, right) => left.seat - right.seat)
+  const me = game.account?.mePlayerId
+  const deckVersionId = game.account?.deckVersionId
+  const result = game.result
+  return {
+    publicId: game.id,
+    ruleset: game.format ?? NO_PLAY_SYSTEM,
+    startingLife: game.startingLife,
+    ...(game.system ? { system: game.system } : {}),
+    ...(game.format ? { format: game.format } : {}),
+    startedAt: game.createdAt,
+    finishedAt: game.finishedAt,
+    eventCount: game.eventCount,
+    players: ordered.map((player, index) => ({
+      localId: player.id,
+      seat: index + 1,
+      displayName: player.name,
+      color: player.color,
+      ...(player.shape ? { shape: player.shape } : {}),
+      currentLife: player.life,
+      ...(player.id === me ? { me: true } : {}),
+      ...(player.id === me && deckVersionId
+        ? { deckVersionId: deckVersionId as Id<"deckVersions"> }
+        : {}),
+    })),
+    result:
+      result?.kind === "win"
+        ? { kind: "win" as const, winnerLocalIds: result.winnerPlayerIds.map(String) }
+        : result?.kind === "draw"
+          ? { kind: "draw" as const }
+          : { kind: "unknown" as const },
+  }
+}
 
 /**
  * The `publishLocalGame` payload, built entirely from local state.

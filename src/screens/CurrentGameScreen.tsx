@@ -42,6 +42,8 @@ export interface CurrentGameScreenProps {
   onViewSummary: (gameId: string) => void
   onGameAbandoned?: () => void
   repository?: LocalGameRepository
+  /** why: the signed-in account that a finished game uploads to. */
+  ownerId?: string
 }
 
 export function CurrentGameScreen({
@@ -58,11 +60,12 @@ export function CurrentGameScreen({
   onViewSummary,
   onGameAbandoned,
   repository,
+  ownerId,
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
   const menuButtonStyle = useMenuButtonStyle()
   const { themed } = useAppTheme()
-  const runtime = useLocalGame(initialGame, repository)
+  const runtime = useLocalGame(initialGame, repository, ownerId)
   const system = runtime.game.system
   const [menuOpen, setMenuOpen] = useState(false)
   const [freshBoard, setFreshBoard] = useState(fresh)

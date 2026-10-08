@@ -15,9 +15,11 @@ import { localGameRepository, type LocalGameRepository } from "./localPersistenc
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { GameCommand, LifeDelta, LocalGame, LocalGameResult, PlayerId } from "./types"
 
+/** why: `ownerId` is the signed-in account, so a finished game is filed under it for upload. */
 export function useLocalGame(
   initialGame: LocalGame,
   repository: LocalGameRepository = localGameRepository,
+  ownerId?: string,
 ) {
   const [game, setGame] = useState(initialGame)
   const reduceMotion = useReducedMotion()
@@ -35,12 +37,12 @@ export function useLocalGame(
         repository.saveActiveGame(next)
         if (!hasLocalGameStarted(gameRef.current) && hasLocalGameStarted(next))
           captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
-      } else repository.archiveGame(next, endSource)
+      } else repository.archiveGame(next, endSource, ownerId)
       gameRef.current = next
       setGame(next)
       return next
     },
-    [context, repository],
+    [context, ownerId, repository],
   )
 
   const assignCommanderDamage = useCallback(

@@ -15,6 +15,8 @@ import {
   asPlayerId,
   createLocalGame,
   createClientId,
+  createRematch,
+  meSeatOf,
   reduceGameEvent,
   validatePlayerNames,
 } from "./domain"
@@ -420,5 +422,50 @@ describe("commander damage", () => {
     game = assign(game, 0, 1, 11)
     game = assign(game, 2, 1, 10)
     expect(isEliminatedByCommanderDamage(game, game.players[1].id)).toBe(false)
+  })
+})
+
+describe("local game account", () => {
+  const input = {
+    startingLife: 20,
+    players: [
+      { name: "Ada", color: "#000" },
+      { name: "Grace", color: "#111" },
+    ],
+  }
+
+  it("maps the setup seat to a player id and drops the deck without a seat", () => {
+    const seated = createLocalGame({
+      ...input,
+      account: { ownerId: "owner", meSeat: 1, deckVersionId: "v1", deckName: "Atraxa" },
+    })
+    expect(seated.account).toEqual({
+      ownerId: "owner",
+      mePlayerId: seated.players[1].id,
+      deckVersionId: "v1",
+      deckName: "Atraxa",
+    })
+    expect(meSeatOf(seated)).toBe(1)
+    const unseated = createLocalGame({
+      ...input,
+      account: { ownerId: "owner", deckVersionId: "v1" },
+    })
+    expect(unseated.account).toEqual({ ownerId: "owner" })
+    expect(meSeatOf(unseated)).toBeUndefined()
+  })
+
+  it("carries the account seat and deck into a rematch", () => {
+    const seated = createLocalGame({
+      ...input,
+      account: { ownerId: "owner", meSeat: 1, deckVersionId: "v1", deckName: "Atraxa" },
+    })
+    const rematch = createRematch(seated, 50)
+    expect(rematch.account).toEqual({
+      ownerId: "owner",
+      mePlayerId: rematch.players[1].id,
+      deckVersionId: "v1",
+      deckName: "Atraxa",
+    })
+    expect(rematch.players[1].id).not.toBe(seated.players[1].id)
   })
 })

@@ -64,6 +64,14 @@ export type GameEvent =
 
 export type CommanderDamageTotals = Record<string, number>
 
+/** why: ties a local game to the signed-in account that will publish it, and to that account's seat. */
+export interface LocalGameAccount {
+  ownerId: string
+  mePlayerId?: PlayerId
+  deckVersionId?: string
+  deckName?: string
+}
+
 export interface LocalGame {
   schemaVersion: 1
   id: GameId
@@ -80,6 +88,7 @@ export interface LocalGame {
   updatedAt: number
   finishedAt?: number
   result?: LocalGameResult
+  account?: LocalGameAccount
 }
 
 export interface NewPlayerInput {
@@ -119,4 +128,9 @@ export interface LocalGameSummary {
   createdAt: number
   finishedAt: number
   result?: LocalGameResult
+  account?: LocalGameAccount
+  /** why: a finished game owned by an account uploads once; the flag survives restarts until the server acks or rejects it. */
+  publish?: "pending" | "published" | "failed"
+  /** why: accounts that declined to claim a signed-out game, so a later sign-in picker can skip it. */
+  skippedBy?: string[]
 }

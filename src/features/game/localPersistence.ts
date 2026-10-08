@@ -15,6 +15,7 @@ import {
   asPlayerId,
   createClientId,
   isLifeDelta,
+  localGameAccount,
   MAX_COMMANDER_DAMAGE,
   validatePlayerNames,
 } from "./domain"
@@ -31,6 +32,7 @@ import type {
   GameEvent,
   GamePlayer,
   LocalGame,
+  LocalGameAccount,
   LocalGameResult,
   LocalGameSummary,
   NewPlayerInput,
@@ -50,6 +52,7 @@ export const LOCAL_KEYS = {
   active: "count.local.active.v1",
   layouts: "count.local.layouts.v1",
   historyIndex: "count.local.history.index.v1",
+  meSeat: "count.local.meSeat.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
 } as const
@@ -220,6 +223,23 @@ function parseEvent(value: unknown): GameEvent | null {
   }
 }
 
+function parseAccount(value: unknown): LocalGameAccount | undefined {
+  if (!isRecord(value) || typeof value.ownerId !== "string" || !value.ownerId) return undefined
+  const deckVersionId = typeof value.deckVersionId === "string" ? value.deckVersionId : undefined
+  return {
+    ownerId: value.ownerId,
+    ...(typeof value.mePlayerId === "string" ? { mePlayerId: asPlayerId(value.mePlayerId) } : {}),
+    ...(deckVersionId ? { deckVersionId } : {}),
+    ...(deckVersionId && typeof value.deckName === "string" ? { deckName: value.deckName } : {}),
+  }
+}
+
+function parseSkippedBy(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const ids = value.filter((id): id is string => typeof id === "string" && id.length > 0)
+  return ids.length > 0 ? ids : undefined
+}
+
 function parseCommanderDamage(value: unknown): CommanderDamageTotals | undefined {
   if (!isRecord(value)) return undefined
   const totals: CommanderDamageTotals = {}
@@ -252,6 +272,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   if (!players || events.some((event) => event.gameId !== value.id)) return null
   const result = parseResult(value.result)
   const commanderDamage = parseCommanderDamage(value.commanderDamage)
+  const account = parseAccount(value.account)
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -271,6 +292,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     updatedAt: value.updatedAt,
     ...(typeof value.finishedAt === "number" ? { finishedAt: value.finishedAt } : {}),
     ...(result ? { result } : {}),
+    ...(account ? { account } : {}),
   }
 }
 
@@ -332,6 +354,8 @@ function parseSummary(value: unknown): LocalGameSummary | null {
     return null
   const players = parsePlayers(value.players)
   const result = parseResult(value.result)
+  const account = parseAccount(value.account)
+  const skippedBy = parseSkippedBy(value.skippedBy)
   return players
     ? {
         schemaVersion: 1,
@@ -345,12 +369,42 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         createdAt: value.createdAt,
         finishedAt: value.finishedAt,
         ...(result ? { result } : {}),
+        ...(account ? { account } : {}),
+        ...(account &&
+        (value.publish === "pending" || value.publish === "published" || value.publish === "failed")
+          ? { publish: value.publish }
+          : {}),
+        ...(skippedBy ? { skippedBy } : {}),
       }
     : null
 }
 
+export type LocalGameAccountInput = Parameters<typeof localGameAccount>[1]
+
 export class LocalGameRepository {
+  private readonly finishListeners = new Set<() => void>()
+
   constructor(private readonly storage: StringStorage = mmkvStorage) {}
+
+  /** why: the publisher waits for finishes instead of polling storage. */
+  onGameFinished(listener: () => void): () => void {
+    this.finishListeners.add(listener)
+    return () => {
+      this.finishListeners.delete(listener)
+    }
+  }
+
+  // why: "none" means the player chose no seat last time, which is different from never having chosen.
+  loadMeSeat(): number | "none" | undefined {
+    const stored = this.storage.getString(LOCAL_KEYS.meSeat)
+    if (stored === "none") return "none"
+    const raw = Number(stored)
+    return stored !== undefined && Number.isInteger(raw) && raw >= 0 && raw < 6 ? raw : undefined
+  }
+
+  saveMeSeat(seat: number | undefined): void {
+    this.storage.set(LOCAL_KEYS.meSeat, seat === undefined ? "none" : String(seat))
+  }
 
   getDeviceId(): ReturnType<typeof asDeviceId> {
     const existing = this.storage.getString(LOCAL_KEYS.device)
@@ -456,20 +510,26 @@ export class LocalGameRepository {
     return game?.status === "active" ? game : null
   }
 
-  updateActivePlayers(gameId: string, players: NewPlayerInput[]): void {
+  updateActivePlayers(
+    gameId: string,
+    players: NewPlayerInput[],
+    account?: LocalGameAccountInput,
+  ): void {
     const game = this.loadActiveGame()
     if (!game || game.id !== gameId || game.players.length !== players.length)
       throw new Error("This game changed. Reopen setup to edit its players.")
     const names = validatePlayerNames(players.map((player) => player.name))
     if (!names.valid) throw new Error(names.errors.find(Boolean) ?? "Enter valid player names.")
+    const nextPlayers = game.players.map((player, index) => ({
+      ...player,
+      name: names.names[index],
+      color: players[index].color,
+      shape: players[index].shape,
+    }))
     this.saveActiveGame({
       ...game,
-      players: game.players.map((player, index) => ({
-        ...player,
-        name: names.names[index],
-        color: players[index].color,
-        shape: players[index].shape,
-      })),
+      players: nextPlayers,
+      ...(account ? { account: localGameAccount(nextPlayers, account) } : {}),
       updatedAt: Date.now(),
     })
   }
@@ -484,8 +544,14 @@ export class LocalGameRepository {
     }
   }
 
-  archiveGame(game: LocalGame, endSource: GameEndSource = "game_menu"): LocalGameSummary | null {
+  // why: a game claimed at setup keeps that owner even if another account is signed in when it ends, so one account's seat and deck never move to another.
+  archiveGame(
+    game: LocalGame,
+    endSource: GameEndSource = "game_menu",
+    ownerId?: string,
+  ): LocalGameSummary | null {
     if (game.status === "active" || game.finishedAt === undefined) return null
+    const account = game.account ?? (ownerId ? { ownerId } : undefined)
     const summary: LocalGameSummary = {
       schemaVersion: 1,
       id: game.id,
@@ -498,11 +564,17 @@ export class LocalGameRepository {
       createdAt: game.createdAt,
       finishedAt: game.finishedAt,
       ...(game.result ? { result: game.result } : {}),
+      ...(account ? { account } : {}),
+      ...(account && game.status === "finished" ? { publish: "pending" as const } : {}),
     }
     const current = this.loadHistory().filter(({ id }) => id !== game.id)
     const next = [summary, ...current].slice(0, MAX_HISTORY_GAMES)
     const removed = current.filter(({ id }) => !next.some((candidate) => candidate.id === id))
-    const boundedGame = { ...game, events: game.events.slice(-MAX_HISTORY_EVENTS) }
+    const boundedGame = {
+      ...game,
+      ...(account ? { account } : {}),
+      events: game.events.slice(-MAX_HISTORY_EVENTS),
+    }
     const detail: HistoryDetail = {
       schemaVersion: 1,
       game: boundedGame,
@@ -521,8 +593,34 @@ export class LocalGameRepository {
         "local",
         endSource,
       )
+      this.finishListeners.forEach((listener) => listener())
     }
     return summary
+  }
+
+  /** why: the uploader runs through this list on sign-in, reconnect, and every finish. */
+  pendingPublishes(ownerId: string): LocalGameSummary[] {
+    return this.loadHistory().filter(
+      (game) => game.publish === "pending" && game.account?.ownerId === ownerId,
+    )
+  }
+
+  markPublished(gameId: string): void {
+    this.settlePublish(gameId, "published")
+  }
+
+  // why: a game the server rejected stays on the device but stops blocking the uploads behind it.
+  markPublishFailed(gameId: string): void {
+    this.settlePublish(gameId, "failed")
+  }
+
+  private settlePublish(gameId: string, publish: "published" | "failed"): void {
+    const history = this.loadHistory()
+    if (!history.some((game) => game.id === gameId && game.publish === "pending")) return
+    this.storage.set(
+      LOCAL_KEYS.historyIndex,
+      JSON.stringify(history.map((game) => (game.id === gameId ? { ...game, publish } : game))),
+    )
   }
 
   loadHistory(): LocalGameSummary[] {

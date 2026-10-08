@@ -14,6 +14,7 @@ import type {
   LifeChangedEvent,
   LifeDelta,
   LocalGame,
+  LocalGameAccount,
   LocalGameResult,
   NewPlayerInput,
   OperationId,
@@ -108,6 +109,7 @@ export function createLocalGame(input: {
   lifeStep?: number
   now?: number
   gameId?: GameId
+  account?: { ownerId: string; meSeat?: number; deckVersionId?: string; deckName?: string }
 }): LocalGame {
   const system = isPlaySystemId(input.system) ? input.system : undefined
   const format = system ? playSystemFormat(system, input.format) : undefined
@@ -151,7 +153,27 @@ export function createLocalGame(input: {
     events: [],
     createdAt: now,
     updatedAt: now,
+    ...(input.account ? { account: localGameAccount(players, input.account) } : {}),
   }
+}
+
+/** why: setup forms know seats by index while a running game knows them by player id. */
+export function localGameAccount(
+  players: readonly GamePlayer[],
+  account: { ownerId: string; meSeat?: number; deckVersionId?: string; deckName?: string },
+): LocalGameAccount {
+  const me = account.meSeat === undefined ? undefined : players[account.meSeat]
+  return {
+    ownerId: account.ownerId,
+    ...(me ? { mePlayerId: me.id } : {}),
+    ...(me && account.deckVersionId ? { deckVersionId: account.deckVersionId } : {}),
+    ...(me && account.deckVersionId && account.deckName ? { deckName: account.deckName } : {}),
+  }
+}
+
+export function meSeatOf(game: Pick<LocalGame, "players" | "account">): number | undefined {
+  const index = game.players.findIndex((player) => player.id === game.account?.mePlayerId)
+  return index === -1 ? undefined : index
 }
 
 export function createRematch(game: LocalGame, now?: number): LocalGame {
@@ -163,6 +185,7 @@ export function createRematch(game: LocalGame, now?: number): LocalGame {
     layout: game.layout,
     lifeStep: game.lifeStep,
     now,
+    ...(game.account ? { account: { ...game.account, meSeat: meSeatOf(game) } } : {}),
   })
 }
 

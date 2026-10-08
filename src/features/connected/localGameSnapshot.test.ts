@@ -1,4 +1,7 @@
-import { buildLocalGameSnapshot } from "@/features/connected/localGameSnapshot"
+import {
+  buildFinishedLocalGameSnapshot,
+  buildLocalGameSnapshot,
+} from "@/features/connected/localGameSnapshot"
 import { asPlayerId, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import type { LocalGame } from "@/features/game/types"
 
@@ -143,5 +146,43 @@ describe("buildLocalGameSnapshot", () => {
     expect(() =>
       buildLocalGameSnapshot({ game, hostPlayerId: asPlayerId("player_missing"), ...identifiers }),
     ).toThrow("The host seat must be one of this game's players")
+  })
+})
+
+describe("buildFinishedLocalGameSnapshot", () => {
+  it("marks the account's seat and deck and references winners by local id", () => {
+    const game = commanderGame()
+    const snapshot = buildFinishedLocalGameSnapshot({
+      schemaVersion: 1,
+      id: game.id,
+      status: "finished",
+      system: "mtg",
+      format: "commander",
+      startingLife: 40,
+      players: [{ ...game.players[0], life: 12 }, game.players[1], game.players[2]],
+      eventCount: 9,
+      createdAt: 100,
+      finishedAt: 200,
+      result: { kind: "win", winnerPlayerIds: [game.players[1].id] },
+      account: { ownerId: "owner", mePlayerId: game.players[1].id, deckVersionId: "version-1" },
+    })
+    expect(snapshot).toMatchObject({
+      publicId: game.id,
+      system: "mtg",
+      format: "commander",
+      ruleset: "commander",
+      startedAt: 100,
+      finishedAt: 200,
+      eventCount: 9,
+      result: { kind: "win", winnerLocalIds: [game.players[1].id] },
+    })
+    expect(snapshot.players.map(({ seat, currentLife }) => [seat, currentLife])).toEqual([
+      [1, 12],
+      [2, 40],
+      [3, 40],
+    ])
+    expect(snapshot.players[0].me).toBeUndefined()
+    expect(snapshot.players[1]).toMatchObject({ me: true, deckVersionId: "version-1" })
+    expect(snapshot.players[2].deckVersionId).toBeUndefined()
   })
 })

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
+import { useAuthAccess } from "@/features/auth/AuthContext"
 import { CloudScreen } from "@/features/auth/CloudScreen"
 import type { CreatedLobby } from "@/features/connected/ConnectedHostSource"
 import { ConnectedSetupSource } from "@/features/connected/ConnectedSetupSource"
@@ -8,6 +9,7 @@ import {
   LocalGamePublishSource,
   type PublishedGame,
 } from "@/features/connected/LocalGamePublishSource"
+import { LocalDeckChoicesSource, type DeckChoices } from "@/features/decks/LocalDeckChoicesSource"
 import {
   applyGameCommand,
   defaultCommandContext,
@@ -57,12 +59,20 @@ export function ReportLocalConnect({
 
 export default function NewLocalGameRoute() {
   const params = useLocalSearchParams<{ mode?: string; setup?: string }>()
+  const auth = useAuthAccess()
+  const ownerId = auth.configured && auth.isSignedIn ? auth.userId : undefined
   const [mode, setMode] = useState<NewGameMode>(params.mode === "connected" ? "connected" : "local")
   const [joinCode, setJoinCode] = useState("")
   const [connected, setConnected] = useState<ConnectedHostFeed>()
   const [localConnect, setLocalConnect] = useState<LocalConnectFeed>()
+  const [decks, setDecks] = useState<DeckChoices>()
   const [activeGame, setActiveGame] = useState(() => localGameRepository.loadActiveGame())
   const [defaults] = useState(() => localGameRepository.loadSettings())
+  // why: seat 1 is the usual pick on a fresh device; a remembered "none" stays none.
+  const [defaultMeSeat] = useState(() => {
+    const remembered = localGameRepository.loadMeSeat()
+    return remembered === "none" ? undefined : (remembered ?? 0)
+  })
   const [initialGame] = useState(activeGame ?? undefined)
   useFocusEffect(
     useCallback(() => {
@@ -83,7 +93,7 @@ export default function NewLocalGameRoute() {
         { type: "game.finish", result },
         defaultCommandContext(localGameRepository.getDeviceId()),
       )
-      localGameRepository.archiveGame(ended, "new_game_prompt")
+      localGameRepository.archiveGame(ended, "new_game_prompt", ownerId)
     } else localGameRepository.clearActiveGame()
     setActiveGame(null)
   }
@@ -94,6 +104,7 @@ export default function NewLocalGameRoute() {
   return (
     <>
       <ConnectedSetupSource onChange={setConnected} onLobbyCreated={openLobby} />
+      {ownerId ? <LocalDeckChoicesSource onChange={setDecks} /> : null}
       {connectableGame ? (
         <LocalGamePublishSource game={connectableGame} onPublished={openPublishedGame}>
           {(feed) => <ReportLocalConnect feed={feed} onChange={setLocalConnect} />}
@@ -104,13 +115,15 @@ export default function NewLocalGameRoute() {
         mode={mode}
         initialGame={initialGame}
         localGame={started ? activeGame : undefined}
+        account={ownerId ? { ownerId, defaultMeSeat, decks } : undefined}
         onResumeLocal={() => router.replace("/game/current")}
         onEndLocal={endLocal}
         onAbandonLocal={() => endLocal()}
+        // why: Play opens plain /game/new before its stored-game state catches up, so a running game's edits must persist on every entry.
         onSavePlayers={
-          started && params.setup === "1"
-            ? (players) => {
-                localGameRepository.updateActivePlayers(activeGame.id, players)
+          started
+            ? (players, account) => {
+                localGameRepository.updateActivePlayers(activeGame.id, players, account)
                 setActiveGame(localGameRepository.loadActiveGame())
               }
             : undefined
@@ -124,6 +137,7 @@ export default function NewLocalGameRoute() {
             return
           }
           if (current) localGameRepository.clearActiveGame()
+          if (setup.account) localGameRepository.saveMeSeat(setup.account.meSeat)
           router.replace({
             pathname: "/",
             params: {

@@ -156,6 +156,7 @@ export default function Index() {
       accountLabel={auth.isSignedIn ? "Account" : "Sign in"}
       onViewSummary={(gameId) => router.push({ pathname: "/history/[gameId]", params: { gameId } })}
       onGameAbandoned={() => router.replace({ pathname: "/", params: { destination: "play" } })}
+      ownerId={auth.isSignedIn ? auth.userId : undefined}
     />
   )
 }

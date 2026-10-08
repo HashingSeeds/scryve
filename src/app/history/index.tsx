@@ -64,7 +64,12 @@ export default function HistoryRoute() {
   const [connected, setConnected] = useState<{ ownerId?: string; feed: ConnectedHistoryFeed }>()
   const signedIn = auth.configured && auth.isSignedIn
   const { source } = useLocalSearchParams<{ source?: string }>()
-  const games = localGameRepository.loadHistory()
+  // why: a game claimed by one account stays private to it on a shared device; unclaimed games stay visible to everyone.
+  const games = localGameRepository
+    .loadHistory()
+    .filter(
+      (game) => game.account === undefined || (signedIn && game.account.ownerId === auth.userId),
+    )
   const shared = {
     games,
     initialSource:
