@@ -25,13 +25,25 @@ If a beta update crashes during launch, expo-updates falls back to the previous 
 
 1. Build preview binaries: `eas build --profile preview` and `eas build --profile preview:device`.
 2. Run the Maestro smoke suite and a manual device pass on iOS and Android. This checks behavior, not the production identity or runtime.
-3. Build production binaries: `eas build --profile production`.
-4. Distribute those exact production binaries to TestFlight and Play internal testing. Confirm the runtime and production channel in Settings, then repeat the manual smoke pass.
+3. Build production binaries from main's tip: `pnpm release:native` builds both platforms on EAS and submits them to TestFlight and Play internal testing. For local builds, run `pnpm build:ios:prod` and `pnpm build:android:prod` from the same commit, then `eas submit`. Play receives Android as a draft on the internal track; start that release in Play Console so testers get it.
+4. Confirm the runtime and production channel in Settings on those exact binaries, then repeat the manual smoke pass.
 5. Promote those exact builds to the stores after acceptance. Start public store releases with a staged rollout. The runtime version comes from the native fingerprint; any native change automatically requires a new binary before updates flow again.
+
+## Versions
+
+The app version lives in `package.json`. EAS keeps the iOS build number and Android version code on its servers and bumps them on every production build, local or cloud.
+
+Production builds settle the version first (`scripts/release-native.cjs`). The `v<version>` tag marks the commit that built that version:
+
+- Building from the tagged commit reuses the version, so iOS and Android, or a retried build, match.
+- Building from a newer commit of main's tip bumps the patch, commits `chore(release): v<version> [skip ci]` to main, tags it, and pushes both. The skip keeps the bump from redeploying Convex and republishing beta.
+- A version with no tag yet is used as is. For a minor or major release, merge `pnpm version minor --no-git-tag-version` (or `major`) to main before building.
+
+Builds need a clean tree. The fingerprint skips the version (`ExpoConfigVersions` in `fingerprint.config.js`), so a bump alone does not change the runtime or cut installs off from OTA updates.
 
 ## Release record
 
-Every store release gets a git tag (`v<version>`) and a GitHub release whose notes contain this manifest:
+Every store release has its `v<version>` tag from the build. Give it a GitHub release whose notes contain this manifest:
 
 ```
 git-sha:
@@ -52,7 +64,7 @@ The beta workflow (`.github/workflows/beta.yml`) deploys Convex to production on
 Cloudflare Pages builds the web app with `pnpm build:pages` (`scripts/pages-build.cjs`). Pages' production branch is `production`, which moves only on promotion:
 
 - **Production (`production`):** builds the web app against production Convex (`EXPO_PUBLIC_CONVEX_URL` in the Pages Production environment) without deploying. It trails main, so pushing its older backend would roll production back.
-- **Preview, backend changed:** when `convex/`, `package.json`, or `pnpm-lock.yaml` differs from main's tip, pushes to a preview deployment named after the branch with the preview `CONVEX_DEPLOY_KEY`. Previews start with no data and are deleted 5 days after creation. Push the branch again to recreate one.
+- **Preview, backend changed:** when `convex/`, `pnpm-lock.yaml`, or `package.json` other than its `version` differs from main's tip, pushes to a preview deployment named after the branch with the preview `CONVEX_DEPLOY_KEY`. Previews start with no data and are deleted 5 days after creation. Push the branch again to recreate one.
 - **Preview, backend matches main** (including main itself): pushes to the shared staging dev deployment with `CONVEX_STAGING_DEPLOY_KEY` (Preview environment only, scoped to `deployment:deploy`). Staging keeps its data and does not count against the deployment cap. Without that variable, every branch gets its own preview.
 
 Convex schema and function changes must follow the compatibility rules in AGENTS.md. Because every merge deploys:

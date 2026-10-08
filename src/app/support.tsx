@@ -90,7 +90,7 @@ export default function SupportRoute() {
           Platform.OS === "ios" ? () => void Linking.openURL(APPLE_STANDARD_EULA_URL) : undefined
         }
         onOpenCookiePolicy={() => router.push("/cookie-policy")}
-        appVersion={Constants.expoConfig?.version}
+        appVersion={Application.nativeApplicationVersion ?? Constants.expoConfig?.version}
       />
     </>
   )
