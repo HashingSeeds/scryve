@@ -16,7 +16,13 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 
-import type { HistoryEntry, HistoryFilters, HistoryOutcome, HistorySource } from "./historyEntries"
+import type {
+  HistoryEntry,
+  HistoryFilters,
+  HistoryMatchDetails,
+  HistoryOutcome,
+  HistorySource,
+} from "./historyEntries"
 import {
   activeFilterCount,
   DATE_RANGE_LABELS,
@@ -33,6 +39,7 @@ import {
   OUTCOME_LABELS,
   podSizeLabel,
   sortedByRecency,
+  SOURCE_LABELS,
   systemLabel,
   tallyOutcomes,
   toggleSystem,
@@ -44,6 +51,8 @@ export interface HistoryScreenProps {
   onBack: () => void
   onSelectLocal: (gameId: string) => void
   onSelectConnected: (publicId: string) => void
+  onSelectManual: (publicId: string) => void
+  onAddMatch?: () => void
   connected?: ConnectedHistoryFeed
   initialSource?: HistorySource
 }
@@ -53,8 +62,9 @@ const DATE_RANGES: DateRange[] = ["any", "7d", "30d", "year"]
 const OUTCOMES: HistoryOutcome[] = ["win", "loss", "draw", "unrecorded"]
 const SOURCES: { value: HistoryFilters["source"]; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "local", label: "Local" },
-  { value: "connected", label: "Connected" },
+  { value: "local", label: SOURCE_LABELS.local },
+  { value: "connected", label: SOURCE_LABELS.connected },
+  { value: "manual", label: SOURCE_LABELS.manual },
 ]
 
 const OUTCOME_BADGES = {
@@ -75,15 +85,31 @@ function timeLabel(timestamp: number) {
 }
 
 function titleFor(entry: HistoryEntry) {
+  if (entry.match) return `vs ${entry.match.opponents.join(" · ")}`
   const names = entryPlayerNames(entry)
   if (names.length > 0) return names.join(" · ")
   return `${entry.players.length} player${entry.players.length === 1 ? "" : "s"}`
 }
 
+// why: a manual match only knows its date, so its row shows the score and event instead of a time.
+function matchSubtitleFor(entry: HistoryEntry, match: HistoryMatchDetails) {
+  return [
+    SOURCE_LABELS[entry.source],
+    [`Bo${match.bestOf}`, match.score].filter(Boolean).join(" "),
+    [match.eventName, match.roundNumber === undefined ? undefined : `R${match.roundNumber}`]
+      .filter(Boolean)
+      .join(" "),
+    match.deckName,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+}
+
 function subtitleFor(entry: HistoryEntry) {
+  if (entry.match) return matchSubtitleFor(entry, entry.match)
   const decks = [...new Set(entryDeckNames(entry))]
   return [
-    entry.source === "connected" ? "Connected" : "Local",
+    SOURCE_LABELS[entry.source],
     timeLabel(entry.finishedAt),
     entry.winnerNames?.length ? `Won by ${entry.winnerNames.join(" & ")}` : undefined,
     decks.length > 0 ? decks.join(", ") : undefined,
@@ -123,17 +149,19 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
         <Text size="sm" weight="medium" numberOfLines={2} text={titleFor(entry)} />
         <Text size="xxs" numberOfLines={1} style={themed($dimmedText)} text={subtitleFor(entry)} />
       </View>
-      <View style={themed($dots)}>
-        {entry.players.slice(0, MAX_COLOR_DOTS).map((player) => (
-          <View
-            key={player.id}
-            style={[themed($dot), player.color ? { backgroundColor: player.color } : undefined]}
-          />
-        ))}
-        {extraPlayers > 0 ? (
-          <Text size="xxs" style={themed($dimmedText)} text={`+${extraPlayers}`} />
-        ) : null}
-      </View>
+      {entry.match ? null : (
+        <View style={themed($dots)}>
+          {entry.players.slice(0, MAX_COLOR_DOTS).map((player) => (
+            <View
+              key={player.id}
+              style={[themed($dot), player.color ? { backgroundColor: player.color } : undefined]}
+            />
+          ))}
+          {extraPlayers > 0 ? (
+            <Text size="xxs" style={themed($dimmedText)} text={`+${extraPlayers}`} />
+          ) : null}
+        </View>
+      )}
     </TouchableOpacity>
   )
 }
@@ -201,6 +229,8 @@ export function HistoryScreen({
   onBack,
   onSelectLocal,
   onSelectConnected,
+  onSelectManual,
+  onAddMatch,
   connected,
   initialSource,
 }: HistoryScreenProps) {
@@ -307,7 +337,12 @@ export function HistoryScreen({
 
   return (
     <Screen preset="fixed" safeAreaEdges={["bottom"]} contentContainerStyle={themed($screen)}>
-      <Header title={titleVisible ? "History" : ""} leftTx="common:back" onLeftPress={onBack} />
+      <Header
+        title={titleVisible ? "History" : ""}
+        leftTx="common:back"
+        onLeftPress={onBack}
+        {...(onAddMatch ? { rightText: "Add result", onRightPress: onAddMatch } : {})}
+      />
       <SectionList
         testID="history-list"
         style={$styles.flex1}
@@ -368,7 +403,9 @@ export function HistoryScreen({
             onPress={() =>
               item.source === "local"
                 ? onSelectLocal(item.routeId)
-                : onSelectConnected(item.routeId)
+                : item.source === "manual"
+                  ? onSelectManual(item.routeId)
+                  : onSelectConnected(item.routeId)
             }
           />
         )}

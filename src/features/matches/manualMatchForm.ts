@@ -114,7 +114,7 @@ export type ManualMatchBuild =
 
 export function buildManualMatchArgs(
   draft: ManualMatchDraft,
-  ids: { publicId: string; deckVersionId: Id<"deckVersions"> },
+  ids: { publicId: string; deckVersionId?: Id<"deckVersions"> },
   now = Date.now(),
 ): ManualMatchBuild {
   const twoPlayer = draft.opponents.length === 1
@@ -151,7 +151,7 @@ export function buildManualMatchArgs(
 
   let me: RecordManualMatchArgs["me"] = {
     seat: 1,
-    deckVersionId: ids.deckVersionId,
+    ...(ids.deckVersionId ? { deckVersionId: ids.deckVersionId } : {}),
     outcome: draft.outcome,
   }
   const scoreGiven = twoPlayer && Object.values(draft.score).some((value) => value.trim() !== "")

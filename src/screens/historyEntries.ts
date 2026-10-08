@@ -10,7 +10,7 @@ import {
 } from "@/features/game/playSystems"
 import type { LocalGameSummary } from "@/features/game/types"
 
-export type HistorySource = "local" | "connected"
+export type HistorySource = "local" | "connected" | "manual"
 export type HistoryOutcome = "win" | "loss" | "draw" | "unrecorded"
 
 export interface HistoryPlayerSummary {
@@ -18,6 +18,16 @@ export interface HistoryPlayerSummary {
   name: string
   color?: string
   deckName?: string
+}
+
+export interface HistoryMatchDetails {
+  bestOf: number
+  opponents: string[]
+  deckName?: string
+  // why: "2-1" or "2-1-1" when the owner entered a game score, otherwise nothing to show.
+  score?: string
+  eventName?: string
+  roundNumber?: number
 }
 
 export interface HistoryEntry {
@@ -28,10 +38,85 @@ export interface HistoryEntry {
   status: "finished" | "abandoned"
   outcome: HistoryOutcome
   winnerNames?: string[]
-  eventCount: number
+  eventCount?: number
   players: HistoryPlayerSummary[]
   system?: PlaySystemId
   format: string
+  match?: HistoryMatchDetails
+}
+
+export const SOURCE_LABELS: Record<HistorySource, string> = {
+  local: "Local",
+  connected: "Connected",
+  manual: "Manual",
+}
+
+function toHistoryOutcome(outcome: string | undefined): HistoryOutcome {
+  return outcome === "win" || outcome === "loss" || outcome === "draw" ? outcome : "unrecorded"
+}
+
+export type ManualMatchSeat = {
+  seat: number
+  displayName: string
+  deckName?: string
+  gamesWon?: number
+  gamesDrawn?: number
+  outcome?: "win" | "loss" | "draw" | "unknown"
+  mine: boolean
+}
+
+export function manualMatchScore(seats: readonly ManualMatchSeat[]) {
+  const mine = seats.find((seat) => seat.mine)
+  if (mine?.gamesWon === undefined) return undefined
+  const losses = seats
+    .filter((seat) => !seat.mine)
+    .reduce((sum, seat) => sum + (seat.gamesWon ?? 0), 0)
+  const draws = mine.gamesDrawn ?? 0
+  return draws > 0 ? `${mine.gamesWon}-${losses}-${draws}` : `${mine.gamesWon}-${losses}`
+}
+
+export function manualHistoryEntry(match: {
+  publicId: string
+  bestOf: number
+  system?: string
+  format?: string
+  eventName?: string
+  roundNumber?: number
+  finishedAt: number
+  outcome?: "win" | "loss" | "draw" | "unknown"
+  seats: readonly ManualMatchSeat[]
+}): HistoryEntry {
+  const system = match.system === undefined ? undefined : playSystemId(match.system)
+  const winnerNames = match.seats
+    .filter((seat) => seat.outcome === "win")
+    .map((seat) => seat.displayName)
+  const score = manualMatchScore(match.seats)
+  const mine = match.seats.find((seat) => seat.mine)
+  return {
+    key: `manual:${match.publicId}`,
+    source: "manual",
+    routeId: match.publicId,
+    finishedAt: match.finishedAt,
+    status: "finished",
+    outcome: toHistoryOutcome(match.outcome),
+    ...(winnerNames.length > 0 ? { winnerNames } : {}),
+    system,
+    players: match.seats.map((seat) => ({
+      id: `${match.publicId}:${seat.seat}`,
+      name: seat.displayName,
+      deckName: seat.deckName,
+    })),
+    // why: a deckless manual match has no system, so it files under a plain "Match" format.
+    format: system && match.format ? playFormatLabel(system, match.format) : "Match",
+    match: {
+      bestOf: match.bestOf,
+      opponents: match.seats.filter((seat) => !seat.mine).map((seat) => seat.displayName),
+      ...(mine?.deckName ? { deckName: mine.deckName } : {}),
+      ...(score ? { score } : {}),
+      ...(match.eventName ? { eventName: match.eventName } : {}),
+      ...(match.roundNumber === undefined ? {} : { roundNumber: match.roundNumber }),
+    },
+  }
 }
 
 export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
@@ -89,10 +174,7 @@ export function connectedHistoryEntry(game: {
     routeId: game.publicId,
     finishedAt: game.finishedAt,
     status: game.terminalStatus === "abandoned" ? "abandoned" : "finished",
-    outcome:
-      game.outcome === "win" || game.outcome === "loss" || game.outcome === "draw"
-        ? game.outcome
-        : "unrecorded",
+    outcome: toHistoryOutcome(game.outcome),
     eventCount: game.eventCount,
     system,
     players: (game.players ?? []).map((player, index) => ({

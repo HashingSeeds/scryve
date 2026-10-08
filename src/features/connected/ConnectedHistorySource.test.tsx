@@ -7,10 +7,8 @@ import { ConnectedHistorySource } from "./ConnectedHistorySource"
 
 jest.mock("../../../convex/_generated/api", () => ({
   api: {
-    games: {
-      connectedHistory: "games.connectedHistory",
-      migrateMyHistoryEntries: "games.migrateMyHistoryEntries",
-    },
+    games: { migrateMyHistoryEntries: "games.migrateMyHistoryEntries" },
+    history: { entries: "history.entries" },
   },
 }))
 
@@ -18,21 +16,33 @@ jest.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true }),
   useMutation: () => jest.fn(async () => ({ isDone: true, continueCursor: "done" })),
   usePaginatedQuery: () => ({
-    results: Array.from({ length: 10 }, (_, index) => ({
-      publicId: `connected-${index}`,
-      outcome: "win",
-      eventCount: index,
-      finishedAt: index,
-      ruleset: "commander",
-      players: [],
-    })),
+    results: Array.from({ length: 10 }, (_, index) =>
+      index === 0
+        ? {
+            kind: "match",
+            publicId: "manual-0",
+            bestOf: 3,
+            finishedAt: index,
+            outcome: "win",
+            seats: [],
+          }
+        : {
+            kind: "game",
+            publicId: `connected-${index}`,
+            outcome: "win",
+            eventCount: index,
+            finishedAt: index,
+            ruleset: "commander",
+            players: [],
+          },
+    ),
     status: "CanLoadMore",
     loadMore: jest.fn(),
   }),
 }))
 
 describe("ConnectedHistorySource", () => {
-  it("offers more pages to every player without an entitlement lookup", () => {
+  it("maps manual matches and games into one feed with more pages available", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <ConnectedHistorySource>
@@ -41,7 +51,7 @@ describe("ConnectedHistorySource", () => {
               testID="history-source-state"
               text={
                 feed.page.status === "ready"
-                  ? `${feed.page.items.length}:${feed.page.nextPage.status}`
+                  ? `${feed.page.items.map((item) => item.key).join(",")}:${feed.page.nextPage.status}`
                   : feed.page.status
               }
             />
@@ -50,6 +60,8 @@ describe("ConnectedHistorySource", () => {
       </ThemeProvider>,
     )
 
-    expect(view.getByTestId("history-source-state")).toHaveTextContent("10:available")
+    expect(view.getByTestId("history-source-state")).toHaveTextContent(
+      "manual:manual-0,connected:connected-1,connected:connected-2,connected:connected-3,connected:connected-4,connected:connected-5,connected:connected-6,connected:connected-7,connected:connected-8,connected:connected-9:available",
+    )
   })
 })

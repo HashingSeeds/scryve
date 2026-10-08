@@ -3,7 +3,7 @@ import { useConvexAuth, useMutation, usePaginatedQuery } from "convex/react"
 
 import { remotePage, type RemotePage } from "@/features/async/remoteState"
 import type { HistoryEntry } from "@/screens/historyEntries"
-import { connectedHistoryEntry } from "@/screens/historyEntries"
+import { connectedHistoryEntry, manualHistoryEntry } from "@/screens/historyEntries"
 
 import { api } from "../../../convex/_generated/api"
 
@@ -25,7 +25,7 @@ export function ConnectedHistorySource({
   const [migrationStatus, setMigrationStatus] = useState<"running" | "complete" | "failed">(
     "running",
   )
-  const history = usePaginatedQuery(api.games.connectedHistory, isAuthenticated ? {} : "skip", {
+  const history = usePaginatedQuery(api.history.entries, isAuthenticated ? {} : "skip", {
     initialNumItems: PAGE_SIZE,
   })
   const retryMigration = useCallback(() => setMigrationAttempt((attempt) => attempt + 1), [])
@@ -54,7 +54,12 @@ export function ConnectedHistorySource({
   const page = (() => {
     const result = remotePage(history, PAGE_SIZE)
     if (result.status === "loading") return result
-    return { ...result, items: result.items.map(connectedHistoryEntry) }
+    return {
+      ...result,
+      items: result.items.map((item) =>
+        item.kind === "match" ? manualHistoryEntry(item) : connectedHistoryEntry(item),
+      ),
+    }
   })()
   return children({
     page,
