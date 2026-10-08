@@ -12,6 +12,7 @@ import { Header } from "@/components/Header"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import type { RemoteValue } from "@/features/async/remoteState"
+import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { playFormatLabel } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -26,6 +27,7 @@ export type ManualMatchState =
   RemoteValue<ManualMatchView | null> | { status: "unavailable"; retry: () => void }
 
 export interface ManualMatchScreenProps {
+  access: CloudAccess
   match: ManualMatchState
   onBack: () => void
   onDeleted: () => void
@@ -96,7 +98,7 @@ function SeatRow({ seat }: { seat: ManualMatchSeat }) {
   )
 }
 
-export function ManualMatchScreen({ match, onBack, onDeleted }: ManualMatchScreenProps) {
+export function ManualMatchScreen({ access, match, onBack, onDeleted }: ManualMatchScreenProps) {
   const { theme, themed } = useAppTheme()
   const deleteMatch = useMutation(api.matches.deleteManualMatch)
   const [confirming, setConfirming] = useState(false)
@@ -133,7 +135,15 @@ export function ManualMatchScreen({ match, onBack, onDeleted }: ManualMatchScree
         leftTx="common:back"
         onLeftPress={busy ? undefined : onBack}
       />
-      {match.status === "unavailable" ? (
+      {!access.ready && !access.loading ? (
+        <EmptyState
+          imageSource={null}
+          heading="Sign in to view this result"
+          content={access.message}
+          button={access.actionLabel ?? "Sign in"}
+          buttonOnPress={access.request}
+        />
+      ) : match.status === "unavailable" ? (
         <EmptyState
           imageSource={null}
           heading="Match unavailable"
@@ -141,7 +151,7 @@ export function ManualMatchScreen({ match, onBack, onDeleted }: ManualMatchScree
           button="Try again"
           buttonOnPress={match.retry}
         />
-      ) : match.status === "loading" ? (
+      ) : match.status === "loading" || access.loading ? (
         <View
           testID="match-loading"
           accessibilityRole="progressbar"

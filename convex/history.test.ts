@@ -125,6 +125,25 @@ describe("history.entries", () => {
 })
 
 describe("history.manualMatch", () => {
+  it("lets a player without a username save, open, and delete a result", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, userId } = await signedIn(t, "history-no-username", "Jane")
+    const user = await t.run((ctx) => ctx.db.get(userId))
+    expect(user?.username).toBeUndefined()
+    const { matchId } = await recordMatch(actor)
+
+    await expect(
+      actor.query(api.history.manualMatch, { publicId: PUBLIC_ID }),
+    ).resolves.toMatchObject({ matchId })
+    await actor.mutation(api.matches.deleteManualMatch, { matchId })
+
+    await expect(actor.query(api.history.manualMatch, { publicId: PUBLIC_ID })).resolves.toBeNull()
+    const page = await actor.query(api.history.entries, {
+      paginationOpts: { cursor: null, numItems: 10 },
+    })
+    expect(page.page).toEqual([])
+  })
+
   it("returns the owner's match and hides it from everyone else", async () => {
     const t = convexTest(schema, modules)
     const { actor } = await signedIn(t, "history-owner", "Alice")
