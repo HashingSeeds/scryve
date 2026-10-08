@@ -1,0 +1,64 @@
+name: merge gate
+
+# Keeps one sticky comment listing every gate an agent's land skill checks before merging.
+# `node scripts/merge-gate.cjs <pr>` prints the same summary locally. Every trigger runs
+# main's copy of the script, which reads the pull request through the API and never runs
+# pull request code, so pull_request_target is safe here. Actions has no event for resolving
+# a review thread, so resolved threads show on the next push, review, or check run.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  workflow_run:
+    workflows: [checks, native fingerprints]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  comment:
+    # Review events on fork PRs get a read-only token, so those refresh on the other triggers.
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    concurrency:
+      group: merge-gate-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: write
+      statuses: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      # workflow_run lists no pull requests for forks, so look the head commit up instead.
+      - name: Find pull request
+        id: pr
+        env:
+          NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ -z "$NUMBER" ]; then
+            NUMBER=$(gh pr list --state open --search "$HEAD_SHA" --json number --jq '.[0].number // empty')
+          fi
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Update merge gate comment
+        if: steps.pr.outputs.number != ''
+        env:
+          NUMBER: ${{ steps.pr.outputs.number }}
+        run: node scripts/merge-gate.cjs "$NUMBER" --comment
