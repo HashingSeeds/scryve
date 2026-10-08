@@ -91,7 +91,9 @@ describe("observability initialization", () => {
     ["preview", "preview", "preview"],
     ["development", null, "development"],
     ["perf", "", "perf"],
-    [undefined, "production", "local"],
+    ["local", "production", "production"],
+    ["local", "", "local"],
+    [undefined, null, "local"],
   ] as const)("reports a %s build on channel %s as %s", (appVariant, channel, environment) => {
     const development = __DEV__
     Reflect.set(globalThis, "__DEV__", false)
