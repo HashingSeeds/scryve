@@ -229,6 +229,15 @@ const TRACE_LAP_MS = 1400
 const RING_FADE_MS = 250
 // why: eight dashes per side divide the outline evenly, so no corner gets a doubled dash.
 const STILL_TRACE_DASH = TRACE_LENGTH / 8
+// why: narrower than the border it covers, so a board-colored edge keeps the ring color apart from the seat colors around the button.
+const RING_STROKE_WIDTH = PENTAGON_STROKE_WIDTH - 3
+
+const [UPPER_RIGHT_X, UPPER_RIGHT_Y] = PENTAGON_POINTS.split(" ")[1].split(",").map(Number)
+// why: signal badges sit on this corner of the closed pentagon so they read as part of the button. Fractions of the button's size.
+export const PENTAGON_UPPER_RIGHT_CORNER = {
+  x: UPPER_RIGHT_X / PENTAGON_VIEWBOX,
+  y: UPPER_RIGHT_Y / PENTAGON_VIEWBOX,
+} as const
 
 export interface BorderSignal {
   color: string
@@ -279,7 +288,7 @@ function SignalRing({ color, animate }: { color?: string; animate: boolean }) {
       points={PENTAGON_POINTS}
       fill="none"
       stroke={shownColor}
-      strokeWidth={PENTAGON_STROKE_WIDTH}
+      strokeWidth={RING_STROKE_WIDTH}
       strokeLinejoin="round"
       animatedProps={animatedProps}
     />
