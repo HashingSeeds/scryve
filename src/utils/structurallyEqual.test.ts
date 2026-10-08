@@ -9,5 +9,6 @@ describe("structurallyEqual", () => {
     expect(structurallyEqual(props(), { ...props(), incoming: { a: 4 } })).toBe(false)
     expect(structurallyEqual(props(), { ...props(), onPress: () => {} })).toBe(false)
     expect(structurallyEqual({ a: undefined }, { b: undefined })).toBe(false)
+    expect(structurallyEqual({ a: 1 }, { toString: Object.prototype.toString })).toBe(false)
   })
 })

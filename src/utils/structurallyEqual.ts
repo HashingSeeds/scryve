@@ -10,7 +10,7 @@ export function structurallyEqual(previous: unknown, next: unknown): boolean {
   const keys = Object.keys(next)
   return (
     keys.length === Object.keys(previous).length &&
-    keys.every((key) => key in previous && structurallyEqual(previous[key], next[key]))
+    keys.every((key) => Object.hasOwn(previous, key) && structurallyEqual(previous[key], next[key]))
   )
 }
 
