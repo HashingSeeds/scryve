@@ -122,8 +122,10 @@ pnpm site:build  # build it to site/dist
 root, the Expo export under `dist/play/`, and `web/_redirects` as `dist/_redirects`. Add a rewrite
 for any new top-level route in `src/app` to `web/_redirects` so deep links return 200.
 
-The Git-connected Cloudflare Pages project builds with `pnpm build:pages` and outputs `dist`. Set
-`CONVEX_DEPLOY_KEY` to a production deploy key in the Production environment and a preview deploy key
-in the Preview environment. Optionally set `CONVEX_STAGING_DEPLOY_KEY` in the Preview environment to a
-staging dev deployment key so branches that don't touch the backend reuse staging. The deploy injects
-the matching Convex URLs, so do not set `EXPO_PUBLIC_CONVEX_URL` in Pages. See [RELEASING.md](RELEASING.md#convex-deploys).
+The Git-connected Cloudflare Pages project builds with `pnpm build:pages` and outputs `dist`. Its
+production branch is `production`, which moves only when a beta update is promoted. Set
+`EXPO_PUBLIC_CONVEX_URL` to the production Convex URL in the Production environment; production builds
+don't deploy Convex, because the beta workflow already did. Set `CONVEX_DEPLOY_KEY` to a preview deploy
+key in the Preview environment, and optionally `CONVEX_STAGING_DEPLOY_KEY` to a staging dev deployment
+key so branches that don't touch the backend reuse staging. Preview deploys inject their Convex URLs.
+See [RELEASING.md](RELEASING.md#convex-deploys).

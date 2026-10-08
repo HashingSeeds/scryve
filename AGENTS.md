@@ -100,4 +100,4 @@ Installed clients cannot be forced to upgrade, so every deployed Convex change m
 - Add new tables, fields, and indexes before deploying code that depends on them.
 - Make background migrations resumable and idempotent.
 - Deploy backend changes that accept both old and new clients BEFORE releasing the new client, then remove old behavior only after the adoption window has passed.
-- Merging to main deploys Convex to production through the Cloudflare Pages build (see RELEASING.md). Treat every merge as a backend release, and never run `convex deploy` against production by hand outside the recovery path there.
+- Merging to main deploys Convex to production and publishes the app to the `beta` channel (`.github/workflows/beta.yml`). The production app and web change only on promotion (see RELEASING.md). Treat every merge as a backend release, and never run `convex deploy` against production by hand outside the recovery path there.

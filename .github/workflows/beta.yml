@@ -1,0 +1,60 @@
+name: beta
+
+# why: every merge ships to the beta channel right away; `pnpm release:promote` (or the promote
+# workflow) later moves a beta update that soaked cleanly to production. See RELEASING.md.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+
+permissions:
+  contents: read
+
+# why: publishes run in merge order. GitHub keeps one pending run, so a burst of merges skips
+# straight to the newest commit, which already contains the ones in between.
+concurrency:
+  group: beta
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # why: beta runs production Convex, so the backend this commit needs goes live first.
+      - name: Deploy Convex to production
+        run: pnpm exec convex deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli@22.2.0
+
+      - name: Publish to beta
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APP_VARIANT: production
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          RELEASE_NOTES="$(node scripts/release-train.cjs notes)"
+          export RELEASE_NOTES
+          eas update --channel beta --environment production --non-interactive \
+            --message "$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)"

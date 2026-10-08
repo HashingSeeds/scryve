@@ -24,9 +24,9 @@
     "site:build": "pnpm --filter scryve-site build",
     "bundle:web": "set -a && . ./.env.development && set +a && env APP_VARIANT=development SCRYVE_WEB_BASE_URL=/play npx expo export --platform web --clear --output-dir dist/play",
     "bundle:web:prod": "set -a && . ./.env.local && . ./.env.production && set +a && env SCRYVE_WEB_BASE_URL=/play npx expo export --platform web --clear --output-dir dist/play",
-    "build:web:pages": "pnpm site:build && APP_VARIANT=production SCRYVE_WEB_BASE_URL=/play EXPO_PUBLIC_SENTRY_ENVIRONMENT=$([ \"${CF_PAGES_BRANCH:-main}\" = main ] && echo production || echo development) npx expo export --platform web --clear --output-dir dist/play && node scripts/prepare-web-deploy.cjs",
+    "build:web:pages": "pnpm site:build && APP_VARIANT=production SCRYVE_WEB_BASE_URL=/play EXPO_PUBLIC_SENTRY_ENVIRONMENT=$([ \"${CF_PAGES_BRANCH:-production}\" = production ] && echo production || echo development) npx expo export --platform web --clear --output-dir dist/play && node scripts/prepare-web-deploy.cjs",
     "build:pages": "node scripts/pages-build.cjs",
-    "deploy:web:prod": "node scripts/prepare-web-deploy.cjs && wrangler pages deploy \"$PWD/dist\" --project-name=scryve --branch=main",
+    "deploy:web:prod": "node scripts/prepare-web-deploy.cjs && wrangler pages deploy \"$PWD/dist\" --project-name=scryve --branch=production",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
     "preview:up": "node scripts/preview.cjs up",
@@ -65,7 +65,8 @@
     "build:android:prod": "set -a && . ./.env.local && . ./.env.production && set +a && npx eas-cli@latest build --profile production --platform android --local",
     "ota:preview": "env APP_VARIANT=preview npx eas-cli@latest update --channel preview --environment preview",
     "ota:beta": "env APP_VARIANT=production npx eas-cli@latest update --channel beta --environment production",
-    "ota:prod": "env APP_VARIANT=production npx eas-cli@latest update --channel production --environment production"
+    "ota:prod": "env APP_VARIANT=production npx eas-cli@latest update --channel production --environment production",
+    "release:promote": "node scripts/release-train.cjs promote"
   },
   "dependencies": {
     "@clerk/expo": "4.6.1",

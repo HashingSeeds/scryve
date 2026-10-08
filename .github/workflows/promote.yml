@@ -1,0 +1,45 @@
+name: promote
+
+# why: promotes without local secrets, from the Actions tab, the GitHub app, or an agent:
+# `gh workflow run promote -f promote=true`. Without `promote`, it only reports.
+on:
+  workflow_dispatch:
+    inputs:
+      promote:
+        description: Promote the candidate if Sentry is clean
+        type: boolean
+        default: false
+      soak_minutes:
+        description: Minutes an update must spend on beta first
+        type: string
+        default: "60"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Promote the newest clean beta update
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SOAK_MINUTES: ${{ inputs.soak_minutes }}
+          PROMOTE: ${{ inputs.promote && '--yes' || '' }}
+        run: node scripts/release-train.cjs promote --soak-minutes "$SOAK_MINUTES" $PROMOTE

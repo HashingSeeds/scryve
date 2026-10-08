@@ -4,12 +4,22 @@ const { test } = require("node:test")
 const { deployTarget } = require("./pages-build.cjs")
 
 const stagingKey = "dev:quiet-otter-123|secret"
-const unreachable = () => assert.fail("main builds never compare against main")
+const unreachable = () => assert.fail("this build never compares against main")
+
+test("production builds the web app without deploying Convex", () => {
+  assert.equal(
+    deployTarget(
+      { CF_PAGES_BRANCH: "production", CONVEX_STAGING_DEPLOY_KEY: stagingKey },
+      unreachable,
+    ),
+    "none",
+  )
+})
 
 test("only branches whose backend matches main use staging", () => {
   assert.equal(
-    deployTarget({ CF_PAGES_BRANCH: "main", CONVEX_STAGING_DEPLOY_KEY: stagingKey }, unreachable),
-    "default",
+    deployTarget({ CF_PAGES_BRANCH: "main", CONVEX_STAGING_DEPLOY_KEY: stagingKey }, () => true),
+    "staging",
   )
   assert.equal(deployTarget({ CF_PAGES_BRANCH: "fix/x" }, unreachable), "default")
   const branch = { CF_PAGES_BRANCH: "fix/x", CONVEX_STAGING_DEPLOY_KEY: stagingKey }
