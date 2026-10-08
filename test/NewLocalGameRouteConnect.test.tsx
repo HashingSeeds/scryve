@@ -5,6 +5,12 @@ import type { ConnectedHostFeed, LocalConnectFeed } from "@/screens/NewGameScree
 
 import NewLocalGameRoute, { ReportLocalConnect } from "../src/app/game/new"
 
+jest.mock("@/features/auth/AuthContext", () => ({
+  useAuthAccess: () => ({ configured: false, isLoaded: true, isSignedIn: false }),
+}))
+jest.mock("@/features/decks/LocalDeckChoicesSource", () => ({
+  LocalDeckChoicesSource: () => null,
+}))
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn(), back: jest.fn() },
   useFocusEffect: jest.fn(),
@@ -36,6 +42,7 @@ jest.mock("@/features/game/localPersistence", () => ({
   localGameRepository: {
     loadActiveGame: () => ({ id: "game-1" }),
     loadSettings: () => ({}),
+    loadMeSeat: () => undefined,
   },
 }))
 jest.mock("@/screens/JoinConnectedScreen", () => ({

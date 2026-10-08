@@ -506,6 +506,16 @@ export const processUserLinkedData = internalMutation({
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }
+      // why: a published local game with no seat of the user's has no membership to anonymize.
+      const hosted = await ctx.db
+        .query("games")
+        .withIndex("by_host_status", (q) => q.eq("hostUserId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (hosted.length) {
+        for (const game of hosted) await ctx.db.patch(game._id, { hostUserId: undefined })
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
       const entitlements = await ctx.db
         .query("userEntitlements")
         .withIndex("by_user", (q) => q.eq("userId", request.userId!))

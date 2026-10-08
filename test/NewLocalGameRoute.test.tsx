@@ -13,6 +13,12 @@ let mockLocalConnectFeed: Record<string, unknown> = {}
 const mockPublish = jest.fn()
 let publishedReporter: ((published: { publicId: string; manualCode: string }) => void) | undefined
 
+jest.mock("@/features/auth/AuthContext", () => ({
+  useAuthAccess: () => ({ configured: false, isLoaded: true, isSignedIn: false }),
+}))
+jest.mock("@/features/decks/LocalDeckChoicesSource", () => ({
+  LocalDeckChoicesSource: () => null,
+}))
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => mockSearchParams,

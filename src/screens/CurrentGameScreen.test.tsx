@@ -735,6 +735,7 @@ it.each([false, true])(
     expect(archive).toHaveBeenCalledWith(
       expect.objectContaining({ status: "finished" }),
       cancelPrompt ? "game_menu" : "stale_game_prompt",
+      undefined,
     )
   },
 )

@@ -354,3 +354,78 @@ describe("LocalGameRepository", () => {
     expect(repository.loadHistoryDetail(games.at(-1)!.id)).not.toBeNull()
   })
 })
+
+describe("LocalGameRepository account ownership", () => {
+  function finished(game: ReturnType<typeof makeGame>, now: number) {
+    return applyGameCommand(
+      game,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [game.players[0].id] } },
+      { ...defaultCommandContext(asDeviceId("device-1")), now: () => now },
+    )
+  }
+
+  it("tags a finished game with the signed-in owner as pending until the server acks", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = makeGame(1)
+    repository.archiveGame(finished(game, 2), "game_menu", "owner-a")
+    expect(repository.loadHistory()[0]).toMatchObject({
+      account: { ownerId: "owner-a" },
+      publish: "pending",
+    })
+    expect(repository.pendingPublishes("owner-a").map(({ id }) => id)).toEqual([game.id])
+    expect(repository.pendingPublishes("owner-b")).toEqual([])
+    repository.markPublished(game.id)
+    expect(repository.loadHistory()[0].publish).toBe("published")
+    expect(repository.pendingPublishes("owner-a")).toEqual([])
+    expect(repository.loadHistoryDetail(game.id)?.game.account).toEqual({ ownerId: "owner-a" })
+  })
+
+  it("keeps the seat and deck claimed at setup over the account signed in at the end", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = createLocalGame({
+      now: 1,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+      account: { ownerId: "owner-a", meSeat: 1, deckVersionId: "v1", deckName: "Atraxa" },
+    })
+    repository.archiveGame(finished(game, 2), "game_menu", "owner-b")
+    const summary = repository.loadHistory()[0]
+    expect(summary.account).toEqual({
+      ownerId: "owner-a",
+      mePlayerId: game.players[1].id,
+      deckVersionId: "v1",
+      deckName: "Atraxa",
+    })
+    const abandoned = applyGameCommand(
+      makeGame(5),
+      { type: "game.abandon" },
+      { ...defaultCommandContext(asDeviceId("device-1")), now: () => 6 },
+    )
+    repository.archiveGame(abandoned, "game_menu", "owner-a")
+    expect(repository.loadHistory()[0]).toMatchObject({ account: { ownerId: "owner-a" } })
+    expect(repository.loadHistory()[0].publish).toBeUndefined()
+  })
+
+  it("lets setup change the account seat and remembers the last seat picked", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = makeGame(1)
+    repository.saveActiveGame(game)
+    repository.updateActivePlayers(
+      game.id,
+      game.players.map(({ name, color, shape }) => ({ name, color, shape })),
+      { ownerId: "owner-a", meSeat: 0 },
+    )
+    expect(repository.loadActiveGame()?.account).toEqual({
+      ownerId: "owner-a",
+      mePlayerId: game.players[0].id,
+    })
+    expect(repository.loadMeSeat()).toBeUndefined()
+    repository.saveMeSeat(2)
+    expect(repository.loadMeSeat()).toBe(2)
+    repository.saveMeSeat(undefined)
+    expect(repository.loadMeSeat()).toBeUndefined()
+  })
+})

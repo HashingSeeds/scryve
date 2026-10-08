@@ -26,6 +26,9 @@ jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () =>
     jest.requireActual<typeof import("react")>("react").useContext(mockAuthContext),
 }))
+jest.mock("@/features/decks/LocalDeckChoicesSource", () => ({
+  LocalDeckChoicesSource: () => null,
+}))
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => ({}),

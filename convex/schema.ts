@@ -108,7 +108,7 @@ export default defineSchema({
   games: defineTable({
     publicId: v.string(),
     hostUserId: v.optional(v.id("users")),
-    mode: v.literal("connected"),
+    mode: v.union(v.literal("connected"), v.literal("local")),
     status: v.union(
       v.literal("lobby"),
       v.literal("active"),
@@ -311,7 +311,7 @@ export default defineSchema({
     v.union(
       v.object({
         userId: v.id("users"),
-        source: v.optional(v.literal("connected")),
+        source: v.optional(v.union(v.literal("connected"), v.literal("local"))),
         gameId: v.id("games"),
         summaryId: v.id("gameSummaries"),
         matchId: v.optional(v.id("matches")),

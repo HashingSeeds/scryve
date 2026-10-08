@@ -27,12 +27,13 @@ import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import {
   MAX_PLAYER_NAME_LENGTH,
+  meSeatOf,
   PLAYER_COLORS,
   validatePlayerNames,
   validateStartingLife,
 } from "@/features/game/domain"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
-import type { LocalSettings } from "@/features/game/localPersistence"
+import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
 import {
   playerGridLayoutForCount,
   type PlayerGridLayoutVariant,
@@ -87,6 +88,21 @@ export interface ConnectedHostFeed {
   exitGame: (game: ResumableGame) => Promise<boolean>
 }
 
+export interface DeckChoice {
+  versionId: string
+  name: string
+  system: string
+  format: string
+}
+
+/** why: present only while signed in, so local games can carry the account's seat and deck. */
+export interface LocalAccountSetup {
+  ownerId: string
+  defaultMeSeat?: number
+  // why: undefined means the deck list is still loading or unavailable, which keeps the picker closed.
+  decks?: readonly DeckChoice[]
+}
+
 export interface NewGameScreenProps {
   defaults: LocalSettings
   mode: NewGameMode
@@ -100,15 +116,17 @@ export interface NewGameScreenProps {
       format?: string
       layout: PlayerGridLayoutVariant
       lifeStep: number
+      account?: LocalGameAccountInput
     },
   ) => void
   connected?: ConnectedHostFeed
   initialGame?: LocalGame
   localGame?: LocalGame
+  account?: LocalAccountSetup
   onResumeLocal?: () => void
   onEndLocal?: (result: LocalGameResult) => void
   onAbandonLocal?: () => void
-  onSavePlayers?: (players: NewPlayerInput[]) => void
+  onSavePlayers?: (players: NewPlayerInput[], account?: LocalGameAccountInput) => void
   joinContent?: ReactNode
   onResumeConnected?: (game: ResumableGame) => void
   /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
@@ -137,6 +155,7 @@ export function NewGameScreen({
   connected,
   initialGame,
   localGame,
+  account,
   onResumeLocal,
   onEndLocal,
   onAbandonLocal,
@@ -183,6 +202,16 @@ export function NewGameScreen({
     initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
   const counter = playSystemRules(system).counter
+  // why: an existing game keeps whatever seat it claimed, even none; only a fresh setup pre-marks one.
+  const [meSeat, setMeSeat] = useState<number | undefined>(() =>
+    initialGame ? meSeatOf(initialGame) : account ? (account.defaultMeSeat ?? 0) : undefined,
+  )
+  const [deck, setDeck] = useState<Pick<DeckChoice, "versionId" | "name"> | undefined>(() => {
+    const chosen = initialGame?.account
+    return chosen?.deckVersionId
+      ? { versionId: chosen.deckVersionId, name: chosen.deckName ?? "Deck" }
+      : undefined
+  })
   const [showOptions, setShowOptions] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
@@ -215,6 +244,20 @@ export function NewGameScreen({
         shape: appearances[index]?.shape ?? shapeForSeat(index + 1, PLAYER_MARK_SHAPES),
       })),
     [appearances, nameValidation.names],
+  )
+  const effectiveMeSeat = meSeat !== undefined && meSeat < playerCount ? meSeat : undefined
+  const deckChoices =
+    account?.decks?.filter((choice) => choice.system === system && choice.format === format) ?? []
+  const accountInput = useMemo<LocalGameAccountInput | undefined>(
+    () =>
+      account
+        ? {
+            ownerId: account.ownerId,
+            meSeat: effectiveMeSeat,
+            ...(deck ? { deckVersionId: deck.versionId, deckName: deck.name } : {}),
+          }
+        : undefined,
+    [account, deck, effectiveMeSeat],
   )
   const valid = connectedMode
     ? validLife && Boolean(connected?.ready || connected?.access) && !connected?.blockedReason
@@ -276,7 +319,7 @@ export function NewGameScreen({
         deckRequired,
         ...setup,
       })
-    else onStartLocal(players, startingLife, setup)
+    else onStartLocal(players, startingLife, { ...setup, account: accountInput })
   }
 
   function chooseSystem(value: string) {
@@ -286,15 +329,17 @@ export function NewGameScreen({
     setFormat(next ? playSystemFormat(next) : undefined)
     setStartingLife(defaultStartingLife(next))
     setLifeStep(nextCounter.tapStep)
+    setDeck(undefined)
   }
 
   function chooseFormat(value: string | undefined) {
     if (startingLife === defaultStartingLife(system, format))
       setStartingLife(defaultStartingLife(system, value))
     setFormat(value)
+    setDeck(undefined)
   }
 
-  function savePlayers(nextAppearances = appearances) {
+  function savePlayers(nextAppearances = appearances, nextAccount = accountInput) {
     if (!onSavePlayers || !initialGame) return
     const savedNames = validatePlayerNames(
       initialGame.players.map((_, index) => names[index].trim() || defaultName(index)),
@@ -302,10 +347,36 @@ export function NewGameScreen({
     if (!savedNames.valid) return
     setPlayerSaveError(undefined)
     try {
-      onSavePlayers(savedNames.names.map((name, index) => ({ name, ...nextAppearances[index] })))
+      onSavePlayers(
+        savedNames.names.map((name, index) => ({ name, ...nextAppearances[index] })),
+        nextAccount,
+      )
     } catch (cause) {
       setPlayerSaveError(cause instanceof Error ? cause.message : "Could not save players.")
     }
+  }
+
+  function chooseMeSeat(value: string | undefined) {
+    const seat = value === undefined ? undefined : Number(value)
+    setMeSeat(seat)
+    if (seat === undefined) setDeck(undefined)
+    if (accountInput)
+      savePlayers(appearances, {
+        ...accountInput,
+        meSeat: seat,
+        ...(seat === undefined ? { deckVersionId: undefined, deckName: undefined } : {}),
+      })
+  }
+
+  function chooseDeck(versionId: string | undefined) {
+    const choice = deckChoices.find((candidate) => candidate.versionId === versionId)
+    setDeck(choice)
+    if (accountInput)
+      savePlayers(appearances, {
+        ...accountInput,
+        deckVersionId: choice?.versionId,
+        deckName: choice?.name,
+      })
   }
 
   async function confirmExit() {
@@ -550,6 +621,49 @@ export function NewGameScreen({
                     </View>
                   ))}
                 </View>
+                {account ? (
+                  <View style={themed($accountSeat)}>
+                    <SelectField
+                      testID="me-seat"
+                      label="This is me"
+                      value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
+                      placeholder="No seat"
+                      clearLabel="No seat"
+                      options={players.map((player, index) => ({
+                        id: String(index),
+                        label: player.name,
+                      }))}
+                      onSelect={chooseMeSeat}
+                    />
+                    {effectiveMeSeat !== undefined && system ? (
+                      <SelectField
+                        testID="me-deck"
+                        label="Your deck"
+                        value={deck?.versionId}
+                        placeholder={
+                          account.decks === undefined
+                            ? "Loading decks…"
+                            : deckChoices.length === 0
+                              ? "No matching decks"
+                              : "No deck"
+                        }
+                        clearLabel="No deck"
+                        disabled={account.decks === undefined && !deck}
+                        options={[
+                          ...(deck &&
+                          !deckChoices.some((choice) => choice.versionId === deck.versionId)
+                            ? [{ id: deck.versionId, label: deck.name }]
+                            : []),
+                          ...deckChoices.map((choice) => ({
+                            id: choice.versionId,
+                            label: choice.name,
+                          })),
+                        ]}
+                        onSelect={chooseDeck}
+                      />
+                    ) : null}
+                  </View>
+                ) : null}
                 {playerSaveError ? <Text accessibilityRole="alert" text={playerSaveError} /> : null}
               </View>
             ) : null}
@@ -881,6 +995,10 @@ const $connectedError: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing
 const $connectedGame: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $retryConnected: ThemedStyle<ViewStyle> = () => ({ minHeight: 40 })
 const $nameField: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $accountSeat: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  gap: spacing.xs,
+  marginTop: spacing.xs,
+})
 const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
   width: 44,
   height: 44,
