@@ -440,3 +440,79 @@ describe("LocalGameRepository account ownership", () => {
     expect(repository.loadHistory()[0].publish).toBe("failed")
   })
 })
+
+describe("LocalGameRepository sign-in claims", () => {
+  function finished(game: ReturnType<typeof makeGame>, now: number) {
+    return applyGameCommand(
+      game,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [game.players[0].id] } },
+      { ...defaultCommandContext(asDeviceId("device-1")), now: () => now },
+    )
+  }
+
+  it("files claimed games under the account for upload and remembers the skipped ones", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const claimed = makeGame(1)
+    const skipped = makeGame(3)
+    repository.archiveGame(finished(claimed, 2))
+    repository.archiveGame(finished(skipped, 4))
+    const listener = jest.fn()
+    repository.onGameFinished(listener)
+
+    repository.resolveClaims("owner-a", [
+      { id: claimed.id, claim: true, mePlayerId: claimed.players[1].id },
+      { id: skipped.id, claim: false },
+    ])
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(repository.pendingPublishes("owner-a").map(({ id }) => id)).toEqual([claimed.id])
+    expect(repository.loadHistory()).toEqual([
+      expect.objectContaining({ id: skipped.id, skippedBy: ["owner-a"] }),
+      expect.objectContaining({
+        id: claimed.id,
+        account: { ownerId: "owner-a", mePlayerId: claimed.players[1].id },
+        publish: "pending",
+      }),
+    ])
+    expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({
+      ownerId: "owner-a",
+      mePlayerId: claimed.players[1].id,
+    })
+    expect(repository.loadHistoryDetail(skipped.id)?.game.account).toBeUndefined()
+
+    repository.resolveClaims("owner-a", [{ id: skipped.id, claim: false }])
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it("notifies History on skip-only decisions and repairs a detail whose write failed", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const claimed = makeGame(1)
+    const skipped = makeGame(3)
+    repository.archiveGame(finished(claimed, 2))
+    repository.archiveGame(finished(skipped, 4))
+    const historyChanged = jest.fn()
+    repository.onHistoryChanged(historyChanged)
+
+    repository.resolveClaims("owner-a", [{ id: skipped.id, claim: false }])
+    expect(historyChanged).toHaveBeenCalledTimes(1)
+
+    const set = storage.set.bind(storage)
+    storage.set = (key, value) => {
+      if (key.includes("history.detail")) throw new Error("disk full")
+      set(key, value)
+    }
+    expect(() => repository.resolveClaims("owner-a", [{ id: claimed.id, claim: true }])).toThrow(
+      "disk full",
+    )
+    expect(historyChanged).toHaveBeenCalledTimes(2)
+    expect(repository.pendingPublishes("owner-a").map(({ id }) => id)).toEqual([claimed.id])
+    expect(repository.loadHistoryDetail(claimed.id)?.game.account).toBeUndefined()
+
+    storage.set = set
+    repository.repairClaimedDetails("owner-a")
+    expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({ ownerId: "owner-a" })
+    repository.repairClaimedDetails("owner-a")
+    expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({ ownerId: "owner-a" })
+  })
+})

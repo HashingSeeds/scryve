@@ -22,6 +22,8 @@ interface AuthAccess {
   isSignedIn: boolean
   userId?: string
   sessionHint?: SessionHint
+  /** why: the sign-in sheet is a modal, so prompts that follow sign-in wait for it to close. */
+  authVisible: boolean
   openAuth: () => void
   closeAuth: () => void
 }
@@ -30,6 +32,7 @@ const AuthAccessContext = createContext<AuthAccess>({
   configured: false,
   isLoaded: true,
   isSignedIn: false,
+  authVisible: false,
   openAuth: () => undefined,
   closeAuth: () => undefined,
 })
@@ -73,10 +76,11 @@ export function ConfiguredAuth({
       isSignedIn: Boolean(isSignedIn),
       userId: user?.id,
       sessionHint,
+      authVisible: visible,
       openAuth: () => setVisible(true),
       closeAuth: () => setVisible(false),
     }),
-    [isLoaded, isSignedIn, user?.id, sessionHint],
+    [isLoaded, isSignedIn, user?.id, sessionHint, visible],
   )
   const client = useMemo(
     () => new ConvexReactClient(convexUrl, { initialAuthTokenReuse: true }),
@@ -123,6 +127,7 @@ export function CloudProviders({ children }: { children: ReactNode }) {
           configurationMessage: config.message,
           isLoaded: true,
           isSignedIn: false,
+          authVisible: false,
           openAuth: () => undefined,
           closeAuth: () => undefined,
         }}

@@ -7,6 +7,7 @@ import {
   ConnectedHistorySource,
   type ConnectedHistoryFeed,
 } from "@/features/connected/ConnectedHistorySource"
+import { localGameVisibleTo } from "@/features/game/localGameClaims"
 import { localGameRepository } from "@/features/game/localPersistence"
 import type { HistorySource } from "@/screens/historyEntries"
 import { HistoryScreen } from "@/screens/HistoryScreen"
@@ -64,12 +65,15 @@ export default function HistoryRoute() {
   const [connected, setConnected] = useState<{ ownerId?: string; feed: ConnectedHistoryFeed }>()
   const signedIn = auth.configured && auth.isSignedIn
   const { source } = useLocalSearchParams<{ source?: string }>()
-  // why: a game claimed by one account stays private to it on a shared device; unclaimed games stay visible to everyone.
-  const games = localGameRepository
-    .loadHistory()
-    .filter(
-      (game) => game.account === undefined || (signedIn && game.account.ownerId === auth.userId),
-    )
+  const [history, setHistory] = useState(() => localGameRepository.loadHistory())
+  useEffect(
+    () => localGameRepository.onHistoryChanged(() => setHistory(localGameRepository.loadHistory())),
+    [],
+  )
+  // why: a game claimed by one account stays private to it on a shared device; unclaimed games stay visible to everyone except the accounts that declined them.
+  const games = history.filter((game) =>
+    localGameVisibleTo(game, signedIn ? auth.userId : undefined),
+  )
   const shared = {
     games,
     initialSource:

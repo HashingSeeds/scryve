@@ -1,8 +1,10 @@
 import {
+  createContext,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -34,6 +36,13 @@ import { api } from "../../../convex/_generated/api"
 const READABLE_WHILE_GATED = new Set(["/terms", "/privacy", "/cookie-policy", "/support"])
 
 export const ACCOUNT_CONSENT_TIMEOUT_MS = 4000
+
+// why: gated children stay mounted under display:none, which a Modal escapes on web, so prompts that open their own modal must ask whether the current account's consent is settled.
+const LegalConsentSettledContext = createContext(false)
+
+export function useLegalConsentSettled() {
+  return useContext(LegalConsentSettledContext)
+}
 
 interface GateProps {
   children: ReactNode
@@ -89,7 +98,12 @@ export function LegalConsentGate({ children, onResolved }: GateProps) {
         {children}
       </ConfiguredConsentGate>
     )
-  if (readingDocument) return <>{children}</>
+  if (readingDocument)
+    return (
+      <LegalConsentSettledContext.Provider value={false}>
+        {children}
+      </LegalConsentSettledContext.Provider>
+    )
   return <DeviceConsentGate onResolved={resolve}>{children}</DeviceConsentGate>
 }
 
@@ -104,10 +118,15 @@ function DeviceConsentGate({ children, onResolved }: GateProps) {
     setAccepted(REQUIRED_CONSENT_VERSIONS)
   }, [])
 
-  if (outstanding.length === 0) return <>{children}</>
+  if (outstanding.length === 0)
+    return (
+      <LegalConsentSettledContext.Provider value>{children}</LegalConsentSettledContext.Provider>
+    )
   return (
     <>
-      <View style={styles.hidden}>{children}</View>
+      <LegalConsentSettledContext.Provider value={false}>
+        <View style={styles.hidden}>{children}</View>
+      </LegalConsentSettledContext.Provider>
       <ConsentPrompt
         documents={outstanding}
         hasPriorAcceptance={hasPriorAcceptance(accepted)}
@@ -407,11 +426,14 @@ function ConfiguredConsentGate({
       : visibleOutstanding.length === 0)
   const needsConsent = !showContent && (!loading || loadingAfterLaunch)
   const keepMounted = showContent || needsConsent
+  const consentSettled = !bypass && !loading && visibleOutstanding.length === 0
 
   return (
     <>
       {keepMounted ? (
-        <View style={[styles.fill, needsConsent && styles.hidden]}>{children}</View>
+        <LegalConsentSettledContext.Provider value={consentSettled}>
+          <View style={[styles.fill, needsConsent && styles.hidden]}>{children}</View>
+        </LegalConsentSettledContext.Provider>
       ) : null}
       {!showContent && !needsConsent ? <LaunchFallback /> : null}
       {needsConsent ? (

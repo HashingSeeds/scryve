@@ -9,6 +9,7 @@ import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-c
 
 import { AccountDeletionSessionGuard } from "@/features/auth/AccountDeletionSessionGuard"
 import { CloudProviders } from "@/features/auth/AuthContext"
+import { LocalGameClaimPrompt } from "@/features/game/LocalGameClaimPrompt"
 import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
 import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
@@ -66,6 +67,7 @@ function Root() {
           <KeyboardProvider>
             <LegalConsentGate onResolved={resolveConsent}>
               <AccountDeletionSessionGuard />
+              <LocalGameClaimPrompt />
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen
                   name="index"

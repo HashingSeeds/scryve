@@ -19,6 +19,7 @@ import {
   MAX_COMMANDER_DAMAGE,
   validatePlayerNames,
 } from "./domain"
+import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import {
   isPlaySystemId,
@@ -383,15 +384,28 @@ export type LocalGameAccountInput = Parameters<typeof localGameAccount>[1]
 
 export class LocalGameRepository {
   private readonly finishListeners = new Set<() => void>()
+  private readonly historyListeners = new Set<() => void>()
 
   constructor(private readonly storage: StringStorage = mmkvStorage) {}
 
-  /** why: the publisher waits for finishes instead of polling storage. */
+  /** why: the publisher waits for finishes and sign-in claims instead of polling storage. */
   onGameFinished(listener: () => void): () => void {
     this.finishListeners.add(listener)
     return () => {
       this.finishListeners.delete(listener)
     }
+  }
+
+  /** why: a mounted History re-reads after archives, publish results, and sign-in claims or skips. */
+  onHistoryChanged(listener: () => void): () => void {
+    this.historyListeners.add(listener)
+    return () => {
+      this.historyListeners.delete(listener)
+    }
+  }
+
+  private notifyHistoryChanged(): void {
+    this.historyListeners.forEach((listener) => listener())
   }
 
   // why: "none" means the player chose no seat last time, which is different from never having chosen.
@@ -595,6 +609,7 @@ export class LocalGameRepository {
       )
       this.finishListeners.forEach((listener) => listener())
     }
+    this.notifyHistoryChanged()
     return summary
   }
 
@@ -603,6 +618,36 @@ export class LocalGameRepository {
     return this.loadHistory().filter(
       (game) => game.publish === "pending" && game.account?.ownerId === ownerId,
     )
+  }
+
+  /** why: the sign-in picker files claimed games under the account and remembers who declined the rest. The index is the authority: once it is written, a failed detail write is repaired by the next call or launch, and the error reaches the picker so the user can retry. */
+  resolveClaims(ownerId: string, decisions: readonly ClaimDecision[]): void {
+    const history = this.loadHistory()
+    const next = applyClaimDecisions(history, ownerId, decisions)
+    const changed = next.some((game, index) => game !== history[index])
+    if (changed) this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
+    try {
+      this.repairClaimedDetails(ownerId)
+    } finally {
+      if (next.some((game, index) => game.account && !history[index].account))
+        this.finishListeners.forEach((listener) => listener())
+      if (changed) this.notifyHistoryChanged()
+    }
+  }
+
+  /** why: brings every detail record owned by this account in line with the index; safe to run on any launch. */
+  repairClaimedDetails(ownerId: string): void {
+    for (const game of this.loadHistory()) {
+      if (game.account?.ownerId !== ownerId) continue
+      const detail = this.loadHistoryDetail(game.id)
+      if (!detail || detail.game.account?.ownerId === ownerId) continue
+      const record: HistoryDetail = {
+        schemaVersion: 1,
+        game: { ...detail.game, account: game.account },
+        eventsTruncated: detail.eventsTruncated,
+      }
+      this.storage.set(LOCAL_KEYS.historyDetail(game.id), JSON.stringify(record))
+    }
   }
 
   markPublished(gameId: string): void {
@@ -621,6 +666,7 @@ export class LocalGameRepository {
       LOCAL_KEYS.historyIndex,
       JSON.stringify(history.map((game) => (game.id === gameId ? { ...game, publish } : game))),
     )
+    this.notifyHistoryChanged()
   }
 
   loadHistory(): LocalGameSummary[] {
