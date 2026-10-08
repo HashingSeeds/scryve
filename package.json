@@ -36,7 +36,7 @@
     "compile:app": "tsc --noEmit -p . --pretty --incremental --tsBuildInfoFile node_modules/.cache/tsc/app.tsbuildinfo",
     "compile:test": "tsc --noEmit -p test/test-tsconfig.json --pretty --incremental --tsBuildInfoFile node_modules/.cache/tsc/test.tsbuildinfo",
     "lint": "eslint . --fix --cache --cache-strategy content --cache-location node_modules/.cache/eslint/",
-    "lint:check": "eslint . --cache --cache-strategy content --cache-location node_modules/.cache/eslint/",
+    "lint:check": "sh scripts/lint-check.sh",
     "export:check": "expo export --platform ios --platform android --platform web --output-dir dist-export-check",
     "lint:comments:baseline": "node scripts/generate-comment-baseline.cjs",
     "comments:apply": "node scripts/comment-review.cjs apply",
