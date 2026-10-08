@@ -45,5 +45,7 @@ describe("useRemoteReady", () => {
     rerender({ publicId: "game-1", isAuthenticated: true, remote: projection })
     rerender({ publicId: "game-2", isAuthenticated: true, remote: undefined })
     expect(result.current).toBe(false)
+    rerender({ publicId: "game-1", isAuthenticated: true, remote: undefined })
+    expect(result.current).toBe(false)
   })
 })

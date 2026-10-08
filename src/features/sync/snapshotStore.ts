@@ -36,6 +36,6 @@ function sameFields<Snapshot extends object>(previous: Snapshot, next: Snapshot)
   const keys = Object.keys(next) as (keyof Snapshot)[]
   return (
     keys.length === Object.keys(previous).length &&
-    keys.every((key) => Object.is(previous[key], next[key]))
+    keys.every((key) => key in previous && Object.is(previous[key], next[key]))
   )
 }

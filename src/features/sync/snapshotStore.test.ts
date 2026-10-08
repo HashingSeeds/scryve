@@ -13,4 +13,13 @@ describe("createSnapshotStore", () => {
     store.set({ pending: [...pending], status: "syncing" })
     expect(listener).toHaveBeenCalledTimes(1)
   })
+
+  it("treats a renamed field as a change even when both values are undefined", () => {
+    const store = createSnapshotStore<{ a?: number; b?: number }>({ a: undefined })
+    const listener = jest.fn()
+    store.subscribe(listener)
+
+    store.set({ b: undefined })
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
 })

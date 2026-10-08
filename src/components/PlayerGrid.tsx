@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
@@ -355,7 +355,9 @@ export function PlayerGrid({
 /** why: `LifeCard` is memoized, so each seat needs one handler identity for the life of the board; it always calls the latest `onChange`. */
 function useStablePlayerHandlers(onChange: PlayerGridProps["onChange"]) {
   const latest = useRef(onChange)
-  latest.current = onChange
+  useLayoutEffect(() => {
+    latest.current = onChange
+  })
   const handlers = useRef(new Map<PlayerId, (delta: LifeDelta) => void>()).current
   return (playerId: PlayerId) => {
     let handler = handlers.get(playerId)

@@ -12,7 +12,7 @@ describe("useSeatColors", () => {
     rerender([{ color: "#f00" }, { color: "#00f" }])
     expect(result.current).toBe(first)
 
-    rerender([{ color: "#f00" }, { color: "#0f0" }])
-    expect(result.current).toEqual(["#f00", "#0f0"])
+    rerender([{ color: "#f00" }, { color: "rgb(0, 255, 0)" }])
+    expect(result.current).toEqual(["#f00", "rgb(0, 255, 0)"])
   })
 })

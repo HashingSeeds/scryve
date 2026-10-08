@@ -967,7 +967,9 @@ function sameLifeCardProps(previous: LifeCardProps, next: LifeCardProps): boolea
   return (
     keys.length === Object.keys(previous).length &&
     keys.every(
-      (key) => Object.is(previous[key], next[key]) || sameFlatObject(previous[key], next[key]),
+      (key) =>
+        key in previous &&
+        (Object.is(previous[key], next[key]) || sameFlatObject(previous[key], next[key])),
     )
   )
 }
@@ -977,7 +979,7 @@ function sameFlatObject(previous: unknown, next: unknown): boolean {
   const keys = Object.keys(next)
   return (
     keys.length === Object.keys(previous).length &&
-    keys.every((key) => Object.is(previous[key], next[key]))
+    keys.every((key) => key in previous && Object.is(previous[key], next[key]))
   )
 }
 
