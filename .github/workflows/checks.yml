@@ -59,6 +59,8 @@ jobs:
               - 'metro.config.js'
               - 'package.json'
               - 'pnpm-lock.yaml'
+              - 'scripts/bundle-size*'
+              - '.github/workflows/checks.yml'
 
   ygo-image-mirror:
     needs: changes
