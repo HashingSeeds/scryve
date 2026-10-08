@@ -70,8 +70,23 @@ function assertGameScores(
       throw new Error(`Games drawn must be 0–${bestOf} in a best of ${bestOf}`)
   }
   if (totalWins > bestOf) throw new Error(`A best of ${bestOf} cannot have ${totalWins} wins`)
-  if (seats.filter((seat) => seat.outcome === "win").length > 1)
-    throw new Error("A match can only have one winner")
+  // why: a score is all or nothing, so a partial one is never guessed into game counters.
+  const scored = seats.filter((seat) => seat.gamesWon !== undefined)
+  if (scored.length !== 0 && scored.length !== seats.length)
+    throw new Error("Enter games won for every seat or leave the score blank")
+  const winners = seats.filter((seat) => seat.outcome === "win")
+  if (winners.length > 1) throw new Error("A match can only have one winner")
+  // why: a called round draws the seats still playing, so a drawn match is the only winner-less one.
+  if (winners.length === 0 && !seats.some((seat) => seat.outcome === "draw"))
+    throw new Error("A match needs a winner unless it was drawn")
+  if (scored.length === seats.length) {
+    const most = Math.max(...seats.map((seat) => seat.gamesWon ?? 0))
+    const ahead = seats.filter((seat) => seat.gamesWon === most)
+    if (winners.length === 1 && (winners[0].gamesWon !== most || ahead.length > 1))
+      throw new Error("The winner must have the most game wins")
+    if (winners.length === 0 && ahead.length === 1)
+      throw new Error("The seat with the most game wins must be the winner")
+  }
 }
 
 async function ownedDeckVersion(
@@ -81,7 +96,13 @@ async function ownedDeckVersion(
 ) {
   const version = await ctx.db.get(deckVersionId)
   const deck = version ? await ctx.db.get(version.deckId) : null
-  if (!version || !deck || deck.ownerUserId !== userId)
+  if (
+    !version ||
+    !deck ||
+    deck.ownerUserId !== userId ||
+    deck.archivedAt !== undefined ||
+    version.archivedAt !== undefined
+  )
     throw new ConvexError({ code: "deck_not_found", message: "Deck not found" })
   return { deck, version }
 }
@@ -100,12 +121,13 @@ function manualDeltas(match: Doc<"matches">, owner: MatchSeat): ManualDeltas {
     draws: outcome === "draw" ? 1 : 0,
     unknown: outcome === "unknown" ? 1 : 0,
   }
-  if (owner.gamesWon === undefined) return { matches }
+  const others = match.seats.filter((seat) => seat.seat !== owner.seat)
+  // why: game counters need every seat's wins; an unset gamesDrawn means no drawn games.
+  if (owner.gamesWon === undefined || others.some((seat) => seat.gamesWon === undefined))
+    return { matches }
   const wins = owner.gamesWon
   const draws = owner.gamesDrawn ?? 0
-  const losses = match.seats
-    .filter((seat) => seat.seat !== owner.seat)
-    .reduce((sum, seat) => sum + (seat.gamesWon ?? 0), 0)
+  const losses = others.reduce((sum, seat) => sum + (seat.gamesWon ?? 0), 0)
   return { matches, games: { total: wins + losses + draws, wins, losses, draws, unknown: 0 } }
 }
 

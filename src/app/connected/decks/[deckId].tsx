@@ -44,10 +44,10 @@ export default function DeckDetailRoute() {
           summary={summary}
           reviewChanges={reviewChanges === "true"}
           onBack={() => router.back()}
-          onAddMatch={(versionId) =>
+          onAddMatch={(versionId, name) =>
             router.push({
               pathname: "/connected/decks/match",
-              params: { versionId, ...(deckName ? { deckName } : {}) },
+              params: { deckId, versionId, deckName: name },
             })
           }
         />

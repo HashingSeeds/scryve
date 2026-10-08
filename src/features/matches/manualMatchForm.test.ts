@@ -3,6 +3,7 @@ import {
   defaultManualMatchDraft,
   emptyOpponent,
   parseIsoDate,
+  withOpponentAdded,
   withSeatOutcome,
 } from "./manualMatchForm"
 import type { Id } from "../../../convex/_generated/dataModel"
@@ -100,9 +101,39 @@ describe("buildManualMatchArgs", () => {
       error: "0–2",
     },
     { name: "a round above the cap", patch: { round: "100" }, error: "Round must be" },
+    {
+      name: "a partial score",
+      patch: { score: { wins: "", losses: "", draws: "1" } },
+      error: "both wins and losses",
+    },
+    {
+      name: "a score that contradicts the result",
+      patch: { score: { wins: "0", losses: "2", draws: "" } },
+      error: "0-2 score is a loss",
+    },
+    {
+      name: "a pod with no winner and no draw",
+      patch: {
+        outcome: "loss" as const,
+        opponents: [draft().opponents[0], { ...emptyOpponent(), name: "Cat" }],
+      },
+      error: "Pick a winner",
+    },
   ])("rejects $name", ({ patch, error }) => {
     const built = buildManualMatchArgs({ ...draft(), ...patch }, ids, today.getTime())
     expect(built).toEqual({ ok: false, error: expect.stringContaining(error) })
+  })
+})
+
+describe("withOpponentAdded", () => {
+  it("seeds the first opponent from the derived two-player result", () => {
+    const pod = withOpponentAdded({ ...draft(), outcome: "loss" })
+    expect(pod.opponents.map((seat) => seat.outcome)).toEqual(["win", "loss"])
+    expect(withOpponentAdded(pod).opponents.map((seat) => seat.outcome)).toEqual([
+      "win",
+      "loss",
+      "loss",
+    ])
   })
 })
 

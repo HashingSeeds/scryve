@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useMutation } from "convex/react"
@@ -17,9 +17,9 @@ import {
   BEST_OF_OPTIONS,
   buildManualMatchArgs,
   defaultManualMatchDraft,
-  emptyOpponent,
   MAX_OPPONENTS,
   OUTCOME_OPTIONS,
+  withOpponentAdded,
   withSeatOutcome,
   type BestOf,
   type ManualMatchDraft,
@@ -55,7 +55,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
   const { themed, theme } = useAppTheme()
   const recordMatch = useMutation(api.matches.recordManualMatch)
   // why: one id per form so a retried save cannot record the match twice.
-  const publicId = useRef(createClientId("match")).current
+  const [publicId] = useState(() => createClientId("match"))
   const [draft, setDraft] = useState<ManualMatchDraft>(() => defaultManualMatchDraft())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -109,7 +109,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text size="xs" style={themed($dim)} text={deck.name} />
+        <Text weight="medium" text={deck.name} />
         <SegmentedControl
           testID="match-best-of"
           accessibilityLabel="Best of"
@@ -205,7 +205,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
             accessibilityRole="button"
             style={$touch}
             disabled={busy}
-            onPress={() => setDraft({ ...draft, opponents: [...draft.opponents, emptyOpponent()] })}
+            onPress={() => setDraft(withOpponentAdded(draft))}
           >
             <Text size="sm" text="+ Add opponent" style={themed($action)} />
           </TouchableOpacity>
@@ -222,7 +222,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
           />
           <TextField
             testID="match-round"
-            label="Round"
+            label="Round (optional)"
             value={draft.round}
             keyboardType="number-pad"
             maxLength={2}

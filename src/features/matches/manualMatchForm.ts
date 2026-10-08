@@ -88,6 +88,15 @@ export function withSeatOutcome(
 
 const OPPOSITE: Record<SeatOutcome, SeatOutcome> = { win: "loss", loss: "win", draw: "draw" }
 
+// why: a two-player form never shows the opponent's result, so a pod starts from the derived one.
+export function withOpponentAdded(draft: ManualMatchDraft): ManualMatchDraft {
+  const opponents =
+    draft.opponents.length === 1
+      ? [{ ...draft.opponents[0], outcome: OPPOSITE[draft.outcome] }]
+      : draft.opponents
+  return { ...draft, opponents: [...opponents, emptyOpponent()] }
+}
+
 function parseCount(
   value: string,
   label: string,
@@ -123,6 +132,9 @@ export function buildManualMatchArgs(
       outcome: twoPlayer ? OPPOSITE[draft.outcome] : opponent.outcome,
     })
   }
+  const outcomes = [draft.outcome, ...opponents.map((seat) => seat.outcome)]
+  if (!outcomes.includes("win") && !outcomes.includes("draw"))
+    return { ok: false, error: "Pick a winner, or mark the drawn seats" }
   const finishedAt = parseIsoDate(draft.date)
   if (finishedAt === undefined) return { ok: false, error: "Date must be YYYY-MM-DD" }
   if (finishedAt > now + 24 * 60 * 60 * 1000)
@@ -144,6 +156,9 @@ export function buildManualMatchArgs(
   }
   const scoreGiven = twoPlayer && Object.values(draft.score).some((value) => value.trim() !== "")
   if (scoreGiven) {
+    // why: a score is all or nothing; only draws may be left blank to mean none.
+    if (draft.score.wins.trim() === "" || draft.score.losses.trim() === "")
+      return { ok: false, error: "Enter both wins and losses, or leave the score blank" }
     const maxWins = Math.ceil(draft.bestOf / 2)
     const wins = parseCount(draft.score.wins, "Wins", maxWins)
     if (!wins.ok) return wins
@@ -153,6 +168,10 @@ export function buildManualMatchArgs(
     if (!draws.ok) return draws
     if (wins.value + losses.value > draft.bestOf)
       return { ok: false, error: `A best of ${draft.bestOf} has at most ${draft.bestOf} games` }
+    const expected: SeatOutcome =
+      wins.value > losses.value ? "win" : losses.value > wins.value ? "loss" : "draw"
+    if (expected !== draft.outcome)
+      return { ok: false, error: `A ${wins.value}-${losses.value} score is a ${expected}` }
     me = { ...me, gamesWon: wins.value, gamesDrawn: draws.value }
     opponents[0] = { ...opponents[0], gamesWon: losses.value, gamesDrawn: draws.value }
   }

@@ -171,6 +171,15 @@ describe("recordManualMatch", () => {
     expect((await statsFor(t, bob.deckId)).deck).toBeNull()
   })
 
+  it("rejects an archived version", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, deckVersionId } = await owner(t)
+    await t.run((ctx) => ctx.db.patch(deckVersionId, { archivedAt: Date.now() }))
+    await expect(
+      actor.mutation(api.matches.recordManualMatch, twoPlayer(deckVersionId)),
+    ).rejects.toThrow("Deck not found")
+  })
+
   it.each([
     {
       name: "duplicate seats",
@@ -184,13 +193,39 @@ describe("recordManualMatch", () => {
     },
     {
       name: "two winners",
-      patch: { opponents: [{ seat: 2, displayName: "Bob", outcome: "win" as const }] },
+      patch: {
+        opponents: [{ seat: 2, displayName: "Bob", gamesWon: 1, outcome: "win" as const }],
+      },
       message: "only have one winner",
     },
     {
       name: "a far-future date",
       patch: { finishedAt: Date.now() + 3 * 24 * 60 * 60 * 1000 },
       message: "cannot be in the future",
+    },
+    {
+      name: "a partial score",
+      patch: { opponents: [{ seat: 2, displayName: "Bob", outcome: "loss" as const }] },
+      message: "every seat or leave the score blank",
+    },
+    {
+      name: "a score that contradicts the result",
+      patch: {
+        me: { seat: 1, gamesWon: 0, outcome: "win" as const },
+        opponents: [{ seat: 2, displayName: "Bob", gamesWon: 2, outcome: "loss" as const }],
+      },
+      message: "winner must have the most game wins",
+    },
+    {
+      name: "a pod with no winner and no draw",
+      patch: {
+        me: { seat: 1, outcome: "loss" as const },
+        opponents: [
+          { seat: 2, displayName: "Bob", outcome: "loss" as const },
+          { seat: 3, displayName: "Cat", outcome: "loss" as const },
+        ],
+      },
+      message: "needs a winner unless it was drawn",
     },
     {
       name: "a format without a system",

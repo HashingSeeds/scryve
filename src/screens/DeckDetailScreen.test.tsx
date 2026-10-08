@@ -2079,7 +2079,7 @@ describe("DeckDetailScreen", () => {
     )
     const view = render(screen())
     fireEvent.press(view.getByTestId("add-match-result"))
-    expect(onAddMatch).toHaveBeenCalledWith("version-main")
+    expect(onAddMatch).toHaveBeenCalledWith("version-main", "Existing Deck")
 
     mockDetail.value = { ...loadedDetail, version: null, cards: [] }
     view.rerender(screen())

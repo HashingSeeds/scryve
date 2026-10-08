@@ -108,7 +108,7 @@ type DeckDetailScreenProps = {
   deckId: string
   summary?: DeckDetailSummary
   onBack: () => void
-  onAddMatch?: (versionId: Id<"deckVersions">) => void
+  onAddMatch?: (versionId: Id<"deckVersions">, deckName: string) => void
 }
 
 function DeckDetailPlaceholder({
@@ -1010,7 +1010,9 @@ function DeckDetailContent({
         onSave={save}
         onCancel={requestDiscard}
         onAddMatch={
-          onAddMatch && liveVersionId && !knownDeleted ? () => onAddMatch(liveVersionId) : undefined
+          onAddMatch && liveVersionId && !knownDeleted
+            ? () => onAddMatch(liveVersionId, deck.name)
+            : undefined
         }
         onDetails={() => {
           if (knownDeleted) return
