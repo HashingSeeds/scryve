@@ -17,12 +17,22 @@ import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
-import { hasLocalGameStarted } from "./domain"
-import { claimableLocalGames } from "./localGameClaims"
+import { hasLocalGameStarted, matchScoreAfter, matchScoreLabel } from "./domain"
+import { claimableLocalUnits, type ClaimUnit } from "./localGameClaims"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
-import type { LocalGameSummary, PlayerId } from "./types"
 
-function resultLabel(game: LocalGameSummary) {
+function latestGame(unit: ClaimUnit) {
+  return unit.games[unit.games.length - 1]
+}
+
+function resultLabel(unit: ClaimUnit) {
+  const game = latestGame(unit)
+  if (unit.match) {
+    const winner = unit.match.result?.outcomes.indexOf("win") ?? -1
+    const standing = `Best of ${unit.match.bestOf} · ${matchScoreLabel(matchScoreAfter(game))}`
+    if (winner >= 0) return `${standing} · Won by ${game.players[winner]?.name ?? "?"}`
+    return unit.match.result ? `${standing} · Draw` : standing
+  }
   const entry = localHistoryEntry(game)
   if (entry.outcome === "draw") return "Draw"
   return entry.winnerNames?.length ? `Won by ${entry.winnerNames.join(" & ")}` : "No result"
@@ -34,8 +44,13 @@ function whenLabel(timestamp: number) {
 }
 
 // why: the result leads so a narrow row truncates the format, not the fact that decides the "This is me" seat.
-function detailLine(game: LocalGameSummary) {
-  return [resultLabel(game), whenLabel(game.finishedAt), localHistoryEntry(game).format].join(" · ")
+function detailLine(unit: ClaimUnit) {
+  const game = latestGame(unit)
+  return [resultLabel(unit), whenLabel(game.finishedAt), localHistoryEntry(game).format].join(" · ")
+}
+
+function gameCount(units: readonly ClaimUnit[]) {
+  return units.reduce((sum, unit) => sum + unit.games.length, 0)
 }
 
 function ClaimPicker({
@@ -47,13 +62,13 @@ function ClaimPicker({
 }) {
   const { themed } = useAppTheme()
   // why: read once per account; games finished while signed in are tagged at the finish and never qualify.
-  const [candidates] = useState(() => claimableLocalGames(repository.loadHistory(), ownerId))
+  const [candidates] = useState(() => claimableLocalUnits(repository.loadHistory(), ownerId))
   const [open, setOpen] = useState(true)
   const [excluded, setExcluded] = useState<readonly string[]>([])
-  const [meSeats, setMeSeats] = useState<Readonly<Record<string, PlayerId | undefined>>>({})
+  const [meSeats, setMeSeats] = useState<Readonly<Record<string, number | undefined>>>({})
   const [error, setError] = useState<string>()
   if (!open || candidates.length === 0) return null
-  const selectedCount = candidates.length - excluded.length
+  const selectedCount = gameCount(candidates.filter((unit) => !excluded.includes(unit.id)))
 
   function toggle(id: string) {
     setExcluded((current) =>
@@ -66,10 +81,10 @@ function ClaimPicker({
     try {
       repository.resolveClaims(
         ownerId,
-        candidates.map((game) => ({
-          id: game.id,
-          claim: !excluded.includes(game.id),
-          mePlayerId: meSeats[game.id],
+        candidates.map((unit) => ({
+          id: unit.id,
+          claim: !excluded.includes(unit.id),
+          meSeat: meSeats[unit.id],
         })),
       )
     } catch {
@@ -99,39 +114,44 @@ function ClaimPicker({
         />
       </View>
       <ScrollView style={$list} contentContainerStyle={themed($rows)}>
-        {candidates.map((game) => {
-          const selected = !excluded.includes(game.id)
+        {candidates.map((unit) => {
+          const selected = !excluded.includes(unit.id)
+          const game = latestGame(unit)
           const names = entryPlayerNames(localHistoryEntry(game)).join(" · ")
+          const meSeat = meSeats[unit.id]
           return (
-            <View key={game.id} style={themed($game)}>
+            <View key={unit.id} style={themed($game)}>
               <Pressable
-                testID={`claim-game-${game.id}`}
+                testID={`claim-game-${unit.id}`}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: selected }}
-                accessibilityLabel={`${names}, ${detailLine(game)}`}
+                accessibilityLabel={`${names}, ${detailLine(unit)}`}
                 style={themed($row)}
-                onPress={() => toggle(game.id)}
+                onPress={() => toggle(unit.id)}
               >
                 <View style={[themed($check), selected && themed($checkOn)]}>
                   {selected ? <Text size="xxs" text="✓" style={themed($checkMark)} /> : null}
                 </View>
                 <View style={$styles.flex1}>
                   <Text size="sm" weight="medium" numberOfLines={2} text={names} />
-                  <Text size="xxs" numberOfLines={1} style={themed($dim)} text={detailLine(game)} />
+                  <Text size="xxs" numberOfLines={1} style={themed($dim)} text={detailLine(unit)} />
                 </View>
               </Pressable>
               {selected ? (
                 <SelectField
-                  testID={`claim-me-seat-${game.id}`}
+                  testID={`claim-me-seat-${unit.id}`}
                   label="This is me"
-                  value={meSeats[game.id]}
+                  value={meSeat === undefined ? undefined : String(meSeat)}
                   placeholder="No seat"
                   clearLabel="No seat"
-                  options={game.players.map((player) => ({ id: player.id, label: player.name }))}
+                  options={game.players.map((player, index) => ({
+                    id: String(index),
+                    label: player.name,
+                  }))}
                   onSelect={(id) =>
                     setMeSeats((current) => ({
                       ...current,
-                      [game.id]: game.players.find((player) => player.id === id)?.id,
+                      [unit.id]: id === undefined ? undefined : Number(id),
                     }))
                   }
                 />

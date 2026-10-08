@@ -460,7 +460,7 @@ describe("LocalGameRepository sign-in claims", () => {
     repository.onGameFinished(listener)
 
     repository.resolveClaims("owner-a", [
-      { id: claimed.id, claim: true, mePlayerId: claimed.players[1].id },
+      { id: claimed.id, claim: true, meSeat: 1 },
       { id: skipped.id, claim: false },
     ])
 

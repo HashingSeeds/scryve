@@ -1,5 +1,10 @@
 import { asGameId, asPlayerId } from "./domain"
-import { applyClaimDecisions, claimableLocalGames, localGameVisibleTo } from "./localGameClaims"
+import {
+  applyClaimDecisions,
+  claimableLocalGames,
+  claimableLocalUnits,
+  localGameVisibleTo,
+} from "./localGameClaims"
 import type { LocalGameSummary } from "./types"
 
 const ada = asPlayerId("p-ada")
@@ -40,7 +45,7 @@ describe("claimableLocalGames", () => {
 describe("applyClaimDecisions", () => {
   it("claims selected games with an optional me seat and records who skipped the rest", () => {
     const next = applyClaimDecisions([game("one"), game("two"), game("three")], "a", [
-      { id: "one", claim: true, mePlayerId: grace },
+      { id: "one", claim: true, meSeat: 1 },
       { id: "two", claim: true },
       { id: "three", claim: false },
     ])
@@ -72,6 +77,50 @@ describe("applyClaimDecisions", () => {
     expect(skipped[0].skippedBy).toEqual(["a"])
     const owned = game("one", { account: { ownerId: "b" }, publish: "published" })
     expect(applyClaimDecisions([owned], "a", [{ id: "one", claim: true }])[0]).toBe(owned)
+  })
+})
+
+describe("match units", () => {
+  const match = { id: "match-1", bestOf: 3 as const, gameNumber: 1, wins: [0, 0], draws: 0 }
+  const first = game("m-game-1", { createdAt: 1, finishedAt: 2, match })
+  const second = game("m-game-2", {
+    createdAt: 3,
+    finishedAt: 4,
+    match: { ...match, gameNumber: 2, wins: [1, 0], result: { outcomes: ["win", "loss"] } },
+  })
+  const single = game("single", { createdAt: 5, finishedAt: 6 })
+
+  it("offers a match as one row with its games oldest first", () => {
+    const units = claimableLocalUnits([single, second, first], "a")
+    expect(units.map((unit) => unit.id)).toEqual(["single", "match-1"])
+    expect(units[1].games.map((unit) => unit.id)).toEqual(["m-game-1", "m-game-2"])
+    expect(units[1].match).toEqual(second.match)
+  })
+
+  it("claims every game of the match with one seat and queues the match result", () => {
+    const next = applyClaimDecisions([single, second, first], "a", [
+      { id: "match-1", claim: true, meSeat: 1 },
+      { id: "single", claim: false },
+    ])
+    expect(next[1]).toMatchObject({
+      id: "m-game-2",
+      account: { ownerId: "a", mePlayerId: grace },
+      publish: "pending",
+      matchPublish: "pending",
+    })
+    expect(next[2]).toMatchObject({
+      id: "m-game-1",
+      account: { ownerId: "a", mePlayerId: grace },
+      publish: "pending",
+    })
+    expect(next[2].matchPublish).toBeUndefined()
+    expect(next[0]).toMatchObject({ skippedBy: ["a"] })
+  })
+
+  it("skips every game of the match together", () => {
+    const next = applyClaimDecisions([second, first], "a", [{ id: "match-1", claim: false }])
+    expect(next.map((unit) => unit.skippedBy)).toEqual([["a"], ["a"]])
+    expect(claimableLocalUnits(next, "a")).toEqual([])
   })
 })
 
