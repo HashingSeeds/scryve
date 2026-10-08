@@ -12,11 +12,12 @@ const checkRun = (name, status, conclusion, { required = false, workflow = "chec
   checkSuite: { workflowRun: workflow ? { workflow: { name: workflow } } : null },
 })
 
-const completedRun = (name, conclusion = "success") => ({
+const completedRun = (name, conclusion = "success", created_at = "2026-10-08T12:00:00Z") => ({
   name,
   event: "pull_request",
   status: "completed",
   conclusion,
+  created_at,
 })
 
 function pullRequest({
@@ -27,6 +28,7 @@ function pullRequest({
   contexts = [checkRun("checks", "COMPLETED", "SUCCESS")],
   more = {},
   files = [],
+  changedFiles = files.length,
   runs = [completedRun("checks")],
 } = {}) {
   const connection = (items, key) => ({
@@ -38,6 +40,7 @@ function pullRequest({
       repository: {
         pullRequest: {
           headRefOid: "abcdef1234567890",
+          changedFiles,
           body,
           reviews: connection(
             reviews.map(([login, state]) => ({ author: { login }, state })),
@@ -112,6 +115,20 @@ test("a green status is not ready while an expected workflow has not reported", 
   )
 })
 
+test("only a successful newest run of each expected workflow counts", () => {
+  const contexts = [{ __typename: "StatusContext", context: "Cloudflare Pages", state: "SUCCESS" }]
+  assert.equal(ready({ contexts, runs: [completedRun("checks", "cancelled")] }), false)
+  assert.equal(
+    gate({ contexts, runs: [completedRun("checks", "cancelled")] }, "Workflows").detail,
+    "checks cancelled",
+  )
+  const rerun = [
+    completedRun("checks", "success", "2026-10-08T12:00:00Z"),
+    completedRun("checks", "failure", "2026-10-08T12:05:00Z"),
+  ]
+  assert.equal(gate({ runs: rerun }, "Workflows").detail, "checks failure")
+})
+
 test("a bot's requested changes stand until it approves, and its open threads block", () => {
   const coderabbit = (reviews, threads) => gate({ reviews, threads }, "CodeRabbit")
   assert.equal(
@@ -147,6 +164,15 @@ test("more threads than one page cannot be verified, so the gate blocks", () => 
     ok: false,
     detail: "too many review threads, comments to verify",
   })
+})
+
+test("a file list shorter than the PR's changed file count blocks", () => {
+  const files = ["README.md"]
+  assert.equal(ready({ files, changedFiles: 3001 }), false)
+  assert.equal(
+    gate({ files, changedFiles: 3001 }, "Completeness").detail,
+    "too many changed files to verify",
+  )
 })
 
 test("convex changes need Matthew, including files renamed out of convex/", () => {

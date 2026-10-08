@@ -18,6 +18,7 @@ query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       headRefOid
+      changedFiles
       body
       reviews(last: 100) {
         pageInfo { hasPreviousPage }
@@ -83,6 +84,8 @@ function toPullRequest(graphql, restFiles, workflowRuns) {
     "review threads": pr.reviewThreads.pageInfo.hasNextPage,
     "comments": pr.comments.pageInfo.hasPreviousPage,
     "checks": rollup?.contexts.pageInfo.hasNextPage ?? false,
+    // why: the REST files endpoint stops at 3,000 files even when paginated.
+    "changed files": restFiles.length !== pr.changedFiles,
   }
   return {
     headSha: pr.headRefOid,
@@ -92,7 +95,8 @@ function toPullRequest(graphql, restFiles, workflowRuns) {
     files: restFiles.flatMap((file) => [file.filename, file.previous_filename ?? []].flat()),
     workflowRuns: workflowRuns
       .filter((run) => run.event === "pull_request")
-      .map(({ name, status }) => ({ name, status })),
+      .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
+      .map(({ name, status, conclusion }) => ({ name, status, conclusion })),
     reviews: pr.reviews.nodes.map((review) => ({
       author: review.author?.login,
       state: review.state,
@@ -139,11 +143,14 @@ function workflowsGate({ workflowRuns, files }) {
   const problems = expected.flatMap((name) => {
     const newest = workflowRuns.find((run) => run.name === name)
     if (!newest) return [`${name} has not started`]
-    return newest.status === "completed" ? [] : [`${name} is ${newest.status.replace(/_/g, " ")}`]
+    if (newest.status !== "completed") return [`${name} is ${newest.status.replace(/_/g, " ")}`]
+    return newest.conclusion === "success"
+      ? []
+      : [`${name} ${newest.conclusion.replace(/_/g, " ")}`]
   })
   return problems.length > 0
     ? { name: "Workflows", ok: false, detail: problems.join("; ") }
-    : { name: "Workflows", ok: true, detail: `${expected.join(", ")} completed` }
+    : { name: "Workflows", ok: true, detail: `${expected.join(", ")} succeeded` }
 }
 
 function checksGate(checks) {
