@@ -8,7 +8,7 @@ import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCa
 import { preconstructedFormat } from "./lib/deckGames"
 import { limitDeckImport } from "./lib/deckRateLimits"
 import { type DeckSource, fetchDeckSource, invalidSourceDeck } from "./lib/deckSources"
-import { archidektDeckLink, resolveArchidektDeck } from "./lib/games/archidekt"
+import { archidektDeckLink, loadArchidektDeck, resolveArchidektDeck } from "./lib/games/archidekt"
 import {
   MAX_CATALOG_BATCH,
   normalizeCardName,
@@ -1261,7 +1261,7 @@ export const resolvePasted = action({
 
 async function recordDeckSource<T>(
   ctx: ActionCtx,
-  game: Exclude<GameSystemId, "mtg">,
+  game: GameSystemId,
   source: DeckSource,
   load: () => Promise<T>,
 ): Promise<T> {
@@ -1315,7 +1315,8 @@ export const resolveLink = action({
         const link = archidektDeckLink(args.url)
         await limitDeckImport(ctx)
         await requireActionCapability(ctx, game, "deckImport")
-        return { sourceName: "Archidekt", ...(await resolveArchidektDeck(ctx, link)) }
+        const deck = await recordDeckSource(ctx, game, "archidekt", () => loadArchidektDeck(link))
+        return { sourceName: "Archidekt", ...(await resolveArchidektDeck(ctx, link, deck)) }
       }
       case "ygo": {
         const link = ygoprodeckDeckLink(args.url)

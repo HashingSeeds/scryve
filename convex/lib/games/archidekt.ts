@@ -173,16 +173,21 @@ function archidektJson(text: string) {
   }
 }
 
-export async function resolveArchidektDeck(
-  ctx: ActionCtx,
-  link: ReturnType<typeof archidektDeckLink>,
-) {
+export async function loadArchidektDeck(link: ReturnType<typeof archidektDeckLink>) {
   const payload = archidektJson(
     await fetchDeckSource("archidekt", `https://archidekt.com/api/decks/${link.deckId}/`, {
       accept: "application/json",
     }),
   )
-  const { entries, ...metadata } = parseArchidektDeck(payload, link.deckId)
+  return parseArchidektDeck(payload, link.deckId)
+}
+
+export async function resolveArchidektDeck(
+  ctx: ActionCtx,
+  link: ReturnType<typeof archidektDeckLink>,
+  deck: ReturnType<typeof parseArchidektDeck>,
+) {
+  const { entries, ...metadata } = deck
   const resolved = new Map<string, CardReference>()
   const ids = [...new Set(entries.map((entry) => entry.scryfallId))]
   for (let offset = 0; offset < ids.length; offset += SCRYFALL_COLLECTION_SIZE) {

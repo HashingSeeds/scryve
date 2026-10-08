@@ -231,28 +231,34 @@ describe("resolveLink", () => {
     }
   })
 
-  it("records a deck source outage separately from card resolution", async () => {
-    const fetchSpy = jest
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response("", { status: 503 }))
-    try {
-      const t = convexTest(schema, modules)
-      registerRateLimiter(t)
-      await expect(
-        t.withIdentity({ subject: "outage-importer" }).action(api.deckImports.resolveLink, {
-          game: "ygo",
-          url: "https://ygoprodeck.com/deck/312866",
-        }),
-      ).rejects.toMatchObject({ data: { code: "ygoprodeck_unavailable" } })
-      await expect(
-        t.run(async (ctx) => await ctx.db.query("providerHealth").collect()),
-      ).resolves.toMatchObject([
-        { game: "ygo", provider: "ygoprodeck", operation: "deck-link", status: "unavailable" },
-      ])
-    } finally {
-      fetchSpy.mockRestore()
-    }
-  })
+  it.each([
+    ["ygo", "ygoprodeck", "https://ygoprodeck.com/deck/312866"],
+    ["mtg", "archidekt", "https://archidekt.com/decks/200"],
+  ])(
+    "records a %s deck source outage separately from card resolution",
+    async (game, source, url) => {
+      const fetchSpy = jest
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("", { status: 503 }))
+      try {
+        const t = convexTest(schema, modules)
+        registerRateLimiter(t)
+        await expect(
+          t.withIdentity({ subject: "outage-importer" }).action(api.deckImports.resolveLink, {
+            game,
+            url,
+          }),
+        ).rejects.toMatchObject({ data: { code: `${source}_unavailable` } })
+        await expect(
+          t.run(async (ctx) => await ctx.db.query("providerHealth").collect()),
+        ).resolves.toMatchObject([
+          { game, provider: source, operation: "deck-link", status: "unavailable" },
+        ])
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    },
+  )
 
   it("rejects another game's deck link before fetching", async () => {
     const fetchSpy = jest.spyOn(globalThis, "fetch")
