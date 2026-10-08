@@ -281,7 +281,7 @@ function SignalRing({ color, animate }: { color?: string; animate: boolean }) {
   const [shownColor, setShownColor] = useState(color)
   if (color && color !== shownColor) setShownColor(color)
   const shown = color !== undefined
-  const opacity = useSharedValue(shown ? 1 : 0)
+  const opacity = useSharedValue(shown && !animate ? 1 : 0)
   useEffect(() => {
     const target = shown ? 1 : 0
     opacity.value = animate
