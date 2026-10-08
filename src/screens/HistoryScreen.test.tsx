@@ -497,3 +497,31 @@ describe("unified history screen", () => {
     expect(button).toBeDisabled()
   })
 })
+
+describe("HistoryScreen published local games", () => {
+  it("keeps the device copy's winner line when the server row for the same game arrives", () => {
+    const game = localGame({
+      id: "game_published" as LocalGameSummary["id"],
+      result: { kind: "win", winnerPlayerIds: ["p1" as never] },
+      account: { ownerId: "owner" },
+      publish: "published",
+    })
+    render(
+      themed(
+        <HistoryScreen
+          games={[game]}
+          onBack={jest.fn()}
+          onSelectLocal={jest.fn()}
+          onSelectConnected={jest.fn()}
+          onSelectManual={jest.fn()}
+          connected={connectedFeed([
+            connectedGame({ publicId: "game_published", source: "local", outcome: "unknown" }),
+          ])}
+        />,
+      ),
+    )
+    expect(screen.getAllByTestId(/history-row-/)).toHaveLength(1)
+    expect(screen.getByTestId("history-row-local-game_published")).toBeTruthy()
+    expect(screen.getByText(/Won by Ada/)).toBeTruthy()
+  })
+})

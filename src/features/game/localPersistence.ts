@@ -370,7 +370,8 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         finishedAt: value.finishedAt,
         ...(result ? { result } : {}),
         ...(account ? { account } : {}),
-        ...(account && (value.publish === "pending" || value.publish === "published")
+        ...(account &&
+        (value.publish === "pending" || value.publish === "published" || value.publish === "failed")
           ? { publish: value.publish }
           : {}),
         ...(skippedBy ? { skippedBy } : {}),
@@ -393,14 +394,16 @@ export class LocalGameRepository {
     }
   }
 
-  loadMeSeat(): number | undefined {
-    const raw = Number(this.storage.getString(LOCAL_KEYS.meSeat))
-    return Number.isInteger(raw) && raw >= 0 && raw < 6 ? raw : undefined
+  // why: "none" means the player chose no seat last time, which is different from never having chosen.
+  loadMeSeat(): number | "none" | undefined {
+    const stored = this.storage.getString(LOCAL_KEYS.meSeat)
+    if (stored === "none") return "none"
+    const raw = Number(stored)
+    return stored !== undefined && Number.isInteger(raw) && raw >= 0 && raw < 6 ? raw : undefined
   }
 
   saveMeSeat(seat: number | undefined): void {
-    if (seat === undefined) this.storage.delete(LOCAL_KEYS.meSeat)
-    else this.storage.set(LOCAL_KEYS.meSeat, String(seat))
+    this.storage.set(LOCAL_KEYS.meSeat, seat === undefined ? "none" : String(seat))
   }
 
   getDeviceId(): ReturnType<typeof asDeviceId> {
@@ -603,15 +606,20 @@ export class LocalGameRepository {
   }
 
   markPublished(gameId: string): void {
+    this.settlePublish(gameId, "published")
+  }
+
+  // why: a game the server rejected stays on the device but stops blocking the uploads behind it.
+  markPublishFailed(gameId: string): void {
+    this.settlePublish(gameId, "failed")
+  }
+
+  private settlePublish(gameId: string, publish: "published" | "failed"): void {
     const history = this.loadHistory()
     if (!history.some((game) => game.id === gameId && game.publish === "pending")) return
     this.storage.set(
       LOCAL_KEYS.historyIndex,
-      JSON.stringify(
-        history.map((game) =>
-          game.id === gameId ? { ...game, publish: "published" as const } : game,
-        ),
-      ),
+      JSON.stringify(history.map((game) => (game.id === gameId ? { ...game, publish } : game))),
     )
   }
 

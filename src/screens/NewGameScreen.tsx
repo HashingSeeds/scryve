@@ -100,8 +100,8 @@ export interface DeckChoice {
 export interface LocalAccountSetup {
   ownerId: string
   defaultMeSeat?: number
-  // why: undefined means the deck list is still loading or unavailable, which keeps the picker closed.
-  decks?: readonly DeckChoice[]
+  // why: undefined means the deck list is still loading, which keeps the picker closed.
+  decks?: readonly DeckChoice[] | "unavailable"
 }
 
 export interface NewGameScreenProps {
@@ -207,9 +207,7 @@ export function NewGameScreen({
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
     initialGame && (initialGame.account || hasLocalGameStarted(initialGame))
       ? meSeatOf(initialGame)
-      : account
-        ? (account.defaultMeSeat ?? 0)
-        : undefined,
+      : account?.defaultMeSeat,
   )
   const [deck, setDeck] = useState<Pick<DeckChoice, "versionId" | "name"> | undefined>(() => {
     const chosen = initialGame?.account
@@ -251,8 +249,9 @@ export function NewGameScreen({
     [appearances, nameValidation.names],
   )
   const effectiveMeSeat = meSeat !== undefined && meSeat < playerCount ? meSeat : undefined
+  const deckList = account?.decks === "unavailable" ? undefined : account?.decks
   const deckChoices =
-    account?.decks?.filter((choice) => choice.system === system && choice.format === format) ?? []
+    deckList?.filter((choice) => choice.system === system && choice.format === format) ?? []
   const accountInput = useMemo<LocalGameAccountInput | undefined>(
     () =>
       account
@@ -344,7 +343,8 @@ export function NewGameScreen({
     setDeck(undefined)
   }
 
-  function savePlayers(nextAppearances = appearances, nextAccount = accountInput) {
+  // why: only the seat and deck pickers may claim a game; a rename must not move it to whoever is signed in now.
+  function savePlayers(nextAppearances = appearances, nextAccount?: LocalGameAccountInput) {
     if (!onSavePlayers || !initialGame) return
     const savedNames = validatePlayerNames(
       initialGame.players.map((_, index) => names[index].trim() || defaultName(index)),
@@ -646,14 +646,16 @@ export function NewGameScreen({
                         label="Your deck"
                         value={deck?.versionId}
                         placeholder={
-                          account.decks === undefined
-                            ? "Loading decks…"
-                            : deckChoices.length === 0
-                              ? "No matching decks"
-                              : "No deck"
+                          account.decks === "unavailable"
+                            ? "Decks unavailable"
+                            : account.decks === undefined
+                              ? "Loading decks…"
+                              : deckChoices.length === 0
+                                ? "No matching decks"
+                                : "No deck"
                         }
                         clearLabel="No deck"
-                        disabled={account.decks === undefined && !deck}
+                        disabled={deckList === undefined && !deck}
                         options={[
                           ...(deck &&
                           !deckChoices.some((choice) => choice.versionId === deck.versionId)

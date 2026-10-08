@@ -16,9 +16,16 @@ export default function GameSummaryRoute() {
       ? router.back()
       : router.replace({ pathname: "/", params: { destination: "play" } })
 
-  const detail =
+  const stored =
     source !== "connected" && typeof gameId === "string"
       ? localGameRepository.loadHistoryDetail(gameId)
+      : null
+  // why: same rule as the list, so a deep link cannot open another account's game on a shared device.
+  const detail =
+    stored &&
+    (stored.game.account === undefined ||
+      (auth.isSignedIn && stored.game.account.ownerId === auth.userId))
+      ? stored
       : null
   // why: a local game published from another device only exists on the server.
   const connectedId =

@@ -225,13 +225,15 @@ async function displayNamesForViewer(
   return names
 }
 
+// why: a local game's names were typed by its only viewer, so they survive where a connected guest becomes a seat label.
 function summaryIdentitySnapshotFor(
   player: Doc<"gamePlayers">,
   user: Doc<"users"> | null,
+  localGame = false,
 ): { displayName: string; usernameAtFinish?: string } {
   const resolved = user ? publicUsernameFor(user) : undefined
   if (resolved) return { displayName: resolved, usernameAtFinish: resolved }
-  if (player.deletedAt) return { displayName: player.displayName }
+  if (player.deletedAt || localGame) return { displayName: player.displayName }
   if (player.usernameAtJoin)
     return { displayName: player.usernameAtJoin, usernameAtFinish: player.usernameAtJoin }
   return { displayName: seatLabelFor(player) }
@@ -241,6 +243,7 @@ export function maskSummaryPlayersForViewer(
   players: Doc<"gameSummaries">["players"],
   viewerUserId: Id<"users">,
   blocked: Set<Id<"users">>,
+  options: { localGame?: boolean } = {},
 ) {
   return players.map((rawPlayer) => {
     // why: deck names are free text, so only the owner sees one that fails the filter.
@@ -257,7 +260,8 @@ export function maskSummaryPlayersForViewer(
     return {
       ...player,
       displayName:
-        player.usernameAtFinish ?? (player.deletedAt ? player.displayName : seatLabelFor(player)),
+        player.usernameAtFinish ??
+        (player.deletedAt || options.localGame ? player.displayName : seatLabelFor(player)),
     }
   })
 }
@@ -515,7 +519,7 @@ async function terminalizeGame(
         return {
           playerId: player._id,
           seat: player.seat,
-          ...summaryIdentitySnapshotFor(player, user),
+          ...summaryIdentitySnapshotFor(player, user, game.mode === "local"),
           ...(player.userId ? { userId: player.userId } : {}),
           ...(deck ? { deckId: deck._id, deckNameAtFinish: deck.name } : {}),
           ...(version
@@ -2523,7 +2527,9 @@ export const connectedHistory = query({
           source: entry.source ?? "connected",
           terminalStatus: summary.terminalStatus ?? "finished",
           terminalReason: summary.terminalReason,
-          players: maskSummaryPlayersForViewer(summary.players, user._id, blocked),
+          players: maskSummaryPlayersForViewer(summary.players, user._id, blocked, {
+            localGame: entry.source === "local",
+          }),
         })
       }
     }
@@ -2711,7 +2717,9 @@ export const connectedSummary = query({
       game: summary.game ?? DEFAULT_DECK_GAME,
       system: summary.system ?? summary.game ?? DEFAULT_DECK_GAME,
       format: summary.format ?? summary.ruleset,
-      players: maskSummaryPlayersForViewer(summary.players, viewer._id, blocked),
+      players: maskSummaryPlayersForViewer(summary.players, viewer._id, blocked, {
+        localGame: game.mode === "local",
+      }),
       viewerPlayerIds: summary.players
         .filter((player) => player.userId === viewer._id)
         .map((player) => player.playerId),

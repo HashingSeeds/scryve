@@ -512,7 +512,15 @@ export const processUserLinkedData = internalMutation({
         .withIndex("by_host_status", (q) => q.eq("hostUserId", request.userId!))
         .take(USER_DATA_BATCH_SIZE)
       if (hosted.length) {
-        for (const game of hosted) await ctx.db.patch(game._id, { hostUserId: undefined })
+        for (const game of hosted) {
+          await ctx.db.patch(game._id, { hostUserId: undefined })
+          const summary = await ctx.db
+            .query("gameSummaries")
+            .withIndex("by_game", (q) => q.eq("gameId", game._id))
+            .unique()
+          if (summary?.finishedByUserId === request.userId)
+            await ctx.db.patch(summary._id, { finishedByUserId: undefined })
+        }
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }

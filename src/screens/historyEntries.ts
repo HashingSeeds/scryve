@@ -166,7 +166,7 @@ export function localHistoryEntry(game: LocalGameSummary): HistoryEntry {
 export function connectedHistoryEntry(game: {
   publicId: string
   /** why: a published local game keys as `local:<id>` so the device's own copy folds into it. */
-  source?: HistorySource
+  source?: "local" | "connected"
   outcome?: "win" | "loss" | "draw" | "unknown"
   eventCount: number
   finishedAt: number

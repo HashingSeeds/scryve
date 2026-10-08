@@ -72,7 +72,9 @@ export const entries = query({
         outcome: entry.outcome,
         terminalStatus: summary.terminalStatus ?? "finished",
         terminalReason: summary.terminalReason,
-        players: maskSummaryPlayersForViewer(summary.players, user._id, blocked),
+        players: maskSummaryPlayersForViewer(summary.players, user._id, blocked, {
+          localGame: entry.source === "local",
+        }),
       })
     }
     return {

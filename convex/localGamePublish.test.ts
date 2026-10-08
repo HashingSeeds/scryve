@@ -81,6 +81,7 @@ describe("publishFinishedLocalGame", () => {
       "Atraxa",
       undefined,
     ])
+    expect(history.page[0].players.map((player) => player.displayName)).toEqual(["Ada", "Grace"])
     const entries = await owner.query(api.history.entries, {
       paginationOpts: { numItems: 10, cursor: null },
     })
@@ -90,6 +91,7 @@ describe("publishFinishedLocalGame", () => {
       source: "local",
       publicId: args.publicId,
       outcome: "win",
+      players: [{ displayName: "Ada" }, { displayName: "Grace" }],
     })
 
     const rows = await t.run(async (ctx) => ({
@@ -133,7 +135,11 @@ describe("publishFinishedLocalGame", () => {
     expect(rows.results).toHaveLength(0)
     await expect(
       owner.query(api.games.connectedSummary, { publicId: finishedGame().publicId }),
-    ).resolves.toMatchObject({ resultKind: "win", viewerPlayerIds: [] })
+    ).resolves.toMatchObject({
+      resultKind: "win",
+      viewerPlayerIds: [],
+      players: [{ displayName: "Ada" }, { displayName: "Grace" }],
+    })
     const other = await synced(t, "other", "Other")
     await expect(
       other.query(api.games.connectedSummary, { publicId: finishedGame().publicId }),
@@ -206,9 +212,12 @@ describe("publishFinishedLocalGame", () => {
       })
     const rows = await t.run(async (ctx) => ({
       game: await ctx.db.query("games").unique(),
+      summary: await ctx.db.query("gameSummaries").unique(),
       entries: await ctx.db.query("gameHistoryEntries").collect(),
     }))
     expect(rows.game?.hostUserId).toBeUndefined()
+    expect(rows.summary?.finishedByUserId).toBeUndefined()
+    expect(rows.summary?.players.map((player) => player.displayName)).toEqual(["Ada", "Grace"])
     expect(rows.entries).toHaveLength(0)
     jest.clearAllTimers()
     jest.useRealTimers()

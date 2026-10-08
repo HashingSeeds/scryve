@@ -10,12 +10,18 @@ import type { DeckChoice } from "@/screens/NewGameScreen"
 
 import { api } from "../../../convex/_generated/api"
 
+export type DeckChoices = DeckChoice[] | "unavailable" | undefined
+
 // why: the "This is me" seat offers the account's decks, read once the user row is synced.
-function DeckChoicesQuery({ onChange }: { onChange: (decks?: DeckChoice[]) => void }) {
+function DeckChoicesQuery({ onChange }: { onChange: (decks: DeckChoices) => void }) {
   const profile = useConnectedProfile()
   const mine = useQuery(api.decks.listMine, profile.status === "ready" ? {} : "skip")
+  const unreachable = profile.status === "offline" || profile.status === "error"
   useEffect(() => {
-    if (!mine) return
+    if (!mine) {
+      if (unreachable) onChange("unavailable")
+      return
+    }
     onChange(
       mine.decks.flatMap((deck) =>
         deck.latestVersionId
@@ -30,13 +36,18 @@ function DeckChoicesQuery({ onChange }: { onChange: (decks?: DeckChoice[]) => vo
           : [],
       ),
     )
-  }, [mine, onChange])
+  }, [mine, onChange, unreachable])
   return null
 }
 
-export function LocalDeckChoicesSource({ onChange }: { onChange: (decks?: DeckChoice[]) => void }) {
+function ReportUnavailable({ onChange }: { onChange: (decks: DeckChoices) => void }) {
+  useEffect(() => onChange("unavailable"), [onChange])
+  return null
+}
+
+export function LocalDeckChoicesSource({ onChange }: { onChange: (decks: DeckChoices) => void }) {
   return (
-    <ConvexQueryBoundary fallback={() => null}>
+    <ConvexQueryBoundary fallback={() => <ReportUnavailable onChange={onChange} />}>
       <ConnectedProfileProvider>
         <DeckChoicesQuery onChange={onChange} />
       </ConnectedProfileProvider>

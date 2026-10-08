@@ -1,4 +1,5 @@
 import { act, render, waitFor } from "@testing-library/react-native"
+import { ConvexError } from "convex/values"
 
 import { resetConnectedProfileBootstrapForTests } from "@/features/connected/useConnectedProfile"
 
@@ -7,11 +8,17 @@ import { LocalGamePublishSession } from "./LocalGamePublishSession"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
 
 const mockSyncCurrent = jest.fn(async () => "convex-user-a")
-const mockPublish = jest.fn(async (_args: { publicId: string; result: { kind: string } }) => ({
-  publicId: "x",
-  summaryId: "s",
-  finishedAt: 1,
-}))
+const mockPublish = jest.fn(
+  async (_args: {
+    publicId: string
+    result: { kind: string }
+    players: { deckVersionId?: string }[]
+  }) => ({
+    publicId: "x",
+    summaryId: "s",
+    finishedAt: 1,
+  }),
+)
 let mockConnected = true
 
 jest.mock("@clerk/expo", () => ({
@@ -43,7 +50,10 @@ class MemoryStorage implements StringStorage {
   }
 }
 
-function finishedGame(now: number) {
+function finishedGame(
+  now: number,
+  account?: { ownerId: string; meSeat: number; deckVersionId: string },
+) {
   const game = createLocalGame({
     now,
     startingLife: 20,
@@ -51,6 +61,7 @@ function finishedGame(now: number) {
       { name: "Ada", color: "#000000" },
       { name: "Grace", color: "#111111" },
     ],
+    ...(account ? { account } : {}),
   })
   return applyGameCommand(
     game,
@@ -101,5 +112,48 @@ describe("LocalGamePublishSession", () => {
     })
     await waitFor(() => expect(repository.pendingPublishes("owner-a")).toHaveLength(0))
     expect(mockPublish).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe("LocalGamePublishSession rejections", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetConnectedProfileBootstrapForTests()
+    mockConnected = true
+  })
+
+  it("marks a rejected game failed and still uploads the games behind it", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(finishedGame(1), "game_menu", "owner-a")
+    repository.archiveGame(finishedGame(10), "game_menu", "owner-a")
+    mockPublish.mockRejectedValueOnce(
+      new Error(
+        "[CONVEX M(games:publishFinishedLocalGame)] Server Error\nUncaught Error: Invalid public game identifier",
+      ),
+    )
+
+    render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await waitFor(() => expect(repository.pendingPublishes("owner-a")).toHaveLength(0))
+    expect(mockPublish).toHaveBeenCalledTimes(2)
+    // why: History lists newest first, and the newest game was the rejected one.
+    expect(repository.loadHistory().map((game) => game.publish)).toEqual(["failed", "published"])
+  })
+
+  it("retries a deck rejection once without the deck", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(
+      finishedGame(1, { ownerId: "owner-a", meSeat: 0, deckVersionId: "gone" }),
+      "game_menu",
+      "owner-a",
+    )
+    mockPublish.mockRejectedValueOnce(
+      new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" }),
+    )
+
+    render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await waitFor(() => expect(repository.loadHistory()[0].publish).toBe("published"))
+    expect(mockPublish).toHaveBeenCalledTimes(2)
+    expect(mockPublish.mock.calls[0][0].players[0].deckVersionId).toBe("gone")
+    expect(mockPublish.mock.calls[1][0].players[0].deckVersionId).toBeUndefined()
   })
 })

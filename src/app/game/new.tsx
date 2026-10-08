@@ -9,7 +9,7 @@ import {
   LocalGamePublishSource,
   type PublishedGame,
 } from "@/features/connected/LocalGamePublishSource"
-import { LocalDeckChoicesSource } from "@/features/decks/LocalDeckChoicesSource"
+import { LocalDeckChoicesSource, type DeckChoices } from "@/features/decks/LocalDeckChoicesSource"
 import {
   applyGameCommand,
   defaultCommandContext,
@@ -21,7 +21,6 @@ import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 import {
   NewGameScreen,
   type ConnectedHostFeed,
-  type DeckChoice,
   type LocalConnectFeed,
   type NewGameMode,
 } from "@/screens/NewGameScreen"
@@ -66,10 +65,14 @@ export default function NewLocalGameRoute() {
   const [joinCode, setJoinCode] = useState("")
   const [connected, setConnected] = useState<ConnectedHostFeed>()
   const [localConnect, setLocalConnect] = useState<LocalConnectFeed>()
-  const [decks, setDecks] = useState<DeckChoice[]>()
+  const [decks, setDecks] = useState<DeckChoices>()
   const [activeGame, setActiveGame] = useState(() => localGameRepository.loadActiveGame())
   const [defaults] = useState(() => localGameRepository.loadSettings())
-  const [defaultMeSeat] = useState(() => localGameRepository.loadMeSeat())
+  // why: seat 1 is the usual pick on a fresh device; a remembered "none" stays none.
+  const [defaultMeSeat] = useState(() => {
+    const remembered = localGameRepository.loadMeSeat()
+    return remembered === "none" ? undefined : (remembered ?? 0)
+  })
   const [initialGame] = useState(activeGame ?? undefined)
   useFocusEffect(
     useCallback(() => {

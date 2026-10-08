@@ -426,6 +426,17 @@ describe("LocalGameRepository account ownership", () => {
     repository.saveMeSeat(2)
     expect(repository.loadMeSeat()).toBe(2)
     repository.saveMeSeat(undefined)
-    expect(repository.loadMeSeat()).toBeUndefined()
+    expect(repository.loadMeSeat()).toBe("none")
+  })
+
+  it("keeps a rejected game on the device without retrying it", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = makeGame(1)
+    repository.archiveGame(finished(game, 2), "game_menu", "owner-a")
+    repository.markPublishFailed(game.id)
+    expect(repository.loadHistory()[0].publish).toBe("failed")
+    expect(repository.pendingPublishes("owner-a")).toEqual([])
+    repository.markPublished(game.id)
+    expect(repository.loadHistory()[0].publish).toBe("failed")
   })
 })

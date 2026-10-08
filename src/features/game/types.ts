@@ -129,8 +129,8 @@ export interface LocalGameSummary {
   finishedAt: number
   result?: LocalGameResult
   account?: LocalGameAccount
-  /** why: a finished game owned by an account uploads once; the flag survives restarts until the server acks. */
-  publish?: "pending" | "published"
+  /** why: a finished game owned by an account uploads once; the flag survives restarts until the server acks or rejects it. */
+  publish?: "pending" | "published" | "failed"
   /** why: accounts that declined to claim a signed-out game, so a later sign-in picker can skip it. */
   skippedBy?: string[]
 }

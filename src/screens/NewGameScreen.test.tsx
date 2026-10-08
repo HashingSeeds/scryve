@@ -1016,6 +1016,31 @@ describe("NewGameScreen", () => {
     )
   })
 
+  it("keeps a running game's owner when another account renames a player", () => {
+    const onSavePlayers = jest.fn()
+    const fresh = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000" },
+        { name: "Grace", color: "#0000FF" },
+      ],
+      startingLife: 20,
+      account: { ownerId: "owner-a", meSeat: 1 },
+    })
+    const initialGame = applyGameCommand(
+      fresh,
+      { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+      defaultCommandContext(asDeviceId("device_test")),
+    )
+    setup({ initialGame, onSavePlayers, account: { ownerId: "owner-b", decks: [] } })
+    expect(screen.getByLabelText("This is me, Grace")).toBeTruthy()
+    fireEvent.changeText(screen.getByTestId("player-name-1"), "Katherine")
+    fireEvent(screen.getByTestId("player-name-1"), "blur")
+    expect(onSavePlayers).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ name: "Katherine" }), expect.objectContaining({ name: "Grace" })],
+      undefined,
+    )
+  })
+
   it("saves a changed account seat for a running game instead of pre-marking one", () => {
     const onSavePlayers = jest.fn()
     const fresh = runningLocalGame()
