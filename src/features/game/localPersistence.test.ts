@@ -440,3 +440,47 @@ describe("LocalGameRepository account ownership", () => {
     expect(repository.loadHistory()[0].publish).toBe("failed")
   })
 })
+
+describe("LocalGameRepository sign-in claims", () => {
+  function finished(game: ReturnType<typeof makeGame>, now: number) {
+    return applyGameCommand(
+      game,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [game.players[0].id] } },
+      { ...defaultCommandContext(asDeviceId("device-1")), now: () => now },
+    )
+  }
+
+  it("files claimed games under the account for upload and remembers the skipped ones", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const claimed = makeGame(1)
+    const skipped = makeGame(3)
+    repository.archiveGame(finished(claimed, 2))
+    repository.archiveGame(finished(skipped, 4))
+    const listener = jest.fn()
+    repository.onGameFinished(listener)
+
+    repository.resolveClaims("owner-a", [
+      { id: claimed.id, claim: true, mePlayerId: claimed.players[1].id },
+      { id: skipped.id, claim: false },
+    ])
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(repository.pendingPublishes("owner-a").map(({ id }) => id)).toEqual([claimed.id])
+    expect(repository.loadHistory()).toEqual([
+      expect.objectContaining({ id: skipped.id, skippedBy: ["owner-a"] }),
+      expect.objectContaining({
+        id: claimed.id,
+        account: { ownerId: "owner-a", mePlayerId: claimed.players[1].id },
+        publish: "pending",
+      }),
+    ])
+    expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({
+      ownerId: "owner-a",
+      mePlayerId: claimed.players[1].id,
+    })
+    expect(repository.loadHistoryDetail(skipped.id)?.game.account).toBeUndefined()
+
+    repository.resolveClaims("owner-a", [{ id: skipped.id, claim: false }])
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+})

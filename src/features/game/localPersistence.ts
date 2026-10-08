@@ -19,6 +19,7 @@ import {
   MAX_COMMANDER_DAMAGE,
   validatePlayerNames,
 } from "./domain"
+import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import {
   isPlaySystemId,
@@ -386,7 +387,7 @@ export class LocalGameRepository {
 
   constructor(private readonly storage: StringStorage = mmkvStorage) {}
 
-  /** why: the publisher waits for finishes instead of polling storage. */
+  /** why: the publisher waits for finishes and sign-in claims instead of polling storage. */
   onGameFinished(listener: () => void): () => void {
     this.finishListeners.add(listener)
     return () => {
@@ -603,6 +604,25 @@ export class LocalGameRepository {
     return this.loadHistory().filter(
       (game) => game.publish === "pending" && game.account?.ownerId === ownerId,
     )
+  }
+
+  /** why: the sign-in picker files claimed games under the account and remembers who declined the rest. */
+  resolveClaims(ownerId: string, decisions: readonly ClaimDecision[]): void {
+    const history = this.loadHistory()
+    const next = applyClaimDecisions(history, ownerId, decisions)
+    this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
+    const claimed = next.filter((game, index) => game.account && !history[index].account)
+    for (const game of claimed) {
+      const detail = this.loadHistoryDetail(game.id)
+      if (!detail) continue
+      const record: HistoryDetail = {
+        schemaVersion: 1,
+        game: { ...detail.game, account: game.account },
+        eventsTruncated: detail.eventsTruncated,
+      }
+      this.storage.set(LOCAL_KEYS.historyDetail(game.id), JSON.stringify(record))
+    }
+    if (claimed.length > 0) this.finishListeners.forEach((listener) => listener())
   }
 
   markPublished(gameId: string): void {
