@@ -1,9 +1,10 @@
-import { StyleSheet } from "react-native"
-import { fireEvent, render } from "@testing-library/react-native"
+import { AccessibilityInfo, StyleSheet } from "react-native"
+import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import { Polygon, Polyline } from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme, lightTheme } from "@/theme/theme"
+import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./GameRadialMenu"
 
@@ -153,25 +154,55 @@ describe("GameRadialMenu", () => {
     expect(onToggle).not.toHaveBeenCalled()
   })
 
-  it("colors the whole pentagon border and badges it only while a sync signal is set", () => {
+  // why: queried by component type because the host element only carries processed SVG props.
+  const signalLayer = (view: ReturnType<typeof render>, testID: string) =>
+    view.UNSAFE_queryAllByType(Polygon).find((polygon) => polygon.props.testID === testID)
+
+  it("rings and badges the pentagon while a sync signal is set, fading the ring out in its last color", () => {
     const signal = {
       tone: "offline",
       badge: "3",
       accessibilityText: "Offline, 3 changes saved on this device",
     } as const
-    const border = (view: ReturnType<typeof render>) =>
-      view.UNSAFE_getAllByType(Polygon).find((polygon) => polygon.props.strokeWidth === 7)
     const view = render(menu(false, jest.fn(), { signal }))
 
-    expect(border(view)!.props.stroke).toBe(lightTheme.colors.gameMenu.signal.offline)
+    expect(signalLayer(view, "game-menu-signal-ring")!.props.stroke).toBe(
+      lightTheme.colors.gameMenu.signal.offline,
+    )
+    expect(signalLayer(view, "game-menu-signal-trace")).toBeUndefined()
     expect(view.getByTestId("game-menu-signal-badge")).toHaveTextContent("3")
     expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe(
       "Game options. Offline, 3 changes saved on this device",
     )
 
     view.rerender(menu(false))
-    expect(border(view)!.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
+    expect(signalLayer(view, "game-menu-signal-ring")!.props.stroke).toBe(
+      lightTheme.colors.gameMenu.signal.offline,
+    )
     expect(view.queryByTestId("game-menu-signal-badge")).toBeNull()
+  })
+
+  it("circles a trace for a moving sync state, held still as dashes until motion is allowed", async () => {
+    const signal = { tone: "catchingUp", badge: "2" } as const
+    const view = render(menu(false, jest.fn(), { signal }))
+
+    const still = signalLayer(view, "game-menu-signal-trace")!
+    const [stillDash, stillGap] = still.props.strokeDasharray
+    expect(still.props.stroke).toBe(lightTheme.colors.gameMenu.signal.catchingUp)
+    expect(stillDash).toBe(stillGap)
+    expect(still.props.animatedProps).toBeUndefined()
+    expect(signalLayer(view, "game-menu-signal-ring")).toBeUndefined()
+
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false)
+    const moving = render(menu(false, jest.fn(), { signal }))
+    await waitFor(() =>
+      expect(signalLayer(moving, "game-menu-signal-trace")!.props.animatedProps).toBeDefined(),
+    )
+    const [sideLength, restOfOutline] = signalLayer(moving, "game-menu-signal-trace")!.props
+      .strokeDasharray
+    expect(restOfOutline).toBeCloseTo(sideLength * 4)
+    jest.restoreAllMocks()
+    resetReducedMotionCacheForTests()
   })
 
   it("offers the sync status line only while open and keeps a blocked action pressable", () => {
