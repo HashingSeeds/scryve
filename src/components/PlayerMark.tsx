@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { memo, useEffect } from "react"
 import type { StyleProp, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
@@ -11,6 +11,7 @@ import Animated, {
 } from "react-native-reanimated"
 import Svg, { Circle, G, Path, Polygon, Rect } from "react-native-svg"
 
+import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import type { LifeCardContentRotation } from "./playerCardTypes"
@@ -33,7 +34,8 @@ export interface PlayerMarkProps {
 
 const CLOSE_POP_MS = 200
 
-export function PlayerMark({
+/** why: each mark is an SVG, and cards re-render around it on every life change with the same mark. */
+export const PlayerMark = memo(function PlayerMark({
   seatNumber,
   color,
   shape: chosenShape,
@@ -89,7 +91,7 @@ export function PlayerMark({
       ) : null}
     </View>
   )
-}
+}, structurallyEqual)
 
 export function DrawMark({ color, size = 44 }: { color: string; size?: number }) {
   return (
