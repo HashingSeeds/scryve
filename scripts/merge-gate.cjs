@@ -1,9 +1,13 @@
+/**
+ * why: intentionally local-only. Whoever lands a PR (the land skill, with its own gh auth) runs
+ * `node scripts/merge-gate.cjs <pr> [--comment]`. A workflow that comments on fork PRs needs a
+ * privileged trigger like pull_request_target, which is easy to make unsafe in a later edit.
+ */
 const { spawnSync } = require("node:child_process")
 const { isDeepStrictEqual } = require("node:util")
 
 const MARKER = "<!-- merge-gate -->"
 const FINGERPRINT_MARKER = "<!-- native-fingerprint-check -->"
-const SELF_WORKFLOW = "merge gate"
 const FINGERPRINT_WORKFLOW = "native fingerprints"
 // why: a workflow still succeeds when its jobs are skipped, so each expected workflow names the job that must pass.
 const MANDATORY_JOBS = { checks: "checks", [FINGERPRINT_WORKFLOW]: "check" }
@@ -192,10 +196,9 @@ function workflowsGate({ workflowRuns, files }) {
 }
 
 function checksGate(checks) {
-  const others = checks.filter((check) => check.workflow !== SELF_WORKFLOW)
-  const required = others.filter((check) => check.required)
+  const required = checks.filter((check) => check.required)
   // why: main has no required checks today, so every check counts until a ruleset marks some.
-  const counted = required.length > 0 ? required : others
+  const counted = required.length > 0 ? required : checks
   const named = (state) =>
     counted.filter((check) => check.state === state).map((check) => check.name)
   const failing = named("fail")
@@ -385,10 +388,7 @@ function fetchPullRequest(number) {
   return toPullRequest(graphql, files, workflowRuns, packageJsons)
 }
 
-/**
- * why: --comment is for CI; it edits the newest bot comment, so a local run would add a second one.
- * It skips the write when a push moved the head, since that push's own run will report.
- */
+/** why: a push while the gate ran would make the summary stale, so it writes nothing and fails instead. */
 function upsertComment(number, body, headSha) {
   const currentHead = gh([
     "api",
@@ -397,15 +397,16 @@ function upsertComment(number, body, headSha) {
     ".head.sha",
   ]).trim()
   if (currentHead !== headSha) {
-    console.log(`Head moved to ${currentHead.slice(0, 7)}; leaving the comment to that run.`)
-    return
+    console.error(`Head moved to ${currentHead.slice(0, 7)} while checking; run the gate again.`)
+    return false
   }
+  const viewer = gh(["api", "user", "--jq", ".login"]).trim()
   const existing = gh([
     "api",
     `repos/{owner}/{repo}/issues/${number}/comments`,
     "--paginate",
     "--jq",
-    `.[] | select(.user.type == "Bot" and (.body | contains("${MARKER}"))) | .id`,
+    `.[] | select(.user.login == "${viewer}" and (.body | contains("${MARKER}"))) | .id`,
   ])
     .split("\n")
     .filter(Boolean)
@@ -414,6 +415,7 @@ function upsertComment(number, body, headSha) {
     ? ["PATCH", `repos/{owner}/{repo}/issues/comments/${existing}`]
     : ["POST", `repos/{owner}/{repo}/issues/${number}/comments`]
   gh(["api", "-X", method, endpoint, "--input", "-"], JSON.stringify({ body }))
+  return true
 }
 
 function main() {
@@ -427,8 +429,8 @@ function main() {
   const gates = evaluateGates(pr)
   const summary = renderSummary(gates, pr.headSha)
   console.log(summary)
-  if (flag === "--comment") upsertComment(number, summary, pr.headSha)
-  else if (gates.some((gate) => !gate.ok)) process.exitCode = 1
+  const written = flag !== "--comment" || upsertComment(number, summary, pr.headSha)
+  if (!written || gates.some((gate) => !gate.ok)) process.exitCode = 1
 }
 
 if (require.main === module) main()

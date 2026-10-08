@@ -86,11 +86,10 @@ const gates = (options) => evaluateGates(pullRequest(options))
 const gate = (options, name) => gates(options).find((candidate) => candidate.name === name)
 const ready = (options) => gates(options).every((candidate) => candidate.ok)
 
-test("required checks win over the rest, and the gate ignores its own run", () => {
+test("required checks win over the rest", () => {
   const contexts = [
     checkRun("checks", "COMPLETED", "SUCCESS", { required: true }),
     checkRun("export", "COMPLETED", "FAILURE"),
-    checkRun("comment", "IN_PROGRESS", null, { workflow: "merge gate" }),
   ]
   assert.deepEqual(gate({ contexts }, "Required checks"), {
     name: "Required checks",
