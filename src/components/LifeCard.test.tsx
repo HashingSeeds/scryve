@@ -38,6 +38,36 @@ describe("LifeCard", () => {
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => jest.useRealTimers())
 
+  it("adds up recent changes on the matching side, even while its controls are hidden", () => {
+    const seat = (life: number, ownership?: "unowned") => (
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={life}
+          color="#41476E"
+          ownership={ownership}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const view = render(seat(20))
+    view.rerender(seat(22))
+    view.rerender(seat(21))
+    expect(view.getByText("+1")).toBeTruthy()
+
+    view.rerender(seat(22, "unowned"))
+    expect(view.queryByText("+2")).toBeNull()
+    view.rerender(seat(22))
+    expect(view.getByText("+2")).toBeTruthy()
+
+    view.rerender(seat(19))
+    expect(view.getByText("-1")).toBeTruthy()
+    act(() => jest.advanceTimersByTime(1800))
+    expect(view.getByText("+")).toBeTruthy()
+    expect(view.getByText("−")).toBeTruthy()
+  })
+
   it.each([false, true])(
     "preserves seat colors and theme rounding in local commander modes, compact=%s",
     (compact) => {

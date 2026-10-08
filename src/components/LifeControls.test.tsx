@@ -64,6 +64,7 @@ describe("LifeControls", () => {
       <ThemeProvider initialContext="dark">
         <LifeControls
           playerName="Yugi"
+
           system="ygo"
           onChange={onChange}
           onLongChange={onLongChange}

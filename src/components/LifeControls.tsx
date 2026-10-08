@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 
@@ -24,7 +24,7 @@ export interface LifeControlsProps {
   contentRotation?: LifeCardContentRotation
   system?: PlaySystemId
   lifeStep?: number
-  recentDelta?: number
+  recentDelta?: RecentDelta
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1) => void
   style?: StyleProp<ViewStyle>
@@ -38,6 +38,55 @@ const HALF_CARD_ZONES: readonly {
   { direction: -1, glyph: "−", edge: "left" },
   { direction: 1, glyph: "+", edge: "right" },
 ]
+
+const RECENT_DELTA_VISIBLE_MS = 1800
+
+export interface RecentDelta {
+  get: () => number
+  subscribe: (listener: () => void) => () => void
+}
+
+const NO_RECENT_DELTA: RecentDelta = { get: () => 0, subscribe: () => () => {} }
+
+/**
+ * why: the card owns the bubble so it keeps adding up while the controls are hidden (commander
+ * overview, damage assignment), but only the controls subscribe, so showing and clearing it
+ * re-renders just the two zones instead of the whole card.
+ */
+export function useRecentDelta(life: number): RecentDelta {
+  const [store] = useState(createRecentDeltaStore)
+  const previousLife = useRef(life)
+  useLayoutEffect(() => {
+    const difference = life - previousLife.current
+    previousLife.current = life
+    if (difference !== 0) store.add(difference)
+  }, [life, store])
+  useEffect(() => store.stop, [store])
+  return store
+}
+
+function createRecentDeltaStore() {
+  let delta = 0
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const listeners = new Set<() => void>()
+  const publish = (next: number) => {
+    delta = next
+    for (const listener of listeners) listener()
+  }
+  return {
+    get: () => delta,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => void listeners.delete(listener)
+    },
+    add: (difference: number) => {
+      publish(delta + difference)
+      clearTimeout(timer)
+      timer = setTimeout(() => publish(0), RECENT_DELTA_VISIBLE_MS)
+    },
+    stop: () => clearTimeout(timer),
+  }
+}
 
 export function lifeControlTestId(seatNumber: number, delta: LifeDelta) {
   return `life-seat-${seatNumber}-${delta}`
@@ -56,12 +105,13 @@ export function LifeControls({
   contentRotation = 0,
   system,
   lifeStep,
-  recentDelta = 0,
+  recentDelta: recentDeltaStore = NO_RECENT_DELTA,
   onChange,
   onLongChange,
   style,
 }: LifeControlsProps) {
   const { themed } = useAppTheme()
+  const recentDelta = useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get)
   const longPressHandled = useRef<LifeDelta | null>(null)
   const displayName = playerName.trim() || "unnamed player"
   const contentRotationStyle: TextStyle | undefined = contentRotation
