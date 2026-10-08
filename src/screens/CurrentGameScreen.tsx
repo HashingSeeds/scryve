@@ -23,6 +23,7 @@ import { supportsCommanderDamage } from "@/features/game/playSystems"
 import type { GamePlayer, LocalGame, LocalGameResult, PlayerId } from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
+import { useSeatColors } from "@/features/game/useSeatColors"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
@@ -216,10 +217,7 @@ export function CurrentGameScreen({
     ],
   )
 
-  const seatColors = useMemo(
-    () => runtime.game.players.map((player) => player.color),
-    [runtime.game.players],
-  )
+  const seatColors = useSeatColors(runtime.game.players)
   const exitAction = useMemo(
     () =>
       armedPlayerId || inspectedPlayerId

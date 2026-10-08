@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 import type {
   LayoutChangeEvent,
   LayoutRectangle,
@@ -128,7 +128,8 @@ function UpdatedAgo({ since, color }: { since: number; color: string }) {
   )
 }
 
-export function LifeCard({
+/** why: the board re-renders on every sync step and server update; a seat only needs to when its own props change. Flat objects (insets, edges, corner style) are rebuilt per render, so they compare by content. */
+export const LifeCard = memo(function LifeCard({
   playerName,
   seatNumber,
   shape,
@@ -754,7 +755,7 @@ export function LifeCard({
       ) : null}
     </View>
   )
-}
+}, sameLifeCardProps)
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
@@ -960,3 +961,30 @@ const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
 
 const $overviewReadout: ViewStyle = { zIndex: 8 }
+
+function sameLifeCardProps(previous: LifeCardProps, next: LifeCardProps): boolean {
+  const keys = Object.keys(next) as (keyof LifeCardProps)[]
+  return (
+    keys.length === Object.keys(previous).length &&
+    keys.every(
+      (key) =>
+        key in previous &&
+        (Object.is(previous[key], next[key]) || sameFlatObject(previous[key], next[key])),
+    )
+  )
+}
+
+function sameFlatObject(previous: unknown, next: unknown): boolean {
+  if (!isPlainObject(previous) || !isPlainObject(next)) return false
+  const keys = Object.keys(next)
+  return (
+    keys.length === Object.keys(previous).length &&
+    keys.every((key) => key in previous && Object.is(previous[key], next[key]))
+  )
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === "object" && value !== null && Object.getPrototypeOf(value) === Object.prototype
+  )
+}

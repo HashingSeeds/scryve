@@ -36,6 +36,24 @@ function players(count: number) {
 }
 
 describe("PlayerGrid", () => {
+  it("sends a seat's life change to the latest onChange after the board re-renders", () => {
+    const first = jest.fn()
+    const latest = jest.fn()
+    const view = render(
+      <ThemeProvider>
+        <PlayerGrid players={players(2)} onChange={first} />
+      </ThemeProvider>,
+    )
+    view.rerender(
+      <ThemeProvider>
+        <PlayerGrid players={players(2)} onChange={latest} />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    expect(first).not.toHaveBeenCalled()
+    expect(latest).toHaveBeenCalledWith(asPlayerId("player-0"), 1)
+  })
+
   it("reveals the board only once life totals have their measured size", () => {
     const window = Dimensions.get("window")
     Dimensions.set({
