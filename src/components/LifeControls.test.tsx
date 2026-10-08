@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -11,7 +11,7 @@ describe("LifeControls", () => {
     const onLongChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Ada" life={20} onChange={onChange} onLongChange={onLongChange} />
+        <LifeControls playerName="Ada" onChange={onChange} onLongChange={onLongChange} />
       </ThemeProvider>,
     )
     for (const delta of [-1, 1] as const) {
@@ -36,7 +36,7 @@ describe("LifeControls", () => {
   it("keeps ±1 reachable as full card halves rather than small buttons", () => {
     const view = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Ada" life={20} onChange={jest.fn()} />
+        <LifeControls playerName="Ada" onChange={jest.fn()} />
       </ThemeProvider>,
     )
     for (const delta of [-1, 1] as const) {
@@ -49,7 +49,7 @@ describe("LifeControls", () => {
   it("marks every control disabled together", () => {
     const view = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Ada" life={20} disabled onChange={jest.fn()} />
+        <LifeControls playerName="Ada" disabled onChange={jest.fn()} />
       </ThemeProvider>,
     )
     for (const delta of [-1, 1] as const) {
@@ -64,7 +64,7 @@ describe("LifeControls", () => {
       <ThemeProvider initialContext="dark">
         <LifeControls
           playerName="Yugi"
-          life={8000}
+
           system="ygo"
           onChange={onChange}
           onLongChange={onLongChange}
@@ -86,7 +86,7 @@ describe("LifeControls", () => {
     const onChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
-        <LifeControls playerName="Ada" life={20} system="mtg" lifeStep={5} onChange={onChange} />
+        <LifeControls playerName="Ada" system="mtg" lifeStep={5} onChange={onChange} />
       </ThemeProvider>,
     )
 
@@ -97,7 +97,7 @@ describe("LifeControls", () => {
   it("uses one as Magic's default change amount", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
-        <LifeControls playerName="Ada" life={20} system="mtg" onChange={jest.fn()} />
+        <LifeControls playerName="Ada" system="mtg" onChange={jest.fn()} />
       </ThemeProvider>,
     )
 
@@ -107,7 +107,7 @@ describe("LifeControls", () => {
   it("uses Prize card language for Pokémon", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
-        <LifeControls playerName="Red" life={20} system="pokemon" onChange={jest.fn()} />
+        <LifeControls playerName="Red" system="pokemon" onChange={jest.fn()} />
       </ThemeProvider>,
     )
 
@@ -119,7 +119,7 @@ describe("LifeControls", () => {
   it("turns sideways controls toward each player's outside edge", () => {
     const left = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Ada" life={20} contentRotation={90} onChange={jest.fn()} />
+        <LifeControls playerName="Ada" contentRotation={90} onChange={jest.fn()} />
       </ThemeProvider>,
     )
     expect(StyleSheet.flatten(left.getByTestId("life-control-zones").props.style)).toMatchObject({
@@ -128,7 +128,7 @@ describe("LifeControls", () => {
 
     const right = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Grace" life={20} contentRotation={-90} onChange={jest.fn()} />
+        <LifeControls playerName="Grace" contentRotation={-90} onChange={jest.fn()} />
       </ThemeProvider>,
     )
     expect(StyleSheet.flatten(right.getByTestId("life-control-zones").props.style)).toMatchObject({
@@ -139,7 +139,7 @@ describe("LifeControls", () => {
   it("pins sideways glyphs to the outer edges clear of the rotated life total", () => {
     const left = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Ada" life={20} contentRotation={90} onChange={jest.fn()} />
+        <LifeControls playerName="Ada" contentRotation={90} onChange={jest.fn()} />
       </ThemeProvider>,
     )
     expect(StyleSheet.flatten(left.getByTestId("life-seat-1--1").props.style)).toMatchObject({
@@ -153,7 +153,7 @@ describe("LifeControls", () => {
 
     const right = render(
       <ThemeProvider initialContext="light">
-        <LifeControls playerName="Grace" life={20} contentRotation={-90} onChange={jest.fn()} />
+        <LifeControls playerName="Grace" contentRotation={-90} onChange={jest.fn()} />
       </ThemeProvider>,
     )
     expect(StyleSheet.flatten(right.getByTestId("life-seat-1--1").props.style)).toMatchObject({
@@ -164,27 +164,5 @@ describe("LifeControls", () => {
       justifyContent: "flex-start",
       alignItems: "center",
     })
-  })
-
-  it("shows recent changes on the matching side, then clears them", () => {
-    jest.useFakeTimers()
-    const controls = (life: number) => (
-      <ThemeProvider initialContext="dark">
-        <LifeControls playerName="Ada" life={life} onChange={jest.fn()} />
-      </ThemeProvider>
-    )
-    const view = render(controls(20))
-    view.rerender(controls(22))
-    view.rerender(controls(21))
-    expect(view.getByText("+1")).toBeTruthy()
-    expect(view.getByText("−")).toBeTruthy()
-
-    view.rerender(controls(18))
-    expect(view.getByText("-2")).toBeTruthy()
-
-    act(() => jest.advanceTimersByTime(1800))
-    expect(view.getByText("+")).toBeTruthy()
-    expect(view.getByText("−")).toBeTruthy()
-    jest.useRealTimers()
   })
 })

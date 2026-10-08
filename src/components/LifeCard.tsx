@@ -33,7 +33,7 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import { CommanderStrip } from "./CommanderStrip"
-import { LifeControls } from "./LifeControls"
+import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
   COMPACT_LIFE_FONT_SIZE,
@@ -299,6 +299,7 @@ export const LifeCard = memo(function LifeCard({
     reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [editorOpen, setEditorOpen] = useState(false)
+  const recentDelta = useRecentDelta(life)
   const previousLife = useRef(life)
   useEffect(() => {
     if (previousLife.current === life) return
@@ -635,7 +636,7 @@ export const LifeCard = memo(function LifeCard({
           contentRotation={contentRotation}
           system={system}
           lifeStep={lifeStep}
-          life={life}
+          recentDelta={recentDelta}
           onChange={onChange}
           onLongChange={() => setEditorOpen(true)}
         />
