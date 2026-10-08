@@ -4,6 +4,9 @@ const MARKER = "<!-- merge-gate -->"
 const FINGERPRINT_MARKER = "<!-- native-fingerprint-check -->"
 const SELF_WORKFLOW = "merge gate"
 const FINGERPRINT_WORKFLOW = "native fingerprints"
+// why: a workflow still succeeds when its jobs are skipped, so each expected workflow names the job that must pass.
+const MANDATORY_JOBS = { checks: "checks", [FINGERPRINT_WORKFLOW]: "check" }
+const CI_CONFIG = /^(?:\.github\/workflows\/|scripts\/merge-gate\.cjs$)/
 // why: mirrors the paths: trigger of fingerprints.yml, so keep the two in sync.
 const NATIVE_INPUT =
   /^(?:package\.json|pnpm-lock\.yaml|app\.json|app\.config\.ts|eas\.json|(?:patches|assets|modules)\/)/
@@ -75,6 +78,18 @@ function statusContextState({ state }) {
   return "fail"
 }
 
+/** why: a re-run keeps its created_at, so the latest attempt is the one that started last. */
+function latestRuns(workflowRuns) {
+  const newestFirst = workflowRuns
+    .filter((run) => run.event === "pull_request" && run.name in MANDATORY_JOBS)
+    .toSorted((a, b) =>
+      (b.run_started_at ?? b.created_at).localeCompare(a.run_started_at ?? a.created_at),
+    )
+  return Object.keys(MANDATORY_JOBS).flatMap(
+    (name) => newestFirst.find((run) => run.name === name) ?? [],
+  )
+}
+
 function toPullRequest(graphql, restFiles, workflowRuns) {
   const pr = graphql.data.repository.pullRequest
   const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup
@@ -93,10 +108,12 @@ function toPullRequest(graphql, restFiles, workflowRuns) {
     truncated: Object.keys(pages).filter((key) => pages[key]),
     // why: a rename lists its old path only as previous_filename, and moving a file out of convex/ still changes convex/.
     files: restFiles.flatMap((file) => [file.filename, file.previous_filename ?? []].flat()),
-    workflowRuns: workflowRuns
-      .filter((run) => run.event === "pull_request")
-      .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
-      .map(({ name, status, conclusion }) => ({ name, status, conclusion })),
+    workflowRuns: latestRuns(workflowRuns).map(({ name, status, conclusion, jobs }) => ({
+      name,
+      status,
+      conclusion,
+      jobs: jobs.map((job) => ({ name: job.name, conclusion: job.conclusion })),
+    })),
     reviews: pr.reviews.nodes.map((review) => ({
       author: review.author?.login,
       state: review.state,
@@ -144,9 +161,10 @@ function workflowsGate({ workflowRuns, files }) {
     const newest = workflowRuns.find((run) => run.name === name)
     if (!newest) return [`${name} has not started`]
     if (newest.status !== "completed") return [`${name} is ${newest.status.replace(/_/g, " ")}`]
-    return newest.conclusion === "success"
-      ? []
-      : [`${name} ${newest.conclusion.replace(/_/g, " ")}`]
+    if (newest.conclusion !== "success") return [`${name} ${newest.conclusion.replace(/_/g, " ")}`]
+    const job = MANDATORY_JOBS[name]
+    const conclusion = newest.jobs.find((candidate) => candidate.name === job)?.conclusion
+    return conclusion === "success" ? [] : [`${name} job ${job} ${conclusion ?? "missing"}`]
   })
   return problems.length > 0
     ? { name: "Workflows", ok: false, detail: problems.join("; ") }
@@ -251,6 +269,13 @@ function evidenceGate({ body, files }) {
     : { name, ok: true, detail: "not needed, no app changes in src/" }
 }
 
+/** why: a PR could otherwise weaken the workflows or script that grade it. */
+function ciConfigGate(files) {
+  return files.some((file) => CI_CONFIG.test(file))
+    ? { name: "CI config", ok: false, detail: "CI config changed, needs Matthew" }
+    : { name: "CI config", ok: true, detail: "no workflow or merge gate changes" }
+}
+
 function evaluateGates(pr) {
   return [
     completenessGate(pr.truncated),
@@ -258,6 +283,7 @@ function evaluateGates(pr) {
     checksGate(pr.checks),
     ...Object.entries(REVIEWERS).map(([name, login]) => reviewerGate(name, login, pr)),
     convexGate(pr.files),
+    ciConfigGate(pr.files),
     fingerprintGate(pr),
     evidenceGate(pr),
   ]
@@ -305,9 +331,16 @@ function fetchPullRequest(number) {
   const pages = (endpoint) => JSON.parse(gh(["api", endpoint, "--paginate", "--slurp"]))
   const files = pages(`repos/{owner}/{repo}/pulls/${number}/files?per_page=100`).flat()
   const headSha = graphql.data.repository.pullRequest.headRefOid
-  const workflowRuns = pages(
-    `repos/{owner}/{repo}/actions/runs?head_sha=${headSha}&per_page=100`,
-  ).flatMap((page) => page.workflow_runs)
+  const workflowRuns = latestRuns(
+    pages(`repos/{owner}/{repo}/actions/runs?head_sha=${headSha}&per_page=100`).flatMap(
+      (page) => page.workflow_runs,
+    ),
+  ).map((run) => ({
+    ...run,
+    jobs: pages(
+      `repos/{owner}/{repo}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`,
+    ).flatMap((page) => page.jobs),
+  }))
   return toPullRequest(graphql, files, workflowRuns)
 }
 

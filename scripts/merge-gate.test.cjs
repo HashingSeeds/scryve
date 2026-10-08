@@ -12,12 +12,19 @@ const checkRun = (name, status, conclusion, { required = false, workflow = "chec
   checkSuite: { workflowRun: workflow ? { workflow: { name: workflow } } : null },
 })
 
-const completedRun = (name, conclusion = "success", created_at = "2026-10-08T12:00:00Z") => ({
+const jobNames = { "checks": "checks", "native fingerprints": "check" }
+const completedRun = (
+  name,
+  conclusion = "success",
+  { created = "2026-10-08T12:00:00Z", started = created, job = conclusion } = {},
+) => ({
   name,
   event: "pull_request",
   status: "completed",
   conclusion,
-  created_at,
+  created_at: created,
+  run_started_at: started,
+  jobs: [{ name: jobNames[name], conclusion: job }],
 })
 
 function pullRequest({
@@ -122,11 +129,45 @@ test("only a successful newest run of each expected workflow counts", () => {
     gate({ contexts, runs: [completedRun("checks", "cancelled")] }, "Workflows").detail,
     "checks cancelled",
   )
-  const rerun = [
-    completedRun("checks", "success", "2026-10-08T12:00:00Z"),
-    completedRun("checks", "failure", "2026-10-08T12:05:00Z"),
+  const newer = [
+    completedRun("checks", "success", { created: "2026-10-08T12:00:00Z" }),
+    completedRun("checks", "failure", { created: "2026-10-08T12:05:00Z" }),
   ]
-  assert.equal(gate({ runs: rerun }, "Workflows").detail, "checks failure")
+  assert.equal(gate({ runs: newer }, "Workflows").detail, "checks failure")
+
+  const rerunOfOlder = [
+    completedRun("checks", "success", { created: "2026-10-08T12:05:00Z" }),
+    completedRun("checks", "cancelled", {
+      created: "2026-10-08T12:00:00Z",
+      started: "2026-10-08T12:10:00Z",
+    }),
+  ]
+  assert.equal(ready({ runs: rerunOfOlder }), false)
+  assert.equal(gate({ runs: rerunOfOlder }, "Workflows").detail, "checks cancelled")
+})
+
+test("a successful workflow whose mandatory job was skipped does not count", () => {
+  const runs = [completedRun("checks", "success", { job: "skipped" })]
+  assert.equal(ready({ runs }), false)
+  assert.equal(gate({ runs }, "Workflows").detail, "checks job checks skipped")
+  const fingerprintRuns = [
+    completedRun("checks"),
+    completedRun("native fingerprints", "success", { job: "skipped" }),
+  ]
+  assert.equal(
+    gate({ files: ["app.json"], runs: fingerprintRuns }, "Workflows").detail,
+    "native fingerprints job check skipped",
+  )
+})
+
+test("changes to workflows or the gate itself need Matthew", () => {
+  assert.equal(ready({ files: [".github/workflows/checks.yml"] }), false)
+  assert.deepEqual(gate({ files: ["scripts/merge-gate.cjs"] }, "CI config"), {
+    name: "CI config",
+    ok: false,
+    detail: "CI config changed, needs Matthew",
+  })
+  assert.equal(gate({ files: ["src/a.ts"] }, "CI config").ok, true)
 })
 
 test("a bot's requested changes stand until it approves, and its open threads block", () => {
