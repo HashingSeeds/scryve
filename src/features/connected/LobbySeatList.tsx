@@ -117,6 +117,16 @@ export function LobbySeatList({
         const deckReady = Boolean(seat.deckVersionId)
         const ready = !deckRequired || deckReady
         const selectingDeck = selectingDeckSeats?.has(seat.seat) ?? false
+        const showManageDecks = Boolean(
+          seat.controlledByMe && onManageDecks && system !== NO_PLAY_SYSTEM,
+        )
+        const onlyAddDeckAction =
+          deckState.status === "ready" &&
+          system !== NO_PLAY_SYSTEM &&
+          usableDecks.length === 0 &&
+          showManageDecks &&
+          (deckRequired || !seat.deckVersionId) &&
+          !selectingDeck
         return (
           <View key={seat.playerId ?? `seat-${seat.seat}`} style={themed($seat)}>
             <View style={themed($seatRow)}>
@@ -172,6 +182,15 @@ export function LobbySeatList({
                   }
                 />
               </View>
+              {showManageDecks ? (
+                <Button
+                  testID={`manage-seat-${seat.seat}-decks`}
+                  text={usableDecks.length === 0 ? "Add a deck" : "Manage decks"}
+                  style={themed($rowAction)}
+                  textStyle={themed($rowActionText)}
+                  onPress={onManageDecks}
+                />
+              ) : null}
               {!seat.controlledByMe && seat.playerId ? (
                 <Button
                   testID={`lobby-report-player-seat-${seat.seat}`}
@@ -183,7 +202,7 @@ export function LobbySeatList({
                 />
               ) : null}
             </View>
-            {seat.controlledByMe ? (
+            {seat.controlledByMe && !onlyAddDeckAction ? (
               <View style={themed($deckChoices)}>
                 {system === NO_PLAY_SYSTEM ? (
                   <Text
@@ -282,13 +301,6 @@ export function LobbySeatList({
                     onPress={() => onSelectVersion(seat.seat)}
                   />
                 ) : null}
-                {onManageDecks && system !== NO_PLAY_SYSTEM ? (
-                  <Button
-                    testID={`manage-seat-${seat.seat}-decks`}
-                    text={usableDecks.length === 0 ? "Add a deck" : "Manage decks"}
-                    onPress={onManageDecks}
-                  />
-                ) : null}
                 {selectingDeck ? (
                   <Text
                     testID={`seat-${seat.seat}-deck-selection-status`}
@@ -341,6 +353,12 @@ const $report: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xs,
 })
 const $reportText: ThemedStyle<TextStyle> = () => ({ fontSize: 14 })
+const $rowAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  minHeight: 44,
+  paddingVertical: spacing.xxs,
+  paddingHorizontal: spacing.sm,
+})
+const $rowActionText: ThemedStyle<TextStyle> = () => ({ fontSize: 14, lineHeight: 18 })
 const $deckLoading: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $deckPlaceholderRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 44,
