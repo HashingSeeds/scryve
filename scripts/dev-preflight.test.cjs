@@ -15,6 +15,8 @@ const {
   needsInstall,
   parseEnv,
   liveRecords,
+  lockListenerInode,
+  lsofLockListener,
   pickPort,
   planStart,
   processInfo,
@@ -120,7 +122,7 @@ test("an unrelated app on the first lock port neither blocks starts nor lets the
     assert.equal(await holdTogether(lockPorts), false)
     await assert.rejects(
       withLock(async () => "acquired", { ports: [lockPort] }),
-      /used by another app/,
+      /used by another app\. Set SCRYVE_DEV_LOCK_PORT=/,
     )
   } finally {
     silent.kill("SIGKILL")
@@ -153,6 +155,32 @@ test("a holder whose event loop is blocked never lets a second start in", async 
     holder.kill("SIGKILL")
     fs.rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test("the owner lookup only considers listeners that conflict with 127.0.0.1", () => {
+  const row = (address, state, inode) =>
+    `   0: ${address}:4E20 00000000:0000 ${state} 00000000:00000000 00:00000000 00000000  1000        0 ${inode} 1`
+  const header =
+    "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode"
+  const tables = (...rows) => [header, ...rows].join("\n")
+  assert.equal(
+    lockListenerInode(
+      tables(row("0200007F", "0A", 111), row("0100007F", "01", 222), row("0100007F", "0A", 333)),
+      20000,
+    ),
+    "333",
+  )
+  assert.equal(lockListenerInode(tables(row("00000000", "0A", 444)), 20000), "444")
+  assert.equal(
+    lockListenerInode(tables(row("00000000000000000000000000000000", "0A", 555)), 20000),
+    "555",
+  )
+  assert.equal(lockListenerInode(tables(row("0200007F", "0A", 111)), 20000), null)
+
+  const lsof = (name) => `p11\nf5\nn127.0.0.2:20000\np22\nf6\nn${name}`
+  assert.equal(lsofLockListener(lsof("127.0.0.1:20000"), 20000), 22)
+  assert.equal(lsofLockListener(lsof("*:20000"), 20000), 22)
+  assert.equal(lsofLockListener(lsof("[::1]:20000"), 20000), null)
 })
 
 test("a killed lock holder frees the lock", async () => {

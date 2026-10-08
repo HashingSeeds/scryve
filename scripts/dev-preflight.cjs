@@ -9,7 +9,10 @@ const { setTimeout } = require("node:timers")
 const DEFAULT_METRO_PORT = 8081
 const LAST_METRO_PORT = 8099
 const STOP_WAIT_MS = 3000
-const LOCK_PORTS = Array.from({ length: 10 }, (_, index) => 18080 + index)
+const LOCK_BASE_PORT = Number(process.env.SCRYVE_DEV_LOCK_PORT || 18080)
+if (!Number.isInteger(LOCK_BASE_PORT) || LOCK_BASE_PORT < 1024 || LOCK_BASE_PORT > 65526)
+  throw new Error(`SCRYVE_DEV_LOCK_PORT must be a port from 1024 to 65526`)
+const LOCK_PORTS = Array.from({ length: 10 }, (_, index) => LOCK_BASE_PORT + index)
 const LOCK_TOKEN = "scryve-dev-lock\n"
 const LOCK_PROBE_MS = 100
 const TEMP_RECORD_MAX_AGE_MS = 60_000
@@ -226,13 +229,23 @@ async function withLock(fn, { ports = LOCK_PORTS, waitMs = LOCK_WAIT_MS } = {}) 
       if (holder) break
     }
     if (!holder)
-      throw new Error(`Every lock port from ${ports[0]} to ${ports.at(-1)} is used by another app.`)
-    if (Date.now() > deadline)
       throw new Error(
-        `Lock port ${holder.port} has been held by pid ${holder.pid ?? listenerPid(holder.port) ?? "unknown"} for over ${waitMs / 1000} s. If that is a stuck pnpm start, stop it.`,
+        `Every lock port from ${ports[0]} to ${ports.at(-1)} is used by another app. ${OTHER_LOCK_PORTS}`,
       )
+    if (Date.now() > deadline) throw new Error(lockBusyMessage(holder, waitMs))
     await sleep(25)
   }
+}
+
+const OTHER_LOCK_PORTS =
+  "Set SCRYVE_DEV_LOCK_PORT=<port> for every pnpm start to use the 10 lock ports from there instead."
+
+function lockBusyMessage(holder, waitMs) {
+  const pid = holder.pid ?? listenerPid(holder.port)
+  const busy = `Lock port ${holder.port} has been`
+  if (pid)
+    return `${busy} held by pid ${pid} for over ${waitMs / 1000} s. Stop it if it is a stuck pnpm start or another app. ${OTHER_LOCK_PORTS}`
+  return `${busy} busy for over ${waitMs / 1000} s and its owner is unknown. Find it with \`lsof -nP -iTCP:${holder.port} -sTCP:LISTEN\` (Linux: \`ss -ltnp 'sport = :${holder.port}'\`) and stop it. ${OTHER_LOCK_PORTS}`
 }
 
 function listen(port) {
@@ -276,13 +289,13 @@ function probe(port) {
 
 function listenerPid(port) {
   if (process.platform !== "linux") {
-    const lsof = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fp"], {
+    const lsof = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fpn"], {
       encoding: "utf8",
     }).stdout
-    const pid = lsof?.match(/^p(\d+)$/m)?.[1]
-    return pid ? Number(pid) : null
+    return lsofLockListener(lsof ?? "", port)
   }
-  const inode = listeningInode(port)
+  const tables = ["/proc/net/tcp", "/proc/net/tcp6"].map((table) => readFile(table)?.toString())
+  const inode = lockListenerInode(tables.join("\n"), port)
   if (!inode) return null
   const socket = `socket:[${inode}]`
   for (const pid of fs.readdirSync("/proc").filter((name) => /^\d+$/.test(name))) {
@@ -298,14 +311,31 @@ function listenerPid(port) {
 }
 
 const TCP_LISTEN = "0A"
+// why: these are 127.0.0.1, 0.0.0.0, ::, and ::ffff:127.0.0.1 as /proc/net/tcp{,6} print them, the only listeners that conflict with the lock's bind.
+const LOCK_CONFLICT_ADDRESSES = new Set([
+  "0100007F",
+  "00000000",
+  "00000000000000000000000000000000",
+  "0000000000000000FFFF00000100007F",
+])
 
-function listeningInode(port) {
+function lockListenerInode(tables, port) {
   const hexPort = port.toString(16).toUpperCase().padStart(4, "0")
-  for (const table of ["/proc/net/tcp", "/proc/net/tcp6"]) {
-    for (const line of readFile(table)?.toString().split("\n").slice(1) ?? []) {
-      const fields = line.trim().split(/\s+/)
-      if (fields[1]?.endsWith(`:${hexPort}`) && fields[3] === TCP_LISTEN) return fields[9]
-    }
+  for (const line of tables.split("\n")) {
+    const fields = line.trim().split(/\s+/)
+    const [address, localPort] = fields[1]?.split(":") ?? []
+    if (localPort === hexPort && fields[3] === TCP_LISTEN && LOCK_CONFLICT_ADDRESSES.has(address))
+      return fields[9]
+  }
+  return null
+}
+
+function lsofLockListener(output, port) {
+  const conflicting = new Set([`127.0.0.1:${port}`, `*:${port}`, `[::ffff:127.0.0.1]:${port}`])
+  let pid = null
+  for (const line of output.split("\n")) {
+    if (line.startsWith("p")) pid = Number(line.slice(1))
+    else if (line.startsWith("n") && conflicting.has(line.slice(1))) return pid
   }
   return null
 }
@@ -394,6 +424,8 @@ module.exports = {
   expoEnv,
   isPortFree,
   liveRecords,
+  lockListenerInode,
+  lsofLockListener,
   needsInstall,
   parseEnv,
   pickPort,
