@@ -162,7 +162,18 @@ const loadedDetail = {
   version: mainVersion,
   cards: [solRing],
   capacity: { used: 2, limit: 5, premium: true, canCreate: true },
-  record: { games: 6, wins: 3, losses: 3, draws: 0, unknown: 0 },
+  record: {
+    games: 6,
+    wins: 3,
+    losses: 3,
+    draws: 0,
+    unknown: 0,
+    connected: { games: { total: 6, wins: 3, losses: 3, draws: 0, unknown: 0 } },
+    manual: {
+      matches: { total: 2, wins: 1, losses: 1, draws: 0, unknown: 0 },
+      games: { total: 3, wins: 2, losses: 1, draws: 0, unknown: 0 },
+    },
+  },
   analyticsLocked: false,
 }
 
@@ -1464,13 +1475,28 @@ describe("DeckDetailScreen", () => {
     expect(view.getByText("Ramp into big spells")).toBeTruthy()
     fireEvent.press(view.getByTestId("deck-settings-button"))
     expect(view.getByText("The list I actually sleeve")).toBeTruthy()
-    expect(view.getByText("3–1")).toBeTruthy()
+    expect(view.getByText("Games 3-1-0")).toBeTruthy()
     expect(view.getAllByText("1 card").length).toBeGreaterThan(0)
     expect(
       StyleSheet.flatten(view.getByTestId("version-marker-version-main").props.style)
         .backgroundColor,
     ).toBe(colors.gameMenu.actions.history)
     expect(view.queryByText(/Premium/)).toBeNull()
+  })
+
+  it("filters deck and version stats by source", () => {
+    const view = renderDetail()
+    expect(view.queryByTestId("deck-stats-line-matches")).toBeNull()
+    expect(view.getByText("3-3-0")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-stats-source-manual"))
+    expect(view.getByText("1-1-0")).toBeTruthy()
+    expect(view.getByText("2-1-0")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-stats-source-all"))
+    expect(view.getByText("1-1-0")).toBeTruthy()
+    expect(view.getByText("5-4-0")).toBeTruthy()
+    fireEvent.press(view.getByTestId("deck-settings-button"))
+    expect(view.getByText("Games 3-1-0")).toBeTruthy()
+    expect(view.getByText("Unplayed")).toBeTruthy()
   })
 
   it("shows the selected deck context while its detail loads", () => {

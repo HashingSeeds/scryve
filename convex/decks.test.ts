@@ -11,6 +11,7 @@ const modules = {
   "./entitlements.ts": async () => jest.requireActual("./entitlements"),
   "./games.ts": async () => jest.requireActual("./games"),
   "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
+  "./matches.ts": async () => jest.requireActual("./matches"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
 
@@ -694,6 +695,55 @@ describe("premium deck tracking", () => {
     await expect(host.query(api.decks.detail, { deckId })).resolves.toMatchObject({
       record: { games: 1, wins: 1 },
       versions: [{ record: { games: 1, wins: 1 } }],
+    })
+  })
+
+  it("returns manual match counters beside Scryve games without changing the game fields", async () => {
+    const t = convexTest(schema, modules)
+    const owner = await synced(t, "manual-owner", "Owner")
+    const deckId = await owner.mutation(api.decks.create, { name: "Burn", format: "modern" })
+    const deckVersionId = await owner.mutation(api.decks.saveVersion, { deckId, cards: [] })
+    const finishedAt = Date.UTC(2026, 9, 3)
+    await owner.mutation(api.matches.recordManualMatch, {
+      publicId: "manual-match-stats-01",
+      bestOf: 3,
+      finishedAt,
+      me: { seat: 1, deckVersionId, gamesWon: 2, outcome: "win" },
+      opponents: [{ seat: 2, displayName: "Bob", gamesWon: 1, outcome: "loss" }],
+    })
+    await owner.mutation(api.matches.recordManualMatch, {
+      publicId: "manual-match-stats-02",
+      bestOf: 3,
+      finishedAt,
+      me: { seat: 1, deckVersionId, outcome: "loss" },
+      opponents: [{ seat: 2, displayName: "Cat", outcome: "win" }],
+    })
+    const locked = await owner.query(api.decks.detail, { deckId })
+    expect(locked.analyticsLocked).toBe(true)
+    expect(locked.record).toBeUndefined()
+    await t.mutation(internal.entitlements.setUserFeature, {
+      clerkUserId: "manual-owner",
+      feature: "deck_analytics",
+      enabled: true,
+      source: "test",
+    })
+    const manual = {
+      matches: { total: 2, wins: 1, losses: 1, draws: 0, unknown: 0 },
+      games: { total: 3, wins: 2, losses: 1, draws: 0, unknown: 0 },
+    }
+    const scryve = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
+    const connected = { games: { total: 0, wins: 0, losses: 0, draws: 0, unknown: 0 } }
+    const record = { ...scryve, connected, manual }
+    const detail = await owner.query(api.decks.detail, { deckId })
+    expect(detail).toMatchObject({ record, versions: [{ record }] })
+    expect(detail.record?.connected).toEqual(connected)
+    await expect(owner.query(api.decks.stats, { deckId })).resolves.toMatchObject({
+      locked: false,
+      ...record,
+      byVersion: [{ deckVersionId, ...record }],
+    })
+    await expect(owner.query(api.decks.listMine)).resolves.toMatchObject({
+      decks: [{ _id: deckId, record }],
     })
   })
 

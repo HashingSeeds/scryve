@@ -294,36 +294,51 @@ async function activeVersions(ctx: QueryCtx | MutationCtx, deckId: Id<"decks">) 
   return versions.sort((left, right) => left.versionNumber - right.versionNumber)
 }
 
-const EMPTY_RECORD = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
+type StatsCounters = Pick<
+  Doc<"deckStats">,
+  "games" | "wins" | "losses" | "draws" | "unknown" | "manualMatches" | "manualGames"
+>
 
-async function versionRecord(ctx: QueryCtx, deckVersionId: Id<"deckVersions">) {
-  const stats = await ctx.db
-    .query("deckVersionStats")
-    .withIndex("by_version", (q) => q.eq("deckVersionId", deckVersionId))
-    .unique()
-  return {
-    games: stats?.games ?? 0,
+// why: top-level fields stay Scryve games for installed clients; each source gets its own envelope.
+// why: an absent tally means no data, and Scryve matches can join `connected` later.
+function statsRecord(stats: StatsCounters | null) {
+  const games = {
+    total: stats?.games ?? 0,
     wins: stats?.wins ?? 0,
     losses: stats?.losses ?? 0,
     draws: stats?.draws ?? 0,
     unknown: stats?.unknown ?? 0,
   }
+  return {
+    games: games.total,
+    wins: games.wins,
+    losses: games.losses,
+    draws: games.draws,
+    unknown: games.unknown,
+    connected: { games },
+    manual: {
+      ...(stats?.manualMatches ? { matches: stats.manualMatches } : {}),
+      ...(stats?.manualGames ? { games: stats.manualGames } : {}),
+    },
+  }
+}
+
+async function versionRecord(ctx: QueryCtx, deckVersionId: Id<"deckVersions">) {
+  return statsRecord(
+    await ctx.db
+      .query("deckVersionStats")
+      .withIndex("by_version", (q) => q.eq("deckVersionId", deckVersionId))
+      .unique(),
+  )
 }
 
 async function deckRecord(ctx: QueryCtx, deckId: Id<"decks">) {
-  const stats = await ctx.db
-    .query("deckStats")
-    .withIndex("by_deck", (q) => q.eq("deckId", deckId))
-    .unique()
-  return stats
-    ? {
-        games: stats.games,
-        wins: stats.wins,
-        losses: stats.losses,
-        draws: stats.draws,
-        unknown: stats.unknown,
-      }
-    : EMPTY_RECORD
+  return statsRecord(
+    await ctx.db
+      .query("deckStats")
+      .withIndex("by_deck", (q) => q.eq("deckId", deckId))
+      .unique(),
+  )
 }
 
 async function lastPlayedAt(ctx: QueryCtx, deckId: Id<"decks">) {
