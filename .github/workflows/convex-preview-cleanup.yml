@@ -1,0 +1,49 @@
+name: convex preview cleanup
+
+# why: previews count against the team's 40-deployment cap until Convex expires them 5 days
+# later. Every trigger runs the same sweep, so a missed event is caught by the next run. Merged
+# PRs auto-delete their branch, so `delete` covers them; the daily sweep catches PRs closed
+# without merging. Never add pull_request or pull_request_target: this job holds a team-wide
+# Convex token, and those triggers let a fork PR start it.
+on:
+  delete:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: List stale previews without deleting them
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: convex-preview-cleanup
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    # why: the token lives only in this environment, which is limited to main, so workflows on
+    # other branches can't read it.
+    environment: convex-preview-cleanup
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Delete previews whose branch is done
+        env:
+          CONVEX_TEAM_TOKEN: ${{ secrets.CONVEX_TEAM_TOKEN }}
+          CONVEX_PROJECT_ID: "2679899"
+          GITHUB_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: node scripts/convex-preview-cleanup.cjs $DRY_RUN
