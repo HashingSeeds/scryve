@@ -34,6 +34,7 @@ import {
   filtersActive,
   formatChoices,
   formatKeyLabel,
+  groupMatchGames,
   localHistoryEntry,
   NO_FILTERS,
   OUTCOME_LABELS,
@@ -73,10 +74,12 @@ const OUTCOME_BADGES = {
   draw: { label: "D", accessibilityLabel: "Draw" },
   unrecorded: { label: "–", accessibilityLabel: "Result not recorded" },
   abandoned: { label: "A", accessibilityLabel: "Abandoned" },
+  inProgress: { label: "–", accessibilityLabel: "In progress" },
 } as const
 
 function badgeFor(entry: HistoryEntry) {
   if (entry.outcome !== "unrecorded") return OUTCOME_BADGES[entry.outcome]
+  if (entry.match?.inProgress) return OUTCOME_BADGES.inProgress
   return entry.status === "abandoned" ? OUTCOME_BADGES.abandoned : OUTCOME_BADGES.unrecorded
 }
 
@@ -85,7 +88,7 @@ function timeLabel(timestamp: number) {
 }
 
 function titleFor(entry: HistoryEntry) {
-  if (entry.match) return `vs ${entry.match.opponents.join(" · ")}`
+  if (entry.match?.opponents) return `vs ${entry.match.opponents.join(" · ")}`
   const names = entryPlayerNames(entry)
   if (names.length > 0) return names.join(" · ")
   return `${entry.players.length} player${entry.players.length === 1 ? "" : "s"}`
@@ -93,13 +96,17 @@ function titleFor(entry: HistoryEntry) {
 
 // why: a manual match only knows its date, so its row shows the score and event instead of a time.
 function matchSubtitleFor(entry: HistoryEntry, match: HistoryMatchDetails) {
+  const games = match.games?.length
+  const decks = [...new Set(entryDeckNames(entry))]
   return [
     SOURCE_LABELS[entry.source],
     [`Bo${match.bestOf}`, match.score].filter(Boolean).join(" "),
+    match.inProgress ? "In progress" : undefined,
+    games === undefined ? undefined : `${games} game${games === 1 ? "" : "s"}`,
     [match.eventName, match.roundNumber === undefined ? undefined : `R${match.roundNumber}`]
       .filter(Boolean)
       .join(" "),
-    match.deckName,
+    match.deckName ?? (games === undefined || decks.length === 0 ? undefined : decks.join(", ")),
   ]
     .filter(Boolean)
     .join(" · ")
@@ -108,8 +115,10 @@ function matchSubtitleFor(entry: HistoryEntry, match: HistoryMatchDetails) {
 function subtitleFor(entry: HistoryEntry) {
   if (entry.match) return matchSubtitleFor(entry, entry.match)
   const decks = [...new Set(entryDeckNames(entry))]
+  const gameNumber = entry.scryveMatch?.gameNumber
   return [
-    SOURCE_LABELS[entry.source],
+    // why: inside a match the game's place in it says more than its source, which the match row shows.
+    gameNumber === undefined ? SOURCE_LABELS[entry.source] : `Game ${gameNumber}`,
     timeLabel(entry.finishedAt),
     entry.winnerNames?.length ? `Won by ${entry.winnerNames.join(" & ")}` : undefined,
     decks.length > 0 ? decks.join(", ") : undefined,
@@ -118,11 +127,25 @@ function subtitleFor(entry: HistoryEntry) {
     .join(" · ")
 }
 
+function rowTestId(entry: HistoryEntry) {
+  return entry.match?.games
+    ? `history-row-match-${entry.routeId}`
+    : `history-row-${entry.source}-${entry.routeId}`
+}
+
 function toggled<T>(values: T[], value: T) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
 }
 
-function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => void }) {
+function HistoryRow({
+  entry,
+  expanded,
+  onPress,
+}: {
+  entry: HistoryEntry
+  expanded?: boolean
+  onPress: () => void
+}) {
   const { theme, themed } = useAppTheme()
   const badge = badgeFor(entry)
   const badgeTone =
@@ -132,14 +155,17 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
         ? theme.colors.error
         : theme.colors.textDim
   const extraPlayers = entry.players.length - MAX_COLOR_DOTS
+  const group = entry.match?.games !== undefined
+  const nested = entry.scryveMatch?.gameNumber !== undefined
 
   return (
     <TouchableOpacity
-      testID={`history-row-${entry.source}-${entry.routeId}`}
+      testID={rowTestId(entry)}
       accessibilityRole="button"
       accessibilityLabel={`${badge.accessibilityLabel} · ${titleFor(entry)} · ${subtitleFor(entry)}`}
+      {...(group ? { accessibilityState: { expanded: Boolean(expanded) } } : {})}
       activeOpacity={0.8}
-      style={themed($row)}
+      style={[themed($row), nested ? themed($nestedRow) : undefined]}
       onPress={onPress}
     >
       <View style={[themed($badge), { borderColor: badgeTone }]}>
@@ -149,7 +175,7 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
         <Text size="sm" weight="medium" numberOfLines={2} text={titleFor(entry)} />
         <Text size="xxs" numberOfLines={1} style={themed($dimmedText)} text={subtitleFor(entry)} />
       </View>
-      {entry.match ? null : (
+      {entry.match && !group ? null : (
         <View style={themed($dots)}>
           {entry.players.slice(0, MAX_COLOR_DOTS).map((player) => (
             <View
@@ -162,6 +188,7 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
           ) : null}
         </View>
       )}
+      {group ? <Text size="xs" style={themed($dimmedText)} text={expanded ? "▾" : "▸"} /> : null}
     </TouchableOpacity>
   )
 }
@@ -241,6 +268,7 @@ export function HistoryScreen({
     source: initialSource ?? "all",
   })
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [expandedMatches, setExpandedMatches] = useState<string[]>([])
   const connectedPage = connected?.page
 
   const entries = useMemo(() => {
@@ -249,10 +277,19 @@ export function HistoryScreen({
     // why: the device copy of a published game keeps its winner line and seat outcome, so it overrides the server row.
     for (const entry of [...connectedEntries, ...games.map(localHistoryEntry)])
       unique.set(entry.key, entry)
-    return sortedByRecency([...unique.values()])
+    return sortedByRecency(groupMatchGames([...unique.values()]))
   }, [games, connectedPage])
   const now = Date.now()
   const visible = filterHistory(entries, filters, now)
+  // why: an expanded match lists its games right under it, in the match's own day.
+  const sections = daySections(visible, now).map((section) => ({
+    ...section,
+    data: section.data.flatMap((entry) =>
+      entry.match?.games && expandedMatches.includes(entry.key)
+        ? [entry, ...entry.match.games]
+        : [entry],
+    ),
+  }))
   const options = useMemo(() => filterOptions(entries), [entries])
   const formats = formatChoices(options.formats, filters.systems)
   const record = tallyOutcomes(visible)
@@ -348,7 +385,7 @@ export function HistoryScreen({
         testID="history-list"
         style={$styles.flex1}
         contentContainerStyle={themed($listContent)}
-        sections={daySections(visible, now)}
+        sections={sections}
         keyExtractor={(entry) => entry.key}
         stickySectionHeadersEnabled={false}
         onScroll={onScroll}
@@ -401,12 +438,15 @@ export function HistoryScreen({
         renderItem={({ item }) => (
           <HistoryRow
             entry={item}
+            expanded={expandedMatches.includes(item.key)}
             onPress={() =>
-              item.source === "local"
-                ? onSelectLocal(item.routeId)
-                : item.source === "manual"
-                  ? onSelectManual(item.routeId)
-                  : onSelectConnected(item.routeId)
+              item.match?.games
+                ? setExpandedMatches((current) => toggled(current, item.key))
+                : item.source === "local"
+                  ? onSelectLocal(item.routeId)
+                  : item.source === "manual"
+                    ? onSelectManual(item.routeId)
+                    : onSelectConnected(item.routeId)
             }
           />
         )}
@@ -663,6 +703,9 @@ const $row: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   paddingVertical: spacing.sm,
   borderBottomWidth: 1,
   borderBottomColor: colors.separator,
+})
+const $nestedRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingLeft: spacing.lg,
 })
 const $skeletonBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   width: BADGE_SIZE,

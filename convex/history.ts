@@ -1,8 +1,8 @@
 import { paginationOptsValidator } from "convex/server"
 import { v } from "convex/values"
 
-import type { Doc } from "./_generated/dataModel"
-import { query } from "./_generated/server"
+import type { Doc, Id } from "./_generated/dataModel"
+import { query, type QueryCtx } from "./_generated/server"
 import { maskSummaryPlayersForViewer } from "./games"
 import { requireUser } from "./lib/auth"
 import { DEFAULT_DECK_GAME } from "./lib/deckGames"
@@ -37,6 +37,42 @@ function manualMatchView(match: ManualMatch) {
 
 export type ManualMatchView = ReturnType<typeof manualMatchView>
 
+type ScryveMatch = Extract<Doc<"matches">, { source: "connected" }>
+
+// why: names come from the game rows, which are already masked for the viewer, so the summary carries only seats, scores, and outcomes.
+function scryveMatchView(match: ScryveMatch, viewerId: Id<"users">) {
+  const seats = match.seats.map((seat) => ({
+    seat: seat.seat,
+    gamesWon: seat.gamesWon,
+    gamesDrawn: seat.gamesDrawn,
+    outcome: seat.outcome,
+    mine: seat.userId !== undefined && seat.userId === viewerId,
+  }))
+  return {
+    publicId: match.publicId,
+    bestOf: match.bestOf,
+    status: match.status,
+    finishedAt: match.finishedAt,
+    outcome: seats.find((seat) => seat.mine)?.outcome,
+    seats,
+  }
+}
+
+export type ScryveMatchView = ReturnType<typeof scryveMatchView>
+
+// why: every game of a match on the page shares one lookup, so reads stay bounded by the page size.
+function scryveMatchLookup(ctx: QueryCtx, viewerId: Id<"users">) {
+  const views = new Map<Id<"matches">, ScryveMatchView | null>()
+  return async (matchId: Id<"matches">) => {
+    const cached = views.get(matchId)
+    if (cached !== undefined) return cached
+    const match = await ctx.db.get(matchId)
+    const view = match?.source === "connected" ? scryveMatchView(match, viewerId) : null
+    views.set(matchId, view)
+    return view
+  }
+}
+
 // why: connectedHistory stays for installed clients, which cannot render manual match rows.
 export const entries = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -48,6 +84,7 @@ export const entries = query({
       .order("desc")
       .paginate(boundedPaginationOptions(args.paginationOpts, CONNECTED_MEMBERSHIP_PAGE_MAX_ITEMS))
     const blocked = await blockedUserIdsFor(ctx, user._id)
+    const scryveMatch = scryveMatchLookup(ctx, user._id)
     const page = []
     for (const entry of history.page) {
       if (entry.source === "manual") {
@@ -58,10 +95,12 @@ export const entries = query({
       }
       const summary = await ctx.db.get(entry.summaryId)
       if (!summary) continue
+      const match = entry.matchId ? await scryveMatch(entry.matchId) : null
       page.push({
         kind: "game" as const,
         source: entry.source,
         matchId: entry.matchId,
+        ...(match ? { match } : {}),
         publicId: summary.publicId,
         startingLife: summary.startingLife,
         ruleset: summary.ruleset,
