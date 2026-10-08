@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
@@ -138,6 +138,7 @@ export function PlayerGrid({
   const screenTopEdgeBand = useTopEdgeBand()
   const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
+  const changeHandlerFor = useStablePlayerHandlers(onChange)
   const counter = playSystemRules(system).counter
   const layout = getPlayerGridLayout({
     playerCount: players.length,
@@ -333,7 +334,7 @@ export function PlayerGrid({
                           }
                         : undefined
                     }
-                    onChange={(delta) => onChange(player.id, delta)}
+                    onChange={changeHandlerFor(player.id)}
                     style={getScreenCornerSquaringStyle({
                       rows,
                       rowIndex,
@@ -349,6 +350,21 @@ export function PlayerGrid({
       </Animated.View>
     </View>
   )
+}
+
+/** why: `LifeCard` is memoized, so each seat needs one handler identity for the life of the board; it always calls the latest `onChange`. */
+function useStablePlayerHandlers(onChange: PlayerGridProps["onChange"]) {
+  const latest = useRef(onChange)
+  latest.current = onChange
+  const handlers = useRef(new Map<PlayerId, (delta: LifeDelta) => void>()).current
+  return (playerId: PlayerId) => {
+    let handler = handlers.get(playerId)
+    if (!handler) {
+      handler = (delta) => latest.current(playerId, delta)
+      handlers.set(playerId, handler)
+    }
+    return handler
+  }
 }
 
 export { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
