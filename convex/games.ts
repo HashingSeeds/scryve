@@ -2332,6 +2332,8 @@ export const connectedHistory = query({
     const blocked = await blockedUserIdsFor(ctx, user._id)
     const page = []
     for (const entry of history.page) {
+      // why: installed clients can only render games. Manual matches reach History in a new query.
+      if (entry.source === "manual") continue
       const summary = await ctx.db.get(entry.summaryId)
       if (summary) {
         page.push({

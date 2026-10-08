@@ -213,6 +213,8 @@ export const renameHeldUserInHistory = internalMutation({
       .withIndex("by_user_and_finished_at", (q) => q.eq("userId", args.userId))
       .paginate({ numItems: HISTORY_RENAME_BATCH_SIZE, cursor: args.cursor ?? null })
     for (const entry of page.page) {
+      // why: only the owner sees a manual match, so a held username never shows to others there.
+      if (entry.source === "manual") continue
       const summary = await ctx.db.get(entry.summaryId)
       if (!summary) continue
       let changed = false

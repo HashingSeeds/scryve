@@ -19,6 +19,10 @@ export const MAX_VERSION_NAME_LENGTH = 40
 export const STALE_GAME_INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000
 export const STALE_GAME_CLEANUP_BATCH_SIZE = 25
 export const UNTOUCHED_REMATCH_LIFETIME_MS = 12 * 60 * 60 * 1000
+export const MAX_EVENT_NAME_LENGTH = 80
+export const MAX_ROUND_NUMBER = 99
+// why: a date picked in a time zone ahead of the server may already read as tomorrow.
+export const MATCH_FINISHED_AT_GRACE_MS = 24 * 60 * 60 * 1000
 
 export function assertPlayerCount(count: number) {
   if (!Number.isInteger(count) || count < MIN_PLAYERS || count > MAX_PLAYERS) {
@@ -112,6 +116,26 @@ export function assertVersionName(name: string) {
   if (value.length < 1 || value.length > MAX_VERSION_NAME_LENGTH)
     throw new Error(`Version name must be 1–${MAX_VERSION_NAME_LENGTH} characters`)
   return value
+}
+
+export function assertEventName(name: string) {
+  const value = name.trim()
+  if (value.length > MAX_EVENT_NAME_LENGTH)
+    throw new Error(`Event name must be at most ${MAX_EVENT_NAME_LENGTH} characters`)
+  return value
+}
+
+export function assertRoundNumber(round: number) {
+  if (!Number.isInteger(round) || round < 1 || round > MAX_ROUND_NUMBER)
+    throw new Error(`Round must be 1–${MAX_ROUND_NUMBER}`)
+  return round
+}
+
+export function assertMatchFinishedAt(finishedAt: number, now: number) {
+  if (!Number.isFinite(finishedAt) || finishedAt <= 0) throw new Error("Choose a valid match date")
+  if (finishedAt > now + MATCH_FINISHED_AT_GRACE_MS)
+    throw new Error("Match date cannot be in the future")
+  return finishedAt
 }
 
 export function assertAvatarUrl(avatarUrl: string | undefined) {

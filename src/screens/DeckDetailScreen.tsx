@@ -108,6 +108,7 @@ type DeckDetailScreenProps = {
   deckId: string
   summary?: DeckDetailSummary
   onBack: () => void
+  onAddMatch?: (versionId: Id<"deckVersions">, deckName: string) => void
 }
 
 function DeckDetailPlaceholder({
@@ -261,6 +262,7 @@ function DeckDetailContent({
   deckId,
   summary,
   onBack,
+  onAddMatch,
   access,
   reviewChanges,
 }: DeckDetailScreenProps) {
@@ -386,6 +388,8 @@ function DeckDetailContent({
   const staleSelection = selectedVersionId !== undefined && detail?.version?._id !== mappedSelection
   const version = staleSelection ? undefined : detail?.version
   const activeVersionId = version?._id ?? cachedVersion?.versionId
+  // why: a manual result attaches to a server version, so a cached or provisional one cannot host it.
+  const liveVersionId = version?._id
   const storedCards = useMemo(
     () =>
       version
@@ -1005,6 +1009,11 @@ function DeckDetailContent({
         onEdit={startEditing}
         onSave={save}
         onCancel={requestDiscard}
+        onAddMatch={
+          onAddMatch && liveVersionId && !knownDeleted
+            ? () => onAddMatch(liveVersionId, deck.name)
+            : undefined
+        }
         onDetails={() => {
           if (knownDeleted) return
           settingsSaveStarted.current = false

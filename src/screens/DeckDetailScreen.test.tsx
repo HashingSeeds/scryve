@@ -2064,4 +2064,25 @@ describe("DeckDetailScreen", () => {
     expect(queryArgs.at(-1)).toEqual({ deckId: "deck-1", versionId: confirmedId })
     expect(view.getByText("Sol Ring")).toBeTruthy()
   })
+
+  it("opens match entry with the live version and hides it without one", () => {
+    const onAddMatch = jest.fn()
+    const screen = () => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={offlineAccess}
+          onAddMatch={onAddMatch}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen())
+    fireEvent.press(view.getByTestId("add-match-result"))
+    expect(onAddMatch).toHaveBeenCalledWith("version-main", "Existing Deck")
+
+    mockDetail.value = { ...loadedDetail, version: null, cards: [] }
+    view.rerender(screen())
+    expect(view.queryByTestId("add-match-result")).toBeNull()
+  })
 })

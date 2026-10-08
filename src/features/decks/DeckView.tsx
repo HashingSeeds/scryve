@@ -38,6 +38,7 @@ export function DeckView({
   onSave,
   onCancel,
   onDetails,
+  onAddMatch,
   onAdd,
   onChooseCommander,
   commanderWarnings,
@@ -70,6 +71,7 @@ export function DeckView({
   onSave: () => void
   onCancel: () => void
   onDetails: () => void
+  onAddMatch?: () => void
   onAdd: () => void
   onChooseCommander?: () => void
   commanderWarnings?: string[]
@@ -147,6 +149,21 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
+              {onAddMatch ? (
+                <TouchableOpacity
+                  testID="add-match-result"
+                  accessibilityRole="button"
+                  style={$noteAction}
+                  disabled={editing || busy}
+                  onPress={onAddMatch}
+                >
+                  <Text
+                    size="sm"
+                    text="Add match result"
+                    style={[themed($action), (editing || busy) && $disabled]}
+                  />
+                </TouchableOpacity>
+              ) : null}
             </View>
             <View style={themed($tabs)} accessibilityRole="tablist">
               {(["cards", "notes"] as const).map((value) => (
