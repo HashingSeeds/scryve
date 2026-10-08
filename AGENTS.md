@@ -47,6 +47,10 @@ We need to be on the same page with terminology. When communicating, use this la
 ## Ways to hurt yourself
 On Linux, an iOS `agent-device` failure does not mean mobile verification is unavailable. Check Android targets with `agent-device devices --platform android` and use an Android emulator when authorized. Check existing QA emulator profiles for the installed development app before concluding it is missing. Respect emulator sessions owned by other worktrees.
 
+## Running the app
+
+`pnpm start` is safe to rerun from any worktree. It stops this worktree's stale Metro and `convex dev`, reinstalls when `pnpm-lock.yaml` changed, and picks a free Metro port from 8081. It writes `{ worktree, port, pid, convex }` to `~/.local/state/scryve-dev/<worktree>-<hash>.json` while it runs; pass that port to `agent-device --metro-port`. Every worktree shares one Convex dev deployment, so only the first `pnpm start` runs `convex dev`. Later ones start Metro only and say which worktree owns the push. Stop that one before testing backend changes from yours.
+
 ## Verifying
 
 - Smallest proof that the change works. `pnpm test <files>` for the tests you touched, targeted lint (`pnpm lint:check <files>`) and `pnpm compile` (typechecks both the app and test tsconfigs) for the scope you changed.

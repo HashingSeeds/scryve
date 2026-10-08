@@ -19,6 +19,17 @@ pnpm install --frozen-lockfile
 pnpm run start
 ```
 
+`pnpm start` runs Metro and `convex dev` together and heals the usual worktree problems
+first: it stops this worktree's leftover Metro and `convex dev`, runs
+`pnpm install --frozen-lockfile` when `pnpm-lock.yaml` changed since the last install,
+and uses the next free port when 8081 is taken. It refuses to start unless
+`CONVEX_DEPLOYMENT` is a `dev:` deployment. All worktrees share one dev deployment
+through `.env.local`, so when another worktree's `convex dev` already pushes to it,
+`pnpm start` warns and starts Metro only. The running instance is recorded in
+`~/.local/state/scryve-dev/` and removed on exit. Concurrent starts take turns through a
+loopback lock on ports 18080-18089; if another app needs those, set
+`SCRYVE_DEV_LOCK_PORT=<port>` for every start to move the range.
+
 Development configuration is split three ways:
 
 - `.env.development` is tracked and holds only public client values, so it reaches
