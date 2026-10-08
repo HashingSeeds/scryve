@@ -192,6 +192,22 @@ function anonymizedSummaryPlayers(
   )
 }
 
+function anonymizedMatchSeats(match: Doc<"matches">, userId: Id<"users">, deletedAt: number) {
+  return match.seats.map((seat) =>
+    seat.userId === userId
+      ? {
+          ...seat,
+          displayName: DELETED_PLAYER_NAME,
+          userId: undefined,
+          deckId: undefined,
+          deckVersionId: undefined,
+          deckName: undefined,
+          deletedAt,
+        }
+      : seat,
+  )
+}
+
 async function anonymizeMembership(
   ctx: MutationCtx,
   request: Doc<"accountDeletionRequests">,
@@ -459,6 +475,34 @@ export const processUserLinkedData = internalMutation({
         .take(USER_DATA_BATCH_SIZE)
       if (results.length) {
         for (const result of results) await ctx.db.delete(result._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      const matchResults = await ctx.db
+        .query("deckMatchResults")
+        .withIndex("by_user", (q) => q.eq("userId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (matchResults.length) {
+        for (const result of matchResults) await ctx.db.delete(result._id)
+        await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
+        return null
+      }
+      const ownedMatches = await ctx.db
+        .query("matches")
+        .withIndex("by_owner_user", (q) => q.eq("ownerUserId", request.userId!))
+        .take(USER_DATA_BATCH_SIZE)
+      if (ownedMatches.length) {
+        const now = Date.now()
+        for (const match of ownedMatches) {
+          // why: a manual match has no other participant to keep it for.
+          if (match.source === "manual") await ctx.db.delete(match._id)
+          else
+            await ctx.db.patch(match._id, {
+              ownerUserId: undefined,
+              seats: anonymizedMatchSeats(match, request.userId, now),
+              updatedAt: now,
+            })
+        }
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }

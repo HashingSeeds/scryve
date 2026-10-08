@@ -44,6 +44,12 @@ export default function DeckDetailRoute() {
           summary={summary}
           reviewChanges={reviewChanges === "true"}
           onBack={() => router.back()}
+          onAddMatch={(versionId) =>
+            router.push({
+              pathname: "/connected/decks/match",
+              params: { versionId, ...(deckName ? { deckName } : {}) },
+            })
+          }
         />
       )}
     </CloudScreen>

@@ -47,6 +47,20 @@ const matchSeat = v.object({
   deletedAt: v.optional(v.number()),
 })
 
+// why: manual results stay separate from Scryve games so stats can filter by source.
+const manualRecordValidator = v.object({
+  total: v.number(),
+  wins: v.number(),
+  losses: v.number(),
+  draws: v.number(),
+  unknown: v.number(),
+})
+
+const manualStatsFields = {
+  manualMatches: v.optional(manualRecordValidator),
+  manualGames: v.optional(manualRecordValidator),
+}
+
 const matchFields = {
   // why: client-generated so a match can start offline. Also the idempotent create key.
   publicId: v.string(),
@@ -535,6 +549,7 @@ export default defineSchema({
     losses: v.number(),
     draws: v.number(),
     unknown: v.number(),
+    ...manualStatsFields,
     updatedAt: v.number(),
   })
     .index("by_version", ["deckVersionId"])
@@ -547,6 +562,7 @@ export default defineSchema({
     losses: v.number(),
     draws: v.number(),
     unknown: v.number(),
+    ...manualStatsFields,
     updatedAt: v.number(),
   }).index("by_deck", ["deckId"]),
 
