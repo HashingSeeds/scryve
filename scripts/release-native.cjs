@@ -43,6 +43,15 @@ function tagCommit(tag) {
   }
 }
 
+function isAncestor(commit, ref) {
+  try {
+    git("merge-base", "--is-ancestor", commit, ref)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function readVersion() {
   return JSON.parse(fs.readFileSync(packageJsonPath, "utf8")).version
 }
@@ -56,7 +65,8 @@ function writeVersion(version) {
 
 function settleVersion() {
   if (git("status", "--porcelain")) throw new Error("Commit or stash your changes first.")
-  git("fetch", "--quiet", "--tags", "origin", "main")
+  // why: origin owns release tags; a stale local tag would otherwise make every fetch fail.
+  git("fetch", "--quiet", "--force", "--tags", "origin", "main")
 
   const head = git("rev-parse", "HEAD")
   const current = readVersion()
@@ -64,8 +74,22 @@ function settleVersion() {
   const tag = `v${plan.version}`
 
   if (plan.action === "reuse") {
-    git("push", "--quiet", "origin", `refs/tags/${tag}`)
-    console.log(`Reusing ${tag}, which this commit already built.`)
+    // why: a run interrupted before its push leaves the bump commit and tag only on this machine.
+    const onMain = isAncestor(head, MAIN)
+    try {
+      if (onMain) git("push", "--quiet", "origin", `refs/tags/${tag}`)
+      else git("push", "--quiet", "--atomic", "origin", "HEAD:refs/heads/main", `refs/tags/${tag}`)
+    } catch (error) {
+      throw new Error(
+        `Could not publish ${tag}. If main moved, run \`git tag -d ${tag}\`, reset to ${MAIN}, and run again.`,
+        { cause: error },
+      )
+    }
+    console.log(
+      onMain
+        ? `Reusing ${tag}, which this commit already built.`
+        : `Published ${tag} and reused it.`,
+    )
     return plan.version
   }
 
@@ -75,7 +99,7 @@ function settleVersion() {
   if (plan.action === "bump") {
     if (tagCommit(tag)) throw new Error(`${tag} already exists. Set package.json past it on main.`)
     writeVersion(plan.version)
-    git("commit", "--quiet", "-m", `chore(release): ${tag}`, "--", "package.json")
+    git("commit", "--quiet", "-m", `chore(release): ${tag} [skip ci]`, "--", "package.json")
   }
   git("tag", "-a", tag, "-m", tag)
 
@@ -85,9 +109,12 @@ function settleVersion() {
     // why: a local tag or bump commit left behind would make the rerun after pulling reuse it.
     git("tag", "-d", tag)
     if (plan.action === "bump") git("reset", "--quiet", "--keep", "HEAD~1")
-    throw new Error(`Could not push ${tag}; main may have moved. Pull and run again.`, {
-      cause: error,
-    })
+    throw new Error(
+      `Could not push ${tag}. If main moved, pull and run again; git says why above.`,
+      {
+        cause: error,
+      },
+    )
   }
   console.log(plan.action === "bump" ? `Bumped to ${tag}.` : `Tagged ${tag}.`)
   return plan.version

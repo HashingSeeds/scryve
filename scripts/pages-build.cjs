@@ -4,7 +4,7 @@ const path = require("node:path")
 const root = path.join(path.dirname(require.resolve("./pages-build.cjs")), "..")
 const convex = path.join(root, "node_modules", ".bin", "convex")
 // why: nothing in convex/ imports from outside it, so these paths are everything `convex deploy` bundles.
-const BACKEND_PATHS = ["convex", "package.json", "pnpm-lock.yaml"]
+const BACKEND_PATHS = ["convex", "pnpm-lock.yaml"]
 
 function deployTarget(env, backendMatchesMain) {
   const branch = env.CF_PAGES_BRANCH
@@ -25,7 +25,23 @@ function backendMatchesMain() {
     console.warn("Could not fetch main, so this build gets its own Convex preview")
     return false
   }
-  return git(["diff", "--quiet", "FETCH_HEAD", "HEAD", "--", ...BACKEND_PATHS]) === 0
+  if (git(["diff", "--quiet", "FETCH_HEAD", "HEAD", "--", ...BACKEND_PATHS]) !== 0) return false
+  const packageJsonAt = (ref) =>
+    spawnSync("git", ["show", `${ref}:package.json`], { cwd: root, encoding: "utf8" }).stdout
+  return packageJsonMatches(packageJsonAt("FETCH_HEAD"), packageJsonAt("HEAD"))
+}
+
+// why: every native release bumps `version` on main, which would send each open branch to its own preview.
+function packageJsonMatches(mainSource, branchSource) {
+  const withoutVersion = (source) => {
+    const { version: _version, ...rest } = JSON.parse(source)
+    return JSON.stringify(rest)
+  }
+  try {
+    return withoutVersion(mainSource) === withoutVersion(branchSource)
+  } catch {
+    return false
+  }
 }
 
 function main() {
@@ -61,4 +77,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { deployTarget }
+module.exports = { deployTarget, packageJsonMatches }

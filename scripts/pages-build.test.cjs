@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { deployTarget } = require("./pages-build.cjs")
+const { deployTarget, packageJsonMatches } = require("./pages-build.cjs")
 
 const stagingKey = "dev:quiet-otter-123|secret"
 const unreachable = () => assert.fail("this build never compares against main")
@@ -43,4 +43,10 @@ test("a staging key for any other deployment type is rejected only when staging 
     deployTarget(branch, () => false),
     "default",
   )
+})
+
+test("a version bump alone keeps a branch on shared staging", () => {
+  const pkg = (version, convex) => JSON.stringify({ version, dependencies: { convex } })
+  assert.equal(packageJsonMatches(pkg("0.1.2", "1.0.0"), pkg("0.1.1", "1.0.0")), true)
+  assert.equal(packageJsonMatches(pkg("0.1.2", "1.1.0"), pkg("0.1.2", "1.0.0")), false)
 })
