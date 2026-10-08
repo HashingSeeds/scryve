@@ -78,9 +78,10 @@ const mockListMine: { value: ShelfState | undefined; error?: Error } = {
 
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvexClient,
-  useQuery: (_reference: unknown, args?: unknown) => {
+  useQuery: (reference: unknown, args?: unknown) => {
     if (args === "skip") return undefined
     if (mockListMine.error) throw mockListMine.error
+    if (reference === "decks.capacity") return mockListMine.value?.capacity
     return mockListMine.value
   },
   useMutation: () => mockSetFavorite,
@@ -89,6 +90,7 @@ jest.mock("convex/react", () => ({
 jest.mock("../../convex/_generated/api", () => ({
   api: {
     decks: {
+      capacity: "decks.capacity",
       listMine: "decks.listMine",
       setFavorite: "decks.setFavorite",
     },
@@ -583,6 +585,21 @@ describe("DecksScreen", () => {
     const view = renderShelf()
     expect(view.queryByText(/Premium/)).toBeNull()
     expect(view.getByText("Add deck")).toBeEnabled()
+  })
+
+  it.each([
+    [{ used: 2, limit: 2, premium: false }, "2 of 2 free decks used"],
+    [{ used: 2, limit: 100, premium: true }, undefined],
+    [{ used: 90, limit: 100, premium: true }, "90 of 100 decks used"],
+  ])("shows the deck count beside the title for %j", (capacity, label) => {
+    mockListMine.value = {
+      decks: [commanderDeck, standardDeck],
+      capacity: { ...capacity, canCreate: capacity.used < capacity.limit },
+      analyticsLocked: false,
+    }
+    const view = renderShelf()
+    if (label) expect(view.getByLabelText(label)).toBeTruthy()
+    else expect(view.queryByTestId("deck-count")).toBeNull()
   })
 
   it("keeps shelf controls mounted and retries a failed deck query", () => {

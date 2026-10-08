@@ -17,6 +17,7 @@ import type { CloudAccess } from "@/features/auth/CloudScreen"
 import type { DeckRecord } from "@/features/decks/deckCopy"
 import { cardCountLabel, recordSummary } from "@/features/decks/deckCopy"
 import { ALL_FORMATS, useDeckFilters } from "@/features/decks/deckFilters"
+import { DeckCount } from "@/features/decks/DeckLimit"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
 import { guestDeckRouteId, useGuestDecks } from "@/features/decks/guestDeck"
@@ -480,6 +481,9 @@ export function DecksScreen({
     >
       <Header
         title="Decks"
+        titleAccessory={
+          (access?.ready ?? true) && !unavailableMessage ? <DeckCount access={access} /> : undefined
+        }
         leftText={onBack ? "Back to lobby" : undefined}
         onLeftPress={onBack}
         backgroundColor={theme.colors.surface}
