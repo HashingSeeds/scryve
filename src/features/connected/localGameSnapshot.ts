@@ -1,3 +1,4 @@
+import { matchScoreAfter } from "@/features/game/domain"
 import { NO_PLAY_SYSTEM, supportsCommanderDamage } from "@/features/game/playSystems"
 import type { LocalGame, LocalGameSummary, PlayerId } from "@/features/game/types"
 
@@ -9,7 +10,11 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
   const me = game.account?.mePlayerId
   const deckVersionId = game.account?.deckVersionId
   const result = game.result
+  const match = game.match
   return {
+    ...(match
+      ? { match: { publicId: match.id, bestOf: match.bestOf, gameNumber: match.gameNumber } }
+      : {}),
     publicId: game.id,
     ruleset: game.format ?? NO_PLAY_SYSTEM,
     startingLife: game.startingLife,
@@ -36,6 +41,27 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
         : result?.kind === "draw"
           ? { kind: "draw" as const }
           : { kind: "unknown" as const },
+  }
+}
+
+/** why: the `finishScryveMatch` payload: the final score by seat and each seat's outcome. */
+export function buildMatchFinishSnapshot(game: LocalGameSummary) {
+  const match = game.match
+  if (!match?.result) throw new Error("This game did not end a match")
+  const score = matchScoreAfter(game)
+  const ordered = game.players
+    .map((player, seat) => ({ player, seat }))
+    .sort((left, right) => left.player.seat - right.player.seat)
+  return {
+    publicId: match.id,
+    finishedAt: game.finishedAt,
+    gameCount: match.gameNumber,
+    seats: ordered.map(({ seat }, index) => ({
+      seat: index + 1,
+      gamesWon: score.wins[seat],
+      gamesDrawn: score.draws,
+      outcome: match.result!.outcomes[seat],
+    })),
   }
 }
 

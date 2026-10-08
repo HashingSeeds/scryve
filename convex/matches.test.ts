@@ -133,6 +133,24 @@ describe("recordManualMatch", () => {
     expect(deck?.manualGames).toBeUndefined()
   })
 
+  it("accepts a pod whose wins spread past the best of", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, deckId } = await owner(t)
+    await actor.mutation(api.matches.recordManualMatch, {
+      publicId: "manual-match-pod-211",
+      bestOf: 3,
+      finishedAt: FINISHED_AT,
+      me: { seat: 1, gamesWon: 2, outcome: "win" },
+      opponents: [
+        { seat: 2, displayName: "Bob", gamesWon: 1, outcome: "loss" },
+        { seat: 3, displayName: "Cat", gamesWon: 1, outcome: "loss" },
+      ],
+    })
+    const { deck } = await statsFor(t, deckId)
+    expect(deck).toBeNull()
+    expect((await t.run((ctx) => ctx.db.query("matches").collect()))[0].seats).toHaveLength(3)
+  })
+
   it("leaves deck stats alone when no deck is attached", async () => {
     const t = convexTest(schema, modules)
     const { actor, deckId } = await owner(t)
@@ -190,6 +208,14 @@ describe("recordManualMatch", () => {
       name: "too many wins for the best of",
       patch: { me: { seat: 1, gamesWon: 3, outcome: "win" as const } },
       message: "Games won must be 0–2",
+    },
+    {
+      name: "two seats splitting more games than the best of",
+      patch: {
+        me: { seat: 1, gamesWon: 2, outcome: "win" as const },
+        opponents: [{ seat: 2, displayName: "Bob", gamesWon: 2, outcome: "loss" as const }],
+      },
+      message: "cannot have 4 wins",
     },
     {
       name: "two winners",

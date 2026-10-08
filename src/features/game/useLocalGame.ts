@@ -7,13 +7,22 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 import {
   applyGameCommand,
   canUndo,
+  createNextMatchGame,
   createRematch,
   defaultCommandContext,
   hasLocalGameStarted,
+  restartMatchGame,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
-import type { GameCommand, LifeDelta, LocalGame, LocalGameResult, PlayerId } from "./types"
+import type {
+  GameCommand,
+  LifeDelta,
+  LocalGame,
+  LocalGameResult,
+  MatchSeatOutcome,
+  PlayerId,
+} from "./types"
 
 /** why: `ownerId` is the signed-in account, so a finished game is filed under it for upload. */
 export function useLocalGame(
@@ -79,13 +88,46 @@ export function useLocalGame(
     [dispatch, reduceMotion, settings.hapticsEnabled],
   )
 
-  const rematch = useCallback(() => {
-    const next = createRematch(gameRef.current)
-    repository.saveActiveGame(next)
-    gameRef.current = next
-    setGame(next)
-    return next
-  }, [repository])
+  const replaceBoard = useCallback(
+    (next: LocalGame) => {
+      repository.saveActiveGame(next)
+      gameRef.current = next
+      setGame(next)
+      return next
+    },
+    [repository],
+  )
+
+  const rematch = useCallback(() => replaceBoard(createRematch(gameRef.current)), [replaceBoard])
+
+  const nextMatchGame = useCallback(
+    () => replaceBoard(createNextMatchGame(gameRef.current)),
+    [replaceBoard],
+  )
+
+  const restartMatchGameBoard = useCallback(
+    () => replaceBoard(restartMatchGame(gameRef.current)),
+    [replaceBoard],
+  )
+
+  /** why: the match's last finished game is in history; ending it also hands the table a fresh match. */
+  const endMatch = useCallback(
+    (matchId: string, outcomes: MatchSeatOutcome[]) => {
+      const ended = repository.finishMatch(matchId, outcomes)
+      if (!ended) throw new Error("This match has no finished game to end.")
+      if (gameRef.current.match?.id === matchId) rematch()
+      return ended
+    },
+    [rematch, repository],
+  )
+
+  const latestMatchGame = useCallback(
+    (matchId: string) => {
+      const latest = repository.latestMatchGame(matchId)
+      return latest ? repository.loadHistoryDetail(latest.id)?.game : undefined
+    },
+    [repository],
+  )
 
   return {
     game,
@@ -98,6 +140,16 @@ export function useLocalGame(
       dispatch({ type: "game.finish", result }, endSource),
     abandon: () => dispatch({ type: "game.abandon" }),
     rematch,
+    nextMatchGame,
+    restartMatchGame: restartMatchGameBoard,
+    endMatch,
+    latestMatchGame,
+    /** why: a match that hit the game cap still owes its result after a restart; the board reopens the prompt from it. */
+    pendingMatchEnd: () => {
+      const matchId = repository.loadPendingMatchEnd()
+      return matchId ? latestMatchGame(matchId) : undefined
+    },
+    holdMatchEnd: (matchId: string) => repository.savePendingMatchEnd(matchId),
     discard: () => {
       repository.clearActiveGame()
       return gameRef.current

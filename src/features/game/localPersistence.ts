@@ -34,11 +34,14 @@ import type {
   GamePlayer,
   LocalGame,
   LocalGameAccount,
+  LocalGameMatch,
   LocalGameResult,
   LocalGameSummary,
+  MatchSeatOutcome,
   NewPlayerInput,
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
+import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -54,6 +57,7 @@ export const LOCAL_KEYS = {
   layouts: "count.local.layouts.v1",
   historyIndex: "count.local.history.index.v1",
   meSeat: "count.local.meSeat.v1",
+  pendingMatchEnd: "count.local.matchEnd.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
 } as const
@@ -235,6 +239,47 @@ function parseAccount(value: unknown): LocalGameAccount | undefined {
   }
 }
 
+const MATCH_OUTCOMES: readonly MatchSeatOutcome[] = ["win", "loss", "draw"]
+
+function isMatchOutcome(value: unknown): value is MatchSeatOutcome {
+  return MATCH_OUTCOMES.some((outcome) => outcome === value)
+}
+
+function isCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
+}
+
+// why: a match that does not line up with the seats is dropped rather than scored wrong.
+function parseMatch(value: unknown, seatCount: number): LocalGameMatch | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    !value.id ||
+    !isMatchBestOf(value.bestOf) ||
+    !isCount(value.gameNumber) ||
+    value.gameNumber < 1 ||
+    value.gameNumber > MAX_GAMES_PER_MATCH ||
+    !Array.isArray(value.wins) ||
+    value.wins.length !== seatCount ||
+    !value.wins.every(isCount) ||
+    !isCount(value.draws)
+  )
+    return undefined
+  const outcomes = isRecord(value.result) ? value.result.outcomes : undefined
+  const result =
+    Array.isArray(outcomes) && outcomes.length === seatCount && outcomes.every(isMatchOutcome)
+      ? { outcomes }
+      : undefined
+  return {
+    id: value.id,
+    bestOf: value.bestOf,
+    gameNumber: value.gameNumber,
+    wins: value.wins,
+    draws: value.draws,
+    ...(result ? { result } : {}),
+  }
+}
+
 function parseSkippedBy(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined
   const ids = value.filter((id): id is string => typeof id === "string" && id.length > 0)
@@ -274,6 +319,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   const result = parseResult(value.result)
   const commanderDamage = parseCommanderDamage(value.commanderDamage)
   const account = parseAccount(value.account)
+  const match = parseMatch(value.match, players.length)
   return {
     schemaVersion: 1,
     id: asGameId(value.id),
@@ -294,6 +340,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(typeof value.finishedAt === "number" ? { finishedAt: value.finishedAt } : {}),
     ...(result ? { result } : {}),
     ...(account ? { account } : {}),
+    ...(match ? { match } : {}),
   }
 }
 
@@ -357,6 +404,7 @@ function parseSummary(value: unknown): LocalGameSummary | null {
   const result = parseResult(value.result)
   const account = parseAccount(value.account)
   const skippedBy = parseSkippedBy(value.skippedBy)
+  const match = players ? parseMatch(value.match, players.length) : undefined
   return players
     ? {
         schemaVersion: 1,
@@ -376,6 +424,14 @@ function parseSummary(value: unknown): LocalGameSummary | null {
           ? { publish: value.publish }
           : {}),
         ...(skippedBy ? { skippedBy } : {}),
+        ...(match ? { match } : {}),
+        ...(account &&
+        match?.result &&
+        (value.matchPublish === "pending" ||
+          value.matchPublish === "published" ||
+          value.matchPublish === "failed")
+          ? { matchPublish: value.matchPublish }
+          : {}),
       }
     : null
 }
@@ -580,6 +636,10 @@ export class LocalGameRepository {
       ...(game.result ? { result: game.result } : {}),
       ...(account ? { account } : {}),
       ...(account && game.status === "finished" ? { publish: "pending" as const } : {}),
+      ...(game.match ? { match: game.match } : {}),
+      ...(account && game.status === "finished" && game.match?.result
+        ? { matchPublish: "pending" as const }
+        : {}),
     }
     const current = this.loadHistory().filter(({ id }) => id !== game.id)
     const next = [summary, ...current].slice(0, MAX_HISTORY_GAMES)
@@ -613,11 +673,11 @@ export class LocalGameRepository {
     return summary
   }
 
-  /** why: the uploader runs through this list on sign-in, reconnect, and every finish. */
+  /** why: the uploader runs through this list on sign-in, reconnect, and every finish, oldest first so a match's games land in order. */
   pendingPublishes(ownerId: string): LocalGameSummary[] {
-    return this.loadHistory().filter(
-      (game) => game.publish === "pending" && game.account?.ownerId === ownerId,
-    )
+    return this.loadHistory()
+      .filter((game) => game.publish === "pending" && game.account?.ownerId === ownerId)
+      .sort((left, right) => left.finishedAt - right.finishedAt)
   }
 
   /** why: the sign-in picker files claimed games under the account and remembers who declined the rest. The index is the authority: once it is written, a failed detail write is repaired by the next call or launch, and the error reaches the picker so the user can retry. */
@@ -626,6 +686,19 @@ export class LocalGameRepository {
     const next = applyClaimDecisions(history, ownerId, decisions)
     const changed = next.some((game, index) => game !== history[index])
     if (changed) this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
+    // why: a match claimed between games continues under the same account and seat, or its next game would not link.
+    const active = this.loadActiveGame()
+    const claimed = active?.match
+      ? decisions.find((decision) => decision.claim && decision.id === active.match?.id)
+      : undefined
+    if (active && claimed && !active.account) {
+      const me = claimed.meSeat === undefined ? undefined : active.players[claimed.meSeat]
+      this.saveActiveGame({
+        ...active,
+        account: { ownerId, ...(me ? { mePlayerId: me.id } : {}) },
+        updatedAt: Date.now(),
+      })
+    }
     try {
       this.repairClaimedDetails(ownerId)
     } finally {
@@ -660,11 +733,102 @@ export class LocalGameRepository {
   }
 
   private settlePublish(gameId: string, publish: "published" | "failed"): void {
+    this.patchSummary(gameId, (game) =>
+      game.publish === "pending" ? { ...game, publish } : undefined,
+    )
+  }
+
+  /** why: a match result only uploads once every game it counts has been acked. */
+  pendingMatchFinishes(ownerId: string): LocalGameSummary[] {
     const history = this.loadHistory()
-    if (!history.some((game) => game.id === gameId && game.publish === "pending")) return
+    return history.filter(
+      (game) =>
+        game.matchPublish === "pending" &&
+        game.account?.ownerId === ownerId &&
+        !history.some((other) => other.publish === "pending" && other.match?.id === game.match?.id),
+    )
+  }
+
+  /** why: the server scores a match from its published games, so a result with a rejected game can never land. */
+  matchFinishesWithFailedGames(ownerId: string): LocalGameSummary[] {
+    const history = this.loadHistory()
+    return history.filter(
+      (game) =>
+        game.matchPublish === "pending" &&
+        game.account?.ownerId === ownerId &&
+        history.some((other) => other.publish === "failed" && other.match?.id === game.match?.id),
+    )
+  }
+
+  markMatchPublished(gameId: string): void {
+    this.settleMatchPublish(gameId, "published")
+  }
+
+  markMatchPublishFailed(gameId: string): void {
+    this.settleMatchPublish(gameId, "failed")
+  }
+
+  private settleMatchPublish(gameId: string, matchPublish: "published" | "failed"): void {
+    this.patchSummary(gameId, (game) =>
+      game.matchPublish === "pending" ? { ...game, matchPublish } : undefined,
+    )
+  }
+
+  /** why: the latest game of a match is the one that carries its result when the player ends it. */
+  latestMatchGame(matchId: string): LocalGameSummary | undefined {
+    return this.loadHistory().find((game) => game.match?.id === matchId)
+  }
+
+  /** why: a match that hit the game cap has no board left; the result it still owes survives a restart here. */
+  loadPendingMatchEnd(): string | undefined {
+    const matchId = this.storage.getString(LOCAL_KEYS.pendingMatchEnd)
+    return matchId && this.latestMatchGame(matchId)?.match?.result === undefined
+      ? matchId
+      : undefined
+  }
+
+  savePendingMatchEnd(matchId: string | undefined): void {
+    if (matchId === undefined) this.storage.delete(LOCAL_KEYS.pendingMatchEnd)
+    else this.storage.set(LOCAL_KEYS.pendingMatchEnd, matchId)
+  }
+
+  // why: ending a match happens after its last game was archived, so the result is written onto that game.
+  finishMatch(matchId: string, outcomes: MatchSeatOutcome[]): LocalGameSummary | null {
+    const latest = this.latestMatchGame(matchId)
+    if (!latest?.match || latest.match.result || outcomes.length !== latest.players.length)
+      return null
+    const match = { ...latest.match, result: { outcomes } }
+    const summary: LocalGameSummary = {
+      ...latest,
+      match,
+      ...(latest.account && latest.status === "finished"
+        ? { matchPublish: "pending" as const }
+        : {}),
+    }
+    this.patchSummary(latest.id, () => summary)
+    if (this.storage.getString(LOCAL_KEYS.pendingMatchEnd) === matchId)
+      this.savePendingMatchEnd(undefined)
+    const detail = parseJson(this.storage.getString(LOCAL_KEYS.historyDetail(latest.id)))
+    if (isRecord(detail) && isRecord(detail.game))
+      this.storage.set(
+        LOCAL_KEYS.historyDetail(latest.id),
+        JSON.stringify({ ...detail, game: { ...detail.game, match } }),
+      )
+    if (summary.matchPublish) this.finishListeners.forEach((listener) => listener())
+    return summary
+  }
+
+  private patchSummary(
+    gameId: string,
+    patch: (game: LocalGameSummary) => LocalGameSummary | undefined,
+  ): void {
+    const history = this.loadHistory()
+    const index = history.findIndex((game) => game.id === gameId)
+    const next = index === -1 ? undefined : patch(history[index])
+    if (!next) return
     this.storage.set(
       LOCAL_KEYS.historyIndex,
-      JSON.stringify(history.map((game) => (game.id === gameId ? { ...game, publish } : game))),
+      JSON.stringify(history.map((game) => (game.id === gameId ? next : game))),
     )
     this.notifyHistoryChanged()
   }

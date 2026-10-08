@@ -19,6 +19,9 @@ const mockPublish = jest.fn(
     finishedAt: 1,
   }),
 )
+const mockFinishMatch = jest.fn(async (_args: { publicId: string; gameCount: number }) => ({
+  matchId: "m",
+}))
 let mockConnected = true
 
 jest.mock("@clerk/expo", () => ({
@@ -28,12 +31,17 @@ jest.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true, isLoading: false }),
   useConvexConnectionState: () => ({ isWebSocketConnected: mockConnected }),
   useMutation: (reference: string) =>
-    reference === "games.publishFinishedLocalGame" ? mockPublish : mockSyncCurrent,
+    reference === "games.publishFinishedLocalGame"
+      ? mockPublish
+      : reference === "matches.finishScryveMatch"
+        ? mockFinishMatch
+        : mockSyncCurrent,
 }))
 jest.mock("../../../convex/_generated/api", () => ({
   api: {
     users: { syncCurrent: "users.syncCurrent" },
     games: { publishFinishedLocalGame: "games.publishFinishedLocalGame" },
+    matches: { finishScryveMatch: "matches.finishScryveMatch" },
   },
 }))
 
@@ -113,6 +121,78 @@ describe("LocalGamePublishSession", () => {
     await waitFor(() => expect(repository.pendingPublishes("owner-a")).toHaveLength(0))
     expect(mockPublish).toHaveBeenCalledTimes(3)
   })
+
+  it("uploads a match's games in order and finishes the match only after they are acked", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const first = createLocalGame({
+      now: 1,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000000" },
+        { name: "Grace", color: "#111111" },
+      ],
+      account: { ownerId: "owner-a", meSeat: 0 },
+      match: { bestOf: 1 },
+    })
+    const context = defaultCommandContext(asDeviceId("device_test"))
+    const decided = applyGameCommand(
+      first,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [first.players[0].id] } },
+      { ...context, now: () => 2 },
+    )
+    mockPublish.mockRejectedValueOnce(new Error("offline"))
+    repository.archiveGame(decided, "game_menu")
+
+    render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
+    expect(mockFinishMatch).not.toHaveBeenCalled()
+
+    await act(async () => {
+      repository.archiveGame(finishedGame(30), "game_menu", "owner-a")
+    })
+    await waitFor(() => expect(mockFinishMatch).toHaveBeenCalledTimes(1))
+    expect(mockPublish.mock.calls.map(([args]) => args.publicId)).toEqual([
+      decided.id,
+      decided.id,
+      repository.loadHistory()[0].id,
+    ])
+    expect(mockFinishMatch.mock.calls[0]?.[0]).toMatchObject({
+      publicId: decided.match?.id,
+      seats: [
+        { seat: 1, outcome: "win", gamesWon: 1, gamesDrawn: 0 },
+        { seat: 2, outcome: "loss", gamesWon: 0, gamesDrawn: 0 },
+      ],
+    })
+    await waitFor(() => expect(repository.loadHistory()[1].matchPublish).toBe("published"))
+  })
+
+  it("marks a rejected match finish failed instead of retrying it forever", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const first = createLocalGame({
+      now: 1,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000000" },
+        { name: "Grace", color: "#111111" },
+      ],
+      account: { ownerId: "owner-a", meSeat: 0 },
+      match: { bestOf: 1 },
+    })
+    const decided = applyGameCommand(
+      first,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [first.players[0].id] } },
+      { ...defaultCommandContext(asDeviceId("device_test")), now: () => 2 },
+    )
+    mockFinishMatch.mockRejectedValueOnce(
+      new Error("[CONVEX M(matches:finishScryveMatch)] Server Error\nUncaught Error: missing"),
+    )
+    repository.archiveGame(decided, "game_menu")
+
+    render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await waitFor(() => expect(repository.loadHistory()[0].matchPublish).toBe("failed"))
+    expect(mockFinishMatch).toHaveBeenCalledTimes(1)
+    expect(mockFinishMatch.mock.calls[0]?.[0]).toMatchObject({ gameCount: 1 })
+  })
 })
 
 describe("LocalGamePublishSession rejections", () => {
@@ -135,8 +215,8 @@ describe("LocalGamePublishSession rejections", () => {
     render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
     await waitFor(() => expect(repository.pendingPublishes("owner-a")).toHaveLength(0))
     expect(mockPublish).toHaveBeenCalledTimes(2)
-    // why: History lists newest first, and the newest game was the rejected one.
-    expect(repository.loadHistory().map((game) => game.publish)).toEqual(["failed", "published"])
+    // why: uploads go oldest first, so the rejected game is the older one, listed last in History.
+    expect(repository.loadHistory().map((game) => game.publish)).toEqual(["published", "failed"])
   })
 
   it("retries a deck rejection once without the deck", async () => {

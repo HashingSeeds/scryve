@@ -45,6 +45,7 @@ import {
   STALE_GAME_INACTIVITY_MS,
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
+import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 
 const MAX_PLAYERS_PER_GAME_READ = 7
 const MAX_INVITES_PER_GAME_READ = 20
@@ -472,8 +473,8 @@ async function terminalizeGame(
     | { kind: "unknown" } = {
     kind: "unknown",
   },
-  // why: a published local game finished on the device, so its records keep that moment and source.
-  options: { finishedAt?: number; historySource?: "local" } = {},
+  // why: a published local game finished on the device, so its records keep that moment, source, and match.
+  options: { finishedAt?: number; historySource?: "local"; matchId?: Id<"matches"> } = {},
 ): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
     .query("gameSummaries")
@@ -548,6 +549,7 @@ async function terminalizeGame(
     players: summaryPlayers,
     resultKind: result.kind,
     ...(result.kind === "win" ? { winnerPlayerIds: result.winnerPlayerIds } : {}),
+    ...(options.matchId ? { matchId: options.matchId } : {}),
   })
   const summary = (await ctx.db.get(summaryId))!
   const playersByUser = new Map<Id<"users">, typeof summaryPlayers>()
@@ -570,6 +572,7 @@ async function terminalizeGame(
       ...(options.historySource ? { source: options.historySource } : {}),
       gameId: game._id,
       summaryId,
+      ...(options.matchId ? { matchId: options.matchId } : {}),
       finishedAt,
       outcome,
     })
@@ -1142,6 +1145,8 @@ export const publishFinishedLocalGame = mutation({
       v.object({ kind: v.literal("draw") }),
       v.object({ kind: v.literal("unknown") }),
     ),
+    // why: a game inside a match carries the match's client id so the first publish creates the match.
+    match: v.optional(publishedMatchValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1187,11 +1192,13 @@ export const publishFinishedLocalGame = mutation({
       return { publicId: existing.publicId, summaryId: summary._id, finishedAt: summary.finishedAt }
     }
     const me = meSeats[0]
+    let myDeck: Doc<"decks"> | undefined
     if (me?.deckVersionId) {
       const version = await ctx.db.get(me.deckVersionId)
       const deck = version ? await ctx.db.get(version.deckId) : null
       if (!version || !deck || deck.ownerUserId !== user._id)
         throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+      myDeck = deck
       if ((deck.game ?? DEFAULT_DECK_GAME) !== gameSystem)
         throw new ConvexError({
           code: "deck_system_mismatch",
@@ -1238,6 +1245,23 @@ export const publishFinishedLocalGame = mutation({
       })
       playerIdsByLocalId.set(player.localId, playerId)
     }
+    const matchId = args.match
+      ? await linkPublishedGameToMatch(ctx, user, args.match, {
+          id: gameId,
+          system: gameSystem,
+          ...(format ? { format } : {}),
+          seats: args.players.map((player) => ({
+            seat: player.seat,
+            displayName: player.displayName,
+            ...(player.me ? { userId: user._id } : {}),
+            ...(player.me && myDeck && player.deckVersionId
+              ? { deckId: myDeck._id, deckVersionId: player.deckVersionId, deckName: myDeck.name }
+              : {}),
+          })),
+        })
+      : undefined
+    if (matchId && args.match)
+      await ctx.db.patch(gameId, { matchId, matchGameNumber: args.match.gameNumber })
     const game = (await ctx.db.get(gameId))!
     const summary = await terminalizeGame(
       ctx,
@@ -1253,7 +1277,7 @@ export const publishFinishedLocalGame = mutation({
             ),
           }
         : args.result,
-      { finishedAt: args.finishedAt, historySource: "local" },
+      { finishedAt: args.finishedAt, historySource: "local", ...(matchId ? { matchId } : {}) },
     )
     if (!me)
       await ctx.db.insert("gameHistoryEntries", {
@@ -1261,6 +1285,7 @@ export const publishFinishedLocalGame = mutation({
         source: "local",
         gameId,
         summaryId: summary._id,
+        ...(matchId ? { matchId } : {}),
         finishedAt: args.finishedAt,
         outcome: "unknown",
       })

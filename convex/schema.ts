@@ -59,6 +59,8 @@ const manualRecordValidator = v.object({
 const manualStatsFields = {
   manualMatches: v.optional(manualRecordValidator),
   manualGames: v.optional(manualRecordValidator),
+  // why: Scryve games already live in the top-level counters; matches played in Scryve get their own tally.
+  connectedMatches: v.optional(manualRecordValidator),
 }
 
 const matchFields = {
@@ -130,6 +132,8 @@ export default defineSchema({
     rematchPublicId: v.optional(v.string()),
     rematchOfGameId: v.optional(v.id("games")),
     matchId: v.optional(v.id("matches")),
+    // why: the game's order inside its match, so out-of-order uploads still sort.
+    matchGameNumber: v.optional(v.number()),
     // Reserved for a future event stream without enabling connected mutations in Phase 2.
     // Legacy event-count base. New life writes never patch this shared row.
     eventSequence: v.optional(v.number()),

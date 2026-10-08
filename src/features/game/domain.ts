@@ -15,7 +15,9 @@ import type {
   LifeDelta,
   LocalGame,
   LocalGameAccount,
+  LocalGameMatch,
   LocalGameResult,
+  LocalMatchResult,
   NewPlayerInput,
   OperationId,
   PlayerId,
@@ -25,6 +27,7 @@ import {
   PLAYER_MARK_SHAPES,
   shapeForSeat,
 } from "../../../convex/lib/appearance"
+import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
 
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
 export const MAX_LIFE_DELTA = 999_999
@@ -110,6 +113,7 @@ export function createLocalGame(input: {
   now?: number
   gameId?: GameId
   account?: { ownerId: string; meSeat?: number; deckVersionId?: string; deckName?: string }
+  match?: { bestOf: MatchBestOf }
 }): LocalGame {
   const system = isPlaySystemId(input.system) ? input.system : undefined
   const format = system ? playSystemFormat(system, input.format) : undefined
@@ -154,7 +158,96 @@ export function createLocalGame(input: {
     createdAt: now,
     updatedAt: now,
     ...(input.account ? { account: localGameAccount(players, input.account) } : {}),
+    ...(input.match ? { match: newMatch(input.match.bestOf, players.length, now) } : {}),
   }
+}
+
+function newMatch(bestOf: MatchBestOf, seatCount: number, now: number): LocalGameMatch {
+  return {
+    id: createClientId("match", now),
+    bestOf,
+    gameNumber: 1,
+    wins: Array.from({ length: seatCount }, () => 0),
+    draws: 0,
+  }
+}
+
+/** why: the score once this game's result is counted, by seat index. */
+export function matchScoreAfter(game: Pick<LocalGame, "players" | "match" | "result">) {
+  const match = game.match
+  if (!match) throw new Error("This game is not part of a match.")
+  const result = game.result
+  return {
+    wins: game.players.map(
+      (player, seat) =>
+        (match.wins[seat] ?? 0) +
+        (result?.kind === "win" && result.winnerPlayerIds.includes(player.id) ? 1 : 0),
+    ),
+    draws: match.draws + (result?.kind === "draw" ? 1 : 0),
+  }
+}
+
+/** why: a seat that reaches the needed wins ends the match without asking. */
+export function completedMatchResult(
+  game: Pick<LocalGame, "players" | "match" | "result">,
+): LocalMatchResult | undefined {
+  if (!game.match) return undefined
+  const { wins } = matchScoreAfter(game)
+  const winner = wins.findIndex((count) => count >= winsNeeded(game.match!.bestOf))
+  if (winner === -1) return undefined
+  return { outcomes: wins.map((_, seat) => (seat === winner ? "win" : "loss")) }
+}
+
+export function drawsLabel(draws: number) {
+  return `${draws} ${draws === 1 ? "draw" : "draws"}`
+}
+
+export function matchScoreLabel(score: { wins: number[]; draws: number }) {
+  return score.draws === 0
+    ? score.wins.join("-")
+    : `${score.wins.join("-")} · ${drawsLabel(score.draws)}`
+}
+
+/** why: the board shows where the match stands before this game counts. */
+export function matchContextLabel(game: Pick<LocalGame, "match">) {
+  const match = game.match
+  if (!match) return undefined
+  return `Game ${match.gameNumber} · ${matchScoreLabel(match)}`
+}
+
+export function canContinueMatch(game: Pick<LocalGame, "status" | "match">) {
+  return (
+    game.status === "finished" &&
+    game.match !== undefined &&
+    game.match.result === undefined &&
+    game.match.gameNumber < MAX_GAMES_PER_MATCH
+  )
+}
+
+/** why: the next game keeps the seats and the score; only the board and the game id are new. */
+export function createNextMatchGame(game: LocalGame, now?: number): LocalGame {
+  if (!game.match || !canContinueMatch(game))
+    throw new Error("This match cannot continue to another game.")
+  const next = createRematch(game, now)
+  return {
+    ...next,
+    match: {
+      ...game.match,
+      gameNumber: game.match.gameNumber + 1,
+      ...matchScoreAfter(game),
+    },
+  }
+}
+
+/** why: a match counts as under way once a game of it started or finished; a fresh game 1 can still be replaced. */
+export function isMatchInProgress(game: LocalGame) {
+  return game.match !== undefined && (game.match.gameNumber > 1 || hasLocalGameStarted(game))
+}
+
+/** why: abandoning a game mid-match restarts that game; the match and its score stay. */
+export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
+  if (!game.match) throw new Error("This game is not part of a match.")
+  return { ...createRematch(game, now), match: game.match }
 }
 
 /** why: setup forms know seats by index while a running game knows them by player id. */
@@ -186,6 +279,8 @@ export function createRematch(game: LocalGame, now?: number): LocalGame {
     lifeStep: game.lifeStep,
     now,
     ...(game.account ? { account: { ...game.account, meSeat: meSeatOf(game) } } : {}),
+    // why: match mode is a table setting, so a finished match hands the table a fresh match.
+    ...(game.match ? { match: { bestOf: game.match.bestOf } } : {}),
   })
 }
 
@@ -315,7 +410,7 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
 
   const status = event.type === "game.finished" ? "finished" : "abandoned"
   const result = event.type === "game.finished" ? sanitizeGameResult(game, event.result) : undefined
-  return {
+  const finished: LocalGame = {
     ...game,
     status,
     events: [...game.events, event],
@@ -323,6 +418,10 @@ export function reduceGameEvent(game: LocalGame, event: GameEvent): LocalGame {
     finishedAt: event.clientCreatedAt,
     ...(result ? { result } : {}),
   }
+  const matchResult = status === "finished" ? completedMatchResult(finished) : undefined
+  return matchResult
+    ? { ...finished, match: { ...finished.match!, result: matchResult } }
+    : finished
 }
 
 export function sanitizeGameResult(

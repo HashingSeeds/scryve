@@ -296,11 +296,18 @@ async function activeVersions(ctx: QueryCtx | MutationCtx, deckId: Id<"decks">) 
 
 type StatsCounters = Pick<
   Doc<"deckStats">,
-  "games" | "wins" | "losses" | "draws" | "unknown" | "manualMatches" | "manualGames"
+  | "games"
+  | "wins"
+  | "losses"
+  | "draws"
+  | "unknown"
+  | "manualMatches"
+  | "manualGames"
+  | "connectedMatches"
 >
 
 // why: top-level fields stay Scryve games for installed clients; each source gets its own envelope.
-// why: an absent tally means no data, and Scryve matches can join `connected` later.
+// why: an absent tally means no data for that line.
 function statsRecord(stats: StatsCounters | null) {
   const games = {
     total: stats?.games ?? 0,
@@ -315,7 +322,10 @@ function statsRecord(stats: StatsCounters | null) {
     losses: games.losses,
     draws: games.draws,
     unknown: games.unknown,
-    connected: { games },
+    connected: {
+      games,
+      ...(stats?.connectedMatches ? { matches: stats.connectedMatches } : {}),
+    },
     manual: {
       ...(stats?.manualMatches ? { matches: stats.manualMatches } : {}),
       ...(stats?.manualGames ? { games: stats.manualGames } : {}),

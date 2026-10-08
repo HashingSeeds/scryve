@@ -2,7 +2,13 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
-import { applyGameCommand, asDeviceId, createLocalGame, defaultCommandContext } from "./domain"
+import {
+  applyGameCommand,
+  asDeviceId,
+  createLocalGame,
+  createNextMatchGame,
+  defaultCommandContext,
+} from "./domain"
 import { LocalGameClaimPrompt } from "./LocalGameClaimPrompt"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
 
@@ -97,7 +103,7 @@ describe("LocalGameClaimPrompt", () => {
     expect(screen.getByText("Add 1 game")).toBeTruthy()
     expect(screen.queryByTestId(`claim-me-seat-${older.id}`)).toBeNull()
     fireEvent.press(screen.getByTestId(`claim-me-seat-${newer.id}`))
-    fireEvent.press(screen.getByTestId(`claim-me-seat-${newer.id}-option-${newer.players[1].id}`))
+    fireEvent.press(screen.getByTestId(`claim-me-seat-${newer.id}-option-1`))
     fireEvent.press(screen.getByTestId("claim-games-confirm"))
 
     expect(screen.queryByTestId("claim-games-dialog")).toBeNull()
@@ -170,6 +176,57 @@ describe("LocalGameClaimPrompt", () => {
     fireEvent.press(screen.getByTestId("claim-games-confirm"))
     expect(screen.queryByTestId("claim-games-dialog")).toBeNull()
     expect(repository.loadHistoryDetail(game.id)?.game.account).toEqual({ ownerId: "owner-a" })
+  })
+
+  it("offers a signed-out match as one row and claims all of its games with one seat", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const first = createLocalGame({
+      now: 1,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000000" },
+        { name: "Grace", color: "#111111" },
+      ],
+      match: { bestOf: 3 },
+    })
+    const context = defaultCommandContext(asDeviceId("device_test"))
+    const firstDone = applyGameCommand(
+      first,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [first.players[1].id] } },
+      { ...context, now: () => 2 },
+    )
+    const second = createNextMatchGame(firstDone, 3)
+    const secondDone = applyGameCommand(
+      second,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [second.players[1].id] } },
+      { ...context, now: () => 4 },
+    )
+    repository.archiveGame(firstDone)
+    repository.archiveGame(secondDone)
+    repository.archiveGame(finishedGame(10, ["Katherine", "Dorothy"]))
+    setup(repository)
+
+    const matchId = first.match!.id
+    expect(screen.getByText("Add 3 games")).toBeTruthy()
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2)
+    expect(screen.getByTestId(`claim-game-${matchId}`)).toHaveAccessibleName(
+      /Best of 3 · 0-2 · Won by Grace/,
+    )
+    fireEvent.press(screen.getByTestId(`claim-me-seat-${matchId}`))
+    fireEvent.press(screen.getByTestId(`claim-me-seat-${matchId}-option-1`))
+    fireEvent.press(screen.getByTestId("claim-games-confirm"))
+
+    const history = repository.loadHistory()
+    expect(history.find((game) => game.id === secondDone.id)).toMatchObject({
+      account: { ownerId: "owner-a", mePlayerId: second.players[1].id },
+      publish: "pending",
+      matchPublish: "pending",
+    })
+    expect(history.find((game) => game.id === firstDone.id)).toMatchObject({
+      account: { ownerId: "owner-a", mePlayerId: first.players[1].id },
+      publish: "pending",
+    })
+    expect(repository.pendingPublishes("owner-a")).toHaveLength(3)
   })
 
   it("changes nothing when dismissed", () => {

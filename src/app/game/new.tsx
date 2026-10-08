@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
 import { useAuthAccess } from "@/features/auth/AuthContext"
@@ -14,9 +14,10 @@ import {
   applyGameCommand,
   defaultCommandContext,
   hasLocalGameStarted,
+  isMatchInProgress,
 } from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
-import type { LocalGameResult } from "@/features/game/types"
+import type { LocalGame, LocalGameResult, MatchSeatOutcome } from "@/features/game/types"
 import { JoinConnectedScreen } from "@/screens/JoinConnectedScreen"
 import {
   NewGameScreen,
@@ -80,6 +81,20 @@ export default function NewLocalGameRoute() {
     }, []),
   )
   const started = activeGame !== null && hasLocalGameStarted(activeGame)
+  // why: a match between games has no life changes yet, but Start must continue it rather than replace it.
+  const blocking = activeGame !== null && (started || isMatchInProgress(activeGame))
+  const matchEndGame = useMemo((): LocalGame | undefined => {
+    if (!activeGame?.match || started || activeGame.match.gameNumber < 2) return undefined
+    const latest = localGameRepository.latestMatchGame(activeGame.match.id)
+    return latest ? localGameRepository.loadHistoryDetail(latest.id)?.game : undefined
+  }, [activeGame, started])
+
+  function endMatch(outcomes: MatchSeatOutcome[]) {
+    if (!activeGame?.match) return
+    localGameRepository.finishMatch(activeGame.match.id, outcomes)
+    localGameRepository.clearActiveGame()
+    setActiveGame(null)
+  }
 
   function endLocal(result?: LocalGameResult) {
     const current = localGameRepository.loadActiveGame()
@@ -114,14 +129,15 @@ export default function NewLocalGameRoute() {
         defaults={defaults}
         mode={mode}
         initialGame={initialGame}
-        localGame={started ? activeGame : undefined}
+        localGame={blocking ? activeGame : undefined}
+        localMatchEnd={matchEndGame ? { game: matchEndGame, onEnd: endMatch } : undefined}
         account={ownerId ? { ownerId, defaultMeSeat, decks } : undefined}
         onResumeLocal={() => router.replace("/game/current")}
         onEndLocal={endLocal}
         onAbandonLocal={() => endLocal()}
         // why: Play opens plain /game/new before its stored-game state catches up, so a running game's edits must persist on every entry.
         onSavePlayers={
-          started
+          blocking
             ? (players, account) => {
                 localGameRepository.updateActivePlayers(activeGame.id, players, account)
                 setActiveGame(localGameRepository.loadActiveGame())
@@ -132,7 +148,7 @@ export default function NewLocalGameRoute() {
         onBack={() => goBack({ pathname: "/", params: { destination: "play" } })}
         onStartLocal={(players, startingLife, setup) => {
           const current = localGameRepository.loadActiveGame()
-          if (current && hasLocalGameStarted(current)) {
+          if (current && (hasLocalGameStarted(current) || isMatchInProgress(current))) {
             setActiveGame(current)
             return
           }

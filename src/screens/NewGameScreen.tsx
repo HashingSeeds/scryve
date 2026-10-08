@@ -27,6 +27,7 @@ import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import {
   hasLocalGameStarted,
+  matchContextLabel,
   MAX_PLAYER_NAME_LENGTH,
   meSeatOf,
   PLAYER_COLORS,
@@ -34,6 +35,7 @@ import {
   validateStartingLife,
 } from "@/features/game/domain"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
+import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
 import {
   playerGridLayoutForCount,
@@ -49,7 +51,13 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { LocalGame, LocalGameResult, NewPlayerInput, PlayerId } from "@/features/game/types"
+import type {
+  LocalGame,
+  LocalGameResult,
+  MatchSeatOutcome,
+  NewPlayerInput,
+  PlayerId,
+} from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -61,6 +69,7 @@ import {
   shapeForSeat,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
+import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
 
 export type NewGameMode = "local" | "connected"
@@ -118,6 +127,7 @@ export interface NewGameScreenProps {
       layout: PlayerGridLayoutVariant
       lifeStep: number
       account?: LocalGameAccountInput
+      match?: { bestOf: MatchBestOf }
     },
   ) => void
   connected?: ConnectedHostFeed
@@ -132,6 +142,8 @@ export interface NewGameScreenProps {
   onResumeConnected?: (game: ResumableGame) => void
   /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
   localConnect?: LocalConnectFeed
+  /** why: between games of a match, setup can end the match from its last finished game; the board owns everything else. */
+  localMatchEnd?: { game: LocalGame; onEnd: (outcomes: MatchSeatOutcome[]) => void }
 }
 
 export interface LocalConnectFeed {
@@ -164,6 +176,7 @@ export function NewGameScreen({
   joinContent,
   onResumeConnected,
   localConnect,
+  localMatchEnd,
 }: NewGameScreenProps) {
   const {
     themed,
@@ -223,6 +236,11 @@ export function NewGameScreen({
     setMeSeat(account?.defaultMeSeat)
     setDeck(undefined)
   }, [account?.defaultMeSeat, account?.ownerId])
+  const [matchOn, setMatchOn] = useState(Boolean(initialGame?.match))
+  // why: the best of follows the table until the player picks one; a pod round is one game, a 1v1 match is three.
+  const [chosenBestOf, setChosenBestOf] = useState<MatchBestOf | undefined>(
+    initialGame?.match?.bestOf,
+  )
   const [showOptions, setShowOptions] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
@@ -257,6 +275,13 @@ export function NewGameScreen({
     [appearances, nameValidation.names],
   )
   const effectiveMeSeat = meSeat !== undefined && meSeat < playerCount ? meSeat : undefined
+  const matchBestOf = matchOn
+    ? (chosenBestOf ?? (format === "commander" || playerCount > 2 ? 1 : 3))
+    : undefined
+  // why: a match is one deck's record, so once it is under way the seat and deck stay put.
+  const matchLocked = Boolean(
+    initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
+  )
   const deckList = account?.decks === "unavailable" ? undefined : account?.decks
   const deckChoices =
     deckList?.filter((choice) => choice.system === system && choice.format === format) ?? []
@@ -277,6 +302,9 @@ export function NewGameScreen({
   const busy = connectedMode && Boolean(connected?.busy)
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)
+  // why: a match in progress is continued from setup, never ended game by game or replaced.
+  const matchBlocks = Boolean(localGame?.match)
+  const [endingMatch, setEndingMatch] = useState(false)
   const connectedBlocksLocal =
     !connectedMode && Boolean(connected?.ready) && connectedGames.length > 0
   const hostedGame = connectedMode ? connectedGames.find((game) => game.isHost) : undefined
@@ -304,13 +332,15 @@ export function NewGameScreen({
           : preparing && showPreparation
             ? connected?.status
             : ""))
-    : localGame
-      ? "Resume current game"
-      : connectedBlocksLocal
-        ? singleBlockingConnected
-          ? "Resume current game"
-          : "Games in progress"
-        : ""
+    : localGame?.match
+      ? `${matchContextLabel(localGame)} · Best of ${localGame.match.bestOf}`
+      : localGame
+        ? "Resume current game"
+        : connectedBlocksLocal
+          ? singleBlockingConnected
+            ? "Resume current game"
+            : "Games in progress"
+          : ""
 
   function submit() {
     if (!valid || busy) return
@@ -331,7 +361,17 @@ export function NewGameScreen({
         deckRequired,
         ...setup,
       })
-    else onStartLocal(players, startingLife, { ...setup, account: accountInput })
+    else
+      onStartLocal(players, startingLife, {
+        ...setup,
+        account: accountInput,
+        ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
+      })
+  }
+
+  function toggleMatch(on: boolean) {
+    setMatchOn(on)
+    setChosenBestOf(undefined)
   }
 
   function chooseSystem(value: string) {
@@ -554,6 +594,36 @@ export function NewGameScreen({
               </View>
             ) : null}
 
+            {!connectedMode && !localGame ? (
+              <View style={themed($section)}>
+                <Text text="Match" preset="subheading" accessibilityRole="header" />
+                <SegmentedControl
+                  testID="match-mode"
+                  accessibilityLabel="Match"
+                  segments={[
+                    { id: "off", label: "Single game" },
+                    { id: "on", label: "Best of" },
+                  ]}
+                  selectedId={matchBestOf ? "on" : "off"}
+                  onSelect={(value) => toggleMatch(value === "on")}
+                />
+                {matchBestOf ? (
+                  <SegmentedControl
+                    testID="match-best-of"
+                    accessibilityLabel="Best of"
+                    segments={MATCH_BEST_OF.map((bestOf) => ({
+                      id: String(bestOf),
+                      label: `Best of ${bestOf}`,
+                    }))}
+                    selectedId={String(matchBestOf)}
+                    onSelect={(value) =>
+                      setChosenBestOf(MATCH_BEST_OF.find((bestOf) => String(bestOf) === value))
+                    }
+                  />
+                ) : null}
+              </View>
+            ) : null}
+
             <Button
               testID="setup-options"
               text={showOptions ? "Hide options" : "Layout and counter options"}
@@ -642,6 +712,7 @@ export function NewGameScreen({
                       value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
                       placeholder="No seat"
                       clearLabel="No seat"
+                      disabled={matchLocked}
                       options={players.map((player, index) => ({
                         id: String(index),
                         label: player.name,
@@ -663,7 +734,7 @@ export function NewGameScreen({
                                 : "No deck"
                         }
                         clearLabel="No deck"
-                        disabled={deckList === undefined && !deck}
+                        disabled={matchLocked || (deckList === undefined && !deck)}
                         options={[
                           ...(deck &&
                           !deckChoices.some((choice) => choice.versionId === deck.versionId)
@@ -685,12 +756,14 @@ export function NewGameScreen({
           </Screen>
           <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
             <View style={themed($footerContent)}>
-              <View style={canConnectLocal ? themed($footerActions) : undefined}>
+              <View style={canConnectLocal || localMatchEnd ? themed($footerActions) : undefined}>
                 <Button
                   testID={connectedMode ? "host-connected-button" : "start-game-button"}
                   text={
                     gameBlocksStart
-                      ? "End current game…"
+                      ? matchBlocks
+                        ? "Continue match"
+                        : "End current game…"
                       : connectedMode
                         ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
                         : undefined
@@ -698,13 +771,15 @@ export function NewGameScreen({
                   tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
                   preset="reversed"
                   style={[
-                    canConnectLocal && themed($footerAction),
+                    (canConnectLocal || localMatchEnd) && themed($footerAction),
                     gameBlocksStart && themed($endCurrentButton),
                   ]}
                   textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
                   disabled={
                     localGameBlocksStart
-                      ? !onEndLocal || Boolean(localConnect?.busy)
+                      ? matchBlocks
+                        ? !onResumeLocal
+                        : !onEndLocal || Boolean(localConnect?.busy)
                       : hostedGame
                         ? !connected?.ready || busy
                         : connectedBlocksLocal
@@ -713,14 +788,18 @@ export function NewGameScreen({
                   }
                   accessibilityHint={
                     gameBlocksStart
-                      ? "Opens the end-game prompt before you can start another game"
+                      ? matchBlocks
+                        ? "Returns to the match in progress"
+                        : "Opens the end-game prompt before you can start another game"
                       : connectedMode
                         ? "Creates a lobby others can join"
                         : "Starts this local game on the current device"
                   }
                   onPress={
                     localGameBlocksStart
-                      ? () => setEndingLocal(true)
+                      ? matchBlocks
+                        ? onResumeLocal
+                        : () => setEndingLocal(true)
                       : hostedGame
                         ? () => setGameToExit(hostedGame)
                         : singleBlockingConnected
@@ -730,6 +809,15 @@ export function NewGameScreen({
                             : submit
                   }
                 />
+                {localMatchEnd ? (
+                  <Button
+                    testID="end-match-setup-button"
+                    text="End match…"
+                    style={themed($footerAction)}
+                    accessibilityHint="Records the match result from its last finished game"
+                    onPress={() => setEndingMatch(true)}
+                  />
+                ) : null}
                 {canConnectLocal ? (
                   <Button
                     testID="connect-local-button"
@@ -951,7 +1039,17 @@ export function NewGameScreen({
           <Button text="Cancel" onPress={() => setPickingHostSeat(false)} />
         </DialogCard>
       ) : null}
-      {endingLocal && localGame && onEndLocal ? (
+      {endingMatch && localMatchEnd ? (
+        <LocalMatchEndDialog
+          game={localMatchEnd.game}
+          onClose={() => setEndingMatch(false)}
+          onEnd={(outcomes) => {
+            localMatchEnd.onEnd(outcomes)
+            setEndingMatch(false)
+          }}
+        />
+      ) : null}
+      {endingLocal && localGame && onEndLocal && !matchBlocks ? (
         <LocalGameEndDialog
           game={localGame}
           onClose={() => setEndingLocal(false)}

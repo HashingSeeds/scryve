@@ -1,6 +1,7 @@
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { PlaySystemId } from "./playSystems"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
+import type { MatchBestOf } from "../../../convex/lib/matchResults"
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name }
 
@@ -72,6 +73,25 @@ export interface LocalGameAccount {
   deckName?: string
 }
 
+export type MatchSeatOutcome = "win" | "loss" | "draw"
+
+/** why: outcomes are by seat index because every game of a match seats the same players in the same order. */
+export interface LocalMatchResult {
+  outcomes: MatchSeatOutcome[]
+}
+
+/** why: a match lives on each of its games, so the score survives the new game id a rematch creates. */
+export interface LocalGameMatch {
+  id: string
+  bestOf: MatchBestOf
+  gameNumber: number
+  /** why: wins per seat index and drawn games before this game. */
+  wins: number[]
+  draws: number
+  /** why: set on the game that ended the match, by reaching the needed wins or by the player ending it. */
+  result?: LocalMatchResult
+}
+
 export interface LocalGame {
   schemaVersion: 1
   id: GameId
@@ -89,6 +109,7 @@ export interface LocalGame {
   finishedAt?: number
   result?: LocalGameResult
   account?: LocalGameAccount
+  match?: LocalGameMatch
 }
 
 export interface NewPlayerInput {
@@ -133,4 +154,7 @@ export interface LocalGameSummary {
   publish?: "pending" | "published" | "failed"
   /** why: accounts that declined to claim a signed-out game, so a later sign-in picker can skip it. */
   skippedBy?: string[]
+  match?: LocalGameMatch
+  /** why: the game that ended a match also carries the match result upload, which waits for every game's ack and is dropped when a game was rejected. */
+  matchPublish?: "pending" | "published" | "failed"
 }
