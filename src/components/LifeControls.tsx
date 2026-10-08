@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 
@@ -24,7 +24,7 @@ export interface LifeControlsProps {
   contentRotation?: LifeCardContentRotation
   system?: PlaySystemId
   lifeStep?: number
-  recentDelta?: number
+  life: number
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1) => void
   style?: StyleProp<ViewStyle>
@@ -38,6 +38,23 @@ const HALF_CARD_ZONES: readonly {
   { direction: -1, glyph: "−", edge: "left" },
   { direction: 1, glyph: "+", edge: "right" },
 ]
+
+const RECENT_DELTA_VISIBLE_MS = 1800
+
+/** why: the bubble lives in the controls so showing and clearing it re-renders only these two zones, not the whole life card. */
+function useRecentDelta(life: number): number {
+  const [recent, setRecent] = useState({ life, delta: 0 })
+  if (recent.life !== life) setRecent({ life, delta: recent.delta + life - recent.life })
+  useEffect(() => {
+    if (recent.delta === 0) return
+    const timer = setTimeout(
+      () => setRecent((current) => ({ ...current, delta: 0 })),
+      RECENT_DELTA_VISIBLE_MS,
+    )
+    return () => clearTimeout(timer)
+  }, [recent])
+  return recent.delta
+}
 
 export function lifeControlTestId(seatNumber: number, delta: LifeDelta) {
   return `life-seat-${seatNumber}-${delta}`
@@ -56,12 +73,13 @@ export function LifeControls({
   contentRotation = 0,
   system,
   lifeStep,
-  recentDelta = 0,
+  life,
   onChange,
   onLongChange,
   style,
 }: LifeControlsProps) {
   const { themed } = useAppTheme()
+  const recentDelta = useRecentDelta(life)
   const longPressHandled = useRef<LifeDelta | null>(null)
   const displayName = playerName.trim() || "unnamed player"
   const contentRotationStyle: TextStyle | undefined = contentRotation

@@ -61,7 +61,6 @@ import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
 import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
-const DELTA_VISIBLE_MS = 1800
 const COMMANDER_OVERVIEW_MS = 220
 
 export type { LifeCardContentRotation } from "./playerCardTypes"
@@ -299,24 +298,17 @@ export const LifeCard = memo(function LifeCard({
   const commanderOverviewExiting =
     reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
-  const [recentDelta, setRecentDelta] = useState(0)
   const [editorOpen, setEditorOpen] = useState(false)
   const previousLife = useRef(life)
-  const deltaTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    const difference = life - previousLife.current
+    if (previousLife.current === life) return
     previousLife.current = life
-    if (difference === 0) return
     if (Platform.OS === "ios") {
       AccessibilityInfo.announceForAccessibility(
         `${identity}, now ${counterValueLabel(system, life)}`,
       )
     }
-    setRecentDelta((current) => current + difference)
-    if (deltaTimer.current) clearTimeout(deltaTimer.current)
-    deltaTimer.current = setTimeout(() => setRecentDelta(0), DELTA_VISIBLE_MS)
   }, [identity, life, system])
-  useEffect(() => () => void (deltaTimer.current && clearTimeout(deltaTimer.current)), [])
 
   const ownershipLabel =
     ownership === "owned"
@@ -643,7 +635,7 @@ export const LifeCard = memo(function LifeCard({
           contentRotation={contentRotation}
           system={system}
           lifeStep={lifeStep}
-          recentDelta={recentDelta}
+          life={life}
           onChange={onChange}
           onLongChange={() => setEditorOpen(true)}
         />
