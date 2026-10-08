@@ -122,6 +122,27 @@ describe("TCGdex Pokemon cards", () => {
       }
     })
 
+    it.each(["PR-SW 250", "SP 250", "SP SWSH250"])(
+      "finds Sword & Shield promos numbered SWSH on TCGdex from %s",
+      async (reference) => {
+        const number = reference.split(" ")[1]
+        const tcgdex = mockTcgdex({
+          [`/cards?name=Lumineon%20V&localId=${number}`]: [
+            candidate("swsh9-250", "250", "Lumineon V"),
+            candidate("swshp-SWSH250", "SWSH250", "Lumineon V"),
+          ],
+          "/cards/swshp-SWSH250": { ...riolu, id: "swshp-SWSH250", name: "Lumineon V" },
+        })
+        try {
+          const result = await pokemonCardByReference(ctx, "Lumineon V", reference)
+
+          expect(result.cards.map((card) => card.cardId)).toEqual(["swshp-SWSH250"])
+        } finally {
+          tcgdex.restore()
+        }
+      },
+    )
+
     it("maps PTCG Live promo codes to TCGdex sets without loading set details", async () => {
       const tcgdex = mockTcgdex({
         "/cards?name=Riolu&localId=149": [
