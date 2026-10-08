@@ -59,6 +59,8 @@ jobs:
               - 'metro.config.js'
               - 'package.json'
               - 'pnpm-lock.yaml'
+              - 'scripts/bundle-size*'
+              - '.github/workflows/checks.yml'
 
   ygo-image-mirror:
     needs: changes
@@ -193,3 +195,38 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: CI=1 pnpm export:check
+
+      - name: Measure bundle sizes
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p "$RUNNER_TEMP/bundle-size"
+          node scripts/bundle-size.cjs measure dist-export-check > "$RUNNER_TEMP/bundle-size/head.json"
+
+      # bundle-size.yml saves one entry per main commit that changes bundled files, so the
+      # prefix fallback finds the newest main sizes when the base commit has no entry.
+      - name: Restore main bundle sizes
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: bundle-size-main
+          key: bundle-size-${{ github.event.pull_request.base.sha }}
+          restore-keys: bundle-size-
+
+      # Fails when a bundle grows past scripts/bundle-size-budget.json. The report becomes
+      # the sticky pull request comment in bundle-size.yml, which can write to fork PRs.
+      - name: Check bundle budget
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: >-
+          node scripts/bundle-size.cjs check "$RUNNER_TEMP/bundle-size/head.json"
+          bundle-size-main/sizes.json "$RUNNER_TEMP/bundle-size/report.json"
+          | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload bundle size report
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-size
+          path: ${{ runner.temp }}/bundle-size/report.json
+          if-no-files-found: ignore
+          retention-days: 7
