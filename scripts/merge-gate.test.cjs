@@ -37,6 +37,7 @@ function pullRequest({
   files = [],
   changedFiles = files.length,
   runs = [completedRun("checks")],
+  packageJsons = null,
 } = {}) {
   const connection = (items, key) => ({
     nodes: items,
@@ -78,7 +79,7 @@ function pullRequest({
       ? { filename: file }
       : { filename: file[1], previous_filename: file[0] },
   )
-  return toPullRequest(graphql, restFiles, runs)
+  return toPullRequest(graphql, restFiles, runs, packageJsons)
 }
 
 const gates = (options) => evaluateGates(pullRequest(options))
@@ -158,16 +159,50 @@ test("a successful workflow whose mandatory job was skipped does not count", () 
     gate({ files: ["app.json"], runs: fingerprintRuns }, "Workflows").detail,
     "native fingerprints job check skipped",
   )
+  const matrix = {
+    ...completedRun("checks"),
+    jobs: [
+      { name: "checks", conclusion: "success" },
+      { name: "checks", conclusion: "skipped" },
+    ],
+  }
+  assert.equal(gate({ runs: [matrix] }, "Workflows").detail, "checks job checks skipped")
 })
 
-test("changes to workflows or the gate itself need Matthew", () => {
+test("changes to workflows, checker config, or the gate itself need Matthew", () => {
   assert.equal(ready({ files: [".github/workflows/checks.yml"] }), false)
   assert.deepEqual(gate({ files: ["scripts/merge-gate.cjs"] }, "CI config"), {
     name: "CI config",
     ok: false,
-    detail: "CI config changed, needs Matthew",
+    detail: "CI config changed, needs Matthew: scripts/merge-gate.cjs",
   })
-  assert.equal(gate({ files: ["src/a.ts"] }, "CI config").ok, true)
+  for (const file of [
+    "tsconfig.json",
+    "test/test-tsconfig.json",
+    ".eslintrc.js",
+    "eslint.config.mjs",
+    ".eslint-comments-baseline.json",
+    "tools/eslint-plugin-self-explanatory-code/index.cjs",
+    "jest.config.js",
+    ".dependency-cruiser.js",
+    "scripts/bundle-size.cjs",
+    "scripts/bundle-size-budget.json",
+    "fingerprint.config.js",
+    ".fingerprintignore",
+  ])
+    assert.equal(gate({ files: [file] }, "CI config").ok, false, file)
+  assert.equal(gate({ files: ["src/a.ts", "scripts/preview.cjs"] }, "CI config").ok, true)
+})
+
+test("package.json blocks only when its scripts change", () => {
+  const base = { scripts: { compile: "tsc", lint: "eslint ." }, dependencies: { a: "1" } }
+  const bumped = { scripts: { lint: "eslint .", compile: "tsc" }, dependencies: { a: "2" } }
+  const noop = { ...base, scripts: { ...base.scripts, compile: "true" } }
+  const ciConfig = (head) =>
+    gate({ files: ["package.json"], packageJsons: { base, head } }, "CI config")
+  assert.equal(ciConfig(bumped).ok, true)
+  assert.equal(ready({ files: ["package.json"], packageJsons: { base, head: noop } }), false)
+  assert.equal(ciConfig(noop).detail, "CI config changed, needs Matthew: package.json scripts")
 })
 
 test("a bot's requested changes stand until it approves, and its open threads block", () => {

@@ -1,4 +1,5 @@
 const { spawnSync } = require("node:child_process")
+const { isDeepStrictEqual } = require("node:util")
 
 const MARKER = "<!-- merge-gate -->"
 const FINGERPRINT_MARKER = "<!-- native-fingerprint-check -->"
@@ -6,7 +7,17 @@ const SELF_WORKFLOW = "merge gate"
 const FINGERPRINT_WORKFLOW = "native fingerprints"
 // why: a workflow still succeeds when its jobs are skipped, so each expected workflow names the job that must pass.
 const MANDATORY_JOBS = { checks: "checks", [FINGERPRINT_WORKFLOW]: "check" }
-const CI_CONFIG = /^(?:\.github\/workflows\/|scripts\/merge-gate\.cjs$)/
+// why: changing what the checks run, or what feeds the fingerprint, could turn a failing PR green.
+const CI_CONFIG = [
+  /^\.github\/workflows\//,
+  /^scripts\/(?:merge-gate\.cjs|bundle-size\.cjs|bundle-size-budget\.json)$/,
+  /(?:^|\/)[^/]*tsconfig[^/]*\.json$/,
+  /^(?:\.eslintrc|eslint\.config\.|\.eslintignore$|\.eslint-comments-baseline\.json$)/,
+  /^tools\/eslint-plugin-/,
+  /^jest\.config\./,
+  /^\.dependency-cruiser\.js$/,
+  /^(?:fingerprint\.config\.js|\.fingerprintignore)$/,
+]
 // why: mirrors the paths: trigger of fingerprints.yml, so keep the two in sync.
 const NATIVE_INPUT =
   /^(?:package\.json|pnpm-lock\.yaml|app\.json|app\.config\.ts|eas\.json|(?:patches|assets|modules)\/)/
@@ -20,6 +31,7 @@ const QUERY = `
 query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
+      baseRefOid
       headRefOid
       changedFiles
       body
@@ -90,7 +102,7 @@ function latestRuns(workflowRuns) {
   )
 }
 
-function toPullRequest(graphql, restFiles, workflowRuns) {
+function toPullRequest(graphql, restFiles, workflowRuns, packageJsons) {
   const pr = graphql.data.repository.pullRequest
   const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup
   const contexts = rollup?.contexts.nodes ?? []
@@ -108,6 +120,9 @@ function toPullRequest(graphql, restFiles, workflowRuns) {
     truncated: Object.keys(pages).filter((key) => pages[key]),
     // why: a rename lists its old path only as previous_filename, and moving a file out of convex/ still changes convex/.
     files: restFiles.flatMap((file) => [file.filename, file.previous_filename ?? []].flat()),
+    packageScriptsChanged:
+      packageJsons !== null &&
+      !isDeepStrictEqual(packageJsons.base?.scripts, packageJsons.head?.scripts),
     workflowRuns: latestRuns(workflowRuns).map(({ name, status, conclusion, jobs }) => ({
       name,
       status,
@@ -163,8 +178,12 @@ function workflowsGate({ workflowRuns, files }) {
     if (newest.status !== "completed") return [`${name} is ${newest.status.replace(/_/g, " ")}`]
     if (newest.conclusion !== "success") return [`${name} ${newest.conclusion.replace(/_/g, " ")}`]
     const job = MANDATORY_JOBS[name]
-    const conclusion = newest.jobs.find((candidate) => candidate.name === job)?.conclusion
-    return conclusion === "success" ? [] : [`${name} job ${job} ${conclusion ?? "missing"}`]
+    // why: a matrix can give several jobs the same explicit name, and every leg has to pass.
+    const conclusions = newest.jobs
+      .filter((candidate) => candidate.name === job)
+      .map((candidate) => candidate.conclusion)
+    const failed = conclusions.length === 0 ? "missing" : conclusions.find((c) => c !== "success")
+    return failed === undefined ? [] : [`${name} job ${job} ${failed}`]
   })
   return problems.length > 0
     ? { name: "Workflows", ok: false, detail: problems.join("; ") }
@@ -269,11 +288,19 @@ function evidenceGate({ body, files }) {
     : { name, ok: true, detail: "not needed, no app changes in src/" }
 }
 
-/** why: a PR could otherwise weaken the workflows or script that grade it. */
-function ciConfigGate(files) {
-  return files.some((file) => CI_CONFIG.test(file))
-    ? { name: "CI config", ok: false, detail: "CI config changed, needs Matthew" }
-    : { name: "CI config", ok: true, detail: "no workflow or merge gate changes" }
+/** why: a PR could otherwise weaken the workflows, checkers, or script that grade it. */
+function ciConfigGate({ files, packageScriptsChanged }) {
+  const changed = [
+    ...files.filter((file) => CI_CONFIG.some((pattern) => pattern.test(file))),
+    ...(packageScriptsChanged ? ["package.json scripts"] : []),
+  ]
+  return changed.length > 0
+    ? {
+        name: "CI config",
+        ok: false,
+        detail: `CI config changed, needs Matthew: ${changed.join(", ")}`,
+      }
+    : { name: "CI config", ok: true, detail: "no workflow, checker, or merge gate changes" }
 }
 
 function evaluateGates(pr) {
@@ -283,7 +310,7 @@ function evaluateGates(pr) {
     checksGate(pr.checks),
     ...Object.entries(REVIEWERS).map(([name, login]) => reviewerGate(name, login, pr)),
     convexGate(pr.files),
-    ciConfigGate(pr.files),
+    ciConfigGate(pr),
     fingerprintGate(pr),
     evidenceGate(pr),
   ]
@@ -341,7 +368,20 @@ function fetchPullRequest(number) {
       `repos/{owner}/{repo}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`,
     ).flatMap((page) => page.jobs),
   }))
-  return toPullRequest(graphql, files, workflowRuns)
+  const { baseRefOid } = graphql.data.repository.pullRequest
+  const packageJsonAt = (ref) =>
+    JSON.parse(
+      gh([
+        "api",
+        `repos/{owner}/{repo}/contents/package.json?ref=${ref}`,
+        "-H",
+        "Accept: application/vnd.github.raw",
+      ]),
+    )
+  const packageJsons = files.some((file) => file.filename === "package.json")
+    ? { base: packageJsonAt(baseRefOid), head: packageJsonAt(headSha) }
+    : null
+  return toPullRequest(graphql, files, workflowRuns, packageJsons)
 }
 
 /**
