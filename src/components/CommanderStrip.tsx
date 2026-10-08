@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentProps } from "react"
+import { memo, useEffect, useState, type ComponentProps } from "react"
 import type { LayoutRectangle, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated from "react-native-reanimated"
@@ -8,6 +8,7 @@ import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
+import { structurallyEqual } from "@/utils/structurallyEqual"
 
 import { BoardPressable } from "./BoardPressable"
 import type { CommanderBoardSeat } from "./commanderDamageLayout"
@@ -45,7 +46,8 @@ export interface CommanderStripProps {
   onToggle: () => void
 }
 
-export function CommanderStrip({
+/** why: the strip's SVG marks are costly, and a life change re-renders the card around them with equal strip props. */
+export const CommanderStrip = memo(function CommanderStrip({
   seatNumber,
   identity,
   ownerPlayerId,
@@ -199,7 +201,7 @@ export function CommanderStrip({
       </BoardPressable>
     </View>
   )
-}
+}, structurallyEqual)
 
 function stripDirection(rotation: LifeCardContentRotation): ViewStyle["flexDirection"] {
   if (rotation === 90) return "column"
