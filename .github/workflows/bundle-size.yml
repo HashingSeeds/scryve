@@ -1,0 +1,150 @@
+name: bundle size
+
+# The checks export job measures each pull request's JS bundles and fails past the budget
+# in scripts/bundle-size-budget.json. This workflow does the two parts that need more than a
+# pull request's read-only token: it records main's sizes for comparison, and it posts the
+# sticky comment from a workflow_run, which also works for fork PRs. The comment job never
+# runs pull request code; it only reads the uploaded numbers.
+
+on:
+  push:
+    branches: [main]
+    # Keep in sync with the exportable filter in checks.yml.
+    paths:
+      - "src/**"
+      - "modules/**"
+      - "app.config.ts"
+      - "app.json"
+      - "assets/**"
+      - "web/**"
+      - "patches/**"
+      - "babel.config.js"
+      - "metro.config.js"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/bundle-size.yml"
+      - "scripts/bundle-size.cjs"
+  workflow_run:
+    workflows: [checks]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  record:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Same key as checks.yml, restored read-only so the export job stays the only writer.
+      - name: Restore Metro cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/metro-cache
+          key: metro-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'babel.config.js', 'metro.config.js', 'app.json', 'app.config.ts') }}
+
+      - name: Export production-like JS bundles
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: CI=1 pnpm export:check
+
+      - name: Measure bundle sizes
+        run: |
+          mkdir -p bundle-size-main
+          node scripts/bundle-size.cjs measure dist-export-check > bundle-size-main/sizes.json
+          cat bundle-size-main/sizes.json
+
+      - name: Save main bundle sizes
+        uses: actions/cache/save@v4
+        with:
+          path: bundle-size-main
+          key: bundle-size-${{ github.sha }}
+
+  comment:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request'
+    concurrency:
+      group: bundle-size-comment-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Runs that skipped or cancelled the export job upload no report.
+      - name: Download bundle size report
+        id: report
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle-size
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/bundle-size
+
+      - name: Update pull request comment
+        if: steps.report.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          REPORT_FILE: ${{ runner.temp }}/bundle-size/report.json
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        with:
+          script: |
+            const fs = require("node:fs")
+            const { MARKER, parseReport, renderComment } = require(
+              `${process.env.GITHUB_WORKSPACE}/scripts/bundle-size.cjs`,
+            )
+            const body = renderComment(parseReport(JSON.parse(fs.readFileSync(process.env.REPORT_FILE, "utf8"))))
+            const { owner, repo } = context.repo
+            const { data: pulls } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              head: `${process.env.HEAD_OWNER}:${process.env.HEAD_BRANCH}`,
+            })
+            // workflow_run lists no pull requests for forks, and a newer push makes this report stale.
+            const pull = pulls.find((candidate) => candidate.head.sha === process.env.HEAD_SHA)
+            if (!pull) {
+              core.info("No open pull request has this commit as its head.")
+              return
+            }
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pull.number,
+            })
+            const existing = comments.find(
+              (comment) => comment.user?.type === "Bot" && comment.body?.includes(MARKER),
+            )
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: pull.number, body })
+            }
