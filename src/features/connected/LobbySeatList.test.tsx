@@ -63,6 +63,27 @@ it("offers deck management when a required system has no matching decks", () => 
   expect(onManageDecks).toHaveBeenCalledTimes(1)
 })
 
+it("keeps the selection status visible while a seat with no matching decks is selecting", () => {
+  render(
+    <ThemeProvider initialContext="dark">
+      <LobbySeatList
+        seats={[{ seat: 1, displayName: "Ada", color: "#7C3AED", controlledByMe: true }]}
+        openSeats={0}
+        deckRequired
+        system="pokemon"
+        deckState={{ status: "ready", value: [] }}
+        selectingDeckSeats={new Set([1])}
+        versionLabel={() => "Current"}
+        onSelectVersion={jest.fn()}
+        onReport={jest.fn()}
+        onManageDecks={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+  expect(screen.getByTestId("seat-1-deck-selection-status")).toHaveTextContent("Selecting deck…")
+  expect(screen.getByText("Add a deck")).toBeTruthy()
+})
+
 it.each(["none", "mtg"])("can clear an unavailable deck in an optional %s game", (system) => {
   const onSelectVersion = jest.fn()
   render(

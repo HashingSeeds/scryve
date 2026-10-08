@@ -354,7 +354,7 @@ const $report: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $reportText: ThemedStyle<TextStyle> = () => ({ fontSize: 14 })
 const $rowAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  minHeight: 40,
+  minHeight: 44,
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.sm,
 })
