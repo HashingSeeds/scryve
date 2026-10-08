@@ -168,6 +168,7 @@ const loadedDetail = {
     losses: 3,
     draws: 0,
     unknown: 0,
+    connected: { games: { total: 6, wins: 3, losses: 3, draws: 0, unknown: 0 } },
     manual: {
       matches: { total: 2, wins: 1, losses: 1, draws: 0, unknown: 0 },
       games: { total: 3, wins: 2, losses: 1, draws: 0, unknown: 0 },

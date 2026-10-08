@@ -732,18 +732,18 @@ describe("premium deck tracking", () => {
       games: { total: 3, wins: 2, losses: 1, draws: 0, unknown: 0 },
     }
     const scryve = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
-    await expect(owner.query(api.decks.detail, { deckId })).resolves.toMatchObject({
-      record: { ...scryve, manual },
-      versions: [{ record: { ...scryve, manual } }],
-    })
+    const connected = { games: { total: 0, wins: 0, losses: 0, draws: 0, unknown: 0 } }
+    const record = { ...scryve, connected, manual }
+    const detail = await owner.query(api.decks.detail, { deckId })
+    expect(detail).toMatchObject({ record, versions: [{ record }] })
+    expect(detail.record?.connected.matches).toBeUndefined()
     await expect(owner.query(api.decks.stats, { deckId })).resolves.toMatchObject({
       locked: false,
-      ...scryve,
-      manual,
-      byVersion: [{ deckVersionId, ...scryve, manual }],
+      ...record,
+      byVersion: [{ deckVersionId, ...record }],
     })
     await expect(owner.query(api.decks.listMine)).resolves.toMatchObject({
-      decks: [{ _id: deckId, record: { ...scryve, manual } }],
+      decks: [{ _id: deckId, record }],
     })
   })
 
