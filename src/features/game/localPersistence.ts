@@ -384,6 +384,7 @@ export type LocalGameAccountInput = Parameters<typeof localGameAccount>[1]
 
 export class LocalGameRepository {
   private readonly finishListeners = new Set<() => void>()
+  private readonly historyListeners = new Set<() => void>()
 
   constructor(private readonly storage: StringStorage = mmkvStorage) {}
 
@@ -393,6 +394,18 @@ export class LocalGameRepository {
     return () => {
       this.finishListeners.delete(listener)
     }
+  }
+
+  /** why: a mounted History re-reads after archives, publish results, and sign-in claims or skips. */
+  onHistoryChanged(listener: () => void): () => void {
+    this.historyListeners.add(listener)
+    return () => {
+      this.historyListeners.delete(listener)
+    }
+  }
+
+  private notifyHistoryChanged(): void {
+    this.historyListeners.forEach((listener) => listener())
   }
 
   // why: "none" means the player chose no seat last time, which is different from never having chosen.
@@ -596,6 +609,7 @@ export class LocalGameRepository {
       )
       this.finishListeners.forEach((listener) => listener())
     }
+    this.notifyHistoryChanged()
     return summary
   }
 
@@ -606,15 +620,27 @@ export class LocalGameRepository {
     )
   }
 
-  /** why: the sign-in picker files claimed games under the account and remembers who declined the rest. */
+  /** why: the sign-in picker files claimed games under the account and remembers who declined the rest. The index is the authority: once it is written, a failed detail write is repaired by the next call or launch, and the error reaches the picker so the user can retry. */
   resolveClaims(ownerId: string, decisions: readonly ClaimDecision[]): void {
     const history = this.loadHistory()
     const next = applyClaimDecisions(history, ownerId, decisions)
-    this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
-    const claimed = next.filter((game, index) => game.account && !history[index].account)
-    for (const game of claimed) {
+    const changed = next.some((game, index) => game !== history[index])
+    if (changed) this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
+    try {
+      this.repairClaimedDetails(ownerId)
+    } finally {
+      if (next.some((game, index) => game.account && !history[index].account))
+        this.finishListeners.forEach((listener) => listener())
+      if (changed) this.notifyHistoryChanged()
+    }
+  }
+
+  /** why: brings every detail record owned by this account in line with the index; safe to run on any launch. */
+  repairClaimedDetails(ownerId: string): void {
+    for (const game of this.loadHistory()) {
+      if (game.account?.ownerId !== ownerId) continue
       const detail = this.loadHistoryDetail(game.id)
-      if (!detail) continue
+      if (!detail || detail.game.account?.ownerId === ownerId) continue
       const record: HistoryDetail = {
         schemaVersion: 1,
         game: { ...detail.game, account: game.account },
@@ -622,7 +648,6 @@ export class LocalGameRepository {
       }
       this.storage.set(LOCAL_KEYS.historyDetail(game.id), JSON.stringify(record))
     }
-    if (claimed.length > 0) this.finishListeners.forEach((listener) => listener())
   }
 
   markPublished(gameId: string): void {
@@ -641,6 +666,7 @@ export class LocalGameRepository {
       LOCAL_KEYS.historyIndex,
       JSON.stringify(history.map((game) => (game.id === gameId ? { ...game, publish } : game))),
     )
+    this.notifyHistoryChanged()
   }
 
   loadHistory(): LocalGameSummary[] {

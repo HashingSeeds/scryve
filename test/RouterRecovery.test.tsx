@@ -23,7 +23,11 @@ jest.mock("@/features/connected/ConnectedSummarySource", () => ({
   ConnectedSummarySource: () => null,
 }))
 jest.mock("@/features/game/localPersistence", () => ({
-  localGameRepository: { loadHistory: () => [], loadHistoryDetail: () => null },
+  localGameRepository: {
+    loadHistory: () => [],
+    loadHistoryDetail: () => null,
+    onHistoryChanged: () => () => undefined,
+  },
 }))
 jest.mock("@/screens/GameSummaryScreen", () => {
   const { TouchableOpacity } = jest.requireActual("react-native")

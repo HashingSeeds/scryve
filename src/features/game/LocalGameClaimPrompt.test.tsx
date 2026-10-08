@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react-native"
+import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
@@ -8,9 +8,15 @@ import { LocalGameRepository, type StringStorage } from "./localPersistence"
 
 let mockAuth: { configured: boolean; isLoaded: boolean; isSignedIn: boolean; userId?: string }
 let mockAuthVisible = false
+let mockConsentSettled = true
+let mockPathname = "/"
 jest.mock("@/features/auth/AuthContext", () => ({
   useAuthAccess: () => ({ ...mockAuth, authVisible: mockAuthVisible }),
 }))
+jest.mock("@/features/legal/LegalConsentGate", () => ({
+  useLegalConsentSettled: () => mockConsentSettled,
+}))
+jest.mock("expo-router", () => ({ usePathname: () => mockPathname }))
 
 class MemoryStorage implements StringStorage {
   values = new Map<string, string>()
@@ -50,6 +56,8 @@ describe("LocalGameClaimPrompt", () => {
   beforeEach(() => {
     mockAuth = { configured: true, isLoaded: true, isSignedIn: true, userId: "owner-a" }
     mockAuthVisible = false
+    mockConsentSettled = true
+    mockPathname = "/"
   })
 
   it("shows only while signed in with undecided signed-out games and the sign-in sheet closed", () => {
@@ -63,6 +71,9 @@ describe("LocalGameClaimPrompt", () => {
     mockAuthVisible = true
     expect(setup(repository).queryByTestId("claim-games-dialog")).toBeNull()
     mockAuthVisible = false
+    mockConsentSettled = false
+    expect(setup(repository).queryByTestId("claim-games-dialog")).toBeNull()
+    mockConsentSettled = true
     mockAuth = { configured: true, isLoaded: true, isSignedIn: false }
     expect(setup(repository).queryByTestId("claim-games-dialog")).toBeNull()
 
@@ -98,6 +109,67 @@ describe("LocalGameClaimPrompt", () => {
       }),
       expect.objectContaining({ id: older.id, skippedBy: ["owner-a"] }),
     ])
+  })
+
+  it("waits for a game in progress to end or the route to change", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.archiveGame(finishedGame(1))
+    const fresh = createLocalGame({
+      now: 20,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000000" },
+        { name: "Grace", color: "#111111" },
+      ],
+    })
+    const running = applyGameCommand(
+      fresh,
+      { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+      defaultCommandContext(asDeviceId("device_test")),
+    )
+    repository.saveActiveGame(running)
+    const view = setup(repository)
+    expect(view.queryByTestId("claim-games-dialog")).toBeNull()
+
+    act(() => {
+      repository.archiveGame(
+        applyGameCommand(
+          running,
+          { type: "game.abandon" },
+          { ...defaultCommandContext(asDeviceId("device_test")), now: () => 30 },
+        ),
+      )
+      mockPathname = "/history"
+    })
+    view.rerender(
+      <ThemeProvider initialContext="dark">
+        <LocalGameClaimPrompt repository={repository} />
+      </ThemeProvider>,
+    )
+    expect(view.getByTestId("claim-games-dialog")).toBeTruthy()
+  })
+
+  it("stays open with an error when saving fails, and the retry finishes the claim", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const game = finishedGame(1)
+    repository.archiveGame(game)
+    const set = storage.set.bind(storage)
+    let failDetailWrites = true
+    storage.set = (key, value) => {
+      if (failDetailWrites && key.includes("history.detail")) throw new Error("disk full")
+      set(key, value)
+    }
+    setup(repository)
+    fireEvent.press(screen.getByTestId("claim-games-confirm"))
+    expect(screen.getByText("Could not save your choice. Try again.")).toBeTruthy()
+    expect(repository.loadHistory()[0]).toMatchObject({ account: { ownerId: "owner-a" } })
+    expect(repository.loadHistoryDetail(game.id)?.game.account).toBeUndefined()
+
+    failDetailWrites = false
+    fireEvent.press(screen.getByTestId("claim-games-confirm"))
+    expect(screen.queryByTestId("claim-games-dialog")).toBeNull()
+    expect(repository.loadHistoryDetail(game.id)?.game.account).toEqual({ ownerId: "owner-a" })
   })
 
   it("changes nothing when dismissed", () => {

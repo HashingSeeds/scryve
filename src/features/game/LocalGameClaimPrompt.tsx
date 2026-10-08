@@ -1,19 +1,23 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Pressable, ScrollView, View } from "react-native"
+import { usePathname } from "expo-router"
 
+import { AlertNote } from "@/components/AlertNote"
 import { Button } from "@/components/Button"
 import { CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
+import { useLegalConsentSettled } from "@/features/legal/LegalConsentGate"
 import { entryPlayerNames, localHistoryEntry } from "@/screens/historyEntries"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
+import { hasLocalGameStarted } from "./domain"
 import { claimableLocalGames } from "./localGameClaims"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { LocalGameSummary, PlayerId } from "./types"
@@ -47,6 +51,7 @@ function ClaimPicker({
   const [open, setOpen] = useState(true)
   const [excluded, setExcluded] = useState<readonly string[]>([])
   const [meSeats, setMeSeats] = useState<Readonly<Record<string, PlayerId | undefined>>>({})
+  const [error, setError] = useState<string>()
   if (!open || candidates.length === 0) return null
   const selectedCount = candidates.length - excluded.length
 
@@ -56,15 +61,21 @@ function ClaimPicker({
     )
   }
 
+  // why: a failed write keeps the picker open; the index is authoritative, so retrying repairs whatever was left behind.
   function confirm() {
-    repository.resolveClaims(
-      ownerId,
-      candidates.map((game) => ({
-        id: game.id,
-        claim: !excluded.includes(game.id),
-        mePlayerId: meSeats[game.id],
-      })),
-    )
+    try {
+      repository.resolveClaims(
+        ownerId,
+        candidates.map((game) => ({
+          id: game.id,
+          claim: !excluded.includes(game.id),
+          mePlayerId: meSeats[game.id],
+        })),
+      )
+    } catch {
+      setError("Could not save your choice. Try again.")
+      return
+    }
     setOpen(false)
   }
 
@@ -129,6 +140,7 @@ function ClaimPicker({
           )
         })}
       </ScrollView>
+      {error ? <AlertNote text={error} /> : null}
       <View style={themed($dialogActions)}>
         <Button
           testID="claim-games-dismiss"
@@ -152,15 +164,46 @@ function ClaimPicker({
   )
 }
 
-/** why: shows whenever a signed-in account has signed-out games it has not decided on; closing it only defers to the next launch. */
+// why: a game in progress is never interrupted; the check reruns when the route changes or a game ends, and otherwise on the next launch.
+function useLocalGameRunning(repository: LocalGameRepository) {
+  const pathname = usePathname()
+  const [finishCount, setFinishCount] = useState(0)
+  const [running, setRunning] = useState(() => isLocalGameRunning(repository))
+  useEffect(
+    () => repository.onGameFinished(() => setFinishCount((count) => count + 1)),
+    [repository],
+  )
+  useEffect(() => {
+    setRunning(isLocalGameRunning(repository))
+  }, [finishCount, pathname, repository])
+  return running
+}
+
+function isLocalGameRunning(repository: LocalGameRepository) {
+  const game = repository.loadActiveGame()
+  return game !== null && hasLocalGameStarted(game)
+}
+
+/** why: shows whenever a signed-in account with settled consent has signed-out games it has not decided on; closing it only defers to the next launch. */
 export function LocalGameClaimPrompt({
   repository = localGameRepository,
 }: {
   repository?: LocalGameRepository
 }) {
   const auth = useAuthAccess()
+  const consentSettled = useLegalConsentSettled()
+  const running = useLocalGameRunning(repository)
   const ownerId = auth.configured && auth.isLoaded && auth.isSignedIn ? auth.userId : undefined
-  if (!ownerId || auth.authVisible) return null
+  // why: a claim whose detail write failed last time is finished here before the account's games are read again.
+  useEffect(() => {
+    if (!ownerId) return
+    try {
+      repository.repairClaimedDetails(ownerId)
+    } catch {
+      // why: storage is still failing; the next launch tries again and the index already holds the claim.
+    }
+  }, [ownerId, repository])
+  if (!ownerId || auth.authVisible || !consentSettled || running) return null
   return <ClaimPicker key={ownerId} ownerId={ownerId} repository={repository} />
 }
 

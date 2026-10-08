@@ -483,4 +483,36 @@ describe("LocalGameRepository sign-in claims", () => {
     repository.resolveClaims("owner-a", [{ id: skipped.id, claim: false }])
     expect(listener).toHaveBeenCalledTimes(1)
   })
+
+  it("notifies History on skip-only decisions and repairs a detail whose write failed", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    const claimed = makeGame(1)
+    const skipped = makeGame(3)
+    repository.archiveGame(finished(claimed, 2))
+    repository.archiveGame(finished(skipped, 4))
+    const historyChanged = jest.fn()
+    repository.onHistoryChanged(historyChanged)
+
+    repository.resolveClaims("owner-a", [{ id: skipped.id, claim: false }])
+    expect(historyChanged).toHaveBeenCalledTimes(1)
+
+    const set = storage.set.bind(storage)
+    storage.set = (key, value) => {
+      if (key.includes("history.detail")) throw new Error("disk full")
+      set(key, value)
+    }
+    expect(() => repository.resolveClaims("owner-a", [{ id: claimed.id, claim: true }])).toThrow(
+      "disk full",
+    )
+    expect(historyChanged).toHaveBeenCalledTimes(2)
+    expect(repository.pendingPublishes("owner-a").map(({ id }) => id)).toEqual([claimed.id])
+    expect(repository.loadHistoryDetail(claimed.id)?.game.account).toBeUndefined()
+
+    storage.set = set
+    repository.repairClaimedDetails("owner-a")
+    expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({ ownerId: "owner-a" })
+    repository.repairClaimedDetails("owner-a")
+    expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({ ownerId: "owner-a" })
+  })
 })
