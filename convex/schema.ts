@@ -59,6 +59,8 @@ const manualRecordValidator = v.object({
 const manualStatsFields = {
   manualMatches: v.optional(manualRecordValidator),
   manualGames: v.optional(manualRecordValidator),
+  // why: Scryve games already live in the top-level counters; matches played in Scryve get their own tally.
+  connectedMatches: v.optional(manualRecordValidator),
 }
 
 const matchFields = {

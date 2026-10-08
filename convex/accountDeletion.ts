@@ -208,6 +208,21 @@ function anonymizedMatchSeats(match: Doc<"matches">, userId: Id<"users">, delete
   )
 }
 
+/** why: a seat on someone else's match is only reachable through the user's game membership, so every membership path anonymizes it. */
+async function anonymizeMatchSeats(
+  ctx: MutationCtx,
+  matchId: Id<"matches">,
+  userId: Id<"users">,
+  deletedAt: number,
+) {
+  const match = await ctx.db.get(matchId)
+  if (!match || !match.seats.some((seat) => seat.userId === userId)) return
+  await ctx.db.patch(match._id, {
+    seats: anonymizedMatchSeats(match, userId, deletedAt),
+    updatedAt: deletedAt,
+  })
+}
+
 async function anonymizeMembership(
   ctx: MutationCtx,
   request: Doc<"accountDeletionRequests">,
@@ -227,6 +242,7 @@ async function anonymizeMembership(
         ...(summary.finishedByUserId === request.userId ? { finishedByUserId: undefined } : {}),
       })
     if (game.hostUserId === request.userId) await ctx.db.patch(game._id, { hostUserId: undefined })
+    if (game.matchId) await anonymizeMatchSeats(ctx, game.matchId, request.userId!, deletedAt)
   }
   await ctx.db.patch(membership._id, {
     userId: undefined,

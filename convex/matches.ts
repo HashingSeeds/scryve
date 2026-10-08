@@ -6,6 +6,12 @@ import { requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { assertGameSystem } from "./lib/integrations"
 import {
+  assertGameScores,
+  MAX_GAMES_PER_MATCH,
+  type MatchBestOf,
+  type MatchOutcome,
+} from "./lib/matchResults"
+import {
   assertDeckName,
   assertDisplayName,
   assertEventName,
@@ -22,6 +28,8 @@ const outcomeValidator = v.union(
   v.literal("unknown"),
 )
 
+const bestOfValidator = v.union(v.literal(1), v.literal(3), v.literal(5))
+
 const seatResultFields = {
   seat: v.number(),
   gamesWon: v.optional(v.number()),
@@ -30,8 +38,9 @@ const seatResultFields = {
 }
 
 type MatchSeat = Doc<"matches">["seats"][number]
-type ManualRecord = NonNullable<Doc<"deckStats">["manualMatches"]>
-type ManualDeltas = { matches: ManualRecord; games?: ManualRecord }
+type MatchRecord = NonNullable<Doc<"deckStats">["manualMatches"]>
+type MatchCounters = Pick<Doc<"deckStats">, "manualMatches" | "manualGames" | "connectedMatches">
+type MatchDeltas = Partial<Record<keyof MatchCounters, MatchRecord>>
 
 // why: same rows a match doc can hold, so a doc never needs rewriting on read.
 const MAX_ROWS_PER_MATCH = 10
@@ -48,44 +57,6 @@ function assertSeatNumbers(seats: readonly { seat: number }[]) {
     if (!Number.isInteger(seat) || seat < 1 || seat > MAX_PLAYERS || numbers.has(seat))
       throw new Error("Seats must be unique numbers between 1 and 6")
     numbers.add(seat)
-  }
-}
-
-function assertGameScores(
-  seats: readonly { gamesWon?: number; gamesDrawn?: number; outcome: MatchSeat["outcome"] }[],
-  bestOf: 1 | 3 | 5,
-) {
-  const maxWins = Math.ceil(bestOf / 2)
-  let totalWins = 0
-  for (const seat of seats) {
-    if (seat.gamesWon !== undefined) {
-      if (!Number.isInteger(seat.gamesWon) || seat.gamesWon < 0 || seat.gamesWon > maxWins)
-        throw new Error(`Games won must be 0–${maxWins} in a best of ${bestOf}`)
-      totalWins += seat.gamesWon
-    }
-    if (
-      seat.gamesDrawn !== undefined &&
-      (!Number.isInteger(seat.gamesDrawn) || seat.gamesDrawn < 0 || seat.gamesDrawn > bestOf)
-    )
-      throw new Error(`Games drawn must be 0–${bestOf} in a best of ${bestOf}`)
-  }
-  if (totalWins > bestOf) throw new Error(`A best of ${bestOf} cannot have ${totalWins} wins`)
-  // why: a score is all or nothing, so a partial one is never guessed into game counters.
-  const scored = seats.filter((seat) => seat.gamesWon !== undefined)
-  if (scored.length !== 0 && scored.length !== seats.length)
-    throw new Error("Enter games won for every seat or leave the score blank")
-  const winners = seats.filter((seat) => seat.outcome === "win")
-  if (winners.length > 1) throw new Error("A match can only have one winner")
-  // why: a called round draws the seats still playing, so a drawn match is the only winner-less one.
-  if (winners.length === 0 && !seats.some((seat) => seat.outcome === "draw"))
-    throw new Error("A match needs a winner unless it was drawn")
-  if (scored.length === seats.length) {
-    const most = Math.max(...seats.map((seat) => seat.gamesWon ?? 0))
-    const ahead = seats.filter((seat) => seat.gamesWon === most)
-    if (winners.length === 1 && (winners[0].gamesWon !== most || ahead.length > 1))
-      throw new Error("The winner must have the most game wins")
-    if (winners.length === 0 && ahead.length === 1)
-      throw new Error("The seat with the most game wins must be the winner")
   }
 }
 
@@ -111,28 +82,34 @@ function ownerSeatOf(match: Doc<"matches">) {
   return match.seats.find((seat) => seat.userId !== undefined && seat.userId === match.ownerUserId)
 }
 
-// why: both record and delete derive counters from the stored seats so they always cancel out.
-function manualDeltas(match: Doc<"matches">, owner: MatchSeat): ManualDeltas {
-  const outcome = owner.outcome ?? "unknown"
-  const matches = {
+function outcomeRecord(outcome: MatchOutcome): MatchRecord {
+  return {
     total: 1,
     wins: outcome === "win" ? 1 : 0,
     losses: outcome === "loss" ? 1 : 0,
     draws: outcome === "draw" ? 1 : 0,
     unknown: outcome === "unknown" ? 1 : 0,
   }
+}
+
+// why: both record and delete derive counters from the stored seats so they always cancel out.
+function manualDeltas(match: Doc<"matches">, owner: MatchSeat): MatchDeltas {
+  const manualMatches = outcomeRecord(owner.outcome ?? "unknown")
   const others = match.seats.filter((seat) => seat.seat !== owner.seat)
   // why: game counters need every seat's wins; an unset gamesDrawn means no drawn games.
   if (owner.gamesWon === undefined || others.some((seat) => seat.gamesWon === undefined))
-    return { matches }
+    return { manualMatches }
   const wins = owner.gamesWon
   const draws = owner.gamesDrawn ?? 0
   const losses = others.reduce((sum, seat) => sum + (seat.gamesWon ?? 0), 0)
-  return { matches, games: { total: wins + losses + draws, wins, losses, draws, unknown: 0 } }
+  return {
+    manualMatches,
+    manualGames: { total: wins + losses + draws, wins, losses, draws, unknown: 0 },
+  }
 }
 
-function addRecord(current: ManualRecord | undefined, delta: ManualRecord, sign: 1 | -1) {
-  const sum = (key: keyof ManualRecord) => Math.max(0, (current?.[key] ?? 0) + sign * delta[key])
+function addRecord(current: MatchRecord | undefined, delta: MatchRecord, sign: 1 | -1) {
+  const sum = (key: keyof MatchRecord) => Math.max(0, (current?.[key] ?? 0) + sign * delta[key])
   return {
     total: sum("total"),
     wins: sum("wins"),
@@ -142,26 +119,29 @@ function addRecord(current: ManualRecord | undefined, delta: ManualRecord, sign:
   }
 }
 
-function manualStatsPatch(
-  current: { manualMatches?: ManualRecord; manualGames?: ManualRecord } | null,
-  deltas: ManualDeltas,
+const MATCH_COUNTER_KEYS = ["manualMatches", "manualGames", "connectedMatches"] as const
+
+function matchStatsPatch(
+  current: MatchCounters | null,
+  deltas: MatchDeltas,
   sign: 1 | -1,
   now: number,
 ) {
-  return {
-    manualMatches: addRecord(current?.manualMatches, deltas.matches, sign),
-    ...(deltas.games ? { manualGames: addRecord(current?.manualGames, deltas.games, sign) } : {}),
-    updatedAt: now,
+  const patch: Partial<MatchCounters> & { updatedAt: number } = { updatedAt: now }
+  for (const key of MATCH_COUNTER_KEYS) {
+    const delta = deltas[key]
+    if (delta) patch[key] = addRecord(current?.[key], delta, sign)
   }
+  return patch
 }
 
 const EMPTY_SCRYVE_RECORD = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
 
-async function applyManualStats(
+async function applyMatchStats(
   ctx: MutationCtx,
   deckId: Id<"decks">,
   deckVersionId: Id<"deckVersions">,
-  deltas: ManualDeltas,
+  deltas: MatchDeltas,
   sign: 1 | -1,
   now: number,
 ) {
@@ -169,14 +149,14 @@ async function applyManualStats(
     .query("deckStats")
     .withIndex("by_deck", (q) => q.eq("deckId", deckId))
     .unique()
-  const patch = manualStatsPatch(stats, deltas, sign, now)
+  const patch = matchStatsPatch(stats, deltas, sign, now)
   if (stats) await ctx.db.patch(stats._id, patch)
   else await ctx.db.insert("deckStats", { deckId, ...EMPTY_SCRYVE_RECORD, ...patch })
   const versionStats = await ctx.db
     .query("deckVersionStats")
     .withIndex("by_version", (q) => q.eq("deckVersionId", deckVersionId))
     .unique()
-  const versionPatch = manualStatsPatch(versionStats, deltas, sign, now)
+  const versionPatch = matchStatsPatch(versionStats, deltas, sign, now)
   if (versionStats) await ctx.db.patch(versionStats._id, versionPatch)
   else
     await ctx.db.insert("deckVersionStats", {
@@ -190,7 +170,7 @@ async function applyManualStats(
 export const recordManualMatch = mutation({
   args: {
     publicId: v.string(),
-    bestOf: v.union(v.literal(1), v.literal(3), v.literal(5)),
+    bestOf: bestOfValidator,
     system: v.optional(v.string()),
     format: v.optional(v.string()),
     finishedAt: v.number(),
@@ -300,7 +280,7 @@ export const recordManualMatch = mutation({
         finishedAt,
       })
       const match = (await ctx.db.get(matchId))!
-      await applyManualStats(
+      await applyMatchStats(
         ctx,
         attached.deck._id,
         attached.version._id,
@@ -338,7 +318,7 @@ export const deleteManualMatch = mutation({
         .filter((q) => q.eq(q.field("matchId"), match._id))
         .take(MAX_ROWS_PER_MATCH)
       for (const result of results) await ctx.db.delete(result._id)
-      await applyManualStats(
+      await applyMatchStats(
         ctx,
         owner.deckId,
         owner.deckVersionId,
@@ -349,5 +329,132 @@ export const deleteManualMatch = mutation({
     }
     await ctx.db.delete(match._id)
     return null
+  },
+})
+
+export const publishedMatchValidator = v.object({
+  publicId: v.string(),
+  bestOf: bestOfValidator,
+  gameNumber: v.number(),
+})
+
+export type PublishedMatchSeat = Pick<
+  MatchSeat,
+  "seat" | "displayName" | "userId" | "deckId" | "deckVersionId" | "deckName"
+>
+
+function assertGameNumber(gameNumber: number) {
+  if (!Number.isInteger(gameNumber) || gameNumber < 1 || gameNumber > MAX_GAMES_PER_MATCH)
+    throw new Error(`A match holds at most ${MAX_GAMES_PER_MATCH} games`)
+}
+
+async function matchByPublicId(ctx: MutationCtx, publicId: string) {
+  assertMatchPublicId(publicId)
+  return await ctx.db
+    .query("matches")
+    .withIndex("by_public_id", (q) => q.eq("publicId", publicId))
+    .unique()
+}
+
+/** why: the first published game creates its match in the same mutation, so neither record exists without the other. */
+export async function linkPublishedGameToMatch(
+  ctx: MutationCtx,
+  user: Doc<"users">,
+  match: { publicId: string; bestOf: MatchBestOf; gameNumber: number },
+  game: { id: Id<"games">; system?: string; format?: string; seats: PublishedMatchSeat[] },
+): Promise<Id<"matches">> {
+  assertGameNumber(match.gameNumber)
+  const now = Date.now()
+  const existing = await matchByPublicId(ctx, match.publicId)
+  if (!existing) {
+    assertSeatNumbers(game.seats)
+    return await ctx.db.insert("matches", {
+      publicId: match.publicId,
+      ownerUserId: user._id,
+      source: "connected",
+      status: "active",
+      bestOf: match.bestOf,
+      ...(game.system ? { system: game.system } : {}),
+      ...(game.format ? { format: game.format } : {}),
+      seats: game.seats,
+      gameIds: [game.id],
+      createdAt: now,
+      updatedAt: now,
+    })
+  }
+  if (existing.source !== "connected" || existing.ownerUserId !== user._id)
+    throw new ConvexError({ code: "match_conflict", message: "Match belongs to another account" })
+  if (existing.seats.length !== game.seats.length)
+    throw new Error("A match keeps the same seats for every game")
+  if (existing.gameIds.includes(game.id)) return existing._id
+  // why: games publish oldest first, so this is an append unless a retry lands out of order.
+  const gameIds = [...existing.gameIds]
+  if (gameIds.length < MAX_GAMES_PER_MATCH)
+    gameIds.splice(Math.min(match.gameNumber - 1, gameIds.length), 0, game.id)
+  await ctx.db.patch(existing._id, { gameIds, updatedAt: now })
+  return existing._id
+}
+
+// why: the device finalizes once every game is acked, and a retry after a lost ack must not count the match twice.
+export const finishScryveMatch = mutation({
+  args: {
+    publicId: v.string(),
+    finishedAt: v.number(),
+    seats: v.array(
+      v.object({
+        seat: v.number(),
+        gamesWon: v.number(),
+        gamesDrawn: v.number(),
+        outcome: outcomeValidator,
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx)
+    const match = await matchByPublicId(ctx, args.publicId)
+    if (!match || match.source !== "connected" || match.ownerUserId !== user._id)
+      throw new ConvexError({ code: "match_not_found", message: "Match not found" })
+    if (match.status === "finished") return { matchId: match._id }
+    const now = Date.now()
+    const finishedAt = assertMatchFinishedAt(args.finishedAt, now)
+    const results = new Map(args.seats.map((seat) => [seat.seat, seat]))
+    if (
+      results.size !== args.seats.length ||
+      results.size !== match.seats.length ||
+      match.seats.some((seat) => !results.has(seat.seat))
+    )
+      throw new Error("A match result needs every seat exactly once")
+    assertGameScores(args.seats, match.bestOf)
+    const seats = match.seats.map((seat) => {
+      const result = results.get(seat.seat)!
+      return {
+        ...seat,
+        gamesWon: result.gamesWon,
+        gamesDrawn: result.gamesDrawn,
+        outcome: result.outcome,
+      }
+    })
+    await ctx.db.patch(match._id, { status: "finished", finishedAt, seats, updatedAt: now })
+    const owner = seats.find((seat) => seat.userId === user._id)
+    if (owner?.deckId && owner.deckVersionId) {
+      await ctx.db.insert("deckMatchResults", {
+        deckId: owner.deckId,
+        deckVersionId: owner.deckVersionId,
+        matchId: match._id,
+        userId: user._id,
+        source: "connected",
+        outcome: owner.outcome,
+        finishedAt,
+      })
+      await applyMatchStats(
+        ctx,
+        owner.deckId,
+        owner.deckVersionId,
+        { connectedMatches: outcomeRecord(owner.outcome) },
+        1,
+        now,
+      )
+    }
+    return { matchId: match._id }
   },
 })
