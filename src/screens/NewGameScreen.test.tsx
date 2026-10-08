@@ -7,7 +7,12 @@ import {
   ConnectedProfileProvider,
   resetConnectedProfileBootstrapForTests,
 } from "@/features/connected/useConnectedProfile"
-import { createLocalGame } from "@/features/game/domain"
+import {
+  applyGameCommand,
+  asDeviceId,
+  createLocalGame,
+  defaultCommandContext,
+} from "@/features/game/domain"
 import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -1011,9 +1016,14 @@ describe("NewGameScreen", () => {
     )
   })
 
-  it("saves a changed account seat for a running game", () => {
+  it("saves a changed account seat for a running game instead of pre-marking one", () => {
     const onSavePlayers = jest.fn()
-    const initialGame = runningLocalGame()
+    const fresh = runningLocalGame()
+    const initialGame = applyGameCommand(
+      fresh,
+      { type: "life.change", playerId: fresh.players[0].id, delta: -1 },
+      defaultCommandContext(asDeviceId("device_test")),
+    )
     setup({ initialGame, onSavePlayers, account: { ownerId: "owner-a", decks: [] } })
     expect(screen.getByLabelText("This is me, No seat")).toBeTruthy()
     fireEvent.press(screen.getByTestId("me-seat"))

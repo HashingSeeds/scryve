@@ -26,6 +26,7 @@ import { AppearancePicker } from "@/features/connected/AppearancePicker"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import {
+  hasLocalGameStarted,
   MAX_PLAYER_NAME_LENGTH,
   meSeatOf,
   PLAYER_COLORS,
@@ -202,9 +203,13 @@ export function NewGameScreen({
     initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
   const counter = playSystemRules(system).counter
-  // why: an existing game keeps whatever seat it claimed, even none; only a fresh setup pre-marks one.
+  // why: a claimed or running game keeps whatever seat it has, even none; a fresh setup pre-marks one.
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
-    initialGame ? meSeatOf(initialGame) : account ? (account.defaultMeSeat ?? 0) : undefined,
+    initialGame && (initialGame.account || hasLocalGameStarted(initialGame))
+      ? meSeatOf(initialGame)
+      : account
+        ? (account.defaultMeSeat ?? 0)
+        : undefined,
   )
   const [deck, setDeck] = useState<Pick<DeckChoice, "versionId" | "name"> | undefined>(() => {
     const chosen = initialGame?.account
