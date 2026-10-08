@@ -60,7 +60,7 @@ const mockPreviewPrecon = jest.fn(async () => ({
 const mockConvexClient = { action: jest.fn() }
 const mockConvexState: { client: typeof mockConvexClient | undefined } = { client: undefined }
 const mockResolvePasted = jest.fn()
-const mockResolveArchidekt = jest.fn()
+const mockResolveLink = jest.fn()
 type MockCatalogDeck = {
   _id: string
   game: string
@@ -183,7 +183,7 @@ jest.mock("convex/react", () => ({
     if (reference === "cards.byId") return mockCardById
     if (reference === "cards.byCatalogId") return mockCatalogCardById
     if (reference === "cards.byPokemonReference") return mockPokemonCardByReference
-    if (reference === "archidektImports.resolvePublic") return mockResolveArchidekt
+    if (reference === "deckImports.resolveLink") return mockResolveLink
     if (reference === "deckCatalogs.browse") return mockBrowse
     if (reference === "deckImports.searchPreconstructed") return mockSearch
     if (reference === "deckImports.previewPreconstructed") return mockPreviewPrecon
@@ -203,12 +203,12 @@ jest.mock("../../convex/_generated/api", () => ({
       importResolved: "decks.importResolved",
       importCatalog: "decks.importCatalog",
     },
-    archidektImports: { resolvePublic: "archidektImports.resolvePublic" },
     deckImports: {
       searchPreconstructed: "deckImports.searchPreconstructed",
       previewPreconstructed: "deckImports.previewPreconstructed",
       resolvePreconstructed: "deckImports.resolvePreconstructed",
       resolvePasted: "deckImports.resolvePasted",
+      resolveLink: "deckImports.resolveLink",
     },
     cards: {
       search: "cards.search",
@@ -1384,6 +1384,7 @@ describe("AddDeckScreen", () => {
     ...resolvedForest,
     name: "Public Forests",
     format: "modern",
+    sourceName: "Archidekt",
     sourceUrl: "https://archidekt.com/decks/12345",
     author: "ForestPlayer",
   }
@@ -1391,14 +1392,14 @@ describe("AddDeckScreen", () => {
   function enterLink(view: ReturnType<typeof renderAddDeck>) {
     chooseMode(view, "paste")
     fireEvent.press(view.getByTestId("import-source-link"))
-    fireEvent.changeText(view.getByTestId("archidekt-url-input"), resolvedArchidekt.sourceUrl)
+    fireEvent.changeText(view.getByTestId("deck-link-input"), resolvedArchidekt.sourceUrl)
     fireEvent.press(view.getByTestId("review-import-button"))
   }
 
   it.each(["account", "guest"])(
     "edits an Archidekt draft before saving with attribution for %s",
     async (owner) => {
-      mockResolveArchidekt.mockResolvedValue(resolvedArchidekt)
+      mockResolveLink.mockResolvedValue(resolvedArchidekt)
       const onCreated = jest.fn()
       const request = jest.fn()
       const view =
@@ -1418,11 +1419,14 @@ describe("AddDeckScreen", () => {
       expect(view.getByText("Public Forests")).toBeTruthy()
       expect(view.getByText("Modern · 2 cards")).toBeTruthy()
       expect(view.queryByTestId("deck-name-input")).toBeNull()
-      expect(view.queryByTestId("archidekt-url-input")).toBeNull()
+      expect(view.queryByTestId("deck-link-input")).toBeNull()
       expect(view.queryByTestId("mode-picker-options")).toBeNull()
       expect(view.queryByTestId("format-picker-options")).toBeNull()
       expect(view.getByText("Archidekt · ForestPlayer")).toBeTruthy()
-      expect(mockResolveArchidekt).toHaveBeenCalledWith({ url: resolvedArchidekt.sourceUrl })
+      expect(mockResolveLink).toHaveBeenCalledWith({
+        url: resolvedArchidekt.sourceUrl,
+        game: "mtg",
+      })
       expect(mockResolvePasted).not.toHaveBeenCalled()
       expect(mockImport).not.toHaveBeenCalled()
       expect(loadGuestDecks()).toEqual([])
@@ -1432,7 +1436,7 @@ describe("AddDeckScreen", () => {
       openSource.mockRestore()
       fireEvent.press(view.getByRole("button", { name: "Edit" }))
       expect(view.getByTestId("pasted-deck-review")).toBeTruthy()
-      expect(view.queryByTestId("archidekt-url-input")).toBeNull()
+      expect(view.queryByTestId("deck-link-input")).toBeNull()
       fireEvent.press(view.getByLabelText("Decrease Forest"))
       expect(view.getByTestId("save-import-button")).toBeEnabled()
       fireEvent.press(view.getByTestId("save-import-button"))
@@ -1455,8 +1459,56 @@ describe("AddDeckScreen", () => {
     },
   )
 
+  it("imports a YGOPRODeck link without an author into the current format", async () => {
+    mockResolveLink.mockResolvedValueOnce({
+      sourceName: "YGOPRODeck",
+      name: "Blue-Eyes for Duelingbook",
+      sourceUrl: "https://ygoprodeck.com/deck/312866",
+      cards: [
+        {
+          game: "ygo",
+          cardId: "14558127",
+          name: "Ash Blossom & Joyous Spring",
+          quantity: 3,
+          section: "main",
+          entryKind: "card",
+          originalReference: "14558127",
+        },
+      ],
+      unresolved: [],
+      invalidLines: [],
+    })
+    const view = renderAddDeck()
+    chooseGame(view, "ygo")
+    chooseMode(view, "paste")
+    fireEvent.press(view.getByTestId("import-source-link"))
+    fireEvent.changeText(
+      view.getByTestId("deck-link-input"),
+      "https://ygoprodeck.com/deck/x-312866",
+    )
+    expect(view.getByText("Review YGOPRODeck deck")).toBeTruthy()
+    fireEvent.press(view.getByTestId("review-import-button"))
+    await waitFor(() => expect(view.getByText("YGOPRODeck")).toBeTruthy())
+    expect(mockResolveLink).toHaveBeenCalledWith({
+      url: "https://ygoprodeck.com/deck/x-312866",
+      game: "ygo",
+    })
+    expect(view.getByText("Advanced · 3 cards")).toBeTruthy()
+    fireEvent.press(view.getByTestId("save-import-button"))
+    await waitFor(() =>
+      expect(mockImport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Blue-Eyes for Duelingbook",
+          game: "ygo",
+          format: "advanced",
+          note: "Imported from YGOPRODeck\nhttps://ygoprodeck.com/deck/312866",
+        }),
+      ),
+    )
+  })
+
   it("keeps a player's chosen format when reviewing the same Archidekt link again", async () => {
-    mockResolveArchidekt.mockResolvedValue(resolvedArchidekt)
+    mockResolveLink.mockResolvedValue(resolvedArchidekt)
     const view = renderAddDeck()
     enterLink(view)
     await waitFor(() => expect(view.getByLabelText("2× Forest")).toBeTruthy())
@@ -1474,7 +1526,7 @@ describe("AddDeckScreen", () => {
   })
 
   it("keeps reloaded Archidekt commanders in main after editing to Modern", async () => {
-    mockResolveArchidekt.mockResolvedValue({
+    mockResolveLink.mockResolvedValue({
       ...resolvedArchidekt,
       format: "commander",
       cards: [
@@ -1489,7 +1541,7 @@ describe("AddDeckScreen", () => {
     chooseFormat(view, "modern")
     fireEvent.press(view.getByRole("button", { name: "common:back" }))
     fireEvent.press(view.getByTestId("review-import-button"))
-    await waitFor(() => expect(mockResolveArchidekt).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(mockResolveLink).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(view.getByTestId("save-import-button")).toBeEnabled())
     expect(view.getByText("Modern · 3 cards")).toBeTruthy()
     expect(view.getByLabelText("3× Forest")).toBeTruthy()
@@ -1511,7 +1563,7 @@ describe("AddDeckScreen", () => {
     "ignores Archidekt results after changing %s",
     async (change) => {
       let finish: ((result: typeof resolvedArchidekt) => void) | undefined
-      mockResolveArchidekt.mockImplementationOnce(
+      mockResolveLink.mockImplementationOnce(
         () =>
           new Promise<typeof resolvedArchidekt>((resolve) => {
             finish = resolve
@@ -1521,7 +1573,7 @@ describe("AddDeckScreen", () => {
       enterLink(view)
       if (change === "url")
         fireEvent.changeText(
-          view.getByTestId("archidekt-url-input"),
+          view.getByTestId("deck-link-input"),
           "https://archidekt.com/decks/67890",
         )
       else if (change === "format") chooseFormat(view, "standard")
@@ -1537,7 +1589,7 @@ describe("AddDeckScreen", () => {
   )
 
   it("keeps a failed Archidekt URL and offers a text export fallback", async () => {
-    mockResolveArchidekt.mockRejectedValueOnce(
+    mockResolveLink.mockRejectedValueOnce(
       new ConvexError({ message: "Use a public Archidekt deck or paste its text export." }),
     )
     const view = renderAddDeck()
@@ -1545,14 +1597,14 @@ describe("AddDeckScreen", () => {
     await waitFor(() =>
       expect(view.getByText("Use a public Archidekt deck or paste its text export.")).toBeTruthy(),
     )
-    expect(view.getByTestId("archidekt-url-input").props.value).toBe(resolvedArchidekt.sourceUrl)
+    expect(view.getByTestId("deck-link-input").props.value).toBe(resolvedArchidekt.sourceUrl)
     fireEvent.press(view.getByText("Paste text instead"))
     expect(view.getByLabelText("Deck list")).toBeTruthy()
     expect(mockImport).not.toHaveBeenCalled()
   })
 
   it("returns to the same edited Archidekt draft after changing source", async () => {
-    mockResolveArchidekt.mockResolvedValue(resolvedArchidekt)
+    mockResolveLink.mockResolvedValue(resolvedArchidekt)
     const view = renderAddDeck()
     chooseMode(view, "paste")
     fireEvent.changeText(view.getByTestId("deck-name-input"), "My forests")
@@ -1560,14 +1612,14 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByText("My forests")).toBeTruthy())
     expect(view.getByText("Modern · 2 cards")).toBeTruthy()
     expect(view.queryByTestId("game-picker-options")).toBeNull()
-    expect(view.queryByTestId("archidekt-url-input")).toBeNull()
+    expect(view.queryByTestId("deck-link-input")).toBeNull()
     expect(view.queryByTestId("deck-note-input")).toBeNull()
     fireEvent.press(view.getByRole("button", { name: "Edit" }))
     fireEvent.press(view.getByLabelText("Increase Forest"))
     fireEvent.press(view.getByRole("button", { name: "common:back" }))
     expect(view.queryByTestId("pasted-deck-review")).toBeNull()
     expect(view.queryByTestId("save-import-button")).toBeNull()
-    expect(view.getByTestId("archidekt-url-input").props.value).toBe(resolvedArchidekt.sourceUrl)
+    expect(view.getByTestId("deck-link-input").props.value).toBe(resolvedArchidekt.sourceUrl)
     expect(view.getByTestId("deck-name-input").props.value).toBe("My forests")
     expect(view.getByTestId("format-picker-options").props.accessibilityLabel).toBe(
       "Format, Modern",
@@ -1576,13 +1628,13 @@ describe("AddDeckScreen", () => {
     fireEvent.press(view.getByTestId("return-import-review-button"))
     await waitFor(() => expect(view.getByText("Edited forests")).toBeTruthy())
     expect(view.getByLabelText("3× Forest")).toBeTruthy()
-    expect(mockResolveArchidekt).toHaveBeenCalledTimes(1)
+    expect(mockResolveLink).toHaveBeenCalledTimes(1)
     expect(view.getByTestId("save-import-button")).toBeEnabled()
     expect(mockImport).not.toHaveBeenCalled()
   })
 
   it("keeps Archidekt attribution separate from existing Build notes", async () => {
-    mockResolveArchidekt.mockResolvedValue(resolvedArchidekt)
+    mockResolveLink.mockResolvedValue(resolvedArchidekt)
     const view = renderAddDeck()
     chooseMode(view, "blank")
     fireEvent.changeText(view.getByTestId("deck-note-input"), "x".repeat(1000))

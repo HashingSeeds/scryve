@@ -11,7 +11,7 @@ function validInterval(intervalMs: number) {
 }
 
 export const reserve = internalMutation({
-  args: { bucket: v.string(), intervalMs: v.number() },
+  args: { bucket: v.string(), intervalMs: v.number(), maxWaitMs: v.optional(v.number()) },
   handler: async (ctx, args) => {
     if (!validInterval(args.intervalMs))
       throw new ConvexError({ code: "invalid_rate_limit", message: "Invalid request interval" })
@@ -21,6 +21,12 @@ export const reserve = internalMutation({
       .unique()
     const now = Date.now()
     const requestAt = Math.max(now, existing?.nextRequestAt ?? now)
+    if (args.maxWaitMs !== undefined && requestAt - now > args.maxWaitMs)
+      throw new ConvexError({
+        code: "rate_limited",
+        message: `Try importing again in ${Math.ceil((requestAt - now) / 1000)} seconds.`,
+        retryAfterMs: requestAt - now,
+      })
     const value = { bucket: args.bucket, nextRequestAt: requestAt + args.intervalMs }
     if (existing) await ctx.db.replace(existing._id, value)
     else await ctx.db.insert("externalApiRateLimits", value)
