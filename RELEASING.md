@@ -4,24 +4,22 @@ This app uses two release paths: OTA updates for JS and asset changes within an 
 
 ## OTA updates (JS-only changes)
 
-1. Merge your changes to main.
-2. Confirm the native fingerprint matches the installed production build and that any required Convex change is already live.
-3. Test the commit in a preview build with `pnpm ota:preview --message "..."`. Run `pnpm e2e` and the manual smoke pass. Preview shares the production app identifier (so purchases work) but has its own runtime fingerprint, so this checks behavior but does not prove production compatibility.
-4. Publish the tested commit with production configuration: `pnpm ota:prod --message "..."`. To show players what changed, set one note per line in `RELEASE_NOTES`, for example `RELEASE_NOTES=$'Faster deck sync\nFixed commander damage corners' pnpm ota:prod --message "..."`. The notes appear under the ⓘ on the "Update ready" notice and in Settings before the player restarts. `--message` stays internal to EAS.
-5. Watch Sentry for new fatal issues after publishing. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
+OTA releases run as a train: every merge ships to beta, and promotion ships what beta proved to production.
 
-Do not republish a preview update group to production. If a future staging build uses the same native configuration, runtime, environment, and code signing as production, promote its tested group with `eas update:republish --group <update-group-id> --destination-channel production`.
+1. Merge to main. `.github/workflows/beta.yml` deploys Convex to production, then publishes the commit to the `beta` channel. Its player notes come from the `feat`, `fix`, and `perf` PR titles since the last promotion.
+2. Let it soak on beta. The lab devices and beta players run it, and Sentry tags every event with its `updateId`.
+3. Promote: `pnpm release:promote` reports, and `pnpm release:promote --yes` promotes. The `promote` workflow does the same without local secrets (`gh workflow run promote -f promote=true`). It takes the newest beta update that has been live for 60 minutes (`--soak-minutes`), stops if Sentry has new unresolved issues from it, republishes that same update group to production, and fast-forwards the `production` branch so Cloudflare Pages ships the matching web app.
+4. If beta shows a problem, revert or fix forward on main. Production never received it.
+
+For a hotfix, promote with `--soak-minutes 0`. Avoid `pnpm ota:prod`: it skips beta and leaves the web app behind. An update only reaches installs with a matching runtime, so after a native change merges, installs need new binaries before they get updates again. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
+
+Do not republish a preview update group to production. Preview has its own runtime fingerprint, so `pnpm ota:preview` checks behavior but does not prove production compatibility.
 
 ## Beta updates (opt-in OTA)
 
-Production builds have a hidden Beta updates switch: tap Version in Settings five times. It points that install at the `beta` channel, which runs the production build, runtime, and Convex backend. Settings and Sentry show `beta` as the channel after a restart.
+Production builds have a hidden Beta updates switch: tap Version in Settings five times. It points that install at the `beta` channel, which runs the production build, runtime, and Convex backend. Settings and Sentry show `beta` as the channel after a restart. The beta workflow publishes every merge, so nothing is published to beta by hand.
 
-1. Create the channel once: `eas channel:create beta`.
-2. Deploy any Convex change the update needs to production first.
-3. Publish: `pnpm ota:beta --message "..."`. `RELEASE_NOTES` works the same as for production.
-4. When it is ready for everyone, publish the same commit with `pnpm ota:prod`, or promote the tested group with `eas update:republish --group <update-group-id> --destination-channel production`.
-
-If a beta update crashes during launch, expo-updates falls back to the previous working update, and the player can turn the switch off. For any other bad beta update, roll it back with `eas update:rollback <beta-update-group-id>`.
+If a beta update crashes during launch, expo-updates falls back to the previous working update, and the player can turn the switch off. For any other bad beta update, revert on main, or roll it back with `eas update:rollback <beta-update-group-id>` while the fix lands.
 
 ## Native releases (fingerprint changed)
 
@@ -49,22 +47,24 @@ sentry-release:
 
 ## Convex deploys
 
-Cloudflare Pages deploys Convex as part of every web build. The build command is `pnpm build:pages` (`scripts/pages-build.cjs`), which runs `convex deploy --cmd "pnpm build:web:pages" --cmd-url-env-var-name EXPO_PUBLIC_CONVEX_URL` with a deploy key chosen per build:
+The beta workflow (`.github/workflows/beta.yml`) deploys Convex to production on every merge to main, with the `CONVEX_DEPLOY_KEY` repository secret, before it publishes the app to beta. Merging to main is a production backend release. If the deploy fails, nothing is published.
 
-- **Production (main):** pushes `convex/` to production with `CONVEX_DEPLOY_KEY`, then builds the web app against it. Merging to main is a production backend release. If the push fails, the build fails and nothing is published.
+Cloudflare Pages builds the web app with `pnpm build:pages` (`scripts/pages-build.cjs`). Pages' production branch is `production`, which moves only on promotion:
+
+- **Production (`production`):** builds the web app against production Convex (`EXPO_PUBLIC_CONVEX_URL` in the Pages Production environment) without deploying. It trails main, so pushing its older backend would roll production back.
 - **Preview, backend changed:** when `convex/`, `package.json`, or `pnpm-lock.yaml` differs from main's tip, pushes to a preview deployment named after the branch with the preview `CONVEX_DEPLOY_KEY`. Previews start with no data and are deleted 5 days after creation. Push the branch again to recreate one.
-- **Preview, backend matches main:** pushes to the shared staging dev deployment with `CONVEX_STAGING_DEPLOY_KEY` (Preview environment only, scoped to `deployment:deploy`). Staging keeps its data and does not count against the deployment cap. Without that variable, every branch gets its own preview.
+- **Preview, backend matches main** (including main itself): pushes to the shared staging dev deployment with `CONVEX_STAGING_DEPLOY_KEY` (Preview environment only, scoped to `deployment:deploy`). Staging keeps its data and does not count against the deployment cap. Without that variable, every branch gets its own preview.
 
 Convex schema and function changes must follow the compatibility rules in AGENTS.md. Because every merge deploys:
 
 - Give each step of an expand-and-contract rollout its own PR and merge them in order. A squash merge cannot preserve an intermediate checkpoint.
 - Check removed or renamed functions against installed clients before merging. Convex does not block them.
-- Use staged indexes on large tables. Pages builds time out after 20 minutes, and a blocking index backfill fails the deploy.
-- Before publishing an OTA update or binary, confirm the Pages build for the backend it needs succeeded.
+- Use staged indexes on large tables. A blocking index backfill can time out the deploy.
+- Before publishing a binary, confirm the beta workflow for the backend it needs succeeded.
 - Undo a bad deploy by merging a revert or forward fix. Server data does not roll back.
-- Run `npx convex deploy` against production by hand only to recover from a failed Pages build.
+- Run `npx convex deploy` against production by hand only to recover from a failed beta workflow.
 
-`convex-deploy-commit` in the release record is the main commit whose Pages build deployed the backend.
+`convex-deploy-commit` in the release record is the main commit whose beta workflow deployed the backend.
 
 ## Scryve Pro rollout
 
