@@ -1,9 +1,12 @@
 import { ConvexError } from "convex/values"
 
+import type { ActionCtx } from "../../_generated/server"
+import { boundedText, deckSourceUrl, fetchDeckSource, invalidSourceDeck } from "../deckSources"
 import { MAX_DECK_CARDS } from "../policy"
-import { objectRecord } from "../scryfall"
+import { type CardReference, fetchScryfall, normalizeScryfallCard, objectRecord } from "../scryfall"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const SCRYFALL_COLLECTION_SIZE = 75
 const FORMATS = new Map([
   [1, "standard"],
   [2, "modern"],
@@ -31,36 +34,15 @@ export type ArchidektEntry = {
   board: "main" | "sideboard" | "commander"
 }
 
-function invalidDeck(
-  message = "Archidekt returned an unsupported deck. Try its text export instead.",
-): never {
-  throw new ConvexError({ code: "archidekt_invalid_deck", message })
+function invalidDeck(message?: string): never {
+  invalidSourceDeck("archidekt", message)
 }
 
 export function archidektDeckLink(input: string) {
-  let url: URL
-  try {
-    url = new URL(input.trim())
-  } catch {
-    throw new ConvexError({
-      code: "invalid_deck_url",
-      message: "Enter a public Archidekt deck link.",
-    })
-  }
+  const message = "Enter a public Archidekt deck link."
+  const url = deckSourceUrl(input, ["archidekt.com", "www.archidekt.com"], message)
   const match = url.pathname.match(/^\/decks\/([1-9]\d{0,14})(?:\/[^/]*)?\/?$/)
-  if (
-    input.length > 2048 ||
-    url.protocol !== "https:" ||
-    !["archidekt.com", "www.archidekt.com"].includes(url.hostname) ||
-    url.port ||
-    url.username ||
-    url.password ||
-    !match
-  )
-    throw new ConvexError({
-      code: "invalid_deck_url",
-      message: "Enter a public Archidekt deck link.",
-    })
+  if (!match) throw new ConvexError({ code: "invalid_deck_url", message })
   return { deckId: match[1], sourceUrl: `https://archidekt.com/decks/${match[1]}` }
 }
 
@@ -178,4 +160,65 @@ export function parseArchidektDeck(payload: unknown, deckId: string) {
   }
   if (entries.size === 0) invalidDeck("No importable cards were found in this Archidekt deck.")
   return { name: deck.name.trim(), format, author: owner.username, entries: [...entries.values()] }
+}
+
+function archidektJson(text: string) {
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    throw new ConvexError({
+      code: "archidekt_invalid_response",
+      message: "Archidekt returned an invalid response.",
+    })
+  }
+}
+
+export async function resolveArchidektDeck(
+  ctx: ActionCtx,
+  link: ReturnType<typeof archidektDeckLink>,
+) {
+  const payload = archidektJson(
+    await fetchDeckSource("archidekt", `https://archidekt.com/api/decks/${link.deckId}/`, {
+      accept: "application/json",
+    }),
+  )
+  const { entries, ...metadata } = parseArchidektDeck(payload, link.deckId)
+  const resolved = new Map<string, CardReference>()
+  const ids = [...new Set(entries.map((entry) => entry.scryfallId))]
+  for (let offset = 0; offset < ids.length; offset += SCRYFALL_COLLECTION_SIZE) {
+    const response = await fetchScryfall(ctx, "/cards/collection", {
+      method: "POST",
+      body: JSON.stringify({
+        identifiers: ids.slice(offset, offset + SCRYFALL_COLLECTION_SIZE).map((id) => ({ id })),
+      }),
+    })
+    if (!response.ok)
+      throw new ConvexError({
+        code: "scryfall_unavailable",
+        message: "Card resolution is temporarily unavailable.",
+      })
+    const result = objectRecord(
+      archidektJson(await boundedText(response, "archidekt_invalid_response")),
+    )
+    if (!Array.isArray(result?.data) || result.data.length > SCRYFALL_COLLECTION_SIZE)
+      throw new ConvexError({
+        code: "scryfall_unavailable",
+        message: "Card resolution returned an invalid response.",
+      })
+    for (const value of result.data) {
+      const card = normalizeScryfallCard(value)
+      if (card) resolved.set(card.scryfallId.toLowerCase(), card)
+    }
+  }
+  const cards: (CardReference & {
+    quantity: number
+    board: "main" | "sideboard" | "commander"
+  })[] = []
+  const unresolved: string[] = []
+  for (const entry of entries) {
+    const card = resolved.get(entry.scryfallId)
+    if (!card || card.oracleId.toLowerCase() !== entry.oracleId) unresolved.push(entry.name)
+    else cards.push({ ...card, quantity: entry.quantity, board: entry.board })
+  }
+  return { ...metadata, sourceUrl: link.sourceUrl, cards, unresolved, invalidLines: [] as string[] }
 }

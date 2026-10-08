@@ -69,6 +69,39 @@ const MODES: Array<{ id: CreationMode; label: string }> = [
 
 const SEARCH_DEBOUNCE_MS = 350
 
+const DECK_LINK_SOURCES = new Map([
+  [
+    "mtg",
+    {
+      name: "Archidekt",
+      placeholder: "https://archidekt.com/decks/12345",
+      helper: "HTTPS links to public Magic decks. For other sites, paste a text export.",
+    },
+  ],
+  [
+    "ygo",
+    {
+      name: "YGOPRODeck",
+      placeholder: "https://ygoprodeck.com/deck/12345",
+      helper: "Links to public YGOPRODeck decks. For other sites, paste a YDK or YDKe export.",
+    },
+  ],
+  [
+    "pokemon",
+    {
+      name: "Limitless",
+      placeholder: "https://play.limitlesstcg.com/tournament/…/player/…",
+      helper: "Limitless tournament decklists. For decks you built, paste a Pokémon TCG Live list.",
+    },
+  ],
+])
+
+function attributionLabel(attribution: { sourceName: string; author?: string }, separator: string) {
+  return attribution.author
+    ? `${attribution.sourceName}${separator}${attribution.author}`
+    : attribution.sourceName
+}
+
 type PreconstructedDeck = {
   fileName: string
   name: string
@@ -331,7 +364,7 @@ export function AddDeckScreen({
   const previewPreconstructed = useAction(api.deckImports.previewPreconstructed)
   const resolvePreconstructed = useAction(api.deckImports.resolvePreconstructed)
   const resolvePasted = useAction(api.deckImports.resolvePasted)
-  const resolveArchidekt = useAction(api.archidektImports.resolvePublic)
+  const resolveLink = useAction(api.deckImports.resolveLink)
   const searchTopDecks = useAction(api.deckCatalogs.browse)
   const importCatalog = useMutation(api.decks.importCatalog)
   const { game, format: filterFormat, setGame, setFormat } = useDeckFilters()
@@ -345,12 +378,13 @@ export function AddDeckScreen({
   const [note, setNote] = useState("")
   const [deckList, setDeckList] = useState("")
   const [importKind, setImportKind] = useState<"text" | "link">("text")
-  const [archidektUrl, setArchidektUrl] = useState("")
-  const importSource = importKind === "link" ? archidektUrl : deckList
+  const [deckLink, setDeckLink] = useState("")
+  const linkSource = DECK_LINK_SOURCES.get(game)
+  const importSource = importKind === "link" ? deckLink : deckList
   const [pastedDraft, setPastedDraft] = useState<{
     source: string
     kind: "text" | "link"
-    attribution?: { sourceUrl: string; author: string }
+    attribution?: { sourceName: string; sourceUrl: string; author?: string }
     game: string
     format: string
     resolved: Pick<
@@ -384,7 +418,7 @@ export function AddDeckScreen({
       )
     : []
   const sourceAttribution = pastedDraft?.attribution
-    ? `Imported from Archidekt by ${pastedDraft.attribution.author}\n${pastedDraft.attribution.sourceUrl}`
+    ? `Imported from ${attributionLabel(pastedDraft.attribution, " by ")}\n${pastedDraft.attribution.sourceUrl}`
     : ""
   const [preconQuery, setPreconQuery] = useState("")
   const [precons, setPrecons] = useState<PreconstructedDeck[]>([])
@@ -773,21 +807,21 @@ export function AddDeckScreen({
     setResolvingPasted(true)
     setError(undefined)
     try {
-      if (importKind === "link" && game !== "mtg") return
+      if (importKind === "link" && !linkSource) return
       const result =
         importKind === "link"
           ? {
               kind: "link" as const,
-              resolved: await resolveArchidekt({ url: archidektUrl.trim() }),
+              resolved: await resolveLink({ url: deckLink.trim(), game }),
             }
           : { kind: "text" as const, resolved: await resolvePasted({ list: deckList, game }) }
       if (pastedToken.current !== token) return
       const resolved = result.resolved
       const suggestedFormat =
         result.kind === "link"
-          ? pastedDraft?.kind === "link" && pastedDraft.source === archidektUrl
+          ? pastedDraft?.kind === "link" && pastedDraft.source === deckLink
             ? format
-            : result.resolved.format
+            : (result.resolved.format ?? format)
           : format
       const normalized = normalizeImportedCards(importCards(resolved.cards), game, suggestedFormat)
       if ("overflow" in normalized) {
@@ -811,7 +845,11 @@ export function AddDeckScreen({
         omitted: false,
         ...(result.kind === "link"
           ? {
-              attribution: { sourceUrl: result.resolved.sourceUrl, author: result.resolved.author },
+              attribution: {
+                sourceName: result.resolved.sourceName,
+                sourceUrl: result.resolved.sourceUrl,
+                ...(result.resolved.author ? { author: result.resolved.author } : {}),
+              },
             }
           : {}),
       })
@@ -824,7 +862,7 @@ export function AddDeckScreen({
         fail(
           cause,
           importKind === "link"
-            ? "Could not load this Archidekt deck. Try again or paste its text export."
+            ? "Could not load this deck. Try again or paste its text export."
             : "Could not resolve deck list. Try again.",
         )
     } finally {
@@ -1194,16 +1232,16 @@ export function AddDeckScreen({
               {pastedDraft.attribution ? (
                 <TouchableOpacity
                   accessibilityRole="link"
-                  accessibilityLabel={`View on Archidekt by ${pastedDraft.attribution.author}`}
+                  accessibilityLabel={`View on ${attributionLabel(pastedDraft.attribution, " by ")}`}
                   style={$importAttribution}
                   onPress={() =>
                     void Linking.openURL(pastedDraft.attribution!.sourceUrl).catch(() =>
-                      setError("Could not open Archidekt."),
+                      setError(`Could not open ${pastedDraft.attribution!.sourceName}.`),
                     )
                   }
                 >
                   <Text
-                    text={`Archidekt · ${pastedDraft.attribution.author}`}
+                    text={attributionLabel(pastedDraft.attribution, " · ")}
                     size="xs"
                     style={themed($label)}
                   />
@@ -1803,7 +1841,7 @@ export function AddDeckScreen({
 
         {mode === "paste" ? (
           <View style={themed($stack)}>
-            {game === "mtg" ? (
+            {linkSource ? (
               <View
                 accessibilityRole="tablist"
                 accessibilityLabel="Import source"
@@ -1821,7 +1859,7 @@ export function AddDeckScreen({
                       setImportKind(kind)
                     }}
                   >
-                    <Text text={kind === "text" ? "Paste text" : "Archidekt link"} />
+                    <Text text={kind === "text" ? "Paste text" : `${linkSource.name} link`} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1833,21 +1871,21 @@ export function AddDeckScreen({
               maxLength={80}
               onChangeText={setName}
             />
-            {importKind === "link" ? (
+            {importKind === "link" && linkSource ? (
               <>
                 <TextField
-                  testID="archidekt-url-input"
-                  label="Archidekt URL"
-                  placeholder="https://archidekt.com/decks/12345"
-                  helper="HTTPS links to public Magic decks. For other sites, paste a text export."
-                  value={archidektUrl}
+                  testID="deck-link-input"
+                  label={`${linkSource.name} link`}
+                  placeholder={linkSource.placeholder}
+                  helper={linkSource.helper}
+                  value={deckLink}
                   maxLength={2048}
                   keyboardType="url"
                   autoCapitalize="none"
                   autoCorrect={false}
                   onChangeText={(next) => {
                     invalidatePasted()
-                    setArchidektUrl(next)
+                    setDeckLink(next)
                   }}
                 />
                 <Button
@@ -1901,8 +1939,8 @@ export function AddDeckScreen({
                     ? "Reload source"
                     : pastedDraft
                       ? "Review changes"
-                      : importKind === "link"
-                        ? "Review Archidekt deck"
+                      : importKind === "link" && linkSource
+                        ? `Review ${linkSource.name} deck`
                         : "Review deck list"
               }
               preset="reversed"

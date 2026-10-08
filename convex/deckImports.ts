@@ -7,14 +7,22 @@ import { action, internalAction, internalMutation, internalQuery } from "./_gene
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { preconstructedFormat } from "./lib/deckGames"
 import { limitDeckImport } from "./lib/deckRateLimits"
+import { type DeckSource, fetchDeckSource, invalidSourceDeck } from "./lib/deckSources"
+import { archidektDeckLink, resolveArchidektDeck } from "./lib/games/archidekt"
 import {
   MAX_CATALOG_BATCH,
   normalizeCardName,
   type CatalogCard,
   type NormalizedCard,
 } from "./lib/games/cards"
+import {
+  limitlessDeckLink,
+  limitlessPlayerDecklist,
+  type LimitlessDeckEntry,
+} from "./lib/games/limitless"
 import { pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
 import { cardsByYgoIds, searchYgo, ygoSection } from "./lib/games/yugioh"
+import { parseYgoprodeckDeckPage, ygoprodeckDeckLink } from "./lib/games/yugiohDecks"
 import { assertGameSystem, type GameSystemId } from "./lib/integrations"
 import { MAX_DECK_CARDS } from "./lib/policy"
 import {
@@ -175,11 +183,20 @@ function parseYdkeDeckList(list: string) {
   const encodedSections = payload.split("!")
   if (encodedSections.length < 3 || encodedSections.length > 4)
     throw new ConvexError({ code: "invalid_deck_list", message: "This YDKE link is invalid" })
+  return {
+    entries: passcodeEntries(
+      (["main", "extra", "side"] as const).map(
+        (section, index) => [section, decodeYdkeSection(encodedSections[index])] as const,
+      ),
+    ),
+    invalidLines: [],
+  }
+}
+
+function passcodeEntries(sections: readonly (readonly [string, readonly string[]])[]) {
   const entries = new Map<string, GenericParsedEntry>()
-  for (const [section, encoded] of ["main", "extra", "side"].map(
-    (section, index) => [section, encodedSections[index]] as const,
-  )) {
-    for (const providerCardId of decodeYdkeSection(encoded)) {
+  for (const [section, providerCardIds] of sections) {
+    for (const providerCardId of providerCardIds) {
       const key = `${section}:${providerCardId}`
       const current = entries.get(key)
       entries.set(key, {
@@ -192,7 +209,24 @@ function parseYdkeDeckList(list: string) {
       })
     }
   }
-  return { entries: [...entries.values()], invalidLines: [] }
+  return [...entries.values()]
+}
+
+function limitlessEntries(rows: readonly LimitlessDeckEntry[]) {
+  const entries = new Map<string, GenericParsedEntry>()
+  for (const row of rows) {
+    const originalReference = `${row.name} ${row.originalReference}`
+    const key = normalizeCardName(originalReference)
+    const current = entries.get(key)
+    entries.set(key, {
+      name: row.name,
+      quantity: (current?.quantity ?? 0) + row.quantity,
+      section: "main",
+      originalReference,
+      sectionExplicit: true,
+    })
+  }
+  return [...entries.values()]
 }
 
 export function parseGenericDeckList(list: string, game: Exclude<GameSystemId, "mtg">) {
@@ -1164,6 +1198,44 @@ export const resolvePreconstructed = action({
   },
 })
 
+async function resolveGenericDeck(
+  ctx: ActionCtx,
+  game: Exclude<GameSystemId, "mtg">,
+  entries: GenericParsedEntry[],
+): Promise<{ cards: GenericDeckCard[]; unresolved: string[] }> {
+  const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
+  const startedAt = Date.now()
+  try {
+    const resolved = await resolveGenericEntries(ctx, game, entries)
+    const finishedAt = Date.now()
+    await ctx.runMutation(internal.providerHealth.record, {
+      game,
+      provider,
+      operation: "deck-resolution",
+      status: resolved.unresolved.length > 0 ? "degraded" : "healthy",
+      lastAttemptAt: finishedAt,
+      ...(resolved.cards.length > resolved.unresolved.length ? { lastSuccessAt: finishedAt } : {}),
+      responseMs: Math.max(0, finishedAt - startedAt),
+      message: `${resolved.cards.length - resolved.unresolved.length} resolved, ${resolved.unresolved.length} unresolved`,
+    })
+    return resolved
+  } catch (error) {
+    const data = error instanceof ConvexError ? objectRecord(error.data) : null
+    if (data?.code === "empty_deck_list" || data?.code === "deck_too_large") throw error
+    const finishedAt = Date.now()
+    await ctx.runMutation(internal.providerHealth.record, {
+      game,
+      provider,
+      operation: "deck-resolution",
+      status: "unavailable",
+      lastAttemptAt: finishedAt,
+      responseMs: Math.max(0, finishedAt - startedAt),
+      message: error instanceof Error ? error.message : "Deck resolution failed",
+    })
+    throw error
+  }
+}
+
 export const resolvePasted = action({
   args: { list: v.string(), game: v.optional(v.string()) },
   handler: async (
@@ -1178,42 +1250,127 @@ export const resolvePasted = action({
     await requireActionCapability(ctx, game, "deckImport")
     if (game !== "mtg") {
       const parsed = parseGenericDeckList(args.list, game)
-      const startedAt = Date.now()
-      try {
-        const resolved: { cards: GenericDeckCard[]; unresolved: string[] } =
-          await resolveGenericEntries(ctx, game, parsed.entries)
-        const finishedAt = Date.now()
-        await ctx.runMutation(internal.providerHealth.record, {
-          game,
-          provider: game === "ygo" ? "ygoprodeck" : "tcgdex",
-          operation: "deck-resolution",
-          status: resolved.unresolved.length > 0 ? "degraded" : "healthy",
-          lastAttemptAt: finishedAt,
-          ...(resolved.cards.length > resolved.unresolved.length
-            ? { lastSuccessAt: finishedAt }
-            : {}),
-          responseMs: Math.max(0, finishedAt - startedAt),
-          message: `${resolved.cards.length - resolved.unresolved.length} resolved, ${resolved.unresolved.length} unresolved`,
-        })
-        return { ...resolved, invalidLines: parsed.invalidLines }
-      } catch (error) {
-        const data = error instanceof ConvexError ? objectRecord(error.data) : null
-        if (data?.code === "empty_deck_list" || data?.code === "deck_too_large") throw error
-        const finishedAt = Date.now()
-        await ctx.runMutation(internal.providerHealth.record, {
-          game,
-          provider: game === "ygo" ? "ygoprodeck" : "tcgdex",
-          operation: "deck-resolution",
-          status: "unavailable",
-          lastAttemptAt: finishedAt,
-          responseMs: Math.max(0, finishedAt - startedAt),
-          message: error instanceof Error ? error.message : "Deck resolution failed",
-        })
-        throw error
-      }
+      const resolved = await resolveGenericDeck(ctx, game, parsed.entries)
+      return { ...resolved, invalidLines: parsed.invalidLines }
     }
     const parsed = parsePastedDeckList(args.list)
     const resolved = await resolveEntries(ctx, parsed.entries)
     return { ...resolved, invalidLines: parsed.invalidLines }
+  },
+})
+
+async function recordDeckSource<T>(
+  ctx: ActionCtx,
+  game: Exclude<GameSystemId, "mtg">,
+  source: DeckSource,
+  load: () => Promise<T>,
+): Promise<T> {
+  const startedAt = Date.now()
+  const record = async (status: "healthy" | "degraded" | "unavailable", message: string) => {
+    const finishedAt = Date.now()
+    await ctx.runMutation(internal.providerHealth.record, {
+      game,
+      provider: source,
+      operation: "deck-link",
+      status,
+      lastAttemptAt: finishedAt,
+      ...(status === "healthy" ? { lastSuccessAt: finishedAt } : {}),
+      responseMs: Math.max(0, finishedAt - startedAt),
+      message,
+    })
+  }
+  try {
+    const result = await load()
+    await record("healthy", "Deck loaded")
+    return result
+  } catch (error) {
+    const code = error instanceof ConvexError ? objectRecord(error.data)?.code : undefined
+    await record(
+      code === `${source}_invalid_deck` ? "degraded" : "unavailable",
+      error instanceof Error ? error.message : "Deck link failed",
+    )
+    throw error
+  }
+}
+
+type DeckLinkResult = {
+  sourceName: string
+  name: string
+  format?: string
+  author?: string
+  sourceUrl: string
+  unresolved: string[]
+  invalidLines: string[]
+} & ({ cards: ResolvedDeckCard[] } | { cards: GenericDeckCard[] })
+
+const LIMITLESS_STANDINGS_MAX_BYTES = 8 * 1024 * 1024
+const LIMITLESS_MAX_WAIT_MS = 5_000
+
+export const resolveLink = action({
+  args: { url: v.string(), game: v.string() },
+  handler: async (ctx, args): Promise<DeckLinkResult> => {
+    const game = assertGameSystem(args.game)
+    switch (game) {
+      case "mtg": {
+        const link = archidektDeckLink(args.url)
+        await limitDeckImport(ctx)
+        await requireActionCapability(ctx, game, "deckImport")
+        return { sourceName: "Archidekt", ...(await resolveArchidektDeck(ctx, link)) }
+      }
+      case "ygo": {
+        const link = ygoprodeckDeckLink(args.url)
+        await limitDeckImport(ctx)
+        await requireActionCapability(ctx, game, "deckImport")
+        const page = await recordDeckSource(ctx, game, "ygoprodeck", async () =>
+          parseYgoprodeckDeckPage(
+            await fetchDeckSource("ygoprodeck", link.sourceUrl, { accept: "text/html" }),
+            link.deckId,
+          ),
+        )
+        const entries = passcodeEntries(Object.entries(page.sections))
+        const resolved = await resolveGenericDeck(ctx, game, entries)
+        return {
+          sourceName: "YGOPRODeck",
+          name: page.name,
+          sourceUrl: link.sourceUrl,
+          ...resolved,
+          invalidLines: [],
+        }
+      }
+      case "pokemon": {
+        const link = limitlessDeckLink(args.url)
+        await limitDeckImport(ctx)
+        await requireActionCapability(ctx, game, "deckImport")
+        const waitMs = await ctx.runMutation(internal.externalApiRateLimits.reserve, {
+          bucket: "limitless:imports",
+          intervalMs: 1_000,
+          maxWaitMs: LIMITLESS_MAX_WAIT_MS,
+        })
+        if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
+        const deck = await recordDeckSource(ctx, game, "limitless", async () => {
+          const body = await fetchDeckSource(
+            "limitless",
+            `https://play.limitlesstcg.com/api/tournaments/${encodeURIComponent(link.tournamentId)}/standings`,
+            { accept: "application/json", maxBytes: LIMITLESS_STANDINGS_MAX_BYTES },
+          )
+          let standings: unknown
+          try {
+            standings = JSON.parse(body)
+          } catch {
+            invalidSourceDeck("limitless")
+          }
+          return limitlessPlayerDecklist(standings, link.player)
+        })
+        const resolved = await resolveGenericDeck(ctx, game, limitlessEntries(deck.entries))
+        return {
+          sourceName: "Limitless",
+          name: deck.name,
+          author: deck.author,
+          sourceUrl: link.sourceUrl,
+          ...resolved,
+          invalidLines: deck.invalidLines,
+        }
+      }
+    }
   },
 })

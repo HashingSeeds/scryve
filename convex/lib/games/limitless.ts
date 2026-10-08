@@ -1,4 +1,7 @@
+import { ConvexError } from "convex/values"
+
 import { normalizeCardName, objectRecord, stringValue } from "./cards"
+import { deckSourceUrl, invalidSourceDeck } from "../deckSources"
 
 export type LimitlessDeckEntry = {
   name: string
@@ -31,25 +34,29 @@ function integer(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) ? value : undefined
 }
 
+function deckEntry(
+  candidate: unknown,
+  category: LimitlessDeckEntry["category"],
+): LimitlessDeckEntry | undefined {
+  const entry = objectRecord(candidate)
+  const name = stringValue(entry?.name)?.trim()
+  const set = stringValue(entry?.set)?.trim().toUpperCase()
+  const collectorNumber = stringValue(entry?.number)?.trim()
+  const quantity = integer(entry?.count)
+  if (!name || !set || !collectorNumber || !quantity || quantity < 1 || quantity > 99)
+    return undefined
+  return {
+    name,
+    quantity,
+    category,
+    collectorNumber,
+    originalReference: `${set} ${collectorNumber}`,
+  }
+}
+
 function deckEntries(value: unknown, category: LimitlessDeckEntry["category"]) {
   if (!Array.isArray(value)) return []
-  return value.flatMap((candidate) => {
-    const entry = objectRecord(candidate)
-    const name = stringValue(entry?.name)?.trim()
-    const set = stringValue(entry?.set)?.trim().toUpperCase()
-    const collectorNumber = stringValue(entry?.number)?.trim()
-    const quantity = integer(entry?.count)
-    if (!name || !set || !collectorNumber || !quantity || quantity < 1 || quantity > 99) return []
-    return [
-      {
-        name,
-        quantity,
-        category,
-        collectorNumber,
-        originalReference: `${set} ${collectorNumber}`,
-      } satisfies LimitlessDeckEntry,
-    ]
-  })
+  return value.flatMap((candidate) => deckEntry(candidate, category) ?? [])
 }
 
 export function normalizeLimitlessStandings(
@@ -93,4 +100,50 @@ export function normalizeLimitlessStandings(
 
 export function pokemonSummaryLookupKey(name: string, collectorNumber: string) {
   return `${normalizeCardName(name)}:${collectorNumber.replace(/^0+/, "").toLocaleLowerCase()}`
+}
+
+export function limitlessDeckLink(input: string) {
+  const message = "Enter a Limitless tournament decklist link."
+  const url = deckSourceUrl(input, ["play.limitlesstcg.com"], message)
+  const match = url.pathname.match(
+    /^\/tournament\/([A-Za-z0-9_-]{8,64})\/player\/([^/]{1,64})(?:\/decklist)?\/?$/,
+  )
+  let player: string | undefined
+  try {
+    player = match ? decodeURIComponent(match[2]) : undefined
+  } catch {
+    player = undefined
+  }
+  if (!match || !player || !/^[\w.-]{1,64}$/.test(player))
+    throw new ConvexError({ code: "invalid_deck_url", message })
+  return {
+    tournamentId: match[1],
+    player,
+    sourceUrl: limitlessDecklistUrl(match[1], player),
+  }
+}
+
+export function limitlessPlayerDecklist(standingsValue: unknown, player: string) {
+  if (!Array.isArray(standingsValue)) invalidSourceDeck("limitless")
+  const standing = standingsValue
+    .map(objectRecord)
+    .find((candidate) => stringValue(candidate?.player)?.toLowerCase() === player.toLowerCase())
+  if (!standing) invalidSourceDeck("limitless", "This player is not in that Limitless tournament.")
+  const decklist = objectRecord(standing.decklist)
+  const entries: LimitlessDeckEntry[] = []
+  const invalidLines: string[] = []
+  for (const category of ["pokemon", "trainer", "energy"] as const) {
+    const rows = decklist?.[category]
+    if (!Array.isArray(rows)) continue
+    for (const row of rows) {
+      const entry = deckEntry(row, category)
+      if (entry) entries.push(entry)
+      else invalidLines.push(stringValue(objectRecord(row)?.name)?.slice(0, 200) || "Unknown card")
+    }
+  }
+  if (entries.length === 0)
+    invalidSourceDeck("limitless", "This player has no public decklist on Limitless.")
+  const author = stringValue(standing.name)?.trim().slice(0, 200) || player
+  const archetype = stringValue(objectRecord(standing.deck)?.name)?.trim().slice(0, 200)
+  return { name: archetype || `${author}'s deck`, author, entries, invalidLines }
 }
