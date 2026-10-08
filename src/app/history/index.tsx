@@ -68,12 +68,17 @@ export default function HistoryRoute() {
   const shared = {
     games,
     initialSource:
-      source === "connected" || source === "local" ? (source as HistorySource) : undefined,
+      source === "connected" || source === "local" || source === "manual"
+        ? (source as HistorySource)
+        : undefined,
     onBack: () => goBack({ pathname: "/", params: { destination: "play" } }),
     onSelectLocal: (gameId: string) =>
       router.push({ pathname: "/history/[gameId]", params: { gameId } }),
     onSelectConnected: (gameId: string) =>
       router.push({ pathname: "/history/[gameId]", params: { gameId, source: "connected" } }),
+    onSelectManual: (publicId: string) =>
+      router.push({ pathname: "/history/match/[publicId]", params: { publicId } }),
+    ...(signedIn ? { onAddMatch: () => router.push("/connected/decks/match") } : {}),
   }
   return (
     <>

@@ -237,7 +237,7 @@ function summaryIdentitySnapshotFor(
   return { displayName: seatLabelFor(player) }
 }
 
-function maskSummaryPlayersForViewer(
+export function maskSummaryPlayersForViewer(
   players: Doc<"gameSummaries">["players"],
   viewerUserId: Id<"users">,
   blocked: Set<Id<"users">>,

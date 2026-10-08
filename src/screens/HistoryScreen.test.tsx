@@ -5,7 +5,7 @@ import type { ConnectedHistoryFeed } from "@/features/connected/ConnectedHistory
 import type { LocalGameSummary } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
 
-import { connectedHistoryEntry, localHistoryEntry } from "./historyEntries"
+import { connectedHistoryEntry, localHistoryEntry, manualHistoryEntry } from "./historyEntries"
 import { HistoryScreen } from "./HistoryScreen"
 
 const NOW = new Date("2026-08-11T20:00:00Z").getTime()
@@ -65,9 +65,30 @@ function connectedGame(overrides: Partial<ConnectedHistoryGame> = {}): Connected
   }
 }
 
+type ManualMatch = Parameters<typeof manualHistoryEntry>[0]
+
+function manualMatch(overrides: Partial<ManualMatch> = {}): ManualMatch {
+  return {
+    publicId: "manual-1",
+    bestOf: 3,
+    system: "mtg",
+    format: "modern",
+    eventName: "FNM",
+    roundNumber: 2,
+    finishedAt: NOW - 4 * HOUR,
+    outcome: "win",
+    seats: [
+      { seat: 1, displayName: "Ada", deckName: "Dragons", gamesWon: 2, outcome: "win", mine: true },
+      { seat: 2, displayName: "Bob", deckName: "Burn", gamesWon: 1, outcome: "loss", mine: false },
+    ],
+    ...overrides,
+  }
+}
+
 function renderHistory(props: Partial<Parameters<typeof HistoryScreen>[0]> = {}) {
   const onSelectLocal = jest.fn()
   const onSelectConnected = jest.fn()
+  const onSelectManual = jest.fn()
   const view = render(
     themed(
       <HistoryScreen
@@ -75,11 +96,12 @@ function renderHistory(props: Partial<Parameters<typeof HistoryScreen>[0]> = {})
         onBack={jest.fn()}
         onSelectLocal={onSelectLocal}
         onSelectConnected={onSelectConnected}
+        onSelectManual={onSelectManual}
         {...props}
       />,
     ),
   )
-  return { ...view, onSelectLocal, onSelectConnected }
+  return { ...view, onSelectLocal, onSelectConnected, onSelectManual }
 }
 
 function openFilters() {
@@ -326,6 +348,57 @@ describe("unified history screen", () => {
     fireEvent.press(screen.getByTestId("history-source-connected"))
 
     expect(screen.getByText(/load more to search further back/i)).toBeTruthy()
+  })
+
+  it("shows manual matches as compact rows with their own source filter", () => {
+    const { onSelectManual } = renderHistory({
+      connected: connectedFeed([connectedGame()], {
+        page: {
+          status: "ready",
+          items: [
+            connectedHistoryEntry(connectedGame()),
+            manualHistoryEntry(manualMatch()),
+            manualHistoryEntry(
+              manualMatch({
+                publicId: "manual-pod",
+                bestOf: 1,
+                eventName: undefined,
+                roundNumber: undefined,
+                outcome: "draw",
+                seats: [
+                  { seat: 1, displayName: "Ada", outcome: "draw", mine: true },
+                  { seat: 2, displayName: "Bob", outcome: "draw", mine: false },
+                  { seat: 3, displayName: "Cat", outcome: "draw", mine: false },
+                  { seat: 4, displayName: "Dan", outcome: "loss", mine: false },
+                ],
+              }),
+            ),
+          ],
+          nextPage: { status: "exhausted" },
+        },
+      }),
+    })
+
+    expect(screen.getByLabelText("Win · vs Bob · Manual · Bo3 2-1 · FNM R2 · Dragons")).toBeTruthy()
+    expect(screen.getByLabelText("Draw · vs Bob · Cat · Dan · Manual · Bo1")).toBeTruthy()
+
+    fireEvent.press(screen.getByTestId("history-source-manual"))
+    expect(screen.queryByTestId("history-row-local-local-1")).toBeNull()
+    expect(screen.queryByTestId("history-row-connected-connected-1")).toBeNull()
+    expect(screen.getAllByTestId(/^history-row-manual-/)).toHaveLength(2)
+
+    fireEvent.press(screen.getByTestId("history-row-manual-manual-1"))
+    expect(onSelectManual).toHaveBeenCalledWith("manual-1")
+  })
+
+  it("offers to add a result only when the route provides a destination", () => {
+    const onAddMatch = jest.fn()
+    renderHistory({ onAddMatch })
+    fireEvent.press(screen.getByText("Add result"))
+    expect(onAddMatch).toHaveBeenCalledTimes(1)
+
+    renderHistory()
+    expect(screen.queryByText("Add result")).toBeNull()
   })
 
   it("shows local games without a connected feed for signed-out players", () => {

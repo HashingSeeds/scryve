@@ -20,6 +20,7 @@ import type * as decks from "../decks.js";
 import type * as entitlements from "../entitlements.js";
 import type * as externalApiRateLimits from "../externalApiRateLimits.js";
 import type * as games from "../games.js";
+import type * as history from "../history.js";
 import type * as http from "../http.js";
 import type * as integrationManifest from "../integrationManifest.js";
 import type * as legal from "../legal.js";
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   entitlements: typeof entitlements;
   externalApiRateLimits: typeof externalApiRateLimits;
   games: typeof games;
+  history: typeof history;
   http: typeof http;
   integrationManifest: typeof integrationManifest;
   legal: typeof legal;

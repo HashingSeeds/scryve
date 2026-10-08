@@ -67,6 +67,11 @@ describe("buildManualMatchArgs", () => {
     expect(built.ok && built.args.opponents[0].outcome).toBe("draw")
   })
 
+  it("leaves the deck off when none is attached", () => {
+    const built = buildManualMatchArgs(draft(), { publicId: ids.publicId }, today.getTime())
+    expect(built.ok && built.args.me).toEqual({ seat: 1, outcome: "win" })
+  })
+
   it("keeps per-seat outcomes for pods with a single winner", () => {
     const pod = withSeatOutcome(
       { ...draft(), opponents: [draft().opponents[0], { ...emptyOpponent(), name: "Cat" }] },

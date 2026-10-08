@@ -40,7 +40,8 @@ export type RecordMatchDeck = {
 
 type RecordMatchScreenProps = {
   access: CloudAccess
-  deck: RecordMatchDeck
+  // why: History adds results without a deck; deck stats only count matches that name one.
+  deck?: RecordMatchDeck
   onBack: () => void
   onSaved: () => void
 }
@@ -75,7 +76,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
       access.request()
       return
     }
-    const built = buildManualMatchArgs(draft, { publicId, deckVersionId: deck.versionId })
+    const built = buildManualMatchArgs(draft, { publicId, deckVersionId: deck?.versionId })
     if (!built.ok) {
       setError(built.error)
       return
@@ -109,7 +110,7 @@ export function RecordMatchScreen({ access, deck, onBack, onSaved }: RecordMatch
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text weight="medium" text={deck.name} />
+        <Text weight="medium" text={deck ? deck.name : "No deck"} />
         <SegmentedControl
           testID="match-best-of"
           accessibilityLabel="Best of"
