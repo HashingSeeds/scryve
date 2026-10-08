@@ -28,22 +28,13 @@ const policyDataset = new DataSet<PhraseMetadata>()
   )
   .addPhrase((phrase) => phrase.setMetadata({ originalWord: "1488" }).addPattern(pattern`1488`))
 
-// why: the app imports this module for name warnings, so compiling the datasets on import would tax every screen that loads it.
-function lazy<T>(build: () => T) {
-  let value: T | undefined
-  return () => (value ??= build())
-}
-
-const englishMatcher = lazy(
-  () =>
-    new RegExpMatcher({
-      ...englishDataset.build(),
-      ...englishRecommendedTransformers,
-    }),
-)
+const englishMatcher = new RegExpMatcher({
+  ...englishDataset.build(),
+  ...englishRecommendedTransformers,
+})
 // Policy patterns are intentionally untransformed. English's leetspeak and duplicate transformers
 // would rewrite numeric references and repeated-letter terms before these literal patterns run.
-const policyMatcher = lazy(() => new RegExpMatcher(policyDataset.build()))
+const policyMatcher = new RegExpMatcher(policyDataset.build())
 
 function gateVariantsOf(username: string) {
   const stripped = username.replace(/[_-]/g, "")
@@ -80,14 +71,14 @@ function reportVariantsOf(username: string) {
 function matchesFor(variants: string[]) {
   const words = new Set<string>()
   for (const variant of variants) {
-    for (const match of englishMatcher().getAllMatches(variant, true)) {
+    for (const match of englishMatcher.getAllMatches(variant, true)) {
       const phrase = englishDataset.getPayloadWithPhraseMetadata(match)
       const word = phrase.phraseMetadata?.originalWord
       if (word) words.add(word)
     }
   }
   for (const variant of policyVariantsOf(variants)) {
-    for (const match of policyMatcher().getAllMatches(variant, true)) {
+    for (const match of policyMatcher.getAllMatches(variant, true)) {
       const phrase = policyDataset.getPayloadWithPhraseMetadata(match)
       const word = phrase.phraseMetadata?.originalWord
       if (word) words.add(word)

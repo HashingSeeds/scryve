@@ -748,6 +748,10 @@ describe("premium deck tracking", () => {
       publicId: created.publicId,
     })
     expect(ownerSummary?.players[0].deckNameAtFinish).toBe("Shitty Dragons")
+    const ownerHistory = await host.query(api.games.connectedHistory, {
+      paginationOpts: { cursor: null, numItems: 10 },
+    })
+    expect(ownerHistory.page[0].players[0].deckNameAtFinish).toBe("Shitty Dragons")
     const joinerSummary = await joiner.query(api.games.connectedSummary, {
       publicId: created.publicId,
     })
