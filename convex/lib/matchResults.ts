@@ -34,7 +34,9 @@ export function assertGameScores(
     )
       throw new Error(`Games drawn must be 0–${MAX_GAMES_PER_MATCH}`)
   }
-  if (totalWins > bestOf) throw new Error(`A best of ${bestOf} cannot have ${totalWins} wins`)
+  // why: two seats split at most bestOf games, but a pod spreads wins across seats (2-1-1 in a best of 3).
+  if (totalWins > (seats.length > 2 ? MAX_GAMES_PER_MATCH : bestOf))
+    throw new Error(`A best of ${bestOf} cannot have ${totalWins} wins`)
   // why: a score is all or nothing, so a partial one is never guessed into game counters.
   const scored = seats.filter((seat) => seat.gamesWon !== undefined)
   if (scored.length !== 0 && scored.length !== seats.length)

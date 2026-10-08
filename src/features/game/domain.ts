@@ -239,6 +239,11 @@ export function createNextMatchGame(game: LocalGame, now?: number): LocalGame {
   }
 }
 
+/** why: a match counts as under way once a game of it started or finished; a fresh game 1 can still be replaced. */
+export function isMatchInProgress(game: LocalGame) {
+  return game.match !== undefined && (game.match.gameNumber > 1 || hasLocalGameStarted(game))
+}
+
 /** why: abandoning a game mid-match restarts that game; the match and its score stay. */
 export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match) throw new Error("This game is not part of a match.")

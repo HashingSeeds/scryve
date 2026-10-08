@@ -27,6 +27,7 @@ import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { ConnectedGameRow } from "@/features/connected/ConnectedGameRow"
 import {
   hasLocalGameStarted,
+  matchContextLabel,
   MAX_PLAYER_NAME_LENGTH,
   meSeatOf,
   PLAYER_COLORS,
@@ -34,6 +35,7 @@ import {
   validateStartingLife,
 } from "@/features/game/domain"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
+import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameAccountInput, LocalSettings } from "@/features/game/localPersistence"
 import {
   playerGridLayoutForCount,
@@ -49,7 +51,13 @@ import {
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { LocalGame, LocalGameResult, NewPlayerInput, PlayerId } from "@/features/game/types"
+import type {
+  LocalGame,
+  LocalGameResult,
+  MatchSeatOutcome,
+  NewPlayerInput,
+  PlayerId,
+} from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
@@ -134,6 +142,8 @@ export interface NewGameScreenProps {
   onResumeConnected?: (game: ResumableGame) => void
   /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
   localConnect?: LocalConnectFeed
+  /** why: between games of a match, setup can end the match from its last finished game; the board owns everything else. */
+  localMatchEnd?: { game: LocalGame; onEnd: (outcomes: MatchSeatOutcome[]) => void }
 }
 
 export interface LocalConnectFeed {
@@ -166,6 +176,7 @@ export function NewGameScreen({
   joinContent,
   onResumeConnected,
   localConnect,
+  localMatchEnd,
 }: NewGameScreenProps) {
   const {
     themed,
@@ -291,6 +302,9 @@ export function NewGameScreen({
   const busy = connectedMode && Boolean(connected?.busy)
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)
+  // why: a match in progress is continued from setup, never ended game by game or replaced.
+  const matchBlocks = Boolean(localGame?.match)
+  const [endingMatch, setEndingMatch] = useState(false)
   const connectedBlocksLocal =
     !connectedMode && Boolean(connected?.ready) && connectedGames.length > 0
   const hostedGame = connectedMode ? connectedGames.find((game) => game.isHost) : undefined
@@ -318,13 +332,15 @@ export function NewGameScreen({
           : preparing && showPreparation
             ? connected?.status
             : ""))
-    : localGame
-      ? "Resume current game"
-      : connectedBlocksLocal
-        ? singleBlockingConnected
-          ? "Resume current game"
-          : "Games in progress"
-        : ""
+    : localGame?.match
+      ? `${matchContextLabel(localGame)} · Best of ${localGame.match.bestOf}`
+      : localGame
+        ? "Resume current game"
+        : connectedBlocksLocal
+          ? singleBlockingConnected
+            ? "Resume current game"
+            : "Games in progress"
+          : ""
 
   function submit() {
     if (!valid || busy) return
@@ -740,12 +756,14 @@ export function NewGameScreen({
           </Screen>
           <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
             <View style={themed($footerContent)}>
-              <View style={canConnectLocal ? themed($footerActions) : undefined}>
+              <View style={canConnectLocal || localMatchEnd ? themed($footerActions) : undefined}>
                 <Button
                   testID={connectedMode ? "host-connected-button" : "start-game-button"}
                   text={
                     gameBlocksStart
-                      ? "End current game…"
+                      ? matchBlocks
+                        ? "Continue match"
+                        : "End current game…"
                       : connectedMode
                         ? (connected?.access?.label ?? (busy ? "Working…" : "Host lobby"))
                         : undefined
@@ -753,13 +771,15 @@ export function NewGameScreen({
                   tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
                   preset="reversed"
                   style={[
-                    canConnectLocal && themed($footerAction),
+                    (canConnectLocal || localMatchEnd) && themed($footerAction),
                     gameBlocksStart && themed($endCurrentButton),
                   ]}
                   textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
                   disabled={
                     localGameBlocksStart
-                      ? !onEndLocal || Boolean(localConnect?.busy)
+                      ? matchBlocks
+                        ? !onResumeLocal
+                        : !onEndLocal || Boolean(localConnect?.busy)
                       : hostedGame
                         ? !connected?.ready || busy
                         : connectedBlocksLocal
@@ -768,14 +788,18 @@ export function NewGameScreen({
                   }
                   accessibilityHint={
                     gameBlocksStart
-                      ? "Opens the end-game prompt before you can start another game"
+                      ? matchBlocks
+                        ? "Returns to the match in progress"
+                        : "Opens the end-game prompt before you can start another game"
                       : connectedMode
                         ? "Creates a lobby others can join"
                         : "Starts this local game on the current device"
                   }
                   onPress={
                     localGameBlocksStart
-                      ? () => setEndingLocal(true)
+                      ? matchBlocks
+                        ? onResumeLocal
+                        : () => setEndingLocal(true)
                       : hostedGame
                         ? () => setGameToExit(hostedGame)
                         : singleBlockingConnected
@@ -785,6 +809,15 @@ export function NewGameScreen({
                             : submit
                   }
                 />
+                {localMatchEnd ? (
+                  <Button
+                    testID="end-match-setup-button"
+                    text="End match…"
+                    style={themed($footerAction)}
+                    accessibilityHint="Records the match result from its last finished game"
+                    onPress={() => setEndingMatch(true)}
+                  />
+                ) : null}
                 {canConnectLocal ? (
                   <Button
                     testID="connect-local-button"
@@ -1006,7 +1039,17 @@ export function NewGameScreen({
           <Button text="Cancel" onPress={() => setPickingHostSeat(false)} />
         </DialogCard>
       ) : null}
-      {endingLocal && localGame && onEndLocal ? (
+      {endingMatch && localMatchEnd ? (
+        <LocalMatchEndDialog
+          game={localMatchEnd.game}
+          onClose={() => setEndingMatch(false)}
+          onEnd={(outcomes) => {
+            localMatchEnd.onEnd(outcomes)
+            setEndingMatch(false)
+          }}
+        />
+      ) : null}
+      {endingLocal && localGame && onEndLocal && !matchBlocks ? (
         <LocalGameEndDialog
           game={localGame}
           onClose={() => setEndingLocal(false)}

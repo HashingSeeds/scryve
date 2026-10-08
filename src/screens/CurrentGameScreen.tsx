@@ -91,7 +91,9 @@ export function CurrentGameScreen({
   const [freshBoard, setFreshBoard] = useState(fresh)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
   // why: the game that just ended decides whether the match goes on, and it is already in history.
-  const [matchPrompt, setMatchPrompt] = useState<LocalGame>()
+  const [matchPrompt, setMatchPrompt] = useState<LocalGame | undefined>(() =>
+    runtime.pendingMatchEnd(),
+  )
   const [matchEnding, setMatchEnding] = useState<LocalGame>()
   const [matchOpen, setMatchOpen] = useState(false)
   const isFresh = freshBoard && !hasLocalGameStarted(runtime.game)
@@ -135,8 +137,9 @@ export function CurrentGameScreen({
     }
     // why: a failed rematch save throws here, and the open dialog shows the error.
     if (ended.match && !ended.match.result) {
-      // why: at the game cap the board waits for the match result, so Cancel cannot orphan the match.
+      // why: at the game cap the board waits for the match result, so Cancel or a restart cannot orphan the match.
       if (canContinueMatch(ended)) runtime.nextMatchGame()
+      else runtime.holdMatchEnd(ended.match.id)
       setEndSource(undefined)
       setFreshBoard(true)
       setMatchPrompt(ended)

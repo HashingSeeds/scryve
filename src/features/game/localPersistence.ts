@@ -57,6 +57,7 @@ export const LOCAL_KEYS = {
   layouts: "count.local.layouts.v1",
   historyIndex: "count.local.history.index.v1",
   meSeat: "count.local.meSeat.v1",
+  pendingMatchEnd: "count.local.matchEnd.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
 } as const
@@ -685,6 +686,19 @@ export class LocalGameRepository {
     const next = applyClaimDecisions(history, ownerId, decisions)
     const changed = next.some((game, index) => game !== history[index])
     if (changed) this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
+    // why: a match claimed between games continues under the same account and seat, or its next game would not link.
+    const active = this.loadActiveGame()
+    const claimed = active?.match
+      ? decisions.find((decision) => decision.claim && decision.id === active.match?.id)
+      : undefined
+    if (active && claimed && !active.account) {
+      const me = claimed.meSeat === undefined ? undefined : active.players[claimed.meSeat]
+      this.saveActiveGame({
+        ...active,
+        account: { ownerId, ...(me ? { mePlayerId: me.id } : {}) },
+        updatedAt: Date.now(),
+      })
+    }
     try {
       this.repairClaimedDetails(ownerId)
     } finally {
@@ -765,6 +779,19 @@ export class LocalGameRepository {
     return this.loadHistory().find((game) => game.match?.id === matchId)
   }
 
+  /** why: a match that hit the game cap has no board left; the result it still owes survives a restart here. */
+  loadPendingMatchEnd(): string | undefined {
+    const matchId = this.storage.getString(LOCAL_KEYS.pendingMatchEnd)
+    return matchId && this.latestMatchGame(matchId)?.match?.result === undefined
+      ? matchId
+      : undefined
+  }
+
+  savePendingMatchEnd(matchId: string | undefined): void {
+    if (matchId === undefined) this.storage.delete(LOCAL_KEYS.pendingMatchEnd)
+    else this.storage.set(LOCAL_KEYS.pendingMatchEnd, matchId)
+  }
+
   // why: ending a match happens after its last game was archived, so the result is written onto that game.
   finishMatch(matchId: string, outcomes: MatchSeatOutcome[]): LocalGameSummary | null {
     const latest = this.latestMatchGame(matchId)
@@ -779,6 +806,8 @@ export class LocalGameRepository {
         : {}),
     }
     this.patchSummary(latest.id, () => summary)
+    if (this.storage.getString(LOCAL_KEYS.pendingMatchEnd) === matchId)
+      this.savePendingMatchEnd(undefined)
     const detail = parseJson(this.storage.getString(LOCAL_KEYS.historyDetail(latest.id)))
     if (isRecord(detail) && isRecord(detail.game))
       this.storage.set(

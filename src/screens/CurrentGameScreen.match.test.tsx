@@ -204,15 +204,37 @@ describe("CurrentGameScreen match mode", () => {
     // why: Cancel returns to the prompt, so the match is never left behind without a result.
     expect(view.getByTestId("match-prompt-dialog")).toBeTruthy()
     expect(repository.loadActiveGame()).toBeNull()
-    fireEvent.press(view.getByTestId("match-prompt-end-button"))
-    fireEvent.press(view.getByTestId("confirm-end-match-button"))
+
+    // why: a restart reopens the owed result from storage on a fresh board.
+    view.unmount()
+    const reopened = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={createLocalGame({
+            players: [
+              { name: "Ada", color: "#41476E" },
+              { name: "Grace", color: "#39755C" },
+            ],
+            startingLife: 2,
+            now: 99,
+          })}
+          fresh
+          repository={repository}
+          onViewSummary={jest.fn()}
+          ownerId="owner"
+        />
+      </ThemeProvider>,
+    )
+    expect(reopened.getByText("Game 10 saved")).toBeTruthy()
+    fireEvent.press(reopened.getByTestId("match-prompt-end-button"))
+    fireEvent.press(reopened.getByTestId("confirm-end-match-button"))
+    expect(repository.loadPendingMatchEnd()).toBeUndefined()
 
     await waitFor(() =>
       expect(repository.loadHistory()[0]).toMatchObject({
         match: { id: initial.match?.id, gameNumber: 10, result: { outcomes: ["draw", "draw"] } },
       }),
     )
-    expect(repository.loadActiveGame()?.match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
-    expect(repository.loadActiveGame()?.match?.id).not.toBe(initial.match?.id)
+    expect(reopened.queryByTestId("match-prompt-dialog")).toBeNull()
   })
 })

@@ -1,7 +1,13 @@
 import { router } from "expo-router"
 import { fireEvent, render } from "@testing-library/react-native"
 
-import { createLocalGame } from "@/features/game/domain"
+import {
+  applyGameCommand,
+  asDeviceId,
+  createLocalGame,
+  createNextMatchGame,
+  defaultCommandContext,
+} from "@/features/game/domain"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -170,6 +176,47 @@ describe("new local game route", () => {
     expect(view.getByText("End current game…")).toBeTruthy()
     fireEvent.press(view.getByTestId("setup-status"))
     expect(router.replace).toHaveBeenCalledWith("/game/current")
+  })
+
+  it("continues an unfinished match from setup instead of replacing it, and can end it", () => {
+    const first = createLocalGame({
+      startingLife: 20,
+      players: [
+        { name: "One", color: "#000" },
+        { name: "Two", color: "#111" },
+      ],
+      match: { bestOf: 3 },
+      now: 1,
+    })
+    const firstDone = applyGameCommand(
+      first,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [first.players[0].id] } },
+      { ...defaultCommandContext(asDeviceId("device_test")), now: () => 2 },
+    )
+    localGameRepository.archiveGame(firstDone)
+    localGameRepository.saveActiveGame(createNextMatchGame(firstDone, 3))
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <NewLocalGameRoute />
+      </ThemeProvider>,
+    )
+    expect(view.getByText("Continue match")).toBeTruthy()
+    expect(view.getByText("Game 2 · 1-0 · Best of 3")).toBeTruthy()
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(router.replace).toHaveBeenCalledWith("/game/current")
+    expect(localGameRepository.loadActiveGame()?.match).toMatchObject({
+      id: first.match?.id,
+      gameNumber: 2,
+    })
+
+    fireEvent.press(view.getByTestId("end-match-setup-button"))
+    fireEvent.press(view.getByTestId("confirm-end-match-button"))
+    expect(localGameRepository.loadActiveGame()).toBeNull()
+    expect(localGameRepository.loadHistory()[0]).toMatchObject({
+      id: firstDone.id,
+      match: { result: { outcomes: ["win", "loss"] } },
+    })
+    expect(view.getByTestId("start-game-button")).toBeEnabled()
   })
 
   it("ends the current game inside setup and preserves the new draft", () => {

@@ -144,6 +144,12 @@ export function useLocalGame(
     restartMatchGame: restartMatchGameBoard,
     endMatch,
     latestMatchGame,
+    /** why: a match that hit the game cap still owes its result after a restart; the board reopens the prompt from it. */
+    pendingMatchEnd: () => {
+      const matchId = repository.loadPendingMatchEnd()
+      return matchId ? latestMatchGame(matchId) : undefined
+    },
+    holdMatchEnd: (matchId: string) => repository.savePendingMatchEnd(matchId),
     discard: () => {
       repository.clearActiveGame()
       return gameRef.current

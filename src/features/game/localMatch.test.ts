@@ -184,6 +184,42 @@ describe("local match", () => {
     expect(restarted.account?.mePlayerId).toBe(restarted.players[0].id)
   })
 
+  it("tags the active continuation when a signed-out match is claimed between games", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const first = finish(
+      createLocalGame({
+        now: 1,
+        startingLife: 20,
+        players: [
+          { name: "Ada", color: "#000" },
+          { name: "Grace", color: "#111" },
+        ],
+        match: { bestOf: 3 },
+      }),
+      0,
+      10,
+    )
+    repository.archiveGame(first)
+    repository.saveActiveGame(createNextMatchGame(first, 20))
+    repository.resolveClaims("owner", [{ id: first.match!.id, claim: true, meSeat: 1 }])
+    const active = repository.loadActiveGame()!
+    expect(active.account).toEqual({ ownerId: "owner", mePlayerId: active.players[1].id })
+    expect(repository.loadHistory()[0].account).toEqual({
+      ownerId: "owner",
+      mePlayerId: first.players[1].id,
+    })
+  })
+
+  it("remembers a match result that is still owed and forgets it once written", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const first = finish(matchGame(), "draw", 10)
+    repository.archiveGame(first, "game_menu")
+    repository.savePendingMatchEnd(first.match!.id)
+    expect(repository.loadPendingMatchEnd()).toBe(first.match!.id)
+    repository.finishMatch(first.match!.id, ["draw", "draw"])
+    expect(repository.loadPendingMatchEnd()).toBeUndefined()
+  })
+
   it("builds the publish payloads with the match id, order, score, and outcomes", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const first = finish(matchGame(), 0, 10)

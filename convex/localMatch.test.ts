@@ -282,6 +282,39 @@ describe("finishScryveMatch", () => {
     expect(games).toHaveLength(3)
   })
 
+  it("finalizes a pod best of three whose wins spread across seats", async () => {
+    const t = convexTest(schema, modules)
+    const { actor } = await owner(t)
+    const third = {
+      localId: "player_c",
+      seat: 3,
+      displayName: "Cat",
+      color: "#10B981",
+      currentLife: 12,
+    }
+    const winners = ["player_me", "player_them", "player_c", "player_me"]
+    for (const [index, winner] of winners.entries())
+      await actor.mutation(api.games.publishFinishedLocalGame, {
+        ...matchGame(index + 1, "me"),
+        players: [...matchGame(index + 1, "me").players, third],
+        result: { kind: "win", winnerLocalIds: [winner] },
+      })
+    await actor.mutation(
+      api.matches.finishScryveMatch,
+      finish(
+        [
+          { seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win" },
+          { seat: 2, gamesWon: 1, gamesDrawn: 0, outcome: "loss" },
+          { seat: 3, gamesWon: 1, gamesDrawn: 0, outcome: "loss" },
+        ],
+        4,
+      ),
+    )
+    const { matches } = await rows(t)
+    expect(matches[0].status).toBe("finished")
+    expect(matches[0].seats.map((seat) => seat.gamesWon)).toEqual([2, 1, 1])
+  })
+
   it("draws a called pod round for the seats still playing", async () => {
     const t = convexTest(schema, modules)
     const { actor, versionId } = await owner(t)
