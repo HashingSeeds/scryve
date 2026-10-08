@@ -1,4 +1,5 @@
 import { AppState, Platform } from "react-native"
+import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
@@ -20,10 +21,14 @@ export interface ObservabilityOptions {
   getAnalyticsId?: () => string | undefined
 }
 
+// why: never default to "production"; local Release and perf builds have no channel and used to pose as store installs.
 function buildEnvironment() {
   const webBuildEnvironment = process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT
-  const sdkDefaultEnvironment = __DEV__ ? "development" : "production"
-  return webBuildEnvironment ?? Updates.channel ?? sdkDefaultEnvironment
+  if (webBuildEnvironment) return webBuildEnvironment
+  if (__DEV__) return "development"
+  const variant: unknown = Constants.expoConfig?.extra?.appVariant
+  if (typeof variant !== "string" || !variant) return "local"
+  return variant === "production" ? Updates.channel || "local" : variant
 }
 
 export function initObservability(
