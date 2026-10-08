@@ -61,6 +61,7 @@ import {
   shapeForSeat,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
+import { MATCH_BEST_OF, type MatchBestOf } from "../../convex/lib/matchResults"
 import { nameFailsGate } from "../../convex/lib/nameFilter"
 
 export type NewGameMode = "local" | "connected"
@@ -118,6 +119,7 @@ export interface NewGameScreenProps {
       layout: PlayerGridLayoutVariant
       lifeStep: number
       account?: LocalGameAccountInput
+      match?: { bestOf: MatchBestOf }
     },
   ) => void
   connected?: ConnectedHostFeed
@@ -223,6 +225,9 @@ export function NewGameScreen({
     setMeSeat(account?.defaultMeSeat)
     setDeck(undefined)
   }, [account?.defaultMeSeat, account?.ownerId])
+  const [matchBestOf, setMatchBestOf] = useState<MatchBestOf | undefined>(
+    initialGame?.match?.bestOf,
+  )
   const [showOptions, setShowOptions] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
@@ -331,7 +336,17 @@ export function NewGameScreen({
         deckRequired,
         ...setup,
       })
-    else onStartLocal(players, startingLife, { ...setup, account: accountInput })
+    else
+      onStartLocal(players, startingLife, {
+        ...setup,
+        account: accountInput,
+        ...(matchBestOf ? { match: { bestOf: matchBestOf } } : {}),
+      })
+  }
+
+  // why: a pod round is one game; a 1v1 constructed match is a best of three.
+  function toggleMatch(on: boolean) {
+    setMatchBestOf(on ? (format === "commander" || playerCount > 2 ? 1 : 3) : undefined)
   }
 
   function chooseSystem(value: string) {
@@ -551,6 +566,36 @@ export function NewGameScreen({
                   selectedId={deckRequired ? "required" : "optional"}
                   onSelect={(value) => setDeckRequired(value === "required")}
                 />
+              </View>
+            ) : null}
+
+            {!connectedMode && !localGame ? (
+              <View style={themed($section)}>
+                <Text text="Match" preset="subheading" accessibilityRole="header" />
+                <SegmentedControl
+                  testID="match-mode"
+                  accessibilityLabel="Match"
+                  segments={[
+                    { id: "off", label: "Single game" },
+                    { id: "on", label: "Best of" },
+                  ]}
+                  selectedId={matchBestOf ? "on" : "off"}
+                  onSelect={(value) => toggleMatch(value === "on")}
+                />
+                {matchBestOf ? (
+                  <SegmentedControl
+                    testID="match-best-of"
+                    accessibilityLabel="Best of"
+                    segments={MATCH_BEST_OF.map((bestOf) => ({
+                      id: String(bestOf),
+                      label: `Best of ${bestOf}`,
+                    }))}
+                    selectedId={String(matchBestOf)}
+                    onSelect={(value) =>
+                      setMatchBestOf(MATCH_BEST_OF.find((bestOf) => String(bestOf) === value))
+                    }
+                  />
+                ) : null}
               </View>
             ) : null}
 

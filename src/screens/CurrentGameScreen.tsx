@@ -1,9 +1,17 @@
 import { useCallback, useMemo, useRef, useState } from "react"
-import type { GestureResponderEvent, ViewStyle } from "react-native"
+import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
+import { Pressable, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/Button"
-import { DialogCard, $dialogText, type DialogOrigin } from "@/components/DialogCard"
+import {
+  $dialogActions,
+  $dialogButton,
+  $dialogText,
+  DialogCard,
+  type DialogOrigin,
+} from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { type RadialMenuAction } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
@@ -11,16 +19,27 @@ import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import {
+  canContinueMatch,
+  drawsLabel,
   hasLocalGameStarted,
   incomingCommanderDamage,
   isEliminatedByCommanderDamage,
+  matchContextLabel,
+  matchScoreAfter,
 } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
 import { LocalGameEndDialog } from "@/features/game/LocalGameEndDialog"
+import { LocalMatchEndDialog } from "@/features/game/LocalMatchEndDialog"
 import type { LocalGameRepository } from "@/features/game/localPersistence"
 import { supportsCommanderDamage } from "@/features/game/playSystems"
-import type { GamePlayer, LocalGame, LocalGameResult, PlayerId } from "@/features/game/types"
+import type {
+  GamePlayer,
+  LocalGame,
+  LocalGameResult,
+  MatchSeatOutcome,
+  PlayerId,
+} from "@/features/game/types"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
@@ -65,12 +84,18 @@ export function CurrentGameScreen({
   useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
   const menuButtonStyle = useMenuButtonStyle()
   const { themed } = useAppTheme()
+  const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const system = runtime.game.system
   const [menuOpen, setMenuOpen] = useState(false)
   const [freshBoard, setFreshBoard] = useState(fresh)
-  const [savedGameId, setSavedGameId] = useState<string>()
+  const [saved, setSaved] = useState<{ gameId: string; message: string }>()
+  // why: the game that just ended decides whether the match goes on, and it is already in history.
+  const [matchPrompt, setMatchPrompt] = useState<LocalGame>()
+  const [matchEnding, setMatchEnding] = useState<LocalGame>()
+  const [matchOpen, setMatchOpen] = useState(false)
   const isFresh = freshBoard && !hasLocalGameStarted(runtime.game)
+  const match = runtime.game.match
   const [endSource, setEndSource] = useState<GameEndSource | undefined>(
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
@@ -109,13 +134,36 @@ export function CurrentGameScreen({
       return
     }
     // why: a failed rematch save throws here, and the open dialog shows the error.
+    if (canContinueMatch(ended)) {
+      runtime.nextMatchGame()
+      setEndSource(undefined)
+      setFreshBoard(true)
+      setMatchPrompt(ended)
+      return
+    }
     runtime.rematch()
     setEndSource(undefined)
     setFreshBoard(true)
-    setSavedGameId(ended.id)
+    if (ended.match && !ended.match.result) setMatchEnding(ended)
+    else setSaved({ gameId: ended.id, message: ended.match ? "Match saved" : "Game saved" })
   }
 
-  const dismissSavedToast = useCallback(() => setSavedGameId(undefined), [])
+  function confirmEndMatch(outcomes: MatchSeatOutcome[]) {
+    if (!matchEnding?.match) return
+    const ended = runtime.endMatch(matchEnding.match.id, outcomes)
+    setMatchEnding(undefined)
+    setFreshBoard(true)
+    setSaved({ gameId: ended.id, message: "Match saved" })
+  }
+
+  function openEndMatch() {
+    if (!match) return
+    const latest = runtime.latestMatchGame(match.id)
+    setMatchOpen(false)
+    if (latest) setMatchEnding(latest)
+  }
+
+  const dismissSavedToast = useCallback(() => setSaved(undefined), [])
 
   function abandonGame() {
     if (!onGameAbandoned) return
@@ -313,20 +361,127 @@ export function CurrentGameScreen({
         </DialogCard>
       ) : null}
 
+      {match && !menuOpen ? (
+        <View pointerEvents="box-none" style={[themed($matchLayer), { top: insets.top + 4 }]}>
+          <Pressable
+            testID="match-context"
+            accessibilityRole="button"
+            accessibilityLabel={`${matchContextLabel(runtime.game)}, best of ${match.bestOf}`}
+            accessibilityHint="Shows the match score"
+            style={themed($matchContext)}
+            onPress={() => setMatchOpen(true)}
+          >
+            <Text
+              size="xxs"
+              weight="medium"
+              text={matchContextLabel(runtime.game)}
+              style={themed($matchContextText)}
+            />
+          </Pressable>
+        </View>
+      ) : null}
+
       {endSource ? (
         <LocalGameEndDialog
           game={runtime.game}
           origin={menuDialogOrigin}
+          singleWinner={Boolean(match)}
           onClose={() => setEndSource(undefined)}
           onEnd={confirmEnd}
           onAbandon={onGameAbandoned ? abandonGame : undefined}
         />
       ) : null}
 
-      {savedGameId ? (
+      {matchOpen && match ? (
+        <DialogCard
+          visible
+          onClose={() => setMatchOpen(false)}
+          backdropTestID="match-backdrop"
+          backdropAccessibilityLabel="Close match score"
+          dialogTestID="match-dialog"
+          accessibilityViewIsModal
+        >
+          <Text text={`Best of ${match.bestOf} · Game ${match.gameNumber}`} preset="subheading" />
+          <View style={themed($matchScore)}>
+            {runtime.game.players.map((player, seat) => (
+              <View key={player.id} style={themed($matchScoreRow)}>
+                <Text text={player.name} numberOfLines={1} style={themed($matchScoreName)} />
+                <Text text={String(match.wins[seat])} weight="medium" />
+              </View>
+            ))}
+            {match.draws ? (
+              <Text size="xs" text={drawsLabel(match.draws)} style={themed($dialogText)} />
+            ) : null}
+          </View>
+          <Button
+            testID="end-match-button"
+            text="End match"
+            disabled={match.gameNumber === 1 || hasLocalGameStarted(runtime.game)}
+            accessibilityHint="Ends the match after its last finished game"
+            style={themed($menuItem)}
+            onPress={openEndMatch}
+          />
+          <Button text="Close" style={themed($menuItem)} onPress={() => setMatchOpen(false)} />
+        </DialogCard>
+      ) : null}
+
+      {matchPrompt?.match ? (
+        <DialogCard
+          visible
+          onClose={() => setMatchPrompt(undefined)}
+          backdropTestID="match-prompt-backdrop"
+          backdropAccessibilityLabel="Continue to the next game"
+          dialogTestID="match-prompt-dialog"
+          dialogAccessibilityRole="alert"
+        >
+          <Text text={`Game ${matchPrompt.match.gameNumber} saved`} preset="subheading" />
+          <Text
+            text={matchPrompt.players
+              .map((player, seat) => `${player.name} ${matchScoreAfter(matchPrompt).wins[seat]}`)
+              .join(" · ")}
+            style={themed($dialogText)}
+          />
+          {matchScoreAfter(matchPrompt).draws ? (
+            <Text
+              size="xs"
+              text={drawsLabel(matchScoreAfter(matchPrompt).draws)}
+              style={themed($dialogText)}
+            />
+          ) : null}
+          <View style={themed($dialogActions)}>
+            <Button
+              testID="match-prompt-end-button"
+              text="End match"
+              style={themed($dialogButton)}
+              onPress={() => {
+                setMatchEnding(matchPrompt)
+                setMatchPrompt(undefined)
+              }}
+            />
+            <Button
+              testID="next-game-button"
+              text="Next game"
+              preset="reversed"
+              style={themed($dialogButton)}
+              onPress={() => setMatchPrompt(undefined)}
+            />
+          </View>
+        </DialogCard>
+      ) : null}
+
+      {matchEnding ? (
+        <LocalMatchEndDialog
+          game={matchEnding}
+          onClose={() => setMatchEnding(undefined)}
+          onEnd={confirmEndMatch}
+        />
+      ) : null}
+
+      {saved ? (
         <GameSavedToast
-          key={savedGameId}
-          onViewSummary={() => onViewSummary(savedGameId)}
+          key={saved.gameId}
+          message={saved.message}
+          onViewSummary={() => onViewSummary(saved.gameId)}
           onDismiss={dismissSavedToast}
         />
       ) : null}
@@ -340,3 +495,28 @@ const $screen: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $menuItem: ThemedStyle<ViewStyle> = () => ({ minHeight: 48 })
+const $matchLayer: ThemedStyle<ViewStyle> = () => ({
+  position: "absolute",
+  left: 0,
+  right: 0,
+  zIndex: 60,
+  elevation: 60,
+  alignItems: "center",
+})
+const $matchContext: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
+  minHeight: 24,
+  justifyContent: "center",
+  paddingHorizontal: spacing.sm,
+  borderRadius: 4,
+  backgroundColor: colors.surface,
+  borderWidth: 1,
+  borderColor: colors.separator,
+})
+const $matchContextText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
+const $matchScore: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
+const $matchScoreRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  justifyContent: "space-between",
+  gap: spacing.sm,
+})
+const $matchScoreName: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })

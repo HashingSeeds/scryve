@@ -11,16 +11,18 @@ import type { ThemedStyle } from "@/theme/types"
 const VISIBLE_MS = 6_000
 
 export function GameSavedToast({
+  message = "Game saved",
   onViewSummary,
   onDismiss,
 }: {
+  message?: string
   onViewSummary: () => void
   onDismiss: () => void
 }) {
   const { themed, theme } = useAppTheme()
   const insets = useSafeAreaInsets()
   useEffect(() => {
-    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility("Game saved")
+    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(message)
     let active = true
     let timeout: ReturnType<typeof setTimeout> | undefined
     const schedule = (ms: number) => {
@@ -36,12 +38,12 @@ export function GameSavedToast({
       active = false
       clearTimeout(timeout)
     }
-  }, [onDismiss])
+  }, [message, onDismiss])
 
   return (
     <View pointerEvents="box-none" style={[themed($layer), { top: insets.top + theme.spacing.md }]}>
       <View testID="game-saved-toast" accessibilityLiveRegion="polite" style={themed($toast)}>
-        <Text size="xs" weight="medium" text="Game saved" style={themed($message)} />
+        <Text size="xs" weight="medium" text={message} style={themed($message)} />
         <Button
           testID="game-saved-summary-button"
           text="Summary"

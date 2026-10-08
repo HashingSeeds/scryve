@@ -1100,4 +1100,29 @@ describe("NewGameScreen", () => {
       meSeat: 0,
     })
   })
+
+  it("starts a single game unless match mode is on, defaulting the best of by format", () => {
+    const onStartLocal = jest.fn()
+    setup({ onStartLocal })
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal.mock.calls[0][2].match).toBeUndefined()
+
+    fireEvent.press(screen.getByTestId("match-mode-on"))
+    expect(screen.getByTestId("match-best-of-3").props.accessibilityState.selected).toBe(true)
+    fireEvent.press(screen.getByTestId("match-best-of-5"))
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal.mock.calls[1][2]).toMatchObject({ match: { bestOf: 5 } })
+
+    fireEvent.press(screen.getByTestId("match-mode-off"))
+    fireEvent.press(screen.getByTestId("play-system-mtg"))
+    fireEvent.press(screen.getByTestId("play-format"))
+    fireEvent.press(screen.getByTestId("play-format-option-commander"))
+    fireEvent.press(screen.getByTestId("match-mode-on"))
+    expect(screen.getByTestId("match-best-of-1").props.accessibilityState.selected).toBe(true)
+  })
+
+  it("keeps match mode off the form while a game is running", () => {
+    setup({ localGame: runningLocalGame() })
+    expect(screen.queryByTestId("match-mode")).toBeNull()
+  })
 })

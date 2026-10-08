@@ -2,7 +2,7 @@ import type { FunctionArgs } from "convex/server"
 import { convexTest, type TestConvex } from "convex-test"
 
 import { api, internal } from "./_generated/api"
-import type { Id } from "./_generated/dataModel"
+import type { Doc, Id } from "./_generated/dataModel"
 import schema from "./schema"
 
 const modules = {
@@ -76,7 +76,10 @@ function finish(
 
 async function rows(t: TestConvex<typeof schema>) {
   return await t.run(async (ctx) => ({
-    matches: await ctx.db.query("matches").collect(),
+    matches: (await ctx.db.query("matches").collect()).filter(
+      (match): match is Extract<Doc<"matches">, { source: "connected" }> =>
+        match.source === "connected",
+    ),
     games: await ctx.db.query("games").collect(),
     summaries: await ctx.db.query("gameSummaries").collect(),
     history: await ctx.db.query("gameHistoryEntries").collect(),
@@ -321,9 +324,10 @@ describe("account deletion", () => {
         .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", "bob"))
         .unique())!
       const match = (await ctx.db.query("matches").first())!
+      const game = (await ctx.db.query("games").first())!
       const seat = (await ctx.db
         .query("gamePlayers")
-        .withIndex("by_game_seat", (q) => q.eq("gameId", match.gameIds[0]).eq("seat", 2))
+        .withIndex("by_game_seat", (q) => q.eq("gameId", game._id).eq("seat", 2))
         .unique())!
       await ctx.db.patch(seat._id, { userId: user._id })
       await ctx.db.patch(match._id, {

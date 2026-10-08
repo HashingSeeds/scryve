@@ -16,12 +16,15 @@ import type { ThemedStyle } from "@/theme/types"
 export function LocalGameEndDialog({
   game,
   origin,
+  singleWinner = false,
   onClose,
   onEnd,
   onAbandon,
 }: {
   game: LocalGame
   origin?: DialogOrigin
+  /** why: a match counts one win per game, so its games cannot share a winner. */
+  singleWinner?: boolean
   onClose: () => void
   onEnd: (result: LocalGameResult) => void
   onAbandon?: () => void
@@ -46,7 +49,11 @@ export function LocalGameEndDialog({
   function toggleWinner(playerId: PlayerId) {
     setDrawSelected(false)
     setWinnerPlayerIds((current) =>
-      current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId],
+      current.includes(playerId)
+        ? current.filter((id) => id !== playerId)
+        : singleWinner
+          ? [playerId]
+          : [...current, playerId],
     )
   }
   function selectDraw() {

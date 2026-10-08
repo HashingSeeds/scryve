@@ -2,7 +2,10 @@ import { useEffect, useState } from "react"
 import { useMutation } from "convex/react"
 import { ConvexError } from "convex/values"
 
-import { buildFinishedLocalGameSnapshot } from "@/features/connected/localGameSnapshot"
+import {
+  buildFinishedLocalGameSnapshot,
+  buildMatchFinishSnapshot,
+} from "@/features/connected/localGameSnapshot"
 import {
   ConnectedProfileProvider,
   useConnectedProfile,
@@ -42,6 +45,7 @@ function ActivePublish({
   const ready = profile.status === "ready" && profile.profile.userId === ownerId
   const online = useConvexOnline()
   const publish = useMutation(api.games.publishFinishedLocalGame)
+  const finishMatch = useMutation(api.matches.finishScryveMatch)
   const [finishCount, setFinishCount] = useState(0)
 
   useEffect(
@@ -79,11 +83,21 @@ function ActivePublish({
           repository.markPublishFailed(game.id)
         }
       }
+      // why: a match result is only sent once its games are acked, so the server can count them.
+      for (const game of repository.pendingMatchFinishes(ownerId)) {
+        if (cancelled) return
+        try {
+          await finishMatch(buildMatchFinishSnapshot(game))
+        } catch {
+          return
+        }
+        repository.markMatchPublished(game.id)
+      }
     })()
     return () => {
       cancelled = true
     }
-  }, [finishCount, online, ownerId, publish, ready, repository])
+  }, [finishCount, finishMatch, online, ownerId, publish, ready, repository])
 
   return null
 }
