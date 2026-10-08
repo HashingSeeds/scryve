@@ -58,3 +58,21 @@ jobs:
           export RELEASE_NOTES
           eas update --channel beta --environment production --non-interactive \
             --message "$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)"
+
+      # why: `eas update` leaves the Hermes bundles and source maps in dist/. Sentry matches them to
+      # crashes by the debug ID Metro injects (getSentryExpoConfig), not by release name, so the
+      # same upload also symbolicates production once promote republishes this update group.
+      - name: Upload source maps to Sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # why: the script only reads org/project from a `@sentry/react-native/expo` plugin entry;
+          # app.json registers `@sentry/react-native`, so pass them explicitly.
+          SENTRY_ORG: matthew-chisolm
+          SENTRY_PROJECT: scryve
+          SENTRY_URL: https://sentry.io/
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::warning::SENTRY_AUTH_TOKEN is not set; skipping source map upload."
+            exit 0
+          fi
+          pnpm exec sentry-expo-upload-sourcemaps dist
