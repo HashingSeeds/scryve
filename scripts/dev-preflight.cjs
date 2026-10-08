@@ -9,8 +9,8 @@ const { setTimeout } = require("node:timers")
 const DEFAULT_METRO_PORT = 8081
 const LAST_METRO_PORT = 8099
 const STOP_WAIT_MS = 3000
-const LOCK_WAIT_MS = 15_000
-const ORPHAN_LOCK_MS = 5000
+const LOCK_PORT = 18080
+const LOCK_WAIT_MS = 2000
 
 const stateDir = path.join(
   process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"),
@@ -205,35 +205,43 @@ async function stopProcesses(procs, info = processInfo) {
   for (const proc of signaled) signalIfSame(proc, "SIGKILL")
 }
 
-/** why: two starts must not both see a free port or an unclaimed deployment, so scan, pick, and record happen under one O_EXCL lock. A holder that died leaves its pid behind, and a lock with no pid is the crash window between create and write. */
-async function withLock(dir, fn, waitMs = LOCK_WAIT_MS) {
-  fs.mkdirSync(dir, { recursive: true })
-  const lock = path.join(dir, "lock")
+/** why: two starts must not both see a free port or an unclaimed deployment. Binding a loopback port is atomic and the kernel frees it when the holder dies, so there is no stale lock to recover. */
+async function withLock(fn, { port = LOCK_PORT, waitMs = LOCK_WAIT_MS } = {}) {
   const deadline = Date.now() + waitMs
-  for (;;) {
-    try {
-      fs.writeFileSync(lock, String(process.pid), { flag: "wx" })
-      break
-    } catch (error) {
-      if (error.code !== "EEXIST") throw error
-    }
-    const content = readFile(lock)?.toString()
-    const holder = Number(content)
-    const orphaned = holder
-      ? !isAlive(holder)
-      : Date.now() - (fs.statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? 0) > ORPHAN_LOCK_MS
-    if (orphaned && readFile(lock)?.toString() === content) {
-      fs.rmSync(lock, { force: true })
-      continue
-    }
-    if (Date.now() > deadline) throw new Error(`Another pnpm start holds ${lock} (pid ${holder})`)
+  let server = await listen(port)
+  while (!server) {
+    if (Date.now() > deadline)
+      throw new Error(
+        `127.0.0.1:${port} stayed busy for ${waitMs / 1000} s. Another pnpm start may be stuck, or something else uses that port.`,
+      )
     await sleep(25)
+    server = await listen(port)
   }
   try {
     return await fn()
   } finally {
-    fs.rmSync(lock, { force: true })
+    await new Promise((resolve) => server.close(resolve))
   }
+}
+
+function listen(port) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer()
+    server.once("error", (error) => (error.code === "EADDRINUSE" ? resolve(null) : reject(error)))
+    server.listen({ port, host: "127.0.0.1", exclusive: true }, () => resolve(server))
+  })
+}
+
+/** why: a starter that is still alive may not have spawned Metro or convex dev yet, so its record is the only sign that this worktree is taken. */
+async function planStart({ records, processes, worktree, deployment, isFree }) {
+  const running = records.find((record) => record.worktree === worktree)
+  if (running)
+    throw new Error(
+      `pnpm start is already running in this worktree (pid ${running.pid}); stop it first`,
+    )
+  const owner = convexOwner(processes, records, worktree, deployment)
+  const port = await pickPort(isFree, new Set(records.map((record) => record.port)))
+  return { owner, port }
 }
 
 const recordFile = (worktree) =>
@@ -243,12 +251,12 @@ const recordFile = (worktree) =>
   )
 
 /** why: a crashed run leaves its record behind, so records whose pid is gone or now names another process are pruned instead of holding a port or deployment forever. */
-function liveRecords() {
-  const names = fs.existsSync(stateDir) ? fs.readdirSync(stateDir) : []
+function liveRecords(dir = stateDir) {
+  const names = fs.existsSync(dir) ? fs.readdirSync(dir) : []
   return names
     .filter((name) => name.endsWith(".json"))
     .flatMap((name) => {
-      const file = path.join(stateDir, name)
+      const file = path.join(dir, name)
       try {
         const record = JSON.parse(fs.readFileSync(file, "utf8"))
         if (processInfo(record.pid)?.identity === record.identity) return [record]
@@ -286,11 +294,11 @@ module.exports = {
   needsInstall,
   parseEnv,
   pickPort,
+  planStart,
   processInfo,
   readFile,
   removeRecord,
   scanDevProcesses,
-  stateDir,
   stopProcesses,
   withLock,
   writeRecord,

@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict")
 const { Buffer } = require("node:buffer")
-const { spawn, spawnSync } = require("node:child_process")
+const { spawn } = require("node:child_process")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
@@ -13,7 +13,9 @@ const {
   devProcesses,
   needsInstall,
   parseEnv,
+  liveRecords,
   pickPort,
+  planStart,
   processInfo,
   stopProcesses,
   withLock,
@@ -79,38 +81,68 @@ test("a record claims the deployment before its convex dev process exists", () =
   assert.equal(convexOwner([], [{ ...claim, convex: false }], "/w/b", "dev-otter"), undefined)
 })
 
+const lockPort = 18_500 + (process.pid % 400)
+
 test("the lock lets one start in at a time", async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-dev-lock-"))
-  try {
-    let inside = 0
-    let overlapped = false
-    const hold = () =>
-      withLock(dir, async () => {
+  let inside = 0
+  let overlapped = false
+  const hold = () =>
+    withLock(
+      async () => {
         inside++
         overlapped ||= inside > 1
         await setTimeout(50)
         inside--
-      })
-    await Promise.all([hold(), hold()])
-    assert.equal(overlapped, false)
-    assert.equal(fs.existsSync(path.join(dir, "lock")), false)
+      },
+      { port: lockPort },
+    )
+  await Promise.all([hold(), hold(), hold()])
+  assert.equal(overlapped, false)
+})
+
+test("a killed lock holder frees the lock", async () => {
+  const holder = spawn(process.execPath, [
+    "-e",
+    `require("node:net").createServer().listen(${lockPort}, "127.0.0.1", () => console.log("held"))`,
+  ])
+  try {
+    await new Promise((resolve) => holder.stdout.once("data", resolve))
+    await assert.rejects(
+      withLock(async () => "acquired", { port: lockPort, waitMs: 100 }),
+      /stayed busy/,
+    )
+    holder.kill("SIGKILL")
+    assert.equal(await withLock(async () => "acquired", { port: lockPort }), "acquired")
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+    holder.kill("SIGKILL")
   }
 })
 
-test("a lock left by a dead start is taken over", async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-dev-lock-"))
-  try {
-    const deadPid = spawnSync(process.execPath, ["-e", ""]).pid
-    fs.writeFileSync(path.join(dir, "lock"), String(deadPid))
-    assert.equal(await withLock(dir, async () => "acquired", 200), "acquired")
+test("a second start in the same worktree is refused while the first is alive", async () => {
+  const first = { worktree: "/w/a", pid: 7, port: 8081, deployment: "dev-otter", convex: true }
+  const plan = { processes: [], deployment: "dev-otter", isFree: async () => true }
+  await assert.rejects(
+    planStart({ ...plan, records: [first], worktree: "/w/a" }),
+    /already running in this worktree \(pid 7\)/,
+  )
+  assert.deepEqual(await planStart({ ...plan, records: [first], worktree: "/w/b" }), {
+    owner: { cwd: "/w/a", pid: 7, deployment: "dev-otter" },
+    port: 8082,
+  })
+})
 
-    fs.writeFileSync(path.join(dir, "lock"), String(process.pid))
-    await assert.rejects(
-      withLock(dir, async () => "acquired", 100),
-      /Another pnpm start holds/,
+test("records survive only while their pid still names the starter that wrote them", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-dev-records-"))
+  try {
+    const { identity } = processInfo(process.pid)
+    const record = { worktree: "/w/a", pid: process.pid, port: 8081 }
+    fs.writeFileSync(path.join(dir, "live.json"), JSON.stringify({ ...record, identity }))
+    fs.writeFileSync(path.join(dir, "reused.json"), JSON.stringify({ ...record, identity: "x" }))
+    assert.deepEqual(
+      liveRecords(dir).map((kept) => kept.identity),
+      [identity],
     )
+    assert.deepEqual(fs.readdirSync(dir), ["live.json"])
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }

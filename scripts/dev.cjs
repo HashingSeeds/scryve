@@ -12,17 +12,15 @@ const { clearTimeout, setTimeout } = require("node:timers")
 const {
   DEFAULT_METRO_PORT,
   convexEnv,
-  convexOwner,
   devDeployment,
   expoEnv,
   isPortFree,
   liveRecords,
   needsInstall,
-  pickPort,
+  planStart,
   readFile,
   removeRecord,
   scanDevProcesses,
-  stateDir,
   stopProcesses,
   withLock,
   writeRecord,
@@ -48,18 +46,34 @@ async function preflight() {
     process.exit(1)
   }
 
-  const { port, owner } = await withLock(stateDir, async () => {
-    const processes = scanDevProcesses()
-    const stale = processes.filter((proc) => proc.cwd === root)
-    if (stale.length > 0) {
-      say(`Stopping stale ${stale.map((proc) => `${proc.kind} (pid ${proc.pid})`).join(", ")}`)
-      await stopProcesses(stale)
-    }
-    const records = liveRecords().filter((record) => record.worktree !== root)
-    const owner = convexOwner(processes, records, root, target.deployment)
-    const port = await pickPort(isPortFree, new Set(records.map((record) => record.port)))
-    writeRecord({ worktree: root, port, deployment: target.deployment, convex: !owner })
-    return { port, owner }
+  const processes = scanDevProcesses()
+  const running = liveRecords().find((record) => record.worktree === root)
+  if (running) {
+    say(`pnpm start is already running in this worktree (pid ${running.pid}); stop it first`)
+    process.exit(1)
+  }
+  const stale = processes.filter((proc) => proc.cwd === root)
+  if (stale.length > 0) {
+    say(`Stopping stale ${stale.map((proc) => `${proc.kind} (pid ${proc.pid})`).join(", ")}`)
+    await stopProcesses(stale)
+  }
+
+  // why: the lock is held only for the record check, port pick, and record write, so a 3 s stale stop never makes another start wait.
+  const { port, owner } = await withLock(async () => {
+    const plan = await planStart({
+      records: liveRecords(),
+      processes,
+      worktree: root,
+      deployment: target.deployment,
+      isFree: isPortFree,
+    })
+    writeRecord({
+      worktree: root,
+      port: plan.port,
+      deployment: target.deployment,
+      convex: !plan.owner,
+    })
+    return plan
   })
   process.on("exit", () => removeRecord(root))
 
