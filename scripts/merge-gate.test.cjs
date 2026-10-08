@@ -12,31 +12,68 @@ const checkRun = (name, status, conclusion, { required = false, workflow = "chec
   checkSuite: { workflowRun: workflow ? { workflow: { name: workflow } } : null },
 })
 
-function graphql({ body = "", reviews = [], threads = [], comments = [], contexts = [] } = {}) {
-  const nodes = (items) => ({ nodes: items })
-  return {
+const completedRun = (name, conclusion = "success") => ({
+  name,
+  event: "pull_request",
+  status: "completed",
+  conclusion,
+})
+
+function pullRequest({
+  body = "",
+  reviews = [],
+  threads = [],
+  comments = [],
+  contexts = [checkRun("checks", "COMPLETED", "SUCCESS")],
+  more = {},
+  files = [],
+  runs = [completedRun("checks")],
+} = {}) {
+  const connection = (items, key) => ({
+    nodes: items,
+    pageInfo: { hasNextPage: more[key] === true, hasPreviousPage: more[key] === true },
+  })
+  const graphql = {
     data: {
       repository: {
         pullRequest: {
           headRefOid: "abcdef1234567890",
           body,
-          reviews: nodes(reviews.map(([login, state]) => ({ author: { login }, state }))),
-          reviewThreads: nodes(
+          reviews: connection(
+            reviews.map(([login, state]) => ({ author: { login }, state })),
+            "reviews",
+          ),
+          reviewThreads: connection(
             threads.map(([login, isResolved]) => ({
               isResolved,
-              comments: nodes([{ author: { login } }]),
+              comments: { nodes: [{ author: { login } }] },
             })),
+            "threads",
           ),
-          comments: nodes(comments.map(([login, text]) => ({ author: { login }, body: text }))),
-          commits: nodes([{ commit: { statusCheckRollup: { contexts: nodes(contexts) } } }]),
+          comments: connection(
+            comments.map(([login, text]) => ({ author: { login }, body: text })),
+            "comments",
+          ),
+          commits: {
+            nodes: [
+              { commit: { statusCheckRollup: { contexts: connection(contexts, "checks") } } },
+            ],
+          },
         },
       },
     },
   }
+  const restFiles = files.map((file) =>
+    typeof file === "string"
+      ? { filename: file }
+      : { filename: file[1], previous_filename: file[0] },
+  )
+  return toPullRequest(graphql, restFiles, runs)
 }
 
-const gate = (gates, name) => gates.find((candidate) => candidate.name === name)
-const passingChecks = [checkRun("checks", "COMPLETED", "SUCCESS")]
+const gates = (options) => evaluateGates(pullRequest(options))
+const gate = (options, name) => gates(options).find((candidate) => candidate.name === name)
+const ready = (options) => gates(options).every((candidate) => candidate.ok)
 
 test("required checks win over the rest, and the gate ignores its own run", () => {
   const contexts = [
@@ -44,8 +81,7 @@ test("required checks win over the rest, and the gate ignores its own run", () =
     checkRun("export", "COMPLETED", "FAILURE"),
     checkRun("comment", "IN_PROGRESS", null, { workflow: "merge gate" }),
   ]
-  const gates = evaluateGates(toPullRequest(graphql({ contexts }), []))
-  assert.deepEqual(gate(gates, "Required checks"), {
+  assert.deepEqual(gate({ contexts }, "Required checks"), {
     name: "Required checks",
     ok: true,
     detail: "1 passed",
@@ -53,21 +89,31 @@ test("required checks win over the rest, and the gate ignores its own run", () =
 
   const unrequired = contexts.map((context) => ({ ...context, isRequired: false }))
   unrequired.push({ __typename: "StatusContext", context: "CodeRabbit", state: "PENDING" })
-  assert.deepEqual(
-    gate(evaluateGates(toPullRequest(graphql({ contexts: unrequired }), [])), "Checks"),
-    {
-      name: "Checks",
-      ok: false,
-      detail: "failing: export; pending: CodeRabbit",
-    },
+  assert.deepEqual(gate({ contexts: unrequired }, "Checks"), {
+    name: "Checks",
+    ok: false,
+    detail: "failing: export; pending: CodeRabbit",
+  })
+})
+
+test("a green status is not ready while an expected workflow has not reported", () => {
+  const contexts = [{ __typename: "StatusContext", context: "Cloudflare Pages", state: "SUCCESS" }]
+  assert.equal(ready({ contexts, runs: [] }), false)
+  assert.deepEqual(gate({ contexts, runs: [] }, "Workflows"), {
+    name: "Workflows",
+    ok: false,
+    detail: "checks has not started",
+  })
+  const queued = { ...completedRun("checks"), status: "queued", conclusion: null }
+  assert.equal(gate({ contexts, runs: [queued] }, "Workflows").detail, "checks is queued")
+  assert.equal(
+    gate({ files: ["app.json"], runs: [completedRun("checks")] }, "Workflows").detail,
+    "native fingerprints has not started",
   )
 })
 
 test("a bot's requested changes stand until it approves, and its open threads block", () => {
-  const pr = (reviews, threads = []) =>
-    toPullRequest(graphql({ reviews, threads, contexts: passingChecks }), [])
-  const coderabbit = (reviews, threads) => gate(evaluateGates(pr(reviews, threads)), "CodeRabbit")
-
+  const coderabbit = (reviews, threads) => gate({ reviews, threads }, "CodeRabbit")
   assert.equal(
     coderabbit([
       ["coderabbitai", "CHANGES_REQUESTED"],
@@ -89,42 +135,69 @@ test("a bot's requested changes stand until it approves, and its open threads bl
     ),
     { name: "CodeRabbit", ok: false, detail: "1 unresolved thread" },
   )
-  assert.equal(gate(evaluateGates(pr([])), "Codex").detail, "no review")
+  assert.equal(gate({}, "Codex").detail, "no review")
 })
 
-test("convex changes and pending native builds need Matthew", () => {
-  const fingerprintComment = [
+test("more threads than one page cannot be verified, so the gate blocks", () => {
+  const threads = Array.from({ length: 100 }, () => ["chatgpt-codex-connector", true])
+  assert.equal(ready({ threads }), true)
+  assert.equal(ready({ threads, more: { threads: true } }), false)
+  assert.deepEqual(gate({ threads, more: { threads: true, comments: true } }, "Completeness"), {
+    name: "Completeness",
+    ok: false,
+    detail: "too many review threads, comments to verify",
+  })
+})
+
+test("convex changes need Matthew, including files renamed out of convex/", () => {
+  assert.equal(
+    gate({ files: ["convex/schema.ts", "convex/decks.ts"] }, "Convex").detail,
+    "2 files in convex/, needs Matthew",
+  )
+  assert.equal(gate({ files: [["convex/decks.ts", "src/decks.ts"]] }, "Convex").ok, false)
+})
+
+test("native input changes need a passing fingerprint check with no build pending", () => {
+  const runs = [completedRun("checks"), completedRun("native fingerprints", "skipped")]
+  const fingerprint = (options) =>
+    gate({ files: ["package.json"], runs, ...options }, "Native fingerprint")
+  const contexts = (conclusion) => [
+    checkRun("checks", "COMPLETED", "SUCCESS"),
+    checkRun("check", "COMPLETED", conclusion, { workflow: "native fingerprints" }),
+  ]
+
+  assert.equal(ready({ files: ["package.json"], runs }), false)
+  assert.deepEqual(fingerprint({}), {
+    name: "Native fingerprint",
+    ok: false,
+    detail: "native inputs changed, fingerprint check missing",
+  })
+  assert.equal(
+    fingerprint({ contexts: contexts("SKIPPED") }).detail,
+    "native inputs changed, fingerprint check skip",
+  )
+  assert.equal(fingerprint({ contexts: contexts("SUCCESS") }).detail, "no native build needed")
+
+  const buildComment = [
     "<!-- native-fingerprint-check -->",
     "| Environment | Platform | Fingerprint difference |",
     "| --- | --- | --- |",
     "| Production | iOS | `aaaa` → `bbbb` |",
   ].join("\n")
-  const gates = evaluateGates(
-    toPullRequest(
-      graphql({
-        contexts: passingChecks,
-        comments: [
-          ["github-actions", fingerprintComment],
-          ["mchisolm0", "<!-- native-fingerprint-check -->\n| Preview | Android |"],
-        ],
-      }),
-      ["convex/schema.ts", "convex/decks.ts", "app.json"],
-    ),
+  assert.equal(
+    fingerprint({
+      contexts: contexts("SUCCESS"),
+      comments: [
+        ["github-actions", buildComment],
+        ["mchisolm0", "<!-- native-fingerprint-check -->\n| Preview | Android |"],
+      ],
+    }).detail,
+    "native build needed: Production iOS",
   )
-  assert.equal(gate(gates, "Convex").detail, "2 files in convex/, needs Matthew")
-  assert.deepEqual(gate(gates, "Native fingerprint"), {
-    name: "Native fingerprint",
-    ok: false,
-    detail: "native build needed: Production iOS",
-  })
 })
 
 test("app changes need uploaded media or perf numbers, not badge images", () => {
-  const evidence = (body, files) =>
-    gate(
-      evaluateGates(toPullRequest(graphql({ body, contexts: passingChecks }), files)),
-      "Evidence",
-    )
+  const evidence = (body, files) => gate({ body, files }, "Evidence")
   const badge = '<img alt="View with [code]smith" src="https://example.com/badge.svg">'
 
   assert.equal(evidence(badge, ["src/app/index.tsx"]).ok, false)

@@ -18,14 +18,41 @@ on:
 permissions: {}
 
 jobs:
-  comment:
+  find:
     # Review events on fork PRs get a read-only token, so those refresh on the other triggers.
     if: >-
       github.event_name == 'pull_request_target' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
       github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      number: ${{ steps.pr.outputs.number }}
+    steps:
+      # workflow_run lists no pull requests for forks, so look the head commit up instead.
+      - name: Find pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ -z "$NUMBER" ]; then
+            NUMBER=$(gh pr list --state open --search "$HEAD_SHA" --json number --jq '.[0].number // empty')
+          fi
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+
+  # One group per pull request, so the newest event wins. The script also skips the write
+  # when the head moved while it ran.
+  comment:
+    needs: find
+    if: needs.find.outputs.number != ''
     concurrency:
-      group: merge-gate-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
+      group: merge-gate-${{ needs.find.outputs.number }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -35,9 +62,6 @@ jobs:
       contents: read
       pull-requests: write
       statuses: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
     steps:
       - name: Check out main
         uses: actions/checkout@v4
@@ -45,20 +69,9 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      # workflow_run lists no pull requests for forks, so look the head commit up instead.
-      - name: Find pull request
-        id: pr
-        env:
-          NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          if [ -z "$NUMBER" ]; then
-            NUMBER=$(gh pr list --state open --search "$HEAD_SHA" --json number --jq '.[0].number // empty')
-          fi
-          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
-
       - name: Update merge gate comment
-        if: steps.pr.outputs.number != ''
         env:
-          NUMBER: ${{ steps.pr.outputs.number }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ needs.find.outputs.number }}
         run: node scripts/merge-gate.cjs "$NUMBER" --comment

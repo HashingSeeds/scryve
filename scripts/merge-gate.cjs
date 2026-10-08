@@ -3,6 +3,10 @@ const { spawnSync } = require("node:child_process")
 const MARKER = "<!-- merge-gate -->"
 const FINGERPRINT_MARKER = "<!-- native-fingerprint-check -->"
 const SELF_WORKFLOW = "merge gate"
+const FINGERPRINT_WORKFLOW = "native fingerprints"
+// why: mirrors the paths: trigger of fingerprints.yml, so keep the two in sync.
+const NATIVE_INPUT =
+  /^(?:package\.json|pnpm-lock\.yaml|app\.json|app\.config\.ts|eas\.json|(?:patches|assets|modules)\/)/
 const REVIEWERS = {
   CodeRabbit: "coderabbitai",
   Codex: "chatgpt-codex-connector",
@@ -15,16 +19,24 @@ query($owner: String!, $name: String!, $number: Int!) {
     pullRequest(number: $number) {
       headRefOid
       body
-      reviews(last: 100) { nodes { author { login } state } }
+      reviews(last: 100) {
+        pageInfo { hasPreviousPage }
+        nodes { author { login } state }
+      }
       reviewThreads(first: 100) {
+        pageInfo { hasNextPage }
         nodes { isResolved comments(first: 1) { nodes { author { login } } } }
       }
-      comments(last: 100) { nodes { author { login } body } }
+      comments(last: 100) {
+        pageInfo { hasPreviousPage }
+        nodes { author { login } body }
+      }
       commits(last: 1) {
         nodes {
           commit {
             statusCheckRollup {
               contexts(first: 100) {
+                pageInfo { hasNextPage }
                 nodes {
                   __typename
                   ... on CheckRun {
@@ -62,13 +74,25 @@ function statusContextState({ state }) {
   return "fail"
 }
 
-function toPullRequest(graphql, files) {
+function toPullRequest(graphql, restFiles, workflowRuns) {
   const pr = graphql.data.repository.pullRequest
-  const contexts = pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []
+  const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup
+  const contexts = rollup?.contexts.nodes ?? []
+  const pages = {
+    "reviews": pr.reviews.pageInfo.hasPreviousPage,
+    "review threads": pr.reviewThreads.pageInfo.hasNextPage,
+    "comments": pr.comments.pageInfo.hasPreviousPage,
+    "checks": rollup?.contexts.pageInfo.hasNextPage ?? false,
+  }
   return {
     headSha: pr.headRefOid,
     body: pr.body ?? "",
-    files,
+    truncated: Object.keys(pages).filter((key) => pages[key]),
+    // why: a rename lists its old path only as previous_filename, and moving a file out of convex/ still changes convex/.
+    files: restFiles.flatMap((file) => [file.filename, file.previous_filename ?? []].flat()),
+    workflowRuns: workflowRuns
+      .filter((run) => run.event === "pull_request")
+      .map(({ name, status }) => ({ name, status })),
     reviews: pr.reviews.nodes.map((review) => ({
       author: review.author?.login,
       state: review.state,
@@ -100,6 +124,27 @@ function toPullRequest(graphql, files) {
 }
 
 const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`
+const changesNativeInputs = (files) => files.some((file) => NATIVE_INPUT.test(file))
+
+/** why: GraphQL pages cap at 100, and an unread page could hide an unresolved thread or failing check. */
+function completenessGate(truncated) {
+  return truncated.length > 0
+    ? { name: "Completeness", ok: false, detail: `too many ${truncated.join(", ")} to verify` }
+    : { name: "Completeness", ok: true, detail: "read every review, thread, comment, and check" }
+}
+
+/** why: a workflow queued before its first job has no check runs yet, so the rollup alone can look green. */
+function workflowsGate({ workflowRuns, files }) {
+  const expected = ["checks", ...(changesNativeInputs(files) ? [FINGERPRINT_WORKFLOW] : [])]
+  const problems = expected.flatMap((name) => {
+    const newest = workflowRuns.find((run) => run.name === name)
+    if (!newest) return [`${name} has not started`]
+    return newest.status === "completed" ? [] : [`${name} is ${newest.status.replace(/_/g, " ")}`]
+  })
+  return problems.length > 0
+    ? { name: "Workflows", ok: false, detail: problems.join("; ") }
+    : { name: "Workflows", ok: true, detail: `${expected.join(", ")} completed` }
+}
 
 function checksGate(checks) {
   const others = checks.filter((check) => check.workflow !== SELF_WORKFLOW)
@@ -151,18 +196,27 @@ function convexGate(files) {
     : { name: "Convex", ok: true, detail: "no convex/ changes" }
 }
 
-/** why: fingerprints.yml keeps its comment only while some target needs a new native build. */
-function fingerprintGate({ checks, comments }) {
+/**
+ * why: fingerprints.yml keeps its comment only while some target needs a new native build, and
+ * it skips fork and outside-author PRs, so only a passing run proves no build is needed.
+ */
+function fingerprintGate({ checks, comments, files }) {
   const name = "Native fingerprint"
-  const check = checks.find((candidate) => candidate.workflow === "native fingerprints")
-  if (check?.state === "pending") return { name, ok: false, detail: "fingerprint check running" }
-  if (check?.state === "fail") return { name, ok: false, detail: "fingerprint check failed" }
   const comment = comments.find(
     (candidate) =>
       candidate.author === "github-actions" && candidate.body.includes(FINGERPRINT_MARKER),
   )
-  if (!comment)
-    return { name, ok: true, detail: check ? "no native build needed" : "no native inputs changed" }
+  if (!comment) {
+    if (!changesNativeInputs(files)) return { name, ok: true, detail: "no native inputs changed" }
+    const check = checks.find((candidate) => candidate.workflow === FINGERPRINT_WORKFLOW)
+    return check?.state === "pass"
+      ? { name, ok: true, detail: "no native build needed" }
+      : {
+          name,
+          ok: false,
+          detail: `native inputs changed, fingerprint check ${check?.state ?? "missing"}`,
+        }
+  }
   const targets = [...comment.body.matchAll(/^\| (\w+) \| (iOS|Android) \|/gm)].map(
     ([, environment, platform]) => `${environment} ${platform}`,
   )
@@ -192,6 +246,8 @@ function evidenceGate({ body, files }) {
 
 function evaluateGates(pr) {
   return [
+    completenessGate(pr.truncated),
+    workflowsGate(pr),
     checksGate(pr.checks),
     ...Object.entries(REVIEWERS).map(([name, login]) => reviewerGate(name, login, pr)),
     convexGate(pr.files),
@@ -239,20 +295,30 @@ function fetchPullRequest(number) {
       `query=${QUERY}`,
     ]),
   )
-  const files = gh([
-    "api",
-    `repos/{owner}/{repo}/pulls/${number}/files`,
-    "--paginate",
-    "--jq",
-    ".[].filename",
-  ])
-    .split("\n")
-    .filter(Boolean)
-  return toPullRequest(graphql, files)
+  const pages = (endpoint) => JSON.parse(gh(["api", endpoint, "--paginate", "--slurp"]))
+  const files = pages(`repos/{owner}/{repo}/pulls/${number}/files?per_page=100`).flat()
+  const headSha = graphql.data.repository.pullRequest.headRefOid
+  const workflowRuns = pages(
+    `repos/{owner}/{repo}/actions/runs?head_sha=${headSha}&per_page=100`,
+  ).flatMap((page) => page.workflow_runs)
+  return toPullRequest(graphql, files, workflowRuns)
 }
 
-/** why: --comment is for CI; it edits the newest bot comment, so a local run would add a second one. */
-function upsertComment(number, body) {
+/**
+ * why: --comment is for CI; it edits the newest bot comment, so a local run would add a second one.
+ * It skips the write when a push moved the head, since that push's own run will report.
+ */
+function upsertComment(number, body, headSha) {
+  const currentHead = gh([
+    "api",
+    `repos/{owner}/{repo}/pulls/${number}`,
+    "--jq",
+    ".head.sha",
+  ]).trim()
+  if (currentHead !== headSha) {
+    console.log(`Head moved to ${currentHead.slice(0, 7)}; leaving the comment to that run.`)
+    return
+  }
   const existing = gh([
     "api",
     `repos/{owner}/{repo}/issues/${number}/comments`,
@@ -280,7 +346,7 @@ function main() {
   const gates = evaluateGates(pr)
   const summary = renderSummary(gates, pr.headSha)
   console.log(summary)
-  if (flag === "--comment") upsertComment(number, summary)
+  if (flag === "--comment") upsertComment(number, summary, pr.headSha)
   else if (gates.some((gate) => !gate.ok)) process.exitCode = 1
 }
 
