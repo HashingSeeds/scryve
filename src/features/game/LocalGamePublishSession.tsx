@@ -83,15 +83,18 @@ function ActivePublish({
           repository.markPublishFailed(game.id)
         }
       }
-      // why: a match result is only sent once its games are acked, so the server can count them.
+      // why: a match result is only sent once its games are acked, so the server can count them; one with a rejected game is dropped.
+      for (const game of repository.matchFinishesWithFailedGames(ownerId))
+        repository.markMatchPublishFailed(game.id)
       for (const game of repository.pendingMatchFinishes(ownerId)) {
         if (cancelled) return
         try {
           await finishMatch(buildMatchFinishSnapshot(game))
-        } catch {
-          return
+          repository.markMatchPublished(game.id)
+        } catch (cause) {
+          if (!isPermanentRejection(cause)) return
+          repository.markMatchPublishFailed(game.id)
         }
-        repository.markMatchPublished(game.id)
       }
     })()
     return () => {

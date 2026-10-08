@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { Pressable, View } from "react-native"
+import { View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -134,8 +134,9 @@ export function CurrentGameScreen({
       return
     }
     // why: a failed rematch save throws here, and the open dialog shows the error.
-    if (canContinueMatch(ended)) {
-      runtime.nextMatchGame()
+    if (ended.match && !ended.match.result) {
+      // why: at the game cap the board waits for the match result, so Cancel cannot orphan the match.
+      if (canContinueMatch(ended)) runtime.nextMatchGame()
       setEndSource(undefined)
       setFreshBoard(true)
       setMatchPrompt(ended)
@@ -144,8 +145,7 @@ export function CurrentGameScreen({
     runtime.rematch()
     setEndSource(undefined)
     setFreshBoard(true)
-    if (ended.match && !ended.match.result) setMatchEnding(ended)
-    else setSaved({ gameId: ended.id, message: ended.match ? "Match saved" : "Game saved" })
+    setSaved({ gameId: ended.id, message: ended.match ? "Match saved" : "Game saved" })
   }
 
   function confirmEndMatch(outcomes: MatchSeatOutcome[]) {
@@ -154,6 +154,12 @@ export function CurrentGameScreen({
     setMatchEnding(undefined)
     setFreshBoard(true)
     setSaved({ gameId: ended.id, message: "Match saved" })
+  }
+
+  function cancelEndMatch() {
+    const ending = matchEnding
+    setMatchEnding(undefined)
+    if (ending && ending.status !== "active" && !canContinueMatch(ending)) setMatchPrompt(ending)
   }
 
   function openEndMatch() {
@@ -165,12 +171,23 @@ export function CurrentGameScreen({
 
   const dismissSavedToast = useCallback(() => setSaved(undefined), [])
 
+  // why: a judge-ordered restart mid-match replays the same game number; the match and its score stay.
   function abandonGame() {
+    setEndSource(undefined)
+    if (match) {
+      runtime.restartMatchGame()
+      setFreshBoard(true)
+      return
+    }
     if (!onGameAbandoned) return
     runtime.discard()
-    setEndSource(undefined)
     setTimeout(onGameAbandoned, 0)
   }
+
+  const openMatchScore = useCallback(() => {
+    setMenuOpen(false)
+    setMatchOpen(true)
+  }, [])
 
   const showEndConfirmation = useCallback(() => {
     setMenuOpen(false)
@@ -320,6 +337,15 @@ export function CurrentGameScreen({
           variant: menuButtonStyle,
           seatColors,
           exitAction,
+          ...(match
+            ? {
+                statusLine: {
+                  text: `${matchContextLabel(runtime.game)} · Best of ${match.bestOf}`,
+                  tone: "caughtUp" as const,
+                  onPress: openMatchScore,
+                },
+              }
+            : {}),
           onToggle: toggleMenu,
           onClose: closeMenu,
         }}
@@ -362,22 +388,16 @@ export function CurrentGameScreen({
       ) : null}
 
       {match && !menuOpen ? (
-        <View pointerEvents="box-none" style={[themed($matchLayer), { top: insets.top + 4 }]}>
-          <Pressable
+        // why: the standing is glanceable only; it never sits between a thumb and the life controls.
+        <View pointerEvents="none" style={[themed($matchLayer), { top: insets.top + 4 }]}>
+          <Text
             testID="match-context"
-            accessibilityRole="button"
             accessibilityLabel={`${matchContextLabel(runtime.game)}, best of ${match.bestOf}`}
-            accessibilityHint="Shows the match score"
-            style={themed($matchContext)}
-            onPress={() => setMatchOpen(true)}
-          >
-            <Text
-              size="xxs"
-              weight="medium"
-              text={matchContextLabel(runtime.game)}
-              style={themed($matchContextText)}
-            />
-          </Pressable>
+            size="xxs"
+            weight="medium"
+            text={matchContextLabel(runtime.game)}
+            style={themed($matchContextText)}
+          />
         </View>
       ) : null}
 
@@ -429,12 +449,20 @@ export function CurrentGameScreen({
         <DialogCard
           visible
           onClose={() => setMatchPrompt(undefined)}
+          closeDisabled={!canContinueMatch(matchPrompt)}
           backdropTestID="match-prompt-backdrop"
           backdropAccessibilityLabel="Continue to the next game"
           dialogTestID="match-prompt-dialog"
           dialogAccessibilityRole="alert"
         >
           <Text text={`Game ${matchPrompt.match.gameNumber} saved`} preset="subheading" />
+          {canContinueMatch(matchPrompt) ? null : (
+            <Text
+              size="xs"
+              text="A match holds at most ten games, so this one ends here."
+              style={themed($dialogText)}
+            />
+          )}
           <Text
             text={matchPrompt.players
               .map((player, seat) => `${player.name} ${matchScoreAfter(matchPrompt).wins[seat]}`)
@@ -458,23 +486,21 @@ export function CurrentGameScreen({
                 setMatchPrompt(undefined)
               }}
             />
-            <Button
-              testID="next-game-button"
-              text="Next game"
-              preset="reversed"
-              style={themed($dialogButton)}
-              onPress={() => setMatchPrompt(undefined)}
-            />
+            {canContinueMatch(matchPrompt) ? (
+              <Button
+                testID="next-game-button"
+                text="Next game"
+                preset="reversed"
+                style={themed($dialogButton)}
+                onPress={() => setMatchPrompt(undefined)}
+              />
+            ) : null}
           </View>
         </DialogCard>
       ) : null}
 
       {matchEnding ? (
-        <LocalMatchEndDialog
-          game={matchEnding}
-          onClose={() => setMatchEnding(undefined)}
-          onEnd={confirmEndMatch}
-        />
+        <LocalMatchEndDialog game={matchEnding} onClose={cancelEndMatch} onEnd={confirmEndMatch} />
       ) : null}
 
       {saved ? (
@@ -503,16 +529,10 @@ const $matchLayer: ThemedStyle<ViewStyle> = () => ({
   elevation: 60,
   alignItems: "center",
 })
-const $matchContext: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
-  minHeight: 24,
-  justifyContent: "center",
-  paddingHorizontal: spacing.sm,
-  borderRadius: 4,
-  backgroundColor: colors.surface,
-  borderWidth: 1,
-  borderColor: colors.separator,
+const $matchContextText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.palette.neutral100,
+  opacity: 0.8,
 })
-const $matchContextText: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 const $matchScore: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const $matchScoreRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

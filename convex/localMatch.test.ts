@@ -22,6 +22,12 @@ const STARTED_AT = 1_700_000_000_000
 const MATCH_ID = "match_local_bo3_000001"
 
 type PublishArgs = FunctionArgs<typeof api.games.publishFinishedLocalGame>
+type SeatResult = {
+  seat: number
+  gamesWon: number
+  gamesDrawn: number
+  outcome: "win" | "loss" | "draw"
+}
 
 async function owner(t: TestConvex<typeof schema>, subject = "owner") {
   const actor = t.withIdentity({ subject })
@@ -68,10 +74,25 @@ function matchGame(
   }
 }
 
-function finish(
-  seats: { seat: number; gamesWon: number; gamesDrawn: number; outcome: "win" | "loss" | "draw" }[],
+const TWO_ONE: SeatResult[] = [
+  { seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win" },
+  { seat: 2, gamesWon: 1, gamesDrawn: 0, outcome: "loss" },
+]
+
+function finish(seats: SeatResult[], gameCount = 3) {
+  return { publicId: MATCH_ID, finishedAt: STARTED_AT + 4 * 60_000, gameCount, seats }
+}
+
+async function publishBestOfThree(
+  actor: ReturnType<TestConvex<typeof schema>["withIdentity"]>,
+  versionId?: Id<"deckVersions">,
 ) {
-  return { publicId: MATCH_ID, finishedAt: STARTED_AT + 4 * 60_000, seats }
+  for (const [number, winner] of [
+    [1, "me"],
+    [2, "them"],
+    [3, "me"],
+  ] as const)
+    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(number, winner, versionId))
 }
 
 async function rows(t: TestConvex<typeof schema>) {
@@ -89,8 +110,13 @@ async function rows(t: TestConvex<typeof schema>) {
   }))
 }
 
+function gameOrder(games: Doc<"games">[], gameIds: Id<"games">[]) {
+  const byId = new Map(games.map((game) => [game._id, game.matchGameNumber]))
+  return gameIds.map((id) => byId.get(id))
+}
+
 describe("publishFinishedLocalGame with a match", () => {
-  it("creates the match with the first game and links every later game in order", async () => {
+  it("creates the match with the first game and links every later game", async () => {
     const t = convexTest(schema, modules)
     const { actor, deckId, versionId } = await owner(t)
     await actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me", versionId))
@@ -110,7 +136,7 @@ describe("publishFinishedLocalGame with a match", () => {
       { seat: 2, displayName: "Grace" },
     ])
     const matchId = first.matches[0]._id
-    expect(first.games[0].matchId).toBe(matchId)
+    expect(first.games[0]).toMatchObject({ matchId, matchGameNumber: 1 })
     expect(first.summaries[0].matchId).toBe(matchId)
     expect(first.history).toEqual([expect.objectContaining({ matchId, source: "local" })])
 
@@ -119,44 +145,39 @@ describe("publishFinishedLocalGame with a match", () => {
     await actor.mutation(api.games.publishFinishedLocalGame, matchGame(3, "me", versionId))
     const later = await rows(t)
     expect(later.matches).toHaveLength(1)
-    const byPublicId = new Map(later.games.map((game) => [game._id, game.publicId]))
-    expect(later.matches[0].gameIds.map((id) => byPublicId.get(id))).toEqual([
-      "game_local_match_000001",
-      "game_local_match_000002",
-      "game_local_match_000003",
-    ])
+    expect(gameOrder(later.games, later.matches[0].gameIds)).toEqual([1, 2, 3])
     expect(later.games.every((game) => game.matchId === matchId)).toBe(true)
     expect(later.history.filter((entry) => entry.matchId === matchId)).toHaveLength(3)
   })
 
-  it("places a late retry by game order and caps a match at ten games", async () => {
+  it("orders games published out of order and refuses a repeated or eleventh game", async () => {
     const t = convexTest(schema, modules)
     const { actor } = await owner(t)
-    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(2, "draw", undefined, 5))
-    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "draw", undefined, 5))
-    for (let number = 3; number <= 10; number += 1)
+    for (const number of [3, 2, 1])
       await actor.mutation(
         api.games.publishFinishedLocalGame,
         matchGame(number, "draw", undefined, 5),
       )
-    const { matches, games } = await rows(t)
-    const byPublicId = new Map(games.map((game) => [game._id, game.publicId]))
-    expect(matches[0].gameIds.map((id) => byPublicId.get(id)?.slice(-2))).toEqual([
-      "01",
-      "02",
-      "03",
-      "04",
-      "05",
-      "06",
-      "07",
-      "08",
-      "09",
-      "10",
-    ])
-    expect(games.every((game) => game.matchId === matches[0]._id)).toBe(true)
+    const early = await rows(t)
+    expect(gameOrder(early.games, early.matches[0].gameIds)).toEqual([1, 2, 3])
+
+    await expect(
+      actor.mutation(api.games.publishFinishedLocalGame, {
+        ...matchGame(2, "draw", undefined, 5),
+        publicId: "game_local_match_dup_02",
+      }),
+    ).rejects.toThrow("Game 2 of this match was already published")
+    for (let number = 4; number <= 10; number += 1)
+      await actor.mutation(
+        api.games.publishFinishedLocalGame,
+        matchGame(number, "draw", undefined, 5),
+      )
     await expect(
       actor.mutation(api.games.publishFinishedLocalGame, matchGame(11, "draw", undefined, 5)),
     ).rejects.toThrow("at most 10 games")
+    const full = await rows(t)
+    expect(full.matches[0].gameIds).toHaveLength(10)
+    expect(full.games.filter((game) => game.matchId)).toHaveLength(10)
   })
 
   it("refuses to attach a game to another account's match", async () => {
@@ -171,22 +192,37 @@ describe("publishFinishedLocalGame with a match", () => {
       }),
     ).rejects.toThrow("another account")
   })
+
+  it("keeps the account's seat and deck for every game of the match", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, versionId } = await owner(t)
+    const otherDeck = await actor.mutation(api.decks.create, { name: "Zoo", format: "modern" })
+    const otherVersion = await actor.mutation(api.decks.saveVersion, {
+      deckId: otherDeck,
+      cards: [],
+    })
+    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "them", versionId))
+    await expect(
+      actor.mutation(api.games.publishFinishedLocalGame, matchGame(2, "me", otherVersion)),
+    ).rejects.toThrow("same seat and deck")
+    const swapped = matchGame(2, "me", versionId)
+    swapped.players = [
+      { ...swapped.players[0], me: undefined, deckVersionId: undefined },
+      { ...swapped.players[1], me: true, deckVersionId: versionId },
+    ]
+    await expect(actor.mutation(api.games.publishFinishedLocalGame, swapped)).rejects.toThrow(
+      "same seat and deck",
+    )
+    expect((await rows(t)).matches[0].gameIds).toHaveLength(1)
+  })
 })
 
 describe("finishScryveMatch", () => {
   it("finalizes once, records the deck result, and counts the match for the deck", async () => {
     const t = convexTest(schema, modules)
     const { actor, deckId, versionId } = await owner(t)
-    for (const [number, winner] of [
-      [1, "me"],
-      [2, "them"],
-      [3, "me"],
-    ] as const)
-      await actor.mutation(api.games.publishFinishedLocalGame, matchGame(number, winner, versionId))
-    const args = finish([
-      { seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win" },
-      { seat: 2, gamesWon: 1, gamesDrawn: 0, outcome: "loss" },
-    ])
+    await publishBestOfThree(actor, versionId)
+    const args = finish(TWO_ONE)
     const first = await actor.mutation(api.matches.finishScryveMatch, args)
     const retry = await actor.mutation(api.matches.finishScryveMatch, args)
     expect(retry).toEqual(first)
@@ -225,6 +261,27 @@ describe("finishScryveMatch", () => {
     })
   })
 
+  it("waits for every game, then closes the match to further games", async () => {
+    const t = convexTest(schema, modules)
+    const { actor } = await owner(t)
+    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me"))
+    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(3, "me"))
+    await expect(actor.mutation(api.matches.finishScryveMatch, finish(TWO_ONE))).rejects.toThrow(
+      "missing",
+    )
+    expect((await rows(t)).matches[0].status).toBe("active")
+
+    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(2, "them"))
+    await actor.mutation(api.matches.finishScryveMatch, finish(TWO_ONE))
+    expect((await rows(t)).matches[0].status).toBe("finished")
+    await expect(
+      actor.mutation(api.games.publishFinishedLocalGame, matchGame(4, "them")),
+    ).rejects.toThrow("already ended")
+    const { matches, games } = await rows(t)
+    expect(matches[0].gameIds).toHaveLength(3)
+    expect(games).toHaveLength(3)
+  })
+
   it("draws a called pod round for the seats still playing", async () => {
     const t = convexTest(schema, modules)
     const { actor, versionId } = await owner(t)
@@ -238,12 +295,15 @@ describe("finishScryveMatch", () => {
     })
     await actor.mutation(
       api.matches.finishScryveMatch,
-      finish([
-        { seat: 1, gamesWon: 0, gamesDrawn: 1, outcome: "draw" },
-        { seat: 2, gamesWon: 0, gamesDrawn: 1, outcome: "loss" },
-        { seat: 3, gamesWon: 0, gamesDrawn: 1, outcome: "draw" },
-        { seat: 4, gamesWon: 0, gamesDrawn: 1, outcome: "loss" },
-      ]),
+      finish(
+        [
+          { seat: 1, gamesWon: 0, gamesDrawn: 1, outcome: "draw" },
+          { seat: 2, gamesWon: 0, gamesDrawn: 1, outcome: "loss" },
+          { seat: 3, gamesWon: 0, gamesDrawn: 1, outcome: "draw" },
+          { seat: 4, gamesWon: 0, gamesDrawn: 1, outcome: "loss" },
+        ],
+        1,
+      ),
     )
     const { matches, stats } = await rows(t)
     expect(matches[0].seats.map((seat) => seat.outcome)).toEqual(["draw", "loss", "draw", "loss"])
@@ -266,12 +326,12 @@ describe("finishScryveMatch", () => {
       message: "only have one winner",
     },
     {
-      name: "a winner who is behind",
+      name: "a score the games do not show",
       seats: [
-        { seat: 1, gamesWon: 1, gamesDrawn: 0, outcome: "win" as const },
-        { seat: 2, gamesWon: 2, gamesDrawn: 0, outcome: "loss" as const },
+        { seat: 1, gamesWon: 1, gamesDrawn: 0, outcome: "loss" as const },
+        { seat: 2, gamesWon: 2, gamesDrawn: 0, outcome: "win" as const },
       ],
-      message: "winner must have the most game wins",
+      message: "does not match its published games",
     },
     {
       name: "a missing seat",
@@ -281,7 +341,7 @@ describe("finishScryveMatch", () => {
   ])("rejects $name and leaves the match active", async ({ seats, message }) => {
     const t = convexTest(schema, modules)
     const { actor } = await owner(t)
-    await actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me"))
+    await publishBestOfThree(actor)
     await expect(actor.mutation(api.matches.finishScryveMatch, finish(seats))).rejects.toThrow(
       message,
     )
@@ -292,15 +352,9 @@ describe("finishScryveMatch", () => {
     const t = convexTest(schema, modules)
     const ada = await owner(t)
     const bob = await owner(t, "bob")
-    await ada.actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me"))
+    await publishBestOfThree(ada.actor)
     await expect(
-      bob.actor.mutation(
-        api.matches.finishScryveMatch,
-        finish([
-          { seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win" },
-          { seat: 2, gamesWon: 0, gamesDrawn: 0, outcome: "loss" },
-        ]),
-      ),
+      bob.actor.mutation(api.matches.finishScryveMatch, finish(TWO_ONE)),
     ).rejects.toThrow("Match not found")
   })
 })

@@ -11,6 +11,7 @@ import {
   createRematch,
   defaultCommandContext,
   hasLocalGameStarted,
+  restartMatchGame,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
@@ -104,6 +105,11 @@ export function useLocalGame(
     [replaceBoard],
   )
 
+  const restartMatchGameBoard = useCallback(
+    () => replaceBoard(restartMatchGame(gameRef.current)),
+    [replaceBoard],
+  )
+
   /** why: the match's last finished game is in history; ending it also hands the table a fresh match. */
   const endMatch = useCallback(
     (matchId: string, outcomes: MatchSeatOutcome[]) => {
@@ -135,6 +141,7 @@ export function useLocalGame(
     abandon: () => dispatch({ type: "game.abandon" }),
     rematch,
     nextMatchGame,
+    restartMatchGame: restartMatchGameBoard,
     endMatch,
     latestMatchGame,
     discard: () => {

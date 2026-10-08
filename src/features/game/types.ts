@@ -155,6 +155,6 @@ export interface LocalGameSummary {
   /** why: accounts that declined to claim a signed-out game, so a later sign-in picker can skip it. */
   skippedBy?: string[]
   match?: LocalGameMatch
-  /** why: the game that ended a match also carries the match result upload, which waits for every game's ack. */
-  matchPublish?: "pending" | "published"
+  /** why: the game that ended a match also carries the match result upload, which waits for every game's ack and is dropped when a game was rejected. */
+  matchPublish?: "pending" | "published" | "failed"
 }

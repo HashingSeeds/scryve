@@ -225,7 +225,9 @@ export function NewGameScreen({
     setMeSeat(account?.defaultMeSeat)
     setDeck(undefined)
   }, [account?.defaultMeSeat, account?.ownerId])
-  const [matchBestOf, setMatchBestOf] = useState<MatchBestOf | undefined>(
+  const [matchOn, setMatchOn] = useState(Boolean(initialGame?.match))
+  // why: the best of follows the table until the player picks one; a pod round is one game, a 1v1 match is three.
+  const [chosenBestOf, setChosenBestOf] = useState<MatchBestOf | undefined>(
     initialGame?.match?.bestOf,
   )
   const [showOptions, setShowOptions] = useState(false)
@@ -262,6 +264,13 @@ export function NewGameScreen({
     [appearances, nameValidation.names],
   )
   const effectiveMeSeat = meSeat !== undefined && meSeat < playerCount ? meSeat : undefined
+  const matchBestOf = matchOn
+    ? (chosenBestOf ?? (format === "commander" || playerCount > 2 ? 1 : 3))
+    : undefined
+  // why: a match is one deck's record, so once it is under way the seat and deck stay put.
+  const matchLocked = Boolean(
+    initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
+  )
   const deckList = account?.decks === "unavailable" ? undefined : account?.decks
   const deckChoices =
     deckList?.filter((choice) => choice.system === system && choice.format === format) ?? []
@@ -344,9 +353,9 @@ export function NewGameScreen({
       })
   }
 
-  // why: a pod round is one game; a 1v1 constructed match is a best of three.
   function toggleMatch(on: boolean) {
-    setMatchBestOf(on ? (format === "commander" || playerCount > 2 ? 1 : 3) : undefined)
+    setMatchOn(on)
+    setChosenBestOf(undefined)
   }
 
   function chooseSystem(value: string) {
@@ -592,7 +601,7 @@ export function NewGameScreen({
                     }))}
                     selectedId={String(matchBestOf)}
                     onSelect={(value) =>
-                      setMatchBestOf(MATCH_BEST_OF.find((bestOf) => String(bestOf) === value))
+                      setChosenBestOf(MATCH_BEST_OF.find((bestOf) => String(bestOf) === value))
                     }
                   />
                 ) : null}
@@ -687,6 +696,7 @@ export function NewGameScreen({
                       value={effectiveMeSeat === undefined ? undefined : String(effectiveMeSeat)}
                       placeholder="No seat"
                       clearLabel="No seat"
+                      disabled={matchLocked}
                       options={players.map((player, index) => ({
                         id: String(index),
                         label: player.name,
@@ -708,7 +718,7 @@ export function NewGameScreen({
                                 : "No deck"
                         }
                         clearLabel="No deck"
-                        disabled={deckList === undefined && !deck}
+                        disabled={matchLocked || (deckList === undefined && !deck)}
                         options={[
                           ...(deck &&
                           !deckChoices.some((choice) => choice.versionId === deck.versionId)

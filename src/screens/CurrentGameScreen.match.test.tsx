@@ -36,7 +36,7 @@ function matchGame(bestOf: 1 | 3 | 5, playerCount = 2) {
   })
 }
 
-function mount(repository: LocalGameRepository) {
+function mount(repository: LocalGameRepository, onGameAbandoned?: () => void) {
   const initial = repository.loadActiveGame()!
   const onViewSummary = jest.fn()
   const view = render(
@@ -45,6 +45,7 @@ function mount(repository: LocalGameRepository) {
         initialGame={initial}
         repository={repository}
         onViewSummary={onViewSummary}
+        onGameAbandoned={onGameAbandoned}
         ownerId="owner"
       />
     </ThemeProvider>,
@@ -145,7 +146,10 @@ describe("CurrentGameScreen match mode", () => {
     endGame(view, 1)
     fireEvent.press(view.getByTestId("next-game-button"))
 
-    fireEvent.press(view.getByTestId("match-context"))
+    // why: the board label never takes touches; the score opens from the menu's status line.
+    expect(view.getByTestId("match-context").props.onPress).toBeUndefined()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByLabelText("Game 2 · 0-1 · Best of 3"))
     expect(view.getByText("Best of 3 · Game 2")).toBeTruthy()
     fireEvent.press(view.getByTestId("end-match-button"))
     expect(view.getByTestId("match-outcome-1-win").props.accessibilityState.selected).toBe(true)
@@ -157,6 +161,58 @@ describe("CurrentGameScreen match mode", () => {
         match: { result: { outcomes: ["loss", "win"] } },
       }),
     )
+    expect(repository.loadActiveGame()?.match?.id).not.toBe(initial.match?.id)
+  })
+
+  it("restarts the same game of the match on Abandon instead of dropping the match", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(matchGame(3))
+    const onGameAbandoned = jest.fn()
+    const { view, initial } = mount(repository, onGameAbandoned)
+    endGame(view, 0)
+    fireEvent.press(view.getByTestId("next-game-button"))
+    const second = repository.loadActiveGame()!
+
+    fireEvent.press(view.getByTestId("life-seat-2--1"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("abandon-game-button"))
+
+    expect(onGameAbandoned).not.toHaveBeenCalled()
+    expect(view.getByTestId("match-context")).toHaveTextContent("Game 2 · 1-0")
+    expect(view.getByTestId("life-total-seat-2").props.children).toBe("2")
+    const restarted = repository.loadActiveGame()!
+    expect(restarted.id).not.toBe(second.id)
+    expect(restarted.match).toEqual({ ...initial.match, gameNumber: 2, wins: [1, 0] })
+    expect(repository.loadHistory().map((game) => game.id)).toEqual([initial.id])
+  })
+
+  it("holds the board at the tenth game until the match result is confirmed", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(matchGame(1))
+    const { view, initial } = mount(repository)
+    for (let game = 1; game < 10; game += 1) {
+      endGame(view, "draw")
+      fireEvent.press(view.getByTestId("next-game-button"))
+    }
+    expect(view.getByTestId("match-context")).toHaveTextContent("Game 10 · 0-0 · 9 draws")
+    endGame(view, "draw")
+    expect(view.queryByTestId("next-game-button")).toBeNull()
+    expect(view.getByText("A match holds at most ten games, so this one ends here.")).toBeTruthy()
+    fireEvent.press(view.getByTestId("match-prompt-end-button"))
+    fireEvent.press(view.getByTestId("end-match-backdrop"))
+    // why: Cancel returns to the prompt, so the match is never left behind without a result.
+    expect(view.getByTestId("match-prompt-dialog")).toBeTruthy()
+    expect(repository.loadActiveGame()).toBeNull()
+    fireEvent.press(view.getByTestId("match-prompt-end-button"))
+    fireEvent.press(view.getByTestId("confirm-end-match-button"))
+
+    await waitFor(() =>
+      expect(repository.loadHistory()[0]).toMatchObject({
+        match: { id: initial.match?.id, gameNumber: 10, result: { outcomes: ["draw", "draw"] } },
+      }),
+    )
+    expect(repository.loadActiveGame()?.match).toMatchObject({ gameNumber: 1, wins: [0, 0] })
     expect(repository.loadActiveGame()?.match?.id).not.toBe(initial.match?.id)
   })
 })

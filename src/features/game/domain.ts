@@ -239,6 +239,12 @@ export function createNextMatchGame(game: LocalGame, now?: number): LocalGame {
   }
 }
 
+/** why: abandoning a game mid-match restarts that game; the match and its score stay. */
+export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
+  if (!game.match) throw new Error("This game is not part of a match.")
+  return { ...createRematch(game, now), match: game.match }
+}
+
 /** why: setup forms know seats by index while a running game knows them by player id. */
 export function localGameAccount(
   players: readonly GamePlayer[],

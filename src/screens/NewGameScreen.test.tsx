@@ -1125,4 +1125,36 @@ describe("NewGameScreen", () => {
     setup({ localGame: runningLocalGame() })
     expect(screen.queryByTestId("match-mode")).toBeNull()
   })
+
+  it("follows the table for the best of until the player picks one", () => {
+    setup()
+    fireEvent.press(screen.getByTestId("match-mode-on"))
+    expect(screen.getByTestId("match-best-of-3").props.accessibilityState.selected).toBe(true)
+    fireEvent.press(screen.getByTestId("player-count-increment"))
+    expect(screen.getByTestId("match-best-of-1").props.accessibilityState.selected).toBe(true)
+    fireEvent.press(screen.getByTestId("match-best-of-5"))
+    fireEvent.press(screen.getByTestId("player-count-decrement"))
+    expect(screen.getByTestId("match-best-of-5").props.accessibilityState.selected).toBe(true)
+  })
+
+  it("locks the seat and deck once a match is under way", () => {
+    const first = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000" },
+        { name: "Grace", color: "#0000FF" },
+      ],
+      startingLife: 20,
+      system: "mtg",
+      format: "modern",
+      account: { ownerId: "owner-a", meSeat: 0, deckVersionId: "v1", deckName: "Burn" },
+      match: { bestOf: 3 },
+    })
+    const second = { ...first, match: { ...first.match!, gameNumber: 2, wins: [1, 0] } }
+    setup({ initialGame: second, onSavePlayers: jest.fn(), account: { ownerId: "owner-a" } })
+    expect(screen.getByLabelText("This is me, Ada")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("me-seat"))
+    expect(screen.queryByTestId("me-seat-option-1")).toBeNull()
+    fireEvent.press(screen.getByTestId("me-deck"))
+    expect(screen.queryByTestId("me-deck-option-none")).toBeNull()
+  })
 })

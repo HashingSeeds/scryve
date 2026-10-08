@@ -1260,7 +1260,8 @@ export const publishFinishedLocalGame = mutation({
           })),
         })
       : undefined
-    if (matchId) await ctx.db.patch(gameId, { matchId })
+    if (matchId && args.match)
+      await ctx.db.patch(gameId, { matchId, matchGameNumber: args.match.gameNumber })
     const game = (await ctx.db.get(gameId))!
     const summary = await terminalizeGame(
       ctx,

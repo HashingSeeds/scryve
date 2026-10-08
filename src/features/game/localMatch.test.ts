@@ -13,6 +13,7 @@ import {
   defaultCommandContext,
   matchContextLabel,
   matchScoreAfter,
+  restartMatchGame,
 } from "./domain"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
 import type { LocalGame } from "./types"
@@ -157,6 +158,32 @@ describe("local match", () => {
     expect(repository.loadHistory()[0].matchPublish).toBe("published")
   })
 
+  it("drops a match result once one of its games was rejected", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const first = finish(matchGame(), 0, 10)
+    const second = finish(createNextMatchGame(first, 20), 0, 30)
+    repository.archiveGame(first, "game_menu")
+    repository.archiveGame(second, "game_menu")
+    repository.markPublishFailed(first.id)
+    repository.markPublished(second.id)
+    expect(repository.matchFinishesWithFailedGames("owner").map((game) => game.id)).toEqual([
+      second.id,
+    ])
+    repository.markMatchPublishFailed(second.id)
+    expect(repository.loadHistory()[0].matchPublish).toBe("failed")
+    expect(repository.pendingMatchFinishes("owner")).toEqual([])
+    expect(repository.matchFinishesWithFailedGames("owner")).toEqual([])
+  })
+
+  it("restarts a game inside the match without touching the score", () => {
+    const second = createNextMatchGame(finish(matchGame(), 0, 10), 20)
+    const restarted = restartMatchGame(second, 30)
+    expect(restarted.id).not.toBe(second.id)
+    expect(restarted.match).toEqual(second.match)
+    expect(restarted.players.map((player) => player.life)).toEqual([20, 20])
+    expect(restarted.account?.mePlayerId).toBe(restarted.players[0].id)
+  })
+
   it("builds the publish payloads with the match id, order, score, and outcomes", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const first = finish(matchGame(), 0, 10)
@@ -171,6 +198,7 @@ describe("local match", () => {
     expect(buildMatchFinishSnapshot(summary)).toEqual({
       publicId: second.match?.id,
       finishedAt: 30,
+      gameCount: 2,
       seats: [
         { seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win" },
         { seat: 2, gamesWon: 0, gamesDrawn: 0, outcome: "loss" },

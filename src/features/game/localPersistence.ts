@@ -426,7 +426,9 @@ function parseSummary(value: unknown): LocalGameSummary | null {
         ...(match ? { match } : {}),
         ...(account &&
         match?.result &&
-        (value.matchPublish === "pending" || value.matchPublish === "published")
+        (value.matchPublish === "pending" ||
+          value.matchPublish === "published" ||
+          value.matchPublish === "failed")
           ? { matchPublish: value.matchPublish }
           : {}),
       }
@@ -733,9 +735,28 @@ export class LocalGameRepository {
     )
   }
 
+  /** why: the server scores a match from its published games, so a result with a rejected game can never land. */
+  matchFinishesWithFailedGames(ownerId: string): LocalGameSummary[] {
+    const history = this.loadHistory()
+    return history.filter(
+      (game) =>
+        game.matchPublish === "pending" &&
+        game.account?.ownerId === ownerId &&
+        history.some((other) => other.publish === "failed" && other.match?.id === game.match?.id),
+    )
+  }
+
   markMatchPublished(gameId: string): void {
+    this.settleMatchPublish(gameId, "published")
+  }
+
+  markMatchPublishFailed(gameId: string): void {
+    this.settleMatchPublish(gameId, "failed")
+  }
+
+  private settleMatchPublish(gameId: string, matchPublish: "published" | "failed"): void {
     this.patchSummary(gameId, (game) =>
-      game.matchPublish === "pending" ? { ...game, matchPublish: "published" } : undefined,
+      game.matchPublish === "pending" ? { ...game, matchPublish } : undefined,
     )
   }
 

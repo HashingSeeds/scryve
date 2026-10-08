@@ -19,7 +19,9 @@ const mockPublish = jest.fn(
     finishedAt: 1,
   }),
 )
-const mockFinishMatch = jest.fn(async (_args: { publicId: string }) => ({ matchId: "m" }))
+const mockFinishMatch = jest.fn(async (_args: { publicId: string; gameCount: number }) => ({
+  matchId: "m",
+}))
 let mockConnected = true
 
 jest.mock("@clerk/expo", () => ({
@@ -162,6 +164,34 @@ describe("LocalGamePublishSession", () => {
       ],
     })
     await waitFor(() => expect(repository.loadHistory()[1].matchPublish).toBe("published"))
+  })
+
+  it("marks a rejected match finish failed instead of retrying it forever", async () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const first = createLocalGame({
+      now: 1,
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000000" },
+        { name: "Grace", color: "#111111" },
+      ],
+      account: { ownerId: "owner-a", meSeat: 0 },
+      match: { bestOf: 1 },
+    })
+    const decided = applyGameCommand(
+      first,
+      { type: "game.finish", result: { kind: "win", winnerPlayerIds: [first.players[0].id] } },
+      { ...defaultCommandContext(asDeviceId("device_test")), now: () => 2 },
+    )
+    mockFinishMatch.mockRejectedValueOnce(
+      new Error("[CONVEX M(matches:finishScryveMatch)] Server Error\nUncaught Error: missing"),
+    )
+    repository.archiveGame(decided, "game_menu")
+
+    render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
+    await waitFor(() => expect(repository.loadHistory()[0].matchPublish).toBe("failed"))
+    expect(mockFinishMatch).toHaveBeenCalledTimes(1)
+    expect(mockFinishMatch.mock.calls[0]?.[0]).toMatchObject({ gameCount: 1 })
   })
 })
 

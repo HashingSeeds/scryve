@@ -55,6 +55,7 @@ export function buildMatchFinishSnapshot(game: LocalGameSummary) {
   return {
     publicId: match.id,
     finishedAt: game.finishedAt,
+    gameCount: match.gameNumber,
     seats: ordered.map(({ seat }, index) => ({
       seat: index + 1,
       gamesWon: score.wins[seat],

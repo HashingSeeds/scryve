@@ -356,6 +356,25 @@ async function matchByPublicId(ctx: MutationCtx, publicId: string) {
     .unique()
 }
 
+type ScryveMatch = Extract<Doc<"matches">, { source: "connected" }>
+
+async function ownedScryveMatch(ctx: MutationCtx, user: Doc<"users">, publicId: string) {
+  const match = await matchByPublicId(ctx, publicId)
+  if (!match || match.source !== "connected" || match.ownerUserId !== user._id)
+    throw new ConvexError({ code: "match_not_found", message: "Match not found" })
+  return match
+}
+
+/** why: a match's games are capped, so reading each one is a bounded way to know their order. */
+async function matchGames(ctx: MutationCtx, match: ScryveMatch) {
+  const games = await Promise.all(match.gameIds.map((gameId) => ctx.db.get(gameId)))
+  return games.flatMap((game) => (game ? [game] : []))
+}
+
+function meSeatOf(seats: readonly PublishedMatchSeat[]) {
+  return seats.find((seat) => seat.userId !== undefined)
+}
+
 /** why: the first published game creates its match in the same mutation, so neither record exists without the other. */
 export async function linkPublishedGameToMatch(
   ctx: MutationCtx,
@@ -384,15 +403,51 @@ export async function linkPublishedGameToMatch(
   }
   if (existing.source !== "connected" || existing.ownerUserId !== user._id)
     throw new ConvexError({ code: "match_conflict", message: "Match belongs to another account" })
+  if (existing.status !== "active")
+    throw new ConvexError({ code: "match_finished", message: "This match already ended" })
   if (existing.seats.length !== game.seats.length)
     throw new Error("A match keeps the same seats for every game")
+  // why: a match is one deck's record, so the account's seat and deck cannot move between its games.
+  const lockedSeat = meSeatOf(existing.seats)
+  const mySeat = meSeatOf(game.seats)
+  if (lockedSeat?.seat !== mySeat?.seat || lockedSeat?.deckVersionId !== mySeat?.deckVersionId)
+    throw new Error("A match keeps the same seat and deck for every game")
   if (existing.gameIds.includes(game.id)) return existing._id
-  // why: games publish oldest first, so this is an append unless a retry lands out of order.
-  const gameIds = [...existing.gameIds]
-  if (gameIds.length < MAX_GAMES_PER_MATCH)
-    gameIds.splice(Math.min(match.gameNumber - 1, gameIds.length), 0, game.id)
-  await ctx.db.patch(existing._id, { gameIds, updatedAt: now })
+  if (existing.gameIds.length >= MAX_GAMES_PER_MATCH)
+    throw new Error(`A match holds at most ${MAX_GAMES_PER_MATCH} games`)
+  const games = await matchGames(ctx, existing)
+  if (games.some((other) => other.matchGameNumber === match.gameNumber))
+    throw new Error(`Game ${match.gameNumber} of this match was already published`)
+  const ordered = [...games.map((other) => ({ id: other._id, number: other.matchGameNumber ?? 0 }))]
+  ordered.push({ id: game.id, number: match.gameNumber })
+  ordered.sort((left, right) => left.number - right.number)
+  await ctx.db.patch(existing._id, { gameIds: ordered.map((entry) => entry.id), updatedAt: now })
   return existing._id
+}
+
+/** why: the server scores a match from the games it holds, so a client cannot finalize a score its games do not show. */
+async function matchScoreFromGames(ctx: MutationCtx, match: ScryveMatch, gameCount: number) {
+  const games = await matchGames(ctx, match)
+  const ordinals = new Set(games.map((game) => game.matchGameNumber))
+  if (
+    games.length !== gameCount ||
+    Array.from({ length: gameCount }, (_, index) => index + 1).some((n) => !ordinals.has(n))
+  )
+    throw new Error("Some games of this match are missing or still uploading")
+  const wins = new Map(match.seats.map((seat) => [seat.seat, 0]))
+  let draws = 0
+  for (const game of games) {
+    const summary = await ctx.db
+      .query("gameSummaries")
+      .withIndex("by_game", (q) => q.eq("gameId", game._id))
+      .unique()
+    if (!summary) throw new Error("A game of this match is missing its summary")
+    if (summary.resultKind === "draw") draws += 1
+    else if (summary.resultKind === "win")
+      for (const player of summary.players)
+        if (player.outcome === "win") wins.set(player.seat, (wins.get(player.seat) ?? 0) + 1)
+  }
+  return { wins, draws }
 }
 
 // why: the device finalizes once every game is acked, and a retry after a lost ack must not count the match twice.
@@ -400,6 +455,8 @@ export const finishScryveMatch = mutation({
   args: {
     publicId: v.string(),
     finishedAt: v.number(),
+    // why: how many games the device played, so a finish cannot land before the last one is linked.
+    gameCount: v.number(),
     seats: v.array(
       v.object({
         seat: v.number(),
@@ -411,12 +468,13 @@ export const finishScryveMatch = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
-    const match = await matchByPublicId(ctx, args.publicId)
-    if (!match || match.source !== "connected" || match.ownerUserId !== user._id)
-      throw new ConvexError({ code: "match_not_found", message: "Match not found" })
+    const match = await ownedScryveMatch(ctx, user, args.publicId)
     if (match.status === "finished") return { matchId: match._id }
+    if (match.status !== "active")
+      throw new ConvexError({ code: "match_finished", message: "This match already ended" })
     const now = Date.now()
     const finishedAt = assertMatchFinishedAt(args.finishedAt, now)
+    assertGameNumber(args.gameCount)
     const results = new Map(args.seats.map((seat) => [seat.seat, seat]))
     if (
       results.size !== args.seats.length ||
@@ -424,6 +482,13 @@ export const finishScryveMatch = mutation({
       match.seats.some((seat) => !results.has(seat.seat))
     )
       throw new Error("A match result needs every seat exactly once")
+    const score = await matchScoreFromGames(ctx, match, args.gameCount)
+    if (
+      args.seats.some(
+        (seat) => seat.gamesWon !== score.wins.get(seat.seat) || seat.gamesDrawn !== score.draws,
+      )
+    )
+      throw new Error("The match score does not match its published games")
     assertGameScores(args.seats, match.bestOf)
     const seats = match.seats.map((seat) => {
       const result = results.get(seat.seat)!
