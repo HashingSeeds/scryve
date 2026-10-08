@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactElement } from "react"
 import Animated, {
   cancelAnimation,
   Easing,
+  ReduceMotion,
   useAnimatedProps,
   useSharedValue,
   withRepeat,
@@ -227,6 +228,8 @@ const PENTAGON_PERIMETER = PENTAGON_SIDES * 2 * PENTAGON_RADIUS * Math.sin(Math.
 const TRACE_LENGTH = PENTAGON_PERIMETER / PENTAGON_SIDES
 const TRACE_LAP_MS = 1400
 const RING_FADE_MS = 250
+// why: Reanimated reads the system setting only at startup, so animations we already gate on the live preference must not consult it again.
+const GATED_MOTION = ReduceMotion.Never
 // why: eight dashes per side divide the outline evenly, so no corner gets a doubled dash.
 const STILL_TRACE_DASH = TRACE_LENGTH / 8
 // why: narrower than the border it covers, so a board-colored edge keeps the ring color apart from the seat colors around the button.
@@ -281,7 +284,9 @@ function SignalRing({ color, animate }: { color?: string; animate: boolean }) {
   const opacity = useSharedValue(shown ? 1 : 0)
   useEffect(() => {
     const target = shown ? 1 : 0
-    opacity.value = animate ? withTiming(target, { duration: RING_FADE_MS }) : target
+    opacity.value = animate
+      ? withTiming(target, { duration: RING_FADE_MS, reduceMotion: GATED_MOTION })
+      : target
   }, [animate, opacity, shown])
   const animatedProps = useAnimatedProps(() => ({ strokeOpacity: opacity.value }))
   if (!shownColor) return null
@@ -303,8 +308,15 @@ function SignalTrace({ color }: { color: string }) {
   const offset = useSharedValue(0)
   useEffect(() => {
     offset.value = withRepeat(
-      withTiming(-PENTAGON_PERIMETER, { duration: TRACE_LAP_MS, easing: Easing.linear }),
+      withTiming(-PENTAGON_PERIMETER, {
+        duration: TRACE_LAP_MS,
+        easing: Easing.linear,
+        reduceMotion: GATED_MOTION,
+      }),
       -1,
+      false,
+      undefined,
+      GATED_MOTION,
     )
     return () => cancelAnimation(offset)
   }, [offset])

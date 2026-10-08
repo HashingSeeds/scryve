@@ -3,6 +3,7 @@ import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "rea
 import { StyleSheet, View } from "react-native"
 import Animated, {
   Easing,
+  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -113,6 +114,10 @@ const ATTENTION_POP_RISE_MS = 130
 const ATTENTION_POP_SETTLE_MS = 190
 // why: flat at the start, so a first web frame that lands before the start time cannot shrink the button.
 const POP_EASING = Easing.inOut(Easing.quad)
+// why: Reanimated reads the system setting only at startup, so animations we already gate on the live preference must not consult it again.
+const GATED_MOTION = ReduceMotion.Never
+const BADGE_ENTERING = ZoomIn.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
+const BADGE_EXITING = ZoomOut.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
 const PENTAGON_SPIN_SPRING = {
   damping: 18,
   stiffness: 220,
@@ -445,10 +450,23 @@ function GameMenuAnchor({
   const pop = useSharedValue(1)
   const needsAttention = signal?.tone === "attention"
   useEffect(() => {
-    if (!needsAttention || !animateFully) return
+    if (!animateFully) {
+      pop.value = 1
+      return
+    }
+    if (!needsAttention) return
     pop.value = withSequence(
-      withTiming(ATTENTION_POP_SCALE, { duration: ATTENTION_POP_RISE_MS, easing: POP_EASING }),
-      withTiming(1, { duration: ATTENTION_POP_SETTLE_MS, easing: POP_EASING }),
+      GATED_MOTION,
+      withTiming(ATTENTION_POP_SCALE, {
+        duration: ATTENTION_POP_RISE_MS,
+        easing: POP_EASING,
+        reduceMotion: GATED_MOTION,
+      }),
+      withTiming(1, {
+        duration: ATTENTION_POP_SETTLE_MS,
+        easing: POP_EASING,
+        reduceMotion: GATED_MOTION,
+      }),
     )
   }, [animateFully, needsAttention, pop])
   const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
@@ -501,27 +519,30 @@ function GameMenuAnchor({
         />
       </BoardPressable>
       {signal?.badge ? (
-        <Animated.View
-          testID="game-menu-signal-badge"
+        <View
           pointerEvents="none"
-          entering={animateFully ? ZoomIn.duration(SIGNAL_BADGE_SCALE_MS) : undefined}
-          exiting={animateFully ? ZoomOut.duration(SIGNAL_BADGE_SCALE_MS) : undefined}
           style={[
-            themed($signalBadge),
-            compact ? $compactSignalBadge : $largeSignalBadge,
-            { backgroundColor: colors.gameMenu.signal[signal.tone] },
+            $signalBadgeCenter,
+            compact ? $compactSignalBadgeCenter : $largeSignalBadgeCenter,
           ]}
         >
-          <Text
-            text={signal.badge}
-            weight="bold"
-            maxFontSizeMultiplier={1.2}
-            style={[
-              themed($signalBadgeText),
-              { color: accessibleForeground(colors.gameMenu.signal[signal.tone]) },
-            ]}
-          />
-        </Animated.View>
+          <Animated.View
+            testID="game-menu-signal-badge"
+            entering={animateFully ? BADGE_ENTERING : undefined}
+            exiting={animateFully ? BADGE_EXITING : undefined}
+            style={[themed($signalBadge), { backgroundColor: colors.gameMenu.signal[signal.tone] }]}
+          >
+            <Text
+              text={signal.badge}
+              weight="bold"
+              maxFontSizeMultiplier={1.2}
+              style={[
+                themed($signalBadgeText),
+                { color: accessibleForeground(colors.gameMenu.signal[signal.tone]) },
+              ]}
+            />
+          </Animated.View>
+        </View>
       ) : null}
     </Animated.View>
   )
@@ -794,16 +815,23 @@ const $actionDetail: ThemedStyle<TextStyle> = () => ({
   textAlign: "center",
 })
 const SIGNAL_BADGE_SIZE = 22
+// why: a zero-size box at the anchor centers the badge on its real width, so "100" sits where "1" does.
+const $signalBadgeCenter: ViewStyle = {
+  position: "absolute",
+  width: 0,
+  height: 0,
+  alignItems: "center",
+  justifyContent: "center",
+}
 function signalBadgeAt(buttonSize: number): ViewStyle {
   return {
-    left: PENTAGON_BADGE_ANCHOR.x * buttonSize - SIGNAL_BADGE_SIZE / 2,
-    top: PENTAGON_BADGE_ANCHOR.y * buttonSize - SIGNAL_BADGE_SIZE / 2,
+    left: PENTAGON_BADGE_ANCHOR.x * buttonSize,
+    top: PENTAGON_BADGE_ANCHOR.y * buttonSize,
   }
 }
-const $largeSignalBadge = signalBadgeAt(MENU_BUTTON_SIZE)
-const $compactSignalBadge = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
+const $largeSignalBadgeCenter = signalBadgeAt(MENU_BUTTON_SIZE)
+const $compactSignalBadgeCenter = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
 const $signalBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  position: "absolute",
   minWidth: SIGNAL_BADGE_SIZE,
   height: SIGNAL_BADGE_SIZE,
   paddingHorizontal: 5,

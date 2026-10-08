@@ -158,7 +158,7 @@ describe("GameRadialMenu", () => {
   const signalLayer = (view: ReturnType<typeof render>, testID: string) =>
     view.UNSAFE_queryAllByType(Polygon).find((polygon) => polygon.props.testID === testID)
 
-  it("colors the whole pentagon border and badges it only while a sync signal is set", () => {
+  it("rings and badges the pentagon while a sync signal is set, fading the ring out in its last color", () => {
     const signal = {
       tone: "offline",
       badge: "3",
@@ -176,7 +176,9 @@ describe("GameRadialMenu", () => {
     )
 
     view.rerender(menu(false))
-    expect(signalLayer(view, "game-menu-signal-ring")!.props.animatedProps.strokeOpacity).toBe(0)
+    expect(signalLayer(view, "game-menu-signal-ring")!.props.stroke).toBe(
+      lightTheme.colors.gameMenu.signal.offline,
+    )
     expect(view.queryByTestId("game-menu-signal-badge")).toBeNull()
   })
 
@@ -185,7 +187,9 @@ describe("GameRadialMenu", () => {
     const view = render(menu(false, jest.fn(), { signal }))
 
     const still = signalLayer(view, "game-menu-signal-trace")!
+    const [stillDash, stillGap] = still.props.strokeDasharray
     expect(still.props.stroke).toBe(lightTheme.colors.gameMenu.signal.catchingUp)
+    expect(stillDash).toBe(stillGap)
     expect(still.props.animatedProps).toBeUndefined()
     expect(signalLayer(view, "game-menu-signal-ring")).toBeUndefined()
 
@@ -194,6 +198,9 @@ describe("GameRadialMenu", () => {
     await waitFor(() =>
       expect(signalLayer(moving, "game-menu-signal-trace")!.props.animatedProps).toBeDefined(),
     )
+    const [sideLength, restOfOutline] = signalLayer(moving, "game-menu-signal-trace")!.props
+      .strokeDasharray
+    expect(restOfOutline).toBeCloseTo(sideLength * 4)
     jest.restoreAllMocks()
     resetReducedMotionCacheForTests()
   })
