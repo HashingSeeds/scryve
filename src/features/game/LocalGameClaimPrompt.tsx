@@ -8,7 +8,6 @@ import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { useAuthAccess } from "@/features/auth/AuthContext"
-import { finishedOnLabel } from "@/screens/gameSummary"
 import { entryPlayerNames, localHistoryEntry } from "@/screens/historyEntries"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -25,10 +24,14 @@ function resultLabel(game: LocalGameSummary) {
   return entry.winnerNames?.length ? `Won by ${entry.winnerNames.join(" & ")}` : "No result"
 }
 
+function whenLabel(timestamp: number) {
+  const date = new Date(timestamp)
+  return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
+}
+
+// why: the result leads so a narrow row truncates the format, not the fact that decides the "This is me" seat.
 function detailLine(game: LocalGameSummary) {
-  return [localHistoryEntry(game).format, finishedOnLabel(game.finishedAt), resultLabel(game)].join(
-    " · ",
-  )
+  return [resultLabel(game), whenLabel(game.finishedAt), localHistoryEntry(game).format].join(" · ")
 }
 
 function ClaimPicker({
