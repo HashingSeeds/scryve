@@ -22,6 +22,7 @@ const SENTRY_ISSUES_URL = "https://sentry.io/api/0/projects/matthew-chisolm/scry
 const PLAYER_FACING_TYPES = new Set(["feat", "fix", "perf"])
 const INTERNAL_SCOPES = new Set(["ci", "deps", "docs", "repo", "scripts", "test", "tooling"])
 const MAX_NOTES = 8
+const PLATFORMS = ["android", "ios"]
 
 const run = (command, args) =>
   execFileSync(command, args, {
@@ -71,31 +72,54 @@ function subjectsSinceProduction(head) {
   return git("log", "--no-merges", "--format=%s", range).split("\n").filter(Boolean)
 }
 
-// `eas update:view` returns one update per platform; a group ships them together.
+// `eas update:view` returns the updates in one group.
 function summarizeGroup(updates) {
   const [first] = updates
   return {
-    group: first.group,
     commit: first.gitCommitHash,
     message: first.message,
-    publishedAt: Date.parse(first.createdAt),
+    firstPublishedAt: Date.parse(first.createdAt),
+    lastPublishedAt: Date.parse(first.createdAt),
+    groups: [first.group],
+    platforms: updates.map((update) => update.platform),
     updateIds: updates.map((update) => update.id),
   }
 }
 
-function findCandidate(now, soakMs) {
-  const groupIds = [
-    ...new Set(
-      eas("update:list", "--branch", "beta", "--limit", "10").currentPage.map((u) => u.group),
-    ),
-  ]
-  const soaking = []
-  for (const groupId of groupIds) {
-    const group = summarizeGroup(eas("update:view", groupId))
-    if (now - group.publishedAt >= soakMs) return { candidate: group, soaking }
-    soaking.push(group)
+// Each platform has its own runtime version, so one merge publishes a group per platform.
+// Groups arrive newest first; a release is promotable once every platform is in and it has soaked.
+function pickRelease(groups, now, soakMs) {
+  const releases = new Map()
+  for (const group of groups) {
+    const release = releases.get(group.commit)
+    // why: re-running beta publishes a commit again, and beta devices run the newest group per platform.
+    if (release?.platforms.some((platform) => group.platforms.includes(platform))) continue
+    const merged = release
+      ? {
+          ...release,
+          firstPublishedAt: Math.min(release.firstPublishedAt, group.firstPublishedAt),
+          lastPublishedAt: Math.max(release.lastPublishedAt, group.lastPublishedAt),
+          groups: [...release.groups, ...group.groups],
+          platforms: [...release.platforms, ...group.platforms],
+          updateIds: [...release.updateIds, ...group.updateIds],
+        }
+      : group
+    releases.set(group.commit, merged)
+    const complete = PLATFORMS.every((platform) => merged.platforms.includes(platform))
+    if (complete && now - merged.lastPublishedAt >= soakMs) {
+      releases.delete(group.commit)
+      return { candidate: merged, soaking: [...releases.values()] }
+    }
   }
+  const soaking = [...releases.values()].filter((release) => now - release.lastPublishedAt < soakMs)
   return { candidate: null, soaking }
+}
+
+function* betaGroups() {
+  const groupIds = new Set(
+    eas("update:list", "--branch", "beta", "--limit", "50").currentPage.map((u) => u.group),
+  )
+  for (const groupId of groupIds) yield summarizeGroup(eas("update:view", groupId))
 }
 
 // why: CI passes SENTRY_READ_TOKEN; on our machines the telemetry skill already stores a read token.
@@ -108,12 +132,12 @@ function sentryToken() {
   return token
 }
 
-// Issues first seen since the candidate was published, on any of its platform updates.
+// Issues first seen since the candidate's first platform published, on any of its updates.
 async function newIssues(candidate) {
   const query = [
     "is:unresolved",
     `updateId:[${candidate.updateIds.join(",")}]`,
-    `firstSeen:>=${new Date(candidate.publishedAt).toISOString()}`,
+    `firstSeen:>=${new Date(candidate.firstPublishedAt).toISOString()}`,
   ].join(" ")
   const url = `${SENTRY_ISSUES_URL}?${new URLSearchParams({ query, statsPeriod: "14d" })}`
   const response = await fetch(url, { headers: { Authorization: `Bearer ${sentryToken()}` } })
@@ -132,9 +156,9 @@ async function promote({ yes, soakMinutes }) {
     )
   }
 
-  const { candidate, soaking } = findCandidate(Date.now(), soakMinutes * 60_000)
-  for (const group of soaking)
-    console.log(`Still soaking: ${group.commit.slice(0, 7)} ${group.message}`)
+  const { candidate, soaking } = pickRelease(betaGroups(), Date.now(), soakMinutes * 60_000)
+  for (const release of soaking)
+    console.log(`Still soaking: ${release.commit.slice(0, 7)} ${release.message}`)
   if (!candidate) return console.log(`Nothing on beta has soaked for ${soakMinutes} minutes yet.`)
 
   const commit = candidate.commit.slice(0, 7)
@@ -148,8 +172,10 @@ async function promote({ yes, soakMinutes }) {
       `${commit} is not ahead of production, so promoting it would roll production back.`,
     )
 
-  const minutes = Math.round((Date.now() - candidate.publishedAt) / 60_000)
-  console.log(`Candidate: ${commit}, beta group ${candidate.group}, on beta for ${minutes} minutes`)
+  const minutes = Math.round((Date.now() - candidate.lastPublishedAt) / 60_000)
+  console.log(
+    `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
+  )
   for (const subject of git(
     "log",
     "--no-merges",
@@ -171,15 +197,16 @@ async function promote({ yes, soakMinutes }) {
   }
   if (!yes) return console.log("No new Sentry issues. Run with --yes to promote.")
 
-  eas(
-    "update:republish",
-    "--group",
-    candidate.group,
-    "--destination-channel",
-    "production",
-    "--message",
-    `Promote ${commit} from beta`,
-  )
+  for (const group of candidate.groups)
+    eas(
+      "update:republish",
+      "--group",
+      group,
+      "--destination-channel",
+      "production",
+      "--message",
+      `Promote ${commit} from beta`,
+    )
   git("push", "origin", `${candidate.commit}:refs/heads/production`)
   console.log(
     `Promoted ${commit}: the app update is live and Pages is building the production web app.`,
@@ -210,4 +237,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { releaseNotes, summarizeGroup }
+module.exports = { pickRelease, releaseNotes, summarizeGroup }

@@ -31,13 +31,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+          cache: pnpm
+
+      # why: EAS evaluates app.config.ts, which imports expo/config-plugins.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Promote the newest clean beta update
         env:
+          APP_VARIANT: production
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           SENTRY_READ_TOKEN: ${{ secrets.SENTRY_READ_TOKEN }}
           SOAK_MINUTES: ${{ inputs.soak_minutes }}
