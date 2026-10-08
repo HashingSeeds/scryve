@@ -158,17 +158,27 @@ function providerSetId(card: NormalizedCard, collectorNumber: string) {
   return card.cardId.endsWith(suffix) ? card.cardId.slice(0, -suffix.length) : undefined
 }
 
+// eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- PTCG Live exports SV and SWSH promos as PR-SV and PR-SW, Limitless calls SWSH promos SP, and TCGdex has no code for swshp.
+const tcgdexSetIdsByDeckListCode = new Map([
+  ["PR-SV", "svp"],
+  ["PR-SW", "swshp"],
+  ["SP", "swshp"],
+])
+
 async function matchesSetCode(ctx: ActionCtx, card: NormalizedCard, setCode: string) {
   const collectorNumber = card.printings[0]?.collectorNumber
   if (!collectorNumber) return false
   const setId = providerSetId(card, collectorNumber)
   if (!setId) return false
+  const aliasedSetId = tcgdexSetIdsByDeckListCode.get(setCode)
+  if (aliasedSetId) return setId === aliasedSetId
   const response = await request(ctx, `/sets/${encodeURIComponent(setId)}`)
   if (!response.ok) return false
   const set = objectRecord((await response.json()) as unknown)
-  const abbreviations = objectRecord(set?.abbreviations)
-  const officialCode = stringValue(set?.tcgOnline) ?? stringValue(abbreviations?.official)
-  return officialCode?.toUpperCase() === setCode
+  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- `tcgOnline` is the retired PTCGO code (ends at Crown Zenith, spells promos "PR-SM"); `abbreviation.official` is the current code ("MEG", subsets "LOR:TG").
+  return [set?.tcgOnline, objectRecord(set?.abbreviation)?.official].some(
+    (code) => stringValue(code)?.split(":")[0]?.toUpperCase() === setCode,
+  )
 }
 
 export async function pokemonCardByReference(

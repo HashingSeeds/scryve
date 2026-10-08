@@ -67,6 +67,80 @@ describe("TCGdex Pokemon cards", () => {
     fetchMock.mockRestore()
   })
 
+  describe("set code tie-break", () => {
+    const ctx = { runMutation: jest.fn(async () => 0) } as unknown as ActionCtx
+    const candidate = (id: string, localId: string, name = "Riolu") => ({ id, localId, name })
+
+    function mockTcgdex(routes: Record<string, unknown>) {
+      const requested: string[] = []
+      const fetchMock = jest.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+        const path = String(input).replace("https://api.tcgdex.net/v2/en", "")
+        requested.push(path)
+        return path in routes
+          ? new Response(JSON.stringify(routes[path]), { status: 200 })
+          : new Response("{}", { status: 404 })
+      })
+      return { requested, restore: () => fetchMock.mockRestore() }
+    }
+
+    it("picks the candidate whose set abbreviation matches the deck list code", async () => {
+      const tcgdex = mockTcgdex({
+        "/cards?name=Riolu&localId=76": [candidate("bw8-76", "76"), candidate("me01-076", "076")],
+        "/sets/bw8": { id: "bw8", tcgOnline: "PLS", abbreviation: { official: "PLS" } },
+        "/sets/me01": { id: "me01", abbreviation: { official: "MEG" } },
+        "/cards/me01-076": { ...riolu, id: "me01-076", localId: "076" },
+      })
+      try {
+        const result = await pokemonCardByReference(ctx, "Riolu", "MEG 76")
+
+        expect(result.cards.map((card) => card.cardId)).toEqual(["me01-076"])
+      } finally {
+        tcgdex.restore()
+      }
+    })
+
+    it.each([
+      [
+        "a current code when the retired PTCGO code differs",
+        "SMP 1",
+        { tcgOnline: "PR-SM", abbreviation: { official: "SMP" } },
+      ],
+      ["a subset code with its suffix", "LOR 1", { abbreviation: { official: "LOR:TG" } }],
+    ])("matches %s", async (_label, reference, set) => {
+      const tcgdex = mockTcgdex({
+        "/cards?name=Riolu&localId=1": [candidate("other-1", "1"), candidate("target-1", "1")],
+        "/sets/other": { abbreviation: { official: "OTH" } },
+        "/sets/target": set,
+        "/cards/target-1": { ...riolu, id: "target-1", localId: "1" },
+      })
+      try {
+        const result = await pokemonCardByReference(ctx, "Riolu", reference)
+
+        expect(result.cards.map((card) => card.cardId)).toEqual(["target-1"])
+      } finally {
+        tcgdex.restore()
+      }
+    })
+
+    it("maps PTCG Live promo codes to TCGdex sets without loading set details", async () => {
+      const tcgdex = mockTcgdex({
+        "/cards?name=Riolu&localId=149": [
+          candidate("sv01-149", "149"),
+          candidate("svp-149", "149"),
+        ],
+        "/cards/svp-149": { ...riolu, id: "svp-149", localId: "149" },
+      })
+      try {
+        const result = await pokemonCardByReference(ctx, "Riolu", "PR-SV 149")
+
+        expect(result.cards.map((card) => card.cardId)).toEqual(["svp-149"])
+        expect(tcgdex.requested.some((path) => path.startsWith("/sets/"))).toBe(false)
+      } finally {
+        tcgdex.restore()
+      }
+    })
+  })
+
   it("loads only bounded, filtered pages for deck catalog summaries", async () => {
     const fetchMock = jest
       .spyOn(globalThis, "fetch")
