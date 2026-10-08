@@ -124,6 +124,85 @@ describe("history.entries", () => {
   })
 })
 
+const SCRYVE_MATCH_ID = "match_local_bo3_000001"
+
+/** why: the same two seats every game, published from the device in order. */
+function scryveMatchGame(gameNumber: number, winner: "me" | "them") {
+  const finishedAt = GAME_AT + gameNumber * 60_000
+  return {
+    publicId: `game_local_match_${String(gameNumber).padStart(6, "0")}`,
+    system: "mtg",
+    format: "modern",
+    ruleset: "modern",
+    startingLife: 20,
+    startedAt: finishedAt - 30_000,
+    finishedAt,
+    eventCount: 3,
+    players: [
+      { localId: "me", seat: 1, displayName: "Alice", color: "#7C3AED", currentLife: 4, me: true },
+      { localId: "them", seat: 2, displayName: "Grace", color: "#2563EB", currentLife: 0 },
+    ],
+    result: { kind: "win" as const, winnerLocalIds: [winner] },
+    match: { publicId: SCRYVE_MATCH_ID, bestOf: 3 as const, gameNumber },
+  }
+}
+
+describe("history.entries Scryve matches", () => {
+  it("adds the match summary to every game of a Scryve match", async () => {
+    const t = convexTest(schema, modules)
+    const { actor } = await signedIn(t, "history-owner", "Alice")
+    const page = async () =>
+      (await actor.query(api.history.entries, { paginationOpts: { cursor: null, numItems: 10 } }))
+        .page
+
+    await actor.mutation(api.games.publishFinishedLocalGame, scryveMatchGame(1, "me"))
+    await actor.mutation(api.games.publishFinishedLocalGame, scryveMatchGame(2, "them"))
+    const active = await page()
+    expect(active.map((row) => (row.kind === "game" ? row.match : undefined))).toEqual([
+      {
+        publicId: SCRYVE_MATCH_ID,
+        bestOf: 3,
+        status: "active",
+        seats: [
+          { seat: 1, mine: true },
+          { seat: 2, mine: false },
+        ],
+      },
+      expect.objectContaining({ publicId: SCRYVE_MATCH_ID, status: "active" }),
+    ])
+
+    await actor.mutation(api.games.publishFinishedLocalGame, scryveMatchGame(3, "me"))
+    const finishedAt = GAME_AT + 4 * 60_000
+    await actor.mutation(api.matches.finishScryveMatch, {
+      publicId: SCRYVE_MATCH_ID,
+      finishedAt,
+      gameCount: 3,
+      seats: [
+        { seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win" },
+        { seat: 2, gamesWon: 1, gamesDrawn: 0, outcome: "loss" },
+      ],
+    })
+    const finished = await page()
+    expect(finished).toHaveLength(3)
+    expect(finished.map((row) => (row.kind === "game" ? row.matchGameNumber : undefined))).toEqual([
+      3, 2, 1,
+    ])
+    for (const row of finished) {
+      expect(row.kind === "game" && row.match).toEqual({
+        publicId: SCRYVE_MATCH_ID,
+        bestOf: 3,
+        status: "finished",
+        finishedAt,
+        outcome: "win",
+        seats: [
+          { seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win", mine: true },
+          { seat: 2, gamesWon: 1, gamesDrawn: 0, outcome: "loss", mine: false },
+        ],
+      })
+    }
+  })
+})
+
 describe("history.manualMatch", () => {
   it("lets a player without a username save, open, and delete a result", async () => {
     const t = convexTest(schema, modules)

@@ -498,6 +498,143 @@ describe("unified history screen", () => {
   })
 })
 
+describe("HistoryScreen Scryve matches", () => {
+  const match = { id: "match_1", bestOf: 3, gameNumber: 1, wins: [0, 0], draws: 0 } as const
+  // why: Ada takes the Bo3 2-1; the third game carries the match result like the device stores it.
+  const deviceGames = [
+    localGame({
+      id: "m-g1",
+      finishedAt: NOW - 3 * HOUR,
+      match,
+      result: { kind: "win", winnerPlayerIds: ["p1"] },
+    } as never),
+    localGame({
+      id: "m-g2",
+      finishedAt: NOW - 2 * HOUR,
+      match: { ...match, gameNumber: 2, wins: [1, 0] },
+      result: { kind: "win", winnerPlayerIds: ["p2"] },
+    } as never),
+    localGame({
+      id: "m-g3",
+      finishedAt: NOW - HOUR / 2,
+      match: { ...match, gameNumber: 3, wins: [1, 1], result: { outcomes: ["win", "loss"] } },
+      result: { kind: "win", winnerPlayerIds: ["p1"] },
+    } as never),
+  ]
+  const claimed = (game: LocalGameSummary) => ({
+    ...game,
+    account: { ownerId: "owner", mePlayerId: "p1" as never },
+    publish: "published" as const,
+  })
+  const serverGame = (
+    publicId: string,
+    finishedAt: number,
+    outcome: "win" | "loss",
+    matchGameNumber: number,
+  ) =>
+    connectedGame({
+      publicId,
+      source: "local",
+      finishedAt,
+      outcome,
+      matchGameNumber,
+      match: {
+        publicId: "match_1",
+        bestOf: 3,
+        status: "finished",
+        outcome: "win",
+        seats: [
+          { seat: 1, gamesWon: 2, gamesDrawn: 0, outcome: "win", mine: true },
+          { seat: 2, gamesWon: 1, gamesDrawn: 0, outcome: "loss", mine: false },
+        ],
+      },
+    })
+  const rowIds = () => screen.getAllByTestId(/^history-row-/).map((row) => row.props.testID)
+
+  it("shows a device match as one row that expands into its games", () => {
+    const { onSelectLocal } = renderHistory({ games: [localGame(), ...deviceGames] })
+
+    expect(rowIds()).toEqual(["history-row-match-match_1", "history-row-local-local-1"])
+    expect(screen.getByLabelText("Win · Ada · Grace · Local · Bo3 2-1 · 3 games")).toBeTruthy()
+
+    fireEvent.press(screen.getByTestId("history-row-match-match_1"))
+    expect(rowIds()).toEqual([
+      "history-row-match-match_1",
+      "history-row-local-m-g3",
+      "history-row-local-m-g2",
+      "history-row-local-m-g1",
+      "history-row-local-local-1",
+    ])
+    expect(screen.getByLabelText(/Game 2 · .* · Won by Grace/)).toBeTruthy()
+
+    fireEvent.press(screen.getByTestId("history-row-local-m-g2"))
+    expect(onSelectLocal).toHaveBeenCalledWith("m-g2")
+
+    fireEvent.press(screen.getByTestId("history-row-match-match_1"))
+    expect(rowIds()).toEqual(["history-row-match-match_1", "history-row-local-local-1"])
+  })
+
+  it("keeps one match row as older pages arrive and device copies overlap server rows", () => {
+    const games = [claimed(deviceGames[2])]
+    const props = { games, onBack: jest.fn(), onSelectLocal: jest.fn() }
+    const view = render(
+      themed(
+        <HistoryScreen
+          {...props}
+          onSelectConnected={jest.fn()}
+          onSelectManual={jest.fn()}
+          connected={connectedFeed([serverGame("m-g3", NOW - HOUR / 2, "win", 3)])}
+        />,
+      ),
+    )
+    expect(rowIds()).toEqual(["history-row-match-match_1"])
+    fireEvent.press(screen.getByTestId("history-row-match-match_1"))
+    expect(rowIds()).toEqual(["history-row-match-match_1", "history-row-local-m-g3"])
+    // why: the only loaded game is still game 3 of the match, not game 1 of what is loaded.
+    expect(screen.getByLabelText(/Game 3 · /)).toBeTruthy()
+
+    view.rerender(
+      themed(
+        <HistoryScreen
+          {...props}
+          onSelectConnected={jest.fn()}
+          onSelectManual={jest.fn()}
+          connected={connectedFeed([
+            serverGame("m-g3", NOW - HOUR / 2, "win", 3),
+            serverGame("m-g2", NOW - 2 * HOUR, "loss", 2),
+            serverGame("m-g1", NOW - 3 * HOUR, "win", 1),
+          ])}
+        />,
+      ),
+    )
+    expect(screen.getAllByTestId("history-row-match-match_1")).toHaveLength(1)
+    expect(rowIds()).toEqual([
+      "history-row-match-match_1",
+      "history-row-local-m-g3",
+      "history-row-local-m-g2",
+      "history-row-local-m-g1",
+    ])
+  })
+
+  it("labels an unfinished match in progress", () => {
+    renderHistory({ games: [localGame(), ...deviceGames.slice(0, 2)] })
+
+    expect(
+      screen.getByLabelText("In progress · Ada · Grace · Local · Bo3 1-1 · In progress · 2 games"),
+    ).toBeTruthy()
+  })
+
+  it("filters a match by the match result, not its games", () => {
+    renderHistory({ games: [localGame(), ...deviceGames.map(claimed)] })
+
+    openFilters()
+    fireEvent.press(screen.getByTestId("history-outcome-win"))
+    fireEvent.press(screen.getByTestId("history-filters-button"))
+
+    expect(rowIds()).toEqual(["history-row-match-match_1"])
+  })
+})
+
 describe("HistoryScreen published local games", () => {
   it("keeps the device copy's winner line when the server row for the same game arrives", () => {
     const game = localGame({
