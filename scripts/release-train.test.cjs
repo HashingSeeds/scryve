@@ -50,7 +50,8 @@ test("a release carries every platform's group for its commit", () => {
   )
   assert.deepEqual(candidate.groups, ["g-old-ios", "g-old-android"])
   assert.deepEqual(candidate.updateIds, ["old-ios", "old-android"])
-  assert.equal(candidate.publishedAt, 30 * MINUTE)
+  assert.equal(candidate.firstPublishedAt, 29 * MINUTE)
+  assert.equal(candidate.lastPublishedAt, 30 * MINUTE)
   assert.deepEqual(
     soaking.map((release) => release.commit),
     ["new"],

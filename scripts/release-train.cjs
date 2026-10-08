@@ -78,7 +78,8 @@ function summarizeGroup(updates) {
   return {
     commit: first.gitCommitHash,
     message: first.message,
-    publishedAt: Date.parse(first.createdAt),
+    firstPublishedAt: Date.parse(first.createdAt),
+    lastPublishedAt: Date.parse(first.createdAt),
     groups: [first.group],
     platforms: updates.map((update) => update.platform),
     updateIds: updates.map((update) => update.id),
@@ -96,7 +97,8 @@ function pickRelease(groups, now, soakMs) {
     const merged = release
       ? {
           ...release,
-          publishedAt: Math.max(release.publishedAt, group.publishedAt),
+          firstPublishedAt: Math.min(release.firstPublishedAt, group.firstPublishedAt),
+          lastPublishedAt: Math.max(release.lastPublishedAt, group.lastPublishedAt),
           groups: [...release.groups, ...group.groups],
           platforms: [...release.platforms, ...group.platforms],
           updateIds: [...release.updateIds, ...group.updateIds],
@@ -104,12 +106,12 @@ function pickRelease(groups, now, soakMs) {
       : group
     releases.set(group.commit, merged)
     const complete = PLATFORMS.every((platform) => merged.platforms.includes(platform))
-    if (complete && now - merged.publishedAt >= soakMs) {
+    if (complete && now - merged.lastPublishedAt >= soakMs) {
       releases.delete(group.commit)
       return { candidate: merged, soaking: [...releases.values()] }
     }
   }
-  const soaking = [...releases.values()].filter((release) => now - release.publishedAt < soakMs)
+  const soaking = [...releases.values()].filter((release) => now - release.lastPublishedAt < soakMs)
   return { candidate: null, soaking }
 }
 
@@ -130,12 +132,12 @@ function sentryToken() {
   return token
 }
 
-// Issues first seen since the candidate was published, on any of its platform updates.
+// Issues first seen since the candidate's first platform published, on any of its updates.
 async function newIssues(candidate) {
   const query = [
     "is:unresolved",
     `updateId:[${candidate.updateIds.join(",")}]`,
-    `firstSeen:>=${new Date(candidate.publishedAt).toISOString()}`,
+    `firstSeen:>=${new Date(candidate.firstPublishedAt).toISOString()}`,
   ].join(" ")
   const url = `${SENTRY_ISSUES_URL}?${new URLSearchParams({ query, statsPeriod: "14d" })}`
   const response = await fetch(url, { headers: { Authorization: `Bearer ${sentryToken()}` } })
@@ -170,7 +172,7 @@ async function promote({ yes, soakMinutes }) {
       `${commit} is not ahead of production, so promoting it would roll production back.`,
     )
 
-  const minutes = Math.round((Date.now() - candidate.publishedAt) / 60_000)
+  const minutes = Math.round((Date.now() - candidate.lastPublishedAt) / 60_000)
   console.log(
     `Candidate: ${commit}, beta groups ${candidate.groups.join(", ")}, on beta for ${minutes} minutes`,
   )
