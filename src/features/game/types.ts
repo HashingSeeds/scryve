@@ -22,6 +22,9 @@ export interface GamePlayer {
   seat: number
 }
 
+/** why: life stays out so another seat's life change does not re-render commander boards and strips on every card. */
+export type CommanderBoardPlayer = Pick<GamePlayer, "id" | "name" | "color" | "shape">
+
 interface BaseGameEvent {
   operationId: OperationId
   gameId: GameId

@@ -2,7 +2,7 @@ import type { StyleProp, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
-import type { GamePlayer, PlayerId } from "@/features/game/types"
+import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -22,7 +22,7 @@ import { Sword } from "./Sword"
 import { Text } from "./Text"
 
 export interface CommanderDamageBoardProps {
-  players?: readonly GamePlayer[]
+  players?: readonly CommanderBoardPlayer[]
   ownerPlayerId: PlayerId
   seats: readonly CommanderBoardSeat[]
   rows: number

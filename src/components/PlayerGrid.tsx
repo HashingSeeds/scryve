@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { type PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
-import type { GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
+import type { CommanderBoardPlayer, GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -138,7 +138,7 @@ export function PlayerGrid({
   const screenTopEdgeBand = useTopEdgeBand()
   const topEdgeBand = boardRotation === 0 ? screenTopEdgeBand : 0
   const [board, setBoard] = useState({ width: 0, height: 0 })
-  const changeHandlerFor = useStablePlayerHandlers(onChange)
+  const stable = useStableCallbacks()
   const counter = playSystemRules(system).counter
   const layout = getPlayerGridLayout({
     playerCount: players.length,
@@ -179,6 +179,12 @@ export function PlayerGrid({
       )
     : null
   const armedPlayer = players.find(({ id }) => id === commanderDamage?.armedPlayerId)
+  const commanderPlayers = players.map(({ id, name, color, shape }): CommanderBoardPlayer => ({
+    id,
+    name,
+    color,
+    shape,
+  }))
 
   return (
     <View testID="player-grid-frame" style={$frame}>
@@ -294,16 +300,17 @@ export function PlayerGrid({
                       commanderDamage && boardSeats
                         ? {
                             ownerPlayerId: player.id,
-                            players: commanderDamage.inspection ? players : undefined,
+                            players: commanderDamage.inspection ? commanderPlayers : undefined,
                             inspection: commanderDamage.inspection
                               ? {
                                   open: commanderDamage.inspection.playerId === player.id,
-                                  onToggle: () =>
+                                  onToggle: stable(`inspect:${player.id}`, () =>
                                     commanderDamage.inspection?.onChange(
                                       commanderDamage.inspection.playerId === player.id
                                         ? null
                                         : player.id,
                                     ),
+                                  ),
                                 }
                               : undefined,
                             seats: boardSeats.seats,
@@ -319,22 +326,28 @@ export function PlayerGrid({
                             },
                             stagedAgainstOwner: commanderDamage.staging?.stagedFor(player) ?? 0,
                             pendingClaims: commanderDamage.pendingFor?.(player),
-                            onPressSword: () => commanderDamage.onPressSword(player),
-                            onStage: (step) => commanderDamage.onStage(player, step),
+                            onPressSword: stable(`sword:${player.id}`, () =>
+                              commanderDamage.onPressSword(player),
+                            ),
+                            onStage: stable(`stage:${player.id}`, (step: number) =>
+                              commanderDamage.onStage(player, step),
+                            ),
                             ...(commanderDamage.staging &&
                             commanderDamage.armedPlayerId === player.id
                               ? {
                                   armBar: {
                                     stagedTargets: commanderDamage.staging.stagedTargets,
-                                    onSend: commanderDamage.staging.onSend,
-                                    onCancel: commanderDamage.staging.onCancel,
+                                    onSend: stable("armSend", commanderDamage.staging.onSend),
+                                    onCancel: stable("armCancel", commanderDamage.staging.onCancel),
                                   },
                                 }
                               : {}),
                           }
                         : undefined
                     }
-                    onChange={changeHandlerFor(player.id)}
+                    onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
+                      onChange(player.id, delta),
+                    )}
                     style={getScreenCornerSquaringStyle({
                       rows,
                       rowIndex,
@@ -352,20 +365,29 @@ export function PlayerGrid({
   )
 }
 
-/** why: `LifeCard` is memoized, so each seat needs one handler identity for the life of the board; it always calls the latest `onChange`. */
-function useStablePlayerHandlers(onChange: PlayerGridProps["onChange"]) {
-  const latest = useRef(onChange)
+type Callback = (...args: never[]) => unknown
+
+/** why: `LifeCard` is memoized and compares props structurally, so each per-seat callback keeps one identity for the life of the board. Each render's closures become the latest only after commit, so a discarded render never leaks into a handler. */
+function useStableCallbacks() {
+  const entries = useRef(new Map<string, { latest: Callback; stable: Callback }>()).current
+  const rendered = useRef(new Map<string, Callback>()).current
+  rendered.clear()
   useLayoutEffect(() => {
-    latest.current = onChange
-  })
-  const handlers = useRef(new Map<PlayerId, (delta: LifeDelta) => void>()).current
-  return (playerId: PlayerId) => {
-    let handler = handlers.get(playerId)
-    if (!handler) {
-      handler = (delta) => latest.current(playerId, delta)
-      handlers.set(playerId, handler)
+    for (const [key, fn] of rendered) {
+      const entry = entries.get(key)
+      if (entry) entry.latest = fn
     }
-    return handler
+  })
+  return <Fn extends Callback>(key: string, fn: Fn): Fn => {
+    rendered.set(key, fn)
+    const existing = entries.get(key)
+    if (existing) return existing.stable as Fn
+    const entry: { latest: Callback; stable: Callback } = {
+      latest: fn,
+      stable: (...args) => entry.latest(...args),
+    }
+    entries.set(key, entry)
+    return entry.stable as Fn
   }
 }
 
