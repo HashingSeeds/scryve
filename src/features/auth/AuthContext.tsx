@@ -37,6 +37,15 @@ export function useAuthAccess() {
   return useContext(AuthAccessContext)
 }
 
+// why: keys the app tree. Sign-out and account switches remount so no screen keeps the old account's state; signing in keeps what the player entered, like a scanned invite.
+function useAccountGeneration(userId: string | undefined) {
+  const [account, setAccount] = useState({ userId, generation: 0 })
+  if (account.userId === userId) return account.generation
+  const generation = account.userId === undefined ? account.generation : account.generation + 1
+  setAccount({ userId, generation })
+  return generation
+}
+
 export function ConfiguredAuth({
   children,
   convexUrl,
@@ -55,6 +64,7 @@ export function ConfiguredAuth({
     isSignedIn: Boolean(isSignedIn),
     userId: user?.id,
   })
+  const accountGeneration = useAccountGeneration(user?.id ?? sessionHint?.userId ?? undefined)
   const value = useMemo<AuthAccess>(
     () => ({
       configured: true,
@@ -83,9 +93,9 @@ export function ConfiguredAuth({
     <ConvexProviderWithAuth client={client} useAuth={convexUseAuth}>
       <DeckSyncSession ownerId={isLoaded && isSignedIn ? user?.id : undefined} />
       <ConvexAuthReconnect onReconnect={retryConvexAuth} />
-      {/* why: keyed on the hinted user too, so Clerk confirming that user at launch does not remount the app. */}
+      {/* why: the hinted user counts as the account, so Clerk confirming that user at launch does not remount the app. */}
       <RevenueCatProvider
-        key={user?.id ?? sessionHint?.userId ?? undefined}
+        key={accountGeneration}
         apiKey={revenueCat.configured ? revenueCat.value.apiKey : undefined}
         appUserID={user?.id}
         configurationMessage={revenueCat.configured ? undefined : revenueCat.message}
