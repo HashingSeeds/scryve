@@ -736,7 +736,7 @@ describe("premium deck tracking", () => {
     const record = { ...scryve, connected, manual }
     const detail = await owner.query(api.decks.detail, { deckId })
     expect(detail).toMatchObject({ record, versions: [{ record }] })
-    expect(detail.record?.connected.matches).toBeUndefined()
+    expect(detail.record?.connected).toEqual(connected)
     await expect(owner.query(api.decks.stats, { deckId })).resolves.toMatchObject({
       locked: false,
       ...record,
