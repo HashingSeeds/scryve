@@ -1,4 +1,12 @@
-import { useMemo, type ReactElement } from "react"
+import { useEffect, useMemo, useState, type ReactElement } from "react"
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedProps,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated"
 import Svg, {
   ClipPath,
   Defs,
@@ -213,24 +221,93 @@ function PentagonHairline({ color }: { color: string }): ReactElement {
   )
 }
 
-const OUTLINE_CORNERS = PENTAGON_POINTS.split(" ")
+const AnimatedPolygon = Animated.createAnimatedComponent(Polygon)
 
-export interface LitBorderSide {
-  index: number
+const PENTAGON_PERIMETER = PENTAGON_SIDES * 2 * PENTAGON_RADIUS * Math.sin(Math.PI / PENTAGON_SIDES)
+const TRACE_LENGTH = PENTAGON_PERIMETER / PENTAGON_SIDES
+const TRACE_LAP_MS = 1400
+const RING_FADE_MS = 250
+// why: eight dashes per side divide the outline evenly, so no corner gets a doubled dash.
+const STILL_TRACE_DASH = TRACE_LENGTH / 8
+
+export interface BorderSignal {
   color: string
+  motion: "ring" | "trace"
 }
 
-function LitSide({ side }: { side: LitBorderSide }): ReactElement {
-  const from = OUTLINE_CORNERS[side.index % PENTAGON_SIDES]
-  const to = OUTLINE_CORNERS[(side.index + 1) % PENTAGON_SIDES]
+function SignalBorder({
+  signal,
+  animate,
+}: {
+  signal?: BorderSignal
+  animate: boolean
+}): ReactElement {
+  const trace = signal?.motion === "trace" ? signal.color : undefined
   return (
-    <Polyline
-      testID="game-menu-lit-side"
-      points={`${from} ${to}`}
+    <>
+      <SignalRing color={signal?.motion === "ring" ? signal.color : undefined} animate={animate} />
+      {trace && animate ? <SignalTrace color={trace} /> : null}
+      {trace && !animate ? (
+        <Polygon
+          testID="game-menu-signal-trace"
+          points={PENTAGON_POINTS}
+          fill="none"
+          stroke={trace}
+          strokeWidth={PENTAGON_STROKE_WIDTH}
+          strokeDasharray={[STILL_TRACE_DASH, STILL_TRACE_DASH]}
+        />
+      ) : null}
+    </>
+  )
+}
+
+// why: the ring keeps its last color while fading out, so the fade never snaps to the board color.
+function SignalRing({ color, animate }: { color?: string; animate: boolean }) {
+  const [shownColor, setShownColor] = useState(color)
+  if (color && color !== shownColor) setShownColor(color)
+  const shown = color !== undefined
+  const opacity = useSharedValue(shown ? 1 : 0)
+  useEffect(() => {
+    const target = shown ? 1 : 0
+    opacity.value = animate ? withTiming(target, { duration: RING_FADE_MS }) : target
+  }, [animate, opacity, shown])
+  const animatedProps = useAnimatedProps(() => ({ strokeOpacity: opacity.value }))
+  if (!shownColor) return null
+  return (
+    <AnimatedPolygon
+      testID="game-menu-signal-ring"
+      points={PENTAGON_POINTS}
       fill="none"
-      stroke={side.color}
+      stroke={shownColor}
       strokeWidth={PENTAGON_STROKE_WIDTH}
+      strokeLinejoin="round"
+      animatedProps={animatedProps}
+    />
+  )
+}
+
+// why: animated props run on the UI thread, so the trace keeps gliding while taps re-render the board.
+function SignalTrace({ color }: { color: string }) {
+  const offset = useSharedValue(0)
+  useEffect(() => {
+    offset.value = withRepeat(
+      withTiming(-PENTAGON_PERIMETER, { duration: TRACE_LAP_MS, easing: Easing.linear }),
+      -1,
+    )
+    return () => cancelAnimation(offset)
+  }, [offset])
+  const animatedProps = useAnimatedProps(() => ({ strokeDashoffset: offset.value }))
+  return (
+    <AnimatedPolygon
+      testID="game-menu-signal-trace"
+      points={PENTAGON_POINTS}
+      fill="none"
+      stroke={color}
+      strokeWidth={PENTAGON_STROKE_WIDTH}
+      strokeLinejoin="round"
       strokeLinecap="round"
+      strokeDasharray={[TRACE_LENGTH, PENTAGON_PERIMETER - TRACE_LENGTH]}
+      animatedProps={animatedProps}
     />
   )
 }
@@ -239,19 +316,21 @@ export interface GameMenuButtonShapeProps {
   variant: MenuButtonStyle
   isDark: boolean
   boardBackgroundColor: string
-  borderColor?: string
-  litSide?: LitBorderSide
   seatColors?: readonly string[]
+  signal?: BorderSignal
+  // why: off while reduced motion is on or unknown, so rings appear at once and traces hold still as dashes.
+  animateSignal?: boolean
 }
 
 export function GameMenuButtonShape({
   variant,
   isDark,
   boardBackgroundColor,
-  borderColor = boardBackgroundColor,
-  litSide,
   seatColors,
+  signal,
+  animateSignal = false,
 }: GameMenuButtonShapeProps): ReactElement {
+  const signalLayer = <SignalBorder signal={signal} animate={animateSignal} />
   return (
     <Svg
       testID="game-menu-pentagon"
@@ -263,17 +342,16 @@ export function GameMenuButtonShape({
         <PrismShape
           isDark={isDark}
           boardBackgroundColor={boardBackgroundColor}
-          borderColor={borderColor}
           seatColors={seatColors}
+          signalLayer={signalLayer}
         />
       ) : (
         <KeystoneTwoShape
           isDark={isDark}
           boardBackgroundColor={boardBackgroundColor}
-          borderColor={borderColor}
+          signalLayer={signalLayer}
         />
       )}
-      {litSide ? <LitSide side={litSide} /> : null}
     </Svg>
   )
 }
@@ -281,11 +359,11 @@ export function GameMenuButtonShape({
 function KeystoneTwoShape({
   isDark,
   boardBackgroundColor,
-  borderColor,
+  signalLayer,
 }: {
   isDark: boolean
   boardBackgroundColor: string
-  borderColor: string
+  signalLayer: ReactElement
 }): ReactElement {
   const face = isDark ? KEYSTONE_II_FACE.dark : KEYSTONE_II_FACE.light
   return (
@@ -302,10 +380,11 @@ function KeystoneTwoShape({
       <Polygon
         points={PENTAGON_POINTS}
         fill="url(#keystoneTwoFill)"
-        stroke={borderColor}
+        stroke={boardBackgroundColor}
         strokeWidth={PENTAGON_STROKE_WIDTH}
         strokeLinejoin="round"
       />
+      {signalLayer}
       {isDark ? null : <PentagonBevel clipId="keystoneTwoFace" opacity={KEYSTONE_II_BEVEL} />}
       <PentagonHairline color={boardBackgroundColor} />
     </>
@@ -315,13 +394,13 @@ function KeystoneTwoShape({
 function PrismShape({
   isDark,
   boardBackgroundColor,
-  borderColor,
   seatColors,
+  signalLayer,
 }: {
   isDark: boolean
   boardBackgroundColor: string
-  borderColor: string
   seatColors?: readonly string[]
+  signalLayer: ReactElement
 }): ReactElement {
   const palette = seatColors && seatColors.length > 0 ? seatColors : PLAYER_COLORS
   const paletteKey = palette.join("|")
@@ -365,10 +444,11 @@ function PrismShape({
       <Polygon
         points={PENTAGON_POINTS}
         fill="none"
-        stroke={borderColor}
+        stroke={boardBackgroundColor}
         strokeWidth={PENTAGON_STROKE_WIDTH}
         strokeLinejoin="round"
       />
+      {signalLayer}
       {isDark ? null : <PentagonBevel clipId="prismFace" opacity={PRISM_BEVEL} />}
       <PentagonHairline color={boardBackgroundColor} />
     </>

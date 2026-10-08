@@ -1,12 +1,16 @@
-import { type ComponentProps, memo, useEffect, useState } from "react"
+import { type ComponentProps, memo, useEffect } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withSequence,
   withSpring,
   withTiming,
+  ZoomIn,
+  ZoomOut,
 } from "react-native-reanimated"
 
 import { nearestEquivalentAngle } from "@/features/game/pinnedBoardGeometry"
@@ -88,7 +92,6 @@ export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
 const ACTION_WIDTH = 116
 const ACTION_HEIGHT = 52
 
-const BORDER_CHASE_STEP_MS = 180
 const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
 const STATUS_LINE_DISTANCE = 128
 const STATUS_LINE_HEIGHT = 40
@@ -102,6 +105,13 @@ const ACTION_START_DISTANCE = 40
 const ACTION_START_SCALE = 0.5
 const ACTION_START_ROTATION_LAG_DEG = 25
 const ACTION_POSE_SPRING = { damping: 13, stiffness: 210, mass: 0.8 } as const
+const SIGNAL_BADGE_SCALE_MS = 180
+// why: "needs you" is the one state worth interrupting for, so the button pops once when it arrives.
+const ATTENTION_POP_SCALE = 1.1
+const ATTENTION_POP_RISE_MS = 130
+const ATTENTION_POP_SETTLE_MS = 190
+// why: flat at the start, so a first web frame that lands before the start time cannot shrink the button.
+const POP_EASING = Easing.inOut(Easing.quad)
 const PENTAGON_SPIN_SPRING = {
   damping: 18,
   stiffness: 220,
@@ -430,6 +440,18 @@ function GameMenuAnchor({
   const pentagonSpinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${pentagonRotation.value}deg` }],
   }))
+
+  const pop = useSharedValue(1)
+  const needsAttention = signal?.tone === "attention"
+  useEffect(() => {
+    if (!needsAttention || !animateFully) return
+    pop.value = withSequence(
+      withTiming(ATTENTION_POP_SCALE, { duration: ATTENTION_POP_RISE_MS, easing: POP_EASING }),
+      withTiming(1, { duration: ATTENTION_POP_SETTLE_MS, easing: POP_EASING }),
+    )
+  }, [animateFully, needsAttention, pop])
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }))
+
   return (
     <Animated.View
       testID="game-menu-anchor"
@@ -438,6 +460,7 @@ function GameMenuAnchor({
         themed($anchor),
         compact ? themed($compactAnchor) : themed($largeAnchor),
         anchorStyle,
+        popStyle,
       ]}
     >
       <BoardPressable
@@ -477,9 +500,11 @@ function GameMenuAnchor({
         />
       </BoardPressable>
       {signal?.badge ? (
-        <View
+        <Animated.View
           testID="game-menu-signal-badge"
           pointerEvents="none"
+          entering={animateFully ? ZoomIn.duration(SIGNAL_BADGE_SCALE_MS) : undefined}
+          exiting={animateFully ? ZoomOut.duration(SIGNAL_BADGE_SCALE_MS) : undefined}
           style={[themed($signalBadge), { backgroundColor: colors.gameMenu.signal[signal.tone] }]}
         >
           <Text
@@ -491,20 +516,10 @@ function GameMenuAnchor({
               { color: accessibleForeground(colors.gameMenu.signal[signal.tone]) },
             ]}
           />
-        </View>
+        </Animated.View>
       ) : null}
     </Animated.View>
   )
-}
-
-function useChasingSide(active: boolean): number | undefined {
-  const [side, setSide] = useState(0)
-  useEffect(() => {
-    if (!active) return
-    const timer = setInterval(() => setSide((current) => (current + 1) % 5), BORDER_CHASE_STEP_MS)
-    return () => clearInterval(timer)
-  }, [active])
-  return active ? side : undefined
 }
 
 function SignalledMenuButtonShape({
@@ -523,21 +538,20 @@ function SignalledMenuButtonShape({
   const {
     theme: { colors },
   } = useAppTheme()
-  const moving = tone !== undefined && MOVING_SIGNAL_TONES.includes(tone)
-  const animateMovement = moving && reducedMotion === false
-  const litSideIndex = useChasingSide(animateMovement)
-  const toneColor = tone ? colors.gameMenu.signal[tone] : undefined
   return (
     <GameMenuButtonShape
       variant={variant}
       isDark={isDark}
       boardBackgroundColor={colors.gameMenu.anchorBorder}
-      borderColor={moving && animateMovement ? undefined : toneColor}
-      litSide={
-        toneColor && litSideIndex !== undefined
-          ? { index: litSideIndex, color: toneColor }
+      signal={
+        tone
+          ? {
+              color: colors.gameMenu.signal[tone],
+              motion: MOVING_SIGNAL_TONES.includes(tone) ? "trace" : "ring",
+            }
           : undefined
       }
+      animateSignal={reducedMotion === false}
       seatColors={seatColors}
     />
   )
