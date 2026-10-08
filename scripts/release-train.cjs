@@ -138,10 +138,11 @@ async function promote({ yes, soakMinutes }) {
   if (!candidate) return console.log(`Nothing on beta has soaked for ${soakMinutes} minutes yet.`)
 
   const commit = candidate.commit.slice(0, 7)
-  if (candidate.commit === git("rev-parse", PRODUCTION_REF))
-    return console.log(`Production already runs ${commit}.`)
   if (!isAncestor(candidate.commit, "origin/main"))
     throw new Error(`${commit} is not on main; only merged commits are promoted.`)
+  // why: a hotfix promoted with --soak-minutes 0 can put production ahead of the soaked candidate.
+  if (isAncestor(candidate.commit, PRODUCTION_REF))
+    return console.log(`Production already includes ${commit}.`)
   if (!isAncestor(PRODUCTION_REF, candidate.commit))
     throw new Error(
       `${commit} is not ahead of production, so promoting it would roll production back.`,
