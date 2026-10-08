@@ -77,13 +77,17 @@ function releaseNotes(commits) {
   return { notes, newSince }
 }
 
+// why: a merge commit's subject is "Merge pull request #N from ..."; GitHub puts the PR title on
+// the first line of its body.
 function recentCommits(head) {
-  return git("log", "--first-parent", "--max-count=200", "--format=%H%x09%s", head)
-    .split("\n")
+  return git("log", "--first-parent", "--max-count=200", "--format=%H%x1f%s%x1f%b%x1e", head)
+    .split("\x1e")
+    .map((record) => record.trim())
     .filter(Boolean)
-    .map((line) => {
-      const [commit, ...subject] = line.split("\t")
-      return { commit, subject: subject.join("\t") }
+    .map((record) => {
+      const [commit, subject, body] = record.split("\x1f")
+      const title = subject.startsWith("Merge pull request") ? body.split("\n")[0] : subject
+      return { commit, subject: title }
     })
 }
 
