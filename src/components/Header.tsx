@@ -1,4 +1,4 @@
-import { ReactElement } from "react"
+import { ReactElement, ReactNode } from "react"
 import {
   StyleProp,
   TextStyle,
@@ -58,6 +58,7 @@ export interface HeaderProps {
    * as well as explicitly setting locale or translation fallbacks.
    */
   titleTxOptions?: TextProps["txOptions"]
+  titleAccessory?: ReactNode
   /**
    * Icon that should appear on the left.
    * Can be used with `onLeftPress`.
@@ -167,6 +168,7 @@ export function Header(props: HeaderProps) {
     titleMode = "center",
     titleTx,
     titleTxOptions,
+    titleAccessory,
     titleContainerStyle: $titleContainerStyleOverride,
     style: $styleOverride,
     titleStyle: $titleStyleOverride,
@@ -194,7 +196,8 @@ export function Header(props: HeaderProps) {
         {!!titleContent && (
           <View
             style={[
-              $titleWrapperPointerEvents,
+              titleAccessory ? $titleWrapperAccessoryPointerEvents : $titleWrapperPointerEvents,
+              !!titleAccessory && themed($titleWrapperRow),
               titleMode === "center" && themed($titleWrapperCenter),
               titleMode === "flex" && $titleWrapperFlex,
               $titleContainerStyleOverride,
@@ -206,6 +209,7 @@ export function Header(props: HeaderProps) {
               text={titleContent}
               style={[$title, $titleStyleOverride]}
             />
+            {titleAccessory}
           </View>
         )}
 
@@ -307,6 +311,15 @@ const $actionFillerContainer: ViewStyle = {
 const $titleWrapperPointerEvents: ViewStyle = {
   pointerEvents: "none",
 }
+
+const $titleWrapperAccessoryPointerEvents: ViewStyle = {
+  pointerEvents: "box-none",
+}
+
+const $titleWrapperRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  gap: spacing.xs,
+})
 
 const $titleWrapperCenter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",

@@ -1,10 +1,11 @@
+import { useState } from "react"
 import { View } from "react-native"
 
 import { Button } from "@/components/Button"
 import { Text } from "@/components/Text"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 
-import { AccountDeckCapacity } from "./AccountDeckCapacity"
+import { DeckLimitDialog } from "./DeckLimit"
 import { useGuestDeckImport } from "./useGuestDeckImport"
 
 function deckCount(count: number) {
@@ -18,6 +19,7 @@ export function GuestDeckImportNotice({
   access?: CloudAccess
   transfer: ReturnType<typeof useGuestDeckImport>
 }) {
+  const [makingRoom, setMakingRoom] = useState(false)
   if (!transfer.guestDecks.length || !access?.ready) return null
   const kept = transfer.result?.limitReached ?? 0
   const imported = transfer.result?.imported ?? 0
@@ -54,7 +56,17 @@ export function GuestDeckImportNotice({
               .filter(Boolean)
               .join(" ")}
           />
-          <AccountDeckCapacity access={access} onArchived={() => void transfer.retry()} />
+          <Button text="Make room" onPress={() => setMakingRoom(true)} />
+          {makingRoom ? (
+            <DeckLimitDialog
+              access={access}
+              onClose={() => setMakingRoom(false)}
+              onRoomMade={() => {
+                setMakingRoom(false)
+                void transfer.retry()
+              }}
+            />
+          ) : null}
         </>
       ) : null}
     </View>

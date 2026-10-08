@@ -23,6 +23,7 @@ export interface DialogOrigin {
 export interface DialogCardProps {
   visible: boolean
   onClose: () => void
+  onDismissed?: () => void
   closeDisabled?: boolean
   backdropTestID?: string
   backdropAccessibilityLabel?: string
@@ -42,6 +43,7 @@ const ENTRANCE_SPRING = { damping: 16, stiffness: 200, mass: 0.7 } as const
 export function DialogCard({
   visible,
   onClose,
+  onDismissed,
   closeDisabled = false,
   backdropTestID,
   backdropAccessibilityLabel,
@@ -91,7 +93,7 @@ export function DialogCard({
     }
   })
 
-  if (!visible) return null
+  if (!visible && !onDismissed) return null
 
   const requestClose = () => {
     if (!closeDisabled) onClose()
@@ -100,6 +102,8 @@ export function DialogCard({
   return (
     <Modal
       transparent
+      visible={visible}
+      onDismiss={onDismissed}
       animationType={animateFromOrigin ? "none" : "fade"}
       onRequestClose={requestClose}
     >

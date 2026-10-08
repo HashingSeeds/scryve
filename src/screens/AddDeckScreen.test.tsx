@@ -1,4 +1,4 @@
-import { Linking } from "react-native"
+import { Linking, Modal } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
@@ -413,7 +413,7 @@ describe("AddDeckScreen", () => {
         view.getByText("Synced 1 deck. 1 deck did not fit and is still saved on this device."),
       ).toBeTruthy(),
     )
-    expect(view.getByTestId("account-deck-capacity")).toBeTruthy()
+    expect(view.getByText("Make room")).toBeTruthy()
     expect(loadGuestDecks()).toEqual([kept])
   })
 
@@ -2228,24 +2228,22 @@ describe("AddDeckScreen", () => {
     )
   })
 
-  it("resolves a full account inline without losing the new deck draft", async () => {
+  it("asks for room only when a full account saves, then finishes that save", async () => {
     atCapacity()
     const view = renderAddDeck()
-    expect(view.getByText("You've reached the free account limit of 2 decks.")).toBeTruthy()
-    expect(view.getByText("Upgrade to Pro")).toBeTruthy()
-    chooseMode(view, "paste")
-    expect(view.getAllByTestId("account-deck-capacity")).toHaveLength(1)
+    expect(view.queryByTestId("deck-limit-dialog")).toBeNull()
     chooseMode(view, "blank")
     continueSetup(view)
     fireEvent.changeText(view.getByTestId("deck-name-input"), "Blocked Deck")
+    fireEvent.press(view.getByText("Create deck"))
+    expect(view.getByText("Deck limit reached")).toBeTruthy()
     expect(mockCreate).not.toHaveBeenCalled()
-    expect(view.queryByText("Create deck")).toBeNull()
-    fireEvent.press(view.getByText("Replace a deck"))
-    fireEvent.press(view.getByText("Archive Existing Deck"))
-    fireEvent.press(view.getByText("Keep deck"))
+    fireEvent.press(view.getByText("Delete a deck"))
+    fireEvent.press(view.getByLabelText("Delete Existing Deck"))
+    fireEvent.press(view.getByText("Back"))
     expect(mockArchive).not.toHaveBeenCalled()
-    fireEvent.press(view.getByText("Archive Existing Deck"))
-    fireEvent.press(view.getByText("Archive deck"))
+    fireEvent.press(view.getByLabelText("Delete Existing Deck"))
+    fireEvent.press(view.getByTestId("deck-limit-confirm-delete"))
     await waitFor(() => expect(mockArchive).toHaveBeenCalledWith({ deckId: "existing-deck" }))
     mockListMine.value = {
       ...readyShelf,
@@ -2256,22 +2254,32 @@ describe("AddDeckScreen", () => {
         <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
       </ThemeProvider>,
     )
-    expect(view.getByTestId("deck-name-input").props.value).toBe("Blocked Deck")
-    expect(view.getByText("Create deck")).toBeEnabled()
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith({
+        name: "Blocked Deck",
+        format: "commander",
+        game: "mtg",
+      }),
+    )
+    expect(view.queryByTestId("deck-limit-dialog")).toBeNull()
   })
 
-  it("lets a full free account browse a deck with upgrade and replacement actions", async () => {
+  it("offers Pro when a full free account imports a browsed deck", async () => {
     atCapacity()
     const view = renderAddDeck()
     await act(async () => jest.advanceTimersByTime(400))
     fireEvent.press(view.getByText("Explorers of the Deep"))
     await waitFor(() => expect(view.getByText("1× Hakbal of the Surging Soul")).toBeTruthy())
-    expect(view.getByText("Upgrade to Pro")).toBeTruthy()
-    expect(view.getByText("Replace a deck")).toBeTruthy()
+    await waitFor(() => expect(view.getByTestId("import-preview-button")).toBeEnabled())
+    fireEvent.press(view.getByTestId("import-preview-button"))
     fireEvent.press(view.getByText("Upgrade to Pro"))
-    expect(mockPresentPaywall).toHaveBeenCalledTimes(1)
-    expect(view.queryByTestId("import-preview-button")).toBeNull()
+    expect(mockPresentPaywall).not.toHaveBeenCalled()
+    const hiding = view.UNSAFE_getAllByType(Modal).find((modal) => modal.props.visible === false)
+    act(() => hiding?.props.onDismiss())
+    await waitFor(() => expect(mockPresentPaywall).toHaveBeenCalledTimes(1))
     expect(mockImport).not.toHaveBeenCalled()
+    fireEvent.press(view.getByText("Not now"))
+    expect(view.queryByTestId("deck-limit-dialog")).toBeNull()
   })
 
   it("keeps entered data while the deck limit is still loading", () => {
