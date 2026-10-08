@@ -697,6 +697,70 @@ describe("premium deck tracking", () => {
     })
   })
 
+  it("shows other players a neutral label for a deck name that fails the name filter", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "host", "Host")
+    const joiner = await synced(t, "joiner", "Joiner")
+    const deckId = await host.mutation(api.decks.create, {
+      name: "Shitty Dragons",
+      format: "commander",
+    })
+    const deckVersionId = await host.mutation(api.decks.saveVersion, {
+      deckId,
+      cards: [
+        {
+          oracleId: "11111111-1111-1111-1111-111111111111",
+          scryfallId: "22222222-2222-2222-2222-222222222222",
+          name: "Dragon Test Card",
+          quantity: 1,
+          board: "commander",
+        },
+      ],
+    })
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "deck-game-public-5678",
+      playerCount: 2,
+      startingLife: 40,
+      ruleset: "commander",
+      inviteToken,
+      manualCodeCandidates: ["ABC234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+      deviceId: hostDeviceId,
+    })
+    await joiner.mutation(api.games.claimSeat, {
+      token: inviteToken,
+      displayName: "Joiner",
+      color: "#2563EB",
+    })
+    await host.mutation(api.decks.selectForSeat, {
+      publicId: created.publicId,
+      seat: 1,
+      deckVersionId,
+    })
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    await host.mutation(api.games.finishGame, {
+      publicId: created.publicId,
+      result: { kind: "unknown" },
+    })
+
+    const ownerSummary = await host.query(api.games.connectedSummary, {
+      publicId: created.publicId,
+    })
+    expect(ownerSummary?.players[0].deckNameAtFinish).toBe("Shitty Dragons")
+    const joinerSummary = await joiner.query(api.games.connectedSummary, {
+      publicId: created.publicId,
+    })
+    expect(joinerSummary?.players[0]).toMatchObject({
+      deckNameAtFinish: "Deck",
+      deckVersionNumber: 1,
+    })
+    const joinerHistory = await joiner.query(api.games.connectedHistory, {
+      paginationOpts: { cursor: null, numItems: 10 },
+    })
+    expect(JSON.stringify([joinerSummary, joinerHistory])).not.toContain("Shitty")
+  })
+
   it.each(["deleted version", "changed format"])(
     "drops an invalid selection at start: %s",
     async (reason) => {

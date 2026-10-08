@@ -28,13 +28,22 @@ const policyDataset = new DataSet<PhraseMetadata>()
   )
   .addPhrase((phrase) => phrase.setMetadata({ originalWord: "1488" }).addPattern(pattern`1488`))
 
-const englishMatcher = new RegExpMatcher({
-  ...englishDataset.build(),
-  ...englishRecommendedTransformers,
-})
+// why: the app imports this module for name warnings, so compiling the datasets on import would tax every screen that loads it.
+function lazy<T>(build: () => T) {
+  let value: T | undefined
+  return () => (value ??= build())
+}
+
+const englishMatcher = lazy(
+  () =>
+    new RegExpMatcher({
+      ...englishDataset.build(),
+      ...englishRecommendedTransformers,
+    }),
+)
 // Policy patterns are intentionally untransformed. English's leetspeak and duplicate transformers
 // would rewrite numeric references and repeated-letter terms before these literal patterns run.
-const policyMatcher = new RegExpMatcher(policyDataset.build())
+const policyMatcher = lazy(() => new RegExpMatcher(policyDataset.build()))
 
 function gateVariantsOf(username: string) {
   const stripped = username.replace(/[_-]/g, "")
@@ -71,14 +80,14 @@ function reportVariantsOf(username: string) {
 function matchesFor(variants: string[]) {
   const words = new Set<string>()
   for (const variant of variants) {
-    for (const match of englishMatcher.getAllMatches(variant, true)) {
+    for (const match of englishMatcher().getAllMatches(variant, true)) {
       const phrase = englishDataset.getPayloadWithPhraseMetadata(match)
       const word = phrase.phraseMetadata?.originalWord
       if (word) words.add(word)
     }
   }
   for (const variant of policyVariantsOf(variants)) {
-    for (const match of policyMatcher.getAllMatches(variant, true)) {
+    for (const match of policyMatcher().getAllMatches(variant, true)) {
       const phrase = policyDataset.getPayloadWithPhraseMetadata(match)
       const word = phrase.phraseMetadata?.originalWord
       if (word) words.add(word)
@@ -87,8 +96,13 @@ function matchesFor(variants: string[]) {
   return [...words]
 }
 
-export function usernameFailsGate(username: string) {
-  return matchesFor(gateVariantsOf(username)).length > 0
+/**
+ * why: one gate covers every name another player can see. A failing username is held behind a
+ * placeholder; a failing deck or guest seat name reaches other players as a neutral label, and the
+ * app warns its owner so they can rename it.
+ */
+export function nameFailsGate(name: string) {
+  return matchesFor(gateVariantsOf(name)).length > 0
 }
 
 export function usernameFailsReportThreshold(username: string) {
@@ -98,3 +112,5 @@ export function usernameFailsReportThreshold(username: string) {
 export function describeUsernameMatches(username: string) {
   return matchesFor(reportVariantsOf(username))
 }
+
+export const HIDDEN_DECK_NAME = "Deck"

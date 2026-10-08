@@ -59,6 +59,7 @@ import {
   shapeForSeat,
   type PlayerAppearance,
 } from "../../convex/lib/appearance"
+import { nameFailsGate } from "../../convex/lib/nameFilter"
 
 export type NewGameMode = "local" | "connected"
 
@@ -532,7 +533,12 @@ export function NewGameScreen({
                         accessibilityLabel={`Name for player ${index + 1}`}
                         maxLength={MAX_PLAYER_NAME_LENGTH}
                         status={nameValidation.errors[index] ? "error" : undefined}
-                        helper={nameValidation.errors[index]}
+                        helper={
+                          nameValidation.errors[index] ??
+                          (nameFailsGate(names[index])
+                            ? `Connected players will see "Player ${index + 1}" instead.`
+                            : undefined)
+                        }
                         containerStyle={themed($nameField)}
                         onBlur={() => savePlayers()}
                         onChangeText={(value) =>

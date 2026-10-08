@@ -6,7 +6,7 @@ import { internalMutation, mutation } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
 import { hasAccountDeletion, requireIdentity } from "./lib/auth"
 import { placeUsernameOnHold, releaseUsernameHold } from "./lib/moderation"
-import { usernameFailsGate } from "./lib/nameFilter"
+import { nameFailsGate } from "./lib/nameFilter"
 import {
   assertAvatarUrl,
   assertDisplayName,
@@ -25,7 +25,7 @@ import { applyStoredRevenueCatState } from "./lib/revenueCat"
 async function enforceUsernameFilter(ctx: MutationCtx, userId: Id<"users">, username: string) {
   const user = await ctx.db.get(userId)
   if (!user) return
-  if (usernameFailsGate(username)) {
+  if (nameFailsGate(username)) {
     const wasHeld = Boolean(user.moderationHold)
     await placeUsernameOnHold(ctx, user, "filter")
     if (!wasHeld) await ctx.scheduler.runAfter(0, internal.moderation.sendHoldAlert, { userId })

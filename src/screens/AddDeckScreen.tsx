@@ -27,7 +27,7 @@ import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { addCommander, getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { DeckCardRow, DeckCardSectionHeader } from "@/features/decks/DeckCardRow"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
-import { cardCountLabel } from "@/features/decks/deckCopy"
+import { cardCountLabel, deckNameWarning } from "@/features/decks/deckCopy"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import {
   guestDeckRouteId,
@@ -1203,6 +1203,7 @@ export function AddDeckScreen({
                   placeholder="Deck name"
                   value={name}
                   maxLength={80}
+                  helper={deckNameWarning(name)}
                   editable={!busy}
                   onChangeText={(next) => {
                     if (busy) return
@@ -1869,6 +1870,7 @@ export function AddDeckScreen({
               label="Deck name"
               value={name}
               maxLength={80}
+              helper={deckNameWarning(name)}
               onChangeText={setName}
             />
             {importKind === "link" && linkSource ? (
@@ -1957,6 +1959,7 @@ export function AddDeckScreen({
               label="Deck name"
               value={name}
               maxLength={80}
+              helper={deckNameWarning(name)}
               onChangeText={setName}
             />
             {noteField}

@@ -295,6 +295,35 @@ describe("claiming an imported seat through claimSeat", () => {
     expect(projection.players[1].controlledByMe).toBe(true)
   })
 
+  it("shows other players the seat label for a guest name that fails the name filter", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await published(t, {
+      players: [
+        ...baseSnapshot.players,
+        {
+          localId: "local-third-player",
+          seat: 3,
+          displayName: "Shitty Steve",
+          color: "#059669",
+          shape: "square",
+          currentLife: 40,
+        },
+      ],
+    })
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    await guest.mutation(api.games.claimSeat, {
+      seat: 2,
+      manualCode: created.manualCode,
+      displayName: "Guest",
+      deviceId: joinerDevice,
+    })
+    const nameOfSeat3 = async (actor: typeof host, deviceId: string) =>
+      (await actor.query(api.games.lobbyProjection, { publicId: created.publicId, deviceId }))
+        .players[2].displayName
+    await expect(nameOfSeat3(host, hostDevice)).resolves.toBe("Shitty Steve")
+    await expect(nameOfSeat3(guest, joinerDevice)).resolves.toBe("Player 3")
+  })
+
   it("rejects strangers, stale invites, claimed seats, and never touches normal connected games", async () => {
     const t = convexTest(schema, modules)
     const { host, created } = await published(t)

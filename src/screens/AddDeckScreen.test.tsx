@@ -315,6 +315,24 @@ describe("AddDeckScreen", () => {
     expect(view.getByTestId("deck-capacity-status")).toBeTruthy()
   })
 
+  it("warns when other players would see a neutral label instead of the deck name", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <AddDeckScreen
+          onBack={jest.fn()}
+          onCreated={jest.fn()}
+          access={{ ready: true, loading: false, signedIn: true, request: jest.fn() }}
+        />
+      </ThemeProvider>,
+    )
+    chooseMode(view, "paste")
+    const warning = 'Other players will see "Deck" instead.'
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Gruul Stompy")
+    expect(view.queryByText(warning)).toBeNull()
+    fireEvent.changeText(view.getByTestId("deck-name-input"), "Shitty Gruul")
+    expect(view.getByText(warning)).toBeTruthy()
+  })
+
   it("allows a new deck after a guest transfer fails without deleting the guest", async () => {
     const saved = saveGuestDeck({ name: "Keep me", game: "mtg", format: "commander", cards: [] })
     mockGuestImport.mockRejectedValueOnce(new Error("Sync unavailable"))
