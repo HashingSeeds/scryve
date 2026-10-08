@@ -22,7 +22,9 @@ const {
   readFile,
   removeRecord,
   scanDevProcesses,
+  stateDir,
   stopProcesses,
+  withLock,
   writeRecord,
 } = require("./dev-preflight.cjs")
 
@@ -46,12 +48,27 @@ async function preflight() {
     process.exit(1)
   }
 
-  const processes = scanDevProcesses()
-  const stale = processes.filter((proc) => proc.cwd === root)
-  if (stale.length > 0) {
-    say(`Stopping stale ${stale.map((proc) => `${proc.kind} (pid ${proc.pid})`).join(", ")}`)
-    await stopProcesses(stale.map((proc) => proc.pid))
-  }
+  const { port, owner } = await withLock(stateDir, async () => {
+    const processes = scanDevProcesses()
+    const stale = processes.filter((proc) => proc.cwd === root)
+    if (stale.length > 0) {
+      say(`Stopping stale ${stale.map((proc) => `${proc.kind} (pid ${proc.pid})`).join(", ")}`)
+      await stopProcesses(stale)
+    }
+    const records = liveRecords().filter((record) => record.worktree !== root)
+    const owner = convexOwner(processes, records, root, target.deployment)
+    const port = await pickPort(isPortFree, new Set(records.map((record) => record.port)))
+    writeRecord({ worktree: root, port, deployment: target.deployment, convex: !owner })
+    return { port, owner }
+  })
+  process.on("exit", () => removeRecord(root))
+
+  if (owner)
+    say(
+      `\u001b[33mconvex dev for ${target.deployment} is already running from ${owner.cwd} (pid ${owner.pid}).\u001b[0m ` +
+        "Starting Metro only, so this worktree's convex/ changes are NOT pushed. Stop that one to push from here.",
+    )
+  if (port !== DEFAULT_METRO_PORT) say(`Port ${DEFAULT_METRO_PORT} is taken. Metro uses ${port}`)
 
   const lockfile = readFile(path.join(root, "pnpm-lock.yaml"))
   if (needsInstall(lockfile, readFile(path.join(root, "node_modules", ".pnpm", "lock.yaml")))) {
@@ -62,23 +79,6 @@ async function preflight() {
     })
     if (install.status !== 0) process.exit(install.status ?? 1)
   }
-
-  const owner = convexOwner(processes, root, target.deployment)
-  if (owner)
-    say(
-      `\u001b[33mconvex dev for ${target.deployment} is already running from ${owner.cwd} (pid ${owner.pid}).\u001b[0m ` +
-        "Starting Metro only, so this worktree's convex/ changes are NOT pushed. Stop that one to push from here.",
-    )
-
-  const reserved = new Set(
-    liveRecords()
-      .filter((record) => record.worktree !== root)
-      .map((record) => record.port),
-  )
-  const port = await pickPort(isPortFree, reserved)
-  if (port !== DEFAULT_METRO_PORT) say(`Port ${DEFAULT_METRO_PORT} is taken. Metro uses ${port}`)
-  writeRecord({ worktree: root, port, pid: process.pid, convex: !owner })
-  process.on("exit", () => removeRecord(root))
   return { port, startConvex: !owner }
 }
 

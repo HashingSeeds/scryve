@@ -9,6 +9,8 @@ const { setTimeout } = require("node:timers")
 const DEFAULT_METRO_PORT = 8081
 const LAST_METRO_PORT = 8099
 const STOP_WAIT_MS = 3000
+const LOCK_WAIT_MS = 15_000
+const ORPHAN_LOCK_MS = 5000
 
 const stateDir = path.join(
   process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"),
@@ -21,16 +23,25 @@ function needsInstall(lockfile, installedLockfile) {
   return !installedLockfile || !lockfile.equals(installedLockfile)
 }
 
-// why: match the node process itself, not shells or editors that merely mention the command.
-const METRO = /^\S*node\s+\S*(?:\.bin\/expo|expo\/bin\/cli)\s+start(?:\s|$)/
-const CONVEX = /^\S*node\s+\S*(?:\.bin\/convex|convex\/bin\/main\.js)\s+dev(?:\s|$)/
+const DEV_COMMANDS = [
+  { kind: "metro", script: /(?:\.bin\/expo|expo\/bin\/cli)$/, command: "start" },
+  { kind: "convex", script: /(?:\.bin\/convex|convex\/bin\/main\.js)$/, command: "dev" },
+]
 
-function devProcesses(psOutput) {
-  return psOutput.split("\n").flatMap((line) => {
-    const [, pid, command] = line.match(/^\s*(\d+)\s+(.*)$/) ?? []
-    if (!pid) return []
-    const kind = METRO.test(command) ? "metro" : CONVEX.test(command) ? "convex" : null
-    return kind ? [{ pid: Number(pid), kind }] : []
+// why: match the node process itself by argv, not shells or editors that merely mention the command.
+function devKind(argv) {
+  if (!/(?:^|\/)node$/.test(argv[0] ?? "")) return null
+  const [script, command] = argv.slice(1).filter((arg) => !arg.startsWith("-"))
+  return (
+    DEV_COMMANDS.find((dev) => dev.script.test(script ?? "") && dev.command === command)?.kind ??
+    null
+  )
+}
+
+function devProcesses(rows) {
+  return rows.flatMap(({ pid, argv }) => {
+    const kind = devKind(argv)
+    return kind ? [{ pid, kind }] : []
   })
 }
 
@@ -47,8 +58,8 @@ function parseEnv(text) {
 
 /** why: Convex reads only .env.local and .env, while Expo also layers the per-mode files, so a preview override can split the two. */
 function devDeployment(convexEnv, expoEnv) {
-  if (convexEnv.CONVEX_DEPLOY_KEY)
-    return { error: "CONVEX_DEPLOY_KEY is set, so convex dev would not use the dev deployment." }
+  const key = ["CONVEX_DEPLOY_KEY", "CONVEX_DEPLOYMENT_TOKEN"].find((name) => convexEnv[name])
+  if (key) return { error: `${key} is set, so convex dev would not use the dev deployment.` }
   const name = convexEnv.CONVEX_DEPLOYMENT?.match(/^dev:([a-z0-9-]+)$/)?.[1]
   if (!name)
     return {
@@ -62,9 +73,14 @@ function devDeployment(convexEnv, expoEnv) {
   return { deployment: name }
 }
 
-function convexOwner(processes, worktree, deployment) {
-  return processes.find(
-    (proc) => proc.kind === "convex" && proc.cwd !== worktree && proc.deployment === deployment,
+/** why: a record claims the deployment before its convex dev appears in the process list, which closes the race between two starts. */
+function convexOwner(processes, records, worktree, deployment) {
+  const claims = records
+    .filter((record) => record.convex)
+    .map((record) => ({ cwd: record.worktree, pid: record.pid, deployment: record.deployment }))
+  const running = processes.filter((proc) => proc.kind === "convex")
+  return [...claims, ...running].find(
+    (owner) => owner.cwd !== worktree && owner.deployment === deployment,
   )
 }
 
@@ -102,22 +118,6 @@ const convexEnv = (dir) => readEnv(dir, [".env", ".env.local"])
 const expoEnv = (dir) =>
   readEnv(dir, [".env", ".env.development", ".env.local", ".env.development.local"])
 
-function cwds(pids) {
-  if (pids.length === 0) return new Map()
-  if (process.platform === "linux")
-    return new Map(pids.map((pid) => [pid, readLink(`/proc/${pid}/cwd`)]))
-  const out = spawnSync("lsof", ["-a", "-d", "cwd", "-Fn", "-p", pids.join(",")], {
-    encoding: "utf8",
-  }).stdout
-  const found = new Map()
-  let pid = null
-  for (const line of out?.split("\n") ?? []) {
-    if (line.startsWith("p")) pid = Number(line.slice(1))
-    else if (line.startsWith("n") && pid) found.set(pid, line.slice(1))
-  }
-  return found
-}
-
 function readLink(link) {
   try {
     return fs.readlinkSync(link)
@@ -126,27 +126,55 @@ function readLink(link) {
   }
 }
 
-// why: spawning ps costs 50 ms or more on a busy Linux box, while reading /proc directly takes about 10 ms.
+/** why: on macOS ps joins argv with spaces, so a dev command whose path contains a space is not found there. Linux keeps exact argv boundaries. */
 function processTable() {
-  if (process.platform !== "linux")
-    return spawnSync("ps", ["-axww", "-o", "pid=,command="], { encoding: "utf8" }).stdout ?? ""
+  if (process.platform !== "linux") {
+    const ps = spawnSync("ps", ["-axww", "-o", "pid=,command="], { encoding: "utf8" }).stdout ?? ""
+    return ps.split("\n").flatMap((line) => {
+      const [, pid, command] = line.match(/^\s*(\d+)\s+(.*)$/) ?? []
+      return pid ? [{ pid: Number(pid), argv: command.split(/\s+/) }] : []
+    })
+  }
+  // why: spawning ps costs 50 ms or more on a busy Linux box, while reading /proc directly takes about 10 ms.
   return fs
     .readdirSync("/proc")
     .filter((name) => /^\d+$/.test(name))
-    .map((pid) => `${pid} ${readFile(`/proc/${pid}/cmdline`)?.toString().replaceAll("\0", " ")}`)
-    .join("\n")
+    .map((pid) => ({
+      pid: Number(pid),
+      argv: readFile(`/proc/${pid}/cmdline`)?.toString().split("\0").slice(0, -1) ?? [],
+    }))
+}
+
+/** why: start time plus cwd plus cmdline tells a reused pid apart from the process that was found earlier. */
+function processInfo(pid) {
+  if (process.platform === "linux") {
+    const stat = readFile(`/proc/${pid}/stat`)?.toString()
+    const cmdline = readFile(`/proc/${pid}/cmdline`)?.toString()
+    const cwd = readLink(`/proc/${pid}/cwd`)
+    if (!stat || !cmdline || !cwd) return null
+    const startTime = stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19]
+    return { cwd, identity: `${startTime}\0${cwd}\0${cmdline}` }
+  }
+  const started = spawnSync("ps", ["-o", "lstart=,command=", "-p", String(pid)], {
+    encoding: "utf8",
+  }).stdout?.trim()
+  const lsof = spawnSync("lsof", ["-a", "-d", "cwd", "-Fn", "-p", String(pid)], {
+    encoding: "utf8",
+  }).stdout
+  const cwd = lsof?.match(/^n(.*)$/m)?.[1]
+  if (!started || !cwd) return null
+  return { cwd, identity: `${started}\0${cwd}` }
 }
 
 function scanDevProcesses() {
-  const found = devProcesses(processTable()).filter((proc) => proc.pid !== process.pid)
-  const dirs = cwds(found.map((proc) => proc.pid))
-  return found.map((proc) => {
-    const cwd = dirs.get(proc.pid) ?? null
+  return devProcesses(processTable()).flatMap((proc) => {
+    const info = proc.pid === process.pid ? null : processInfo(proc.pid)
+    if (!info) return []
     const deployment =
-      proc.kind === "convex" && cwd
-        ? convexEnv(cwd).CONVEX_DEPLOYMENT?.match(/^dev:(.+)$/)?.[1]
+      proc.kind === "convex"
+        ? convexEnv(info.cwd).CONVEX_DEPLOYMENT?.match(/^dev:(.+)$/)?.[1]
         : undefined
-    return { ...proc, cwd, deployment }
+    return [{ ...proc, ...info, deployment }]
   })
 }
 
@@ -159,18 +187,52 @@ const isAlive = (pid) => {
   }
 }
 
-async function stopProcesses(pids) {
-  for (const pid of pids) signal(pid, "SIGTERM")
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function stopProcesses(procs, info = processInfo) {
+  const signalIfSame = (proc, name) => {
+    if (info(proc.pid)?.identity !== proc.identity) return false
+    try {
+      process.kill(proc.pid, name)
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error
+    }
+    return true
+  }
+  const signaled = procs.filter((proc) => signalIfSame(proc, "SIGTERM"))
   const deadline = Date.now() + STOP_WAIT_MS
-  while (pids.some(isAlive) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50))
-  for (const pid of pids.filter(isAlive)) signal(pid, "SIGKILL")
+  while (signaled.some((proc) => isAlive(proc.pid)) && Date.now() < deadline) await sleep(50)
+  for (const proc of signaled) signalIfSame(proc, "SIGKILL")
 }
 
-function signal(pid, name) {
+/** why: two starts must not both see a free port or an unclaimed deployment, so scan, pick, and record happen under one O_EXCL lock. A holder that died leaves its pid behind, and a lock with no pid is the crash window between create and write. */
+async function withLock(dir, fn, waitMs = LOCK_WAIT_MS) {
+  fs.mkdirSync(dir, { recursive: true })
+  const lock = path.join(dir, "lock")
+  const deadline = Date.now() + waitMs
+  for (;;) {
+    try {
+      fs.writeFileSync(lock, String(process.pid), { flag: "wx" })
+      break
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error
+    }
+    const content = readFile(lock)?.toString()
+    const holder = Number(content)
+    const orphaned = holder
+      ? !isAlive(holder)
+      : Date.now() - (fs.statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? 0) > ORPHAN_LOCK_MS
+    if (orphaned && readFile(lock)?.toString() === content) {
+      fs.rmSync(lock, { force: true })
+      continue
+    }
+    if (Date.now() > deadline) throw new Error(`Another pnpm start holds ${lock} (pid ${holder})`)
+    await sleep(25)
+  }
   try {
-    process.kill(pid, name)
-  } catch (error) {
-    if (error.code !== "ESRCH") throw error
+    return await fn()
+  } finally {
+    fs.rmSync(lock, { force: true })
   }
 }
 
@@ -180,23 +242,29 @@ const recordFile = (worktree) =>
     `${path.basename(worktree)}-${createHash("sha256").update(worktree).digest("hex").slice(0, 8)}.json`,
   )
 
-/** why: a crashed run leaves its record behind, so records with dead pids are pruned instead of reserving their port forever. */
+/** why: a crashed run leaves its record behind, so records whose pid is gone or now names another process are pruned instead of holding a port or deployment forever. */
 function liveRecords() {
   const names = fs.existsSync(stateDir) ? fs.readdirSync(stateDir) : []
-  return names.flatMap((name) => {
-    const file = path.join(stateDir, name)
-    try {
-      const record = JSON.parse(fs.readFileSync(file, "utf8"))
-      if (isAlive(record.pid)) return [record]
-    } catch {}
-    fs.rmSync(file, { force: true })
-    return []
-  })
+  return names
+    .filter((name) => name.endsWith(".json"))
+    .flatMap((name) => {
+      const file = path.join(stateDir, name)
+      try {
+        const record = JSON.parse(fs.readFileSync(file, "utf8"))
+        if (processInfo(record.pid)?.identity === record.identity) return [record]
+      } catch {}
+      fs.rmSync(file, { force: true })
+      return []
+    })
 }
 
 function writeRecord(record) {
   fs.mkdirSync(stateDir, { recursive: true })
-  fs.writeFileSync(recordFile(record.worktree), `${JSON.stringify(record)}\n`)
+  const { identity } = processInfo(process.pid) ?? {}
+  fs.writeFileSync(
+    recordFile(record.worktree),
+    `${JSON.stringify({ ...record, pid: process.pid, identity })}\n`,
+  )
 }
 
 function removeRecord(worktree) {
@@ -210,6 +278,7 @@ module.exports = {
   convexEnv,
   convexOwner,
   devDeployment,
+  devKind,
   devProcesses,
   expoEnv,
   isPortFree,
@@ -217,10 +286,12 @@ module.exports = {
   needsInstall,
   parseEnv,
   pickPort,
+  processInfo,
   readFile,
   removeRecord,
   scanDevProcesses,
   stateDir,
   stopProcesses,
+  withLock,
   writeRecord,
 }
