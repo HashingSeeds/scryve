@@ -40,10 +40,15 @@ describe("localHistoryEntry", () => {
     ).toBe("win")
   })
 
-  it("keeps the table-level outcome when no seat is the account's", () => {
+  it("keeps the table-level outcome for signed-out games only", () => {
     expect(localHistoryEntry(game()).outcome).toBe("win")
-    expect(localHistoryEntry(game({ account: { ownerId: "owner" } })).outcome).toBe("win")
     expect(localHistoryEntry(game({ result: undefined })).outcome).toBe("unrecorded")
+    const owned = localHistoryEntry(game({ account: { ownerId: "owner" } }))
+    expect(owned.outcome).toBe("unrecorded")
+    expect(owned.winnerNames).toEqual(["Ada"])
+    expect(
+      localHistoryEntry(game({ account: { ownerId: "owner" }, result: { kind: "draw" } })).outcome,
+    ).toBe("unrecorded")
   })
 })
 

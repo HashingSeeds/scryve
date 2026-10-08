@@ -1016,6 +1016,48 @@ describe("NewGameScreen", () => {
     )
   })
 
+  it("drops the previous account's seat and deck when the signed-in owner changes", () => {
+    const onStartLocal = jest.fn()
+    const decks = [{ versionId: "v-standard", name: "Mono Red", system: "mtg", format: "standard" }]
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="local"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={onStartLocal}
+          account={{ ownerId: "owner-a", defaultMeSeat: 1, decks }}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(screen.getByTestId("play-system-mtg"))
+    fireEvent.press(screen.getByTestId("me-deck"))
+    fireEvent.press(screen.getByTestId("me-deck-option-v-standard"))
+    expect(screen.getByLabelText("Your deck, Mono Red")).toBeTruthy()
+
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <NewGameScreen
+          defaults={DEFAULT_LOCAL_SETTINGS}
+          mode="local"
+          onModeChange={jest.fn()}
+          onBack={jest.fn()}
+          onStartLocal={onStartLocal}
+          account={{ ownerId: "owner-b", defaultMeSeat: 0, decks: [] }}
+        />
+      </ThemeProvider>,
+    )
+    expect(screen.getByLabelText("This is me, Player 1")).toBeTruthy()
+    expect(screen.getByLabelText("Your deck, No matching decks")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("start-game-button"))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      20,
+      expect.objectContaining({ account: { ownerId: "owner-b", meSeat: 0 } }),
+    )
+  })
+
   it("keeps a running game's owner when another account renames a player", () => {
     const onSavePlayers = jest.fn()
     const fresh = createLocalGame({

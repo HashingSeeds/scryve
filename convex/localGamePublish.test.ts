@@ -183,6 +183,36 @@ describe("publishFinishedLocalGame", () => {
     )
   })
 
+  it("stores a game without a system as none, not as Magic", async () => {
+    const t = convexTest(schema, modules)
+    const owner = await synced(t, "owner", "Owner")
+    await owner.mutation(api.games.publishFinishedLocalGame, {
+      ...finishedGame({ system: undefined, format: undefined, ruleset: "none", startingLife: 20 }),
+      players: [
+        {
+          localId: "player_a",
+          seat: 1,
+          displayName: "Ada",
+          color: "#7C3AED",
+          currentLife: 12,
+          me: true,
+        },
+        { localId: "player_b", seat: 2, displayName: "Grace", color: "#2563EB", currentLife: 0 },
+      ],
+    })
+    const rows = await t.run(async (ctx) => ({
+      game: await ctx.db.query("games").unique(),
+      summary: await ctx.db.query("gameSummaries").unique(),
+    }))
+    expect(rows.game).toMatchObject({ game: "none", system: "none", ruleset: "none" })
+    expect(rows.game?.format).toBeUndefined()
+    expect(rows.summary).toMatchObject({ game: "none", system: "none", format: "none" })
+    const history = await owner.query(api.history.entries, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(history.page[0]).toMatchObject({ system: "none", format: "none" })
+  })
+
   it("stays finished through stale-game cleanup", async () => {
     const t = convexTest(schema, modules)
     const owner = await synced(t, "owner", "Owner")

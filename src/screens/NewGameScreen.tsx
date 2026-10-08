@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ScrollView, TouchableOpacity, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -215,6 +215,14 @@ export function NewGameScreen({
       ? { versionId: chosen.deckVersionId, name: chosen.deckName ?? "Deck" }
       : undefined
   })
+  // why: a sign-out or account switch while this screen stays mounted must not hand the previous account's seat and deck to the new one.
+  const seenOwnerId = useRef(account?.ownerId)
+  useEffect(() => {
+    if (seenOwnerId.current === account?.ownerId) return
+    seenOwnerId.current = account?.ownerId
+    setMeSeat(account?.defaultMeSeat)
+    setDeck(undefined)
+  }, [account?.defaultMeSeat, account?.ownerId])
   const [showOptions, setShowOptions] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
   const [endingLocal, setEndingLocal] = useState(false)
