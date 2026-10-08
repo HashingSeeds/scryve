@@ -21,6 +21,7 @@ const {
   readFile,
   removeRecord,
   scanDevProcesses,
+  stateDir,
   stopProcesses,
   withLock,
   writeRecord,
@@ -61,7 +62,7 @@ async function preflight() {
   // why: the lock is held only for the record check, port pick, and record write, so a 3 s stale stop never makes another start wait.
   const { port, owner } = await withLock(async () => {
     const plan = await planStart({
-      records: liveRecords(),
+      records: liveRecords(stateDir, { prune: true }),
       processes,
       worktree: root,
       deployment: target.deployment,

@@ -9,7 +9,9 @@ const { setTimeout } = require("node:timers")
 const DEFAULT_METRO_PORT = 8081
 const LAST_METRO_PORT = 8099
 const STOP_WAIT_MS = 3000
-const LOCK_PORT = 18080
+const LOCK_PORTS = Array.from({ length: 10 }, (_, index) => 18080 + index)
+const LOCK_TOKEN = "scryve-dev-lock\n"
+const LOCK_PROBE_MS = 100
 const LOCK_WAIT_MS = 2000
 
 const stateDir = path.join(
@@ -205,30 +207,55 @@ async function stopProcesses(procs, info = processInfo) {
   for (const proc of signaled) signalIfSame(proc, "SIGKILL")
 }
 
-/** why: two starts must not both see a free port or an unclaimed deployment. Binding a loopback port is atomic and the kernel frees it when the holder dies, so there is no stale lock to recover. */
-async function withLock(fn, { port = LOCK_PORT, waitMs = LOCK_WAIT_MS } = {}) {
+/** why: two starts must not both see a free port or an unclaimed deployment. Binding a loopback port is atomic and the kernel frees it when the holder dies. The holder answers with a token, so a port taken by an unrelated app is skipped, and every starter walks the same list to meet on the same port. */
+async function withLock(fn, { ports = LOCK_PORTS, waitMs = LOCK_WAIT_MS } = {}) {
   const deadline = Date.now() + waitMs
-  let server = await listen(port)
-  while (!server) {
+  for (;;) {
+    let held = false
+    for (const port of ports) {
+      const server = await listen(port)
+      if (server) {
+        try {
+          return await fn()
+        } finally {
+          await new Promise((resolve) => server.close(resolve))
+        }
+      }
+      held = await holdsLock(port)
+      if (held) break
+    }
+    if (!held)
+      throw new Error(`Every lock port from ${ports[0]} to ${ports.at(-1)} is used by another app.`)
     if (Date.now() > deadline)
-      throw new Error(
-        `127.0.0.1:${port} stayed busy for ${waitMs / 1000} s. Another pnpm start may be stuck, or something else uses that port.`,
-      )
+      throw new Error(`Another pnpm start held the lock for ${waitMs / 1000} s and may be stuck.`)
     await sleep(25)
-    server = await listen(port)
-  }
-  try {
-    return await fn()
-  } finally {
-    await new Promise((resolve) => server.close(resolve))
   }
 }
 
 function listen(port) {
   return new Promise((resolve, reject) => {
-    const server = net.createServer()
+    const server = net.createServer((socket) => socket.end(LOCK_TOKEN))
     server.once("error", (error) => (error.code === "EADDRINUSE" ? resolve(null) : reject(error)))
     server.listen({ port, host: "127.0.0.1", exclusive: true }, () => resolve(server))
+  })
+}
+
+// why: a refused connection means the holder just released the port, so it counts as ours and the walk restarts.
+function holdsLock(port) {
+  return new Promise((resolve) => {
+    const socket = net.connect(port, "127.0.0.1")
+    let reply = ""
+    const finish = (isLock) => {
+      socket.destroy()
+      resolve(isLock)
+    }
+    socket.setTimeout(LOCK_PROBE_MS, () => finish(false))
+    socket.on("data", (chunk) => {
+      reply += chunk
+      if (reply.length >= LOCK_TOKEN.length) finish(reply.startsWith(LOCK_TOKEN))
+    })
+    socket.on("end", () => finish(reply === LOCK_TOKEN))
+    socket.on("error", (error) => finish(error.code === "ECONNREFUSED"))
   })
 }
 
@@ -250,38 +277,45 @@ const recordFile = (worktree) =>
     `${path.basename(worktree)}-${createHash("sha256").update(worktree).digest("hex").slice(0, 8)}.json`,
   )
 
-/** why: a crashed run leaves its record behind, so records whose pid is gone or now names another process are pruned instead of holding a port or deployment forever. */
-function liveRecords(dir = stateDir) {
+/** why: a crashed run leaves its record behind. Only a caller holding the lock may prune, so a record mid-rename or a live claim is never deleted by a racing start. */
+function liveRecords(dir = stateDir, { prune = false } = {}) {
   const names = fs.existsSync(dir) ? fs.readdirSync(dir) : []
   return names
     .filter((name) => name.endsWith(".json"))
     .flatMap((name) => {
       const file = path.join(dir, name)
-      try {
-        const record = JSON.parse(fs.readFileSync(file, "utf8"))
-        if (processInfo(record.pid)?.identity === record.identity) return [record]
-      } catch {}
-      fs.rmSync(file, { force: true })
+      const record = parseRecord(readFile(file))
+      if (record && processInfo(record.pid)?.identity === record.identity) return [record]
+      if (prune) fs.rmSync(file, { force: true })
       return []
     })
 }
 
+function parseRecord(content) {
+  try {
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
+}
+
+// why: readers outside the lock must never see a half-written record, so write a temp file and rename it into place.
 function writeRecord(record) {
   fs.mkdirSync(stateDir, { recursive: true })
   const { identity } = processInfo(process.pid) ?? {}
-  fs.writeFileSync(
-    recordFile(record.worktree),
-    `${JSON.stringify({ ...record, pid: process.pid, identity })}\n`,
-  )
+  const file = recordFile(record.worktree)
+  const temp = `${file}.${process.pid}.tmp`
+  fs.writeFileSync(temp, `${JSON.stringify({ ...record, pid: process.pid, identity })}\n`)
+  fs.renameSync(temp, file)
 }
 
 function removeRecord(worktree) {
   const file = recordFile(worktree)
-  const record = JSON.parse(readFile(file) ?? "null")
-  if (record?.pid === process.pid) fs.rmSync(file, { force: true })
+  if (parseRecord(readFile(file))?.pid === process.pid) fs.rmSync(file, { force: true })
 }
 
 module.exports = {
+  LOCK_TOKEN,
   DEFAULT_METRO_PORT,
   convexEnv,
   convexOwner,
@@ -299,6 +333,7 @@ module.exports = {
   readFile,
   removeRecord,
   scanDevProcesses,
+  stateDir,
   stopProcesses,
   withLock,
   writeRecord,

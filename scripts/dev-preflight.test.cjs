@@ -8,6 +8,7 @@ const { test } = require("node:test")
 const { setTimeout } = require("node:timers/promises")
 
 const {
+  LOCK_TOKEN,
   convexOwner,
   devDeployment,
   devProcesses,
@@ -82,8 +83,14 @@ test("a record claims the deployment before its convex dev process exists", () =
 })
 
 const lockPort = 18_500 + (process.pid % 400)
+const lockPorts = [lockPort, lockPort + 1]
 
-test("the lock lets one start in at a time", async () => {
+const listenIn = (script) => {
+  const proc = spawn(process.execPath, ["-e", script])
+  return new Promise((resolve) => proc.stdout.once("data", () => resolve(proc)))
+}
+
+const holdTogether = async (ports) => {
   let inside = 0
   let overlapped = false
   const hold = () =>
@@ -94,25 +101,43 @@ test("the lock lets one start in at a time", async () => {
         await setTimeout(50)
         inside--
       },
-      { port: lockPort },
+      { ports },
     )
   await Promise.all([hold(), hold(), hold()])
-  assert.equal(overlapped, false)
+  return overlapped
+}
+
+test("the lock lets one start in at a time", async () => {
+  assert.equal(await holdTogether(lockPorts), false)
+})
+
+test("an unrelated app on the first lock port neither blocks starts nor lets them overlap", async () => {
+  const silent = await listenIn(
+    `require("node:net").createServer(() => {}).listen(${lockPort}, "127.0.0.1", () => console.log("up"))`,
+  )
+  try {
+    assert.equal(await withLock(async () => "acquired", { ports: lockPorts }), "acquired")
+    assert.equal(await holdTogether(lockPorts), false)
+    await assert.rejects(
+      withLock(async () => "acquired", { ports: [lockPort] }),
+      /used by another app/,
+    )
+  } finally {
+    silent.kill("SIGKILL")
+  }
 })
 
 test("a killed lock holder frees the lock", async () => {
-  const holder = spawn(process.execPath, [
-    "-e",
-    `require("node:net").createServer().listen(${lockPort}, "127.0.0.1", () => console.log("held"))`,
-  ])
+  const holder = await listenIn(
+    `require("node:net").createServer((s) => s.end(${JSON.stringify(LOCK_TOKEN)})).listen(${lockPort}, "127.0.0.1", () => console.log("held"))`,
+  )
   try {
-    await new Promise((resolve) => holder.stdout.once("data", resolve))
     await assert.rejects(
-      withLock(async () => "acquired", { port: lockPort, waitMs: 100 }),
-      /stayed busy/,
+      withLock(async () => "acquired", { ports: lockPorts, waitMs: 100 }),
+      /held the lock/,
     )
     holder.kill("SIGKILL")
-    assert.equal(await withLock(async () => "acquired", { port: lockPort }), "acquired")
+    assert.equal(await withLock(async () => "acquired", { ports: lockPorts }), "acquired")
   } finally {
     holder.kill("SIGKILL")
   }
@@ -131,17 +156,18 @@ test("a second start in the same worktree is refused while the first is alive", 
   })
 })
 
-test("records survive only while their pid still names the starter that wrote them", () => {
+test("records survive only while their pid still names the starter, and only the lock holder prunes", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-dev-records-"))
   try {
     const { identity } = processInfo(process.pid)
     const record = { worktree: "/w/a", pid: process.pid, port: 8081 }
     fs.writeFileSync(path.join(dir, "live.json"), JSON.stringify({ ...record, identity }))
     fs.writeFileSync(path.join(dir, "reused.json"), JSON.stringify({ ...record, identity: "x" }))
-    assert.deepEqual(
-      liveRecords(dir).map((kept) => kept.identity),
-      [identity],
-    )
+    fs.writeFileSync(path.join(dir, "partial.json"), '{"worktree":"/w/b","po')
+    const kept = (options) => liveRecords(dir, options).map((live) => live.identity)
+    assert.deepEqual(kept(), [identity])
+    assert.equal(fs.readdirSync(dir).length, 3)
+    assert.deepEqual(kept({ prune: true }), [identity])
     assert.deepEqual(fs.readdirSync(dir), ["live.json"])
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
