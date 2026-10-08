@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import { Platform, ScrollView, TouchableOpacity, View } from "react-native"
 import { useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
@@ -58,20 +58,44 @@ function DeckCountLabel({ access }: { access?: CloudAccess }) {
 type Step =
   { kind: "options" } | { kind: "choose" } | { kind: "confirm"; id: Id<"decks">; name: string }
 
-export function DeckLimitDialog({
-  access,
-  onClose,
-  onRoomMade,
-}: {
+type DeckLimitDialogProps = {
   access?: CloudAccess
   onClose: () => void
   onRoomMade?: () => void
-}) {
+}
+
+export function DeckLimitDialog(props: DeckLimitDialogProps) {
+  const { themed } = useAppTheme()
+  return (
+    <ConvexQueryBoundary
+      fallback={({ retry }) => (
+        <DialogCard
+          visible
+          onClose={props.onClose}
+          dialogTestID="deck-limit-dialog"
+          style={themed($dialog)}
+        >
+          <Text size="sm" text="Deck slots unavailable. Your draft is kept." />
+          <View style={themed($row)}>
+            <Button text="Close" style={$flex1} onPress={props.onClose} />
+            <Button text="Retry" style={$flex1} onPress={retry} />
+          </View>
+        </DialogCard>
+      )}
+    >
+      <DeckLimitDialogBody {...props} />
+    </ConvexQueryBoundary>
+  )
+}
+
+type PaywallState = "closed" | "waitingForDismiss" | "open"
+
+function DeckLimitDialogBody({ access, onClose, onRoomMade }: DeckLimitDialogProps) {
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
   const deleteDeck = useMutation(api.decks.archive)
   const [step, setStep] = useState<Step>({ kind: "options" })
-  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [paywall, setPaywall] = useState<PaywallState>("closed")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const skip = access && !access.ready
@@ -81,10 +105,15 @@ export function DeckLimitDialog({
     if (capacity?.canCreate) roomMade()
   }, [capacity?.canCreate])
 
-  async function upgrade() {
-    setPaywallOpen(true)
+  async function presentPaywall() {
+    setPaywall("open")
     await billing.presentPaywall()
-    setPaywallOpen(false)
+    setPaywall("closed")
+  }
+
+  function upgrade() {
+    if (Platform.OS === "ios") setPaywall("waitingForDismiss")
+    else void presentPaywall()
   }
 
   async function confirmDelete(deckId: Id<"decks">) {
@@ -105,7 +134,8 @@ export function DeckLimitDialog({
   const limit = capacity?.limit ?? (premium ? MAX_PREMIUM_DECKS : FREE_DECK_LIMIT)
   return (
     <DialogCard
-      visible={!paywallOpen}
+      visible={paywall === "closed"}
+      onDismissed={paywall === "waitingForDismiss" ? () => void presentPaywall() : undefined}
       onClose={onClose}
       closeDisabled={busy}
       backdropAccessibilityLabel="Close deck limit"
@@ -135,7 +165,7 @@ export function DeckLimitDialog({
                 text="Upgrade to Pro"
                 preset="reversed"
                 disabled={!billing.configured || billing.isLoading}
-                onPress={() => void upgrade()}
+                onPress={upgrade}
               />
             )}
             <Button

@@ -1,4 +1,4 @@
-import { Linking } from "react-native"
+import { Linking, Modal } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
@@ -2273,6 +2273,9 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByTestId("import-preview-button")).toBeEnabled())
     fireEvent.press(view.getByTestId("import-preview-button"))
     fireEvent.press(view.getByText("Upgrade to Pro"))
+    expect(mockPresentPaywall).not.toHaveBeenCalled()
+    const hiding = view.UNSAFE_getAllByType(Modal).find((modal) => modal.props.visible === false)
+    act(() => hiding?.props.onDismiss())
     await waitFor(() => expect(mockPresentPaywall).toHaveBeenCalledTimes(1))
     expect(mockImport).not.toHaveBeenCalled()
     fireEvent.press(view.getByText("Not now"))
