@@ -12,6 +12,7 @@ const modules = {
   "./decks.ts": async () => jest.requireActual("./decks"),
   "./entitlements.ts": async () => jest.requireActual("./entitlements"),
   "./games.ts": async () => jest.requireActual("./games"),
+  "./history.ts": async () => jest.requireActual("./history"),
   "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
@@ -80,6 +81,16 @@ describe("publishFinishedLocalGame", () => {
       "Atraxa",
       undefined,
     ])
+    const entries = await owner.query(api.history.entries, {
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(entries.page).toHaveLength(1)
+    expect(entries.page[0]).toMatchObject({
+      kind: "game",
+      source: "local",
+      publicId: args.publicId,
+      outcome: "win",
+    })
 
     const rows = await t.run(async (ctx) => ({
       games: await ctx.db.query("games").collect(),
