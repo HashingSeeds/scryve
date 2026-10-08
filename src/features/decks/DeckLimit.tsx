@@ -64,46 +64,13 @@ type DeckLimitDialogProps = {
   onRoomMade?: () => void
 }
 
-export function DeckLimitDialog(props: DeckLimitDialogProps) {
-  const { themed } = useAppTheme()
-  return (
-    <ConvexQueryBoundary
-      fallback={({ retry }) => (
-        <DialogCard
-          visible
-          onClose={props.onClose}
-          dialogTestID="deck-limit-dialog"
-          style={themed($dialog)}
-        >
-          <Text size="sm" text="Deck slots unavailable. Your draft is kept." />
-          <View style={themed($row)}>
-            <Button text="Close" style={$flex1} onPress={props.onClose} />
-            <Button text="Retry" style={$flex1} onPress={retry} />
-          </View>
-        </DialogCard>
-      )}
-    >
-      <DeckLimitDialogBody {...props} />
-    </ConvexQueryBoundary>
-  )
-}
-
 type PaywallState = "closed" | "waitingForDismiss" | "open"
 
-function DeckLimitDialogBody({ access, onClose, onRoomMade }: DeckLimitDialogProps) {
+export function DeckLimitDialog(props: DeckLimitDialogProps) {
   const { themed } = useAppTheme()
   const billing = useRevenueCat()
-  const deleteDeck = useMutation(api.decks.archive)
-  const [step, setStep] = useState<Step>({ kind: "options" })
   const [paywall, setPaywall] = useState<PaywallState>("closed")
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string>()
-  const skip = access && !access.ready
-  const capacity = useQuery(api.decks.capacity, skip ? "skip" : {})
-  const roomMade = useEffectEvent(() => onRoomMade?.())
-  useEffect(() => {
-    if (capacity?.canCreate) roomMade()
-  }, [capacity?.canCreate])
 
   async function presentPaywall() {
     setPaywall("open")
@@ -115,6 +82,59 @@ function DeckLimitDialogBody({ access, onClose, onRoomMade }: DeckLimitDialogPro
     if (Platform.OS === "ios") setPaywall("waitingForDismiss")
     else void presentPaywall()
   }
+
+  return (
+    <DialogCard
+      visible={paywall === "closed"}
+      onDismissed={paywall === "waitingForDismiss" ? () => void presentPaywall() : undefined}
+      onClose={props.onClose}
+      closeDisabled={busy}
+      backdropAccessibilityLabel="Close deck limit"
+      dialogTestID="deck-limit-dialog"
+      dialogAccessibilityRole="alert"
+      accessibilityViewIsModal
+      style={themed($dialog)}
+    >
+      <ConvexQueryBoundary
+        fallback={({ retry }) => (
+          <>
+            <Text size="sm" text="Deck slots unavailable. Your draft is kept." />
+            <View style={themed($row)}>
+              <Button text="Close" style={$flex1} onPress={props.onClose} />
+              <Button text="Retry" style={$flex1} onPress={retry} />
+            </View>
+          </>
+        )}
+      >
+        <DeckLimitOptions {...props} busy={busy} setBusy={setBusy} onUpgrade={upgrade} />
+      </ConvexQueryBoundary>
+    </DialogCard>
+  )
+}
+
+function DeckLimitOptions({
+  access,
+  onClose,
+  onRoomMade,
+  busy,
+  setBusy,
+  onUpgrade,
+}: DeckLimitDialogProps & {
+  busy: boolean
+  setBusy: (busy: boolean) => void
+  onUpgrade: () => void
+}) {
+  const { themed } = useAppTheme()
+  const billing = useRevenueCat()
+  const deleteDeck = useMutation(api.decks.archive)
+  const [step, setStep] = useState<Step>({ kind: "options" })
+  const [error, setError] = useState<string>()
+  const skip = access && !access.ready
+  const capacity = useQuery(api.decks.capacity, skip ? "skip" : {})
+  const roomMade = useEffectEvent(() => onRoomMade?.())
+  useEffect(() => {
+    if (capacity?.canCreate) roomMade()
+  }, [capacity?.canCreate])
 
   async function confirmDelete(deckId: Id<"decks">) {
     if (skip) return
@@ -133,17 +153,7 @@ function DeckLimitDialogBody({ access, onClose, onRoomMade }: DeckLimitDialogPro
   const premium = capacity?.premium ?? false
   const limit = capacity?.limit ?? (premium ? MAX_PREMIUM_DECKS : FREE_DECK_LIMIT)
   return (
-    <DialogCard
-      visible={paywall === "closed"}
-      onDismissed={paywall === "waitingForDismiss" ? () => void presentPaywall() : undefined}
-      onClose={onClose}
-      closeDisabled={busy}
-      backdropAccessibilityLabel="Close deck limit"
-      dialogTestID="deck-limit-dialog"
-      dialogAccessibilityRole="alert"
-      accessibilityViewIsModal
-      style={themed($dialog)}
-    >
+    <>
       {step.kind === "options" ? (
         <>
           <View style={themed($copy)}>
@@ -165,7 +175,7 @@ function DeckLimitDialogBody({ access, onClose, onRoomMade }: DeckLimitDialogPro
                 text="Upgrade to Pro"
                 preset="reversed"
                 disabled={!billing.configured || billing.isLoading}
-                onPress={upgrade}
+                onPress={onUpgrade}
               />
             )}
             <Button
@@ -235,7 +245,7 @@ function DeckLimitDialogBody({ access, onClose, onRoomMade }: DeckLimitDialogPro
       {error || billing.error ? (
         <Text accessibilityRole="alert" size="sm" text={error ?? billing.error ?? ""} />
       ) : null}
-    </DialogCard>
+    </>
   )
 }
 
