@@ -1,4 +1,5 @@
 import { AppState, Platform } from "react-native"
+import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
@@ -20,10 +21,14 @@ export interface ObservabilityOptions {
   getAnalyticsId?: () => string | undefined
 }
 
+// why: only EAS builds carry a channel, so channel-less local and perf builds stop posing as production, and store installs keep their channel even if an update ships without APP_VARIANT.
 function buildEnvironment() {
   const webBuildEnvironment = process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT
-  const sdkDefaultEnvironment = __DEV__ ? "development" : "production"
-  return webBuildEnvironment ?? Updates.channel ?? sdkDefaultEnvironment
+  if (webBuildEnvironment) return webBuildEnvironment
+  if (__DEV__) return "development"
+  const variant: unknown = Constants.expoConfig?.extra?.appVariant
+  if (typeof variant === "string" && !["", "production", "local"].includes(variant)) return variant
+  return Updates.channel || "local"
 }
 
 export function initObservability(

@@ -36,9 +36,21 @@ jest.mock("expo-updates", () => ({
   },
 }))
 
+const mockExpoConfig: { extra: { appVariant?: string } } = { extra: {} }
+
+jest.mock("expo-constants", () => ({
+  __esModule: true,
+  default: {
+    get expoConfig() {
+      return mockExpoConfig
+    },
+  },
+}))
+
 describe("observability initialization", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockExpoConfig.extra = {}
     mockUpdatesState.updateId = "test-update-id"
     mockUpdatesState.channel = "test-channel"
     mockUpdatesState.runtimeVersion = "1.0.0"
@@ -73,13 +85,37 @@ describe("observability initialization", () => {
   })
 
   it.each([
-    ["preview", "preview"],
-    [null, "development"],
-  ] as const)("sets the Sentry environment from update channel %s", (channel, environment) => {
+    ["production", "production", "production"],
+    ["production", "beta", "beta"],
+    ["production", null, "local"],
+    ["preview", "preview", "preview"],
+    ["development", null, "development"],
+    ["perf", "", "perf"],
+    ["local", "production", "production"],
+    ["local", "", "local"],
+    [undefined, null, "local"],
+  ] as const)("reports a %s build on channel %s as %s", (appVariant, channel, environment) => {
+    const development = __DEV__
+    Reflect.set(globalThis, "__DEV__", false)
+    mockExpoConfig.extra = { appVariant }
     mockUpdatesState.channel = channel
-    initObservability()
+    try {
+      initObservability()
+    } finally {
+      Reflect.set(globalThis, "__DEV__", development)
+    }
 
     expect(Sentry.init).toHaveBeenCalledWith(expect.objectContaining({ environment }))
+  })
+
+  it("reports any __DEV__ bundle as development", () => {
+    mockExpoConfig.extra = { appVariant: "production" }
+    mockUpdatesState.channel = "production"
+    initObservability()
+
+    expect(Sentry.init).toHaveBeenCalledWith(
+      expect.objectContaining({ environment: "development" }),
+    )
   })
 
   it("prefers the build's Sentry environment over the update channel", () => {

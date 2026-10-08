@@ -145,6 +145,8 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     plugins,
     extra: {
       ...config.extra,
+      // why: Sentry reads this to tag the build; "local" marks builds made without an EAS profile or script.
+      appVariant: process.env.APP_VARIANT || "local",
       ...(RELEASE_NOTES.length > 0 ? { releaseNotes: RELEASE_NOTES } : {}),
     },
   }
