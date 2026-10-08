@@ -184,6 +184,9 @@ describe("history.entries Scryve matches", () => {
     })
     const finished = await page()
     expect(finished).toHaveLength(3)
+    expect(finished.map((row) => (row.kind === "game" ? row.matchGameNumber : undefined))).toEqual([
+      3, 2, 1,
+    ])
     for (const row of finished) {
       expect(row.kind === "game" && row.match).toEqual({
         publicId: SCRYVE_MATCH_ID,

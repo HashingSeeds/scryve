@@ -96,11 +96,14 @@ export const entries = query({
       const summary = await ctx.db.get(entry.summaryId)
       if (!summary) continue
       const match = entry.matchId ? await scryveMatch(entry.matchId) : null
+      // why: the game's ordinal in its match lives on the game doc, so only match rows read it.
+      const game = match ? await ctx.db.get(entry.gameId) : null
       page.push({
         kind: "game" as const,
         source: entry.source,
         matchId: entry.matchId,
         ...(match ? { match } : {}),
+        ...(game?.matchGameNumber !== undefined ? { matchGameNumber: game.matchGameNumber } : {}),
         publicId: summary.publicId,
         startingLife: summary.startingLife,
         ruleset: summary.ruleset,

@@ -526,12 +526,18 @@ describe("HistoryScreen Scryve matches", () => {
     account: { ownerId: "owner", mePlayerId: "p1" as never },
     publish: "published" as const,
   })
-  const serverGame = (publicId: string, finishedAt: number, outcome: "win" | "loss") =>
+  const serverGame = (
+    publicId: string,
+    finishedAt: number,
+    outcome: "win" | "loss",
+    matchGameNumber: number,
+  ) =>
     connectedGame({
       publicId,
       source: "local",
       finishedAt,
       outcome,
+      matchGameNumber,
       match: {
         publicId: "match_1",
         bestOf: 3,
@@ -577,11 +583,15 @@ describe("HistoryScreen Scryve matches", () => {
           {...props}
           onSelectConnected={jest.fn()}
           onSelectManual={jest.fn()}
-          connected={connectedFeed([serverGame("m-g3", NOW - HOUR / 2, "win")])}
+          connected={connectedFeed([serverGame("m-g3", NOW - HOUR / 2, "win", 3)])}
         />,
       ),
     )
     expect(rowIds()).toEqual(["history-row-match-match_1"])
+    fireEvent.press(screen.getByTestId("history-row-match-match_1"))
+    expect(rowIds()).toEqual(["history-row-match-match_1", "history-row-local-m-g3"])
+    // why: the only loaded game is still game 3 of the match, not game 1 of what is loaded.
+    expect(screen.getByLabelText(/Game 3 · /)).toBeTruthy()
 
     view.rerender(
       themed(
@@ -590,15 +600,14 @@ describe("HistoryScreen Scryve matches", () => {
           onSelectConnected={jest.fn()}
           onSelectManual={jest.fn()}
           connected={connectedFeed([
-            serverGame("m-g3", NOW - HOUR / 2, "win"),
-            serverGame("m-g2", NOW - 2 * HOUR, "loss"),
-            serverGame("m-g1", NOW - 3 * HOUR, "win"),
+            serverGame("m-g3", NOW - HOUR / 2, "win", 3),
+            serverGame("m-g2", NOW - 2 * HOUR, "loss", 2),
+            serverGame("m-g1", NOW - 3 * HOUR, "win", 1),
           ])}
         />,
       ),
     )
-    expect(rowIds()).toEqual(["history-row-match-match_1"])
-    fireEvent.press(screen.getByTestId("history-row-match-match_1"))
+    expect(screen.getAllByTestId("history-row-match-match_1")).toHaveLength(1)
     expect(rowIds()).toEqual([
       "history-row-match-match_1",
       "history-row-local-m-g3",

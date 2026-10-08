@@ -104,7 +104,12 @@ function deviceMatch(account?: LocalGameSummary["account"]): LocalGameSummary[] 
   ].map((summary) => (account ? { ...summary, account } : summary)) as LocalGameSummary[]
 }
 
-function serverMatchGame(publicId: string, finishedAt: number, outcome: "win" | "loss") {
+function serverMatchGame(
+  publicId: string,
+  finishedAt: number,
+  outcome: "win" | "loss" | "draw",
+  matchGameNumber?: number,
+) {
   const match: ScryveMatchSummary = {
     publicId: "match_1",
     bestOf: 3,
@@ -122,8 +127,13 @@ function serverMatchGame(publicId: string, finishedAt: number, outcome: "win" | 
     eventCount: 1,
     finishedAt,
     match,
+    ...(matchGameNumber === undefined ? {} : { matchGameNumber }),
     players: [],
   }
+}
+
+function gameNumbers(match: HistoryEntry) {
+  return match.match!.games!.map((entry) => entry.scryveMatch?.gameNumber)
 }
 
 function keys(entries: HistoryEntry[]) {
@@ -184,6 +194,46 @@ describe("groupMatchGames", () => {
       outcome: "unrecorded",
       match: { inProgress: true, score: "1-1" },
     })
+  })
+
+  it("counts a drawn game once, since the server stores the draw on every seat", () => {
+    const row = serverMatchGame("g3", 30, "win")
+    const drawn = {
+      ...row.match,
+      seats: [
+        { seat: 1, gamesWon: 2, gamesDrawn: 1, outcome: "win" as const, mine: true },
+        { seat: 2, gamesWon: 0, gamesDrawn: 1, outcome: "loss" as const, mine: false },
+      ],
+    }
+    const [match] = groupMatchGames([connectedHistoryEntry({ ...row, match: drawn })])
+
+    expect(match.match?.score).toBe("2-0-1")
+  })
+
+  it("labels games by their stored ordinal, so a lone newest game stays Game 3 as pages load", () => {
+    const [firstPage] = groupMatchGames([
+      connectedHistoryEntry(serverMatchGame("g3", 30, "win", 3)),
+    ])
+    expect(gameNumbers(firstPage)).toEqual([3])
+
+    const [loaded] = groupMatchGames(
+      [
+        serverMatchGame("g3", 30, "win", 3),
+        serverMatchGame("g1", 10, "win", 1),
+        serverMatchGame("g2", 20, "loss", 2),
+      ].map(connectedHistoryEntry),
+    )
+    expect(gameNumbers(loaded)).toEqual([3, 2, 1])
+    expect(gameNumbers(groupMatchGames(deviceMatch().slice(1).map(localHistoryEntry))[0])).toEqual([
+      3, 2,
+    ])
+
+    const [untracked] = groupMatchGames(
+      [serverMatchGame("g2", 20, "loss"), serverMatchGame("g1", 10, "win")].map(
+        connectedHistoryEntry,
+      ),
+    )
+    expect(gameNumbers(untracked)).toEqual([2, 1])
   })
 
   it("keeps one group when a device copy and the server row describe the same game", () => {

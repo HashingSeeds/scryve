@@ -46,7 +46,7 @@ export interface HistoryMatchRef {
   publicId: string
   bestOf: number
   standing: HistoryMatchStanding
-  /** why: assigned by the group in time order, so server rows get one too. */
+  /** why: the ordinal the device or server stored; the group falls back to time order only when none did. */
   gameNumber?: number
 }
 
@@ -181,6 +181,7 @@ function localMatchRef(game: LocalGameSummary, match: LocalGameMatch): HistoryMa
   return {
     publicId: match.id,
     bestOf: match.bestOf,
+    gameNumber: match.gameNumber,
     standing: {
       finished: result !== undefined,
       outcome,
@@ -239,21 +240,20 @@ export type ScryveMatchSummary = {
 }
 
 // why: the server only scores a match once it is finished; until then the loaded games tell the standing.
-function serverMatchRef(match: ScryveMatchSummary): HistoryMatchRef {
+function serverMatchRef(match: ScryveMatchSummary, gameNumber?: number): HistoryMatchRef {
   const finished = match.status === "finished"
   const mine = match.seats.findIndex((seat) => seat.mine)
   const wins = match.seats.map((seat) => seat.gamesWon)
+  // why: a drawn game is drawn for every seat, so the server stores the same count on each; read one.
+  const draws = (match.seats[mine] ?? match.seats[0])?.gamesDrawn ?? 0
   const score =
     finished && wins.every((count) => count !== undefined)
-      ? scryveMatchScore(
-          wins,
-          match.seats.reduce((sum, seat) => sum + (seat.gamesDrawn ?? 0), 0),
-          mine,
-        )
+      ? scryveMatchScore(wins, draws, mine)
       : undefined
   return {
     publicId: match.publicId,
     bestOf: match.bestOf,
+    ...(gameNumber === undefined ? {} : { gameNumber }),
     standing: {
       finished,
       outcome: finished ? toHistoryOutcome(match.outcome) : "unrecorded",
@@ -275,6 +275,7 @@ export function connectedHistoryEntry(game: {
   startingLife?: number
   terminalStatus?: string
   match?: ScryveMatchSummary
+  matchGameNumber?: number
   players: {
     playerId?: string
     displayName?: string
@@ -291,7 +292,7 @@ export function connectedHistoryEntry(game: {
     finishedAt: game.finishedAt,
     status: game.terminalStatus === "abandoned" ? "abandoned" : "finished",
     outcome: toHistoryOutcome(game.outcome),
-    ...(game.match ? { scryveMatch: serverMatchRef(game.match) } : {}),
+    ...(game.match ? { scryveMatch: serverMatchRef(game.match, game.matchGameNumber) } : {}),
     eventCount: game.eventCount,
     system,
     players: (game.players ?? []).map((player, index) => ({
@@ -320,11 +321,16 @@ function runningScore(games: HistoryEntry[]) {
 }
 
 function matchGroupEntry(publicId: string, games: HistoryEntry[]): HistoryEntry {
+  // why: stored ordinals keep "Game 3" right when only game 3 is loaded; time order is the fallback for rows without one.
   const ordered = [...games]
-    .sort((a, b) => a.finishedAt - b.finishedAt)
+    .sort(
+      (a, b) =>
+        (a.scryveMatch?.gameNumber ?? 0) - (b.scryveMatch?.gameNumber ?? 0) ||
+        a.finishedAt - b.finishedAt,
+    )
     .map((game, index) => ({
       ...game,
-      scryveMatch: { ...game.scryveMatch!, gameNumber: index + 1 },
+      scryveMatch: { ...game.scryveMatch!, gameNumber: game.scryveMatch?.gameNumber ?? index + 1 },
     }))
   const latest = ordered[ordered.length - 1]
   const ref = latest.scryveMatch
