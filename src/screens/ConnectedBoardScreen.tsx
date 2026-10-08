@@ -1,4 +1,14 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -10,7 +20,11 @@ import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, $dialogText, type DialogOrigin } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import type { RadialMenuAction } from "@/components/GameRadialMenu"
-import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
+import {
+  getPlayerGridLayoutOptions,
+  PlayerGrid,
+  type PlayerGridProps,
+} from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Screen } from "@/components/Screen"
@@ -22,10 +36,17 @@ import {
   boardSyncMenuSignal,
   boardSyncStatusText,
   useBoardSyncSignal,
+  type BoardSyncSignal,
 } from "@/features/connected/boardSyncSignal"
+import {
+  connectedBoardView,
+  connectedLives,
+  type ConnectedBoardSeat,
+  type ConnectedBoardView,
+} from "@/features/connected/boardView"
 import { InviteCard } from "@/features/connected/InviteCard"
 import { buildInviteQrPayload, buildInviteUrl } from "@/features/connected/inviteLinks"
-import type { ConnectedPlayerProjection } from "@/features/connected/model"
+import type { PendingLifeAction } from "@/features/connected/model"
 import { removeResumeEntryEverywhere } from "@/features/connected/persistence"
 import {
   PlayerActionsDialog,
@@ -51,6 +72,7 @@ import { isGameUnavailableError } from "@/utils/convexError"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 import { usePageBackgroundColor } from "@/utils/usePageBackgroundColor"
 import { useStoreReview } from "@/utils/useStoreReview"
+import { useStructurallyStable } from "@/utils/useStructurallyStable"
 
 import { isPlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -218,19 +240,66 @@ type ConnectedBoardReadyProps = {
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
-  runtime: Extract<ConnectedGameRuntime, { status: "ready" }>
+  view: ConnectedBoardReadyView
+  controls: ConnectedBoardControls
 }
 
-function toBoardPlayer(player: ConnectedPlayerProjection): GamePlayer {
+type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
+
+/** why: kept structurally stable across life changes and sync bookkeeping, so the memoized board only renders when what it lays out changes. */
+type ConnectedBoardReadyView = {
+  game: ConnectedBoardView
+  syncSignal: BoardSyncSignal
+  offlineSince?: number
+  /** why: a send in progress lasts a moment on every tap, so it is left out here and ending re-checks the exact queue. */
+  finishBlocker?: FinishBlocker
+  failed: ConnectedGameRuntime["failed"]
+  changeError?: string
+  finishError?: string
+  finishing: boolean
+}
+
+type ConnectedBoardControls = Pick<
+  ConnectedGameRuntime,
+  | "changeLife"
+  | "submitCommanderDamage"
+  | "resolveCommanderDamageClaim"
+  | "finish"
+  | "abandon"
+  | "dismissFailed"
+> & {
+  /** why: press-time checks read the latest runtime so the board does not re-render for state it only checks on press. */
+  current: () => ConnectedGameRuntime
+}
+
+type BoardSeat = Omit<GamePlayer, "life">
+
+/** why: life totals change on every tap; only the life grid and the winner picker read them, so the rest of the board skips those renders. */
+const ConnectedLivesContext = createContext<Readonly<Record<string, number>>>({})
+/** why: the unsent count moves on every tap; only the status sheet shows it. */
+const ConnectedUnsentContext = createContext(0)
+
+function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
   return {
     id: asPlayerId(player.playerId),
     name: player.displayName,
     color: player.color,
     ...(isPlayerMarkShape(player.shape) ? { shape: player.shape } : {}),
-    life: player.currentLife,
     seat: player.seat,
   }
 }
+
+function finishBlockerFor(runtime: ConnectedGameRuntime): FinishBlocker | undefined {
+  return runtime.connectionStatus === "offline"
+    ? FINISH_BLOCKERS.offline
+    : runtime.pending.length > 0
+      ? FINISH_BLOCKERS.sending
+      : runtime.failed.length > 0
+        ? FINISH_BLOCKERS.rejected
+        : undefined
+}
+
+const NO_LIVES: Readonly<Record<string, number>> = {}
 
 function ConnectedBoardRuntime({
   publicId,
@@ -263,6 +332,66 @@ function ConnectedBoardRuntime({
 }) {
   useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
   const runtime = useConnectedGame(publicId, ownerId)
+  const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
+    connectionStatus: runtime.connectionStatus,
+    unsent: runtime.pending.length,
+    oldestUnsentAt: runtime.pending[0]?.queuedAt,
+    rejected: runtime.failed.length,
+    needsAttention: Boolean(runtime.changeError),
+  })
+  const finishBlocker = finishBlockerFor(runtime)
+  const view = useStructurallyStable<ConnectedBoardReadyView | null>(
+    runtime.status === "ready"
+      ? {
+          game: connectedBoardView(runtime.projection),
+          syncSignal,
+          offlineSince,
+          finishBlocker:
+            finishBlocker === FINISH_BLOCKERS.sending &&
+            (syncSignal.kind === "live" || syncSignal.kind === "caughtUp")
+              ? undefined
+              : finishBlocker,
+          failed: runtime.failed,
+          changeError: runtime.changeError,
+          finishError: runtime.finishError,
+          finishing: runtime.finishing,
+        }
+      : null,
+  )
+  const lives = useStructurallyStable(
+    runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
+  )
+  const latest = useRef(runtime)
+  useLayoutEffect(() => {
+    latest.current = runtime
+  })
+  const {
+    changeLife,
+    submitCommanderDamage,
+    resolveCommanderDamageClaim,
+    finish,
+    abandon,
+    dismissFailed,
+  } = runtime
+  const controls = useMemo(
+    (): ConnectedBoardControls => ({
+      changeLife,
+      submitCommanderDamage,
+      resolveCommanderDamageClaim,
+      finish,
+      abandon,
+      dismissFailed,
+      current: () => latest.current,
+    }),
+    [
+      abandon,
+      changeLife,
+      dismissFailed,
+      finish,
+      resolveCommanderDamageClaim,
+      submitCommanderDamage,
+    ],
+  )
   if (runtime.status === "loading")
     return (
       <ConnectedBoardShell
@@ -277,26 +406,32 @@ function ConnectedBoardRuntime({
         onBack={onBack}
       />
     )
+  if (!view) return null
   return (
-    <ConnectedBoardReady
-      publicId={publicId}
-      initialInviteOpen={initialInviteOpen}
-      onBack={onBack}
-      onSetup={onSetup}
-      onHistory={onHistory}
-      onDecks={onDecks}
-      onSettings={onSettings}
-      onAccount={onAccount}
-      accountLabel={accountLabel}
-      onGameEnded={onGameEnded}
-      onRematch={onRematch}
-      onGameAbandoned={onGameAbandoned}
-      runtime={runtime}
-    />
+    <ConnectedLivesContext.Provider value={lives}>
+      <ConnectedUnsentContext.Provider value={runtime.pending.length}>
+        <ConnectedBoardReady
+          publicId={publicId}
+          initialInviteOpen={initialInviteOpen}
+          onBack={onBack}
+          onSetup={onSetup}
+          onHistory={onHistory}
+          onDecks={onDecks}
+          onSettings={onSettings}
+          onAccount={onAccount}
+          accountLabel={accountLabel}
+          onGameEnded={onGameEnded}
+          onRematch={onRematch}
+          onGameAbandoned={onGameAbandoned}
+          view={view}
+          controls={controls}
+        />
+      </ConnectedUnsentContext.Provider>
+    </ConnectedLivesContext.Provider>
   )
 }
 
-/** why: memoized so query resubscribes in `ConnectedBoardRuntime` that leave the runtime unchanged skip the whole board. */
+/** why: memoized so life changes, sync bookkeeping and query resubscribes in `ConnectedBoardRuntime` skip the whole board; only context consumers re-render. */
 const ConnectedBoardReady = memo(function ConnectedBoardReady({
   publicId,
   initialInviteOpen,
@@ -310,7 +445,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onGameEnded,
   onRematch,
   onGameAbandoned,
-  runtime,
+  view,
+  controls,
 }: ConnectedBoardReadyProps) {
   const menuButtonStyle = useMenuButtonStyle()
   const {
@@ -339,8 +475,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   const finishSubmitInFlight = useRef(false)
   const [abandonedOpen, setAbandonedOpen] = useState(false)
   const navigatedTerminal = useRef(false)
-  const terminalStatus = runtime.status === "ready" ? runtime.projection.status : undefined
-  const rematchPublicId = runtime.projection.rematchPublicId
+  const game = view.game
+  const { syncSignal, offlineSince, finishBlocker } = view
+  const terminalStatus = game.status
+  const rematchPublicId = game.rematchPublicId
   useEffect(() => {
     if (terminalStatus === "finished") {
       if (navigatedTerminal.current) return
@@ -352,7 +490,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     }
   }, [terminalStatus, rematchPublicId, onRematch, onGameEnded, publicId])
   useStoreReview(
-    runtime.projection.status === "finished" &&
+    game.status === "finished" &&
       !menuOpen &&
       !statusOpen &&
       !layoutPickerOpen &&
@@ -388,7 +526,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     setInspectedPlayerId(null)
   }, [])
 
-  const game = runtime.projection
   const system = game.system
   const counter = playSystemRules(system).counter
   const active = game.status === "active"
@@ -401,10 +538,10 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       ),
     [game.players],
   )
-  const players: GamePlayer[] = useMemo(
+  const players: BoardSeat[] = useMemo(
     () => [
-      ...game.players.filter((player) => !controlled.has(player.playerId)).map(toBoardPlayer),
-      ...game.players.filter((player) => controlled.has(player.playerId)).map(toBoardPlayer),
+      ...game.players.filter((player) => !controlled.has(player.playerId)).map(toBoardSeat),
+      ...game.players.filter((player) => controlled.has(player.playerId)).map(toBoardSeat),
     ],
     [controlled, game.players],
   )
@@ -416,7 +553,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     supportsCommanderDamage(system, game.format || game.ruleset) &&
     game.commanderDamage !== undefined
   const commanderTotals = game.commanderDamage?.totals ?? []
-  const failedActionLabel = (event: (typeof runtime.pending)[number]["event"]) => {
+  const failedActionLabel = (event: PendingLifeAction["event"]) => {
     if (event.type === "life.changed")
       return `A ${event.delta > 0 ? "+" : ""}${event.delta} ${counter.label} change could not sync`
     if (event.type === "commanderDamage.submitted")
@@ -425,7 +562,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   }
   const displayNameOf = (playerId: string) =>
     game.players.find((candidate) => candidate.playerId === playerId)?.displayName ?? "Another seat"
-  const incomingCommanderDamage = (player: GamePlayer): Record<PlayerId, number> =>
+  const incomingCommanderDamage = (player: BoardSeat): Record<PlayerId, number> =>
     Object.fromEntries(
       players
         .filter(({ id }) => id !== player.id)
@@ -437,7 +574,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         ]),
     ) as Record<PlayerId, number>
   function toggleCommanderSword(player: GamePlayer) {
-    if (!active || runtime.connectionStatus !== "connected" || !controlled.has(player.id)) return
+    if (
+      !active ||
+      controls.current().connectionStatus !== "connected" ||
+      !controlled.has(player.id)
+    )
+      return
     setInspectedPlayerId(null)
     if (armedCommander?.playerId === player.id) {
       sendCommanderDamage()
@@ -465,27 +607,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       delta === undefined || delta === 0 ? [] : [{ toPlayerId, delta }],
     )
     if (!changes.length) return
-    runtime.submitCommanderDamage(armedCommander.playerId, changes)
+    controls.submitCommanderDamage(armedCommander.playerId, changes)
     setArmedCommander(null)
     setInspectedPlayerId(null)
   }
   const finishResultSelected = winnerPlayerIds.length > 0 || drawSelected
 
-  const finishBlocker =
-    runtime.connectionStatus === "offline"
-      ? FINISH_BLOCKERS.offline
-      : runtime.pending.length > 0
-        ? FINISH_BLOCKERS.sending
-        : runtime.failed.length > 0
-          ? FINISH_BLOCKERS.rejected
-          : undefined
-  const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
-    connectionStatus: runtime.connectionStatus,
-    unsent: runtime.pending.length,
-    oldestUnsentAt: runtime.pending[0]?.queuedAt,
-    rejected: runtime.failed.length,
-    needsAttention: Boolean(runtime.changeError),
-  })
   const syncStatusText = boardSyncStatusText(syncSignal)
   const openSyncStatus = useCallback(() => {
     setMenuOpen(false)
@@ -522,7 +649,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
     else onBack?.()
   }
 
-  const canEnd = active && game.isHost && !runtime.finishing
+  const canEnd = active && game.isHost && !view.finishing
   const radialActions: RadialMenuAction[] = useMemo(
     () => [
       {
@@ -571,12 +698,20 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         onPress: (event) => {
           captureMenuDialogOrigin(event)
           setMenuOpen(false)
-          if (finishBlocker) setStatusOpen(true)
+          if (finishBlockerFor(controls.current())) setStatusOpen(true)
           else setConfirmingFinish(true)
         },
       },
     ],
-    [canEnd, captureMenuDialogOrigin, finishBlocker, layoutOptions.length, onHistory, onSetup],
+    [
+      canEnd,
+      captureMenuDialogOrigin,
+      controls,
+      finishBlocker,
+      layoutOptions.length,
+      onHistory,
+      onSetup,
+    ],
   )
   const seatColors = useSeatColors(players)
   const exitAction = useMemo(
@@ -617,9 +752,9 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         playerCount={players.length}
         layoutVariant={layoutVariant}
         renderGrid={(boardOrientation) => (
-          <PlayerGrid
+          <ConnectedLifeGrid
             boardOrientation={boardOrientation}
-            players={players}
+            seats={players}
             system={system}
             lifeStep={game.lifeStep}
             layoutVariant={layoutVariant}
@@ -656,8 +791,8 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                               claimId: claim.claimId,
                               attackerName: displayNameOf(claim.fromPlayerId),
                               delta: claim.delta,
-                              onConfirm: () => runtime.resolveCommanderDamageClaim(claim, true),
-                              onDecline: () => runtime.resolveCommanderDamageClaim(claim, false),
+                              onConfirm: () => controls.resolveCommanderDamageClaim(claim, true),
+                              onDecline: () => controls.resolveCommanderDamageClaim(claim, false),
                             }))
                         : [],
                     onPressSword: toggleCommanderSword,
@@ -665,7 +800,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                   }
                 : undefined
             }
-            onChange={(playerId, delta) => runtime.changeLife(playerId, delta)}
+            onChange={controls.changeLife}
           />
         )}
         menu={{
@@ -777,7 +912,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           <Text
             text={
               finished
-                ? `${counterChangeLabel(system, game.eventSequence)} accepted · final`
+                ? `${counterChangeLabel(system, game.finalEventSequence ?? 0)} accepted · final`
                 : `${playFormatLabel(system, game.format || game.ruleset)} · starts with ${counterValueLabel(system, game.startingLife)}`
             }
             size="xs"
@@ -785,16 +920,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           />
           {finished ? null : (
             <View testID="connected-sync-details" style={themed($syncRows)}>
-              <SyncRow
-                label="Your changes"
-                value={() =>
-                  runtime.pending.length === 0
-                    ? "All sent"
-                    : syncSignal.kind === "offline"
-                      ? `${runtime.pending.length} saved on this device. They send when you reconnect.`
-                      : `Sending ${runtime.pending.length}`
-                }
-              />
+              <UnsentChangesRow offline={syncSignal.kind === "offline"} />
               <SyncRow
                 label="Other players"
                 since={offlineSince}
@@ -806,11 +932,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                       : "Live"
                 }
               />
-              <SyncRow label="Finish game" value={() => finishBlocker?.detail ?? "Available"} />
+              <FinishAvailabilityRow blocker={finishBlocker} />
             </View>
           )}
           <ScrollView style={themed($statusScroll)} contentContainerStyle={themed($statusList)}>
-            {runtime.failed.map((failure) => (
+            {view.failed.map((failure) => (
               <View
                 key={failure.action.event.operationId}
                 testID="connected-failed-action"
@@ -820,22 +946,22 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 <Text text={`${failedActionLabel(failure.action.event)}: ${failure.reason}`} />
                 <Button
                   text="Dismiss after reviewing"
-                  onPress={() => runtime.dismissFailed(failure.action.event.operationId)}
+                  onPress={() => controls.dismissFailed(failure.action.event.operationId)}
                 />
               </View>
             ))}
-            {runtime.changeError ? (
+            {view.changeError ? (
               <Text
                 testID="connected-change-error"
                 accessibilityRole="alert"
-                text={runtime.changeError}
+                text={view.changeError}
               />
             ) : null}
-            {runtime.finishError ? (
+            {view.finishError ? (
               <Text
                 testID="connected-finish-error"
                 accessibilityRole="alert"
-                text={runtime.finishError}
+                text={view.finishError}
               />
             ) : null}
             {!active && !finished ? (
@@ -892,7 +1018,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         <DialogCard
           visible
           onClose={() => setConfirmingFinish(false)}
-          closeDisabled={runtime.finishing}
+          closeDisabled={view.finishing}
           origin={menuDialogOrigin}
           backdropTestID="connected-finish-backdrop"
           backdropAccessibilityLabel="Cancel ending the connected game"
@@ -909,28 +1035,15 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             />
           </View>
           <View style={themed($resultChoices)}>
-            {game.players.map((player) => {
-              const selected = winnerPlayerIds.includes(player.playerId)
-              return (
-                <ChoiceButton
-                  key={player.playerId}
-                  text={player.displayName}
-                  detail={counterValueLabel(system, player.currentLife)}
-                  accentColor={player.color}
-                  Leading={({ color }) => (
-                    <PlayerMark
-                      seatNumber={player.seat}
-                      shape={isPlayerMarkShape(player.shape) ? player.shape : undefined}
-                      color={color}
-                      size={28}
-                    />
-                  )}
-                  accessibilityLabel={`${player.displayName}, ${counterValueLabel(system, player.currentLife)}${selected ? ", winner" : ""}`}
-                  selected={selected}
-                  onPress={() => toggleWinner(player.playerId)}
-                />
-              )
-            })}
+            {game.players.map((player) => (
+              <WinnerChoice
+                key={player.playerId}
+                player={player}
+                system={system}
+                selected={winnerPlayerIds.includes(player.playerId)}
+                onPress={() => toggleWinner(player.playerId)}
+              />
+            ))}
             <ChoiceButton
               text="Draw"
               accentColor={colors.palette.neutral400}
@@ -939,28 +1052,28 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               onPress={selectDraw}
             />
           </View>
-          {runtime.finishError ? (
-            <AlertNote testID="connected-finish-error" text={runtime.finishError} />
+          {view.finishError ? (
+            <AlertNote testID="connected-finish-error" text={view.finishError} />
           ) : null}
           <View style={themed($dialogActions)}>
             <Button
               testID="cancel-connected-finish-button"
               tx="game:cancel"
-              disabled={runtime.finishing}
+              disabled={view.finishing}
               style={themed($dialogAction)}
               onPress={() => setConfirmingFinish(false)}
             />
             <Button
               testID="confirm-connected-finish-button"
               tx={
-                runtime.finishing
+                view.finishing
                   ? "game:ending"
                   : finishResultSelected
                     ? "game:finish"
                     : "game:abandon"
               }
               preset={finishResultSelected ? "reversed" : "filled"}
-              disabled={runtime.finishing || Boolean(finishBlocker)}
+              disabled={view.finishing || Boolean(finishBlocker)}
               style={themed($dialogAction)}
               onPress={async () => {
                 if (finishSubmitInFlight.current) return
@@ -968,12 +1081,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                 try {
                   const withResult = finishResultSelected
                   const ended = withResult
-                    ? await runtime.finish(
+                    ? await controls.finish(
                         winnerPlayerIds.length > 0
                           ? { kind: "win" as const, winnerPlayerIds }
                           : { kind: "draw" as const },
                       )
-                    : await runtime.abandon()
+                    : await controls.abandon()
                   if (!ended) return
                   setConfirmingFinish(false)
                   // why: the finished projection carries any rematch, so the host follows it like every other board.
@@ -1073,6 +1186,74 @@ const FINISH_BLOCKERS = {
   sending: { petal: "sending changes", detail: "After your changes send" },
   rejected: { petal: "review first", detail: "Review the changes below first" },
 } as const
+
+/** why: reads life from context so a life change re-renders only this grid and the changed card, not the board around it. */
+function ConnectedLifeGrid({
+  seats,
+  ...grid
+}: Omit<PlayerGridProps, "players"> & { seats: BoardSeat[] }) {
+  const lives = useContext(ConnectedLivesContext)
+  const players = useMemo(
+    () => seats.map((seat): GamePlayer => ({ ...seat, life: lives[seat.id] ?? 0 })),
+    [lives, seats],
+  )
+  return <PlayerGrid {...grid} players={players} />
+}
+
+function WinnerChoice({
+  player,
+  system,
+  selected,
+  onPress,
+}: {
+  player: ConnectedBoardSeat
+  system: ConnectedBoardView["system"]
+  selected: boolean
+  onPress: () => void
+}) {
+  const life = counterValueLabel(system, useContext(ConnectedLivesContext)[player.playerId] ?? 0)
+  return (
+    <ChoiceButton
+      text={player.displayName}
+      detail={life}
+      accentColor={player.color}
+      Leading={({ color }) => (
+        <PlayerMark
+          seatNumber={player.seat}
+          shape={isPlayerMarkShape(player.shape) ? player.shape : undefined}
+          color={color}
+          size={28}
+        />
+      )}
+      accessibilityLabel={`${player.displayName}, ${life}${selected ? ", winner" : ""}`}
+      selected={selected}
+      onPress={onPress}
+    />
+  )
+}
+
+function UnsentChangesRow({ offline }: { offline: boolean }) {
+  const unsent = useContext(ConnectedUnsentContext)
+  return (
+    <SyncRow
+      label="Your changes"
+      value={() =>
+        unsent === 0
+          ? "All sent"
+          : offline
+            ? `${unsent} saved on this device. They send when you reconnect.`
+            : `Sending ${unsent}`
+      }
+    />
+  )
+}
+
+/** why: the board's blocker leaves out a brief send in progress, which this row still reports. */
+function FinishAvailabilityRow({ blocker }: { blocker?: FinishBlocker }) {
+  const unsent = useContext(ConnectedUnsentContext)
+  const shown = blocker ?? (unsent > 0 ? FINISH_BLOCKERS.sending : undefined)
+  return <SyncRow label="Finish game" value={() => shown?.detail ?? "Available"} />
+}
 
 function ElapsedText({
   since,

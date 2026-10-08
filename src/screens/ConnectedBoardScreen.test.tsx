@@ -716,6 +716,54 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.queryByText("1 pending")).toBeNull()
   })
 
+  it("leaves a moment of sending off the End action but still explains it when pressed", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      connectionStatus: "syncing",
+      pending: [
+        {
+          event: { type: "life.changed", operationId: "operation-1", playerId: "player-1" },
+          queuedAt: Date.now(),
+        },
+      ],
+      projection: { ...connectedHarness.runtime.projection, isHost: true },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedMenu()
+    expect(screen.getByTestId("end-game-button").props.accessibilityLabel).toBe("End")
+
+    fireEvent.press(screen.getByTestId("end-game-button"))
+    expect(screen.getByTestId("connected-status-dialog")).toBeTruthy()
+    expect(screen.getByText("After your changes send")).toBeTruthy()
+    expect(screen.getByText("Sending 1")).toBeTruthy()
+    expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull()
+  })
+
+  it("shows another seat's new life on its card and in the winner picker", () => {
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: { ...connectedHarness.runtime.projection, isHost: true },
+    }
+    const view = render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...connectedHarness.runtime.projection,
+        eventSequence: 1,
+        players: connectedHarness.runtime.projection.players.map((player) =>
+          player.playerId === "player-2" ? { ...player, currentLife: 33 } : player,
+        ),
+      },
+    }
+    view.rerender(themed(<ConnectedBoardScreen publicId="game-public" />))
+
+    expect(screen.getByTestId("life-total-seat-1").props.children).toBe("33")
+    openConnectedFinish()
+    expect(
+      within(screen.getByTestId("connected-finish-confirmation")).getByLabelText(/^Grace, 33 /),
+    ).toBeTruthy()
+  })
+
   it("does not explain a blocked End to a player who cannot end the game", () => {
     connectedHarness.runtime = {
       ...connectedHarness.runtime,

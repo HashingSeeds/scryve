@@ -91,7 +91,7 @@ export type MockConnectedRuntime = {
     invitation?: { token: string; manualCode: string; expiresAt: number }
     players: RuntimePlayer[]
   }
-  pending: Array<{ event: RuntimeActionEvent }>
+  pending: Array<{ event: RuntimeActionEvent; queuedAt?: number }>
   failed: Array<{ action: { event: RuntimeActionEvent }; reason: string }>
   connectionStatus: "connected" | "offline" | "syncing"
   changeLife: jest.Mock
