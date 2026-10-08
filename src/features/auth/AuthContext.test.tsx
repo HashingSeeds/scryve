@@ -101,20 +101,61 @@ describe("native auth experience", () => {
     )
   })
 
-  describe("launch with a session hint", () => {
-    const mounts = jest.fn()
-    function MountProbe() {
-      useEffect(() => mounts(), [])
-      return null
-    }
-    const app = () => (
-      <ThemeProvider initialContext="light">
-        <CloudProviders>
-          <MountProbe />
-        </CloudProviders>
-      </ThemeProvider>
-    )
+  const mounts = jest.fn()
+  function MountProbe() {
+    useEffect(() => mounts(), [])
+    return null
+  }
+  const app = () => (
+    <ThemeProvider initialContext="light">
+      <CloudProviders>
+        <MountProbe />
+      </CloudProviders>
+    </ThemeProvider>
+  )
 
+  describe("account changes", () => {
+    beforeEach(() => {
+      mounts.mockClear()
+      writeSessionHint({ userId: null })
+    })
+    afterEach(() => {
+      mockUseAuth.mockReset().mockReturnValue({ isLoaded: true, isSignedIn: false })
+      mockUseUser.mockReset().mockReturnValue({ user: { id: "user_test" } })
+    })
+    function signIn(id: string) {
+      mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: true })
+      mockUseUser.mockReturnValue({ user: { id } })
+    }
+    function signOut() {
+      mockUseAuth.mockReturnValue({ isLoaded: true, isSignedIn: false })
+      mockUseUser.mockReturnValue({ user: null })
+    }
+
+    it("keeps the app mounted when a signed-out player signs in", () => {
+      signOut()
+      const view = render(app())
+      signIn("user_test")
+      view.rerender(app())
+      expect(mounts).toHaveBeenCalledTimes(1)
+    })
+
+    it("starts the app fresh on sign-out and on a switch to another account", () => {
+      signIn("user_test")
+      const view = render(app())
+      signOut()
+      view.rerender(app())
+      expect(mounts).toHaveBeenCalledTimes(2)
+      signIn("user_test")
+      view.rerender(app())
+      expect(mounts).toHaveBeenCalledTimes(2)
+      signIn("user_other")
+      view.rerender(app())
+      expect(mounts).toHaveBeenCalledTimes(3)
+    })
+  })
+
+  describe("launch with a session hint", () => {
     beforeEach(() => {
       mounts.mockClear()
       writeSessionHint({ userId: "user_test" })
