@@ -91,10 +91,12 @@ function pickRelease(groups, now, soakMs) {
   const releases = new Map()
   for (const group of groups) {
     const release = releases.get(group.commit)
+    // why: re-running beta publishes a commit again, and beta devices run the newest group per platform.
+    if (release?.platforms.some((platform) => group.platforms.includes(platform))) continue
     const merged = release
       ? {
           ...release,
-          publishedAt: Math.min(release.publishedAt, group.publishedAt),
+          publishedAt: Math.max(release.publishedAt, group.publishedAt),
           groups: [...release.groups, ...group.groups],
           platforms: [...release.platforms, ...group.platforms],
           updateIds: [...release.updateIds, ...group.updateIds],
@@ -113,7 +115,7 @@ function pickRelease(groups, now, soakMs) {
 
 function* betaGroups() {
   const groupIds = new Set(
-    eas("update:list", "--branch", "beta", "--limit", "20").currentPage.map((u) => u.group),
+    eas("update:list", "--branch", "beta", "--limit", "50").currentPage.map((u) => u.group),
   )
   for (const groupId of groupIds) yield summarizeGroup(eas("update:view", groupId))
 }

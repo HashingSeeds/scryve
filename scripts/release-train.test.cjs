@@ -25,11 +25,11 @@ test("release notes drop repeats and stop at eight", () => {
 })
 
 const MINUTE = 60_000
-const group = (commit, platform, minutesAgo) =>
+const group = (commit, platform, minutesAgo, attempt = "") =>
   summarizeGroup([
     {
-      id: `${commit}-${platform}`,
-      group: `g-${commit}-${platform}`,
+      id: `${commit}${attempt}-${platform}`,
+      group: `g-${commit}${attempt}-${platform}`,
       platform,
       gitCommitHash: commit,
       message: `merge ${commit}`,
@@ -50,7 +50,7 @@ test("a release carries every platform's group for its commit", () => {
   )
   assert.deepEqual(candidate.groups, ["g-old-ios", "g-old-android"])
   assert.deepEqual(candidate.updateIds, ["old-ios", "old-android"])
-  assert.equal(candidate.publishedAt, 29 * MINUTE)
+  assert.equal(candidate.publishedAt, 30 * MINUTE)
   assert.deepEqual(
     soaking.map((release) => release.commit),
     ["new"],
@@ -60,4 +60,27 @@ test("a release carries every platform's group for its commit", () => {
 test("a release missing a platform is never promoted", () => {
   const { candidate } = pickRelease([group("old", "ios", 70)], 100 * MINUTE, 60 * MINUTE)
   assert.equal(candidate, null)
+})
+
+test("a release soaks from its last platform's publish", () => {
+  const { candidate } = pickRelease(
+    [group("old", "ios", 59), group("old", "android", 61)],
+    100 * MINUTE,
+    60 * MINUTE,
+  )
+  assert.equal(candidate, null)
+})
+
+test("a commit published twice promotes only its newest groups", () => {
+  const groups = [
+    group("same", "ios", 5, "-rerun"),
+    group("same", "android", 5, "-rerun"),
+    group("same", "ios", 70),
+    group("same", "android", 70),
+  ]
+  assert.equal(pickRelease(groups, 100 * MINUTE, 60 * MINUTE).candidate, null)
+  assert.deepEqual(pickRelease(groups, 100 * MINUTE, 0).candidate.groups, [
+    "g-same-rerun-ios",
+    "g-same-rerun-android",
+  ])
 })
