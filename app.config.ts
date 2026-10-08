@@ -4,11 +4,16 @@ import { CodeGenerator, withMainActivity } from "expo/config-plugins"
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
 
-// why: safe only because fingerprint.config.js skips ExpoConfigExtraSection; otherwise notes change the runtime.
-const RELEASE_NOTES = (process.env.RELEASE_NOTES ?? "")
-  .split("\n")
-  .map((line) => line.trim())
-  .filter(Boolean)
+/**
+ * why: safe only because fingerprint.config.js skips ExpoConfigExtraSection; otherwise notes change
+ * the runtime. RELEASE_NOTES is `release-train.cjs notes` output. The commit lets a later update's
+ * notes skip what this build already has; EAS sets it for binaries, GitHub Actions for beta updates.
+ */
+const RELEASE_NOTES: { notes: string[]; newSince: Record<string, number> } | null = process.env
+  .RELEASE_NOTES
+  ? JSON.parse(process.env.RELEASE_NOTES)
+  : null
+const RELEASE_COMMIT = process.env.EAS_BUILD_GIT_COMMIT_HASH ?? process.env.GITHUB_SHA
 
 function normalizeHttpsOrigin(value: string | undefined): string | null {
   if (!value) return null
@@ -147,7 +152,10 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
       ...config.extra,
       // why: Sentry reads this to tag the build; "local" marks builds made without an EAS profile or script.
       appVariant: process.env.APP_VARIANT || "local",
-      ...(RELEASE_NOTES.length > 0 ? { releaseNotes: RELEASE_NOTES } : {}),
+      ...(RELEASE_NOTES
+        ? { releaseNotes: RELEASE_NOTES.notes, releaseNotesNewSince: RELEASE_NOTES.newSince }
+        : {}),
+      ...(RELEASE_COMMIT ? { releaseCommit: RELEASE_COMMIT } : {}),
     },
   }
 

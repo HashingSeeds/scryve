@@ -3,15 +3,20 @@ const { test } = require("node:test")
 
 const { pickRelease, releaseNotes, summarizeGroup } = require("./release-train.cjs")
 
+const commits = (...subjects) =>
+  subjects.map((subject, index) => ({ commit: `c${index}`, subject }))
+
 test("release notes keep player-facing changes in plain words", () => {
   assert.deepEqual(
-    releaseNotes([
-      "fix(decks): pasted Pokémon cards like Riolu MEG 76 no longer come in unmatched (#303)",
-      "fix(tooling): lint:check lints only the files you pass (#304)",
-      "chore(web): bump wrangler (#290)",
-      "perf: cut cold launch by 23% (#288)",
-      "Merge branch 'main'",
-    ]),
+    releaseNotes(
+      commits(
+        "fix(decks): pasted Pokémon cards like Riolu MEG 76 no longer come in unmatched (#303)",
+        "fix(tooling): lint:check lints only the files you pass (#304)",
+        "chore(web): bump wrangler (#290)",
+        "perf: cut cold launch by 23% (#288)",
+        "Merge branch 'main'",
+      ),
+    ).notes,
     [
       "Pasted Pokémon cards like Riolu MEG 76 no longer come in unmatched",
       "Cut cold launch by 23%",
@@ -19,9 +24,20 @@ test("release notes keep player-facing changes in plain words", () => {
   )
 })
 
-test("release notes drop repeats and stop at eight", () => {
+test("each commit in the window knows how many notes came after it", () => {
   const subjects = Array.from({ length: 10 }, (_, index) => `fix(game): change ${index}`)
-  assert.equal(releaseNotes([...subjects, "fix(game): change 0"]).length, 8)
+  const { notes, newSince } = releaseNotes(
+    commits("fix(game): change 0", "chore: bump", "fix(game): change 0", ...subjects),
+  )
+  assert.equal(notes.length, 8)
+  assert.deepEqual(Object.entries(newSince).slice(0, 4), [
+    ["c0", 0],
+    ["c1", 1],
+    ["c2", 1],
+    ["c3", 1],
+  ])
+  assert.equal(newSince.c10, 7)
+  assert.equal(newSince.c11, undefined)
 })
 
 const MINUTE = 60_000
