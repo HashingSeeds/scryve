@@ -119,8 +119,9 @@ export default function NewLocalGameRoute() {
         onResumeLocal={() => router.replace("/game/current")}
         onEndLocal={endLocal}
         onAbandonLocal={() => endLocal()}
+        // why: Play opens plain /game/new before its stored-game state catches up, so a running game's edits must persist on every entry.
         onSavePlayers={
-          started && params.setup === "1"
+          started
             ? (players, account) => {
                 localGameRepository.updateActivePlayers(activeGame.id, players, account)
                 setActiveGame(localGameRepository.loadActiveGame())
