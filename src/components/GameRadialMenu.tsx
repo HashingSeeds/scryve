@@ -336,7 +336,7 @@ type GameMenuAnchorProps = {
 }
 
 /** why: a hardware-pinned board does not turn with the window, so the pentagon and its fan stay put through the system rotation and then turn together about the anchor to face the holder (`facingAngle`, clockwise degrees). `holderAnchor` is where the anchor sits in the holder's view and picks the side the fan opens toward. The box is large enough to contain the fan, because Android drops touches outside a parent's bounds. */
-export function GameMenuCluster({
+export const GameMenuCluster = memo(function GameMenuCluster({
   holderAnchor,
   holderHeight,
   facingAngle,
@@ -390,7 +390,7 @@ export function GameMenuCluster({
       ) : null}
     </Animated.View>
   )
-}
+})
 
 function GameMenuAnchor({
   open,

@@ -72,7 +72,10 @@ function PinnedGameBoardStage({
     () => getPlayerGridMenuAnchor(playerCount, gridLayout),
     [playerCount, gridLayout],
   )
-  const holderAnchor = boardPointToWindowPoint(boardAnchor, { width, height }, holderAngle)
+  const holderAnchor = useMemo(
+    () => boardPointToWindowPoint(boardAnchor, { width, height }, holderAngle),
+    [boardAnchor, width, height, holderAngle],
+  )
   const boardOrientation = useMemo(
     () =>
       pinned

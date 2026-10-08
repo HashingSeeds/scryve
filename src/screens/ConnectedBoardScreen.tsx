@@ -44,6 +44,7 @@ import {
 } from "@/features/game/playSystems"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
+import { useSeatColors } from "@/features/game/useSeatColors"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { isGameUnavailableError } from "@/utils/convexError"
@@ -576,7 +577,7 @@ function ConnectedBoardReady({
     ],
     [canEnd, captureMenuDialogOrigin, finishBlocker, layoutOptions.length, onHistory, onSetup],
   )
-  const seatColors = useMemo(() => players.map((player) => player.color), [players])
+  const seatColors = useSeatColors(players)
   const exitAction = useMemo(
     () =>
       armedCommander || inspectedPlayerId
