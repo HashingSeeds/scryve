@@ -39,7 +39,7 @@ jobs:
       - name: Promote the newest clean beta update
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_READ_TOKEN: ${{ secrets.SENTRY_READ_TOKEN }}
           SOAK_MINUTES: ${{ inputs.soak_minutes }}
           PROMOTE: ${{ inputs.promote && '--yes' || '' }}
         run: node scripts/release-train.cjs promote --soak-minutes "$SOAK_MINUTES" $PROMOTE

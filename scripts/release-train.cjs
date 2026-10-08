@@ -98,13 +98,13 @@ function findCandidate(now, soakMs) {
   return { candidate: null, soaking }
 }
 
-// why: CI passes SENTRY_AUTH_TOKEN; on our machines the telemetry skill already stores a read token.
+// why: CI passes SENTRY_READ_TOKEN; on our machines the telemetry skill already stores a read token.
 function sentryToken() {
-  if (process.env.SENTRY_AUTH_TOKEN) return process.env.SENTRY_AUTH_TOKEN
+  if (process.env.SENTRY_READ_TOKEN) return process.env.SENTRY_READ_TOKEN
   const telemetryEnv = path.join(os.homedir(), ".config", "telemetry", "env")
   const contents = fs.existsSync(telemetryEnv) ? fs.readFileSync(telemetryEnv, "utf8") : ""
   const token = contents.match(/^TELEMETRY_SENTRY_TOKEN=(.*)$/m)?.[1]
-  if (!token) throw new Error("Set SENTRY_AUTH_TOKEN (event:read) to check beta for new issues")
+  if (!token) throw new Error("Set SENTRY_READ_TOKEN (event:read) to check beta for new issues")
   return token
 }
 
