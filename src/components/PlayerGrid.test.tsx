@@ -83,6 +83,35 @@ describe("PlayerGrid", () => {
     expect(measuredOpacity).toBe(1)
   })
 
+  it("keeps commander callbacks stable across renders while calling the latest handler", () => {
+    const gamePlayers = players(2)
+    const grid = (onPressSword: jest.Mock) => (
+      <ThemeProvider>
+        <PlayerGrid
+          players={gamePlayers}
+          commanderDamage={{
+            incomingFor: () => ({}),
+            armedPlayerId: null,
+            onPressSword,
+            onStage: jest.fn(),
+          }}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>
+    )
+    const first = jest.fn()
+    const latest = jest.fn()
+    const view = render(grid(first))
+    const swordAt = () => view.UNSAFE_getAllByType(LifeCard)[0].props.commanderDamage.onPressSword
+    const initialSword = swordAt()
+
+    view.rerender(grid(latest))
+    expect(swordAt()).toBe(initialSword)
+    act(() => swordAt()())
+    expect(first).not.toHaveBeenCalled()
+    expect(latest).toHaveBeenCalledWith(gamePlayers[0])
+  })
+
   it.each([-90, 90])(
     "preserves five-player seats and commander grids when the board turns %i°",
     (boardRotation) => {

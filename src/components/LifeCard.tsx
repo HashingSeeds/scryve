@@ -21,6 +21,7 @@ import type { LifeDelta } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
+import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useElapsedSince } from "@/utils/useElapsedSince"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
@@ -128,7 +129,7 @@ function UpdatedAgo({ since, color }: { since: number; color: string }) {
   )
 }
 
-/** why: the board re-renders on every sync step and server update; a seat only needs to when its own props change. Flat objects (insets, edges, corner style) are rebuilt per render, so they compare by content. */
+/** why: the board re-renders on every sync step and server update; a seat only needs to when its own props change. PlayerGrid rebuilds plain props (insets, styles, commander data) each render, so they compare by content, and it keeps every callback's identity stable. */
 export const LifeCard = memo(function LifeCard({
   playerName,
   seatNumber,
@@ -755,7 +756,7 @@ export const LifeCard = memo(function LifeCard({
       ) : null}
     </View>
   )
-}, sameLifeCardProps)
+}, structurallyEqual)
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
@@ -961,30 +962,3 @@ const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
 const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
 
 const $overviewReadout: ViewStyle = { zIndex: 8 }
-
-function sameLifeCardProps(previous: LifeCardProps, next: LifeCardProps): boolean {
-  const keys = Object.keys(next) as (keyof LifeCardProps)[]
-  return (
-    keys.length === Object.keys(previous).length &&
-    keys.every(
-      (key) =>
-        key in previous &&
-        (Object.is(previous[key], next[key]) || sameFlatObject(previous[key], next[key])),
-    )
-  )
-}
-
-function sameFlatObject(previous: unknown, next: unknown): boolean {
-  if (!isPlainObject(previous) || !isPlainObject(next)) return false
-  const keys = Object.keys(next)
-  return (
-    keys.length === Object.keys(previous).length &&
-    keys.every((key) => key in previous && Object.is(previous[key], next[key]))
-  )
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === "object" && value !== null && Object.getPrototypeOf(value) === Object.prototype
-  )
-}

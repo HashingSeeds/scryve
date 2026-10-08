@@ -4,7 +4,7 @@ import { StyleSheet, View } from "react-native"
 import Animated from "react-native-reanimated"
 
 import { COMMANDER_LETHAL_DAMAGE } from "@/features/game/domain"
-import type { GamePlayer, PlayerId } from "@/features/game/types"
+import type { CommanderBoardPlayer, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
@@ -30,7 +30,7 @@ export interface CommanderStripProps {
   seatNumber: number
   identity: string
   ownerPlayerId: PlayerId
-  players: readonly GamePlayer[]
+  players: readonly CommanderBoardPlayer[]
   seats: readonly CommanderBoardSeat[]
   incoming: Record<PlayerId, number>
   foreground: string
