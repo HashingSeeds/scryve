@@ -43,8 +43,14 @@ async function main() {
   )
   const previews = await listing.json()
 
-  for (const { name, previewIdentifier: branch } of previews) {
-    if (!branch) continue
+  for (const {
+    name,
+    deploymentType,
+    projectId: owningProject,
+    previewIdentifier: branch,
+  } of previews) {
+    /** why: the token can delete prod and staging too, so never trust the listing filter alone. */
+    if (deploymentType !== "preview" || String(owningProject) !== projectId || !branch) continue
     const encoded = encodeURIComponent(branch)
     const branchResponse = await request(
       `${GITHUB_API}/repos/${repo}/branches/${encoded}`,

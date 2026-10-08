@@ -1,10 +1,11 @@
 name: convex preview cleanup
 
 # why: previews count against the team's 40-deployment cap until Convex expires them 5 days
-# later. Every trigger runs the same sweep, so a missed event is caught by the next run.
+# later. Every trigger runs the same sweep, so a missed event is caught by the next run. Merged
+# PRs auto-delete their branch, so `delete` covers them; the daily sweep catches PRs closed
+# without merging. Never add pull_request or pull_request_target: this job holds a team-wide
+# Convex token, and those triggers let a fork PR start it.
 on:
-  pull_request:
-    types: [closed]
   delete:
   schedule:
     - cron: "17 9 * * *"
@@ -27,6 +28,9 @@ jobs:
   sweep:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
+    # why: the token lives only in this environment, which is limited to main, so workflows on
+    # other branches can't read it.
+    environment: convex-preview-cleanup
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
