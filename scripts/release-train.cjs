@@ -78,7 +78,7 @@ function releaseNotes(commits) {
 }
 
 function recentCommits(head) {
-  return git("log", "--max-count=200", "--format=%H%x09%s", head)
+  return git("log", "--first-parent", "--max-count=200", "--format=%H%x09%s", head)
     .split("\n")
     .filter(Boolean)
     .map((line) => {
