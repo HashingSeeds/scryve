@@ -19,11 +19,11 @@ import type {
   FailedLifeAction,
   PendingLifeAction,
 } from "./model"
-import { toConnectedProjection } from "./model"
 import { OutboxSyncController } from "./OutboxSyncController"
 import type { ConnectedGameResult } from "./OutboxSyncController"
 import { connectedDeploymentScope, ConnectedGameRepository } from "./persistence"
 import { useConvexOnline } from "./useConvexOnline"
+import { useRemoteReady } from "./useRemoteReady"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
@@ -203,7 +203,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
       }
     : "skip"
   const remote = useQuery(api.games.lobbyProjection, projectionArgsWhileSignedIn)
-  const remoteReady = toConnectedProjection(remote) !== null
+  const remoteReady = useRemoteReady(publicId, isAuthenticated, remote)
   const unreachableWithoutCache =
     !snapshot.projection && !remoteReady && !isWebSocketConnected && !isLoading && !isRefreshing
   const [unreachableTimedOut, setUnreachableTimedOut] = useState(false)
@@ -257,34 +257,37 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
 
   useEffect(() => () => controller.dispose(), [controller])
 
-  const runtime = {
-    pending: snapshot.pending,
-    failed: snapshot.failed,
-    connectionStatus: snapshot.connectionStatus,
-    changeError: snapshot.changeError,
-    finishError: snapshot.finishError,
-    finishing: snapshot.finishing,
-    changeLife: controller.changeLife,
-    submitCommanderDamage: controller.submitCommanderDamage,
-    resolveCommanderDamageClaim: controller.resolveCommanderDamage,
-    finish: controller.finish,
-    abandon: controller.abandon,
-    dismissFailed: controller.dismissFailed,
-  }
-  return snapshot.projection
-    ? {
-        ...runtime,
-        status: "ready",
-        source: remoteReady ? "remote" : "cache",
-        projection: snapshot.projection,
-      }
-    : unreachableTimedOut
+  // why: the projection query re-renders this hook on every resubscribe, so the board only sees a new runtime when the snapshot or readiness changed.
+  return useMemo((): ConnectedGameRuntime => {
+    const runtime = {
+      pending: snapshot.pending,
+      failed: snapshot.failed,
+      connectionStatus: snapshot.connectionStatus,
+      changeError: snapshot.changeError,
+      finishError: snapshot.finishError,
+      finishing: snapshot.finishing,
+      changeLife: controller.changeLife,
+      submitCommanderDamage: controller.submitCommanderDamage,
+      resolveCommanderDamageClaim: controller.resolveCommanderDamage,
+      finish: controller.finish,
+      abandon: controller.abandon,
+      dismissFailed: controller.dismissFailed,
+    }
+    return snapshot.projection
       ? {
           ...runtime,
-          status: "unavailable",
-          message:
-            "This board is not saved on this device. Reconnect so the game can be loaded here.",
-          projection: null,
+          status: "ready",
+          source: remoteReady ? "remote" : "cache",
+          projection: snapshot.projection,
         }
-      : { ...runtime, status: "loading", projection: null }
+      : unreachableTimedOut
+        ? {
+            ...runtime,
+            status: "unavailable",
+            message:
+              "This board is not saved on this device. Reconnect so the game can be loaded here.",
+            projection: null,
+          }
+        : { ...runtime, status: "loading", projection: null }
+  }, [controller, remoteReady, snapshot, unreachableTimedOut])
 }

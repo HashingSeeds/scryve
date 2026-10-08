@@ -23,8 +23,19 @@ export function createSnapshotStore<Snapshot extends object>(
   const state$ = observable(ObservableHint.opaque(initial)) as unknown as ObservableParam<Snapshot>
   return {
     state$,
-    set: (snapshot) => state$.set(ObservableHint.opaque(snapshot)),
+    set: (snapshot) => {
+      if (!sameFields(state$.peek(), snapshot)) state$.set(ObservableHint.opaque(snapshot))
+    },
     getSnapshot: () => state$.peek(),
     subscribe: (listener) => state$.onChange(listener),
   }
+}
+
+/** why: domains rebuild a snapshot on every lifecycle step, and an unchanged one would re-render every subscriber. */
+function sameFields<Snapshot extends object>(previous: Snapshot, next: Snapshot): boolean {
+  const keys = Object.keys(next) as (keyof Snapshot)[]
+  return (
+    keys.length === Object.keys(previous).length &&
+    keys.every((key) => Object.is(previous[key], next[key]))
+  )
 }

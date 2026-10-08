@@ -99,6 +99,11 @@ export class OutboxSyncController {
   private confirmed: ConnectedProjection | null
   private pending: PendingLifeAction[]
   private failed: FailedLifeAction[]
+  private overlay: {
+    confirmed: ConnectedProjection
+    pending: PendingLifeAction[]
+    projection: ConnectedDisplayProjection
+  } | null = null
   private changeError: string | undefined
   private finishError: string | undefined
   private finishing = false
@@ -400,10 +405,19 @@ export class OutboxSyncController {
     return isAuthenticated && !isLoading && !isRefreshing && isWebSocketConnected && remoteReady
   }
 
+  /** why: keeps the board's projection identity while its inputs are unchanged, so environment and sync-status publishes do not re-render every seat. */
+  private displayProjection(): ConnectedDisplayProjection | null {
+    const { confirmed, pending } = this
+    if (!confirmed) return null
+    if (this.overlay?.confirmed !== confirmed || this.overlay.pending !== pending)
+      this.overlay = { confirmed, pending, projection: overlayPendingDeltas(confirmed, pending) }
+    return this.overlay.projection
+  }
+
   private buildSnapshot(): OutboxSyncSnapshot {
     const { isAuthenticated, isLoading, isWebSocketConnected } = this.environment
     return {
-      projection: this.confirmed ? overlayPendingDeltas(this.confirmed, this.pending) : null,
+      projection: this.displayProjection(),
       pending: this.pending,
       failed: this.failed,
       connectionStatus:

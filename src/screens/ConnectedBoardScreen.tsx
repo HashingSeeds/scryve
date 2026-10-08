@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, Share, View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -296,7 +296,8 @@ function ConnectedBoardRuntime({
   )
 }
 
-function ConnectedBoardReady({
+/** why: memoized so query resubscribes in `ConnectedBoardRuntime` that leave the runtime unchanged skip the whole board. */
+const ConnectedBoardReady = memo(function ConnectedBoardReady({
   publicId,
   initialInviteOpen,
   onBack,
@@ -995,7 +996,7 @@ function ConnectedBoardReady({
       ) : null}
     </Screen>
   )
-}
+})
 
 const $screen: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flex: 1,
