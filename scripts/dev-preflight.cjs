@@ -12,6 +12,7 @@ const STOP_WAIT_MS = 3000
 const LOCK_PORTS = Array.from({ length: 10 }, (_, index) => 18080 + index)
 const LOCK_TOKEN = "scryve-dev-lock\n"
 const LOCK_PROBE_MS = 100
+const TEMP_RECORD_MAX_AGE_MS = 60_000
 const LOCK_WAIT_MS = 2000
 
 const stateDir = path.join(
@@ -207,11 +208,11 @@ async function stopProcesses(procs, info = processInfo) {
   for (const proc of signaled) signalIfSame(proc, "SIGKILL")
 }
 
-/** why: two starts must not both see a free port or an unclaimed deployment. Binding a loopback port is atomic and the kernel frees it when the holder dies. The holder answers with a token, so a port taken by an unrelated app is skipped, and every starter walks the same list to meet on the same port. */
+/** why: two starts must not both see a free port or an unclaimed deployment. Binding a loopback port is atomic and the kernel frees it when the holder dies. A port is skipped only when the OS names a listener that is clearly not a dev starter, so every starter walks the same list and meets on the same port. */
 async function withLock(fn, { ports = LOCK_PORTS, waitMs = LOCK_WAIT_MS } = {}) {
   const deadline = Date.now() + waitMs
   for (;;) {
-    let held = false
+    let holder = null
     for (const port of ports) {
       const server = await listen(port)
       if (server) {
@@ -221,13 +222,15 @@ async function withLock(fn, { ports = LOCK_PORTS, waitMs = LOCK_WAIT_MS } = {}) 
           await new Promise((resolve) => server.close(resolve))
         }
       }
-      held = await holdsLock(port)
-      if (held) break
+      holder = await lockHolder(port)
+      if (holder) break
     }
-    if (!held)
+    if (!holder)
       throw new Error(`Every lock port from ${ports[0]} to ${ports.at(-1)} is used by another app.`)
     if (Date.now() > deadline)
-      throw new Error(`Another pnpm start held the lock for ${waitMs / 1000} s and may be stuck.`)
+      throw new Error(
+        `Lock port ${holder.port} has been held by pid ${holder.pid ?? listenerPid(holder.port) ?? "unknown"} for over ${waitMs / 1000} s. If that is a stuck pnpm start, stop it.`,
+      )
     await sleep(25)
   }
 }
@@ -240,23 +243,80 @@ function listen(port) {
   })
 }
 
-// why: a refused connection means the holder just released the port, so it counts as ours and the walk restarts.
-function holdsLock(port) {
+/** why: a holder busy in its critical section cannot answer, so silence is never proof of a foreign app. Only an OS-named listener that is not a dev starter frees the port for skipping; an unknown owner fails closed. */
+async function lockHolder(port) {
+  const reply = await probe(port)
+  if (reply === "token" || reply === "refused") return { port, pid: null }
+  const pid = listenerPid(port)
+  const argv = pid ? processArgv(pid) : null
+  return argv && !isDevStarter(argv) ? null : { port, pid }
+}
+
+const isDevStarter = (argv) => argv.some((arg) => /(?:^|\/)scripts\/dev\.cjs$/.test(arg))
+
+// why: a refused connection means the holder just released the port, so the walk restarts.
+function probe(port) {
   return new Promise((resolve) => {
     const socket = net.connect(port, "127.0.0.1")
     let reply = ""
-    const finish = (isLock) => {
+    const finish = (result) => {
       socket.destroy()
-      resolve(isLock)
+      resolve(result)
     }
-    socket.setTimeout(LOCK_PROBE_MS, () => finish(false))
+    socket.setTimeout(LOCK_PROBE_MS, () => finish("silent"))
     socket.on("data", (chunk) => {
       reply += chunk
-      if (reply.length >= LOCK_TOKEN.length) finish(reply.startsWith(LOCK_TOKEN))
+      if (reply.length >= LOCK_TOKEN.length)
+        finish(reply.startsWith(LOCK_TOKEN) ? "token" : "other")
     })
-    socket.on("end", () => finish(reply === LOCK_TOKEN))
-    socket.on("error", (error) => finish(error.code === "ECONNREFUSED"))
+    socket.on("end", () => finish(reply === LOCK_TOKEN ? "token" : "other"))
+    socket.on("error", (error) => finish(error.code === "ECONNREFUSED" ? "refused" : "other"))
   })
+}
+
+function listenerPid(port) {
+  if (process.platform !== "linux") {
+    const lsof = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fp"], {
+      encoding: "utf8",
+    }).stdout
+    const pid = lsof?.match(/^p(\d+)$/m)?.[1]
+    return pid ? Number(pid) : null
+  }
+  const inode = listeningInode(port)
+  if (!inode) return null
+  const socket = `socket:[${inode}]`
+  for (const pid of fs.readdirSync("/proc").filter((name) => /^\d+$/.test(name))) {
+    let fds = []
+    try {
+      fds = fs.readdirSync(`/proc/${pid}/fd`)
+    } catch {
+      continue
+    }
+    if (fds.some((fd) => readLink(`/proc/${pid}/fd/${fd}`) === socket)) return Number(pid)
+  }
+  return null
+}
+
+const TCP_LISTEN = "0A"
+
+function listeningInode(port) {
+  const hexPort = port.toString(16).toUpperCase().padStart(4, "0")
+  for (const table of ["/proc/net/tcp", "/proc/net/tcp6"]) {
+    for (const line of readFile(table)?.toString().split("\n").slice(1) ?? []) {
+      const fields = line.trim().split(/\s+/)
+      if (fields[1]?.endsWith(`:${hexPort}`) && fields[3] === TCP_LISTEN) return fields[9]
+    }
+  }
+  return null
+}
+
+function processArgv(pid) {
+  if (process.platform === "linux")
+    return readFile(`/proc/${pid}/cmdline`)?.toString().split("\0").slice(0, -1) ?? null
+  const command = spawnSync("ps", ["-o", "command=", "-p", String(pid)], {
+    encoding: "utf8",
+  }).stdout?.trim()
+  return command ? command.split(/\s+/) : null
 }
 
 /** why: a starter that is still alive may not have spawned Metro or convex dev yet, so its record is the only sign that this worktree is taken. */
@@ -280,6 +340,7 @@ const recordFile = (worktree) =>
 /** why: a crashed run leaves its record behind. Only a caller holding the lock may prune, so a record mid-rename or a live claim is never deleted by a racing start. */
 function liveRecords(dir = stateDir, { prune = false } = {}) {
   const names = fs.existsSync(dir) ? fs.readdirSync(dir) : []
+  if (prune) removeOldTempRecords(dir, names)
   return names
     .filter((name) => name.endsWith(".json"))
     .flatMap((name) => {
@@ -289,6 +350,14 @@ function liveRecords(dir = stateDir, { prune = false } = {}) {
       if (prune) fs.rmSync(file, { force: true })
       return []
     })
+}
+
+function removeOldTempRecords(dir, names) {
+  for (const name of names.filter((entry) => entry.endsWith(".tmp"))) {
+    const file = path.join(dir, name)
+    const age = Date.now() - (fs.statSync(file, { throwIfNoEntry: false })?.mtimeMs ?? Date.now())
+    if (age > TEMP_RECORD_MAX_AGE_MS) fs.rmSync(file, { force: true })
+  }
 }
 
 function parseRecord(content) {

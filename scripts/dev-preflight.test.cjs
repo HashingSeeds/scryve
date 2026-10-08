@@ -127,6 +127,34 @@ test("an unrelated app on the first lock port neither blocks starts nor lets the
   }
 })
 
+test("a holder whose event loop is blocked never lets a second start in", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scryve-dev-busy-"))
+  fs.mkdirSync(path.join(dir, "scripts"))
+  const starter = path.join(dir, "scripts", "dev.cjs")
+  fs.writeFileSync(
+    starter,
+    `require(${JSON.stringify(require.resolve("./dev-preflight.cjs"))}).withLock(() => {
+      console.log("held")
+      const end = Date.now() + 1500
+      while (Date.now() < end) {}
+    }, { ports: ${JSON.stringify(lockPorts)} })`,
+  )
+  const holder = spawn(process.execPath, [starter])
+  try {
+    await new Promise((resolve) => holder.stdout.once("data", resolve))
+    const heldAt = Date.now()
+    await assert.rejects(
+      withLock(async () => "acquired", { ports: lockPorts, waitMs: 300 }),
+      new RegExp(`Lock port ${lockPort} has been held by pid ${holder.pid}`),
+    )
+    await withLock(async () => "acquired", { ports: lockPorts, waitMs: 5000 })
+    assert.ok(Date.now() - heldAt >= 1400, "entered while the busy holder still held the lock")
+  } finally {
+    holder.kill("SIGKILL")
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test("a killed lock holder frees the lock", async () => {
   const holder = await listenIn(
     `require("node:net").createServer((s) => s.end(${JSON.stringify(LOCK_TOKEN)})).listen(${lockPort}, "127.0.0.1", () => console.log("held"))`,
@@ -134,7 +162,7 @@ test("a killed lock holder frees the lock", async () => {
   try {
     await assert.rejects(
       withLock(async () => "acquired", { ports: lockPorts, waitMs: 100 }),
-      /held the lock/,
+      /Lock port \d+ has been held by pid \d+/,
     )
     holder.kill("SIGKILL")
     assert.equal(await withLock(async () => "acquired", { ports: lockPorts }), "acquired")
@@ -164,11 +192,15 @@ test("records survive only while their pid still names the starter, and only the
     fs.writeFileSync(path.join(dir, "live.json"), JSON.stringify({ ...record, identity }))
     fs.writeFileSync(path.join(dir, "reused.json"), JSON.stringify({ ...record, identity: "x" }))
     fs.writeFileSync(path.join(dir, "partial.json"), '{"worktree":"/w/b","po')
+    fs.writeFileSync(path.join(dir, "fresh.json.1.tmp"), "{")
+    fs.writeFileSync(path.join(dir, "old.json.2.tmp"), "{")
+    const twoMinutesAgo = new Date(Date.now() - 120_000)
+    fs.utimesSync(path.join(dir, "old.json.2.tmp"), twoMinutesAgo, twoMinutesAgo)
     const kept = (options) => liveRecords(dir, options).map((live) => live.identity)
     assert.deepEqual(kept(), [identity])
-    assert.equal(fs.readdirSync(dir).length, 3)
+    assert.equal(fs.readdirSync(dir).length, 5)
     assert.deepEqual(kept({ prune: true }), [identity])
-    assert.deepEqual(fs.readdirSync(dir), ["live.json"])
+    assert.deepEqual(fs.readdirSync(dir).sort(), ["fresh.json.1.tmp", "live.json"])
   } finally {
     fs.rmSync(dir, { recursive: true, force: true })
   }
