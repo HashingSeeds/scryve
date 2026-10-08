@@ -31,6 +31,7 @@ import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/featu
 import { cardCountLabel } from "@/features/decks/deckCopy"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
+import { deckStatLines, type StatsSource } from "@/features/decks/deckStatLines"
 import {
   DECK_VERSION_CONFLICT_REASON,
   DECK_VERSION_QUEUE_CONFLICT_REASON,
@@ -328,6 +329,7 @@ function DeckDetailContent({
   const updateDeck = useMutation(api.decks.update)
   const archiveDeck = useMutation(api.decks.archive)
   const [tab, setTab] = useState<"cards" | "notes">("cards")
+  const [statsSource, setStatsSource] = useState<StatsSource>("scryve")
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<DeckCard[]>([])
   const [dialog, setDialog] = useState<DeckDialog>("none")
@@ -1009,6 +1011,11 @@ function DeckDetailContent({
         onEdit={startEditing}
         onSave={save}
         onCancel={requestDiscard}
+        stats={
+          detail?.record
+            ? { record: detail.record, source: statsSource, onSourceChange: setStatsSource }
+            : undefined
+        }
         onAddMatch={
           onAddMatch && liveVersionId && !knownDeleted
             ? () => onAddMatch(liveVersionId, deck.name)
@@ -1375,13 +1382,15 @@ function DeckDetailContent({
               </View>
               {versionRows.map((candidate) => {
                 const selected = candidate._id === activeVersionId
-                const record = candidate.record
                 // Live records only; cached rows must not present unknown stats as fresh.
-                const candidateRecord = record?.games
-                  ? `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ""}`
+                const recordLines = candidate.record
+                  ? deckStatLines(candidate.record, statsSource)
+                  : []
+                const candidateRecord = recordLines.length
+                  ? recordLines.map((line) => `${line.label} ${line.text}`)
                   : detail
-                    ? "Unplayed"
-                    : ""
+                    ? ["Unplayed"]
+                    : []
                 return (
                   <TouchableOpacity
                     key={candidate._id}
@@ -1411,7 +1420,9 @@ function DeckDetailContent({
                       ) : null}
                     </View>
                     <View style={themed($versionContext)}>
-                      <Text weight="medium" style={$tabularNumbers} text={candidateRecord} />
+                      {candidateRecord.map((text) => (
+                        <Text key={text} weight="medium" style={$tabularNumbers} text={text} />
+                      ))}
                       <Text
                         size="xxs"
                         style={themed($dimmedText)}

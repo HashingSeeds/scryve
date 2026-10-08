@@ -12,6 +12,8 @@ import type { ThemedStyle } from "@/theme/types"
 
 import { DeckCardRow, DeckCardSectionHeader } from "./DeckCardRow"
 import { groupedCards, printingKey, totalQuantity, type DeckCard } from "./deckCards"
+import type { DeckStatsRecord, StatsSource } from "./deckStatLines"
+import { DeckStats } from "./DeckStats"
 import { deckFormatLabel, deckGame, deckSections } from "../../../convex/lib/deckGames"
 
 export function DeckView({
@@ -47,6 +49,7 @@ export function DeckView({
   onIncrement,
   onDecrement,
   undo,
+  stats,
 }: {
   tab: "cards" | "notes"
   onTabChange: (tab: "cards" | "notes") => void
@@ -80,6 +83,12 @@ export function DeckView({
   onIncrement: (card: DeckCard) => void
   onDecrement: (card: DeckCard) => void
   undo?: { name: string; restore: () => void }
+  // why: stats arrive only for Pro users with a live deck read, so the block is optional.
+  stats?: {
+    record: DeckStatsRecord
+    source: StatsSource
+    onSourceChange: (source: StatsSource) => void
+  }
 }) {
   const { themed, theme } = useAppTheme()
   const sections = groupedCards(cards, deckSections(game, format))
@@ -149,6 +158,7 @@ export function DeckView({
                   .filter(Boolean)
                   .join(" · ")}
               />
+              {stats ? <DeckStats {...stats} /> : null}
               {onAddMatch ? (
                 <TouchableOpacity
                   testID="add-match-result"
