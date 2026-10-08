@@ -158,17 +158,37 @@ function providerSetId(card: NormalizedCard, collectorNumber: string) {
   return card.cardId.endsWith(suffix) ? card.cardId.slice(0, -suffix.length) : undefined
 }
 
-async function matchesSetCode(ctx: ActionCtx, card: NormalizedCard, setCode: string) {
+// eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- PTCG Live exports SV and SWSH promos as PR-SV and PR-SW, Limitless calls SWSH promos SP, TCGdex has no code for swshp, and numbers its cards SWSH001.
+const promoSetsByDeckListCode = new Map<string, { setId: string; numberPrefix?: string }>([
+  ["PR-SV", { setId: "svp" }],
+  ["PR-SW", { setId: "swshp", numberPrefix: "SWSH" }],
+  ["SP", { setId: "swshp", numberPrefix: "SWSH" }],
+])
+
+function promoCollectorNumber(value: string, numberPrefix = "") {
+  return normalizedCollectorNumber(
+    value.toUpperCase().startsWith(numberPrefix) ? value.slice(numberPrefix.length) : value,
+  )
+}
+
+async function matchesSetCode(
+  ctx: ActionCtx,
+  card: NormalizedCard,
+  setCode: string,
+  promoSetId: string | undefined,
+) {
   const collectorNumber = card.printings[0]?.collectorNumber
   if (!collectorNumber) return false
   const setId = providerSetId(card, collectorNumber)
   if (!setId) return false
+  if (promoSetId) return setId === promoSetId
   const response = await request(ctx, `/sets/${encodeURIComponent(setId)}`)
   if (!response.ok) return false
   const set = objectRecord((await response.json()) as unknown)
-  const abbreviations = objectRecord(set?.abbreviations)
-  const officialCode = stringValue(set?.tcgOnline) ?? stringValue(abbreviations?.official)
-  return officialCode?.toUpperCase() === setCode
+  // eslint-disable-next-line self-explanatory-code/prefer-self-explanatory-code -- `tcgOnline` is the retired PTCGO code (ends at Crown Zenith, spells promos "PR-SM"); `abbreviation.official` is the current code ("MEG", subsets "LOR:TG").
+  return [set?.tcgOnline, objectRecord(set?.abbreviation)?.official].some(
+    (code) => stringValue(code)?.split(":")[0]?.toUpperCase() === setCode,
+  )
 }
 
 export async function pokemonCardByReference(
@@ -185,20 +205,22 @@ export async function pokemonCardByReference(
   )
   if (response.status === 404) return { cards: [], status: response.status }
   if (!response.ok) throw Object.assign(new Error("TCGdex reference lookup failed"), { response })
+  const promoSet = promoSetsByDeckListCode.get(reference.setCode)
+  const collectorNumber = promoCollectorNumber(reference.collectorNumber, promoSet?.numberPrefix)
   const exact = normalizePokemonCards((await response.json()) as unknown, includeImages).filter(
     (card) =>
       normalizeCardName(card.name) === normalizeCardName(name) &&
       card.printings.some(
         (printing) =>
           printing.collectorNumber !== undefined &&
-          normalizedCollectorNumber(printing.collectorNumber) ===
-            normalizedCollectorNumber(reference.collectorNumber),
+          promoCollectorNumber(printing.collectorNumber, promoSet?.numberPrefix) ===
+            collectorNumber,
       ),
   )
   let selected = exact.length === 1 ? exact[0] : undefined
   if (!selected && exact.length > 1) {
     for (const candidate of exact.slice(0, 10)) {
-      if (await matchesSetCode(ctx, candidate, reference.setCode)) {
+      if (await matchesSetCode(ctx, candidate, reference.setCode, promoSet?.setId)) {
         selected = candidate
         break
       }
