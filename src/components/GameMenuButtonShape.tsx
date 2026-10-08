@@ -232,11 +232,14 @@ const STILL_TRACE_DASH = TRACE_LENGTH / 8
 // why: narrower than the border it covers, so a board-colored edge keeps the ring color apart from the seat colors around the button.
 const RING_STROKE_WIDTH = PENTAGON_STROKE_WIDTH - 3
 
-const [UPPER_RIGHT_X, UPPER_RIGHT_Y] = PENTAGON_POINTS.split(" ")[1].split(",").map(Number)
-// why: signal badges sit on this corner of the closed pentagon so they read as part of the button. Fractions of the button's size.
-export const PENTAGON_UPPER_RIGHT_CORNER = {
-  x: UPPER_RIGHT_X / PENTAGON_VIEWBOX,
-  y: UPPER_RIGHT_Y / PENTAGON_VIEWBOX,
+const [[APEX_X, APEX_Y], [UPPER_RIGHT_X, UPPER_RIGHT_Y]] = PENTAGON_POINTS.split(" ").map(
+  (corner) => corner.split(",").map(Number),
+)
+// why: 30% of the way from the upper-right corner toward the apex keeps that corner visible, and the point stays on the border when the open menu turns the pentagon. The anchor is in fractions of the button size.
+const BADGE_SHARE_OF_EDGE = 0.3
+export const PENTAGON_BADGE_ANCHOR = {
+  x: (UPPER_RIGHT_X + BADGE_SHARE_OF_EDGE * (APEX_X - UPPER_RIGHT_X)) / PENTAGON_VIEWBOX,
+  y: (UPPER_RIGHT_Y + BADGE_SHARE_OF_EDGE * (APEX_Y - UPPER_RIGHT_Y)) / PENTAGON_VIEWBOX,
 } as const
 
 export interface BorderSignal {

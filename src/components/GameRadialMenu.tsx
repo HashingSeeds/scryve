@@ -33,7 +33,7 @@ import {
   DEFAULT_MENU_BUTTON_STYLE,
   GameMenuButtonShape,
   type MenuButtonStyle,
-  PENTAGON_UPPER_RIGHT_CORNER,
+  PENTAGON_BADGE_ANCHOR,
 } from "./GameMenuButtonShape"
 import { Text } from "./Text"
 
@@ -508,7 +508,7 @@ function GameMenuAnchor({
           exiting={animateFully ? ZoomOut.duration(SIGNAL_BADGE_SCALE_MS) : undefined}
           style={[
             themed($signalBadge),
-            compact ? $compactSignalBadgeCorner : $largeSignalBadgeCorner,
+            compact ? $compactSignalBadge : $largeSignalBadge,
             { backgroundColor: colors.gameMenu.signal[signal.tone] },
           ]}
         >
@@ -794,14 +794,14 @@ const $actionDetail: ThemedStyle<TextStyle> = () => ({
   textAlign: "center",
 })
 const SIGNAL_BADGE_SIZE = 22
-function signalBadgeCorner(buttonSize: number): ViewStyle {
+function signalBadgeAt(buttonSize: number): ViewStyle {
   return {
-    left: PENTAGON_UPPER_RIGHT_CORNER.x * buttonSize - SIGNAL_BADGE_SIZE / 2,
-    top: PENTAGON_UPPER_RIGHT_CORNER.y * buttonSize - SIGNAL_BADGE_SIZE / 2,
+    left: PENTAGON_BADGE_ANCHOR.x * buttonSize - SIGNAL_BADGE_SIZE / 2,
+    top: PENTAGON_BADGE_ANCHOR.y * buttonSize - SIGNAL_BADGE_SIZE / 2,
   }
 }
-const $largeSignalBadgeCorner = signalBadgeCorner(MENU_BUTTON_SIZE)
-const $compactSignalBadgeCorner = signalBadgeCorner(COMPACT_MENU_BUTTON_SIZE)
+const $largeSignalBadge = signalBadgeAt(MENU_BUTTON_SIZE)
+const $compactSignalBadge = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
 const $signalBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   position: "absolute",
   minWidth: SIGNAL_BADGE_SIZE,
