@@ -2,7 +2,6 @@
   "name": "Scryve",
   "slug": "count",
   "scheme": ["scryve", "count"],
-  "version": "0.1.0",
   "runtimeVersion": {
     "policy": "fingerprint"
   },

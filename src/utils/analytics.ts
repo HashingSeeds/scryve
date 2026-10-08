@@ -1,4 +1,5 @@
 import { AppState, Platform } from "react-native"
+import * as Application from "expo-application"
 import Constants from "expo-constants"
 import type PostHog from "posthog-react-native"
 
@@ -102,7 +103,9 @@ export function analyticsProperties(event: string, properties: Record<string, un
     if (typeof properties[key] === "string") result[key] = properties[key]
   result.consent_source = loadString(SOURCE_KEY) === "first_use" ? "first_use" : "settings"
   result.platform = Platform.OS
-  result.app_version = Constants.expoConfig?.version ?? "unknown"
+  // why: an OTA update carries the newer config version; the binary's own version is the one installed.
+  result.app_version =
+    Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? "unknown"
   return result
 }
 
