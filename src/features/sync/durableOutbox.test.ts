@@ -140,12 +140,14 @@ describe("durable outbox", () => {
     storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
 
     const now = jest.spyOn(Date, "now").mockReturnValue(1)
-    expect(outbox.loadPending("deck")).toEqual([])
-    expect(outbox.loadFailed("deck")).toEqual([failedDone])
+    const pending = outbox.loadPending("deck")
+    const failed = outbox.loadFailed("deck")
     storage.set(pendingKey, rewritten)
     outbox.loadPending("deck")
     now.mockRestore()
 
+    expect(pending).toEqual([])
+    expect(failed).toEqual([failedDone])
     expect([...storage.values.keys()].filter((key) => key.startsWith("notes.pending."))).toEqual([])
     expect(quarantined()).toEqual([future, rewritten, staleDone, '{"action":', ""].sort())
   })
