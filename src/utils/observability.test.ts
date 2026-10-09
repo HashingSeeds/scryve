@@ -180,6 +180,7 @@ describe("observability initialization", () => {
   })
 
   it("uploads transactions without breadcrumbs, so request URLs stay out", () => {
+    mockAnalytics.enabled = true
     initObservability()
     const { beforeSendTransaction } = (Sentry.init as jest.Mock).mock.calls[0][0]
 
@@ -190,6 +191,17 @@ describe("observability initialization", () => {
     })
 
     expect(event).toEqual({ type: "transaction", transaction: "settings", breadcrumbs: [] })
+  })
+
+  it("drops a transaction that finishes after sharing was turned off", () => {
+    mockAnalytics.enabled = true
+    initObservability()
+    const { tracesSampler, beforeSendTransaction } = (Sentry.init as jest.Mock).mock.calls[0][0]
+    expect(tracesSampler()).toBe(0.2)
+
+    mockAnalytics.enabled = false
+
+    expect(beforeSendTransaction({ type: "transaction", transaction: "settings" })).toBeNull()
   })
 
   it("forwards telemetry to the sync timing adapter", () => {
