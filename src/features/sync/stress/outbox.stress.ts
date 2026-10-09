@@ -40,6 +40,7 @@ import {
   isSidecarKey,
   namesBuild,
   provenanceOf,
+  rawBuildIds,
   safeJson,
   takeReports,
 } from "./design"
@@ -546,7 +547,15 @@ describe("outbox stress", () => {
 
           // why: a report can leak an id inside a longer string (a storage key, a message), so every identifier is searched as a substring.
           const serialized = reportStrings(reports).join("\n")
-          const identifiers = ["SENTINEL", OWNER, FAKE_IDS.publicId, operationId, key, ...secrets]
+          const identifiers = [
+            "SENTINEL",
+            OWNER,
+            FAKE_IDS.publicId,
+            operationId,
+            key,
+            ...secrets,
+            ...Object.values(rawBuildIds(BRANCH_BUILD)),
+          ]
           const leaks = identifiers.filter((identifier) => serialized.includes(identifier))
           record(
             scenario,
@@ -568,6 +577,14 @@ describe("outbox stress", () => {
           has("bytes", entry?.bytes === utf8Bytes(damaged))
           if (kind !== "truncated" && kind !== "empty") has("shape", isRecord(entry?.shape))
           has("writtenBy", namesBuild(entry?.writtenBy, BRANCH_BUILD))
+          const writer = entry?.writtenBy
+          if (isRecord(writer))
+            has(
+              "build digests",
+              [writer.update, writer.runtime, writer.commit].every(
+                (part) => typeof part === "string" && /^[\da-f]{8}$/.test(part),
+              ),
+            )
 
           if (kind === "renamed" || kind === "retyped" || kind === "missing-nested") {
             const reported = reportedShape(entry?.shape)

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto"
+
 import * as kernel from "@/features/sync/durableOutbox"
 
 import type { MemoryStorage } from "./storage"
@@ -31,12 +33,17 @@ export function configureBuild(writtenBy: string) {
   const configure = hook("configureOutboxDiagnostics")
   if (configure) return void configure({ writtenBy, report: capture })
   hook("setQuarantineReporter")?.(capture)
-  hook("setOutboxWriter")?.({
-    app: buildVersion(writtenBy),
-    update: "embedded",
-    runtime: "unknown",
-  })
+  hook("setOutboxWriter")?.({ app: buildVersion(writtenBy), ...rawBuildIds(writtenBy) })
 }
+
+const hexOf = (value: string) => createHash("sha1").update(value).digest("hex")
+
+/** why: the inline design drops build parts that aren't real formats (UUID update, 40-hex runtime, hex commit), so stand-ins look real; reports must carry them only as digests. */
+export const rawBuildIds = (build: string) => ({
+  update: hexOf(`${build}:update`).replace(/^(.{8})(.{4})(.{4})(.{4})(.{12}).*$/, "$1-$2-$3-$4-$5"),
+  runtime: hexOf(`${build}:runtime`),
+  commit: hexOf(`${build}:commit`).slice(0, 12),
+})
 
 // why: the inline design only reports build identifiers in real formats, so each harness build gets a semver.
 const buildVersions = new Map<string, string>()
