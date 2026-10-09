@@ -115,6 +115,32 @@ async function runBackfill(t: Tester, args: { numItems: number; dryRun?: boolean
   return first
 }
 
+const EMPTY = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
+
+// why: what the seeded mix must look like once every abandoned result is gone.
+async function expectCleaned(t: Tester, deckA: Id<"decks">, deckB: Id<"decks">) {
+  const after = await state(t)
+  expect(after.results).toEqual(["game_nowinner_000000001", "game_won_0000000000001"])
+  expect(after.outcomes).toEqual(["unknown", "win"])
+  expect(after.stats).toEqual([
+    {
+      deckId: deckA,
+      games: 2,
+      wins: 1,
+      losses: 0,
+      draws: 0,
+      unknown: 1,
+      manualMatches: { total: 1, wins: 1, losses: 0, draws: 0, unknown: 0 },
+      manualGames: { total: 3, wins: 2, losses: 1, draws: 0, unknown: 0 },
+    },
+    { deckId: deckB, ...EMPTY },
+  ])
+  expect(after.versionStats.map((row) => row && { ...row, deckVersionId: undefined })).toEqual(
+    after.stats.map((row) => row && { ...row, deckVersionId: undefined }),
+  )
+  return after
+}
+
 describe("removeAbandonedGameResults", () => {
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => jest.useRealTimers())
@@ -131,53 +157,53 @@ describe("removeAbandonedGameResults", () => {
     })
 
     await runBackfill(t, { numItems: 1 })
-    const after = await state(t)
-    expect(after.results).toEqual(["game_nowinner_000000001", "game_won_0000000000001"])
-    expect(after.outcomes).toEqual(["unknown", "win"])
-    const manualMatches = { total: 1, wins: 1, losses: 0, draws: 0, unknown: 0 }
-    const manualGames = { total: 3, wins: 2, losses: 1, draws: 0, unknown: 0 }
-    expect(after.stats).toEqual([
-      {
-        deckId: deckA,
-        games: 2,
-        wins: 1,
-        losses: 0,
-        draws: 0,
-        unknown: 1,
-        manualMatches,
-        manualGames,
-      },
-      { deckId: deckB, games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 },
-    ])
-    expect(after.versionStats.map((row) => row && { ...row, deckVersionId: undefined })).toEqual(
-      after.stats.map((row) => row && { ...row, deckVersionId: undefined }),
-    )
+    const after = await expectCleaned(t, deckA, deckB)
 
     await runBackfill(t, { numItems: 1 })
     expect(await state(t)).toEqual(after)
   })
 
-  it("reaches the same result when a run is interrupted and restarted from the beginning", async () => {
-    const reference = convexTest(schema, modules)
-    await seed(reference)
-    await runBackfill(reference, { numItems: 50 })
-
+  it("stays exact when a run stops after deleting and restarts from the beginning", async () => {
     const t = convexTest(schema, modules)
-    await seed(t)
-    // why: the first batch's continuation stays queued, standing in for a run cut off mid-way.
+    const { deckA, deckB } = await seed(t)
+    // why: rows page in creation order, so the first three hold one abandoned result.
     const first = await t.mutation(internal.resultsBackfill.removeAbandonedGameResults, {
-      paginationOpts: { numItems: 2, cursor: null },
+      paginationOpts: { numItems: 3, cursor: null },
     })
-    expect(first.isDone).toBe(false)
+    expect(first).toMatchObject({ scanned: 3, found: 1, isDone: false })
+    await t.run(async (ctx) => {
+      const queued = await ctx.db.system.query("_scheduled_functions").collect()
+      for (const job of queued)
+        if (job.state.kind === "pending") await ctx.scheduler.cancel(job._id)
+    })
+    const partial = await state(t)
+    expect(partial.results).toHaveLength(3)
+    expect(partial.stats).toEqual([
+      expect.objectContaining({ deckId: deckA, games: 2, wins: 1, unknown: 1 }),
+      { deckId: deckB, ...EMPTY, games: 1, unknown: 1 },
+    ])
+
     await runBackfill(t, { numItems: 1 })
-    const ids = (rows: Awaited<ReturnType<typeof state>>) => ({
-      ...rows,
-      stats: rows.stats.map((row) => row && { ...row, deckId: undefined }),
-      versionStats: rows.versionStats.map(
-        (row) => row && { ...row, deckId: undefined, deckVersionId: undefined },
-      ),
+    await expectCleaned(t, deckA, deckB)
+  })
+
+  it("floors counters at 0 when a deck's tally is already empty", async () => {
+    const t = convexTest(schema, modules)
+    const { deckA, deckB, versionB } = await seed(t)
+    await t.run(async (ctx) => {
+      const stats = await ctx.db
+        .query("deckStats")
+        .withIndex("by_deck", (q) => q.eq("deckId", deckB))
+        .unique()
+      const versionStats = await ctx.db
+        .query("deckVersionStats")
+        .withIndex("by_version", (q) => q.eq("deckVersionId", versionB))
+        .unique()
+      await ctx.db.patch(stats!._id, EMPTY)
+      await ctx.db.patch(versionStats!._id, EMPTY)
     })
-    expect(ids(await state(t))).toEqual(ids(await state(reference)))
+    await runBackfill(t, { numItems: 50 })
+    await expectCleaned(t, deckA, deckB)
   })
 
   it("counts without writing on a dry run", async () => {

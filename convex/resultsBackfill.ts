@@ -5,6 +5,9 @@ import { internal } from "./_generated/api"
 import { internalMutation } from "./_generated/server"
 import { isAbandonedSummary, removeGameResult } from "./lib/results"
 
+// why: each row costs a summary lookup plus reads and writes on two stats tables, so a large page would hit transaction limits.
+const MAX_BATCH = 100
+
 /**
  * why: games abandoned before #350 still sit in deck results and counters. Filtering on the
  * summary keeps finished no-winner games, which are also "unknown", counting.
@@ -17,7 +20,11 @@ export const removeAbandonedGameResults = internalMutation({
     foundSoFar: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const page = await ctx.db.query("deckGameResults").paginate(args.paginationOpts)
+    const paginationOpts = {
+      ...args.paginationOpts,
+      numItems: Math.min(args.paginationOpts.numItems, MAX_BATCH),
+    }
+    const page = await ctx.db.query("deckGameResults").paginate(paginationOpts)
     const now = Date.now()
     let found = 0
     for (const result of page.page) {
@@ -35,10 +42,16 @@ export const removeAbandonedGameResults = internalMutation({
     )
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.resultsBackfill.removeAbandonedGameResults, {
-        paginationOpts: { ...args.paginationOpts, cursor: page.continueCursor },
+        paginationOpts: { ...paginationOpts, cursor: page.continueCursor },
         ...(args.dryRun ? { dryRun: true } : {}),
         foundSoFar,
       })
-    return { found, foundSoFar, isDone: page.isDone, continueCursor: page.continueCursor }
+    return {
+      scanned: page.page.length,
+      found,
+      foundSoFar,
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+    }
   },
 })
