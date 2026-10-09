@@ -602,6 +602,7 @@ it("caps Pokemon fallback detail requests and prioritizes the original set", asy
 })
 
 it("allows guest card searches and enforces the shared guest quota", async () => {
+  const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
   const t = convexTest(schema, modules)
   registerRateLimiter(t)
   const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => response([pokemonCard]))
@@ -614,10 +615,14 @@ it("allows guest card searches and enforces the shared guest quota", async () =>
     })
     await expect(
       t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
+    ).resolves.toMatchObject([{ name: "Charizard" }])
+    await expect(
+      t.action(api.cards.search, { game: "pokemon", query: "pikachu" }),
     ).rejects.toMatchObject({ data: { code: "rate_limited" } })
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   } finally {
     fetchSpy.mockRestore()
+    nowSpy.mockRestore()
   }
 })
 
@@ -674,6 +679,50 @@ it("caps provider lookups per signed-in caller without touching cached cards or 
     })
   } finally {
     fetchSpy.mockRestore()
+  }
+})
+
+it("gives each guest device its own lookup budget and falls back to the shared guest bucket", async () => {
+  // why: buckets refill once per second, so a frozen clock keeps a slow runner from refilling them.
+  const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000_000)
+  const t = convexTest(schema, modules)
+  registerRateLimiter(t)
+  const fetchSpy = jest.spyOn(global, "fetch").mockImplementation((input) => {
+    const id = String(input).split("/").pop() ?? ""
+    return response({ ...pokemonCard, id, localId: id.split("-").pop() })
+  })
+  const lookup = (cardId: string, deviceId?: string) =>
+    t.action(api.cards.byCatalogId, { game: "pokemon", cardId, deviceId })
+  try {
+    await expect(lookup("base1-1")).resolves.toMatchObject({ cardId: "base1-1" })
+    const drained = "device_drained01"
+    await t.run(async (ctx) => {
+      await deckRateLimiter.limit(ctx, "guestCardLookup", { key: `device:${drained}`, count: 20 })
+    })
+    const fetches = fetchSpy.mock.calls.length
+    await expect(lookup("base1-2", drained)).rejects.toMatchObject({
+      data: { code: "rate_limited", retryAfterMs: expect.any(Number) },
+    })
+    expect(fetchSpy).toHaveBeenCalledTimes(fetches)
+    await expect(lookup("base1-1", drained)).resolves.toMatchObject({ cardId: "base1-1" })
+    expect(fetchSpy).toHaveBeenCalledTimes(fetches)
+
+    await expect(lookup("base1-3", "device_fresh0001")).resolves.toMatchObject({
+      cardId: "base1-3",
+    })
+    await t.run(async (ctx) => {
+      await deckRateLimiter.limit(ctx, "guestCardLookup", { count: 19 })
+    })
+    for (const deviceId of [undefined, "bad id"])
+      await expect(lookup("base1-4", deviceId)).rejects.toMatchObject({
+        data: { code: "rate_limited" },
+      })
+    await expect(lookup("base1-5", "device_fresh0001")).resolves.toMatchObject({
+      cardId: "base1-5",
+    })
+  } finally {
+    fetchSpy.mockRestore()
+    nowSpy.mockRestore()
   }
 })
 
