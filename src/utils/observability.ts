@@ -3,6 +3,8 @@ import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
+import { setQuarantineReporter } from "@/features/sync/durableOutbox"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { setTelemetryAdapter } from "@/utils/telemetry"
 import {
   combineTelemetryAdapters,
@@ -68,6 +70,16 @@ export function initObservability(
     updateChannel: Updates.channel ?? "none",
     runtimeVersion: Updates.runtimeVersion ?? "unknown",
     embeddedLaunch: String(Updates.isEmbeddedLaunch),
+  })
+
+  setQuarantineReporter(({ outbox, count, reasons }) => {
+    const error = new Error("Unreadable outbox records were quarantined")
+    error.name = "OutboxQuarantine"
+    reportCrash(error, ErrorType.HANDLED, {
+      tags: { outbox },
+      extra: { count, reasons },
+      fingerprint: ["outbox-quarantine", outbox],
+    })
   })
 
   const unbatchedBreadcrumbAdapter = {

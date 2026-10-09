@@ -1,5 +1,3 @@
-import { ErrorType, reportCrash } from "@/utils/crashReporting"
-
 export interface DurablePendingRecord {
   schemaVersion: number
   queuedAt: number
@@ -73,7 +71,20 @@ export const DURABLE_OUTBOX_LIMITS: DurableOutboxLimits = {
 
 export const DURABLE_QUARANTINE_PREFIX = "quarantine:"
 
-type QuarantineReason = "empty" | "invalid_json" | "rejected"
+export type QuarantineReason = "empty" | "invalid_json" | "rejected"
+
+export interface QuarantineReport {
+  outbox: string
+  count: number
+  reasons: QuarantineReason[]
+}
+
+let reportQuarantine: (report: QuarantineReport) => void = () => {}
+
+/** why: sync code stays free of React Native, so the app wires its error reporter in at startup. */
+export function setQuarantineReporter(reporter: (report: QuarantineReport) => void): void {
+  reportQuarantine = reporter
+}
 
 // why: reports name the outbox by its fixed `<namespace>.vN` key prefix so owner, game, and operation IDs never leave the device.
 const outboxLabel = (recordKey: string): string =>
@@ -354,13 +365,10 @@ export class DurableOutbox<
   /** why: quarantine is otherwise silent; one report per load pass tells us a release needs a recovery path, without sending record contents. */
   private reportQuarantined(scopeId: string, quarantined: readonly QuarantineReason[]): void {
     if (!quarantined.length) return
-    const outbox = outboxLabel(this.keys.pendingRecord(scopeId, "", this.ownerId))
-    const error = new Error("Unreadable outbox records were quarantined")
-    error.name = "OutboxQuarantine"
-    reportCrash(error, ErrorType.HANDLED, {
-      tags: { outbox },
-      extra: { count: quarantined.length, reasons: [...new Set(quarantined)] },
-      fingerprint: ["outbox-quarantine", outbox],
+    reportQuarantine({
+      outbox: outboxLabel(this.keys.pendingRecord(scopeId, "", this.ownerId)),
+      count: quarantined.length,
+      reasons: [...new Set(quarantined)],
     })
   }
 
