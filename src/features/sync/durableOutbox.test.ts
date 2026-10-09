@@ -128,6 +128,7 @@ describe("durable outbox", () => {
         .sort()
     const pendingKey = keys.pendingRecord("deck", "note-future", "owner")
     const future = JSON.stringify({ ...operation("note-future", 1), payload: { body: "v2" } })
+    const rewritten = JSON.stringify({ ...operation("note-future", 2), payload: { body: "v3" } })
     const done = operation("note-done", 1)
     const staleDone = JSON.stringify({ ...done, payload: { body: "v2" } })
     const failedDone = codec.createFailure(done, "rejected", 2)
@@ -137,17 +138,17 @@ describe("durable outbox", () => {
     storage.set(keys.failedRecord("deck", "note-done", "owner"), JSON.stringify(failedDone))
     storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
 
+    const now = jest.spyOn(Date, "now").mockReturnValue(1)
     expect(outbox.loadPending("deck")).toEqual([])
     expect(outbox.loadFailed("deck")).toEqual([failedDone])
-    storage.set(pendingKey, future)
-    const now = jest.spyOn(Date, "now").mockReturnValue(1)
+    storage.set(pendingKey, rewritten)
     outbox.loadPending("deck")
     now.mockRestore()
 
     expect([...storage.values.keys()].filter((key) => key.startsWith("pending."))).toEqual([
       keys.pendingIndex("deck", "owner"),
     ])
-    expect(quarantined()).toEqual([future, future, staleDone, '{"action":', ""].sort())
+    expect(quarantined()).toEqual([future, rewritten, staleDone, '{"action":', ""].sort())
   })
 
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {
