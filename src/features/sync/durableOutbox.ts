@@ -96,6 +96,7 @@ export interface QuarantinedRecord {
   /** why: key paths and `typeof` labels only; values can hold player data. */
   shape: Record<string, string>
   operationType: string
+  /** why: `update`, `runtime` and `commit` are 8-hex digests here; `scripts/outbox-provenance-lookup.cjs` maps them back. */
   writtenBy: WrittenBy | "unknown"
 }
 
@@ -160,6 +161,22 @@ const WRITTEN_BY_FORMATS = {
 const writtenByPart = (value: unknown, part: keyof WrittenBy): string | undefined =>
   typeof value === "string" && WRITTEN_BY_FORMATS[part].test(value) ? value : undefined
 
+/** why: FNV-1a, so `scripts/outbox-provenance-lookup.cjs` can hash known builds and match without expo-crypto. */
+const provenanceDigest = (value: string): string => {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0")
+}
+
+// why: a well-formed UUID or hex string could still be an operation or account ID copied in, so only a digest leaves the device.
+const digestPart = (value: string | undefined): string =>
+  value === undefined || value === "embedded" || value === "unknown"
+    ? (value ?? "unknown")
+    : provenanceDigest(value)
+
 const parseWrittenBy = (value: unknown): WrittenBy | "unknown" => {
   if (!isRecord(value)) return "unknown"
   const app = writtenByPart(value.app, "app")
@@ -169,9 +186,9 @@ const parseWrittenBy = (value: unknown): WrittenBy | "unknown" => {
   if (!app && !update && !runtime && !commit) return "unknown"
   return {
     app: app ?? "unknown",
-    update: update ?? "unknown",
-    runtime: runtime ?? "unknown",
-    ...(commit ? { commit } : {}),
+    update: digestPart(update),
+    runtime: digestPart(runtime),
+    ...(commit ? { commit: digestPart(commit) } : {}),
   }
 }
 

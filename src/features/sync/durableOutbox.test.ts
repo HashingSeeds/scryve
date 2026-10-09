@@ -1,3 +1,6 @@
+import { spawnSync } from "node:child_process"
+import { join } from "node:path"
+
 import {
   DURABLE_QUARANTINE_PREFIX,
   DurableOutbox,
@@ -230,6 +233,7 @@ describe("durable outbox provenance", () => {
     knownKeys: ["id", "ownerId", "scopeId", "payload", "note", "op"],
   }
   const bytes = (value: string) => new TextEncoder().encode(value).length
+  const digest: unknown = expect.stringMatching(/^[\da-f]{8}$/)
   const stored = (storage: MemoryStorage, key: string): Record<string, unknown> =>
     JSON.parse(storage.getString(key)!) as Record<string, unknown>
   const reported = (report: jest.Mock) =>
@@ -370,7 +374,7 @@ describe("durable outbox provenance", () => {
                 "writtenBy.runtime": "string",
               },
               operationType: "create",
-              writtenBy: otherWriter,
+              writtenBy: { ...otherWriter, runtime: digest },
             },
             {
               slot: "pending",
@@ -378,7 +382,7 @@ describe("durable outbox provenance", () => {
               bytes: bytes(torn),
               shape: {},
               operationType: "unknown",
-              writtenBy: writer,
+              writtenBy: { app: writer.app, update: digest, runtime: digest, commit: digest },
             },
           ],
         },
@@ -482,9 +486,41 @@ describe("durable outbox provenance", () => {
     outbox.loadPending("deck")
 
     expect(reported(report).map((record) => record.writtenBy)).toEqual([
-      { ...writer, update: "unknown" },
+      { app: writer.app, update: "unknown", runtime: digest, commit: digest },
       "unknown",
     ])
     expect(JSON.stringify(report.mock.calls)).not.toMatch(/user_|Sol Ring|Island/)
+  })
+
+  it("reports build IDs only as digests that the lookup script maps back", () => {
+    const operationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    const report = jest.fn()
+    setQuarantineReporter(report)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, notes)
+    for (const [id, update] of [
+      ["note-copied", operationId],
+      ["note-real", writer.update],
+    ])
+      storage.set(
+        keys.pendingRecord("deck", id, "owner"),
+        JSON.stringify({ writtenBy: { ...writer, update }, id, payload: { body: 1 } }),
+      )
+
+    outbox.loadPending("deck")
+
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(
+      new RegExp([operationId, writer.update, writer.runtime, writer.commit].join("|")),
+    )
+    const [, real] = reported(report)
+    const lookup = spawnSync(
+      process.execPath,
+      [
+        join(__dirname, "../../../scripts/outbox-provenance-lookup.cjs"),
+        real.writtenBy === "unknown" ? "" : real.writtenBy.update,
+      ],
+      { input: `${operationId}\n${writer.update}\n`, encoding: "utf8" },
+    )
+    expect(lookup.stdout.trim().split(" ")[1]).toBe(writer.update)
   })
 })
