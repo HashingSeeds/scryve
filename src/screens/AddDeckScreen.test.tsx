@@ -919,8 +919,6 @@ describe("AddDeckScreen", () => {
     const cards = Array.from({ length: 298 }, (_, index) => ({
       ...resolvedForest.cards[0],
       name: `Card ${index}`,
-      // why: imageless rows each start a fallback lookup, which loops past 200 rows in tests.
-      imageUrl: "https://cards.scryfall.io/normal/card.jpg",
       quantity: 1,
       scryfallId: `print-${index}`,
       oracleId: `oracle-${index}`,
