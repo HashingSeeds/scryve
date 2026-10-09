@@ -102,8 +102,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          read -r sha state labeled < <(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
             --jq '[.head.sha, .state, any(.labels[]; .name == "preview")] | @tsv')
+          read -r sha state labeled <<< "$pr"
           if [ "$sha" = "$HEAD_SHA" ] && [ "$state" = open ] && [ "$labeled" = true ]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
           else

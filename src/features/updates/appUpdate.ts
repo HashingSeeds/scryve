@@ -159,6 +159,10 @@ export async function openPrPreview(
   }
 }
 
+/**
+ * why: expo-updates launches a cached update only when its saved request headers match the current
+ * ones (LauncherSelectionPolicyFilterAware), so clearing the override cannot relaunch a pr-N update.
+ */
 export async function backToPreview() {
   if (switching) return
   switching = true
