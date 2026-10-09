@@ -610,12 +610,68 @@ it("allows guest card searches and enforces the shared guest quota", async () =>
       t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
     ).resolves.toMatchObject([{ name: "Charizard", cardId: "base1-4" }])
     await t.run(async (ctx) => {
-      await deckRateLimiter.limit(ctx, "guestDeckImport", { count: 19 })
+      await deckRateLimiter.limit(ctx, "guestCardLookup", { count: 19 })
     })
     await expect(
       t.action(api.cards.search, { game: "pokemon", query: "charizard" }),
     ).rejects.toMatchObject({ data: { code: "rate_limited" } })
     expect(fetchSpy).toHaveBeenCalledTimes(1)
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
+
+it("caps provider lookups per signed-in caller without touching cached cards or other callers", async () => {
+  const cachedId = "33333333-3333-3333-3333-333333333333"
+  const uncachedId = (index: number) =>
+    `${String(index).padStart(8, "0")}-4444-4444-4444-444444444444`
+  const t = convexTest(schema, modules)
+  registerRateLimiter(t)
+  await t.mutation(internal.cards.cache, {
+    scryfallId: cachedId,
+    oracleId: cachedId,
+    name: "Sol Ring",
+    setName: "Commander 2021",
+    commanderEligibility: "ineligible",
+    commanderLegality: "legal",
+    colorIdentity: "",
+    keywords: "",
+  })
+  const fetchSpy = jest.spyOn(global, "fetch").mockImplementation((input) => {
+    const id = String(input).split("/").pop() ?? ""
+    return response({ id, oracle_id: id, name: "Avenge", set_name: "Test" })
+  })
+  try {
+    const drainer = t.withIdentity({
+      subject: "card-drainer",
+      tokenIdentifier: "test|card-drainer",
+    })
+    await t.run(async (ctx) => {
+      await deckRateLimiter.limit(ctx, "cardLookup", { key: "test|card-drainer", count: 19 })
+    })
+    await drainer.action(api.cards.byId, { scryfallId: uncachedId(0) })
+    const callsAtLimit = fetchSpy.mock.calls.length
+    await expect(
+      drainer.action(api.cards.byId, { scryfallId: uncachedId(20) }),
+    ).rejects.toMatchObject({ data: { code: "rate_limited", retryAfterMs: expect.any(Number) } })
+    await expect(
+      drainer.action(api.cards.search, { game: "mtg", query: "avenge" }),
+    ).rejects.toMatchObject({ data: { code: "rate_limited" } })
+    await expect(
+      drainer.action(api.cards.imageFallbacks, { game: "mtg", cardId: uncachedId(21) }),
+    ).rejects.toMatchObject({ data: { code: "rate_limited" } })
+    expect(fetchSpy).toHaveBeenCalledTimes(callsAtLimit)
+    await expect(drainer.action(api.cards.byId, { scryfallId: cachedId })).resolves.toMatchObject({
+      name: "Sol Ring",
+    })
+
+    const other = t.withIdentity({ subject: "card-other" })
+    await expect(
+      other.action(api.cards.byId, { scryfallId: uncachedId(30) }),
+    ).resolves.toMatchObject({ name: "Avenge" })
+    await expect(t.action(api.cards.byId, { scryfallId: uncachedId(31) })).resolves.toMatchObject({
+      name: "Avenge",
+    })
   } finally {
     fetchSpy.mockRestore()
   }
