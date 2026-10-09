@@ -108,6 +108,17 @@ jobs:
             const existing = comments.find(
               (comment) => comment.user?.type === "Bot" && comment.body?.includes(marker),
             )
+            // why: last, right before writing, so a run that went stale while listing never
+            // overwrites a newer run's comment.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issue_number })
+            if (
+              pr.head.sha !== HEAD_SHA ||
+              pr.state !== "open" ||
+              !pr.labels.some((label) => label.name === "preview")
+            ) {
+              core.notice("The PR moved on; a newer run owns the comment.")
+              return
+            }
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
             } else {
@@ -195,7 +206,8 @@ jobs:
     needs: bundle
     # why: no concurrency group. One shared across pushes let a run waiting for approval block every
     # newer push. The head, state, and label rechecks before `eas update` and the comment make a
-    # stale run skip instead.
+    # stale run skip instead. If two first publishes ever race to create the pr-<n> channel, re-run
+    # the newer one that failed.
     # why: holds EXPO_PREVIEW_TOKEN and requires Matthew's approval.
     environment: pr-preview
     runs-on: ubuntu-latest
@@ -382,15 +394,6 @@ jobs:
             const { CHANNEL, HEAD_SHA, FLAGS, IOS, ANDROID, PUBLISHED } = process.env
             const { owner, repo } = context.repo
             const issue_number = context.issue.number
-            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issue_number })
-            if (
-              pr.head.sha !== HEAD_SHA ||
-              pr.state !== "open" ||
-              !pr.labels.some((label) => label.name === "preview")
-            ) {
-              core.notice("The PR moved on; a newer run owns the comment.")
-              return
-            }
             const link = `scryve-preview://preview/${CHANNEL}`
             // why: qr.expo.dev only encodes development-client links; the app accepts that form too.
             const { projectId } = require(`${process.env.GITHUB_WORKSPACE}/app.json`).extra.eas
@@ -421,6 +424,17 @@ jobs:
             const existing = comments.find(
               (comment) => comment.user?.type === "Bot" && comment.body?.includes(marker),
             )
+            // why: last, right before writing, so a run that went stale while listing never
+            // overwrites a newer run's comment.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issue_number })
+            if (
+              pr.head.sha !== HEAD_SHA ||
+              pr.state !== "open" ||
+              !pr.labels.some((label) => label.name === "preview")
+            ) {
+              core.notice("The PR moved on; a newer run owns the comment.")
+              return
+            }
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
             } else {
