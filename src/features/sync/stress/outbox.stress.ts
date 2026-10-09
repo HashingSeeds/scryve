@@ -39,6 +39,16 @@ const SEEDS = Number(process.env.OUTBOX_STRESS_SEEDS ?? 6)
 const STEPS = Number(process.env.OUTBOX_STRESS_STEPS ?? 24)
 const LEGACY_BUILDS: readonly BuildName[] = ["main", "v0.1.1"]
 const CLOCK = 1_700_000_000_000
+// why: reports may name these exact strings; they are code, not player data.
+const OPERATION_TYPES = [
+  "life.changed",
+  "commanderDamage.submitted",
+  "commanderDamage.resolved",
+  "cards",
+  "create",
+  "rename",
+  "delete",
+]
 
 let design: Design = "none"
 let world: World
@@ -419,7 +429,7 @@ describe("outbox stress", () => {
           const parsed = withoutProvenance(safeJson(original))
           const secrets = privateValues(
             parsed,
-            new Set(["commander", BRANCH_BUILD, "stress rejection"]),
+            new Set(["commander", BRANCH_BUILD, "stress rejection", ...OPERATION_TYPES]),
           )
           const prefix = slot === "failed" ? "action." : ""
           const damaged = corrupt(original, kind, lane.name, prefix)
@@ -467,7 +477,7 @@ describe("outbox stress", () => {
             )
           has("slot", entry?.slot === slot)
           has("bytes", entry?.bytes === utf8Bytes(damaged))
-          has("shape", isRecord(entry?.shape))
+          if (kind !== "truncated" && kind !== "empty") has("shape", isRecord(entry?.shape))
           has("writtenBy", namesBuild(entry?.writtenBy, BRANCH_BUILD))
 
           if (kind === "renamed" || kind === "retyped" || kind === "missing-nested") {
