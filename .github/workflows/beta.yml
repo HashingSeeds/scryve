@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 # why: publishes run in merge order. GitHub keeps one pending run, so a burst of merges skips
 # straight to the newest commit, which already contains the ones in between.
@@ -42,14 +43,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check whether the backend changed
+        id: backend
+        run: node scripts/convex-backend.cjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       # why: beta runs production Convex, so the backend this commit needs goes live first.
       - name: Deploy Convex to production
+        if: steps.backend.outputs.deploy != 'false'
         run: pnpm exec convex deploy
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
 
       - name: Install EAS CLI
-        run: npm install -g eas-cli@22.2.0
+        run: npm install -g "eas-cli@$(node -p "require('./package.json').config.easCli")"
 
       - name: Publish to beta
         env:

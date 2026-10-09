@@ -53,9 +53,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # expo doctor flags eas-cli as a project dependency, so CI installs a pinned global copy.
+      # expo doctor flags eas-cli as a project dependency, so CI installs a global copy pinned by
+      # package.json `config.easCli`, the version local scripts run too.
       - name: Install EAS CLI
-        run: npm install -g eas-cli@22.2.0
+        run: npm install -g "eas-cli@$(node -p "require('./package.json').config.easCli")"
 
       - name: Restore cached base fingerprints
         uses: actions/cache@v4

@@ -11,10 +11,12 @@ import {
   createNextMatchGame,
   createRematch,
   defaultCommandContext,
+  lastPlayerStanding,
   matchContextLabel,
   matchScoreAfter,
   restartMatchGame,
 } from "./domain"
+import { defaultMatchOutcomes } from "./LocalMatchEndDialog"
 import { LocalGameRepository, type StringStorage } from "./localPersistence"
 import type { LocalGame } from "./types"
 
@@ -85,6 +87,26 @@ describe("local match", () => {
     expect(matchScoreAfter(decided)).toEqual({ wins: [2, 0], draws: 1 })
     expect(canContinueMatch(decided)).toBe(false)
     expect(() => createNextMatchGame(decided)).toThrow("cannot continue")
+  })
+
+  it("treats the Pokémon player who took every Prize card as the one still standing", () => {
+    const game = createLocalGame({
+      now: 1,
+      startingLife: 6,
+      system: "pokemon",
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+      match: { bestOf: 3 },
+    })
+    const tookAll = applyGameCommand(
+      game,
+      { type: "life.change", playerId: game.players[1].id, delta: -6 },
+      defaultCommandContext(asDeviceId("device")),
+    )
+    expect(lastPlayerStanding(tookAll)).toBe(tookAll.players[1].id)
+    expect(defaultMatchOutcomes(tookAll)).toEqual(["loss", "draw"])
   })
 
   it("hands the table a fresh match after a rematch", () => {

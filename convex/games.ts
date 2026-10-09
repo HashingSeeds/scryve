@@ -577,7 +577,9 @@ async function terminalizeGame(
       outcome,
     })
   }
-  for (const player of recordsHistory ? summaryPlayers : []) {
+  // why: an abandoned game has no result, so counting it as a played game would drag down deck win rates.
+  const recordsDeckResults = recordsHistory && status === "finished"
+  for (const player of recordsDeckResults ? summaryPlayers : []) {
     if (!player.userId || !player.deckId || !player.deckVersionId) continue
     await ctx.db.insert("deckGameResults", {
       deckId: player.deckId,

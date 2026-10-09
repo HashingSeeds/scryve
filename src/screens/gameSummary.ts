@@ -8,7 +8,11 @@ import {
   playSystemId,
   type PlaySystemId,
 } from "@/features/game/playSystems"
-import type { LifeChangedEvent, LocalGame } from "@/features/game/types"
+import type {
+  CommanderDamageAssignedEvent,
+  LifeChangedEvent,
+  LocalGame,
+} from "@/features/game/types"
 
 import type { HistoryOutcome, HistorySource } from "./historyEntries"
 
@@ -96,13 +100,18 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
   }
 }
 
+/** why: commander damage also costs the target life, so the summary counts it as a life change. */
 export function localChanges(game: LocalGame): SummaryChange[] {
   return game.events
-    .filter((event): event is LifeChangedEvent => event.type === "life.changed")
+    .filter(
+      (event): event is LifeChangedEvent | CommanderDamageAssignedEvent =>
+        event.type === "life.changed" || event.type === "commanderDamage.assigned",
+    )
     .map((event) => ({
       id: event.operationId,
-      playerId: event.playerId,
-      delta: event.delta,
+      ...(event.type === "life.changed"
+        ? { playerId: event.playerId, delta: event.delta }
+        : { playerId: event.toPlayerId, delta: -event.delta }),
       undo: Boolean(event.compensatesOperationId),
     }))
 }

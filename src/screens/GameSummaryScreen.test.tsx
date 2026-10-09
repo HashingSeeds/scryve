@@ -207,6 +207,27 @@ describe("game summary", () => {
     expect(screen.getByText(/Undo stays in the record/)).toBeTruthy()
   })
 
+  it("counts commander damage as a life change for the player who took it", () => {
+    const game = localGame({
+      events: [
+        {
+          type: "commanderDamage.assigned",
+          operationId: "op-1",
+          gameId: "game-1",
+          actorId: "actor-1",
+          deviceId: "device-1",
+          clientCreatedAt: CREATED_AT,
+          fromPlayerId: "p2",
+          toPlayerId: "p1",
+          delta: 21,
+        } as GameEvent,
+      ],
+    })
+
+    expect(localChanges(game)).toEqual([{ id: "op-1", playerId: "p1", delta: -21, undo: false }])
+    expect(localSummaryModel(game).changeCount).toBe(1)
+  })
+
   it("states plainly when no life changes were recorded", () => {
     renderLocal()
 
