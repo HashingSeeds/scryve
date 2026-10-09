@@ -17,6 +17,9 @@ describe("play system defaults", () => {
 
   it("starts Brawl at 25 life without commander damage", () => {
     expect(defaultStartingLife("mtg", "brawl")).toBe(25)
+    expect(defaultStartingLife("mtg", "brawl", 2)).toBe(25)
+    expect(defaultStartingLife("mtg", "brawl", 4)).toBe(30)
+    expect(defaultStartingLife("mtg", "commander", 4)).toBe(40)
     expect(supportsCommanderDamage("mtg", "brawl")).toBe(false)
     expect(supportsCommanderDamage("mtg", "commander")).toBe(true)
   })

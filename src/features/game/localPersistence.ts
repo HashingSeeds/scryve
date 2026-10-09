@@ -22,6 +22,7 @@ import {
 import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import {
+  defaultStartingLife,
   isPlaySystemId,
   playSystemFormats,
   playSystemId,
@@ -363,18 +364,34 @@ function parseSettings(value: unknown): LocalSettings | null {
   ) {
     return null
   }
+  const systemPreference = parseSystemPreference(migrated.defaultSystem, migrated.defaultFormat)
   return {
     schemaVersion: 1,
     defaultPlayerCount: migrated.defaultPlayerCount,
-    defaultStartingLife: migrated.defaultStartingLife,
+    defaultStartingLife: migrateBrawlStartingLife(
+      systemPreference,
+      migrated.defaultStartingLife,
+      migrated.defaultPlayerCount,
+    ),
     hapticsEnabled: migrated.hapticsEnabled,
     themePreference: migrated.themePreference,
     menuButtonStyle: isMenuButtonStyle(migrated.menuButtonStyle)
       ? migrated.menuButtonStyle
       : DEFAULT_MENU_BUTTON_STYLE,
     launchDestination: migrated.launchDestination === "decks" ? "decks" : "play",
-    ...parseSystemPreference(migrated.defaultSystem, migrated.defaultFormat),
+    ...systemPreference,
   }
+}
+
+// why: Brawl preferences saved before Brawl had its own default stored Magic's 20, which would otherwise read as a custom value and stop following format changes.
+function migrateBrawlStartingLife(
+  { defaultSystem, defaultFormat }: ReturnType<typeof parseSystemPreference>,
+  startingLife: number,
+  playerCount: number,
+) {
+  return defaultSystem === "mtg" && defaultFormat === "brawl" && startingLife === 20
+    ? defaultStartingLife(defaultSystem, defaultFormat, playerCount)
+    : startingLife
 }
 
 function parseSystemPreference(

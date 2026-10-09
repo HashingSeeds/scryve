@@ -3,7 +3,11 @@ import * as Clipboard from "expo-clipboard"
 import * as Updates from "expo-updates"
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
+import {
+  DEFAULT_LOCAL_SETTINGS,
+  LOCAL_KEYS,
+  LocalGameRepository,
+} from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 import { analyticsId } from "@/utils/analytics"
 
@@ -492,6 +496,46 @@ describe("SettingsScreen", () => {
     fireEvent.press(view.getByTestId("default-format-option-standard"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultFormat: "standard", defaultStartingLife: 39 }),
+    )
+  })
+
+  it("moves a migrated Brawl default to Commander life and multiplayer Brawl life", () => {
+    const stored = new Map<string, string>([
+      [
+        LOCAL_KEYS.settings,
+        JSON.stringify({
+          ...DEFAULT_LOCAL_SETTINGS,
+          defaultStartingLife: 20,
+          defaultSystem: "mtg",
+          defaultFormat: "brawl",
+        }),
+      ],
+    ])
+    const settings = new LocalGameRepository({
+      getString: (key) => stored.get(key),
+      set: (key, value) => stored.set(key, value),
+      delete: (key) => stored.delete(key),
+    }).loadSettings()
+    const onSettingsChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={settings}
+          onBack={jest.fn()}
+          onSettingsChange={onSettingsChange}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("default-player-count-increment"))
+    expect(onSettingsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ defaultPlayerCount: 3, defaultStartingLife: 30 }),
+    )
+
+    fireEvent.press(view.getByTestId("default-format"))
+    fireEvent.press(view.getByTestId("default-format-option-commander"))
+    expect(onSettingsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ defaultFormat: "commander", defaultStartingLife: 40 }),
     )
   })
 

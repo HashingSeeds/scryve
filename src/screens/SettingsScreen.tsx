@@ -129,7 +129,7 @@ export function SettingsScreen({
     const { defaultSystem: _system, defaultFormat: _format, ...rest } = settings
     const next: LocalSettings = {
       ...rest,
-      defaultStartingLife: defaultStartingLife(system),
+      defaultStartingLife: defaultStartingLife(system, undefined, settings.defaultPlayerCount),
       ...(system
         ? {
             defaultSystem: system,
@@ -141,17 +141,34 @@ export function SettingsScreen({
   }
   const selectFormat = (format?: string) => {
     if (!settings.defaultSystem) return
-    const previousDefaultLife = defaultStartingLife(settings.defaultSystem, settings.defaultFormat)
     const { defaultFormat: _format, ...rest } = settings
     const next: LocalSettings = {
       ...rest,
       ...(format ? { defaultFormat: format } : {}),
-      ...(settings.defaultStartingLife === previousDefaultLife
-        ? { defaultStartingLife: defaultStartingLife(settings.defaultSystem, format) }
-        : {}),
+      ...followDefaultLife({ defaultFormat: format }),
     }
     setSettings(next)
     onSettingsChange(next)
+  }
+  // why: a starting value still at its default follows the new default; a custom one stays put.
+  const followDefaultLife = (
+    changes: Partial<Pick<LocalSettings, "defaultFormat" | "defaultPlayerCount">>,
+  ) => {
+    const { defaultSystem, defaultFormat, defaultPlayerCount } = { ...settings, ...changes }
+    const previous = defaultStartingLife(
+      settings.defaultSystem,
+      settings.defaultFormat,
+      settings.defaultPlayerCount,
+    )
+    return settings.defaultStartingLife === previous
+      ? {
+          defaultStartingLife: defaultStartingLife(
+            defaultSystem,
+            defaultFormat,
+            defaultPlayerCount,
+          ),
+        }
+      : {}
   }
   const themes: ThemePreference[] = ["system", "light", "dark"]
   const formats = settings.defaultSystem ? playSystemFormats(settings.defaultSystem) : []
@@ -175,7 +192,9 @@ export function SettingsScreen({
               value={settings.defaultPlayerCount}
               min={MIN_PLAYERS}
               max={MAX_PLAYERS}
-              onChange={(defaultPlayerCount) => update({ defaultPlayerCount })}
+              onChange={(defaultPlayerCount) =>
+                update({ defaultPlayerCount, ...followDefaultLife({ defaultPlayerCount }) })
+              }
             />
           </View>
           <View style={themed($counterValue)}>

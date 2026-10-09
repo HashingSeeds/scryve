@@ -14,9 +14,9 @@ export type { CapabilityKey, CapabilityRelease, SystemId as GameSystemId } from 
 
 export type Integration = IntegrationDefinition & { id: SystemId; displayName: string }
 
-export function integrationFor(id: SystemId): Integration {
+export function integrationFor<Id extends SystemId>(id: Id) {
   const { label, integration } = SYSTEMS[id]
-  return { id, displayName: label, ...integration }
+  return { id, displayName: label, ...integration } satisfies Integration
 }
 
 export function integration(game: string): Integration | undefined {

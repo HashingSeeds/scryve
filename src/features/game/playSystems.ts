@@ -82,10 +82,15 @@ function playFormatDefinition(system: unknown, format?: string) {
   return formatDefinition(system, playSystemFormat(system, format))
 }
 
-export function defaultStartingLife(system?: unknown, format?: string): number {
+export function defaultStartingLife(system?: unknown, format?: string, playerCount = 2): number {
   const counter = playSystemRules(system).counter
   if (!isPlaySystemId(system)) return counter.defaultValue
-  return playFormatDefinition(system, format)?.startingValue ?? counter.defaultValue
+  const definition = playFormatDefinition(system, format)
+  return (
+    (playerCount > 2 ? definition?.multiplayerStartingValue : undefined) ??
+    definition?.startingValue ??
+    counter.defaultValue
+  )
 }
 
 export function supportsCommanderDamage(value: unknown, format?: string): boolean {

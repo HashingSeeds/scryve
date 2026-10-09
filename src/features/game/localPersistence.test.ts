@@ -211,6 +211,27 @@ describe("LocalGameRepository", () => {
     })
   })
 
+  it.each([
+    [2, 20, 25],
+    [4, 20, 30],
+    [2, 22, 22],
+  ])("migrates a %i-player Brawl default stored at %i life to %i", (players, stored, expected) => {
+    const storage = new MemoryStorage()
+    storage.set(
+      LOCAL_KEYS.settings,
+      JSON.stringify({
+        schemaVersion: 1,
+        defaultPlayerCount: players,
+        defaultStartingLife: stored,
+        hapticsEnabled: true,
+        themePreference: "dark",
+        defaultSystem: "mtg",
+        defaultFormat: "brawl",
+      }),
+    )
+    expect(new LocalGameRepository(storage).loadSettings().defaultStartingLife).toBe(expected)
+  })
+
   it("stores a default system and format only when both are known", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)

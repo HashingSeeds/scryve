@@ -23,6 +23,7 @@ export type FormatDefinition = {
   readonly blurb?: string
   readonly sections: readonly DeckSection[]
   readonly startingValue?: number
+  readonly multiplayerStartingValue?: number
   readonly hasCommanderDamage?: boolean
   readonly singleton?: boolean
 }
@@ -165,8 +166,9 @@ export const SYSTEMS = {
         label: "Brawl",
         blurb: "60 cards, singleton",
         sections: MTG_COMMAND_ZONE_SECTIONS,
-        // why: Comprehensive Rules 903.12: two-player Brawl starts at 25 and skips the 21 commander damage loss.
+        // why: Comprehensive Rules 903.12: Brawl starts at 25 (30 multiplayer) and skips the 21 commander damage loss.
         startingValue: 25,
+        multiplayerStartingValue: 30,
         hasCommanderDamage: false,
         singleton: true,
       },
