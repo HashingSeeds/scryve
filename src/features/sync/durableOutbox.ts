@@ -326,7 +326,8 @@ export class DurableOutbox<
   /** why: a record this build can't read may be readable by a later one, so it is kept aside instead of deleted. */
   private quarantine(key: string): void {
     const value = this.storage.getString(key)
-    if (value) this.storage.set(`${DURABLE_QUARANTINE_PREFIX}${Date.now()}:${key}`, value)
+    if (value !== undefined)
+      this.storage.set(`${DURABLE_QUARANTINE_PREFIX}${Date.now()}:${key}`, value)
     this.storage.delete(key)
   }
 
