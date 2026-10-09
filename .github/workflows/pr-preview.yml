@@ -410,9 +410,11 @@ jobs:
               ].join("\n"),
             ]
             if (PUBLISHED === "true") {
+              // why: chat apps and GitHub only link http(s); the site page opens the deep link.
+              const openUrl = `${process.env.EXPO_PUBLIC_INVITE_ORIGIN}/preview/${CHANNEL}`
               sections.push(
                 `<img src="${qr}" width="180" alt="QR code for ${link}">`,
-                `Scan with a phone that has Scryve (Preview), or open \`${link}\`.`,
+                `[Open on this phone](${openUrl}), or scan with a phone that has Scryve (Preview).`,
               )
             }
             const body = sections.join("\n\n")
