@@ -1,3 +1,5 @@
+import { reportCrash } from "@/utils/crashReporting"
+
 import {
   DURABLE_QUARANTINE_PREFIX,
   DurableOutbox,
@@ -6,6 +8,11 @@ import {
   type DurableOutboxKeys,
   type DurablePendingRecord,
 } from "./durableOutbox"
+
+jest.mock("@/utils/crashReporting", () => ({
+  ErrorType: { HANDLED: "Handled" },
+  reportCrash: jest.fn(),
+}))
 
 interface NoteOperation extends DurablePendingRecord {
   schemaVersion: 1
@@ -40,10 +47,10 @@ class MemoryStorage {
 }
 
 const keys: DurableOutboxKeys = {
-  pendingIndex: (scope, owner) => `pending.${owner}.${scope}`,
-  pendingRecord: (scope, operationId, owner) => `pending.${owner}.${scope}.${operationId}`,
-  failedIndex: (scope, owner) => `failed.${owner}.${scope}`,
-  failedRecord: (scope, operationId, owner) => `failed.${owner}.${scope}.${operationId}`,
+  pendingIndex: (scope, owner) => `notes.pendingIndex.v1.${owner}.${scope}`,
+  pendingRecord: (scope, operationId, owner) => `notes.pending.v1.${owner}.${scope}.${operationId}`,
+  failedIndex: (scope, owner) => `notes.failedIndex.v1.${owner}.${scope}`,
+  failedRecord: (scope, operationId, owner) => `notes.failed.v1.${owner}.${scope}.${operationId}`,
 }
 
 const codec: DurableOutboxCodec<NoteOperation, NoteFailure> = {
@@ -145,10 +152,33 @@ describe("durable outbox", () => {
     outbox.loadPending("deck")
     now.mockRestore()
 
-    expect([...storage.values.keys()].filter((key) => key.startsWith("pending."))).toEqual([
-      keys.pendingIndex("deck", "owner"),
-    ])
+    expect([...storage.values.keys()].filter((key) => key.startsWith("notes.pending."))).toEqual([])
     expect(quarantined()).toEqual([future, rewritten, staleDone, '{"action":', ""].sort())
+  })
+
+  it("reports each quarantine once with metadata only, and a clean load not at all", () => {
+    const report = jest.mocked(reportCrash)
+    report.mockClear()
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    outbox.enqueue(operation("note-valid", 1), "deck")
+    outbox.loadPending("deck")
+    expect(report).not.toHaveBeenCalled()
+
+    storage.set(keys.pendingRecord("deck", "note-secret", "owner"), '{"note":"private"}')
+    storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
+    outbox.loadPending("deck")
+    outbox.loadPending("deck")
+
+    expect(report).toHaveBeenCalledTimes(1)
+    const [error, , context] = report.mock.calls[0]
+    expect(error.name).toBe("OutboxQuarantine")
+    expect(context).toEqual({
+      tags: { outbox: "notes.pending.v1" },
+      extra: { count: 2, reasons: ["rejected", "empty"] },
+      fingerprint: ["outbox-quarantine", "notes.pending.v1"],
+    })
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(/owner|private|note-secret/)
   })
 
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {
