@@ -8,6 +8,7 @@ import {
   COMMANDER_LETHAL_DAMAGE,
   incomingCommanderDamage,
   isEliminatedByCommanderDamage,
+  lastPlayerStanding,
   MAX_COMMANDER_DAMAGE,
   asDeviceId,
   asGameId,
@@ -422,6 +423,17 @@ describe("commander damage", () => {
     game = assign(game, 0, 1, 11)
     game = assign(game, 2, 1, 10)
     expect(isEliminatedByCommanderDamage(game, game.players[1].id)).toBe(false)
+  })
+
+  it("names the last player standing once life and commander damage knock out the rest", () => {
+    let game = assign(makeGame(3, 40), 0, 1, COMMANDER_LETHAL_DAMAGE)
+    expect(lastPlayerStanding(game)).toBeUndefined()
+    game = applyGameCommand(
+      game,
+      { type: "life.change", playerId: game.players[0].id, delta: -40 },
+      sharedContext,
+    )
+    expect(lastPlayerStanding(game)).toBe(game.players[2].id)
   })
 })
 
