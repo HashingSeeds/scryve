@@ -64,7 +64,7 @@ describe("useLocalGame persistence", () => {
     expect(new LocalGameRepository(storage).loadActiveGame()?.players[0].life).toBe(21)
   })
 
-  it("adopts a rename made under it before its next tap saves", () => {
+  it("adopts a rename made under it in the same millisecond before its next tap saves", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)
     const initial = game()
@@ -73,10 +73,12 @@ describe("useLocalGame persistence", () => {
       ({ storedGame }: { storedGame: LocalGame }) => useLocalGame(storedGame, repository),
       { initialProps: { storedGame: initial } },
     )
+    jest.spyOn(Date, "now").mockReturnValueOnce(initial.updatedAt)
     repository.updateActivePlayers(initial.id, [
       { name: "Alice", color: "#000" },
       { name: "Grace", color: "#111" },
     ])
+    expect(repository.loadActiveGame()?.updatedAt).toBe(initial.updatedAt)
     rerender({ storedGame: repository.loadActiveGame() ?? initial })
 
     act(() => result.current.changeLife(initial.players[1].id, 1))

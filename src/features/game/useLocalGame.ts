@@ -28,8 +28,9 @@ import type {
  * why: `storedGame` is the game as the route last read it from storage. The route rereads on
  * focus, so a board left open under setup adopts renames and ended games instead of saving
  * its older copy over them. A new read always wins: the board saves before it updates, so
- * storage is never behind it. `ownerId` is the signed-in account, so a finished game is filed
- * under it for upload.
+ * storage is never behind it. Each read is a new object, so callers must keep it stable
+ * between reads. `ownerId` is the signed-in account, so a finished game is filed under it
+ * for upload.
  */
 export function useLocalGame(
   storedGame: LocalGame,
@@ -38,7 +39,7 @@ export function useLocalGame(
 ) {
   const [game, setGame] = useState(storedGame)
   const [readGame, setReadGame] = useState(storedGame)
-  if (storedGame.id !== readGame.id || storedGame.updatedAt !== readGame.updatedAt) {
+  if (storedGame !== readGame) {
     setReadGame(storedGame)
     setGame(storedGame)
   }
