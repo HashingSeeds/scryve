@@ -2473,7 +2473,11 @@ export const leaveMyGame = mutation({
         )
       : userPlayers[0]
     if (!player) throw new Error("Game membership required")
-    if (player.resumable !== false) await ctx.db.patch(player._id, { resumable: false })
+    // why: lobby seats are claimed by inserting a row, so leaving deletes it for the next joiner; an active seat keeps its life history.
+    if (game.status === "lobby") {
+      await ctx.db.delete(player._id)
+      await ctx.db.patch(game._id, { updatedAt: Date.now() })
+    } else if (player.resumable !== false) await ctx.db.patch(player._id, { resumable: false })
     return { publicId: game.publicId, left: true }
   },
 })
