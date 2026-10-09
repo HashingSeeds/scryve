@@ -15,11 +15,12 @@ permissions:
   contents: read
 
 jobs:
-  # why: a publish waiting for approval holds its concurrency group, so a newer push's publish
-  # queues behind it and GitHub cancels all but one pending run. Cancelling older runs that are
-  # not running yet frees the group. A run already in progress is left alone: its bundle is
-  # cancelled by the bundle group, and its publish may be inside `eas update`, which a cancel
-  # cannot retract. A separate job, so `actions: write` never meets the PR's dependencies.
+  # why: best-effort cleanup so stale runs don't sit in the approval queue. Nothing blocks on it:
+  # publish shares no concurrency group across pushes, and each run rechecks the PR's head, state,
+  # and label right before `eas update` and before the comment. A cancel can only hit a waiting
+  # run for an older head of this PR, which would skip at that recheck anyway, so racing an
+  # approval is harmless. Runs for the same head are never cancelled. A separate job, so
+  # `actions: write` never meets the PR's dependencies.
   supersede:
     # why: the author check is a filter, not the security boundary. Under `pull_request` this file
     # comes from the PR branch, so a branch could rewrite it. The boundary is that only Matthew's
@@ -35,15 +36,16 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Cancel older runs still waiting for approval
+      - name: Cancel older runs for this PR still waiting for approval
         env:
           GH_TOKEN: ${{ github.token }}
-          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/pr-preview.yml/runs" \
-            -f event=pull_request -f branch="$HEAD_REF" -F per_page=50 \
-            --jq ".workflow_runs[] | select(.id < $GITHUB_RUN_ID
-              and (.status | IN(\"waiting\", \"pending\", \"queued\", \"requested\"))) | .id")
+            -f event=pull_request -f status=waiting -F per_page=100 \
+            --jq ".workflow_runs[] | select(.id < $GITHUB_RUN_ID and .head_sha != \"$HEAD_SHA\"
+              and any(.pull_requests[]; .number == $PR_NUMBER)) | .id")
           for id in $runs; do
             echo "cancelling run $id"
             gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" \
@@ -191,12 +193,9 @@ jobs:
 
   publish:
     needs: bundle
-    # why: job level, so an unrelated label skips without touching the queue. Never cancel in
-    # progress: EAS keeps an update it already accepted, so a cancelled older push could land after
-    # a newer one. The supersede job clears older runs that are only waiting.
-    concurrency:
-      group: pr-preview-${{ github.event.pull_request.number }}
-      cancel-in-progress: false
+    # why: no concurrency group. One shared across pushes let a run waiting for approval block every
+    # newer push. The head, state, and label rechecks before `eas update` and the comment make a
+    # stale run skip instead.
     # why: holds EXPO_PREVIEW_TOKEN and requires Matthew's approval.
     environment: pr-preview
     runs-on: ubuntu-latest
