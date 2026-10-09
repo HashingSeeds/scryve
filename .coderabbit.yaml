@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Keys not set here fall back to the CodeRabbit dashboard settings.
+inheritance: true
+reviews:
+  # why: scripts/merge-gate.cjs reads the "CodeRabbit" commit status, so keep that surface.
+  review_progress: false
+  commit_status: true
+  # why: a review that errors should read as failed, not success.
+  fail_commit_status: true
+  # why: agents open PRs as Matthew, and `@coderabbitai resolve` approved #331 without a review.
+  allow_author_approval: false
+  request_changes_workflow: true
+  auto_review:
+    # why: the default pauses reviews after 5 commits, which quietly blocks the merge gate.
+    auto_pause_after_reviewed_commits: 0
