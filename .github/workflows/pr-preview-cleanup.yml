@@ -72,7 +72,7 @@ jobs:
             local offset=0 page
             while :; do
               page=$(eas "$1:list" --limit 25 --offset "$offset" --json --non-interactive | json \
-                | jq -r "$2 | .name")
+                | jq -r "$2 | .name") || return 1
               [ -z "$page" ] && return
               # why: the token can delete beta, preview, and production too; touch only PR channels.
               grep -E '^pr-[0-9]+$' <<< "$page" || true

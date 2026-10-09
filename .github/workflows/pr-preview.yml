@@ -93,18 +93,21 @@ jobs:
           esac
           echo "platform=$platform" >> "$GITHUB_OUTPUT"
 
-      # why: runs queue rather than cancel, so a queued run for an older push skips here.
-      - name: Check this is still the PR head
+      # why: runs queue rather than cancel, so a queued run for an older push, a closed PR, or a
+      # removed label skips here. A close that lands after this check is caught by the daily
+      # cleanup sweep, which lists channels as well as branches.
+      - name: Check the PR still wants this preview
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          current=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
-          if [ "$current" = "$HEAD_SHA" ]; then
+          read -r sha state labeled < <(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '[.head.sha, .state, any(.labels[]; .name == "preview")] | @tsv')
+          if [ "$sha" = "$HEAD_SHA" ] && [ "$state" = open ] && [ "$labeled" = true ]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::$HEAD_SHA is no longer the PR head ($current); skipping"
+            echo "::notice::skipping: head $sha, state $state, preview label $labeled"
           fi
 
       # Same key as the checks export job, restored read-only so that job stays the only writer.
