@@ -1,11 +1,12 @@
 import {
+  configureOutboxDiagnostics,
   DURABLE_QUARANTINE_PREFIX,
+  DURABLE_SIDECAR_PREFIX,
   DurableOutbox,
   type DurableFailedRecord,
   type DurableOutboxCodec,
   type DurableOutboxKeys,
   type DurablePendingRecord,
-  setQuarantineReporter,
 } from "./durableOutbox"
 
 interface NoteOperation extends DurablePendingRecord {
@@ -152,24 +153,89 @@ describe("durable outbox", () => {
     expect(quarantined()).toEqual([future, rewritten, staleDone, '{"action":', ""].sort())
   })
 
-  it("reports each quarantine once with metadata only, and a clean load not at all", () => {
+  it("keeps provenance beside each record and removes it with the record", () => {
+    configureOutboxDiagnostics({ writtenBy: "build-a" })
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const sidecar = (key: string) => storage.getString(`${DURABLE_SIDECAR_PREFIX}${key}`)
+    const sidecarKeys = () =>
+      [...storage.values.keys()].filter((key) => key.startsWith(DURABLE_SIDECAR_PREFIX))
+    const ackKey = keys.pendingRecord("deck", "note-ack", "owner")
+    const now = jest.spyOn(Date, "now").mockReturnValue(5)
+    outbox.enqueue(operation("note-ack", 1), "deck")
+    outbox.enqueue(operation("note-fail", 2), "deck")
+    outbox.fail("deck", "note-fail", "rejected", 6)
+    now.mockRestore()
+
+    expect(storage.getString(ackKey)).toBe(JSON.stringify(operation("note-ack", 1)))
+    expect(JSON.parse(sidecar(ackKey)!)).toEqual({ writtenBy: "build-a", writtenAt: 5 })
+    expect(sidecar(keys.pendingRecord("deck", "note-fail", "owner"))).toBeUndefined()
+    expect(sidecar(keys.failedRecord("deck", "note-fail", "owner"))).toBeDefined()
+
+    outbox.acknowledge("deck", "note-ack")
+    outbox.dismissFailed("deck", "note-fail")
+    expect(sidecarKeys()).toEqual([])
+
+    outbox.enqueue(operation("note-torn", 3), "deck")
+    storage.set(keys.pendingRecord("deck", "note-torn", "owner"), "{")
+    outbox.loadPending("deck")
+    expect(sidecarKeys()).toEqual([
+      expect.stringMatching(/^meta:quarantine:\d+:notes\.pending\.v1\.owner\.deck\.note-torn$/),
+    ])
+  })
+
+  it("reports each quarantine once with shape and provenance, never values", () => {
     const report = jest.fn()
-    setQuarantineReporter(report)
+    configureOutboxDiagnostics({ writtenBy: "1.2.3+update-a@runtime-1", report })
     const storage = new MemoryStorage()
     const outbox = new DurableOutbox(storage, "owner", keys, codec)
     outbox.enqueue(operation("note-valid", 1), "deck")
     outbox.loadPending("deck")
     expect(report).not.toHaveBeenCalled()
 
-    storage.set(keys.pendingRecord("deck", "note-secret", "owner"), '{"note":"private"}')
+    const sentinel = "sentinel-7f3a9c"
+    const future = JSON.stringify({
+      schemaVersion: 2,
+      op: "rename",
+      event: { type: "life.changed", note: sentinel, nested: { deep: sentinel } },
+      payload: [sentinel],
+      label: "not-an-allowlisted-type",
+    })
+    outbox.enqueue(operation("note-secret", 2, sentinel), "deck")
+    storage.set(keys.pendingRecord("deck", "note-secret", "owner"), future)
     storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
     outbox.loadPending("deck")
     outbox.loadPending("deck")
 
     expect(report.mock.calls).toEqual([
-      [{ outbox: "notes.pending.v1", count: 2, reasons: ["rejected", "empty"] }],
+      [
+        {
+          outbox: "notes.pending.v1",
+          count: 2,
+          reasons: ["rejected", "empty"],
+          records: [
+            {
+              slot: "pending",
+              reason: "rejected",
+              bytes: Buffer.byteLength(future),
+              shape: {
+                schemaVersion: "number",
+                op: "string",
+                event: { type: "string", note: "string", nested: "object" },
+                payload: "array",
+                label: "string",
+              },
+              operationType: "rename",
+              writtenBy: "1.2.3+update-a@runtime-1",
+            },
+            { slot: "pending", reason: "empty", bytes: 0, shape: "null", writtenBy: "unknown" },
+          ],
+        },
+      ],
     ])
-    expect(JSON.stringify(report.mock.calls)).not.toMatch(/owner|private|note-secret/)
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(
+      new RegExp(`${sentinel}|owner|note-secret|not-an-allowlisted-type`),
+    )
   })
 
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {

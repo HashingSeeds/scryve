@@ -71,20 +71,55 @@ export const DURABLE_OUTBOX_LIMITS: DurableOutboxLimits = {
 
 export const DURABLE_QUARANTINE_PREFIX = "quarantine:"
 
+export const DURABLE_SIDECAR_PREFIX = "meta:"
+
+const MAX_REPORTED_RECORDS = 10
+
+// why: only these exact strings may leave the device; anything else in a record could be player or deck data.
+const KNOWN_OPERATION_TYPES = new Set([
+  "life.changed",
+  "commanderDamage.submitted",
+  "commanderDamage.resolved",
+  "cards",
+  "create",
+  "rename",
+  "delete",
+])
+
 export type QuarantineReason = "empty" | "invalid_json" | "rejected"
+
+type RecordShape = string | { [key: string]: RecordShape }
+
+export interface QuarantinedRecord {
+  slot: "pending" | "failed"
+  reason: QuarantineReason
+  bytes: number
+  shape: RecordShape
+  operationType?: string
+  writtenBy: string
+}
 
 export interface QuarantineReport {
   outbox: string
   count: number
   reasons: QuarantineReason[]
+  records: QuarantinedRecord[]
 }
 
-let reportQuarantine: (report: QuarantineReport) => void = () => {}
-
-/** why: sync code stays free of React Native, so the app wires its error reporter in at startup. */
-export function setQuarantineReporter(reporter: (report: QuarantineReport) => void): void {
-  reportQuarantine = reporter
+interface OutboxDiagnostics {
+  writtenBy: string
+  report: (report: QuarantineReport) => void
 }
+
+let diagnostics: OutboxDiagnostics = { writtenBy: "unknown", report: () => {} }
+
+/** why: sync code stays free of React Native, so the app supplies its build identity and error reporter at startup. */
+export function configureOutboxDiagnostics(next: Partial<OutboxDiagnostics>): void {
+  diagnostics = { ...diagnostics, ...next }
+}
+
+// why: provenance lives beside the record, never in it, so builds that predate it read records unchanged.
+const sidecarKey = (recordKey: string): string => `${DURABLE_SIDECAR_PREFIX}${recordKey}`
 
 // why: reports name the outbox by its fixed `<namespace>.vN` key prefix so owner, game, and operation IDs never leave the device.
 const outboxLabel = (recordKey: string): string =>
@@ -97,6 +132,34 @@ const parsedJson = (value: string | undefined): unknown => {
   } catch {
     return null
   }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+// why: types only, one level into nested objects like `action` or `event`; values never appear.
+const shapeOf = (value: unknown, depth = 1): RecordShape => {
+  if (value === null) return "null"
+  if (Array.isArray(value)) return "array"
+  if (!isRecord(value)) return typeof value
+  if (depth < 0) return "object"
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [key, shapeOf(child, depth - 1)]),
+  )
+}
+
+const operationTypeOf = (value: unknown): string | undefined =>
+  [value, isRecord(value) ? value.action : undefined]
+    .flatMap((candidate) =>
+      isRecord(candidate)
+        ? [candidate.op, candidate.type, isRecord(candidate.event) ? candidate.event.type : null]
+        : [],
+    )
+    .find((type): type is string => typeof type === "string" && KNOWN_OPERATION_TYPES.has(type))
+
+const writtenByOf = (sidecar: string | undefined): string => {
+  const parsed = parsedJson(sidecar)
+  return isRecord(parsed) && typeof parsed.writtenBy === "string" ? parsed.writtenBy : "unknown"
 }
 
 const stringIndex = (value: unknown): string[] =>
@@ -173,7 +236,7 @@ export class DurableOutbox<
     )
     if (pendingBytes + utf8ByteLength(serialized) > this.limits.maxPendingBytes)
       return { accepted: false, reason: "byte_limit", pending }
-    this.storage.set(this.keys.pendingRecord(scopeId, operationId, this.ownerId), serialized)
+    this.writeRecord(this.keys.pendingRecord(scopeId, operationId, this.ownerId), serialized)
     const index = stringIndex(
       parsedJson(this.storage.getString(this.keys.pendingIndex(scopeId, this.ownerId))),
     )
@@ -201,7 +264,7 @@ export class DurableOutbox<
     ])
     const pending: Pending[] = []
     const validIds: string[] = []
-    const quarantined: QuarantineReason[] = []
+    const quarantined: QuarantinedRecord[] = []
     for (const operationId of index) {
       const pendingKey = this.keys.pendingRecord(scopeId, operationId, this.ownerId)
       const failedKey = this.keys.failedRecord(scopeId, operationId, this.ownerId)
@@ -213,12 +276,12 @@ export class DurableOutbox<
           this.codec.operationId(failed.action) === operationId &&
           this.codec.belongsToScope(failed.action, this.ownerId, scopeId)
         ) {
-          if (action) this.storage.delete(pendingKey)
-          else this.quarantine(pendingKey, quarantined)
+          if (action) this.deleteRecord(pendingKey)
+          else this.quarantine(pendingKey, "pending", quarantined)
           continue
         }
-        this.quarantine(failedKey, quarantined)
-      } else if (failedValue) this.quarantine(failedKey, quarantined)
+        this.quarantine(failedKey, "failed", quarantined)
+      } else if (failedValue) this.quarantine(failedKey, "failed", quarantined)
       if (
         action &&
         this.codec.operationId(action) === operationId &&
@@ -226,7 +289,7 @@ export class DurableOutbox<
       ) {
         pending.push(action)
         validIds.push(operationId)
-      } else this.quarantine(pendingKey, quarantined)
+      } else this.quarantine(pendingKey, "pending", quarantined)
     }
     this.storage.set(this.keys.pendingIndex(scopeId, this.ownerId), JSON.stringify(validIds))
     this.reportQuarantined(scopeId, quarantined)
@@ -238,12 +301,12 @@ export class DurableOutbox<
     const action = this.codec.parsePending(parsedJson(this.storage.getString(key)))
     if (!action) return null
     const updated = { ...action, attempts: action.attempts + 1, lastAttemptAt: attemptedAt }
-    this.storage.set(key, JSON.stringify(updated))
+    this.writeRecord(key, JSON.stringify(updated))
     return updated
   }
 
   acknowledge(scopeId: string, operationId: string): void {
-    this.storage.delete(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
+    this.deleteRecord(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
     const index = stringIndex(
       parsedJson(this.storage.getString(this.keys.pendingIndex(scopeId, this.ownerId))),
     ).filter((candidate) => candidate !== operationId)
@@ -292,7 +355,7 @@ export class DurableOutbox<
     )
     if (failedBytes + utf8ByteLength(JSON.stringify(record)) > this.limits.maxFailedBytes)
       return { accepted: false, reason: "byte_limit", failed, pending }
-    this.storage.set(
+    this.writeRecord(
       this.keys.failedRecord(scopeId, operationId, this.ownerId),
       JSON.stringify(record),
     )
@@ -304,7 +367,7 @@ export class DurableOutbox<
     const nextPending = pending.filter(
       (candidate) => this.codec.operationId(candidate) !== operationId,
     )
-    this.storage.delete(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
+    this.deleteRecord(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
     this.storage.set(
       this.keys.pendingIndex(scopeId, this.ownerId),
       JSON.stringify(nextPending.map((candidate) => this.codec.operationId(candidate))),
@@ -325,7 +388,7 @@ export class DurableOutbox<
       ...discovered,
     ])
     const failures: Failed[] = []
-    const quarantined: QuarantineReason[] = []
+    const quarantined: QuarantinedRecord[] = []
     for (const operationId of index) {
       const key = this.keys.failedRecord(scopeId, operationId, this.ownerId)
       const failure = this.codec.parseFailed(parsedJson(this.storage.getString(key)))
@@ -335,7 +398,7 @@ export class DurableOutbox<
         this.codec.belongsToScope(failure.action, this.ownerId, scopeId)
       )
         failures.push(failure)
-      else this.quarantine(key, quarantined)
+      else this.quarantine(key, "failed", quarantined)
     }
     this.reportQuarantined(scopeId, quarantined)
     failures.sort((left, right) => left.failedAt - right.failedAt)
@@ -347,7 +410,27 @@ export class DurableOutbox<
   }
 
   /** why: a record this build can't read may be readable by a later one, so it is kept aside instead of deleted. */
-  private quarantine(key: string, quarantined: QuarantineReason[]): void {
+  // why: the record lands before its sidecar, so a torn write leaves provenance unknown rather than wrong for a new record.
+  private writeRecord(key: string, value: string): void {
+    this.storage.set(key, value)
+    this.storage.set(
+      sidecarKey(key),
+      JSON.stringify({ writtenBy: diagnostics.writtenBy, writtenAt: Date.now() }),
+    )
+  }
+
+  // why: the sidecar goes first, so a torn delete never leaves provenance pointing at a record that is gone.
+  private deleteRecord(key: string): void {
+    this.storage.delete(sidecarKey(key))
+    this.storage.delete(key)
+  }
+
+  /** why: a record this build can't read may be readable by a later one, so it is kept aside instead of deleted. */
+  private quarantine(
+    key: string,
+    slot: QuarantinedRecord["slot"],
+    quarantined: QuarantinedRecord[],
+  ): void {
     const value = this.storage.getString(key)
     if (value !== undefined) {
       const base = `${DURABLE_QUARANTINE_PREFIX}${Date.now()}:${key}`
@@ -355,25 +438,35 @@ export class DurableOutbox<
       for (let copy = 1; this.storage.getString(target) !== undefined; copy += 1)
         target = `${base}:${copy}`
       this.storage.set(target, value)
-      quarantined.push(
-        value === "" ? "empty" : parsedJson(value) === null ? "invalid_json" : "rejected",
-      )
+      const sidecar = this.storage.getString(sidecarKey(key))
+      if (sidecar !== undefined) this.storage.set(sidecarKey(target), sidecar)
+      const parsed = parsedJson(value)
+      const operationType = operationTypeOf(parsed)
+      quarantined.push({
+        slot,
+        reason: value === "" ? "empty" : parsed === null ? "invalid_json" : "rejected",
+        bytes: utf8ByteLength(value),
+        shape: shapeOf(parsed),
+        ...(operationType ? { operationType } : {}),
+        writtenBy: writtenByOf(sidecar),
+      })
     }
-    this.storage.delete(key)
+    this.deleteRecord(key)
   }
 
   /** why: quarantine is otherwise silent; one report per load pass tells us a release needs a recovery path, without sending record contents. */
-  private reportQuarantined(scopeId: string, quarantined: readonly QuarantineReason[]): void {
+  private reportQuarantined(scopeId: string, quarantined: readonly QuarantinedRecord[]): void {
     if (!quarantined.length) return
-    reportQuarantine({
+    diagnostics.report({
       outbox: outboxLabel(this.keys.pendingRecord(scopeId, "", this.ownerId)),
       count: quarantined.length,
-      reasons: [...new Set(quarantined)],
+      reasons: [...new Set(quarantined.map(({ reason }) => reason))],
+      records: quarantined.slice(0, MAX_REPORTED_RECORDS),
     })
   }
 
   dismissFailed(scopeId: string, operationId: string): void {
-    this.storage.delete(this.keys.failedRecord(scopeId, operationId, this.ownerId))
+    this.deleteRecord(this.keys.failedRecord(scopeId, operationId, this.ownerId))
     const index = stringIndex(
       parsedJson(this.storage.getString(this.keys.failedIndex(scopeId, this.ownerId))),
     ).filter((candidate) => candidate !== operationId)
