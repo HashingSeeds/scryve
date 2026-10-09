@@ -14,7 +14,7 @@ import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 import schema from "../../../convex/schema"
-import type { DurableStringStorage } from "../sync/durableOutbox"
+import { setOutboxWriter, type DurableStringStorage } from "../sync/durableOutbox"
 
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("../../../convex/_generated/api"),
@@ -693,6 +693,49 @@ describe("deck version card writes", () => {
     expect(client.mutation).toHaveBeenCalledTimes(1)
     expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
     stopSession()
+  })
+
+  it("sends every lifecycle op without the stored writer provenance", async () => {
+    const local = new MemoryStorage()
+    const repository = new DeckVersionWriteRepository("owner", local)
+    setOutboxWriter({ app: "1.4.0", update: "update-a", runtime: "runtime-1" })
+    const ops: Array<Pick<PendingVersionWrite, "op" | "name">> = [
+      { op: "create", name: "Sideboard" },
+      { op: "cards" },
+      { op: "rename", name: "Renamed" },
+      { op: "delete" },
+    ]
+    for (const [index, extra] of ops.entries())
+      repository.enqueue({
+        ...pendingWrite(),
+        ...extra,
+        versionId: `version-${extra.op}` as Id<"deckVersions">,
+        operationId: `aaaaaaaa-aaaa-4aaa-8aaa-00000000000${index}`,
+      })
+    setOutboxWriter(undefined)
+    expect(
+      [...local.values.values()].filter((value) => value.includes('"writtenBy"')),
+    ).toHaveLength(ops.length)
+    const mutation = jest.fn(async (_reference: unknown, args: { versionId?: string }) => ({
+      ...versionSnapshot(1),
+      versionId: args.versionId ?? versionId,
+    }))
+    const controller = new DeckVersionWriteController(
+      { mutation } as unknown as ConvexReactClient,
+      repository,
+    )
+
+    const stop = controller.start()
+    await flush()
+    stop()
+
+    expect(mutation.mock.calls.map(([reference]) => reference)).toEqual([
+      api.decks.syncCreateVersion,
+      api.decks.syncVersionWrite,
+      api.decks.syncUpdateVersion,
+      api.decks.syncDeleteVersion,
+    ])
+    for (const [, args] of mutation.mock.calls) expect(args).not.toHaveProperty("writtenBy")
   })
 
   it("scopes default write controllers to the client's deployment URL", () => {

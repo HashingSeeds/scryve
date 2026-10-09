@@ -165,6 +165,7 @@ const codec: DurableOutboxCodec<PendingVersionWrite, FailedVersionWrite> = {
   operationId: (action) => action.operationId,
   belongsToScope: (action, ownerId, scope) => action.ownerId === ownerId && scope === SCOPE,
   compare: (left, right) => compareActions(left, right),
+  operationTypes: [...lifecycleOps],
 }
 
 function compareActions(left: PendingVersionWrite, right: PendingVersionWrite) {
@@ -189,7 +190,6 @@ function replayChain(actions: readonly PendingVersionWrite[]): PendingVersionWri
 
 export class DeckVersionWriteRepository {
   private readonly outbox: DurableOutbox<PendingVersionWrite, FailedVersionWrite>
-  private readonly keys: DurableOutboxKeys
   private readonly local: DurableStringStorage
   private readonly deploymentUrl?: string
 
@@ -200,8 +200,13 @@ export class DeckVersionWriteRepository {
   ) {
     this.local = local
     this.deploymentUrl = deploymentUrl
-    this.keys = outboxKeys(deploymentUrl)
-    this.outbox = new DurableOutbox(local, ownerId, this.keys, codec, VERSION_OUTBOX_LIMITS)
+    this.outbox = new DurableOutbox(
+      local,
+      ownerId,
+      outboxKeys(deploymentUrl),
+      codec,
+      VERSION_OUTBOX_LIMITS,
+    )
   }
 
   get cache() {
@@ -251,10 +256,7 @@ export class DeckVersionWriteRepository {
       .filter((action) => action.versionId === versionId && action.attempts === 0)
       .entries())
       if (tail.expectedRevision !== ackRevision + offset)
-        this.local.set(
-          this.keys.pendingRecord(SCOPE, tail.operationId, this.ownerId),
-          JSON.stringify({ ...tail, expectedRevision: ackRevision + offset }),
-        )
+        this.outbox.replacePending(SCOPE, { ...tail, expectedRevision: ackRevision + offset })
   }
 }
 

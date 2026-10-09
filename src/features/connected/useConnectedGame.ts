@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useValue } from "@legendapp/state/react"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
+import type { FunctionArgs } from "convex/server"
 
 import { asDeviceId } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
@@ -98,6 +99,52 @@ function acknowledgementForQueuedResolution(
   return { ...claimAcknowledgement, operationId: queuedResolutionOperationId }
 }
 
+type QueuedActionMutations = {
+  [
+    Name in
+      "changeLife" | "submitCommanderDamage" | "confirmCommanderDamage" | "declineCommanderDamage"
+  ]: (args: FunctionArgs<(typeof api.games)[Name]>) => Promise<OutboxAcknowledgement>
+}
+
+/** why: sends a queued action by picking each mutation arg from its event so nothing else stored with it reaches a strict validator. */
+export function sendQueuedAction(
+  mutations: QueuedActionMutations,
+  publicId: string,
+  { event }: PendingLifeAction,
+): Promise<OutboxAcknowledgement> {
+  if (event.type === "life.changed")
+    return mutations.changeLife({
+      publicId,
+      playerId: event.playerId as unknown as Id<"gamePlayers">,
+      operationId: event.operationId,
+      delta: event.delta,
+      deviceId: event.deviceId,
+      clientCreatedAt: event.clientCreatedAt,
+    })
+  if (event.type === "commanderDamage.submitted")
+    return mutations.submitCommanderDamage({
+      publicId,
+      fromPlayerId: event.fromPlayerId as unknown as Id<"gamePlayers">,
+      toPlayerId: event.toPlayerId as unknown as Id<"gamePlayers">,
+      operationId: event.operationId,
+      delta: event.delta,
+      deviceId: event.deviceId,
+      clientCreatedAt: event.clientCreatedAt,
+    })
+  const resolve = event.accepted
+    ? mutations.confirmCommanderDamage
+    : mutations.declineCommanderDamage
+  return resolve({
+    publicId,
+    operationId: event.claimOperationId,
+    resolutionOperationId: event.operationId,
+    deviceId: event.deviceId,
+    clientCreatedAt: event.clientCreatedAt,
+  }).then((claimAcknowledgement) =>
+    acknowledgementForQueuedResolution(claimAcknowledgement, event.operationId),
+  )
+}
+
 export function useConnectedGame(publicId: string, ownerId = "anonymous"): ConnectedGameRuntime {
   const { isAuthenticated, isLoading, isRefreshing } = useConvexAuth()
   const isWebSocketConnected = useConvexOnline()
@@ -137,40 +184,17 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
         publicId,
         ownerId,
         deviceId,
-        send: (action) => {
-          const { event } = action
-          if (event.type === "life.changed")
-            return mutations.current.changeLifeMutation({
-              publicId,
-              playerId: event.playerId as unknown as Id<"gamePlayers">,
-              operationId: event.operationId,
-              delta: event.delta,
-              deviceId: event.deviceId,
-              clientCreatedAt: event.clientCreatedAt,
-            })
-          if (event.type === "commanderDamage.submitted")
-            return mutations.current.submitCommanderDamageMutation({
-              publicId,
-              fromPlayerId: event.fromPlayerId as unknown as Id<"gamePlayers">,
-              toPlayerId: event.toPlayerId as unknown as Id<"gamePlayers">,
-              operationId: event.operationId,
-              delta: event.delta,
-              deviceId: event.deviceId,
-              clientCreatedAt: event.clientCreatedAt,
-            })
-          const resolve = event.accepted
-            ? mutations.current.confirmCommanderDamageMutation
-            : mutations.current.declineCommanderDamageMutation
-          return resolve({
+        send: (action) =>
+          sendQueuedAction(
+            {
+              changeLife: mutations.current.changeLifeMutation,
+              submitCommanderDamage: mutations.current.submitCommanderDamageMutation,
+              confirmCommanderDamage: mutations.current.confirmCommanderDamageMutation,
+              declineCommanderDamage: mutations.current.declineCommanderDamageMutation,
+            },
             publicId,
-            operationId: event.claimOperationId,
-            resolutionOperationId: event.operationId,
-            deviceId: event.deviceId,
-            clientCreatedAt: event.clientCreatedAt,
-          }).then((claimAcknowledgement) =>
-            acknowledgementForQueuedResolution(claimAcknowledgement, event.operationId),
-          )
-        },
+            action,
+          ),
         finishGame: async (result) =>
           mutations.current.finishMutation({
             publicId,
