@@ -17,6 +17,7 @@ const path = require("node:path")
 const { parseArgs } = require("node:util")
 
 const root = path.join(path.dirname(require.resolve("./release-train.cjs")), "..")
+const easCli = `eas-cli@${require(path.join(root, "package.json")).config.easCli}`
 const PRODUCTION_REF = "origin/production"
 const SENTRY_ISSUES_URL = "https://sentry.io/api/0/projects/matthew-chisolm/scryve/issues/"
 const PLAYER_FACING_TYPES = new Set(["feat", "fix", "perf"])
@@ -32,7 +33,7 @@ const run = (command, args) =>
   }).trim()
 const git = (...args) => run("git", args)
 // why: --json keeps stdout parseable and implies --non-interactive where a command supports it.
-const eas = (...args) => JSON.parse(run("npx", ["--yes", "eas-cli@latest", ...args, "--json"]))
+const eas = (...args) => JSON.parse(run("npx", ["--yes", easCli, ...args, "--json"]))
 
 function refExists(ref) {
   try {
