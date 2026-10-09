@@ -30,6 +30,7 @@
     "build:web:pages": "pnpm site:build && APP_VARIANT=production SCRYVE_WEB_BASE_URL=/play EXPO_PUBLIC_SENTRY_ENVIRONMENT=$([ \"${CF_PAGES_BRANCH:-production}\" = production ] && echo production || echo development) npx expo export --platform web --clear --output-dir dist/play && node scripts/prepare-web-deploy.cjs",
     "build:pages": "node scripts/pages-build.cjs",
     "convex:dev": "convex dev",
+    "bots": "node scripts/bots.cjs",
     "preview:up": "node scripts/preview.cjs up",
     "preview:check": "node scripts/preview.cjs check",
     "prebuild:clean": "expo prebuild --clean",

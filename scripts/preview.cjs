@@ -149,4 +149,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { previewName, writeOverride }
+module.exports = { previewKey, previewName, writeOverride }
