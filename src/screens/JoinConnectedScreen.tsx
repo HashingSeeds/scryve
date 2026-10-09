@@ -30,6 +30,8 @@ import { InviteScannerScreen } from "./InviteScannerScreen"
 import { api } from "../../convex/_generated/api"
 import { PLAYER_COLOR_CHOICES } from "../../convex/lib/appearance"
 
+const INVALID_INVITE = "Invite is invalid, expired, or revoked"
+
 export function JoinConnectedScreen({
   inviteToken,
   access,
@@ -127,7 +129,9 @@ export function JoinConnectedScreen({
         return
       }
       failureReason = "request"
-      const seats = (await claimableSeats({ token, manualCode: manualCode ?? undefined })).seats
+      const lookup = await claimableSeats({ token, manualCode: manualCode ?? undefined })
+      if ("invalid" in lookup) throw new Error(INVALID_INVITE)
+      const seats = lookup.seats
       if (seats.length > 1 && seat === undefined) {
         setOpenSeats(seats)
         return
@@ -145,6 +149,7 @@ export function JoinConnectedScreen({
         color: PLAYER_COLOR_CHOICES[0],
         deviceId,
       })
+      if (!result) throw new Error(INVALID_INVITE)
       requestSucceeded = true
       emitTelemetry("join.completed", { durationMs: Date.now() - startedAt, outcome: "success" })
       captureAnalytics("connection_attempt", { action: "join", stage: "succeeded" })

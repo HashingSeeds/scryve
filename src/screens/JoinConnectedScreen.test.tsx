@@ -254,6 +254,23 @@ describe("JoinConnectedScreen", () => {
     expect(mockClaimSeat).toHaveBeenCalledWith(expect.not.objectContaining({ seat: 2 }))
   })
 
+  it("shows a wrong code without claiming", async () => {
+    mockClaimableSeats.mockResolvedValue({ invalid: true, seats: [] })
+    const onJoined = jest.fn()
+    render(themed(<JoinConnectedScreen onJoined={onJoined} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    expect(screen.getByTestId("join-error")).toHaveTextContent(
+      "Invite is invalid, expired, or revoked",
+    )
+    expect(mockClaimSeat).not.toHaveBeenCalled()
+    expect(onJoined).not.toHaveBeenCalled()
+  })
+
   it("re-checks open seats on every attempt and rejects a seat taken meanwhile", async () => {
     mockClaimableSeats.mockResolvedValue({
       publicId: "game-public",

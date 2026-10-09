@@ -106,11 +106,11 @@ export type MockConnectedRuntime = {
 }
 
 export const mockClaimSeat = jest.fn(async () => ({ publicId: "game-public", seat: 2 }))
-export const mockClaimableSeats = jest.fn(async () => ({
-  publicId: "game-public",
-  mode: "connected",
-  seats: [] as number[],
-}))
+export const mockClaimableSeats = jest.fn(
+  async (): Promise<
+    { publicId: string; mode: string; seats: number[] } | { invalid: true; seats: number[] }
+  > => ({ publicId: "game-public", mode: "connected", seats: [] }),
+)
 export const mockSyncUser = jest.fn(async () => "user")
 export const mockStart = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockLeave = jest.fn(async () => ({ publicId: "game-public", left: true }))
