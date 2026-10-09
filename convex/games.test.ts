@@ -1127,6 +1127,26 @@ describe("connected game lifecycle and API hardening", () => {
     expect(await t.run((ctx) => ctx.db.get(rowBefore!._id))).toEqual(rowBefore)
   })
 
+  it("frees a lobby seat when its player leaves", async () => {
+    const t = convexTest(schema, modules)
+    const { host, created } = await lobby(t)
+    const leaver = await synced(t, "lobby-leaver", "Leaver")
+    await leaver.mutation(api.games.claimSeat, { token, displayName: "Leaver", color: "#2563EB" })
+    await expect(
+      leaver.mutation(api.games.leaveMyGame, { publicId: created.publicId }),
+    ).resolves.toMatchObject({ left: true })
+
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    expect(projection.players.map((player) => player.seat)).toEqual([1])
+    const next = await synced(t, "lobby-next", "Next")
+    await expect(
+      next.mutation(api.games.claimSeat, { token, displayName: "Next", color: "#112233" }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+    await expect(
+      leaver.query(api.games.lobbyProjection, { publicId: created.publicId }),
+    ).rejects.toThrow("Game unavailable")
+  })
+
   it("does not transfer lobby host authority and allows explicit lobby abandon", async () => {
     const t = convexTest(schema, modules)
     const { host, created } = await lobby(t)
