@@ -32,16 +32,17 @@ app (react-native-web via Expo) in a browser.
    and verify the process belongs to this worktree. Never kill another
    worktree's server; start on a free explicit port if needed.
 2. Otherwise start `pnpm web` from the repository root and wait for the
-   bundler. Do not start `convex dev`; test against whatever backend state
-   exists and note connected-play gaps in the report.
+   bundler. Do not start `convex dev`; it overwrites the shared development
+   deployment. Connected play uses that deployment as it is (see below).
 3. Open the app in the browser using the harness's browser automation
    (preview tools where available).
 4. Check the console for errors after load; record any that appear.
 
 Development identity:
 
-- Clerk test identity: `jane+clerk_test@sow.care`
-- Clerk development OTP: `424242`
+- Clerk test identities: `jane+clerk_test@sow.care`, `john+clerk_test@sow.care`
+- Clerk development OTP: `424242` (same for both)
+- Any `*+clerk_test@sow.care` address is a test account on the Clerk development instance.
 
 ## Establish the required app state
 
@@ -65,7 +66,7 @@ the Clerk publishable key is not a test key or the Convex deployment does not
 match the development configuration.
 
 When the affected flow requires authentication and a Clerk session already
-exists, confirm it belongs to `jane+clerk_test@sow.care`. If the identity cannot
+exists, confirm it belongs to a `*+clerk_test@sow.care` test account. If the identity cannot
 be confirmed or belongs to another account, stop and report the mismatch. Do
 not sign out, switch accounts, or treat that session as valid test evidence
 without separate approval.
@@ -89,9 +90,25 @@ affected flow needs:
 5. Refresh the page once. Confirm the Clerk session and current consent persist
    before navigating to the changed screen.
 
-The email address and fixed OTP work only with Clerk test mode. Never enable
+The test addresses and fixed OTP work only with Clerk test mode. Never enable
 Clerk test mode in production and never request or store a Clerk secret key in
 the client, repository, screenshots, or report.
+
+## Two players for connected play
+
+Connected play needs two signed-in players in browser contexts with separate
+storage. Use T3 preview tabs when available: `preview_open` with
+`reuseExistingTab=false`, keeping each returned `tabId` for every call.
+Otherwise use Playwright with one `browser.newContext()` per identity. Sign in
+`jane+clerk_test@sow.care` in one and `john+clerk_test@sow.care` in the other
+through the flow above.
+
+Both players use the shared development Convex deployment, which any
+worktree's `convex dev` can overwrite with older code. Check it matches this
+worktree's `convex/` before trusting results: function specs can match while
+the code is stale, so compare a call's behavior or `npx convex logs` stack
+lines instead. If it is stale, mark connected-play flows skipped and note the
+risk in the report. Do not redeploy it.
 
 ## Drive the flow
 
@@ -102,7 +119,7 @@ the client, repository, screenshots, or report.
 - For layout changes, check at desktop width and a phone-width viewport
   (~390px); Scryve web is often used at phone sizes.
 - Treat sign-in prompts as part of the flow under test. Use the development
-  test identity above when the flow requires authentication. If the configured
+  test identities above when the flow requires authentication. If the configured
   server is not a development Clerk and Convex environment, mark the flow
   skipped rather than working around auth.
 
@@ -159,7 +176,8 @@ actually saw.
   development instance and email-code sign-in is enabled. If they are missing,
   skip authenticated flows and record them as such. Do not switch to a personal
   account, production instance, or secret-bearing workaround.
-- **Connected-play screens fail:** expected without a Convex dev backend;
-  record as skipped, not failed.
+- **Connected-play screens fail:** confirm both tabs are signed in as
+  different test accounts and the dev deployment is current. If it is stale
+  or unreachable, record as skipped, not failed.
 - **Interaction has no effect:** check the console first — RN-web-only
   crashes often appear there before the UI visibly breaks.

@@ -33,7 +33,7 @@ Development identity:
 - Bundle identifier: `com.sowinghope.count.dev`
 - Clerk test identities: `jane+clerk_test@sow.care`, `john+clerk_test@sow.care`
 - Clerk development OTP: `424242` (same for both)
-- Any `*+clerk_test@sow.care` address is a test account on a development build.
+- Any `*+clerk_test@sow.care` address is a test account on the Clerk development instance.
 
 Bundle presence proves the variant, not native compatibility. An Expo
 fingerprint can prove that an EAS build matches this worktree's native runtime,
