@@ -12,5 +12,8 @@ reviews:
   allow_author_approval: false
   request_changes_workflow: true
   auto_review:
+    # why: every push spent a review, and agent fix rounds used up the per-account limit; ask with
+    # `@coderabbitai full review` once a PR's fixes are pushed.
+    auto_incremental_review: false
     # why: the default pauses reviews after 5 commits, which quietly blocks the merge gate.
     auto_pause_after_reviewed_commits: 0
