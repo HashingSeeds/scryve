@@ -27,8 +27,23 @@ const completedRun = (
   jobs: [{ name: jobNames[name], conclusion: job }],
 })
 
+const HEAD = "abcdef1234567890"
+const coderabbitStatus = (description, state = "success", login = "coderabbitai[bot]") => ({
+  context: "CodeRabbit",
+  state,
+  description,
+  creator: { login },
+})
+
 function pullRequest({
   body = "",
+  author = "mchisolm0",
+  crossRepository = false,
+  killSwitch = null,
+  statuses = [
+    coderabbitStatus("Review completed"),
+    coderabbitStatus("Review in progress", "pending"),
+  ],
   reviews = [],
   threads = [],
   comments = [],
@@ -47,11 +62,17 @@ function pullRequest({
     data: {
       repository: {
         pullRequest: {
-          headRefOid: "abcdef1234567890",
+          headRefOid: HEAD,
+          isCrossRepository: crossRepository,
+          author: { login: author },
           changedFiles,
           body,
           reviews: connection(
-            reviews.map(([login, state]) => ({ author: { login }, state })),
+            reviews.map(([login, state, oid = HEAD]) => ({
+              author: { login },
+              state,
+              commit: { oid },
+            })),
             "reviews",
           ),
           reviewThreads: connection(
@@ -79,7 +100,13 @@ function pullRequest({
       ? { filename: file }
       : { filename: file[1], previous_filename: file[0] },
   )
-  return toPullRequest(graphql, restFiles, runs, packageJsons)
+  return toPullRequest(graphql, {
+    restFiles,
+    workflowRuns: runs,
+    packageJsons,
+    statuses,
+    killSwitch,
+  })
 }
 
 const gates = (options) => evaluateGates(pullRequest(options))
@@ -231,6 +258,70 @@ test("a bot's requested changes stand until it approves, and its open threads bl
     { name: "CodeRabbit", ok: false, detail: "1 unresolved thread" },
   )
   assert.equal(gate({}, "Codex").detail, "no review")
+})
+
+test("CodeRabbit must finish a review of the head commit", () => {
+  const coderabbit = (statuses) => gate({ statuses }, "CodeRabbit")
+  assert.deepEqual(coderabbit(undefined), {
+    name: "CodeRabbit",
+    ok: true,
+    detail: "reviewed abcdef1",
+  })
+  assert.equal(coderabbit([]).detail, "has not reviewed abcdef1, comment `@coderabbitai review`")
+  assert.equal(
+    coderabbit([coderabbitStatus("Review in progress", "pending")]).detail,
+    "review in progress on abcdef1",
+  )
+  // why: #325 and #331 had success statuses with no review of the head commit behind them.
+  for (const description of [
+    "Review rate limited",
+    "Approve command performed: Comments resolved. Approval completed",
+  ]) {
+    assert.equal(
+      coderabbit([coderabbitStatus(description), coderabbitStatus("Review in progress", "pending")])
+        .detail,
+      `no completed review of abcdef1 (${description}), comment \`@coderabbitai review\``,
+    )
+  }
+  assert.equal(
+    coderabbit([coderabbitStatus("Review completed", "success", "mchisolm0")]).ok,
+    false,
+    "a CodeRabbit status posted by anyone but the app does not count",
+  )
+  assert.equal(
+    gate({ reviews: [["coderabbitai", "APPROVED"]] }, "CodeRabbit").detail,
+    "approved abcdef1",
+  )
+  assert.equal(
+    gate({ reviews: [["coderabbitai", "APPROVED", "0123456"]] }, "CodeRabbit").detail,
+    "reviewed abcdef1",
+  )
+})
+
+test("only same-repo PRs from allowlisted authors can land", () => {
+  assert.equal(gate({}, "Author").ok, true)
+  assert.equal(
+    gate({ crossRepository: true }, "Author").detail,
+    "opened from a fork, needs Matthew",
+  )
+  assert.equal(
+    gate({ author: "someone" }, "Author").detail,
+    "someone is not on the allowlist, needs Matthew",
+  )
+})
+
+test("lockfile, patch, and pnpm config changes need Matthew", () => {
+  assert.equal(gate({ files: ["src/app.tsx"] }, "Dependencies").ok, true)
+  assert.equal(
+    gate({ files: ["pnpm-lock.yaml", "patches/expo.patch"] }, "Dependencies").detail,
+    "pnpm-lock.yaml, patches/expo.patch changed, needs Matthew",
+  )
+})
+
+test("AGENT_LAND=off pauses every agent merge", () => {
+  assert.equal(ready({}), true)
+  assert.equal(ready({ killSwitch: "off" }), false)
+  assert.equal(gate({ killSwitch: "on" }, "Agent merges").ok, true)
 })
 
 test("more threads than one page cannot be verified, so the gate blocks", () => {

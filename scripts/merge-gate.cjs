@@ -1,7 +1,8 @@
 /**
  * why: intentionally local-only. Whoever lands a PR (the land skill, with its own gh auth) runs
- * `node scripts/merge-gate.cjs <pr> [--comment]`. A workflow that comments on fork PRs needs a
- * privileged trigger like pull_request_target, which is easy to make unsafe in a later edit.
+ * main's copy: `node scripts/merge-gate.cjs <pr> [--comment] [--merge]`. A workflow that comments
+ * on fork PRs needs a privileged trigger like pull_request_target, which is easy to make unsafe in
+ * a later edit. --merge squash-merges only the head commit the gates checked.
  */
 const { spawnSync } = require("node:child_process")
 const { isDeepStrictEqual } = require("node:util")
@@ -13,7 +14,8 @@ const FINGERPRINT_WORKFLOW = "native fingerprints"
 const MANDATORY_JOBS = { checks: "checks", [FINGERPRINT_WORKFLOW]: "check" }
 // why: changing what the checks run, or what feeds the fingerprint, could turn a failing PR green.
 const CI_CONFIG = [
-  /^\.github\/workflows\//,
+  /^\.github\//,
+  /^\.coderabbit\.ya?ml$/,
   /^scripts\/(?:merge-gate\.cjs|bundle-size\.cjs|bundle-size-budget\.json)$/,
   /(?:^|\/)[^/]*tsconfig[^/]*\.json$/,
   /(?:^|\/)(?:\.eslintrc[^/]*|eslint\.config\.[^/]+|\.eslintignore)$/,
@@ -26,11 +28,19 @@ const CI_CONFIG = [
 // why: mirrors the paths: trigger of fingerprints.yml, so keep the two in sync.
 const NATIVE_INPUT =
   /^(?:package\.json|pnpm-lock\.yaml|app\.json|app\.config\.ts|eas\.json|(?:patches|assets|modules)\/)/
-const REVIEWERS = {
-  CodeRabbit: "coderabbitai",
-  Codex: "chatgpt-codex-connector",
-  Macroscope: "macroscopeapp",
-}
+/**
+ * why: Convex bundles npm packages into production functions at merge, and beta.yml runs their
+ * install scripts in the job that holds the deploy key.
+ */
+const DEPENDENCIES = /^(?:pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.cjs|patches\/)/
+// why: the repo is public, so only same-repo PRs from these authors can land without Matthew.
+const AUTHORS = ["mchisolm0"]
+// why: the paid CodeRabbit plan reviews every PR, so its review is required; the others advise.
+const CODERABBIT = { login: "coderabbitai", app: "coderabbitai[bot]", context: "CodeRabbit" }
+const ADVISORY_REVIEWERS = { Codex: "chatgpt-codex-connector", Macroscope: "macroscopeapp" }
+// why: Matthew sets this repository variable to "off" to stop agent merges without a code change.
+const KILL_SWITCH = "AGENT_LAND"
+const LANDED_LABEL = "agent-landed"
 
 const QUERY = `
 query($owner: String!, $name: String!, $number: Int!) {
@@ -38,11 +48,13 @@ query($owner: String!, $name: String!, $number: Int!) {
     pullRequest(number: $number) {
       baseRefOid
       headRefOid
+      isCrossRepository
+      author { login }
       changedFiles
       body
       reviews(last: 100) {
         pageInfo { hasPreviousPage }
-        nodes { author { login } state }
+        nodes { author { login } state commit { oid } }
       }
       reviewThreads(first: 100) {
         pageInfo { hasNextPage }
@@ -107,7 +119,7 @@ function latestRuns(workflowRuns) {
   )
 }
 
-function toPullRequest(graphql, restFiles, workflowRuns, packageJsons) {
+function toPullRequest(graphql, { restFiles, workflowRuns, packageJsons, statuses, killSwitch }) {
   const pr = graphql.data.repository.pullRequest
   const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup
   const contexts = rollup?.contexts.nodes ?? []
@@ -121,6 +133,16 @@ function toPullRequest(graphql, restFiles, workflowRuns, packageJsons) {
   }
   return {
     headSha: pr.headRefOid,
+    author: pr.author?.login ?? null,
+    crossRepository: pr.isCrossRepository,
+    killSwitch,
+    // why: anyone with write access can post a "CodeRabbit" status, so only the app's own count.
+    coderabbitStatuses: statuses
+      .filter(
+        ({ context, creator }) =>
+          context === CODERABBIT.context && creator?.login === CODERABBIT.app,
+      )
+      .map(({ state, description }) => ({ state, description })),
     body: pr.body ?? "",
     truncated: Object.keys(pages).filter((key) => pages[key]),
     // why: a rename lists its old path only as previous_filename, and moving a file out of convex/ still changes convex/.
@@ -137,6 +159,7 @@ function toPullRequest(graphql, restFiles, workflowRuns, packageJsons) {
     reviews: pr.reviews.nodes.map((review) => ({
       author: review.author?.login,
       state: review.state,
+      commit: review.commit?.oid ?? null,
     })),
     threads: pr.reviewThreads.nodes.map((thread) => ({
       author: thread.comments.nodes[0]?.author?.login,
@@ -217,20 +240,73 @@ function checksGate(checks) {
   }
 }
 
-function reviewerGate(name, login, { reviews, threads }) {
+function reviewerProblems(login, { reviews, threads }) {
   const decisive = reviews
     .filter((review) => review.author === login && review.state !== "COMMENTED")
-    .at(-1)?.state
+    .at(-1)
   const unresolved = threads.filter((thread) => thread.author === login && !thread.isResolved)
-  const changesRequested = decisive === "CHANGES_REQUESTED"
-  const problems = [
-    changesRequested && "changes requested",
-    unresolved.length > 0 && `${plural(unresolved.length, "unresolved thread")}`,
-  ].filter(Boolean)
+  return {
+    decisive,
+    problems: [
+      decisive?.state === "CHANGES_REQUESTED" && "changes requested",
+      unresolved.length > 0 && `${plural(unresolved.length, "unresolved thread")}`,
+    ].filter(Boolean),
+  }
+}
+
+function advisoryReviewerGate(name, login, pr) {
+  const { decisive, problems } = reviewerProblems(login, pr)
   if (problems.length > 0) return { name, ok: false, detail: problems.join(", ") }
-  if (decisive === "APPROVED") return { name, ok: true, detail: "approved" }
-  const reviewed = reviews.some((review) => review.author === login)
+  if (decisive?.state === "APPROVED") return { name, ok: true, detail: "approved" }
+  const reviewed = pr.reviews.some((review) => review.author === login)
   return { name, ok: true, detail: reviewed ? "reviewed, threads resolved" : "no review" }
+}
+
+/**
+ * why: CodeRabbit's status reads success when it was rate limited, and `@coderabbitai resolve`
+ * approves a commit it never read. Only its "Review completed" status on the head commit means
+ * it reviewed the code being merged.
+ */
+function coderabbitGate(pr) {
+  const name = "CodeRabbit"
+  const head = pr.headSha.slice(0, 7)
+  const latest = pr.coderabbitStatuses[0]
+  const { decisive, problems } = reviewerProblems(CODERABBIT.login, pr)
+  if (!latest) problems.push(`has not reviewed ${head}, comment \`@coderabbitai review\``)
+  else if (latest.state === "pending")
+    problems.push(`${latest.description.toLowerCase()} on ${head}`)
+  else if (!pr.coderabbitStatuses.some(({ description }) => description === "Review completed"))
+    problems.push(
+      `no completed review of ${head} (${latest.description}), comment \`@coderabbitai review\``,
+    )
+  if (problems.length > 0) return { name, ok: false, detail: problems.join(", ") }
+  const approved = decisive?.state === "APPROVED" && decisive.commit === pr.headSha
+  return { name, ok: true, detail: `${approved ? "approved" : "reviewed"} ${head}` }
+}
+
+function authorGate({ author, crossRepository }) {
+  const name = "Author"
+  if (crossRepository) return { name, ok: false, detail: "opened from a fork, needs Matthew" }
+  return AUTHORS.includes(author)
+    ? { name, ok: true, detail: `${author}, same repository` }
+    : {
+        name,
+        ok: false,
+        detail: `${author ?? "unknown author"} is not on the allowlist, needs Matthew`,
+      }
+}
+
+function dependencyGate(files) {
+  const changed = files.filter((file) => DEPENDENCIES.test(file))
+  return changed.length > 0
+    ? { name: "Dependencies", ok: false, detail: `${changed.join(", ")} changed, needs Matthew` }
+    : { name: "Dependencies", ok: true, detail: "no lockfile, patch, or pnpm config changes" }
+}
+
+function killSwitchGate(killSwitch) {
+  return killSwitch === "off"
+    ? { name: "Agent merges", ok: false, detail: `paused by Matthew (${KILL_SWITCH}=off)` }
+    : { name: "Agent merges", ok: true, detail: "allowed" }
 }
 
 function convexGate(files) {
@@ -309,11 +385,17 @@ function ciConfigGate({ files, packageScriptsChanged }) {
 
 function evaluateGates(pr) {
   return [
+    killSwitchGate(pr.killSwitch),
+    authorGate(pr),
     completenessGate(pr.truncated),
     workflowsGate(pr),
     checksGate(pr.checks),
-    ...Object.entries(REVIEWERS).map(([name, login]) => reviewerGate(name, login, pr)),
+    coderabbitGate(pr),
+    ...Object.entries(ADVISORY_REVIEWERS).map(([name, login]) =>
+      advisoryReviewerGate(name, login, pr),
+    ),
     convexGate(pr.files),
+    dependencyGate(pr.files),
     ciConfigGate(pr),
     fingerprintGate(pr),
     evidenceGate(pr),
@@ -336,9 +418,10 @@ function renderSummary(gates, headSha) {
   ].join("\n")
 }
 
-function gh(args, input) {
+function gh(args, input, { allowNotFound = false } = {}) {
   const result = spawnSync("gh", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 })
   if (result.error) throw result.error
+  if (result.status !== 0 && allowNotFound && result.stderr.includes("HTTP 404")) return null
   if (result.status !== 0)
     throw new Error(`gh ${args.slice(0, 2).join(" ")} failed: ${result.stderr.trim()}`)
   return result.stdout
@@ -385,7 +468,20 @@ function fetchPullRequest(number) {
   const packageJsons = files.some((file) => file.filename === "package.json")
     ? { base: packageJsonAt(baseRefOid), head: packageJsonAt(headSha) }
     : null
-  return toPullRequest(graphql, files, workflowRuns, packageJsons)
+  // why: newest first, so the first CodeRabbit entry is its current state for this commit.
+  const statuses = pages(`repos/{owner}/{repo}/commits/${headSha}/statuses?per_page=100`).flat()
+  const killSwitch = gh(
+    ["api", `repos/{owner}/{repo}/actions/variables/${KILL_SWITCH}`, "--jq", ".value"],
+    undefined,
+    { allowNotFound: true },
+  )?.trim()
+  return toPullRequest(graphql, {
+    restFiles: files,
+    workflowRuns,
+    packageJsons,
+    statuses,
+    killSwitch: killSwitch ?? null,
+  })
 }
 
 /** why: a push while the gate ran would make the summary stale, so it writes nothing and fails instead. */
@@ -418,10 +514,27 @@ function upsertComment(number, body, headSha) {
   return true
 }
 
+/**
+ * why: --match-head-commit makes GitHub refuse the merge if anyone pushed after the gates ran.
+ * No --delete-branch: the repo deletes merged branches and retargets stacked PRs, while gh's
+ * flag closed the stacked #311.
+ */
+function merge(number, headSha) {
+  gh(
+    ["api", "-X", "POST", `repos/{owner}/{repo}/issues/${number}/labels`, "--input", "-"],
+    JSON.stringify({ labels: [LANDED_LABEL] }),
+  )
+  gh(["pr", "merge", number, "--squash", "--match-head-commit", headSha])
+  console.log(`Merged #${number} at ${headSha}.`)
+}
+
 function main() {
-  const [number, flag] = process.argv.slice(2)
-  if (!/^\d+$/.test(number ?? "") || (flag !== undefined && flag !== "--comment")) {
-    console.error("Usage: node scripts/merge-gate.cjs <pr> [--comment]")
+  const [number, ...flags] = process.argv.slice(2)
+  if (
+    !/^\d+$/.test(number ?? "") ||
+    flags.some((flag) => !["--comment", "--merge"].includes(flag))
+  ) {
+    console.error("Usage: node scripts/merge-gate.cjs <pr> [--comment] [--merge]")
     process.exitCode = 2
     return
   }
@@ -429,10 +542,18 @@ function main() {
   const gates = evaluateGates(pr)
   const summary = renderSummary(gates, pr.headSha)
   console.log(summary)
-  const written = flag !== "--comment" || upsertComment(number, summary, pr.headSha)
-  if (!written || gates.some((gate) => !gate.ok)) process.exitCode = 1
+  const ready = gates.every((gate) => gate.ok)
+  // why: a merge always leaves the gate table on the PR as its audit record.
+  const comment = flags.includes("--comment") || flags.includes("--merge")
+  const written = !comment || upsertComment(number, summary, pr.headSha)
+  if (!written || !ready) {
+    process.exitCode = 1
+    return
+  }
+  if (flags.includes("--merge")) merge(number, pr.headSha)
 }
 
-if (require.main === module) main()
+// why: land pipes main's copy in (`node - <pr>`), where require.main is unset.
+if (require.main === module || module.id === "[stdin]") main()
 
 module.exports = { evaluateGates, renderSummary, toPullRequest }
