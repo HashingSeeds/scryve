@@ -311,13 +311,12 @@ function DeckDetailContent({
   const [tab, setTab] = useState<"cards" | "notes">("cards")
   const [statsSource, setStatsSource] = useState<StatsSource>("scryve")
   const [draft, setDraftState] = useState(closedDeckDraft)
-  // why: search taps can land before a re-render, so limit checks must read the newest draft.
+  // why: search taps can land before a re-render, so limit checks read this ref, which every draft write updates first.
   const latestDraft = useRef(draft)
-  latestDraft.current = draft
-  function setDraft(update: DeckDraft | ((current: DeckDraft) => DeckDraft)) {
+  const setDraft = useCallback((update: DeckDraft | ((current: DeckDraft) => DeckDraft)) => {
     latestDraft.current = typeof update === "function" ? update(latestDraft.current) : update
     setDraftState(latestDraft.current)
-  }
+  }, [])
   const [dialog, setDialog] = useState<DeckDialog>("none")
   const [pendingNavigation, setPendingNavigation] =
     useState<Parameters<typeof navigation.dispatch>[0]>()
@@ -382,8 +381,8 @@ function DeckDetailContent({
   const { displayCards } = view
   useEffect(() => {
     if (!draft.editing || !draft.fromCache || detail === undefined) return
-    setDraftState((current) => reseedDeckDraft(current, displayCards))
-  }, [detail, displayCards, draft.editing, draft.fromCache])
+    setDraft((current) => reseedDeckDraft(current, displayCards))
+  }, [detail, displayCards, draft.editing, draft.fromCache, setDraft])
 
   // Keeps the persistent cache fresh with live reads so the next offline session is current.
   useEffect(() => {

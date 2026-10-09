@@ -414,9 +414,8 @@ export function AddDeckScreen({
   const linkSource = DECK_LINK_SOURCES.get(game)
   const importSource = importKind === "link" ? deckLink : deckList
   const [pastedDraft, setPastedDraftState] = useState<PastedDraft>()
-  // why: search taps can land before a re-render, so import edits must read the newest draft.
+  // why: search taps can land before a re-render, so import edits read this ref, which every draft write updates first.
   const latestPastedDraft = useRef(pastedDraft)
-  latestPastedDraft.current = pastedDraft
   function setPastedDraft(next: PastedDraft | undefined) {
     latestPastedDraft.current = next
     setPastedDraftState(next)

@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native"
 
 import { clearCardDetails, saveCardDetails } from "@/features/decks/cardDetailsCache"
+import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { cardDetailsKey } from "@/features/decks/deckCards"
 import { colors } from "@/theme/colors"
 import { ThemeProvider } from "@/theme/context"
@@ -787,6 +788,42 @@ describe("DeckDetailScreen", () => {
     expect(view.queryByText("Unsaved changes")).toBeNull()
     expect(view.getByTestId("save-version-button")).toBeDisabled()
     expect(mockSaveVersion).not.toHaveBeenCalled()
+  })
+
+  it("adds on top of the re-seeded live list after reconnect", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    const screen = (ready: boolean) => (
+      <ThemeProvider initialContext="light">
+        <DeckDetailScreen
+          deckId="deck-1"
+          onBack={jest.fn()}
+          access={{ ready, loading: false, signedIn: true, ownerId: "owner-a", request: jest.fn() }}
+        />
+      </ThemeProvider>
+    )
+    const view = render(screen(false))
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    mockDetail.value = loadedDetail
+    view.rerender(screen(true))
+
+    fireEvent.press(view.getByTestId("deck-add-cards"))
+    act(() => {
+      expect(
+        view.UNSAFE_getByType(CardSearchScreen).props.onAdd({
+          name: "Arcane Signet",
+          scryfallId: "arcane-signet",
+          quantity: 1,
+          board: "main",
+        }),
+      ).toBeUndefined()
+    })
+    fireEvent.press(view.getByText("Done"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+
+    const queued = mockVersionCardUpdate.mock.calls[0][2] as Array<Record<string, unknown>>
+    expect(queued.map((card) => card.name)).toEqual(["Sol Ring", "Arcane Signet"])
   })
 
   it("adds an offline cache-known card through the offline search results", () => {
