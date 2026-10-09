@@ -1051,6 +1051,7 @@ describe("AddDeckScreen", () => {
     expect(mockConvexClient.action).toHaveBeenCalledWith("cards.search", {
       game: "mtg",
       query: "Sol Ring",
+      deviceId: expect.any(String),
     })
     fireEvent.press(view.getByLabelText("Add Sol Ring to deck"))
     fireEvent.press(view.getByLabelText("Add Sol Ring to deck"))
@@ -1277,11 +1278,19 @@ describe("AddDeckScreen", () => {
     expect(mockCardById).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("import-card-main-1"))
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
-    expect(mockCardById).toHaveBeenCalledWith({ scryfallId: secondId })
+    expect(mockCardById).toHaveBeenCalledWith({
+      scryfallId: secondId,
+      deviceId: expect.any(String),
+    })
     expect(mockCardById).toHaveBeenCalledTimes(1)
     fireEvent.press(view.getByText("Close"))
     fireEvent.press(view.getByTestId("import-card-main-0"))
-    await waitFor(() => expect(mockCardById).toHaveBeenCalledWith({ scryfallId: firstId }))
+    await waitFor(() =>
+      expect(mockCardById).toHaveBeenCalledWith({
+        scryfallId: firstId,
+        deviceId: expect.any(String),
+      }),
+    )
     fireEvent.press(view.getByText("Close"))
     fireEvent.press(view.getByTestId("import-card-main-1"))
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
@@ -1321,7 +1330,11 @@ describe("AddDeckScreen", () => {
     expect(mockCatalogCardById).not.toHaveBeenCalled()
     fireEvent.press(view.getByTestId("import-card-main-0"))
     await waitFor(() => expect(view.getByText("Effect Monster")).toBeTruthy())
-    expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
+    expect(mockCatalogCardById).toHaveBeenCalledWith({
+      game: "ygo",
+      cardId: "14558127",
+      deviceId: expect.any(String),
+    })
     expect(mockCardById).not.toHaveBeenCalled()
     expect(mockImport).not.toHaveBeenCalled()
   })
@@ -1351,6 +1364,7 @@ describe("AddDeckScreen", () => {
     expect(mockPokemonCardByReference).toHaveBeenCalledWith({
       name: "Riolu",
       originalReference: "MEG 76",
+      deviceId: expect.any(String),
     })
     fireEvent.press(view.getByText("Close"))
     expect(view.getByTestId("import-card-thumbnail-main-0").props.source).toEqual([
@@ -1995,6 +2009,7 @@ describe("AddDeckScreen", () => {
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
     expect(mockCardById).toHaveBeenCalledWith({
       scryfallId: "22222222-2222-2222-2222-222222222222",
+      deviceId: expect.any(String),
     })
     expect(view.getByText("Legendary Creature — Merfolk Scout")).toBeTruthy()
     expect(view.queryByTestId("card-focus-increment")).toBeNull()
@@ -2175,7 +2190,11 @@ describe("AddDeckScreen", () => {
     expect(view.getByTestId("card-focus-dialog")).toBeTruthy()
     expect(view.getByText("Ash Blossom & Joyous Spring")).toBeTruthy()
     await waitFor(() => expect(view.getByText("Effect Monster")).toBeTruthy())
-    expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
+    expect(mockCatalogCardById).toHaveBeenCalledWith({
+      game: "ygo",
+      cardId: "14558127",
+      deviceId: expect.any(String),
+    })
   })
 
   it("resolves a Pokemon Top Deck card from its provider reference", async () => {
@@ -2220,6 +2239,7 @@ describe("AddDeckScreen", () => {
     expect(mockPokemonCardByReference).toHaveBeenCalledWith({
       name: "Riolu",
       originalReference: "MEG 76",
+      deviceId: expect.any(String),
     })
     fireEvent.press(view.getByText("Close"))
     expect(view.getByTestId("catalog-card-thumbnail-catalog-card-riolu").props.source).toEqual([
