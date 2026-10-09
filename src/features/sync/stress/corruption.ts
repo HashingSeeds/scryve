@@ -108,10 +108,14 @@ export function corrupt(
 const typeLabel = (value: unknown) =>
   value === null ? "null" : Array.isArray(value) ? "array" : typeof value
 
-export function flatShape(value: unknown, depth = 2, prefix = ""): Map<string, string> {
+export function flatShape(value: unknown, depth = 4, prefix = ""): Map<string, string> {
   const shape = new Map<string, string>()
-  if (!isRecord(value)) return shape
-  for (const [key, child] of Object.entries(value)) {
+  const entries = Array.isArray(value)
+    ? value.slice(0, 3).map((item, index): [string, unknown] => [String(index), item])
+    : isRecord(value)
+      ? Object.entries(value)
+      : []
+  for (const [key, child] of entries) {
     shape.set(prefix + key, typeLabel(child))
     if (depth > 1)
       for (const entry of flatShape(child, depth - 1, `${prefix}${key}.`)) shape.set(...entry)

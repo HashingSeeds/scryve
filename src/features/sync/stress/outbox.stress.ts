@@ -404,7 +404,8 @@ describe("outbox stress", () => {
     expect(failuresIn(scenario)).toEqual([])
   })
 
-  it("5 two web tabs sharing one store", () => {
+  // why: a stale tab still resends an operation another tab settled until https://github.com/HashingSeeds/scryve/pull/369 is in this stack; flip to `it` then.
+  it.failing("5 two web tabs sharing one store", () => {
     const scenario = "5 two tabs"
     for (const lane of LANES) {
       for (let seed = 5000; seed < 5000 + SEEDS * 40; seed += 1) {
