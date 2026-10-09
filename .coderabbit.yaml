@@ -1,5 +1,6 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# Keys not set here fall back to the CodeRabbit dashboard settings.
+# Keys not set here come from the next config level up (central or organization settings)
+# instead of CodeRabbit's defaults, as far as each level also enables inheritance.
 inheritance: true
 reviews:
   # why: scripts/merge-gate.cjs reads the "CodeRabbit" commit status, so keep that surface.
