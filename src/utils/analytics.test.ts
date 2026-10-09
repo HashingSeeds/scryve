@@ -177,3 +177,33 @@ it("allowlists completion entry points without adding them to game starts", () =
     "end_source",
   )
 })
+
+it("sends only timed sync events, with consent, as sync_timing", async () => {
+  jest.useFakeTimers()
+  global.fetch = fetchMock
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue({ status: 200, text: async () => "{}", json: async () => ({}) })
+  process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-key"
+  process.env.EXPO_PUBLIC_POSTHOG_HOST = "https://analytics.invalid"
+  await jest.isolateModulesAsync(async () => {
+    const analytics: typeof import("./analytics") = require("./analytics")
+    require("@/utils/storage").storage.clearAll()
+    const events = [
+      { name: "mutation.ack", at: 1, metadata: { durationMs: 120.4, attemptCount: 2 } },
+      { name: "join.completed", at: 2, metadata: { outcome: "success" } },
+      { name: "outbox.drain", at: 3, metadata: { durationMs: 5 } },
+    ] as const
+    analytics.syncTimingSink.send(events)
+    await tick(31_000)
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    analytics.setAnalyticsEnabled(true, "settings")
+    analytics.syncTimingSink.send(events)
+    await tick(31_000)
+    const body = fetchMock.mock.calls.map(([, options]) => String(options.body)).join("")
+    expect(body.match(/"event":"sync_timing"/g)).toHaveLength(1)
+    expect(body).toContain('"timing":"mutation.ack","duration_ms":120,"attempt_count":2')
+    analytics.setAnalyticsEnabled(false)
+    await tick()
+  })
+})

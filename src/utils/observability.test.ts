@@ -11,6 +11,14 @@ jest.mock("@sentry/react-native", () => ({
   mobileReplayIntegration: jest.fn(() => ({ type: "mobileReplay" })),
   browserReplayIntegration: jest.fn(() => ({ type: "browserReplay" })),
   feedbackIntegration: jest.fn(() => ({ type: "feedback" })),
+  reactNativeTracingIntegration: jest.fn(() => ({ type: "tracing" })),
+  reactNavigationIntegration: jest.fn(() => ({ type: "navigation" })),
+}))
+
+const mockSyncTimingSend = jest.fn()
+
+jest.mock("@/utils/analytics", () => ({
+  syncTimingSink: { send: (events: unknown) => mockSyncTimingSend(events) },
 }))
 
 const mockUpdatesState = {
@@ -49,6 +57,7 @@ jest.mock("expo-constants", () => ({
 
 describe("observability initialization", () => {
   beforeEach(() => {
+    jest.useFakeTimers()
     jest.clearAllMocks()
     mockExpoConfig.extra = {}
     mockUpdatesState.updateId = "test-update-id"
@@ -58,31 +67,39 @@ describe("observability initialization", () => {
   })
 
   afterEach(() => {
+    jest.clearAllTimers()
+    jest.useRealTimers()
     jest.restoreAllMocks()
     setTelemetryAdapter()
   })
 
   it.each([
-    ["ios", 0],
-    ["android", 1],
-    ["web", 1],
-  ] as const)("configures error replay for %s", (platform, errorReplaySampleRate) => {
-    jest.replaceProperty(Platform, "OS", platform)
-    initObservability()
+    ["ios", 0, 0.2],
+    ["android", 1, 0.2],
+    ["web", 1, undefined],
+  ] as const)(
+    "configures replay and tracing for %s",
+    (platform, errorReplaySampleRate, tracesSampleRate) => {
+      jest.replaceProperty(Platform, "OS", platform)
+      initObservability()
 
-    expect(Sentry.init).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sendDefaultPii: false,
-        enableLogs: false,
-        replaysSessionSampleRate: 0,
-        replaysOnErrorSampleRate: errorReplaySampleRate,
-        integrations: [
-          { type: platform === "web" ? "browserReplay" : "mobileReplay" },
-          { type: "feedback" },
-        ],
-      }),
-    )
-  })
+      expect(Sentry.init).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sendDefaultPii: false,
+          enableLogs: false,
+          replaysSessionSampleRate: 0,
+          replaysOnErrorSampleRate: errorReplaySampleRate,
+          tracesSampleRate,
+          integrations: [
+            { type: platform === "web" ? "browserReplay" : "mobileReplay" },
+            { type: "tracing" },
+            { type: "navigation" },
+            { type: "feedback" },
+          ],
+        }),
+      )
+    },
+  )
 
   it.each([
     ["production", "production", "production"],
@@ -141,13 +158,27 @@ describe("observability initialization", () => {
     })
   })
 
-  it("includes both mobileReplayIntegration and feedbackIntegration", () => {
+  it("traces launch and navigation without request spans", () => {
     initObservability()
 
-    const callArgs = (Sentry.init as jest.Mock).mock.calls[0][0]
-    expect(callArgs.integrations).toHaveLength(2)
-    expect(callArgs.integrations[0].type).toBe("mobileReplay")
-    expect(callArgs.integrations[1].type).toBe("feedback")
+    expect(Sentry.reactNativeTracingIntegration).toHaveBeenCalledWith({
+      traceFetch: false,
+      traceXHR: false,
+    })
+  })
+
+  it("batches sync timings to the analytics sink", async () => {
+    initObservability()
+
+    emitTelemetry("join.completed", { durationMs: 840, outcome: "success" })
+    await jest.advanceTimersByTimeAsync(30_000)
+
+    expect(mockSyncTimingSend).toHaveBeenCalledWith([
+      expect.objectContaining({
+        name: "join.completed",
+        metadata: { durationMs: 840, outcome: "success" },
+      }),
+    ])
   })
 
   it("sets release correlation tags from expo-updates", () => {

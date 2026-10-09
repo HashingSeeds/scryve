@@ -2,8 +2,14 @@ import "react-native-url-polyfill/auto"
 
 import { useCallback, useEffect, useState } from "react"
 import { AppMetrics, ObserveRoot } from "expo-observe"
-import { SplashScreen, Stack, type ErrorBoundaryProps } from "expo-router"
+import {
+  SplashScreen,
+  Stack,
+  useNavigationContainerRef,
+  type ErrorBoundaryProps,
+} from "expo-router"
 import { setOptions as setSplashScreenOptions } from "expo-splash-screen"
+import * as Sentry from "@sentry/react-native"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context"
 
@@ -18,7 +24,7 @@ import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
 import { ThemeProvider } from "@/theme/context"
 import { initAnalytics } from "@/utils/analytics"
 import { reportCrash } from "@/utils/crashReporting"
-import { initObservability } from "@/utils/observability"
+import { initObservability, navigationTracing } from "@/utils/observability"
 
 initObservability()
 
@@ -48,6 +54,11 @@ function Root() {
   const [isConsentResolved, setIsConsentResolved] = useState(false)
   const resolveConsent = useCallback(() => setIsConsentResolved(true), [])
   const ready = useLaunchReadiness(isConsentResolved)
+  const navigationRef = useNavigationContainerRef()
+
+  useEffect(() => {
+    navigationTracing.registerNavigationContainer(navigationRef)
+  }, [navigationRef])
 
   useEffect(() => {
     if (ready && isConsentResolved) {
@@ -91,4 +102,4 @@ function Root() {
   )
 }
 
-export default ObserveRoot.wrap(Root)
+export default Sentry.wrap(ObserveRoot.wrap(Root))
