@@ -35,6 +35,7 @@ import type * as lib_deckSources from "../lib/deckSources.js";
 import type * as lib_deckSync from "../lib/deckSync.js";
 import type * as lib_deckVersions from "../lib/deckVersions.js";
 import type * as lib_entitlements from "../lib/entitlements.js";
+import type * as lib_gameRateLimits from "../lib/gameRateLimits.js";
 import type * as lib_gameWriteErrors from "../lib/gameWriteErrors.js";
 import type * as lib_games_archidekt from "../lib/games/archidekt.js";
 import type * as lib_games_cards from "../lib/games/cards.js";
@@ -93,6 +94,7 @@ declare const fullApi: ApiFromModules<{
   "lib/deckSync": typeof lib_deckSync;
   "lib/deckVersions": typeof lib_deckVersions;
   "lib/entitlements": typeof lib_entitlements;
+  "lib/gameRateLimits": typeof lib_gameRateLimits;
   "lib/gameWriteErrors": typeof lib_gameWriteErrors;
   "lib/games/archidekt": typeof lib_games_archidekt;
   "lib/games/cards": typeof lib_games_cards;

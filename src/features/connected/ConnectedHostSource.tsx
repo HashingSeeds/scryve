@@ -16,6 +16,7 @@ import { LocalGameRepository } from "@/features/game/localPersistence"
 import { NO_PLAY_SYSTEM } from "@/features/game/playSystems"
 import type { ConnectedHostFeed } from "@/screens/NewGameScreen"
 import { captureAnalytics } from "@/utils/analytics"
+import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../../convex/_generated/api"
 import { PLAYER_COLOR_CHOICES } from "../../../convex/lib/appearance"
@@ -186,7 +187,12 @@ function ConnectedHostQuerySource({
           stage: "failed",
           reason: "request",
         })
-      setHostError(cause instanceof Error ? cause.message : "Could not create lobby")
+      setHostError(
+        convexErrorMessage(
+          cause,
+          cause instanceof Error ? cause.message : "Could not create lobby",
+        ),
+      )
     } finally {
       setBusy(false)
     }

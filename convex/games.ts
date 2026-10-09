@@ -18,6 +18,7 @@ import {
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
+import { limitGameRate } from "./lib/gameRateLimits"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
@@ -640,6 +641,7 @@ export const createLobby = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    await limitGameRate(ctx, "lobbyCreate", user._id)
     if (args.game !== undefined && args.system !== undefined && args.game !== args.system)
       throw new Error("Game system fields must match")
     const noSystem = (args.system ?? args.game) === NO_GAME_SYSTEM
@@ -1042,6 +1044,7 @@ export const publishLocalGame = mutation({
         players: receipt.players,
       }
     }
+    await limitGameRate(ctx, "lobbyCreate", user._id)
     await clearWayToHost(ctx, user._id)
     if (
       await ctx.db
@@ -1572,7 +1575,8 @@ export const setMyAppearance = mutation({
     assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
     const game = await gameByPublicId(ctx, args.publicId)
     if (game.status !== "lobby") throw new Error("Appearance can only change in a lobby")
-    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
+    const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
+    await limitGameRate(ctx, "gameWrite", user._id)
     const players = await playersForGame(ctx, game._id)
     const requested = { color: args.color.toUpperCase(), shape: args.shape as PlayerMarkShape }
     if (appearanceIsTaken(takenAppearances(players, player._id), requested))
@@ -1591,7 +1595,8 @@ export const updateLobbySettings = mutation({
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    await requireHost(ctx, game)
+    const host = await requireHost(ctx, game)
+    await limitGameRate(ctx, "gameWrite", host._id)
     if (game.status !== "lobby")
       throw new ConvexError({
         code: "lobby_settings_not_allowed",
@@ -1671,7 +1676,8 @@ export const updateMySeat = mutation({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     if (game.status !== "lobby") throw new Error("Seat metadata can only change in the lobby")
-    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
+    const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
+    await limitGameRate(ctx, "gameWrite", user._id)
     const displayName = assertDisplayName(args.displayName)
     assertAllowedColor(args.color)
     const color = args.color.toUpperCase()
@@ -1703,7 +1709,8 @@ export const rotateInvite = mutation({
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    await requireHost(ctx, game)
+    const host = await requireHost(ctx, game)
+    await limitGameRate(ctx, "gameWrite", host._id)
     if (game.status !== "lobby" && game.status !== "active")
       throw new Error("Only a lobby or active game invite can be rotated")
     assertInviteToken(args.inviteToken)
@@ -1779,6 +1786,7 @@ export const changeLife = mutation({
         deduplicated: true,
       }
     }
+    await limitGameRate(ctx, "gameWrite", user._id)
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const now = Date.now()
@@ -1909,6 +1917,7 @@ export const submitCommanderDamage = mutation({
       )
       .unique()
     if (eventWithOperation) throw syncOperationMismatch()
+    await limitGameRate(ctx, "gameWrite", user._id)
 
     const pair = await ctx.db
       .query("gameCommanderDamage")
@@ -2089,6 +2098,7 @@ async function resolveCommanderClaim(
         : {}),
     }
   }
+  await limitGameRate(ctx, "gameWrite", user._id)
   if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
   const now = Date.now()

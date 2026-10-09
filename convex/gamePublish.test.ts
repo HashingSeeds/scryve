@@ -1,20 +1,12 @@
-import { convexTest } from "convex-test"
-
+import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api } from "./_generated/api"
-import schema from "./schema"
 
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 const token = "t".repeat(43)
 
 const hostDevice = "device-host-0001"
 const joinerDevice = "device-joiner-0002"
 
-async function signedIn(t: ReturnType<typeof convexTest>, subject: string, name: string) {
+async function signedIn(t: ConvexTestHarness, subject: string, name: string) {
   const actor = t.withIdentity({ subject })
   await actor.mutation(api.users.syncCurrent, { displayName: name })
   return actor
@@ -55,10 +47,7 @@ function snapshotArgs(overrides: Partial<typeof baseSnapshot> = {}) {
   return { ...baseSnapshot, ...overrides }
 }
 
-async function published(
-  t: ReturnType<typeof convexTest>,
-  overrides: Partial<typeof baseSnapshot> = {},
-) {
+async function published(t: ConvexTestHarness, overrides: Partial<typeof baseSnapshot> = {}) {
   const host = await signedIn(t, "host-subject", "Host")
   const created = await host.mutation(api.games.publishLocalGame, snapshotArgs(overrides))
   return { host, created }
@@ -66,14 +55,14 @@ async function published(
 
 describe("publishLocalGame", () => {
   it("requires authentication", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await expect(t.mutation(api.games.publishLocalGame, snapshotArgs())).rejects.toThrow(
       "Authentication required",
     )
   })
 
   it("preserves the full local snapshot state and returns the exact seat mapping", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t)
     expect(created.players).toEqual([
       { localId: "local-host-player", seat: 1, playerId: created.players[0].playerId },
@@ -131,7 +120,7 @@ describe("publishLocalGame", () => {
   })
 
   it("retries the same immutable payload idempotently and rejects a mismatched reuse", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t)
     await expect(host.mutation(api.games.publishLocalGame, snapshotArgs())).resolves.toEqual(
       created,
@@ -147,7 +136,7 @@ describe("publishLocalGame", () => {
   })
 
   it("enforces host capacity and public id collisions like createLobby", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t)
     await expect(
       host.mutation(
@@ -171,7 +160,7 @@ describe("publishLocalGame", () => {
   })
 
   it("validates snapshot trust boundaries before any write", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = await signedIn(t, "host-subject", "Host")
     await expect(
       host.mutation(
@@ -218,7 +207,7 @@ describe("publishLocalGame", () => {
 
 describe("claiming an imported seat through claimSeat", () => {
   it("claims an unclaimed imported seat without resetting state and transfers authority", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     await expect(
@@ -277,7 +266,7 @@ describe("claiming an imported seat through claimSeat", () => {
   })
 
   it("keeps unclaimed imported seats under host control", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t)
     await host.mutation(api.games.changeLife, {
       publicId: created.publicId,
@@ -296,7 +285,7 @@ describe("claiming an imported seat through claimSeat", () => {
   })
 
   it("shows other players the seat label for a guest name that fails the name filter", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t, {
       players: [
         ...baseSnapshot.players,
@@ -325,7 +314,7 @@ describe("claiming an imported seat through claimSeat", () => {
   })
 
   it("rejects strangers, stale invites, claimed seats, and never touches normal connected games", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t)
     const guestTwo = await signedIn(t, "guest-two-subject", "GuestTwo")
     await guestTwo.mutation(api.games.claimSeat, {
@@ -399,7 +388,7 @@ describe("claiming an imported seat through claimSeat", () => {
 
 describe("imported game invite renewal and discovery", () => {
   it("rotates the invite on an active imported game and rejects the revoked token", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t)
     const renewed = await host.mutation(api.games.rotateInvite, {
       publicId: created.publicId,
@@ -429,7 +418,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("discovers unclaimed seats without identity data and enforces boundaries", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     await expect(
@@ -451,7 +440,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("leaves seat lookups out of the join rate-limit budget", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     for (let index = 0; index < 15; index += 1) {
@@ -469,7 +458,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("reports a lobby as having nothing to choose so joining stays one step", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = await signedIn(t, "lobby-host-subject", "LobbyHost")
     const created = await host.mutation(api.games.createLobby, {
       publicId: "plain-lobby-id-000001",
@@ -488,7 +477,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("discovers and claims using only the invite payload, then the returned publicId", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     const byCode = await guest.mutation(api.games.claimableSeats, {
@@ -525,7 +514,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("blocks blocked invitees from seat discovery and claiming", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     const hostUser = await t.run((ctx) =>
@@ -559,7 +548,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("restores the legacy no-username display fallback for owned seats", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const legacyHost = await signedIn(t, "legacy-host-subject", "LegacyHost")
     const legacy = await legacyHost.mutation(api.games.createLobby, {
       publicId: "legacy-fallback-id-0001",
@@ -578,7 +567,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("rejects a second imported seat even from a different device", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await published(t, {
       players: [
         ...baseSnapshot.players,
@@ -608,7 +597,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("does not bypass authorization when a pre-claim operation is retried after a claim", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t)
     const write = {
       publicId: created.publicId,
@@ -638,7 +627,7 @@ describe("imported game invite renewal and discovery", () => {
 
 describe("published player appearances", () => {
   it("resolves duplicate colors and shapes while preserving seats, life, and retries", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const args = snapshotArgs({
       players: baseSnapshot.players.map((player) => ({
         ...player,
@@ -662,7 +651,7 @@ describe("published player appearances", () => {
   })
 
   it("maps new local marks to distinct marks supported by installed clients", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await published(t, {
       players: baseSnapshot.players.map((player, index) => ({
         ...player,

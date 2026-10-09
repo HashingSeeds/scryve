@@ -29,7 +29,8 @@ Play
 Failure
   --drop-every off         drop each bot's socket this often; changes queue and replay
   --drop-for 5s            how long each drop lasts
-  --burst 1                life changes per tick, sent at once
+  --burst 1                life changes per tick, sent at once (the server allows
+                           60 at once, then 5/s per bot; the rest come back rate_limited)
   --duplicate              send every change twice with the same operation id
 
 Target
