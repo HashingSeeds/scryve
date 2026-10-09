@@ -315,6 +315,19 @@ export function isEliminatedByCommanderDamage(game: LocalGame, playerId: PlayerI
   )
 }
 
+/** why: Pokémon counts Prize cards down, so reaching zero wins and knocks out everyone else. */
+export function isPlayerOut(game: LocalGame, playerId: PlayerId): boolean {
+  if (playSystemRules(game.system).counter.direction === "down")
+    return game.players.some((player) => player.id !== playerId && player.life <= 0)
+  const player = game.players.find(({ id }) => id === playerId)
+  return (player?.life ?? 0) <= 0 || isEliminatedByCommanderDamage(game, playerId)
+}
+
+export function lastPlayerStanding(game: LocalGame): PlayerId | undefined {
+  const standing = game.players.filter(({ id }) => !isPlayerOut(game, id))
+  return standing.length === 1 ? standing[0].id : undefined
+}
+
 type CompensatableEvent = LifeChangedEvent | CommanderDamageAssignedEvent
 
 function isCompensatable(event: GameEvent): event is CompensatableEvent {

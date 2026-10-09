@@ -9,7 +9,7 @@ import { DialogCard, $dialogActions } from "@/components/DialogCard"
 import { PlayerMark } from "@/components/PlayerMark"
 import { SegmentedControl } from "@/components/SegmentedControl"
 import { Text } from "@/components/Text"
-import { isEliminatedByCommanderDamage, matchScoreAfter } from "@/features/game/domain"
+import { isPlayerOut, matchScoreAfter } from "@/features/game/domain"
 import type { LocalGame, MatchSeatOutcome } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -22,9 +22,8 @@ const OUTCOME_SEGMENTS = [
   { id: "draw", label: "Draw" },
 ] as const
 
-function isEliminated(game: LocalGame, seat: number) {
-  const player = game.players[seat]
-  return player.life <= 0 || isEliminatedByCommanderDamage(game, player.id)
+function drawForRemaining(game: LocalGame): MatchSeatOutcome[] {
+  return game.players.map((player) => (isPlayerOut(game, player.id) ? "loss" : "draw"))
 }
 
 /** why: a match usually ends the way its score says; a called round draws whoever is still playing. */
@@ -34,7 +33,7 @@ export function defaultMatchOutcomes(game: LocalGame): MatchSeatOutcome[] {
   const leaders = wins.filter((count) => count === most)
   if (game.result?.kind !== "draw" && most > 0 && leaders.length === 1)
     return wins.map((count) => (count === most ? "win" : "loss"))
-  return game.players.map((_, seat) => (isEliminated(game, seat) ? "loss" : "draw"))
+  return drawForRemaining(game)
 }
 
 export function LocalMatchEndDialog({
@@ -59,7 +58,7 @@ export function LocalMatchEndDialog({
 
   function drawRemaining() {
     setError(undefined)
-    setOutcomes(game.players.map((_, seat) => (isEliminated(game, seat) ? "loss" : "draw")))
+    setOutcomes(drawForRemaining(game))
   }
 
   function confirm() {
@@ -94,7 +93,12 @@ export function LocalMatchEndDialog({
         {game.players.map((player, seat) => (
           <View key={player.id} style={themed($seat)}>
             <View style={themed($seatName)}>
-              <PlayerMark seatNumber={player.seat} color={player.color} size={24} />
+              <PlayerMark
+                seatNumber={seat + 1}
+                shape={player.shape}
+                color={player.color}
+                size={24}
+              />
               <Text text={player.name} numberOfLines={1} style={themed($name)} />
               <Text text={String(score.wins[seat])} size="xs" style={themed($wins)} />
             </View>

@@ -55,6 +55,7 @@ import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { deckFormatLabel, deckGame, deckSections } from "../../convex/lib/deckGames"
 import { versionLabel } from "../../convex/lib/deckVersions"
+import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 
 type DeckDialog =
   | "none"
@@ -1261,7 +1262,8 @@ function DeckDetailContent({
                 card.commanderColor,
               )
               if ("error" in result) return result.error
-              if (result.cards.length > 300) return "A deck can have at most 300 entries."
+              if (result.cards.length > MAX_DECK_CARDS)
+                return `A deck can have at most ${MAX_DECK_CARDS} entries.`
               setDraft(result.cards)
               setUndo(undefined)
               setCommanderSelected(true)
@@ -1270,7 +1272,8 @@ function DeckDetailContent({
             }
             const existing = draft.find((entry) => printingKey(entry) === printingKey(card))
             if (existing && existing.quantity >= 999) return "A card can have at most 999 copies."
-            if (!existing && draft.length >= 300) return "A deck can have at most 300 entries."
+            if (!existing && draft.length >= MAX_DECK_CARDS)
+              return `A deck can have at most ${MAX_DECK_CARDS} entries.`
             addCard(card)
             return undefined
           }}

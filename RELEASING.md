@@ -6,12 +6,12 @@ This app uses two release paths: OTA updates for JS and asset changes within an 
 
 OTA releases run as a train: every merge ships to beta, and promotion ships what beta proved to production.
 
-1. Merge to main. `.github/workflows/beta.yml` deploys Convex to production, then publishes the commit to the `beta` channel. Its player notes are the newest eight `feat`, `fix`, and `perf` PR titles on main. Each build and update records its commit, so an install shows only the notes newer than what it runs.
+1. Merge to main. `.github/workflows/beta.yml` deploys Convex to production if the backend changed, then publishes the commit to the `beta` channel. Its player notes are the newest eight `feat`, `fix`, and `perf` PR titles on main. Each build and update records its commit, so an install shows only the notes newer than what it runs.
 2. Let it soak on beta. The lab devices and beta players run it, and Sentry tags every event with its `updateId`.
 3. Promote: `pnpm release:promote` reports, and `pnpm release:promote --yes` promotes. The `promote` workflow does the same without local secrets (`gh workflow run promote -f promote=true`). It takes the newest beta update that has been live for 60 minutes (`--soak-minutes`), stops if Sentry has new unresolved issues from it, republishes that same update group to production, and fast-forwards the `production` branch so Cloudflare Pages ships the matching web app.
 4. If beta shows a problem, revert or fix forward on main. Production never received it.
 
-For a hotfix, promote with `--soak-minutes 0`. Avoid `pnpm ota:prod`: it skips beta and leaves the web app behind. An update only reaches installs with a matching runtime, so after a native change merges, installs need new binaries before they get updates again. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
+For a hotfix, promote with `--soak-minutes 0`. Do not run `eas update` against the production channel: it skips beta and leaves the web app behind. An update only reaches installs with a matching runtime, so after a native change merges, installs need new binaries before they get updates again. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
 
 Do not republish a preview update group to production. Preview has its own app identifier, runtime fingerprint, and RevenueCat Test Store key, so it installs beside the store app and `pnpm ota:preview` checks behavior but does not prove production compatibility. Test real store purchases with a TestFlight or Play internal production build.
 
@@ -59,7 +59,9 @@ sentry-release:
 
 ## Convex deploys
 
-The beta workflow (`.github/workflows/beta.yml`) deploys Convex to production on every merge to main, with the `CONVEX_DEPLOY_KEY` repository secret, before it publishes the app to beta. Merging to main is a production backend release. If the deploy fails, nothing is published.
+The beta workflow (`.github/workflows/beta.yml`) deploys Convex to production with the `CONVEX_DEPLOY_KEY` repository secret before it publishes the app to beta. Merging to main is a production backend release. If the deploy fails, nothing is published.
+
+It skips the deploy only when the beta run that finished last succeeded and `convex/`, `pnpm-lock.yaml`, and `package.json` other than its `version` match that run's commit (`scripts/convex-backend.cjs`). A root `convex.json` always deploys, since it can move the functions. A burst of merges skips runs, so comparing with the previous commit could miss a backend change. Any other outcome, including a failed lookup, deploys.
 
 Cloudflare Pages builds the web app with `pnpm build:pages` (`scripts/pages-build.cjs`). Pages' production branch is `production`, which moves only on promotion:
 
@@ -67,7 +69,7 @@ Cloudflare Pages builds the web app with `pnpm build:pages` (`scripts/pages-buil
 - **Preview, backend changed:** when `convex/`, `pnpm-lock.yaml`, or `package.json` other than its `version` differs from main's tip, pushes to a preview deployment named after the branch with the preview `CONVEX_DEPLOY_KEY`. Previews start with no data. The `convex preview cleanup` workflow deletes a preview when its branch is deleted, and its daily sweep deletes previews whose PRs are all closed. Convex deletes any left 5 days after creation. Push the branch again to recreate one. The workflow needs a Convex team access token as the `CONVEX_TEAM_TOKEN` secret in the `convex-preview-cleanup` environment, which is limited to main.
 - **Preview, backend matches main** (including main itself): pushes to the shared staging dev deployment with `CONVEX_STAGING_DEPLOY_KEY` (Preview environment only, scoped to `deployment:deploy`). Staging keeps its data and does not count against the deployment cap. Without that variable, every branch gets its own preview.
 
-Convex schema and function changes must follow the compatibility rules in AGENTS.md. Because every merge deploys:
+Convex schema and function changes must follow the compatibility rules in AGENTS.md. Because every merge that changes the backend deploys:
 
 - Give each step of an expand-and-contract rollout its own PR and merge them in order. A squash merge cannot preserve an intermediate checkpoint.
 - Check removed or renamed functions against installed clients before merging. Convex does not block them.
@@ -76,7 +78,7 @@ Convex schema and function changes must follow the compatibility rules in AGENTS
 - Undo a bad deploy by merging a revert or forward fix. Server data does not roll back.
 - Run `npx convex deploy` against production by hand only to recover from a failed beta workflow.
 
-`convex-deploy-commit` in the release record is the main commit whose beta workflow deployed the backend.
+`convex-deploy-commit` in the release record is the newest main commit whose beta workflow ran the deploy. Later runs that skipped it ship that same backend.
 
 ## Scryve Pro rollout
 

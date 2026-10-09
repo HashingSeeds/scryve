@@ -12,6 +12,7 @@ const path = require("node:path")
 
 const root = path.join(path.dirname(require.resolve("./release-native.cjs")), "..")
 const packageJsonPath = path.join(root, "package.json")
+const easCli = `eas-cli@${require(packageJsonPath).config.easCli}`
 const MAIN = "origin/main"
 
 const git = (...args) =>
@@ -128,16 +129,7 @@ function main() {
     console.log(`Building ${version} for iOS and Android on EAS.`)
     execFileSync(
       "npx",
-      [
-        "--yes",
-        "eas-cli@latest",
-        "build",
-        "--profile",
-        "production",
-        "--platform",
-        "all",
-        "--auto-submit",
-      ],
+      ["--yes", easCli, "build", "--profile", "production", "--platform", "all", "--auto-submit"],
       { cwd: root, stdio: "inherit" },
     )
     return

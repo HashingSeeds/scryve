@@ -56,6 +56,8 @@ export interface DeckVersionWriteSnapshot {
 
 const SCOPE = "versionCards"
 const RETRY_DELAY_MS = 2_000
+// why: each card write is a full list; a 300-entry deck is ~190 KB, past the default budget.
+const VERSION_OUTBOX_LIMITS = { maxPendingBytes: 512 * 1024, maxFailedBytes: 512 * 1024 }
 export const DECK_VERSION_CONFLICT_REASON =
   "Deck cards changed on another device. Choose which card list to keep."
 export const DECK_VERSION_QUEUE_CONFLICT_REASON =
@@ -199,7 +201,7 @@ export class DeckVersionWriteRepository {
     this.local = local
     this.deploymentUrl = deploymentUrl
     this.keys = outboxKeys(deploymentUrl)
-    this.outbox = new DurableOutbox(local, ownerId, this.keys, codec)
+    this.outbox = new DurableOutbox(local, ownerId, this.keys, codec, VERSION_OUTBOX_LIMITS)
   }
 
   get cache() {
