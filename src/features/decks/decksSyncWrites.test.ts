@@ -123,6 +123,22 @@ describe("deck metadata writes", () => {
     stop()
   })
 
+  it("keeps a dismissed failure dismissed when a stale tab rejects it again", () => {
+    const local = new MemoryStorage()
+    const staleTab = new DeckSyncWriteRepository("owner", local)
+    const otherTab = new DeckSyncWriteRepository("owner", local)
+    const action = pendingWrite()
+    otherTab.enqueue(action)
+    const stalePending = staleTab.loadPending()
+    otherTab.failAction(action, "Rejected", 2, [], otherTab.loadPending())
+    otherTab.dismissFailed(action.operationId)
+
+    staleTab.failAction(action, "Rejected", 3, [], stalePending)
+
+    expect(staleTab.loadFailed()).toEqual([])
+    expect(staleTab.loadPending()).toEqual([])
+  })
+
   it("leaves legacy unscoped writes untouched", () => {
     const local = new MemoryStorage()
     const legacy = new DeckSyncWriteRepository("owner", local)

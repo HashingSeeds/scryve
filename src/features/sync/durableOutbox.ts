@@ -273,7 +273,12 @@ export class DurableOutbox<
     const operationId = this.codec.operationId(action)
     const failed = [...currentFailed]
     const pending = oldestFirst(currentPending, this.codec.operationId, this.codec.compare)
-    if (failed.some((candidate) => this.codec.operationId(candidate.action) === operationId))
+    if (
+      failed.some((candidate) => this.codec.operationId(candidate.action) === operationId) ||
+      // why: another tab settled it after this list was loaded; failing it now would bring back a dismissed failure.
+      this.storage.getString(this.keys.pendingRecord(scopeId, operationId, this.ownerId)) ===
+        undefined
+    )
       return {
         accepted: true,
         failed,

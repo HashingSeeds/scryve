@@ -75,7 +75,13 @@ export async function drainOutbox<
     if (options.shouldContinue && !options.shouldContinue()) return result(false)
     const action = queue[0]
     const operationId = options.operationId(action)
-    const attempted = options.repository.updateAttempt(operationId, now()) ?? action
+    const attempted = options.repository.updateAttempt(operationId, now())
+    // why: no stored record means another tab already acked or settled it; sending again would revive a dismissed failure.
+    if (!attempted) {
+      queue.shift()
+      changed()
+      continue
+    }
     queue[0] = attempted
     options.onAttempt?.(operationId)
     changed()

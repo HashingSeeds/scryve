@@ -78,6 +78,26 @@ describe("generic outbox drain", () => {
     expect(repository.pending).toEqual([])
   })
 
+  it("skips an operation another tab settled after this drain loaded it", async () => {
+    const repository = new InMemoryRepository()
+    repository.pending = [operation("op-first"), operation("op-settled-elsewhere")]
+    const sent: string[] = []
+    const result = await drainOutbox({
+      repository,
+      operationId: (item) => item.id,
+      classifyFailure: retryOrReject("reject"),
+      send: async (item) => {
+        sent.push(item.id)
+        repository.acknowledge("op-settled-elsewhere")
+        return { operationId: item.id }
+      },
+    })
+
+    expect(sent).toEqual(["op-first"])
+    expect(result).toMatchObject({ acknowledged: ["op-first"], failed: [], pending: [] })
+    expect(repository.failures).toEqual([])
+  })
+
   it("moves terminal failures out of pending and retains the rejection", async () => {
     const repository = new InMemoryRepository()
     repository.pending = [operation("op-reject")]

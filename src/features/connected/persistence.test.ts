@@ -104,6 +104,22 @@ describe("connected MMKV repository", () => {
     expect(result).toMatchObject({ accepted: false, reason: "byte_limit", pending: [] })
   })
 
+  it("keeps a dismissed failure dismissed when a stale tab rejects it again", () => {
+    const storage = new MemoryStorage()
+    const staleTab = new ConnectedGameRepository(storage, "user-1")
+    const otherTab = new ConnectedGameRepository(storage, "user-1")
+    const rejected = action("operation-stale-tab-01", 1)
+    otherTab.enqueue(rejected, [])
+    const stalePending = staleTab.loadOutbox("game-public")
+    otherTab.fail("game-public", rejected.event.operationId, "Game is not active", 2)
+    otherTab.dismissFailed("game-public", rejected.event.operationId)
+
+    staleTab.failAction(rejected, "Game is not active", 3, [], stalePending)
+
+    expect(staleTab.loadFailed("game-public")).toEqual([])
+    expect(staleTab.loadOutbox("game-public")).toEqual([])
+  })
+
   it("recovers durable outbox records after process death and acknowledges exactly one", () => {
     const storage = new MemoryStorage()
     new ConnectedGameRepository(storage).enqueue(action("operation-first-1", 1))
