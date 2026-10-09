@@ -3,7 +3,7 @@ import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
-import { setQuarantineReporter } from "@/features/sync/durableOutbox"
+import { setOutboxWriter, setQuarantineReporter } from "@/features/sync/durableOutbox"
 import { analyticsEnabled, syncTimingAdapter } from "@/utils/analytics"
 import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { setTelemetryAdapter } from "@/utils/telemetry"
@@ -67,19 +67,31 @@ export function initObservability() {
     ],
   })
 
+  const updateId = Updates.updateId ?? "embedded"
+  const runtimeVersion = Updates.runtimeVersion ?? "unknown"
   Sentry.setTags({
-    updateId: Updates.updateId ?? "embedded",
+    updateId,
     updateChannel: Updates.channel ?? "none",
-    runtimeVersion: Updates.runtimeVersion ?? "unknown",
+    runtimeVersion,
     embeddedLaunch: String(Updates.isEmbeddedLaunch),
   })
 
-  setQuarantineReporter(({ outbox, count, reasons }) => {
+  setOutboxWriter({
+    app: Constants.expoConfig?.version ?? "unknown",
+    update: updateId,
+    runtime: runtimeVersion,
+  })
+  setQuarantineReporter(({ outbox, count, reasons, records }) => {
     const error = new Error("Unreadable outbox records were quarantined")
     error.name = "OutboxQuarantine"
     reportCrash(error, ErrorType.HANDLED, {
       tags: { outbox },
-      extra: { count, reasons },
+      // why: Sentry flattens extra past three levels, so each record gets its own key to keep its shape readable.
+      extra: {
+        count,
+        reasons,
+        ...Object.fromEntries(records.map((record, index) => [`record${index}`, record])),
+      },
       fingerprint: ["outbox-quarantine", outbox],
     })
   })

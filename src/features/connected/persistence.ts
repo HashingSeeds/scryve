@@ -380,6 +380,11 @@ const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
     left.queuedAt - right.queuedAt ||
     left.event.clientCreatedAt - right.event.clientCreatedAt ||
     left.event.operationId.localeCompare(right.event.operationId),
+  operationTypes: [
+    "life.changed",
+    "commanderDamage.submitted",
+    "commanderDamage.resolved",
+  ] satisfies ConnectedActionEvent["type"][],
 }
 
 export class ConnectedGameRepository {
