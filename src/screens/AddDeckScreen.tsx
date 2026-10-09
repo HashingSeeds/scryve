@@ -104,6 +104,29 @@ const DECK_LINK_SOURCES = new Map([
   ],
 ])
 
+type PastedDraft = {
+  source: string
+  kind: "text" | "link"
+  attribution?: { sourceName: string; sourceUrl: string; author?: string }
+  game: string
+  format: string
+  resolved: Pick<
+    FunctionReturnType<typeof api.deckImports.resolvePasted>,
+    "unresolved" | "invalidLines"
+  >
+  cards: GuestDeckPayload["cards"]
+  omitted: boolean
+}
+
+function importableCards(draft: PastedDraft) {
+  return draft.cards.filter(
+    (card) =>
+      !draft.omitted ||
+      !card.originalReference ||
+      !draft.resolved.unresolved.includes(card.originalReference),
+  )
+}
+
 function attributionLabel(attribution: { sourceName: string; author?: string }, separator: string) {
   return attribution.author
     ? `${attribution.sourceName}${separator}${attribution.author}`
@@ -390,19 +413,14 @@ export function AddDeckScreen({
   const [deckLink, setDeckLink] = useState("")
   const linkSource = DECK_LINK_SOURCES.get(game)
   const importSource = importKind === "link" ? deckLink : deckList
-  const [pastedDraft, setPastedDraft] = useState<{
-    source: string
-    kind: "text" | "link"
-    attribution?: { sourceName: string; sourceUrl: string; author?: string }
-    game: string
-    format: string
-    resolved: Pick<
-      FunctionReturnType<typeof api.deckImports.resolvePasted>,
-      "unresolved" | "invalidLines"
-    >
-    cards: GuestDeckPayload["cards"]
-    omitted: boolean
-  }>()
+  const [pastedDraft, setPastedDraftState] = useState<PastedDraft>()
+  // why: search taps can land before a re-render, so import edits must read the newest draft.
+  const latestPastedDraft = useRef(pastedDraft)
+  latestPastedDraft.current = pastedDraft
+  function setPastedDraft(next: PastedDraft | undefined) {
+    latestPastedDraft.current = next
+    setPastedDraftState(next)
+  }
   const [resolvingPasted, setResolvingPasted] = useState(false)
   const [reviewingPasted, setReviewingPasted] = useState(false)
   const [editingPasted, setEditingPasted] = useState(false)
@@ -418,14 +436,7 @@ export function AddDeckScreen({
   const pastedProblems = pastedDraft
     ? [...pastedDraft.resolved.unresolved, ...pastedDraft.resolved.invalidLines]
     : []
-  const pastedCards = pastedDraft
-    ? pastedDraft.cards.filter(
-        (card) =>
-          !pastedDraft.omitted ||
-          !card.originalReference ||
-          !pastedDraft.resolved.unresolved.includes(card.originalReference),
-      )
-    : []
+  const pastedCards = pastedDraft ? importableCards(pastedDraft) : []
   const sourceAttribution = pastedDraft?.attribution
     ? `Imported from ${attributionLabel(pastedDraft.attribution, " by ")}\n${pastedDraft.attribution.sourceUrl}`
     : ""
@@ -933,11 +944,12 @@ export function AddDeckScreen({
   }
 
   function changeImportQuantity(card: DeckCard, delta: number) {
-    if (!pastedDraft || busy) return
+    const draft = latestPastedDraft.current
+    if (!draft || busy) return
     setGuestConflict(false)
     setPendingGuestPayload(undefined)
     if (card.quantity + delta <= 0) setFocusedPreviewCard(undefined)
-    setPastedDraft({ ...pastedDraft, cards: adjustCardQuantity(pastedDraft.cards, card, delta) })
+    setPastedDraft({ ...draft, cards: adjustCardQuantity(draft.cards, card, delta) })
   }
 
   function changeImportFormat(next?: string) {
@@ -959,21 +971,19 @@ export function AddDeckScreen({
 
   function addImportCard(card: GuestDeckPayload["cards"][number]) {
     if (busy) return "Wait for the deck to finish saving."
-    if (!pastedDraft) return "Review the import before adding cards."
+    const draft = latestPastedDraft.current
+    if (!draft) return "Review the import before adding cards."
+    const cards = importableCards(draft)
     if (game === "mtg" && format === "commander" && cardSection(card) === "commander") {
       const cached = loadCardDetails()
-      const result = addCommanderCard(
-        pastedCards,
-        card,
-        (entry) => cached[cardDetailsKey(entry, game)],
-      )
+      const result = addCommanderCard(cards, card, (entry) => cached[cardDetailsKey(entry, game)])
       if ("error" in result) return result.error
-      setPastedDraft({ ...pastedDraft, cards: result.cards })
+      setPastedDraft({ ...draft, cards: result.cards })
       setPastedCommanderSelected(true)
     } else {
-      const limitError = cardLimitError(pastedCards, card)
+      const limitError = cardLimitError(cards, card)
       if (limitError) return limitError
-      setPastedDraft({ ...pastedDraft, cards: incrementCard(pastedCards, card) })
+      setPastedDraft({ ...draft, cards: incrementCard(cards, card) })
     }
     if (choosingPastedCommander) setAddingPastedCard(false)
     setGuestConflict(false)

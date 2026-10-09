@@ -915,6 +915,42 @@ describe("AddDeckScreen", () => {
     expect(view.getByText("1298 cards")).toBeTruthy()
   })
 
+  it("keeps every add and stops at the entry limit when adds land before a re-render", async () => {
+    const cards = Array.from({ length: 298 }, (_, index) => ({
+      ...resolvedForest.cards[0],
+      name: `Card ${index}`,
+      // why: imageless rows each start a fallback lookup, which loops past 200 rows in tests.
+      imageUrl: "https://cards.scryfall.io/normal/card.jpg",
+      quantity: 1,
+      scryfallId: `print-${index}`,
+      oracleId: `oracle-${index}`,
+    }))
+    mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards })
+    const view = renderAddDeck()
+    enterPasted(view)
+    await waitFor(() => expect(view.getByTestId("pasted-deck-review")).toBeTruthy())
+    fireEvent.press(view.getByRole("button", { name: "Edit" }))
+    fireEvent.press(view.getByTestId("import-add-cards"))
+    const add = view.UNSAFE_getByType(CardSearchScreen).props.onAdd
+    const extra = (index: number) => ({
+      ...cards[0],
+      name: `Extra ${index}`,
+      scryfallId: `extra-${index}`,
+      oracleId: `extra-oracle-${index}`,
+    })
+    act(() => {
+      expect(add(extra(1))).toBeUndefined()
+      expect(add(extra(2))).toBeUndefined()
+      expect(add(extra(3))).toBe("A deck can have at most 300 entries.")
+    })
+    fireEvent.press(
+      within(view.UNSAFE_getByType(CardSearchScreen)).getByRole("button", { name: "Done" }),
+    )
+    expect(view.getByText("300 cards")).toBeTruthy()
+    expect(view.getByText("Extra 1")).toBeTruthy()
+    expect(view.getByText("Extra 2")).toBeTruthy()
+  })
+
   async function editColorCommander(quantity: number) {
     const card = { ...resolvedForest.cards[0], board: "main" as const, quantity }
     mockResolvePasted.mockResolvedValueOnce({ ...resolvedForest, cards: [card] })
