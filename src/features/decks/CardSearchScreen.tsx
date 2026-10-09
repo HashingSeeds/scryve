@@ -20,6 +20,7 @@ import { Screen } from "@/components/Screen"
 import { SelectField } from "@/components/SelectField"
 import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
@@ -57,6 +58,7 @@ export function CardSearchScreen({
   commanderCards?: DeckCard[]
 }) {
   const convex = useConvex()
+  const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   const connection = useConvexConnectionState()
   const { themed, theme } = useAppTheme()
   const sections = deckSections(game, format)
@@ -106,7 +108,7 @@ export function CardSearchScreen({
     let active = true
     setKeywordError(undefined)
     void convex
-      .action(api.cards.keywordAbilities, {})
+      .action(api.cards.keywordAbilities, { deviceId })
       .then((catalog) => {
         if (!active) return
         setKeywordCatalog([...catalog].sort((a, b) => a.localeCompare(b)))
@@ -118,7 +120,7 @@ export function CardSearchScreen({
     return () => {
       active = false
     }
-  }, [filtersOpen, convex, offline])
+  }, [filtersOpen, convex, offline, deviceId])
   const [checkingDeck, setCheckingDeck] = useState(false)
   const [rulesAttempt, setRulesAttempt] = useState(0)
   const [rulesError, setRulesError] = useState<string>()
@@ -212,7 +214,7 @@ export function CardSearchScreen({
               (value) => value && /^[0-9a-f-]{36}$/i.test(value),
             )
           if (!id) continue
-          const details = await client.action(api.cards.byId, { scryfallId: id })
+          const details = await client.action(api.cards.byId, { scryfallId: id, deviceId })
           if (!active) return
           cached[key] = details
           saveCardDetails({ [key]: details })
@@ -240,6 +242,7 @@ export function CardSearchScreen({
     rulesAttempt,
     needsKeywords,
     rulesRetryAfterMs,
+    deviceId,
   ])
 
   useEffect(() => {
@@ -280,6 +283,7 @@ export function CardSearchScreen({
         if (!convex) throw new Error("Card search unavailable")
         const found = await convex.action(api.cards.search, {
           game,
+          deviceId,
           query: choosingCommander
             ? `${searchQuery.length >= 2 ? `(${searchQuery}) ` : ""}is:commander f:commander${colorFilters.length ? (colorFilters.includes("C") ? " id:c" : ` (id${exactColors ? "=" : ">="}${colorFilters.join("").toLowerCase()} or o:"choose a color")`) : ""}${keywords.map((keyword) => ` kw:"${keyword.replace(/["\\]/g, "")}"`).join("")}`
             : searchQuery,
@@ -315,6 +319,7 @@ export function CardSearchScreen({
     searchRequested,
     searchAttempt,
     searchError?.retryAfterMs,
+    deviceId,
   ])
 
   function searchEntry(card: SearchCard) {

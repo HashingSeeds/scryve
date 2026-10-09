@@ -1613,7 +1613,11 @@ describe("DeckDetailScreen", () => {
     fireEvent.press(view.getByLabelText("3× Ash Blossom & Joyous Spring"))
 
     await waitFor(() => expect(view.getByTestId("card-focus-dialog")).toBeTruthy())
-    expect(mockCatalogCardById).toHaveBeenCalledWith({ game: "ygo", cardId: "14558127" })
+    expect(mockCatalogCardById).toHaveBeenCalledWith({
+      game: "ygo",
+      cardId: "14558127",
+      deviceId: expect.any(String),
+    })
     expect(view.getByText("Effect Monster")).toBeTruthy()
   })
 
@@ -1642,6 +1646,7 @@ describe("DeckDetailScreen", () => {
     expect(mockPokemonCardByReference).toHaveBeenCalledWith({
       name: "Riolu",
       originalReference: "MEG 76",
+      deviceId: expect.any(String),
     })
   })
 
