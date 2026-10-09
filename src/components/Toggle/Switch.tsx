@@ -52,7 +52,7 @@ function SwitchInput(props: SwitchInputProps) {
     themed,
   } = useAppTheme()
 
-  const animate = useRef(new Animated.Value(on ? 1 : 0)) // Initial value is set based on isActive
+  const animate = useRef(new Animated.Value(on ? 1 : 0))
   const opacity = useRef(new Animated.Value(0))
   const reduceMotion = useReducedMotion()
 
@@ -60,7 +60,7 @@ function SwitchInput(props: SwitchInputProps) {
     Animated.timing(animate.current, {
       toValue: on ? 1 : 0,
       duration: motionDuration(reduceMotion, 300),
-      useNativeDriver: true, // Enable native driver for smoother animations
+      useNativeDriver: true,
     }).start()
   }, [on, reduceMotion])
 
