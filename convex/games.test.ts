@@ -9,7 +9,11 @@ const modules = {
   "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
   "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
   "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
+  "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
+  "./decks.ts": async () => jest.requireActual("./decks"),
+  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
   "./games.ts": async () => jest.requireActual("./games"),
+  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
 const token = "t".repeat(43)
@@ -1165,6 +1169,71 @@ describe("connected game lifecycle and API hardening", () => {
     ).resolves.toMatchObject({ publicId: created.publicId })
     const summary = await joiner.query(api.games.connectedSummary, { publicId: created.publicId })
     expect(summary).toMatchObject({ eventCount: 0, terminalStatus: "abandoned" })
+  })
+
+  it("records deck results only for finished games, not abandoned ones", async () => {
+    const t = convexTest(schema, modules)
+    const host = await synced(t, "stats-host", "Host")
+    const joiner = await synced(t, "stats-joiner", "Joiner")
+    const deckId = await host.mutation(api.decks.create, {
+      name: "Stats Deck",
+      format: "commander",
+    })
+    const deckVersionId = await host.mutation(api.decks.saveVersion, { deckId, cards: [] })
+    const lobbyWithDeck = async (name: string) => {
+      const inviteToken = name.padEnd(43, "x")
+      const { publicId } = await host.mutation(api.games.createLobby, {
+        publicId: `${name}-public-id-123456`,
+        playerCount: 2,
+        startingLife: 40,
+        ruleset: "commander",
+        inviteToken,
+        manualCodeCandidates: [name.slice(0, 3).toUpperCase() + "234"],
+        hostDisplayName: "Host",
+        hostColor: "#7C3AED",
+        deviceId: "device-host-0001",
+      })
+      await host.mutation(api.decks.selectForSeat, { publicId, seat: 1, deckVersionId })
+      return { publicId, inviteToken }
+    }
+    const startWithJoiner = async ({
+      publicId,
+      inviteToken,
+    }: {
+      publicId: string
+      inviteToken: string
+    }) => {
+      await joiner.mutation(api.games.claimSeat, {
+        token: inviteToken,
+        displayName: "Joiner",
+        color: "#2563EB",
+      })
+      await host.mutation(api.games.startGame, { publicId })
+      return publicId
+    }
+    const deckRecords = () =>
+      t.run(async (ctx) => ({
+        results: (await ctx.db.query("deckGameResults").collect()).length,
+        deckGames: (await ctx.db.query("deckStats").collect()).map(({ games }) => games),
+        versionGames: (await ctx.db.query("deckVersionStats").collect()).map(({ games }) => games),
+      }))
+    const none = { results: 0, deckGames: [], versionGames: [] }
+
+    const neverStarted = await lobbyWithDeck("unstarted")
+    await host.mutation(api.games.abandonGame, { publicId: neverStarted.publicId })
+    expect(await deckRecords()).toEqual(none)
+
+    const abandoned = await startWithJoiner(await lobbyWithDeck("abandoned"))
+    await host.mutation(api.games.abandonGame, { publicId: abandoned })
+    expect(await deckRecords()).toEqual(none)
+
+    const finished = await startWithJoiner(await lobbyWithDeck("finished"))
+    const projection = await host.query(api.games.lobbyProjection, { publicId: finished })
+    await host.mutation(api.games.finishGame, {
+      publicId: finished,
+      result: { kind: "win", winnerPlayerIds: [projection.players[0].playerId] },
+    })
+    expect(await deckRecords()).toEqual({ results: 1, deckGames: [1], versionGames: [1] })
   })
 
   it("abandons lobby/active games idempotently with correct bounded summaries and replay", async () => {
