@@ -1,29 +1,18 @@
+import { deckFormatLabel, deckFormats } from "../../../convex/lib/deckGames"
 import {
-  deckFormatLabel,
-  deckFormats,
-  defaultDeckFormat,
-  DECK_GAME_LIST,
-} from "../../../convex/lib/deckGames"
+  formatDefinition,
+  isSystemId,
+  SYSTEM_IDS,
+  SYSTEMS,
+  type CounterDefinition,
+  type SystemId,
+} from "../../../convex/lib/systems"
 
-export const PLAY_SYSTEM_IDS = ["mtg", "ygo", "pokemon"] as const
-export type PlaySystemId = (typeof PLAY_SYSTEM_IDS)[number]
+export const PLAY_SYSTEM_IDS = SYSTEM_IDS
+export type PlaySystemId = SystemId
 export const NO_PLAY_SYSTEM = "none"
 
-export type CounterRules = {
-  label: string
-  heading: string
-  singular: string
-  plural: string
-  defaultValue: number
-  presets: readonly number[]
-  tapStep: number
-  longPressStep?: number
-  quickAdjustments: readonly [number, number]
-  scrubStep: number
-  scrubSteps: number
-  direction: "open" | "down"
-  maxStartingValue: number
-}
+export type CounterRules = CounterDefinition
 
 export type PlaySystemRules = {
   id: PlaySystemId
@@ -33,72 +22,16 @@ export type PlaySystemRules = {
   counter: CounterRules
 }
 
-const SYSTEM_LABELS = new Map(
-  DECK_GAME_LIST.map((game) => [game.id, { label: game.label, shortLabel: game.shortLabel }]),
-)
+function playRulesFor(id: PlaySystemId): PlaySystemRules {
+  const { label, shortLabel, defaultFormat, counter } = SYSTEMS[id]
+  return { id, label, shortLabel, defaultFormat: defaultFormat.play, counter }
+}
 
+// why: rules feed render paths, so each system keeps one stable object.
 const PLAY_SYSTEMS: Record<PlaySystemId, PlaySystemRules> = {
-  mtg: {
-    id: "mtg",
-    label: SYSTEM_LABELS.get("mtg")?.label ?? "Magic: The Gathering",
-    shortLabel: SYSTEM_LABELS.get("mtg")?.shortLabel ?? "Magic",
-    defaultFormat: "standard",
-    counter: {
-      label: "life",
-      heading: "Life",
-      singular: "life",
-      plural: "life",
-      defaultValue: 20,
-      presets: [20, 30, 40],
-      tapStep: 1,
-      quickAdjustments: [10, 5],
-      scrubStep: 1,
-      scrubSteps: 20,
-      direction: "open",
-      maxStartingValue: 999,
-    },
-  },
-  ygo: {
-    id: "ygo",
-    label: SYSTEM_LABELS.get("ygo")?.label ?? "Yu-Gi-Oh!",
-    shortLabel: SYSTEM_LABELS.get("ygo")?.shortLabel ?? "Yu-Gi-Oh!",
-    defaultFormat: "advanced",
-    counter: {
-      label: "Life Points",
-      heading: "Life Points",
-      singular: "Life Point",
-      plural: "Life Points",
-      defaultValue: 8000,
-      presets: [8000],
-      tapStep: 100,
-      quickAdjustments: [1000, 50],
-      scrubStep: 100,
-      scrubSteps: 80,
-      longPressStep: 1000,
-      direction: "open",
-      maxStartingValue: 999_999,
-    },
-  },
-  pokemon: {
-    id: "pokemon",
-    label: SYSTEM_LABELS.get("pokemon")?.label ?? "Pokémon TCG",
-    shortLabel: SYSTEM_LABELS.get("pokemon")?.shortLabel ?? "Pokémon",
-    defaultFormat: "standard",
-    counter: {
-      label: "Prize cards",
-      heading: "Prize cards",
-      singular: "Prize card",
-      plural: "Prize cards",
-      defaultValue: 6,
-      presets: [6],
-      tapStep: 1,
-      quickAdjustments: [2, 1],
-      scrubStep: 1,
-      scrubSteps: 20,
-      direction: "down",
-      maxStartingValue: 99,
-    },
-  },
+  mtg: playRulesFor("mtg"),
+  ygo: playRulesFor("ygo"),
+  pokemon: playRulesFor("pokemon"),
 }
 
 const GENERIC_PLAY_RULES = {
@@ -125,9 +58,7 @@ const GENERIC_PLAY_RULES = {
 
 export const PLAY_SYSTEM_LIST = PLAY_SYSTEM_IDS.map((id) => PLAY_SYSTEMS[id])
 
-export function isPlaySystemId(value: unknown): value is PlaySystemId {
-  return typeof value === "string" && PLAY_SYSTEM_IDS.some((system) => system === value)
-}
+export const isPlaySystemId = isSystemId
 
 export function playSystemId(value: unknown): PlaySystemId {
   return isPlaySystemId(value) ? value : "mtg"
@@ -144,24 +75,21 @@ export function playSystemFormats(value?: unknown) {
 export function playSystemFormat(value?: unknown, format?: string): string {
   const system = playSystemId(value)
   if (format && deckFormats(system).some((candidate) => candidate.id === format)) return format
-  return PLAY_SYSTEMS[system].defaultFormat ?? defaultDeckFormat(system)
+  return SYSTEMS[system].defaultFormat.play
 }
 
-export const COMMANDER_DAMAGE_FORMAT = "commander"
+function playFormatDefinition(system: unknown, format?: string) {
+  return formatDefinition(system, playSystemFormat(system, format))
+}
 
 export function defaultStartingLife(system?: unknown, format?: string): number {
-  if (
-    playSystemId(system) === "mtg" &&
-    playSystemFormat(system, format) === COMMANDER_DAMAGE_FORMAT
-  )
-    return 40
-  return playSystemRules(system).counter.defaultValue
+  const counter = playSystemRules(system).counter
+  if (!isPlaySystemId(system)) return counter.defaultValue
+  return playFormatDefinition(system, format)?.startingValue ?? counter.defaultValue
 }
 
 export function supportsCommanderDamage(value: unknown, format?: string): boolean {
-  return (
-    playSystemId(value) === "mtg" && playSystemFormat(value, format) === COMMANDER_DAMAGE_FORMAT
-  )
+  return playFormatDefinition(playSystemId(value), format)?.hasCommanderDamage ?? false
 }
 
 export function playFormatLabel(value: unknown, format?: string): string {
@@ -185,9 +113,8 @@ export function counterDeltaFromStartLabel(
   current: number,
   startingValue: number,
 ): string {
-  const system = playSystemId(value)
   const delta = current - startingValue
-  if (system === "pokemon") {
+  if (playSystemRules(value).counter.direction === "down") {
     const taken = startingValue - current
     return taken === 0 ? "none taken" : `${taken} taken`
   }

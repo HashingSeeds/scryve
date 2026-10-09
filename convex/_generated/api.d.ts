@@ -54,6 +54,8 @@ import type * as lib_policy from "../lib/policy.js";
 import type * as lib_results from "../lib/results.js";
 import type * as lib_revenueCat from "../lib/revenueCat.js";
 import type * as lib_scryfall from "../lib/scryfall.js";
+import type * as lib_systems_definitions from "../lib/systems/definitions.js";
+import type * as lib_systems_index from "../lib/systems/index.js";
 import type * as lib_usernameSuggestions from "../lib/usernameSuggestions.js";
 import type * as matches from "../matches.js";
 import type * as moderation from "../moderation.js";
@@ -115,6 +117,8 @@ declare const fullApi: ApiFromModules<{
   "lib/results": typeof lib_results;
   "lib/revenueCat": typeof lib_revenueCat;
   "lib/scryfall": typeof lib_scryfall;
+  "lib/systems/definitions": typeof lib_systems_definitions;
+  "lib/systems/index": typeof lib_systems_index;
   "lib/usernameSuggestions": typeof lib_usernameSuggestions;
   matches: typeof matches;
   moderation: typeof moderation;
