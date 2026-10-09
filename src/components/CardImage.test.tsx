@@ -1,3 +1,4 @@
+import { Profiler } from "react"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { ConvexError } from "convex/values"
 
@@ -38,6 +39,28 @@ function cards(id: string, source?: string, preview = false) {
   )
 }
 beforeEach(() => mockFallbacks.mockReset())
+
+it("settles when more image-less cards are mounted than the cache holds", async () => {
+  let commits = 0
+  const unmatched = (count: number) => (
+    <Profiler id="cards" onRender={() => (commits += 1)}>
+      <ThemeProvider initialContext="dark">
+        {Array.from({ length: count }, (_, index) => (
+          <CardImage key={index} style={style} accessibilityLabel={`Unmatched ${index}`} compact />
+        ))}
+      </ThemeProvider>
+    </Profiler>
+  )
+  const view = render(unmatched(200))
+  await act(async () => {})
+  view.rerender(unmatched(250))
+  await act(async () => {})
+  const settled = commits
+  await act(async () => {})
+  expect(commits).toBe(settled)
+  expect(view.getAllByText("No image found")).toHaveLength(250)
+  expect(mockFallbacks).not.toHaveBeenCalled()
+})
 
 it("shares a replacement between thumbnail and preview after an image error", async () => {
   mockFallbacks.mockResolvedValue(["broken", "working"])
