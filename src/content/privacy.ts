@@ -3,8 +3,8 @@ import type { LegalDocumentContent } from "./legal"
 export const privacyContent = {
   id: "privacy",
   title: "PRIVACY POLICY",
-  version: "2026-09-10",
-  effectiveDate: "September 10, 2026",
+  version: "2026-10-09",
+  effectiveDate: "October 9, 2026",
   sections: [
     {
       blocks: [
