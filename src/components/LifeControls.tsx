@@ -25,6 +25,7 @@ export interface LifeControlsProps {
   system?: PlaySystemId
   lifeStep?: number
   recentDelta?: RecentDelta
+  pendingDelta?: number
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1) => void
   onPreview?: (pendingDelta: number) => void
@@ -107,13 +108,15 @@ export function LifeControls({
   system,
   lifeStep,
   recentDelta: recentDeltaStore = NO_RECENT_DELTA,
+  pendingDelta = 0,
   onChange,
   onLongChange,
   onPreview,
   style,
 }: LifeControlsProps) {
   const { themed } = useAppTheme()
-  const recentDelta = useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get)
+  const recentDelta =
+    useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get) + pendingDelta
   const longPressHandled = useRef<LifeDelta | null>(null)
   // why: a zone that freezes or unmounts mid-press never reports press-out, so drop its preview.
   useEffect(() => {

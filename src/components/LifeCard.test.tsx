@@ -804,9 +804,14 @@ describe("LifeCard", () => {
     const minus = view.getByTestId("life-seat-1--1")
 
     fireEvent(minus, "pressIn")
+    act(() => jest.advanceTimersByTime(2000))
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("19")
+    expect(view.getByText("-1")).toBeTruthy()
     fireEvent(minus, "pressOut")
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("20")
+    expect(view.getByText("−")).toBeTruthy()
+    expect(view.getByText("+")).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
 
     fireEvent(minus, "pressIn")
     fireEvent(minus, "longPress")

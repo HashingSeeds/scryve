@@ -303,7 +303,7 @@ export const LifeCard = memo(function LifeCard({
     reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [editorOpen, setEditorOpen] = useState(false)
-  const recentDelta = useRecentDelta(shownLife)
+  const recentDelta = useRecentDelta(life)
   const previousLife = useRef(life)
   useEffect(() => {
     if (previousLife.current === life) return
@@ -641,6 +641,7 @@ export const LifeCard = memo(function LifeCard({
           system={system}
           lifeStep={lifeStep}
           recentDelta={recentDelta}
+          pendingDelta={preview}
           onChange={onChange}
           onPreview={setPreview}
           onLongChange={() => setEditorOpen(true)}
