@@ -16,6 +16,8 @@
  */
 import { makeFunctionReference } from "convex/server"
 
+import type { DurableStringStorage } from "@/features/sync/durableOutbox"
+
 import { contractClient, makeWorld, type Verdict, verdictFailed, type World } from "./contract"
 import {
   CORRUPTIONS,
@@ -47,6 +49,7 @@ import {
 import { orphanSidecars, quarantinedOperations, type ViolationKind } from "./invariants"
 import {
   type BuildName,
+  connectedLane,
   FAKE_IDS,
   type Lane,
   type LaneRepo,
@@ -144,6 +147,17 @@ function recordVerdicts(
 }
 
 /** why: a send that stalls or skips records would otherwise look like a clean contract, so every queued record must reach a validator. */
+class NoDeleteStorage extends MemoryStorage {
+  delete() {}
+}
+
+async function sendAll(lane: Lane, disk: DurableStringStorage, build?: BuildName) {
+  const verdicts: Verdict[] = []
+  const sent = await lane.send(disk, contractClient(world, verdicts), world.ids, build)
+  const reached = sent.queued > 0 && sent.remaining === 0 && verdicts.length === sent.queued
+  return { verdicts, sent, reached }
+}
+
 async function sendThroughValidators(
   scenario: string,
   lane: Lane,
@@ -151,9 +165,7 @@ async function sendThroughValidators(
   tag: string,
   build?: BuildName,
 ) {
-  const verdicts: Verdict[] = []
-  const sent = await lane.send(disk, contractClient(world, verdicts), world.ids, build)
-  const reached = sent.queued > 0 && sent.remaining === 0 && verdicts.length === sent.queued
+  const { verdicts, sent, reached } = await sendAll(lane, disk, build)
   record(
     scenario,
     `${lane.name}: every queued record reached a validator`,
@@ -225,20 +237,54 @@ describe("outbox stress", () => {
       clientCreatedAt: CLOCK,
     }
     const probes = [
-      ["games:doesNotExist", life, "error"],
-      ["games:changeLife", { ...life, writtenBy: "90.0.0" }, "rejected"],
-      ["games:changeLife", { ...life, publicId: "no-such-game-public-id" }, "business"],
+      ["missing function", "games:doesNotExist", life, "error"],
+      ["extra field", "games:changeLife", { ...life, writtenBy: "90.0.0" }, "rejected"],
+      [
+        "wrong type quoting a handler path",
+        "games:changeLife",
+        { ...life, delta: "/convex/games.ts:1" },
+        "rejected",
+      ],
+      ["wrong type on decks.create", "decks:create", { name: 1, format: "commander" }, "rejected"],
+      [
+        "wrong nested card type",
+        "decks:syncCreateVersion",
+        {
+          deckId: world.ids.deckId,
+          operationId: "calibration-operation-02",
+          name: "Version",
+          cards: [{ name: 5, quantity: 1 }],
+        },
+        "rejected",
+      ],
+      [
+        "domain rule",
+        "games:changeLife",
+        { ...life, publicId: "no-such-game-public-id" },
+        "business",
+      ],
     ] as const
-    for (const [name, args, expected] of probes) {
+    for (const [label, name, args, expected] of probes) {
       await client.mutation(makeFunctionReference<"mutation">(name), args).catch(() => undefined)
       const outcome = verdicts.at(-1)?.outcome
       record(
         scenario,
-        `contract client labels ${expected}`,
+        `contract client: ${label} is ${expected}`,
         outcome === expected ? "pass" : "fail",
         `${name} came back ${outcome}`,
       )
     }
+
+    // why: a sender that never acknowledges must trip the pending-record gate, or that gate proves nothing.
+    const stuck = new NoDeleteStorage()
+    connectedLane.open(stuck).enqueue(connectedLane.makeAction(seededRandom(1), CLOCK, world.ids))
+    const { reached } = await sendAll(connectedLane, stuck)
+    record(
+      scenario,
+      "pending gate fails a no-op acknowledgement",
+      reached ? "fail" : "pass",
+      "gate passed with the record still pending",
+    )
     expect(failuresIn(scenario)).toEqual([])
   })
 
@@ -704,8 +750,7 @@ describe("outbox stress", () => {
             `${tag} ${provenanceOf(disk, key)}`,
           )
 
-        const verdicts: Verdict[] = []
-        await lane.send(disk, contractClient(world, verdicts), world.ids)
+        const verdicts = await sendThroughValidators(scenario, lane, disk, tag)
         recordVerdicts(
           scenario,
           `${lane.name}: recovered record sends with valid args`,

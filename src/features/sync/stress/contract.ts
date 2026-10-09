@@ -1,6 +1,7 @@
 import type { ConvexReactClient } from "convex/react"
 import { type FunctionReference, type FunctionReturnType, getFunctionName } from "convex/server"
 import { ConvexError } from "convex/values"
+import { join } from "node:path"
 
 import { FAKE_IDS, OWNER, type ServerIds } from "./lanes"
 import { api } from "../../../../convex/_generated/api"
@@ -74,15 +75,27 @@ const isValidatorError = (error: unknown) =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-// why: a domain rule either throws a coded ConvexError or a plain Error from handler source under convex/; convex-test only runs a handler after its validators pass. Anything else (missing function, harness crash) never got a fair hearing.
+const CONVEX_SOURCE = join(__dirname, "../../../../convex/")
+
+// why: only the stack frames count; a message can quote any path.
+const handlerFrame = (error: Error) =>
+  (error.stack ?? "")
+    .split("\n")
+    .slice(error.message.split("\n").length)
+    .find(
+      (frame) =>
+        /^\s+at /.test(frame) &&
+        frame.includes(CONVEX_SOURCE) &&
+        !frame.includes(`${CONVEX_SOURCE}_generated/`),
+    )
+
+// why: a domain rule either throws a coded ConvexError or a plain Error from a convex/ handler frame. Callers rule out validator errors first, so a handler frame here means the args already passed validation.
 const businessCode = (error: unknown) => {
   if (error instanceof ConvexError && isRecord(error.data) && typeof error.data.code === "string")
     return error.data.code
-  const handlerFrame = /\/convex\/(?!_generated\/)[\w/]+\.ts:\d+/.exec(
-    error instanceof Error ? (error.stack ?? "") : "",
-  )
-  return handlerFrame && error instanceof Error
-    ? `${handlerFrame[0].replace(/^.*\/convex\//, "convex/")} ${error.message}`
+  const frame = error instanceof Error ? handlerFrame(error) : undefined
+  return frame && error instanceof Error
+    ? `${frame.slice(frame.indexOf(CONVEX_SOURCE) + CONVEX_SOURCE.length).replace(/\)$/, "")} ${error.message}`
     : undefined
 }
 
@@ -142,7 +155,7 @@ export function contractClient(
       verdicts.push({ name, outcome: "accepted" })
       return result
     } catch (error) {
-      const code = businessCode(error)
+      const code = isValidatorError(error) ? undefined : businessCode(error)
       if (code) {
         verdicts.push({ name, outcome: "business", detail: code })
         return plausibleResult(name, args, world.ids)
