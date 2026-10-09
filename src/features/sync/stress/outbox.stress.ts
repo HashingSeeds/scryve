@@ -1,3 +1,19 @@
+/**
+ * why: an opt-in stress harness for the offline outbox kernel and its three adapters. It is slow and
+ * exploratory, so it has its own Jest config and never runs in `pnpm test` or CI.
+ *
+ * Run:      pnpm jest -c src/features/sync/stress/jest.config.js --runInBand
+ * Tune:     OUTBOX_STRESS_SEEDS (default 6), OUTBOX_STRESS_STEPS (default 24)
+ * Save:     OUTBOX_STRESS_LABEL=name OUTBOX_STRESS_OUT=/tmp/name.json
+ * Compare:  node src/features/sync/stress/compare.mjs /tmp/a.json /tmp/b.json
+ * Other branch: git checkout <ref> && git checkout <harness branch> -- src/features/sync/stress
+ * Old builds: legacy/ pins main and v0.1.1 outbox code; regenerate with
+ *           node src/features/sync/stress/legacy/fetch.mjs
+ *
+ * Scenarios: 0 calibration, 1 storage faults, 2 rollback, 3 forward, 4 Convex validator contract,
+ * 5 two web tabs, 6 corruption matrix, 7 recovery drill, 8 cost. Each failure prints its replay seed.
+ * `gate` rows fail the run; `score` rows only grade a design.
+ */
 import { contractClient, makeWorld, type Verdict, type World } from "./contract"
 import {
   CORRUPTIONS,
