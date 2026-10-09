@@ -1,17 +1,9 @@
-import { convexTest } from "convex-test"
-
+import { makeConvexTest } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./providerHealth.ts": async () => jest.requireActual("./providerHealth"),
-}
 
 describe("provider health", () => {
   it("requires authentication to read current provider health", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
 
     await expect(
       t.query(api.providerHealth.current, {
@@ -23,7 +15,7 @@ describe("provider health", () => {
   })
 
   it("preserves the last success while replacing per-attempt fields", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "health-reader" })
 
     await t.mutation(internal.providerHealth.record, {
