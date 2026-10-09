@@ -130,4 +130,48 @@ describe("receipt pruning", () => {
       owner.mutation(api.decks.syncWrite, deckWrite(createOperation, 0, "Offline deck")),
     ).rejects.toThrow("Deck changed on another device")
   })
+
+  it("keeps deck version receipts so an old version create still replays once", async () => {
+    const t = convexTest(schema, modules)
+    const owner = t.withIdentity({ subject: "version-owner" })
+    await owner.mutation(api.users.syncCurrent, { displayName: "version-owner" })
+    const deckId = await owner.mutation(api.decks.create, { name: "Deck", format: "commander" })
+    await t.run(async (ctx) => {
+      const deck = await ctx.db.get(deckId)
+      if (!deck) throw new Error("expected a deck")
+      await ctx.db.insert("userEntitlements", {
+        userId: deck.ownerUserId,
+        feature: "deck_versions",
+        enabled: true,
+        source: "test",
+        updatedAt: Date.now(),
+      })
+    })
+    const create = {
+      deckId,
+      operationId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      name: "Snapshot",
+      cards: [
+        {
+          oracleId: "11111111-1111-1111-1111-111111111111",
+          scryfallId: "22222222-2222-2222-2222-222222222222",
+          name: "Sync card",
+          quantity: 1,
+          board: "main" as const,
+        },
+      ],
+    }
+    const created = await owner.mutation(api.decks.syncCreateVersion, create)
+
+    jest.setSystemTime(startedAt + RECEIPT_RETENTION_MS + DAY_MS)
+    await t.mutation(internal.crons.pruneOldReceipts, {})
+    await expect(owner.mutation(api.decks.syncCreateVersion, create)).resolves.toEqual(created)
+    const versions = await t.run((ctx) =>
+      ctx.db
+        .query("deckVersions")
+        .withIndex("by_deck_and_version_number", (q) => q.eq("deckId", deckId))
+        .collect(),
+    )
+    expect(versions).toHaveLength(2)
+  })
 })

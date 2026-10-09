@@ -9,11 +9,11 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export const RECEIPT_RETENTION_MS = 365 * DAY_MS
 export const RECEIPT_PRUNE_BATCH_SIZE = 100
 
+// why: deckVersionSyncReceipts stays until syncCreateVersion has another duplicate guard; its receipt is the only one.
 const RECEIPT_TABLES = [
   "gamePublishReceipts",
   "gameCompletionReceipts",
   "deckSyncReceipts",
-  "deckVersionSyncReceipts",
   "revenueCatWebhookEvents",
 ] as const
 
