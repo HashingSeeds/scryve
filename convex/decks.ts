@@ -380,14 +380,15 @@ export const listMine = query({
       deckCapacity(ctx, user),
       hasFeature(ctx, user, PREMIUM_FEATURES.deckAnalytics),
     ])
-    const owned = await ctx.db
+    const active = await ctx.db
       .query("decks")
-      .withIndex("by_owner_and_updated_at", (q) => q.eq("ownerUserId", user._id))
-      .order("desc")
+      .withIndex("by_owner_and_archived_at", (q) =>
+        q.eq("ownerUserId", user._id).eq("archivedAt", undefined),
+      )
       .take(MAX_PREMIUM_DECKS + 1)
     const decks = await Promise.all(
-      owned
-        .filter((deck) => deck.archivedAt === undefined)
+      active
+        .sort((left, right) => right.updatedAt - left.updatedAt)
         .slice(0, MAX_PREMIUM_DECKS)
         .map(async (deck) => {
           const versions = await activeVersions(ctx, deck._id)
@@ -746,6 +747,8 @@ export const saveVersion = mutation({
     const target = args.versionId
       ? versions.find((version) => version._id === args.versionId)
       : versions[versions.length - 1]
+    if (args.versionId && !target)
+      throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
     const now = Date.now()
     if (!target) {
       const versionId = await insertDeckVersion(
