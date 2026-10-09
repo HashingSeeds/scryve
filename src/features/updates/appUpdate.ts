@@ -126,15 +126,22 @@ function overrideChannel(channel: string | null) {
   Updates.setUpdateRequestHeadersOverride(channel ? { "expo-channel-name": channel } : null)
 }
 
+// why: a second link while a switch is in flight could reset the override the first one set.
+let switching = false
+
 /**
  * why: the pr-preview workflow publishes each labeled PR to its own `pr-<number>` channel. Without
  * a compatible update there, the build keeps the channel it is running.
  */
-export async function openPrPreview(channel: string): Promise<"current" | "missing" | "reloading"> {
+export async function openPrPreview(
+  channel: string,
+): Promise<"busy" | "current" | "missing" | "reloading"> {
   if (!isPrChannel(channel)) return "missing"
+  if (switching) return "busy"
+  switching = true
   const running = isPrChannel(Updates.channel) ? Updates.channel : null
-  overrideChannel(channel)
   try {
+    overrideChannel(channel)
     const result = await Updates.checkForUpdateAsync()
     if (!result.isAvailable) {
       if (running === channel) return "current"
@@ -142,19 +149,31 @@ export async function openPrPreview(channel: string): Promise<"current" | "missi
       return "missing"
     }
     await Updates.fetchUpdateAsync()
+    await Updates.reloadAsync()
+    return "reloading"
   } catch (error) {
     overrideChannel(running)
     throw error
+  } finally {
+    switching = false
   }
-  await Updates.reloadAsync()
-  return "reloading"
 }
 
 export async function backToPreview() {
-  overrideChannel(null)
-  const result = await Updates.checkForUpdateAsync()
-  if (result.isAvailable) await Updates.fetchUpdateAsync()
-  await Updates.reloadAsync()
+  if (switching) return
+  switching = true
+  const running = isPrChannel(Updates.channel) ? Updates.channel : null
+  try {
+    overrideChannel(null)
+    const result = await Updates.checkForUpdateAsync()
+    if (result.isAvailable) await Updates.fetchUpdateAsync()
+    await Updates.reloadAsync()
+  } catch (error) {
+    overrideChannel(running)
+    throw error
+  } finally {
+    switching = false
+  }
 }
 
 export function restartToUpdate() {

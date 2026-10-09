@@ -18,6 +18,7 @@ export default function PrPreviewRoute() {
       (result) => {
         if (!current) return
         if (result === "current") goHome()
+        if (result === "busy") setMessage("Another preview is still loading. Open this link again.")
         if (result === "missing")
           setMessage(
             `${channel} has no update this build can run. It may need a new preview build.`,

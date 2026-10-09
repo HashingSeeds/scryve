@@ -34,15 +34,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -66,20 +66,25 @@ jobs:
           # eas-cli can log lines before the JSON on stdout (expo/eas-cli#3870).
           json() { awk 'found{print} !found && /^[{[]/{found=1; print}'; }
 
-          # why: list every page before deleting, since deleting shifts the offsets.
-          branches=()
-          offset=0
-          while :; do
-            page=$(eas branch:list --limit 25 --offset "$offset" --json --non-interactive | json \
-              | jq -r '.[].name')
-            [ -z "$page" ] && break
-            mapfile -t -O "${#branches[@]}" branches <<< "$page"
-            offset=$((offset + 25))
-          done
+          # Prints every PR channel or branch name. Lists all pages before anything is deleted,
+          # since deleting shifts the offsets.
+          pr_names() {
+            local offset=0 page
+            while :; do
+              page=$(eas "$1:list" --limit 25 --offset "$offset" --json --non-interactive | json \
+                | jq -r "$2 | .name")
+              [ -z "$page" ] && return
+              # why: the token can delete beta, preview, and production too; touch only PR channels.
+              grep -E '^pr-[0-9]+$' <<< "$page" || true
+              offset=$((offset + 25))
+            done
+          }
+          channels=$(pr_names channel '.currentPage[]')
+          branches=$(pr_names branch '.[]')
 
-          for name in "${branches[@]}"; do
-            # why: the token can delete beta, preview, and production too; touch only PR channels.
-            [[ "$name" =~ ^pr-[0-9]+$ ]] || continue
+          failed=0
+          mapfile -t names < <(printf '%s\n' "$channels" "$branches" | grep -E '^pr-[0-9]+$' | sort -u)
+          for name in "${names[@]}"; do
             if ! state=$(gh pr view "${name#pr-}" --json state --jq .state); then
               echo "::warning::could not read the state of PR ${name#pr-}; keeping $name"
               continue
@@ -90,8 +95,20 @@ jobs:
             fi
             echo "$([ "$DRY_RUN" = true ] && echo stale || echo delete) $name ($state)"
             [ "$DRY_RUN" = true ] && continue
-            # why: pr-preview creates the channel and branch together; the channel goes first so
-            # the branch is no longer linked. A failed half is retried by the next sweep.
-            eas channel:delete "$name" --non-interactive || echo "::warning::no channel $name"
-            eas branch:delete "$name" --non-interactive || echo "::warning::could not delete $name"
+            # why: the channel goes first so the branch is no longer linked. Both lists feed the
+            # sweep, so a half that fails here is retried by the next run, which still fails loudly.
+            if grep -qx "$name" <<< "$channels"; then
+              eas channel:delete "$name" --non-interactive || {
+                echo "::error::could not delete channel $name"
+                failed=1
+                continue
+              }
+            fi
+            if grep -qx "$name" <<< "$branches"; then
+              eas branch:delete "$name" --non-interactive || {
+                echo "::error::could not delete branch $name"
+                failed=1
+              }
+            fi
           done
+          exit "$failed"

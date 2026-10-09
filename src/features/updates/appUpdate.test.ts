@@ -54,6 +54,16 @@ describe("openPrPreview", () => {
     expect(Updates.reloadAsync).not.toHaveBeenCalled()
   })
 
+  it("ignores a second link while the first is still switching", async () => {
+    mockUpdates.channel = "preview"
+    mockUpdates.available = false
+    const first = openPrPreview("pr-1")
+    await expect(openPrPreview("pr-2")).resolves.toBe("busy")
+    await expect(first).resolves.toBe("missing")
+    expect(override.mock.calls).toEqual([[{ "expo-channel-name": "pr-1" }], [null]])
+    await expect(openPrPreview("pr-2")).resolves.toBe("missing")
+  })
+
   it("never overrides the channel for anything but a PR channel", async () => {
     await expect(openPrPreview("production")).resolves.toBe("missing")
     expect(override).not.toHaveBeenCalled()

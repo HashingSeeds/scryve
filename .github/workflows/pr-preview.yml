@@ -21,10 +21,11 @@ jobs:
       (github.event.action != 'labeled' || github.event.label.name == 'preview') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login == 'mchisolm0' }}
-    # why: job level, so adding an unrelated label does not cancel a publish in progress.
+    # why: job level, so an unrelated label skips without touching the queue. Never cancel: EAS
+    # keeps an update it already accepted, so a cancelled older push could land after a newer one.
     concurrency:
       group: pr-preview-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     environment: pr-preview
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -33,16 +34,16 @@ jobs:
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -64,12 +65,20 @@ jobs:
           # eas-cli can log lines before the JSON on stdout (expo/eas-cli#3870).
           json() { awk 'found{print} !found && /^[{[]/{found=1; print}'; }
           ready=()
+          log="$RUNNER_TEMP/fingerprint.log"
           for platform in ios android; do
             hash=$(eas fingerprint:generate --build-profile preview:device --platform "$platform" \
-              --json --non-interactive | json | jq -er .hash)
-            # why: a simulator build has the same runtime but cannot be installed on a phone.
-            builds=$(eas build:list --platform "$platform" --status finished --fingerprint-hash "$hash" \
-              --limit 10 --json --non-interactive | json | jq '[.[] | select(.isForIosSimulator | not)] | length')
+              --json --non-interactive 2> "$log" | json | jq -er .hash)
+            cat "$log" >&2
+            # why: when EAS env vars fail to load, eas-cli 22 only logs it and fingerprints with the
+            # profile's vars, which can match a build this commit cannot run.
+            if ! grep -Eq '(loaded from|found for) the "preview" environment on EAS' "$log"; then
+              echo "::error::eas fingerprint:generate did not load the preview EAS environment"
+              exit 1
+            fi
+            # why: preview:device is the phone profile; iOS `preview` builds are simulator-only.
+            builds=$(eas build:list --platform "$platform" --build-profile preview:device --status finished \
+              --fingerprint-hash "$hash" --limit 1 --json --non-interactive | json | jq length)
             if [ "$builds" -gt 0 ]; then
               ready+=("$platform")
               echo "$platform=ready" >> "$GITHUB_OUTPUT"
@@ -84,10 +93,24 @@ jobs:
           esac
           echo "platform=$platform" >> "$GITHUB_OUTPUT"
 
+      # why: runs queue rather than cancel, so a queued run for an older push skips here.
+      - name: Check this is still the PR head
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
+          if [ "$current" = "$HEAD_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::$HEAD_SHA is no longer the PR head ($current); skipping"
+          fi
+
       # Same key as the checks export job, restored read-only so that job stays the only writer.
       - name: Restore Metro cache
-        if: steps.runtime.outputs.platform != ''
-        uses: actions/cache/restore@v4
+        if: steps.head.outputs.current == 'true' && steps.runtime.outputs.platform != ''
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ runner.temp }}/metro-cache
           key: metro-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'babel.config.js', 'metro.config.js', 'app.json', 'app.config.ts') }}
@@ -95,7 +118,7 @@ jobs:
       # why: `--channel` creates the pr-<number> channel and branch when they are missing. This ships
       # unmerged code, so the preview EAS environment must never point at production Convex.
       - name: Publish to the PR channel
-        if: steps.runtime.outputs.platform != ''
+        if: steps.head.outputs.current == 'true' && steps.runtime.outputs.platform != ''
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_PREVIEW_TOKEN }}
           APP_VARIANT: preview
@@ -106,7 +129,8 @@ jobs:
             --non-interactive --message "PR preview at ${HEAD_SHA:0:7}"
 
       - name: Update pull request comment
-        uses: actions/github-script@v7
+        if: steps.head.outputs.current == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           IOS: ${{ steps.runtime.outputs.ios }}
           ANDROID: ${{ steps.runtime.outputs.android }}

@@ -83,6 +83,7 @@ export function SettingsScreen({
   const [analyticsError, setAnalyticsError] = useState("")
   const [beta, setBeta] = useState(betaUpdatesChosen)
   const [versionTaps, setVersionTaps] = useState(0)
+  const [previewError, setPreviewError] = useState("")
   const unavailable = Platform.OS === "web" ? "Not applicable" : "Unavailable"
   const appInfo = {
     Version:
@@ -416,8 +417,16 @@ export function SettingsScreen({
             <Button
               testID="back-to-preview-button"
               text="Back to preview"
-              onPress={() => void backToPreview().catch(() => undefined)}
+              onPress={() => {
+                setPreviewError("")
+                backToPreview().catch(() =>
+                  setPreviewError("Could not go back to preview. Try again."),
+                )
+              }}
             />
+          ) : null}
+          {previewError ? (
+            <Text text={previewError} size="sm" accessibilityLiveRegion="polite" />
           ) : null}
           <Button
             testID="copy-debug-info-button"

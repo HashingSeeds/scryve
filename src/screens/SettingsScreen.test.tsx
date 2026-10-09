@@ -327,6 +327,17 @@ describe("SettingsScreen", () => {
       expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith(null)
       await waitFor(() => expect(Updates.reloadAsync).toHaveBeenCalled())
     })
+
+    it("keeps the PR channel and says so when going back to preview fails", async () => {
+      mockUpdates.channel = "pr-12"
+      jest.mocked(Updates.checkForUpdateAsync).mockRejectedValueOnce(new Error("offline"))
+      const view = renderSettings()
+      fireEvent.press(view.getByTestId("back-to-preview-button"))
+      expect(await view.findByText("Could not go back to preview. Try again.")).toBeTruthy()
+      expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith({
+        "expo-channel-name": "pr-12",
+      })
+    })
   })
 
   it("exposes the two shipping menu button treatments", () => {
