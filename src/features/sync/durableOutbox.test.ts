@@ -1,5 +1,3 @@
-import { reportCrash } from "@/utils/crashReporting"
-
 import {
   DURABLE_QUARANTINE_PREFIX,
   DurableOutbox,
@@ -7,12 +5,8 @@ import {
   type DurableOutboxCodec,
   type DurableOutboxKeys,
   type DurablePendingRecord,
+  setQuarantineReporter,
 } from "./durableOutbox"
-
-jest.mock("@/utils/crashReporting", () => ({
-  ErrorType: { HANDLED: "Handled" },
-  reportCrash: jest.fn(),
-}))
 
 interface NoteOperation extends DurablePendingRecord {
   schemaVersion: 1
@@ -157,8 +151,8 @@ describe("durable outbox", () => {
   })
 
   it("reports each quarantine once with metadata only, and a clean load not at all", () => {
-    const report = jest.mocked(reportCrash)
-    report.mockClear()
+    const report = jest.fn()
+    setQuarantineReporter(report)
     const storage = new MemoryStorage()
     const outbox = new DurableOutbox(storage, "owner", keys, codec)
     outbox.enqueue(operation("note-valid", 1), "deck")
@@ -170,14 +164,9 @@ describe("durable outbox", () => {
     outbox.loadPending("deck")
     outbox.loadPending("deck")
 
-    expect(report).toHaveBeenCalledTimes(1)
-    const [error, , context] = report.mock.calls[0]
-    expect(error.name).toBe("OutboxQuarantine")
-    expect(context).toEqual({
-      tags: { outbox: "notes.pending.v1" },
-      extra: { count: 2, reasons: ["rejected", "empty"] },
-      fingerprint: ["outbox-quarantine", "notes.pending.v1"],
-    })
+    expect(report.mock.calls).toEqual([
+      [{ outbox: "notes.pending.v1", count: 2, reasons: ["rejected", "empty"] }],
+    ])
     expect(JSON.stringify(report.mock.calls)).not.toMatch(/owner|private|note-secret/)
   })
 
