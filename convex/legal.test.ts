@@ -1,22 +1,14 @@
-import { convexTest } from "convex-test"
-
+import { makeConvexTest } from "../test/convexTest"
 import { api } from "./_generated/api"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./legal.ts": async () => jest.requireActual("./legal"),
-}
 
 describe("legal acceptances", () => {
   it("returns null for a signed-out visitor", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await expect(t.query(api.legal.currentAcceptances, {})).resolves.toBeNull()
   })
 
   it("records an acceptance and reads it back", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "consent-user" })
     await actor.mutation(api.legal.recordAcceptance, {
       document: "terms",
@@ -29,7 +21,7 @@ describe("legal acceptances", () => {
   })
 
   it("keeps one row per document and updates it on a new version", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "consent-user" })
     await actor.mutation(api.legal.recordAcceptance, {
       document: "privacy",
@@ -48,7 +40,7 @@ describe("legal acceptances", () => {
   })
 
   it("does not separate acceptances between users", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await t.withIdentity({ subject: "first" }).mutation(api.legal.recordAcceptance, {
       document: "terms",
       version: "2026-08-18",
@@ -60,7 +52,7 @@ describe("legal acceptances", () => {
   })
 
   it("refuses to record consent for a different account than the one that gave it", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const second = t.withIdentity({ subject: "second" })
     await expect(
       second.mutation(api.legal.recordAcceptance, {
@@ -81,7 +73,7 @@ describe("legal acceptances", () => {
   })
 
   it("rejects an acceptance from a signed-out visitor", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await expect(
       t.mutation(api.legal.recordAcceptance, {
         document: "terms",
@@ -92,7 +84,7 @@ describe("legal acceptances", () => {
   })
 
   it("rejects a blank version", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await expect(
       t.withIdentity({ subject: "blank" }).mutation(api.legal.recordAcceptance, {
         document: "terms",
