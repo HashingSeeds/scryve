@@ -12,7 +12,7 @@ const FALLBACK_SENTRY_DSN =
 
 const TAP_FREQUENCY_EVENT_KEEP_PROBABILITY = 0.05
 
-// why: about 1,600 sessions a month at roughly 20 spans each is ~6,400 spans at this rate, against the plan's 5M monthly span quota.
+// why: ~1,600 sessions a month at about 10 spans each is ~3,200 spans at this rate, under 0.1% of the plan's 5M monthly span quota.
 const NATIVE_TRACES_SAMPLE_RATE = 0.2
 
 export const navigationTracing = Sentry.reactNavigationIntegration()
