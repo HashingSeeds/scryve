@@ -28,8 +28,11 @@ import {
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import {
+  backToPreview,
   betaUpdatesChosen,
+  canOpenPrPreview,
   canSwitchToBeta,
+  isPrChannel,
   setBetaUpdates,
   updateChannelLabel,
 } from "@/features/updates/appUpdate"
@@ -80,6 +83,7 @@ export function SettingsScreen({
   const [analyticsError, setAnalyticsError] = useState("")
   const [beta, setBeta] = useState(betaUpdatesChosen)
   const [versionTaps, setVersionTaps] = useState(0)
+  const [previewError, setPreviewError] = useState("")
   const unavailable = Platform.OS === "web" ? "Not applicable" : "Unavailable"
   const appInfo = {
     Version:
@@ -408,6 +412,21 @@ export function SettingsScreen({
                 if (setBetaUpdates(value)) setBeta(value)
               }}
             />
+          ) : null}
+          {canOpenPrPreview() && isPrChannel(Updates.channel) ? (
+            <Button
+              testID="back-to-preview-button"
+              text="Back to preview"
+              onPress={() => {
+                setPreviewError("")
+                backToPreview().catch(() =>
+                  setPreviewError("Could not go back to preview. Try again."),
+                )
+              }}
+            />
+          ) : null}
+          {previewError ? (
+            <Text text={previewError} size="sm" accessibilityLiveRegion="polite" />
           ) : null}
           <Button
             testID="copy-debug-info-button"

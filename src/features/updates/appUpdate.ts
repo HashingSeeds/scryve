@@ -106,6 +106,80 @@ export function setBetaUpdates(enabled: boolean) {
   return true
 }
 
+const PR_CHANNEL = /^pr-[0-9]+$/
+
+export function isPrChannel(channel: string | null | undefined): channel is string {
+  return !!channel && PR_CHANNEL.test(channel)
+}
+
+/** why: the `preview` EAS profile (APP_VARIANT=preview) is the only build on these channels. */
+export function canOpenPrPreview() {
+  return (
+    Platform.OS !== "web" &&
+    Updates.isEnabled &&
+    !__DEV__ &&
+    (Updates.channel === "preview" || isPrChannel(Updates.channel))
+  )
+}
+
+function overrideChannel(channel: string | null) {
+  Updates.setUpdateRequestHeadersOverride(channel ? { "expo-channel-name": channel } : null)
+}
+
+// why: a second link while a switch is in flight could reset the override the first one set.
+let switching = false
+
+/**
+ * why: the pr-preview workflow publishes each labeled PR to its own `pr-<number>` channel. Without
+ * a compatible update there, the build keeps the channel it is running.
+ */
+export async function openPrPreview(
+  channel: string,
+): Promise<"busy" | "current" | "missing" | "reloading"> {
+  if (!isPrChannel(channel)) return "missing"
+  if (switching) return "busy"
+  switching = true
+  const running = isPrChannel(Updates.channel) ? Updates.channel : null
+  try {
+    overrideChannel(channel)
+    const result = await Updates.checkForUpdateAsync()
+    if (!result.isAvailable) {
+      if (running === channel) return "current"
+      overrideChannel(running)
+      return "missing"
+    }
+    await Updates.fetchUpdateAsync()
+    await Updates.reloadAsync()
+    return "reloading"
+  } catch (error) {
+    overrideChannel(running)
+    throw error
+  } finally {
+    switching = false
+  }
+}
+
+/**
+ * why: expo-updates launches a cached update only when its saved request headers match the current
+ * ones (LauncherSelectionPolicyFilterAware), so clearing the override cannot relaunch a pr-N update.
+ */
+export async function backToPreview() {
+  if (switching) return
+  switching = true
+  const running = isPrChannel(Updates.channel) ? Updates.channel : null
+  try {
+    overrideChannel(null)
+    const result = await Updates.checkForUpdateAsync()
+    if (result.isAvailable) await Updates.fetchUpdateAsync()
+    await Updates.reloadAsync()
+  } catch (error) {
+    overrideChannel(running)
+    throw error
+  } finally {
+    switching = false
+  }
+}
+
 export function restartToUpdate() {
   Updates.reloadAsync().catch(() => undefined)
 }

@@ -317,6 +317,27 @@ describe("SettingsScreen", () => {
       tapVersion(view, 5)
       expect(view.queryByTestId("beta-updates-switch")).toBeNull()
     })
+
+    it("offers Back to preview only while a preview build runs a PR channel", async () => {
+      expect(renderSettings().queryByTestId("back-to-preview-button")).toBeNull()
+      mockUpdates.channel = "pr-12"
+      const view = renderSettings()
+      expect(view.getByText("Channel: pr-12")).toBeTruthy()
+      fireEvent.press(view.getByTestId("back-to-preview-button"))
+      expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith(null)
+      await waitFor(() => expect(Updates.reloadAsync).toHaveBeenCalled())
+    })
+
+    it("keeps the PR channel and says so when going back to preview fails", async () => {
+      mockUpdates.channel = "pr-12"
+      jest.mocked(Updates.checkForUpdateAsync).mockRejectedValueOnce(new Error("offline"))
+      const view = renderSettings()
+      fireEvent.press(view.getByTestId("back-to-preview-button"))
+      expect(await view.findByText("Could not go back to preview. Try again.")).toBeTruthy()
+      expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith({
+        "expo-channel-name": "pr-12",
+      })
+    })
   })
 
   it("exposes the two shipping menu button treatments", () => {

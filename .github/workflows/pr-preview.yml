@@ -1,0 +1,401 @@
+name: pr preview
+
+# why: publishes a labeled PR as an EAS update on its own `pr-<number>` channel, so a preview build
+# can open it from the sticky comment without a new binary. Only `pull_request` runs this. Never
+# add pull_request_target or workflow_run: they run with secrets for code a fork controls.
+#
+# The bundle job runs the PR's dependencies with no secrets. The publish job holds the Expo token,
+# waits for approval in the pr-preview environment, and runs only the PR base's code (main). It
+# reads the PR's export as data and publishes it under the base's app config.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    # why: the author check is a filter, not the security boundary. Under `pull_request` this file
+    # comes from the PR branch, so a branch could rewrite it. The boundary is that only Matthew's
+    # account can push branches here, GitHub never gives fork PRs secrets, and publishing needs
+    # his approval.
+    if: >-
+      ${{ contains(github.event.pull_request.labels.*.name, 'preview') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'preview') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'mchisolm0' }}
+    concurrency:
+      group: pr-preview-bundle-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      flags: ${{ steps.flags.outputs.flags }}
+      ios: ${{ steps.fingerprints.outputs.ios }}
+      android: ${{ steps.fingerprints.outputs.android }}
+    steps:
+      # why: runs before the PR's dependencies are installed, so nothing they run can shape the
+      # flags Matthew reads before approving.
+      - name: Flag dependency and config changes
+        id: flags
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          script: |
+            const { owner, repo } = context.repo
+            const issue_number = context.issue.number
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: issue_number,
+            })
+            const changed = (names) => files.some(({ filename }) => names.some((name) =>
+              name.endsWith("/") ? filename.startsWith(name) : filename === name))
+            const flags = []
+            if (changed(["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/"]))
+              flags.push("> [!WARNING]\n> Dependencies changed (package.json, lockfile, or patches).")
+            if (changed(["babel.config.js", "metro.config.js", "eas.json"]))
+              flags.push("> [!WARNING]\n> Build config changed (babel, metro, or eas.json).")
+            if (changed(["app.json", "app.config.ts"]))
+              flags.push("> [!WARNING]\n> App config changed. The preview carries main's app config, not this PR's.")
+            core.setOutput("flags", flags.join("\n\n"))
+
+            const marker = "<!-- pr-preview -->"
+            const body = [
+              marker,
+              ...flags,
+              `**Preview** \`pr-${issue_number}\` at ${process.env.HEAD_SHA.slice(0, 7)}: bundling, then waiting for approval in \`pr-preview\`.`,
+            ].join("\n\n")
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+            })
+            const existing = comments.find(
+              (comment) => comment.user?.type === "Bot" && comment.body?.includes(marker),
+            )
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body })
+            }
+
+      - name: Check out pull request
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # why: matches `eas fingerprint:generate --build-profile preview:device` without an Expo
+      # token: the profile's eas.json env, and managed workflow since ios/ and android/ are ignored.
+      # EAS env vars do not change fingerprints today (fingerprint-drift checks); if one starts to,
+      # the publish job's comparison fails closed.
+      - name: Compute preview fingerprints
+        id: fingerprints
+        shell: bash
+        run: |
+          set -euo pipefail
+          entries=$(jq -r '.build.production.env + .build.preview.env
+            | to_entries[] | "\(.key)=\(.value)"' eas.json)
+          mapfile -t profile_env <<< "$entries"
+          for platform in ios android; do
+            result=$(env -i PATH="$PATH" HOME="$HOME" EXPO_NO_DOTENV=1 "${profile_env[@]}" \
+              pnpm exec expo-updates runtimeversion:resolve --platform "$platform" --workflow managed)
+            hash=$(tail -n 1 <<< "$result" | jq -er .runtimeVersion)
+            echo "$platform=$hash" >> "$GITHUB_OUTPUT"
+          done
+
+      # why: EXPO_PUBLIC_* values are inlined into the bundle, and reading the EAS preview env needs
+      # a token, so repository variables mirror it. They must match the EAS `preview` environment.
+      - name: Export update bundles
+        env:
+          APP_VARIANT: preview
+          EXPO_NO_DOTENV: "1"
+          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.PREVIEW_EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_CONVEX_URL: ${{ vars.PREVIEW_EXPO_PUBLIC_CONVEX_URL }}
+          EXPO_PUBLIC_CONVEX_SITE_URL: ${{ vars.PREVIEW_EXPO_PUBLIC_CONVEX_SITE_URL }}
+          EXPO_PUBLIC_POSTHOG_HOST: ${{ vars.PREVIEW_EXPO_PUBLIC_POSTHOG_HOST }}
+          EXPO_PUBLIC_POSTHOG_KEY: ${{ vars.PREVIEW_EXPO_PUBLIC_POSTHOG_KEY }}
+          EXPO_PUBLIC_REVENUECAT_API_KEY: ${{ vars.PREVIEW_EXPO_PUBLIC_REVENUECAT_API_KEY }}
+          TMPDIR: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLERK_PUBLISHABLE_KEY CONVEX_URL CONVEX_SITE_URL POSTHOG_HOST POSTHOG_KEY \
+            REVENUECAT_API_KEY; do
+            var="EXPO_PUBLIC_$name"
+            [ -n "${!var}" ] || { echo "::error::set the PREVIEW_$var repository variable"; exit 1; }
+          done
+          entries=$(jq -r '.build.production.env + .build.preview.env
+            | to_entries[] | "\(.key)=\(.value)"' eas.json)
+          mapfile -t profile_env <<< "$entries"
+          export "${profile_env[@]}"
+          # Same flags `eas update` passes to `expo export`, minus source maps.
+          pnpm exec expo export --output-dir dist --dump-assetmap --platform ios --platform android
+
+      - name: Upload update bundles
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-preview-dist
+          path: |
+            dist/metadata.json
+            dist/assetmap.json
+            dist/_expo/
+            dist/assets/
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: bundle
+    # why: job level, so an unrelated label skips without touching the queue. Never cancel: EAS
+    # keeps an update it already accepted, so a cancelled older push could land after a newer one.
+    concurrency:
+      group: pr-preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    # why: holds EXPO_PREVIEW_TOKEN and requires Matthew's approval.
+    environment: pr-preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    env:
+      CHANNEL: pr-${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      # why: approval and queued runs can lag, so an older push, a closed PR, or a removed label
+      # skips here, and again just before publishing and commenting. A close that lands after the
+      # last check is caught by the daily cleanup sweep, which lists channels as well as branches.
+      - name: Check the PR still wants this preview
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '"\(.head.sha) \(.state) \(any(.labels[]; .name == "preview"))"')
+          if [ "$pr" = "$HEAD_SHA open true" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::skipping: PR is now $pr"
+          fi
+
+      # why: the base is a main commit, so the token only meets main's code and dependencies.
+      - name: Check out PR base
+        if: steps.head.outputs.current == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        if: steps.head.outputs.current == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      # why: no dependency cache. The bundle job's run of the PR could write one this job restores.
+      - name: Set up Node.js
+        if: steps.head.outputs.current == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      # why: EAS evaluates app.config.ts, which imports expo/config-plugins, and resolves the
+      # fingerprint runtime through expo-updates.
+      - name: Install base dependencies
+        if: steps.head.outputs.current == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Install EAS CLI
+        if: steps.head.outputs.current == 'true'
+        run: npm install -g eas-cli@22.2.0
+
+      # why: preview:device sets no env of its own, so this is what `eas build` and
+      # `eas fingerprint:generate` use. `eas update` ignores build profiles, so publishing needs it
+      # set here to resolve the same runtime as the installed builds.
+      - name: Load the preview:device profile env
+        if: steps.head.outputs.current == 'true'
+        run: >-
+          jq -r '.build.production.env + .build.preview.env | to_entries[] | "\(.key)=\(.value)"'
+          eas.json >> "$GITHUB_ENV"
+
+      # why: the bundle job ran the PR's dependencies, so its artifact is data. download-artifact
+      # would extract it before anything checks the entry names, so the raw zip is checked first
+      # and unpacked outside the checkout.
+      - name: Fetch update bundles
+        if: steps.head.outputs.current == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+            --jq '[.artifacts[] | select(.name == "pr-preview-dist") | .id]
+              | if length == 1 then .[0] else error("expected one pr-preview-dist artifact") end')
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/pr-preview-dist.zip"
+          python3 -I scripts/pr-preview-unzip.py "$RUNNER_TEMP/pr-preview-dist.zip" \
+            "$RUNNER_TEMP/preview-artifact"
+
+      # why: eas-cli reads only metadata.json, assetmap.json, and the files metadata.json lists.
+      - name: Validate update bundles
+        if: steps.head.outputs.current == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dist="$RUNNER_TEMP/preview-artifact"
+          jq -e '.version == 0 and .bundler == "metro"
+            and (.fileMetadata | keys - ["android", "ios"] | length == 0)' "$dist/metadata.json" >/dev/null
+          jq -e . "$dist/assetmap.json" >/dev/null
+          paths=$(jq -r '.fileMetadata[] | .bundle, .assets[].path' "$dist/metadata.json")
+          while IFS= read -r file; do
+            if ! [[ "$file" =~ ^(_expo/static/js/(ios|android)/[A-Za-z0-9_.-]+\.(hbc|js)|assets/[0-9a-f]{32})$ ]] \
+              || [ ! -f "$dist/$file" ]; then
+              echo "::error::unexpected bundle path: $file"
+              exit 1
+            fi
+          done <<< "$paths"
+
+      - name: Find preview builds that can run this PR
+        id: runtime
+        if: steps.head.outputs.current == 'true'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_PREVIEW_TOKEN }}
+          PR_IOS: ${{ needs.bundle.outputs.ios }}
+          PR_ANDROID: ${{ needs.bundle.outputs.android }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # eas-cli can log lines before the JSON on stdout (expo/eas-cli#3870).
+          json() { awk 'found{print} !found && /^[{[]/{found=1; print}'; }
+          log="$RUNNER_TEMP/fingerprint.log"
+          ready=()
+          for platform in ios android; do
+            pr_var="PR_${platform^^}"
+            pr_hash="${!pr_var}"
+            [[ "$pr_hash" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::bad $platform fingerprint"; exit 1; }
+            hash=$(eas fingerprint:generate --build-profile preview:device --platform "$platform" \
+              --json --non-interactive 2> "$log" | json | jq -er .hash)
+            cat "$log" >&2
+            # why: when EAS env vars fail to load, eas-cli 22 only logs it and fingerprints with the
+            # profile's vars, which can match a build this commit cannot run.
+            if ! grep -Eq '(loaded from|found for) the "preview" environment on EAS' "$log"; then
+              echo "::error::eas fingerprint:generate did not load the preview EAS environment"
+              exit 1
+            fi
+            # why: the update is published from the base, so its runtime is the base's.
+            if [ "$hash" != "$pr_hash" ]; then
+              echo "$platform=native change or stale base: rebase (\`${pr_hash:0:8}\` vs base \`${hash:0:8}\`)" >> "$GITHUB_OUTPUT"
+              continue
+            fi
+            # why: preview:device is the phone profile; iOS `preview` builds are simulator-only.
+            builds=$(eas build:list --platform "$platform" --build-profile preview:device --status finished \
+              --fingerprint-hash "$hash" --limit 1 --json --non-interactive | json | jq length)
+            if [ "$builds" -gt 0 ]; then
+              ready+=("$platform")
+              echo "$platform=ready" >> "$GITHUB_OUTPUT"
+            else
+              echo "$platform=native change: needs a new preview build (\`${hash:0:8}\`)" >> "$GITHUB_OUTPUT"
+            fi
+          done
+          case "${#ready[@]}" in
+            0) platform="" ;;
+            1) platform="${ready[0]}" ;;
+            *) platform=all ;;
+          esac
+          echo "platform=$platform" >> "$GITHUB_OUTPUT"
+
+      # why: `--channel` creates the pr-<number> channel and branch when they are missing. This ships
+      # unmerged code, so the preview EAS environment must never point at production Convex.
+      - name: Publish to the PR channel
+        id: publish
+        if: steps.head.outputs.current == 'true' && steps.runtime.outputs.platform != ''
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_PREVIEW_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          PLATFORM: ${{ steps.runtime.outputs.platform }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '"\(.head.sha) \(.state) \(any(.labels[]; .name == "preview"))"')
+          if [ "$pr" != "$HEAD_SHA open true" ]; then
+            echo "::notice::skipping: PR is now $pr"
+            exit 0
+          fi
+          eas update --skip-bundler --input-dir "$RUNNER_TEMP/preview-artifact" --channel "$CHANNEL" \
+            --environment preview --platform "$PLATFORM" --non-interactive \
+            --message "PR preview at ${HEAD_SHA:0:7}"
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Update pull request comment
+        if: steps.head.outputs.current == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          FLAGS: ${{ needs.bundle.outputs.flags }}
+          IOS: ${{ steps.runtime.outputs.ios }}
+          ANDROID: ${{ steps.runtime.outputs.android }}
+          PUBLISHED: ${{ steps.publish.outputs.published }}
+        with:
+          script: |
+            const marker = "<!-- pr-preview -->"
+            const { CHANNEL, HEAD_SHA, FLAGS, IOS, ANDROID, PUBLISHED } = process.env
+            const { owner, repo } = context.repo
+            const issue_number = context.issue.number
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issue_number })
+            if (
+              pr.head.sha !== HEAD_SHA ||
+              pr.state !== "open" ||
+              !pr.labels.some((label) => label.name === "preview")
+            ) {
+              core.notice("The PR moved on; a newer run owns the comment.")
+              return
+            }
+            const link = `scryve-preview://preview/${CHANNEL}`
+            // why: qr.expo.dev only encodes development-client links; the app accepts that form too.
+            const { projectId } = require(`${process.env.GITHUB_WORKSPACE}/app.json`).extra.eas
+            const updateUrl = `https://u.expo.dev/${projectId}?channel-name=${CHANNEL}`
+            const qr = `https://qr.expo.dev/development-client?appScheme=scryve-preview&url=${encodeURIComponent(updateUrl)}`
+            const sections = [
+              marker,
+              ...(FLAGS ? [FLAGS] : []),
+              [
+                `**Preview** \`${CHANNEL}\` at ${HEAD_SHA.slice(0, 7)}`,
+                "",
+                `- iOS: ${IOS}`,
+                `- Android: ${ANDROID}`,
+              ].join("\n"),
+            ]
+            if (PUBLISHED === "true") {
+              sections.push(
+                `<img src="${qr}" width="180" alt="QR code for ${link}">`,
+                `Scan with a phone that has Scryve (Preview), or open \`${link}\`.`,
+              )
+            }
+            const body = sections.join("\n\n")
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+            })
+            const existing = comments.find(
+              (comment) => comment.user?.type === "Bot" && comment.body?.includes(marker),
+            )
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body })
+            }
