@@ -23,10 +23,16 @@ import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import { addCommander, getCommanderWarnings } from "@/features/decks/commanderSelection"
+import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { DeckCardRow, DeckCardSectionHeader } from "@/features/decks/DeckCardRow"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel, deckNameWarning } from "@/features/decks/deckCopy"
+import {
+  addCommanderCard,
+  adjustCardQuantity,
+  cardLimitError,
+  incrementCard,
+} from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { DeckLimitDialog } from "@/features/decks/DeckLimit"
 import {
@@ -53,7 +59,7 @@ import {
   defaultDeckFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
-import { FREE_DECK_LIMIT, MAX_DECK_CARDS, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
+import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
 
 type CreationMode = "precon" | "paste" | "blank"
 
@@ -931,16 +937,7 @@ export function AddDeckScreen({
     setGuestConflict(false)
     setPendingGuestPayload(undefined)
     if (card.quantity + delta <= 0) setFocusedPreviewCard(undefined)
-    setPastedDraft({
-      ...pastedDraft,
-      cards: pastedDraft.cards.flatMap((entry) =>
-        printingKey(entry) !== printingKey(card)
-          ? [entry]
-          : entry.quantity + delta > 0
-            ? [{ ...entry, quantity: Math.min(999, entry.quantity + delta) }]
-            : [],
-      ),
-    })
+    setPastedDraft({ ...pastedDraft, cards: adjustCardQuantity(pastedDraft.cards, card, delta) })
   }
 
   function changeImportFormat(next?: string) {
@@ -965,30 +962,18 @@ export function AddDeckScreen({
     if (!pastedDraft) return "Review the import before adding cards."
     if (game === "mtg" && format === "commander" && cardSection(card) === "commander") {
       const cached = loadCardDetails()
-      const result = addCommander(
+      const result = addCommanderCard(
         pastedCards,
         card,
         (entry) => cached[cardDetailsKey(entry, game)],
-        card.commanderColor,
       )
       if ("error" in result) return result.error
-      if (result.cards.length > MAX_DECK_CARDS)
-        return `A deck can have at most ${MAX_DECK_CARDS} entries.`
       setPastedDraft({ ...pastedDraft, cards: result.cards })
       setPastedCommanderSelected(true)
     } else {
-      const existing = pastedCards.find((entry) => printingKey(entry) === printingKey(card))
-      if (existing && existing.quantity >= 999) return "A card can have at most 999 copies."
-      if (!existing && pastedCards.length >= MAX_DECK_CARDS)
-        return `A deck can have at most ${MAX_DECK_CARDS} entries.`
-      setPastedDraft({
-        ...pastedDraft,
-        cards: existing
-          ? pastedCards.map((entry) =>
-              entry === existing ? { ...entry, quantity: entry.quantity + 1 } : entry,
-            )
-          : [...pastedCards, card],
-      })
+      const limitError = cardLimitError(pastedCards, card)
+      if (limitError) return limitError
+      setPastedDraft({ ...pastedDraft, cards: incrementCard(pastedCards, card) })
     }
     if (choosingPastedCommander) setAddingPastedCard(false)
     setGuestConflict(false)

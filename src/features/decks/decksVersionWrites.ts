@@ -19,6 +19,7 @@ import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "
 import { storage } from "@/utils/storage"
 
 import { scopedOwnerId } from "./decksSync"
+import { DECK_VERSION_CONFLICT_REASON, DECK_VERSION_QUEUE_CONFLICT_REASON } from "./deckSyncReasons"
 import { DeckVersionCacheRepository, type CachedVersion } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import { MAX_DECK_NOTE_LENGTH, assertVersionName } from "../../../convex/lib/policy"
@@ -58,10 +59,7 @@ const SCOPE = "versionCards"
 const RETRY_DELAY_MS = 2_000
 // why: each card write is a full list; a 300-entry deck is ~190 KB, past the default budget.
 const VERSION_OUTBOX_LIMITS = { maxPendingBytes: 512 * 1024, maxFailedBytes: 512 * 1024 }
-export const DECK_VERSION_CONFLICT_REASON =
-  "Deck cards changed on another device. Choose which card list to keep."
-export const DECK_VERSION_QUEUE_CONFLICT_REASON =
-  "An earlier card edit conflicted. Choose which card list to keep."
+export { DECK_VERSION_CONFLICT_REASON, DECK_VERSION_QUEUE_CONFLICT_REASON }
 export const DECK_VERSION_DRAFT_UNSYNCED_REASON =
   "This offline draft was never synced. Discard it and create the version again."
 export const DECK_VERSION_LAST_REASON = "A deck must keep at least one version."

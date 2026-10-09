@@ -25,6 +25,7 @@ import {
   type DeckSyncController,
   type SyncedDeck,
 } from "./decksSync"
+import { DECK_CONFLICT_REASON } from "./deckSyncReasons"
 import { api } from "../../../convex/_generated/api"
 import { assertDeckName, assertDeckFormat, assertDeckNote } from "../../../convex/lib/policy"
 
@@ -54,9 +55,10 @@ export interface DeckSyncWriteSnapshot {
   capacityBlocked: boolean
 }
 
+export { DECK_CONFLICT_REASON }
+
 const SCOPE = "metadata"
 const RETRY_DELAY_MS = 2_000
-export const DECK_CONFLICT_REASON = "Deck changed on another device. Choose which version to keep."
 export const DECK_REJECTED_REASON = "The server can't accept this edit. Discard it and edit again."
 const permanentErrors = new Set([
   "sync_conflict",
