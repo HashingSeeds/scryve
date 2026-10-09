@@ -212,9 +212,16 @@ const ignored = (path: string) => path === "writtenBy" || path.startsWith("writt
  */
 export function deriveFix(
   reported: Map<string, string>,
-  expected: Map<string, string>,
+  everything: Map<string, string>,
 ): Fix | undefined {
   if (!reported.size) return undefined
+  // why: a report only expands some levels, so only expected paths whose parent the report expanded can count as missing.
+  const reportedParents = new Set([...reported.keys()].map(parentOf))
+  const expected = new Map(
+    [...everything].filter(
+      ([path]) => parentOf(path) === "" || reportedParents.has(parentOf(path)),
+    ),
+  )
   const missing = [...expected.keys()].filter((path) => !reported.has(path) && !ignored(path))
   const extra = [...reported.keys()].filter((path) => !expected.has(path) && !ignored(path))
   const retyped = [...expected].filter(
