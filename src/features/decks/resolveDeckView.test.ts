@@ -292,14 +292,18 @@ describe("resolveDeckView metadata and status", () => {
   it("reads card details for commander warnings only after a commander choice", () => {
     const loadCardDetails = jest.fn(() => ({}))
     const commander = { ...card("Talrand"), section: "commander" }
-    const draft = openDeckDraft({ cards: [commander], note: "", fromCache: false })
+    const draft = openDeckDraft({
+      cards: [commander, card("Island"), card("Ponder")],
+      note: "",
+      fromCache: false,
+    })
     resolveDeckView(input({ detail: detail(), draft, loadCardDetails }))
     expect(loadCardDetails).not.toHaveBeenCalled()
 
     const view = resolveDeckView(
       input({ detail: detail(), draft: { ...draft, commanderSelected: true }, loadCardDetails }),
     )
-    expect(loadCardDetails).toHaveBeenCalled()
+    expect(loadCardDetails).toHaveBeenCalledTimes(1)
     expect(view.commanderWarnings).toEqual([
       "Some card details are missing. Deck color identity has not been fully checked.",
     ])

@@ -106,6 +106,11 @@ describe("deck draft editing", () => {
     expect(adjustCardQuantity(cards, cards[0], 5)[0].quantity).toBe(999)
     expect(adjustCardQuantity(cards, cards[0], -998)).toEqual([])
   })
+
+  it("decrements a merged entry above 999 by one copy", () => {
+    const cards = [card("Relentless Rats", { quantity: 1500 })]
+    expect(adjustCardQuantity(cards, cards[0], -1)[0].quantity).toBe(1499)
+  })
 })
 
 describe("deck draft limits", () => {
@@ -199,6 +204,26 @@ describe("planDeckSave", () => {
         canQueueNote: true,
       }),
     ).toEqual({ cards: "none", note: "queue", immediate: true })
+  })
+
+  it("saves both parts through the server when sync is off", () => {
+    expect(
+      planDeckSave({
+        changes: { cards: true, note: true },
+        canQueueCards: false,
+        canQueueNote: false,
+      }),
+    ).toEqual({ cards: "mutation", note: "mutation", immediate: false })
+  })
+
+  it("writes nothing when the draft has no changes", () => {
+    expect(
+      planDeckSave({
+        changes: { cards: false, note: false },
+        canQueueCards: true,
+        canQueueNote: true,
+      }),
+    ).toEqual({ cards: "none", note: "none", immediate: false })
   })
 
   it("saves through the server when cards cannot queue", () => {

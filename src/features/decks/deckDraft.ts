@@ -81,7 +81,15 @@ export function adjustCardQuantity<T extends DeckCard>(
     printingKey(entry) !== printingKey(card)
       ? [entry]
       : entry.quantity + delta > 0
-        ? [{ ...entry, quantity: Math.min(MAX_CARD_COPIES, entry.quantity + delta) }]
+        ? [
+            {
+              ...entry,
+              quantity:
+                delta > 0
+                  ? Math.min(MAX_CARD_COPIES, entry.quantity + delta)
+                  : entry.quantity + delta,
+            },
+          ]
         : [],
   )
 }

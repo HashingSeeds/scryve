@@ -167,8 +167,9 @@ export function resolveDeckView(input: DeckViewInput) {
       : draft.fromCache
     : cachedCards !== undefined
   const game = deck?.game ?? "mtg"
-  const commanderWarnings = draft.commanderSelected
-    ? getCommanderWarnings(cards, (card) => input.loadCardDetails()[cardDetailsKey(card, game)])
+  const cardDetails = draft.commanderSelected ? input.loadCardDetails() : undefined
+  const commanderWarnings = cardDetails
+    ? getCommanderWarnings(cards, (card) => cardDetails[cardDetailsKey(card, game)])
     : []
 
   const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)

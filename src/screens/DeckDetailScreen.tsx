@@ -38,6 +38,7 @@ import {
   reseedDeckDraft,
   restoreDraftUndo,
   setDraftNote,
+  type DeckDraft,
 } from "@/features/decks/deckDraft"
 import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
 import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
@@ -309,7 +310,14 @@ function DeckDetailContent({
   const archiveDeck = useMutation(api.decks.archive)
   const [tab, setTab] = useState<"cards" | "notes">("cards")
   const [statsSource, setStatsSource] = useState<StatsSource>("scryve")
-  const [draft, setDraft] = useState(closedDeckDraft)
+  const [draft, setDraftState] = useState(closedDeckDraft)
+  // why: search taps can land before a re-render, so limit checks must read the newest draft.
+  const latestDraft = useRef(draft)
+  latestDraft.current = draft
+  function setDraft(update: DeckDraft | ((current: DeckDraft) => DeckDraft)) {
+    latestDraft.current = typeof update === "function" ? update(latestDraft.current) : update
+    setDraftState(latestDraft.current)
+  }
   const [dialog, setDialog] = useState<DeckDialog>("none")
   const [pendingNavigation, setPendingNavigation] =
     useState<Parameters<typeof navigation.dispatch>[0]>()
@@ -374,7 +382,7 @@ function DeckDetailContent({
   const { displayCards } = view
   useEffect(() => {
     if (!draft.editing || !draft.fromCache || detail === undefined) return
-    setDraft((current) => reseedDeckDraft(current, displayCards))
+    setDraftState((current) => reseedDeckDraft(current, displayCards))
   }, [detail, displayCards, draft.editing, draft.fromCache])
 
   // Keeps the persistent cache fresh with live reads so the next offline session is current.
@@ -469,7 +477,7 @@ function DeckDetailContent({
 
   function addCard(card: DeckCard) {
     if (knownDeleted) return
-    const alreadyInDraft = draft.cards.some(
+    const alreadyInDraft = latestDraft.current.cards.some(
       (candidate) => printingKey(candidate) === printingKey(card),
     )
     if (!alreadyInDraft && offline) {
@@ -1003,7 +1011,7 @@ function DeckDetailContent({
             if (isCommanderPick(deck, card)) {
               const cached = loadCardDetails()
               const next = addDraftCommander(
-                draft,
+                latestDraft.current,
                 card,
                 (entry) => cached[cardDetailsKey(entry, deck.game)],
               )
@@ -1012,7 +1020,7 @@ function DeckDetailContent({
               if (choosingCommander) setAdding(false)
               return undefined
             }
-            const limitError = cardLimitError(draft.cards, card)
+            const limitError = cardLimitError(latestDraft.current.cards, card)
             if (limitError) return limitError
             addCard(card)
             return undefined

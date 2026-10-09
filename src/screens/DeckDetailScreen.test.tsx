@@ -904,6 +904,62 @@ describe("DeckDetailScreen", () => {
     expect(mockVersionCardUpdate).not.toHaveBeenCalled()
   })
 
+  it("stops at the entry limit when two adds land before a re-render", () => {
+    mockDeckSyncState.enabled = true
+    mockDeckSyncState.metadata = [cachedMetadata]
+    mockMetadataWriteState.metadata = [cachedMetadata]
+    mockDetail.value = undefined
+    mockConnectionState.isWebSocketConnected = false
+    mockVersionCacheState.version = {
+      deckId: "deck-1",
+      versionId: "version-main",
+      revision: 2,
+      versionNumber: 1,
+      name: "Main",
+      note: "",
+      fingerprint: "f1",
+      cardCount: 299,
+      cardQuantity: 299,
+      deleted: false,
+      updatedAt: 1,
+    }
+    mockVersionCacheState.versions = [mockVersionCacheState.version]
+    mockVersionCacheState.cards = Array.from({ length: 299 }, (_, index) => ({
+      ...solRing,
+      _id: `card-${index}`,
+      scryfallId: undefined,
+      oracleId: undefined,
+      printingId: `printing-${index}`,
+      name: `Filler ${index}`,
+    }))
+    const extra = (name: string) => ({
+      game: "mtg",
+      card: { ...solRing, scryfallId: undefined, oracleId: undefined, printingId: name, name },
+    })
+    mockVersionCacheState.knownCards = {
+      "Extra One": extra("Extra One"),
+      "Extra Two": extra("Extra Two"),
+    }
+    const view = renderDetail(offlineAccess)
+
+    fireEvent.press(view.getByTestId("edit-deck-button"))
+    fireEvent.press(view.getByTestId("deck-add-cards"))
+    fireEvent.changeText(view.getByTestId("card-search-input"), "Extra")
+    const first = view.getByLabelText("Add Extra One to deck")
+    const second = view.getByLabelText("Add Extra Two to deck")
+    act(() => {
+      fireEvent.press(first)
+      fireEvent.press(second)
+    })
+
+    expect(view.getByText("A deck can have at most 300 entries.")).toBeTruthy()
+    fireEvent.press(view.getByText("Done"))
+    fireEvent.press(view.getByTestId("save-version-button"))
+    const queued = mockVersionCardUpdate.mock.calls[0][2] as Array<Record<string, unknown>>
+    expect(queued).toHaveLength(300)
+    expect(queued.map((card) => card.name)).not.toContain("Extra Two")
+  })
+
   it("keeps another game system's cached cards out of the offline add candidates", () => {
     mockDeckSyncState.enabled = true
     mockDeckSyncState.metadata = [cachedMetadata]
