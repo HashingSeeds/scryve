@@ -14,6 +14,8 @@
  * 5 two web tabs, 6 corruption matrix, 7 recovery drill, 8 cost. Each failure prints its replay seed.
  * `gate` rows fail the run; `score` rows only grade a design.
  */
+import { makeFunctionReference } from "convex/server"
+
 import { contractClient, makeWorld, type Verdict, verdictFailed, type World } from "./contract"
 import {
   CORRUPTIONS,
@@ -206,6 +208,36 @@ describe("outbox stress", () => {
       "harness saw no loss",
     )
     metric(scenario, "main build loses corrupt records", `${lost} losses detected`)
+    expect(failuresIn(scenario)).toEqual([])
+  })
+
+  it("0 calibration: the contract client fails what it should", async () => {
+    const scenario = "0 calibration"
+    const verdicts: Verdict[] = []
+    const client = contractClient(world, verdicts)
+    const life = {
+      publicId: world.ids.publicId,
+      playerId: world.ids.playerIds[0],
+      operationId: "calibration-operation-01",
+      delta: 1,
+      deviceId: "device-host-0001",
+      clientCreatedAt: CLOCK,
+    }
+    const probes = [
+      ["games:doesNotExist", life, "error"],
+      ["games:changeLife", { ...life, writtenBy: "90.0.0" }, "rejected"],
+      ["games:changeLife", { ...life, publicId: "no-such-game-public-id" }, "business"],
+    ] as const
+    for (const [name, args, expected] of probes) {
+      await client.mutation(makeFunctionReference<"mutation">(name), args).catch(() => undefined)
+      const outcome = verdicts.at(-1)?.outcome
+      record(
+        scenario,
+        `contract client labels ${expected}`,
+        outcome === expected ? "pass" : "fail",
+        `${name} came back ${outcome}`,
+      )
+    }
     expect(failuresIn(scenario)).toEqual([])
   })
 

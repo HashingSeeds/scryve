@@ -74,11 +74,17 @@ const isValidatorError = (error: unknown) =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-// why: domain rules throw ConvexError with a stable code; anything else means the args never got a fair hearing.
-const businessCode = (error: unknown) =>
-  error instanceof ConvexError && isRecord(error.data) && typeof error.data.code === "string"
-    ? error.data.code
+// why: a domain rule either throws a coded ConvexError or a plain Error from handler source under convex/; convex-test only runs a handler after its validators pass. Anything else (missing function, harness crash) never got a fair hearing.
+const businessCode = (error: unknown) => {
+  if (error instanceof ConvexError && isRecord(error.data) && typeof error.data.code === "string")
+    return error.data.code
+  const handlerFrame = /\/convex\/(?!_generated\/)[\w/]+\.ts:\d+/.exec(
+    error instanceof Error ? (error.stack ?? "") : "",
+  )
+  return handlerFrame && error instanceof Error
+    ? `${handlerFrame[0].replace(/^.*\/convex\//, "convex/")} ${error.message}`
     : undefined
+}
 
 const numberArg = (args: Record<string, unknown>, key: string) =>
   typeof args[key] === "number" ? args[key] : 0
