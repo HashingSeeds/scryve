@@ -18,6 +18,7 @@ import {
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
+import { limitGameRate } from "./lib/gameRateLimits"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
@@ -640,6 +641,7 @@ export const createLobby = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    await limitGameRate(ctx, "lobbyCreate", user._id)
     if (args.game !== undefined && args.system !== undefined && args.game !== args.system)
       throw new Error("Game system fields must match")
     const noSystem = (args.system ?? args.game) === NO_GAME_SYSTEM
@@ -1572,7 +1574,8 @@ export const setMyAppearance = mutation({
     assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
     const game = await gameByPublicId(ctx, args.publicId)
     if (game.status !== "lobby") throw new Error("Appearance can only change in a lobby")
-    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
+    const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
+    await limitGameRate(ctx, "gameWrite", user._id)
     const players = await playersForGame(ctx, game._id)
     const requested = { color: args.color.toUpperCase(), shape: args.shape as PlayerMarkShape }
     if (appearanceIsTaken(takenAppearances(players, player._id), requested))
@@ -1671,7 +1674,8 @@ export const updateMySeat = mutation({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     if (game.status !== "lobby") throw new Error("Seat metadata can only change in the lobby")
-    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
+    const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
+    await limitGameRate(ctx, "gameWrite", user._id)
     const displayName = assertDisplayName(args.displayName)
     assertAllowedColor(args.color)
     const color = args.color.toUpperCase()
@@ -1742,6 +1746,7 @@ export const changeLife = mutation({
 
     const game = await gameByPublicIdForWrite(ctx, args.publicId)
     const user = await requireUser(ctx)
+    await limitGameRate(ctx, "gameWrite", user._id)
     const membership = await ctx.db
       .query("gamePlayers")
       .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
@@ -1874,6 +1879,7 @@ export const submitCommanderDamage = mutation({
     const game = await gameByPublicIdForWrite(ctx, args.publicId)
     assertCommanderGame(game)
     const user = await requireUser(ctx)
+    await limitGameRate(ctx, "gameWrite", user._id)
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
     const source = await commanderPlayerForWrite(
       ctx,
@@ -2009,6 +2015,7 @@ async function resolveCommanderClaim(
   const game = await gameByPublicIdForWrite(ctx, args.publicId)
   assertCommanderGame(game)
   const user = await requireUser(ctx)
+  await limitGameRate(ctx, "gameWrite", user._id)
   const claim = await ctx.db
     .query("gameCommanderClaims")
     .withIndex("by_game_operation", (q) =>

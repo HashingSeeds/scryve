@@ -1,17 +1,5 @@
-import { convexTest } from "convex-test"
-
+import { makeConvexTest } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
-  "./accountDeletionActions.ts": async () => jest.requireActual("./accountDeletionActions"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const inviteToken = "d".repeat(43)
 
@@ -32,7 +20,7 @@ describe("account deletion", () => {
   })
 
   it("unlinks one account while preserving anonymized history for the other player", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = t.withIdentity({ subject: "deleting-host" })
     const otherPlayer = t.withIdentity({ subject: "remaining-player" })
     await host.mutation(api.users.syncCurrent, {
@@ -146,7 +134,7 @@ describe("account deletion", () => {
   })
 
   it("anonymizes moderation-linked data in bounded, retryable phases", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = t.withIdentity({ subject: "moderation-deleting-host" })
     const now = 1_700_000_000_000
     const dismissedEvidence = {
@@ -392,7 +380,7 @@ describe("account deletion", () => {
   })
 
   it("deletes sync receipts in resumable owner-scoped batches before deleting decks", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const owner = t.withIdentity({ subject: "sync-deletion-owner" })
     const other = t.withIdentity({ subject: "sync-deletion-other" })
     await owner.mutation(api.users.syncCurrent, { displayName: "Sync Owner" })
@@ -442,7 +430,7 @@ describe("account deletion", () => {
   })
 
   it("deletes version sync receipts before the metadata receipts they mirror", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const owner = t.withIdentity({ subject: "version-receipt-deletion-owner" })
     await owner.mutation(api.users.syncCurrent, { displayName: "Version Receipt Owner" })
     const saved = await owner.mutation(api.decks.syncWrite, {
@@ -487,7 +475,7 @@ describe("account deletion", () => {
   })
 
   it("accepts deletion for a Clerk identity that has no Scryve projection", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const clerkUserId = "clerk-only-user"
     const actor = t.withIdentity({ subject: clerkUserId })
     await t.run((ctx) =>
@@ -519,7 +507,7 @@ describe("account deletion", () => {
   })
 
   it("ignores delayed profile webhooks during and after deletion, including retries", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "delayed-webhook-owner" })
     const profile = {
       clerkUserId: "delayed-webhook-owner",
@@ -560,7 +548,7 @@ describe("account deletion", () => {
   })
 
   it.each([false, true])("recreates a suppression receipt (dangling ID: %s)", async (dangling) => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const clerkUserId = "legacy-deleted-account"
     const actor = t.withIdentity({ subject: clerkUserId })
     const receiptId = dangling
@@ -609,7 +597,7 @@ describe("account deletion", () => {
   })
 
   it("keeps a completion receipt without raw identifiers readable after identity removal", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "receipt-owner" })
     const request = await actor.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
       confirmation: "DELETE",
@@ -641,7 +629,7 @@ describe("account deletion", () => {
   })
 
   it("publishes a safe failure receipt without the provider error", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "failed-receipt-owner" })
     const request = await actor.mutation(api.accountDeletion.requestCurrentAccountDeletion, {
       confirmation: "DELETE",
@@ -662,7 +650,7 @@ describe("account deletion", () => {
 
   it("fails before changing data when Clerk deletion is not configured", async () => {
     delete process.env.CLERK_SECRET_KEY
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "configuration-check-user" })
     await actor.mutation(api.users.syncCurrent, { displayName: "Configured later" })
     await expect(
