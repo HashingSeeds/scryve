@@ -78,7 +78,7 @@ Convex schema and function changes must follow the compatibility rules in AGENTS
 - Undo a bad deploy by merging a revert or forward fix. Server data does not roll back.
 - Run `npx convex deploy` against production by hand only to recover from a failed beta workflow.
 
-`convex-deploy-commit` in the release record is the main commit whose beta workflow deployed the backend.
+`convex-deploy-commit` in the release record is the newest main commit whose beta workflow ran the deploy. Later runs that skipped it ship that same backend.
 
 ## Scryve Pro rollout
 
