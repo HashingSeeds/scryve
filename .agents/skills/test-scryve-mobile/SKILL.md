@@ -166,6 +166,17 @@ loop.
   connected-play features may be skipped but must fail softly.
 - Obvious regressions in adjacent screens navigated along the way.
 
+## Connected play
+
+When the change touches connected play, fill the other seats with `pnpm bots`
+instead of more devices. Bots only run against a Convex preview, so first run
+`pnpm preview:up`, which points this worktree's app at the branch preview (a
+preview passes the development-deployment check). Then either host in the app
+and run `pnpm bots join <CODE> --count <n>`, or run `pnpm bots host --players <n>`
+and join the code it prints. `pnpm bots --help` lists the play and failure
+options (commander damage, socket drops, bursts, duplicates); add `--json` for
+one event per line.
+
 ## Fallbacks
 
 If agent-device cannot complete a flow, run the tagged Maestro smoke flows:
@@ -211,8 +222,8 @@ backend, stale dev client, etc.). Be specific about what you actually saw.
   pre-grant permissions only if asked.
 - **agent-device can't see an element:** take a fresh snapshot after
   navigation; fall back to screenshot estimation, then Maestro smoke.
-- **Connected-play screens fail:** expected without a Convex dev backend;
-  record as skipped, not failed.
+- **Connected-play screens fail:** expected without a Convex backend; use a
+  preview and `pnpm bots` (see Connected play), else record as skipped.
 - **Clerk rejects the test identity or OTP:** confirm the app uses the Clerk
   development instance and that email-code sign-in is enabled. Do not switch
   to a personal account, production instance, or secret-bearing workaround.
