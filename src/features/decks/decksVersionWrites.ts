@@ -15,7 +15,7 @@ import {
   type DurableStringStorage,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
-import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
+import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
 import { scopedOwnerId } from "./decksSync"
@@ -65,6 +65,8 @@ export const DECK_VERSION_QUEUE_CONFLICT_REASON =
 export const DECK_VERSION_DRAFT_UNSYNCED_REASON =
   "This offline draft was never synced. Discard it and create the version again."
 export const DECK_VERSION_LAST_REASON = "A deck must keep at least one version."
+export const DECK_VERSION_REJECTED_REASON =
+  "The server can't accept these changes. Discard them and edit again."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -107,6 +109,39 @@ function isCount(value: unknown): value is number {
 
 function isCard(value: unknown): value is VersionCardPayload {
   return isRecord(value) && typeof value.name === "string" && isCount(value.quantity)
+}
+
+/* why: queued cards can carry fields the server validator rejects (another build wrote them, or a
+   contract release dropped one). `satisfies` breaks the build when the validator's fields change. */
+const serverCardFields = new Set(
+  Object.keys({
+    game: true,
+    identityNamespace: true,
+    cardId: true,
+    providerCardId: true,
+    printingId: true,
+    section: true,
+    entryKind: true,
+    originalReference: true,
+    category: true,
+    oracleId: true,
+    scryfallId: true,
+    name: true,
+    imageUrl: true,
+    smallImageUrl: true,
+    quantity: true,
+    board: true,
+    commanderColor: true,
+  } satisfies Record<keyof VersionCardPayload, true>),
+)
+
+function serverCards(cards: readonly VersionCardPayload[]): VersionCardPayload[] {
+  return cards.map(
+    (card) =>
+      Object.fromEntries(
+        Object.entries(card).filter(([field]) => serverCardFields.has(field)),
+      ) as VersionCardPayload,
+  )
 }
 
 const lifecycleOps = new Set<VersionLifecycleOp>(["cards", "create", "rename", "delete"])
@@ -509,7 +544,7 @@ export class DeckVersionWriteController {
         operationId: action.operationId,
         name: action.name ?? "",
         ...(action.note ? { note: action.note } : {}),
-        cards: action.cards,
+        cards: serverCards(action.cards),
       })
     const draftRow = this.repository.cache
       .loadVersions(action.deckId)
@@ -541,7 +576,7 @@ export class DeckVersionWriteController {
       versionId: serverVersionId as VersionWriteArgs["versionId"],
       operationId: action.operationId,
       expectedRevision: action.expectedRevision,
-      cards: action.cards,
+      cards: serverCards(action.cards),
       returnConflict: true,
     })
   }
@@ -564,6 +599,8 @@ export class DeckVersionWriteController {
               ? DECK_VERSION_QUEUE_CONFLICT_REASON
               : DECK_VERSION_CONFLICT_REASON,
           }
+        if (isArgumentValidationError(cause))
+          return { kind: "reject" as const, reason: DECK_VERSION_REJECTED_REASON }
         return code && permanentErrors.has(code)
           ? {
               kind: "reject" as const,

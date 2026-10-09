@@ -7,6 +7,7 @@ import { storage } from "@/utils/storage"
 import { DeckSyncRepository, type SyncedDeck } from "./decksSync"
 import {
   DECK_CONFLICT_REASON,
+  DECK_REJECTED_REASON,
   DeckMetadataWriteController,
   DeckSyncWriteRepository,
   getDeckMetadataWriteController,
@@ -409,6 +410,30 @@ describe("deck metadata writes", () => {
     await flush()
 
     expect(controller.getSnapshot().failures).toMatchObject([{ reason: "Deck was deleted" }])
+    stop()
+  })
+
+  it("fails an edit the server's argument validator rejects instead of retrying it", async () => {
+    const local = new MemoryStorage()
+    new DeckSyncRepository("owner", local).mergeMetadata([metadata()])
+    const controller = new DeckMetadataWriteController(
+      {
+        mutation: jest.fn(async () => {
+          throw new Error(
+            "[CONVEX M(decks:syncWrite)] Server Error\nArgumentValidationError: Object contains extra field `foil` that is not in the validator.",
+          )
+        }),
+      } as unknown as ConvexReactClient,
+      new DeckSyncWriteRepository("owner", local),
+    )
+    controller.update(deckId, { name: "Offline rename" })
+    const stop = controller.start()
+    await flush()
+
+    expect(controller.getSnapshot()).toMatchObject({
+      pending: [],
+      failures: [{ reason: DECK_REJECTED_REASON }],
+    })
     stop()
   })
 

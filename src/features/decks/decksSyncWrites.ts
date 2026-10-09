@@ -15,7 +15,7 @@ import {
   type DurableStringStorage,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
-import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
+import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
 import {
@@ -57,6 +57,7 @@ export interface DeckSyncWriteSnapshot {
 const SCOPE = "metadata"
 const RETRY_DELAY_MS = 2_000
 export const DECK_CONFLICT_REASON = "Deck changed on another device. Choose which version to keep."
+export const DECK_REJECTED_REASON = "The server can't accept this edit. Discard it and edit again."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -344,6 +345,8 @@ export class DeckMetadataWriteController {
         const code = convexErrorCode(cause)
         if (code === "sync_conflict")
           return { kind: "reject" as const, reason: DECK_CONFLICT_REASON }
+        if (isArgumentValidationError(cause))
+          return { kind: "reject" as const, reason: DECK_REJECTED_REASON }
         return code && permanentErrors.has(code)
           ? {
               kind: "reject" as const,
