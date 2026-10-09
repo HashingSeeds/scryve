@@ -3,8 +3,8 @@ const fs = require("node:fs")
 const path = require("node:path")
 
 const root = path.join(path.dirname(require.resolve("./convex-backend.cjs")), "..")
-// why: nothing in convex/ imports from outside it, so these paths are everything `convex deploy` bundles.
-const BACKEND_PATHS = ["convex", "pnpm-lock.yaml"]
+// why: convex/ imports nothing outside it and only convex.json can relocate it, so these are everything `convex deploy` bundles.
+const BACKEND_PATHS = ["convex", "convex.json", "pnpm-lock.yaml"]
 
 // why: every native release bumps `version` on main, which would otherwise count as a backend change.
 function packageJsonMatches(baseSource, headSource) {
@@ -32,11 +32,14 @@ function backendMatches(baseRef, headRef, cwd = root) {
 }
 
 /**
- * why: beta runs one at a time, so the newest finished run is the last one that could have
- * deployed. Only a success proves production runs its commit's backend: a failed or cancelled run
- * may have deployed and then stopped, and a later revert would then match the wrong commit.
+ * why: beta runs one at a time, so the finished run that started last is the last one that could
+ * have deployed, even when it re-ran an older commit. Only a success proves production runs its
+ * commit's backend: a failed or cancelled run may have deployed and then stopped.
  */
-function betaDeployDecision(lastRun, matches) {
+function betaDeployDecision(finishedRuns, matches) {
+  const [lastRun] = finishedRuns.toSorted((a, b) =>
+    b.run_started_at.localeCompare(a.run_started_at),
+  )
   if (!lastRun) return { deploy: true, reason: "no finished beta run to compare against" }
   const sha = lastRun.head_sha
   if (lastRun.conclusion !== "success")
@@ -45,21 +48,22 @@ function betaDeployDecision(lastRun, matches) {
   return { deploy: false, reason: `the backend matches ${sha}, which the last beta run shipped` }
 }
 
-async function lastFinishedBetaRun({ GITHUB_REPOSITORY, GITHUB_TOKEN }) {
+// why: the API lists runs by creation, so a re-run of an older one can sit below newer runs.
+async function finishedBetaRuns({ GITHUB_REPOSITORY, GITHUB_TOKEN }) {
   const response = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/beta.yml/runs?branch=main&status=completed&per_page=1`,
+    `https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/beta.yml/runs?branch=main&status=completed&per_page=100`,
     { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: "application/vnd.github+json" } },
   )
   if (!response.ok) throw new Error(`GitHub API returned ${response.status}`)
-  return (await response.json()).workflow_runs[0]
+  return (await response.json()).workflow_runs
 }
 
 async function main() {
-  const lastRun = await lastFinishedBetaRun(process.env).catch((error) => {
+  const runs = await finishedBetaRuns(process.env).catch((error) => {
     console.warn(`Could not look up the last beta run: ${error.message}`)
-    return undefined
+    return []
   })
-  const { deploy, reason } = betaDeployDecision(lastRun, (sha) => backendMatches(sha, "HEAD"))
+  const { deploy, reason } = betaDeployDecision(runs, (sha) => backendMatches(sha, "HEAD"))
   console.log(`${deploy ? "Deploying" : "Skipping the deploy"}: ${reason}`)
   fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${deploy}\n`)
 }

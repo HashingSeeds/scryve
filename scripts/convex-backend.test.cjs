@@ -55,15 +55,29 @@ test("a version bump alone keeps package.json matching", () => {
   assert.equal(packageJsonMatches("", pkg("0.1.2")), false)
 })
 
+const run = (head_sha, conclusion, run_started_at = "2026-10-09T10:00:00Z") => ({
+  head_sha,
+  conclusion,
+  run_started_at,
+})
+
 test("beta skips the deploy only when the last successful run shipped the same backend", () => {
-  const success = { head_sha: "abc", conclusion: "success" }
-  assert.equal(betaDeployDecision(success, () => true).deploy, false)
-  assert.equal(betaDeployDecision(success, () => false).deploy, true)
+  assert.equal(betaDeployDecision([run("abc", "success")], () => true).deploy, false)
+  assert.equal(betaDeployDecision([run("abc", "success")], () => false).deploy, true)
 })
 
 test("beta deploys without comparing when the last run is missing or did not succeed", () => {
   const unreachable = () => assert.fail("nothing proves which backend is live")
-  assert.equal(betaDeployDecision(undefined, unreachable).deploy, true)
+  assert.equal(betaDeployDecision([], unreachable).deploy, true)
   for (const conclusion of ["failure", "cancelled", "timed_out"])
-    assert.equal(betaDeployDecision({ head_sha: "abc", conclusion }, unreachable).deploy, true)
+    assert.equal(betaDeployDecision([run("abc", conclusion)], unreachable).deploy, true)
+})
+
+test("a re-run of an older commit is what production last received", () => {
+  const runs = [
+    run("newer", "success", "2026-10-09T10:00:00Z"),
+    run("older", "success", "2026-10-09T11:00:00Z"),
+  ]
+  assert.equal(betaDeployDecision(runs, (sha) => sha === "older").deploy, false)
+  assert.equal(betaDeployDecision(runs, (sha) => sha === "newer").deploy, true)
 })
