@@ -1720,14 +1720,18 @@ describe("connected commander damage claims", () => {
     await claim("commander-queued-0001", 5)
     await confirm("commander-queued-0001")
     await claim("commander-queued-0002", -5)
+    const eventCount = async () =>
+      (await t.run((ctx) => ctx.db.query("gameEvents").collect())).length
     await expect(claim("commander-queued-0003", -5)).resolves.toMatchObject({
       status: "declined",
       deduplicated: false,
     })
+    const eventsAfterDecline = await eventCount()
     await expect(claim("commander-queued-0003", -5)).resolves.toMatchObject({
       status: "declined",
       deduplicated: true,
     })
+    expect(await eventCount()).toBe(eventsAfterDecline)
     const { publicId, ...submitted } = claimArgs("commander-queued-0003", -5)
     await expect(
       game.host.query(api.games.connectedOperationStatus, {
@@ -1772,7 +1776,7 @@ describe("connected commander damage claims", () => {
         ),
       ),
     ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
-    await claim("commander-queued-0005", 1)
+    await expect(claim("commander-queued-0005", 1)).resolves.toMatchObject({ status: "pending" })
     await expect(
       game.host.mutation(api.games.declineCommanderDamage, {
         publicId: game.publicId,
@@ -1781,6 +1785,37 @@ describe("connected commander damage claims", () => {
         clientCreatedAt: 1_700_000_000_002,
       }),
     ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+  })
+
+  it("declines totals above 99 and refuses a decline id another event already uses", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const claim = (operationId: string, delta: number) =>
+      game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta),
+      )
+    await claim("commander-ceiling-0001", 99)
+    await game.joiner.mutation(api.games.confirmCommanderDamage, {
+      publicId: game.publicId,
+      operationId: "commander-ceiling-0001",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_001,
+    })
+    await expect(claim("commander-ceiling-0002", 1)).resolves.toMatchObject({
+      status: "declined",
+    })
+
+    await game.host.mutation(
+      api.games.changeLife,
+      lifeArgs(game.publicId, game.hostPlayerId, "commander-ceiling-0003_declined", -1),
+    )
+    await expect(claim("commander-ceiling-0003", 1)).rejects.toMatchObject({
+      data: { code: "sync_operation_mismatch" },
+    })
+    await expect(claim("commander-ceiling-0003", 1)).rejects.toMatchObject({
+      data: { code: "sync_operation_mismatch" },
+    })
   })
 
   it("does not acknowledge a resolution whose stored outcome conflicts with the queue", async () => {

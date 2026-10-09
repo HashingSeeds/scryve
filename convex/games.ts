@@ -1928,6 +1928,17 @@ export const submitCommanderDamage = mutation({
       nextTotal > MAX_COMMANDER_DAMAGE ||
       pending.length >= MAX_PENDING_COMMANDER_CLAIMS ||
       pending.some((claim) => claim.fromPlayerId === source._id && claim.toPlayerId === target._id)
+    const declineOperationId = `${args.operationId}_declined`
+    if (
+      declined &&
+      (await ctx.db
+        .query("gameEvents")
+        .withIndex("by_game_operation", (q) =>
+          q.eq("gameId", game._id).eq("operationId", declineOperationId),
+        )
+        .first())
+    )
+      throw syncOperationMismatch()
 
     const now = Date.now()
     const status = declined ? ("declined" as const) : ("pending" as const)
@@ -1962,7 +1973,7 @@ export const submitCommanderDamage = mutation({
       await ctx.db.insert("gameEvents", {
         gameId: game._id,
         playerId: target._id,
-        operationId: `${args.operationId}_declined`,
+        operationId: declineOperationId,
         kind: "commanderDamage.declined",
         delta: args.delta,
         fromPlayerId: source._id,
