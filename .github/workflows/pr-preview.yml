@@ -15,7 +15,13 @@ permissions:
   contents: read
 
 jobs:
-  bundle:
+  # why: best-effort cleanup so stale runs don't sit in the approval queue. Nothing blocks on it:
+  # publish shares no concurrency group across pushes, and each run rechecks the PR's head, state,
+  # and label right before `eas update` and before the comment. A cancel can only hit a waiting
+  # run for an older head of this PR, which would skip at that recheck anyway, so racing an
+  # approval is harmless. Runs for the same head are never cancelled. A separate job, so
+  # `actions: write` never meets the PR's dependencies.
+  supersede:
     # why: the author check is a filter, not the security boundary. Under `pull_request` this file
     # comes from the PR branch, so a branch could rewrite it. The boundary is that only Matthew's
     # account can push branches here, GitHub never gives fork PRs secrets, and publishing needs
@@ -25,6 +31,29 @@ jobs:
       (github.event.action != 'labeled' || github.event.label.name == 'preview') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login == 'mchisolm0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel older runs for this PR still waiting for approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/pr-preview.yml/runs" \
+            -f event=pull_request -f status=waiting -F per_page=100 \
+            --jq ".workflow_runs[] | select(.id < $GITHUB_RUN_ID and .head_sha != \"$HEAD_SHA\"
+              and any(.pull_requests[]; .number == $PR_NUMBER)) | .id")
+          for id in $runs; do
+            echo "cancelling run $id"
+            gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" \
+              || echo "::warning::could not cancel run $id; it may have finished"
+          done
+
+  bundle:
+    needs: supersede
     concurrency:
       group: pr-preview-bundle-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -79,6 +108,17 @@ jobs:
             const existing = comments.find(
               (comment) => comment.user?.type === "Bot" && comment.body?.includes(marker),
             )
+            // why: last, right before writing, so a run that went stale while listing never
+            // overwrites a newer run's comment.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issue_number })
+            if (
+              pr.head.sha !== HEAD_SHA ||
+              pr.state !== "open" ||
+              !pr.labels.some((label) => label.name === "preview")
+            ) {
+              core.notice("The PR moved on; a newer run owns the comment.")
+              return
+            }
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
             } else {
@@ -164,11 +204,10 @@ jobs:
 
   publish:
     needs: bundle
-    # why: job level, so an unrelated label skips without touching the queue. Never cancel: EAS
-    # keeps an update it already accepted, so a cancelled older push could land after a newer one.
-    concurrency:
-      group: pr-preview-${{ github.event.pull_request.number }}
-      cancel-in-progress: false
+    # why: no concurrency group. One shared across pushes let a run waiting for approval block every
+    # newer push. The head, state, and label rechecks before `eas update` and the comment make a
+    # stale run skip instead. If two first publishes ever race to create the pr-<n> channel, re-run
+    # the newer one that failed.
     # why: holds EXPO_PREVIEW_TOKEN and requires Matthew's approval.
     environment: pr-preview
     runs-on: ubuntu-latest
@@ -355,15 +394,6 @@ jobs:
             const { CHANNEL, HEAD_SHA, FLAGS, IOS, ANDROID, PUBLISHED } = process.env
             const { owner, repo } = context.repo
             const issue_number = context.issue.number
-            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issue_number })
-            if (
-              pr.head.sha !== HEAD_SHA ||
-              pr.state !== "open" ||
-              !pr.labels.some((label) => label.name === "preview")
-            ) {
-              core.notice("The PR moved on; a newer run owns the comment.")
-              return
-            }
             const link = `scryve-preview://preview/${CHANNEL}`
             // why: qr.expo.dev only encodes development-client links; the app accepts that form too.
             const { projectId } = require(`${process.env.GITHUB_WORKSPACE}/app.json`).extra.eas
@@ -394,6 +424,17 @@ jobs:
             const existing = comments.find(
               (comment) => comment.user?.type === "Bot" && comment.body?.includes(marker),
             )
+            // why: last, right before writing, so a run that went stale while listing never
+            // overwrites a newer run's comment.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issue_number })
+            if (
+              pr.head.sha !== HEAD_SHA ||
+              pr.state !== "open" ||
+              !pr.labels.some((label) => label.name === "preview")
+            ) {
+              core.notice("The PR moved on; a newer run owns the comment.")
+              return
+            }
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
             } else {
