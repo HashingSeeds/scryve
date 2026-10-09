@@ -64,12 +64,13 @@ export function safeJson(value: string | undefined): unknown {
   }
 }
 
+// why: both designs name the writer of the stored bytes at the root; a copy nested under `action` is stale by definition.
 function findWrittenBy(value: unknown): string | undefined {
   if (!isRecord(value)) return undefined
   if (typeof value.writtenBy === "string") return value.writtenBy
   if (isRecord(value.writtenBy) && typeof value.writtenBy.app === "string")
     return value.writtenBy.app
-  return isRecord(value.action) ? findWrittenBy(value.action) : undefined
+  return undefined
 }
 
 export { isRecord }
