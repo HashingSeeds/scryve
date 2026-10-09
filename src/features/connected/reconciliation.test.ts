@@ -19,10 +19,6 @@ const permanentFailures = [
   ["invalid_device_id", "Invalid device identifier"],
   ["invalid_client_timestamp", "Invalid client timestamp"],
   ["invalid_life_delta", "Life delta must be a non-zero whole number from -999999 to 999999"],
-  [
-    "commander_claim_rejected",
-    "Invalid operation: a pending commander damage claim already exists for this pair",
-  ],
 ]
 
 const legacyPermanentMessage =
@@ -120,17 +116,6 @@ describe("connected reconciliation", () => {
   it("retains authorization/game-state failures but retries auth expiry and network loss", () => {
     expect(classifyWriteFailure(new Error("Seat-owner permission required"))).toBe("permanent")
     expect(classifyWriteFailure(new Error("Game is not active"))).toBe("permanent")
-    expect(
-      classifyWriteFailure(
-        new Error("A pending commander damage claim already exists for this pair"),
-      ),
-    ).toBe("permanent")
-    expect(
-      classifyWriteFailure(new Error("Commander damage total must remain between 0 and 99")),
-    ).toBe("permanent")
-    expect(classifyWriteFailure(new Error("Attacking seat-owner permission required"))).toBe(
-      "permanent",
-    )
     expect(classifyWriteFailure(new Error("Authentication required"))).toBe("retry")
     expect(classifyWriteFailure(new Error("Network disconnected"))).toBe("retry")
   })

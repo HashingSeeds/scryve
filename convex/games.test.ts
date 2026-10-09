@@ -1506,7 +1506,7 @@ describe("connected commander damage claims", () => {
           1,
         ),
       ),
-    ).rejects.toThrow("pending commander damage claim already exists")
+    ).resolves.toMatchObject({ status: "declined" })
 
     const attackerProjection = await game.host.query(api.games.lobbyProjection, {
       publicId: game.publicId,
@@ -1555,7 +1555,7 @@ describe("connected commander damage claims", () => {
         }),
       ],
     })
-    expect(await t.run((ctx) => ctx.db.query("gameEvents").collect())).toHaveLength(2)
+    expect(await t.run((ctx) => ctx.db.query("gameEvents").collect())).toHaveLength(4)
   })
 
   it("supports negative claims, declines without changing life, and projects lethal damage", async () => {
@@ -1703,14 +1703,13 @@ describe("connected commander damage claims", () => {
     ).rejects.toThrow("only available in Commander games")
   })
 
-  it("rejects claims queued behind a resolved claim with permanent codes", async () => {
+  it("declines claims that can never land so the attacker's queue drains", async () => {
     const t = convexTest(schema, modules)
     const game = await activeGame(t)
+    const claimArgs = (operationId: string, delta: number) =>
+      commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta)
     const claim = (operationId: string, delta: number) =>
-      game.host.mutation(
-        api.games.submitCommanderDamage,
-        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta),
-      )
+      game.host.mutation(api.games.submitCommanderDamage, claimArgs(operationId, delta))
     const confirm = (operationId: string) =>
       game.joiner.mutation(api.games.confirmCommanderDamage, {
         publicId: game.publicId,
@@ -1721,18 +1720,43 @@ describe("connected commander damage claims", () => {
     await claim("commander-queued-0001", 5)
     await confirm("commander-queued-0001")
     await claim("commander-queued-0002", -5)
-    await expect(claim("commander-queued-0003", -5)).rejects.toMatchObject({
-      data: {
-        code: "commander_claim_rejected",
-        message: expect.stringContaining("pending commander damage claim already exists"),
-      },
+    await expect(claim("commander-queued-0003", -5)).resolves.toMatchObject({
+      status: "declined",
+      deduplicated: false,
     })
+    await expect(claim("commander-queued-0003", -5)).resolves.toMatchObject({
+      status: "declined",
+      deduplicated: true,
+    })
+    const { publicId, ...submitted } = claimArgs("commander-queued-0003", -5)
+    await expect(
+      game.host.query(api.games.connectedOperationStatus, {
+        publicId,
+        operation: { kind: "commanderDamage.submitted", ...submitted },
+      }),
+    ).resolves.toMatchObject({ status: "acknowledged" })
+    const defender = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(defender.commanderDamage?.pendingClaims).toMatchObject([
+      { operationId: "commander-queued-0002" },
+    ])
+
     await confirm("commander-queued-0002")
-    await expect(claim("commander-queued-0003", -5)).rejects.toMatchObject({
-      data: {
-        code: "commander_claim_rejected",
-        message: expect.stringContaining("total must remain between 0 and 99"),
-      },
+    await expect(claim("commander-queued-0006", -5)).resolves.toMatchObject({
+      status: "declined",
+    })
+    await game.host.mutation(
+      api.games.changeLife,
+      lifeArgs(game.publicId, game.hostPlayerId, "operation-after-decline", -3),
+    )
+    const projection = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.players.map((player) => player.currentLife)).toEqual([37, 40])
+    expect(projection.commanderDamage).toMatchObject({
+      totals: [expect.objectContaining({ total: 0 })],
+      pendingClaims: [],
     })
 
     await expect(

@@ -1831,17 +1831,6 @@ async function commanderPlayerForWrite(
   return player
 }
 
-// why: a queued claim that conflicts with another claim never succeeds, so clients must drop it; the "Invalid operation" prefix is what clients without error codes match.
-function commanderClaimRejected(reason: string) {
-  return gameWriteError("commander_claim_rejected", `Invalid operation: ${reason}`)
-}
-
-function commanderTotalOutOfRange() {
-  return commanderClaimRejected(
-    `commander damage total must remain between 0 and ${MAX_COMMANDER_DAMAGE}`,
-  )
-}
-
 function commanderClaimMatches(
   claim: Doc<"gameCommanderClaims">,
   args: {
@@ -1929,30 +1918,31 @@ export const submitCommanderDamage = mutation({
       )
       .unique()
     const nextTotal = (pair?.total ?? 0) + args.delta
-    if (nextTotal < 0 || nextTotal > MAX_COMMANDER_DAMAGE) throw commanderTotalOutOfRange()
     const pending = await ctx.db
       .query("gameCommanderClaims")
       .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
       .take(MAX_PENDING_COMMANDER_CLAIMS + 1)
-    if (
+    // why: a claim that can never land is stored as declined instead of thrown, so every installed outbox sees a success and stops retrying it.
+    const declined =
+      nextTotal < 0 ||
+      nextTotal > MAX_COMMANDER_DAMAGE ||
+      pending.length >= MAX_PENDING_COMMANDER_CLAIMS ||
       pending.some((claim) => claim.fromPlayerId === source._id && claim.toPlayerId === target._id)
-    )
-      throw commanderClaimRejected("a pending commander damage claim already exists for this pair")
-    if (pending.length >= MAX_PENDING_COMMANDER_CLAIMS)
-      throw commanderClaimRejected("too many pending commander damage claims")
 
     const now = Date.now()
+    const status = declined ? ("declined" as const) : ("pending" as const)
     const claimId = await ctx.db.insert("gameCommanderClaims", {
       gameId: game._id,
       operationId: args.operationId,
       fromPlayerId: source._id,
       toPlayerId: target._id,
       delta: args.delta,
-      status: "pending",
+      status,
       actorUserId: user._id,
       deviceId: args.deviceId,
       clientCreatedAt: args.clientCreatedAt,
       createdAt: now,
+      ...(declined ? { resolvedAt: now } : {}),
     })
     await ctx.db.insert("gameEvents", {
       gameId: game._id,
@@ -1968,16 +1958,24 @@ export const submitCommanderDamage = mutation({
       clientCreatedAt: args.clientCreatedAt,
       serverCreatedAt: now,
     })
+    if (declined)
+      await ctx.db.insert("gameEvents", {
+        gameId: game._id,
+        playerId: target._id,
+        operationId: `${args.operationId}_declined`,
+        kind: "commanderDamage.declined",
+        delta: args.delta,
+        fromPlayerId: source._id,
+        toPlayerId: target._id,
+        claimOperationId: args.operationId,
+        clientCreatedAt: args.clientCreatedAt,
+        serverCreatedAt: now,
+      })
     await ctx.db.patch(target._id, {
-      eventCount: (target.eventCount ?? 0) + 1,
+      eventCount: (target.eventCount ?? 0) + (declined ? 2 : 1),
       lastEventAt: now,
     })
-    return {
-      operationId: args.operationId,
-      claimId,
-      status: "pending" as const,
-      deduplicated: false,
-    }
+    return { operationId: args.operationId, claimId, status, deduplicated: false }
   },
 })
 
@@ -2115,7 +2113,8 @@ async function resolveCommanderClaim(
       )
       .unique()
     const total = (pair?.total ?? 0) + claim.delta
-    if (total < 0 || total > MAX_COMMANDER_DAMAGE) throw commanderTotalOutOfRange()
+    if (total < 0 || total > MAX_COMMANDER_DAMAGE)
+      throw new Error("Commander damage total must remain between 0 and 99")
     await ctx.db.insert("gameEvents", {
       gameId: game._id,
       playerId: target._id,
