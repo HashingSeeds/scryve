@@ -193,7 +193,8 @@ export class DurableOutbox<
           this.codec.operationId(failed.action) === operationId &&
           this.codec.belongsToScope(failed.action, this.ownerId, scopeId)
         ) {
-          this.storage.delete(pendingKey)
+          if (action) this.storage.delete(pendingKey)
+          else this.quarantine(pendingKey)
           continue
         }
         this.quarantine(failedKey)
@@ -325,7 +326,7 @@ export class DurableOutbox<
   /** why: a record this build can't read may be readable by a later one, so it is kept aside instead of deleted. */
   private quarantine(key: string): void {
     const value = this.storage.getString(key)
-    if (value) this.storage.set(`${DURABLE_QUARANTINE_PREFIX}${key}`, value)
+    if (value) this.storage.set(`${DURABLE_QUARANTINE_PREFIX}${Date.now()}:${key}`, value)
     this.storage.delete(key)
   }
 
