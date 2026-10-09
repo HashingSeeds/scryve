@@ -353,6 +353,27 @@ describe("LocalGameRepository", () => {
     expect(repository.loadHistoryDetail(games[0].id)).toBeNull()
     expect(repository.loadHistoryDetail(games.at(-1)!.id)).not.toBeNull()
   })
+
+  it("keeps games past the cap until they publish, then evicts them", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const context = defaultCommandContext(asDeviceId("device"))
+    const unpublished = applyGameCommand(
+      makeGame(0),
+      { type: "game.finish", result: { kind: "draw" } },
+      context,
+    )
+    repository.archiveGame(unpublished, "game_menu", "owner-a")
+    for (let index = 1; index <= MAX_HISTORY_GAMES; index += 1)
+      repository.archiveGame(applyGameCommand(makeGame(index), { type: "game.abandon" }, context))
+
+    expect(repository.loadHistory()).toHaveLength(MAX_HISTORY_GAMES + 1)
+    expect(repository.pendingPublishes("owner-a").map(({ id }) => id)).toEqual([unpublished.id])
+    expect(repository.loadHistoryDetail(unpublished.id)).not.toBeNull()
+
+    repository.markPublished(unpublished.id)
+    expect(repository.loadHistory()).toHaveLength(MAX_HISTORY_GAMES)
+    expect(repository.loadHistoryDetail(unpublished.id)).toBeNull()
+  })
 })
 
 describe("LocalGameRepository account ownership", () => {
