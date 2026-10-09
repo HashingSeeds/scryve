@@ -181,6 +181,26 @@ export function privateValues(value: unknown, allow: ReadonlySet<string>, out = 
   return out
 }
 
+const MASKED_KEY = /^<key\d+>$/
+const parentOf = (path: string) => path.slice(0, path.lastIndexOf(".") + 1)
+const isMaskedSibling = (path: string, of: string) =>
+  path.startsWith(parentOf(of)) && MASKED_KEY.test(path.slice(parentOf(of).length))
+
+/** why: a report may mask keys its codec doesn't know, so a rename shows as the known key gone beside a placeholder at the same level. */
+export function showsRename(reported: Map<string, string>, from: string, to: string): boolean {
+  if (reported.has(from)) return false
+  return reported.has(to) || [...reported.keys()].some((path) => isMaskedSibling(path, to))
+}
+
+export function matchesMaskedRename(derived: Fix | undefined, truth: Fix): boolean {
+  return (
+    derived?.kind === "rename" &&
+    truth.kind === "rename" &&
+    derived.to === truth.to &&
+    isMaskedSibling(derived.from, truth.from)
+  )
+}
+
 export type Fix =
   { kind: "rename"; from: string; to: string } | { kind: "retype"; path: string; to: string }
 

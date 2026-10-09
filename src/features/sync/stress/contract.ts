@@ -8,8 +8,8 @@ import { type ConvexTestHarness, makeConvexTest } from "../../../../test/convexT
 
 export interface Verdict {
   name: string
-  /** why: accepted: ran; business: passed validators then failed a domain rule; rejected: a validator refused the args. */
-  outcome: "accepted" | "business" | "rejected"
+  /** why: accepted ran; business passed validators then hit a coded domain rule; rejected failed a validator; error is anything else (missing function, crash) and counts as a failure. */
+  outcome: "accepted" | "business" | "rejected" | "error"
   detail?: string
 }
 
@@ -74,6 +74,12 @@ const isValidatorError = (error: unknown) =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
+// why: domain rules throw ConvexError with a stable code; anything else means the args never got a fair hearing.
+const businessCode = (error: unknown) =>
+  error instanceof ConvexError && isRecord(error.data) && typeof error.data.code === "string"
+    ? error.data.code
+    : undefined
+
 const numberArg = (args: Record<string, unknown>, key: string) =>
   typeof args[key] === "number" ? args[key] : 0
 
@@ -130,12 +136,14 @@ export function contractClient(
       verdicts.push({ name, outcome: "accepted" })
       return result
     } catch (error) {
-      if (!isValidatorError(error)) {
-        verdicts.push({ name, outcome: "business", detail: String(error).slice(0, 120) })
+      const code = businessCode(error)
+      if (code) {
+        verdicts.push({ name, outcome: "business", detail: code })
         return plausibleResult(name, args, world.ids)
       }
-      verdicts.push({ name, outcome: "rejected", detail: String(error).slice(0, 200) })
-      throw new ConvexError({ code: "invalid_operation_id", message: "validator rejected args" })
+      const outcome = isValidatorError(error) ? "rejected" : "error"
+      verdicts.push({ name, outcome, detail: String(error).slice(0, 200) })
+      throw new ConvexError({ code: "invalid_operation_id", message: `harness: ${outcome}` })
     }
   }
   return {
@@ -149,3 +157,6 @@ export function contractClient(
     },
   }
 }
+
+export const verdictFailed = (verdict: Verdict) =>
+  verdict.outcome === "rejected" || verdict.outcome === "error"

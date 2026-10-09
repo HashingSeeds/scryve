@@ -31,11 +31,26 @@ export function configureBuild(writtenBy: string) {
   const configure = hook("configureOutboxDiagnostics")
   if (configure) return void configure({ writtenBy, report: capture })
   hook("setQuarantineReporter")?.(capture)
-  hook("setOutboxWriter")?.({ app: writtenBy, update: "stress", runtime: "stress" })
+  hook("setOutboxWriter")?.({
+    app: buildVersion(writtenBy),
+    update: "embedded",
+    runtime: "unknown",
+  })
 }
 
+// why: the inline design only reports build identifiers in real formats, so each harness build gets a semver.
+const buildVersions = new Map<string, string>()
+const buildVersion = (name: string) => {
+  const version = buildVersions.get(name) ?? `90.0.${buildVersions.size}`
+  buildVersions.set(name, version)
+  return version
+}
+const buildName = (app: string) =>
+  [...buildVersions].find(([, version]) => version === app)?.[0] ?? app
+
 export const namesBuild = (writtenBy: unknown, build: string) =>
-  writtenBy === build || (isRecord(writtenBy) && writtenBy.app === build)
+  writtenBy === build ||
+  (isRecord(writtenBy) && typeof writtenBy.app === "string" && buildName(writtenBy.app) === build)
 
 export const takeReports = () => reports.splice(0, reports.length)
 
@@ -69,7 +84,7 @@ function findWrittenBy(value: unknown): string | undefined {
   if (!isRecord(value)) return undefined
   if (typeof value.writtenBy === "string") return value.writtenBy
   if (isRecord(value.writtenBy) && typeof value.writtenBy.app === "string")
-    return value.writtenBy.app
+    return buildName(value.writtenBy.app)
   return undefined
 }
 

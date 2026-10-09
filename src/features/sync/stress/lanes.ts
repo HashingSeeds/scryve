@@ -76,13 +76,20 @@ export interface Lane<Pending = unknown, Failed = unknown> {
   failedOperationId(failure: Failed): string
   makeAction(random: Random, at: number, ids: ServerIds): Pending
   open(storage: DurableStringStorage, build?: BuildName): LaneRepo<Pending, Failed>
-  /** why: drains every pending record through the build's real send code. Connected has no extractable sender, so it mirrors useConnectedGame. */
+  /** why: drains every pending record through the build's real send code, so callers can prove each queued record reached a validator. */
   send(
     storage: DurableStringStorage,
     client: Client,
     ids: ServerIds,
     build?: BuildName,
-  ): Promise<void>
+  ): Promise<SendResult>
+}
+
+export interface SendResult {
+  queued: number
+  remaining: number
+  /** why: `mirror` means the build exports no connected sender, so the harness used its copy of the app closure. */
+  sender: "app" | "mirror" | "controller"
 }
 
 const uuid = (random: Random) => {
@@ -91,15 +98,41 @@ const uuid = (random: Random) => {
   return `${run(8)}-${run(4)}-4${run(3)}-8${run(3)}-${run(12)}`
 }
 
-// why: tests can't wait on the controller's internal drain promise, so they yield until the queue stops moving.
-async function settle(pending: () => number) {
+// why: tests can't wait on the controller's internal drain promise, so they yield until the queue stops moving; callers fail on whatever is left.
+async function settle(pending: () => number): Promise<number> {
   let last = -1
   for (let idle = 0; idle < 200;) {
     await new Promise((resolve) => setImmediate(resolve))
     const now = pending()
     idle = now === last ? idle + 1 : 0
     last = now
-    if (now === 0) return
+    if (now === 0) return 0
+  }
+  return last
+}
+
+const CONNECTED_MUTATIONS = {
+  changeLife: "games:changeLife",
+  submitCommanderDamage: "games:submitCommanderDamage",
+  confirmCommanderDamage: "games:confirmCommanderDamage",
+  declineCommanderDamage: "games:declineCommanderDamage",
+} as const
+
+// why: the app's connected sender lives in a hook module and only some branches export it, so it is looked up at runtime.
+async function appConnectedSender() {
+  const module = await import("@/features/connected/useConnectedGame")
+  const sender: unknown = Reflect.get(module, "sendQueuedAction")
+  if (typeof sender !== "function") return undefined
+  return (client: Client, publicId: string, action: PendingLifeAction): Promise<unknown> => {
+    const mutations = Object.fromEntries(
+      Object.entries(CONNECTED_MUTATIONS).map(([key, name]) => [
+        key,
+        (args: Record<string, unknown>) =>
+          client.mutation(makeFunctionReference<"mutation">(name), args),
+      ]),
+    )
+    const sent: unknown = Reflect.apply(sender, undefined, [mutations, publicId, action])
+    return Promise.resolve(sent)
   }
 }
 
@@ -252,13 +285,23 @@ export const connectedLane: Lane<PendingLifeAction, FailedLifeAction> = {
   },
   async send(storage, client, ids, build = "branch") {
     const repo = connectedLane.open(storage, build)
-    for (const action of repo.pending()) {
+    const queued = repo.pending()
+    const app = build === "branch" ? await appConnectedSender() : undefined
+    for (const action of queued) {
       const { name, args } = connectedMutation(ids.publicId, action)
-      const sent = await client.mutation(makeFunctionReference<"mutation">(name), args).then(
+      const sending = app
+        ? app(client, ids.publicId, action)
+        : client.mutation(makeFunctionReference<"mutation">(name), args)
+      const sent = await sending.then(
         () => true,
         () => false,
       )
       if (sent) repo.ack(connectedLane.operationId(action))
+    }
+    return {
+      queued: queued.length,
+      remaining: repo.pending().length,
+      sender: app ? "app" : "mirror",
     }
   },
 }
@@ -303,11 +346,13 @@ function deckBuild<Repo extends DeckLike<unknown, unknown>>(
 ) {
   return {
     open: (storage: DurableStringStorage) => new Repository(OWNER, storage),
-    async send(storage: DurableStringStorage, client: Client) {
+    async send(storage: DurableStringStorage, client: Client): Promise<SendResult> {
       const repo = new Repository(OWNER, storage)
+      const queued = repo.loadPending().length
       const stop = new Controller(client, repo).start()
-      await settle(() => repo.loadPending().length)
+      const remaining = await settle(() => repo.loadPending().length)
       stop()
+      return { queued, remaining, sender: "controller" }
     },
   }
 }

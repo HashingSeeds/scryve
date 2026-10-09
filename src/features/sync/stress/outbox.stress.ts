@@ -14,7 +14,7 @@
  * 5 two web tabs, 6 corruption matrix, 7 recovery drill, 8 cost. Each failure prints its replay seed.
  * `gate` rows fail the run; `score` rows only grade a design.
  */
-import { contractClient, makeWorld, type Verdict, type World } from "./contract"
+import { contractClient, makeWorld, type Verdict, verdictFailed, type World } from "./contract"
 import {
   CORRUPTIONS,
   corrupt,
@@ -22,10 +22,12 @@ import {
   type Fix,
   flatShape,
   getPath,
+  matchesMaskedRename,
   privateValues,
   reportedShape,
   reportRecords,
   reportStrings,
+  showsRename,
   TARGETS,
 } from "./corruption"
 import {
@@ -40,7 +42,15 @@ import {
   takeReports,
 } from "./design"
 import { orphanSidecars, quarantinedOperations, type ViolationKind } from "./invariants"
-import { type BuildName, FAKE_IDS, type Lane, type LaneRepo, LANES, type ServerIds } from "./lanes"
+import {
+  type BuildName,
+  FAKE_IDS,
+  type Lane,
+  type LaneRepo,
+  LANES,
+  OWNER,
+  type ServerIds,
+} from "./lanes"
 import { recoverQuarantined, recoveryLoc } from "./recovery"
 import { failuresIn, metric, printScorecard, record, score } from "./scorecard"
 import { runSequence, runTwoTabs } from "./sequence"
@@ -48,6 +58,11 @@ import { type FaultMode, MemoryStorage, seededRandom, utf8Bytes } from "./storag
 
 jest.mock("expo-crypto", () => ({ randomUUID: () => require("node:crypto").randomUUID() }))
 jest.mock("@/utils/storage", () => ({ storage: new (require("./storage").MemoryStorage)() }))
+// why: these pull React Native UI into Node; the connected sender under test needs none of them.
+jest.mock("@/features/game/localPersistence", () => ({ LocalGameRepository: class {} }))
+jest.mock("@/utils/analytics", () => ({ captureGame: () => undefined }))
+jest.mock("@/utils/storeReview", () => ({ recordReviewCompletion: () => undefined }))
+jest.mock("@/features/connected/useConvexOnline", () => ({ useConvexOnline: () => true }))
 
 const BRANCH_BUILD = "stress-branch-build"
 const OLD_WRITER = "stress-older-build"
@@ -119,10 +134,37 @@ function recordVerdicts(
     record(
       scenario,
       check,
-      verdict.outcome === "rejected" ? "fail" : "pass",
-      `${tag} ${verdict.name}: ${verdict.detail ?? ""}`,
+      verdictFailed(verdict) ? "fail" : "pass",
+      `${tag} ${verdict.name} ${verdict.outcome}: ${verdict.detail ?? ""}`,
     )
   if (!verdicts.length) record(scenario, check, "fail", `${tag} nothing was sent`)
+}
+
+/** why: a send that stalls or skips records would otherwise look like a clean contract, so every queued record must reach a validator. */
+async function sendThroughValidators(
+  scenario: string,
+  lane: Lane,
+  disk: MemoryStorage,
+  tag: string,
+  build?: BuildName,
+) {
+  const verdicts: Verdict[] = []
+  const sent = await lane.send(disk, contractClient(world, verdicts), world.ids, build)
+  const reached = sent.queued > 0 && sent.remaining === 0 && verdicts.length === sent.queued
+  record(
+    scenario,
+    `${lane.name}: every queued record reached a validator`,
+    reached ? "pass" : "fail",
+    `${tag} queued ${sent.queued}, validated ${verdicts.length}, left pending ${sent.remaining}`,
+  )
+  if (lane.name === "connected")
+    score(
+      scenario,
+      `${lane.name}: sent by the app's own sender`,
+      build ? "na" : sent.sender === "app" ? "pass" : "warn",
+      `${tag} used the harness ${sent.sender}`,
+    )
+  return verdicts
 }
 
 // why: deck send paths refuse to send past an unresolved failure for the same deck or version, so the user resolves them first.
@@ -267,8 +309,7 @@ describe("outbox stress", () => {
         }
 
         dismissAll(lane, disk, build)
-        const verdicts: Verdict[] = []
-        await lane.send(disk, contractClient(world, verdicts), world.ids, build)
+        const verdicts = await sendThroughValidators(scenario, lane, disk, tag, build)
         recordVerdicts(scenario, `${lane.name}: old send args pass validators`, verdicts, tag)
 
         const orphans = orphanSidecars(disk)
@@ -356,8 +397,7 @@ describe("outbox stress", () => {
           )
 
         dismissAll(lane, disk)
-        const verdicts: Verdict[] = []
-        await lane.send(disk, contractClient(world, verdicts), world.ids)
+        const verdicts = await sendThroughValidators(scenario, lane, disk, tag)
         recordVerdicts(
           scenario,
           `${lane.name}: branch sends old records with valid args`,
@@ -381,14 +421,13 @@ describe("outbox stress", () => {
         repo.attempt(lane.operationId(action), CLOCK + 50)
       const keys = recordKeys(lane, disk)
       const carrying = keys.filter((key) => provenanceOf(disk, key) === BRANCH_BUILD).length
-      const verdicts: Verdict[] = []
-      await lane.send(disk, contractClient(world, verdicts), world.ids)
+      const verdicts = await sendThroughValidators(scenario, lane, disk, lane.name)
       for (const verdict of verdicts)
         record(
           scenario,
           `${lane.name} -> ${verdict.name}`,
-          verdict.outcome === "rejected" ? "fail" : "pass",
-          `${verdict.detail ?? ""}`,
+          verdictFailed(verdict) ? "fail" : "pass",
+          `${verdict.outcome}: ${verdict.detail ?? ""}`,
         )
       if (!verdicts.length)
         record(scenario, `${lane.name}: anything sent`, "fail", "nothing was sent")
@@ -473,9 +512,10 @@ describe("outbox stress", () => {
               `${tag} quarantined=${quarantined} reports=${reports.length}`,
             )
 
-          const leaks = reportStrings(reports).filter(
-            (value) => value.includes("SENTINEL") || secrets.has(value),
-          )
+          // why: a report can leak an id inside a longer string (a storage key, a message), so every identifier is searched as a substring.
+          const serialized = reportStrings(reports).join("\n")
+          const identifiers = ["SENTINEL", OWNER, FAKE_IDS.publicId, operationId, key, ...secrets]
+          const leaks = identifiers.filter((identifier) => serialized.includes(identifier))
           record(
             scenario,
             `${lane.name}: report carries no record values`,
@@ -502,8 +542,7 @@ describe("outbox stress", () => {
             const target = TARGETS[lane.name]
             const found =
               kind === "renamed"
-                ? reported.has(prefix + target.rename[1]) &&
-                  !reported.has(prefix + target.rename[0])
+                ? showsRename(reported, prefix + target.rename[0], prefix + target.rename[1])
                 : kind === "retyped"
                   ? reported.get(prefix + target.retype) === "string"
                   : [...flatShape(parsed).keys()].includes(prefix + target.missing) &&
@@ -553,14 +592,16 @@ describe("outbox stress", () => {
             ? { kind: "rename", from: target.rename[1], to: target.rename[0] }
             : { kind: "retype", path: target.retype, to: "number" }
         const derived = deriveFix(reportedShape(entry?.shape), expected)
-        const exact = JSON.stringify(derived) === JSON.stringify(truth)
+        const masked = matchesMaskedRename(derived, truth)
+        const exact = JSON.stringify(derived) === JSON.stringify(truth) || masked
         score(
           scenario,
           `${lane.name}: fix derivable from report`,
           exact ? "pass" : "fail",
           `${tag} derived ${JSON.stringify(derived)}`,
         )
-        const fix = derived && exact ? derived : truth
+        // why: a masked new name is read from the writer's commit, which is what `truth` stands in for.
+        const fix = derived && exact && !masked ? derived : truth
 
         const requeueInto = (storage: MemoryStorage) => (repaired: Record<string, unknown>) =>
           lane.open(storage).enqueue(repaired)
