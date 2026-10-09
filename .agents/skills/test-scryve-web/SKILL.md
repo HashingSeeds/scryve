@@ -96,10 +96,10 @@ the client, repository, screenshots, or report.
 
 ## Two players for connected play
 
-Connected play needs two signed-in players. Use two browser contexts with
-separate storage, for example two T3 server tabs from `preview_open` with
-`reuseExistingTab=false`. Keep each returned `tabId` and pass it on every call.
-Sign in `jane+clerk_test@sow.care` in one and `john+clerk_test@sow.care` in the
+Connected play needs two signed-in players in browser contexts with separate
+storage. Use T3 preview tabs when available: `preview_open` with
+`reuseExistingTab=false`, keeping each returned `tabId` for every call.
+Otherwise use Playwright with one `browser.newContext()` per identity. Sign in `jane+clerk_test@sow.care` in one and `john+clerk_test@sow.care` in the
 other through the flow above.
 
 Both players use the shared development Convex deployment, which any
