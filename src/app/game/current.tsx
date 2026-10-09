@@ -1,4 +1,5 @@
-import { router } from "expo-router"
+import { useCallback, useState } from "react"
+import { router, useFocusEffect } from "expo-router"
 
 import { EmptyState } from "@/components/EmptyState"
 import { Screen } from "@/components/Screen"
@@ -9,7 +10,9 @@ import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 
 export default function CurrentLocalGameRoute() {
   const auth = useAuthAccess()
-  const game = localGameRepository.loadActiveGame()
+  const [game, setGame] = useState(() => localGameRepository.loadActiveGame())
+  // why: setup can rename or end this game while the board waits underneath; the board adopts what this reads.
+  useFocusEffect(useCallback(() => setGame(localGameRepository.loadActiveGame()), []))
   if (!game) {
     return (
       <Screen preset="auto" safeAreaEdges={["top", "bottom"]}>

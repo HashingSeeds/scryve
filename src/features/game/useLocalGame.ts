@@ -24,13 +24,23 @@ import type {
   PlayerId,
 } from "./types"
 
-/** why: `ownerId` is the signed-in account, so a finished game is filed under it for upload. */
+/**
+ * why: `storedGame` is the game as the route last read it from storage. The route rereads on
+ * focus, so a board left open under setup adopts renames and ended games instead of saving
+ * its older copy over them. `ownerId` is the signed-in account, so a finished game is filed
+ * under it for upload.
+ */
 export function useLocalGame(
-  initialGame: LocalGame,
+  storedGame: LocalGame,
   repository: LocalGameRepository = localGameRepository,
   ownerId?: string,
 ) {
-  const [game, setGame] = useState(initialGame)
+  const [game, setGame] = useState(storedGame)
+  const [readGame, setReadGame] = useState(storedGame)
+  if (storedGame.id !== readGame.id || storedGame.updatedAt !== readGame.updatedAt) {
+    setReadGame(storedGame)
+    if (storedGame.id !== game.id || storedGame.updatedAt > game.updatedAt) setGame(storedGame)
+  }
   const reduceMotion = useReducedMotion()
   const deviceId = useMemo(() => repository.getDeviceId(), [repository])
   const context = useMemo(() => defaultCommandContext(deviceId), [deviceId])

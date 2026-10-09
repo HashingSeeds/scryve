@@ -88,7 +88,8 @@ export function CurrentGameScreen({
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const system = runtime.game.system
   const [menuOpen, setMenuOpen] = useState(false)
-  const [freshBoard, setFreshBoard] = useState(fresh)
+  // why: a board opened on a game already in play keeps End for it; every later game here starts fresh.
+  const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
   // why: the game that just ended decides whether the match goes on, and it is already in history.
   const [matchPrompt, setMatchPrompt] = useState<LocalGame | undefined>(() =>
@@ -96,7 +97,7 @@ export function CurrentGameScreen({
   )
   const [matchEnding, setMatchEnding] = useState<LocalGame>()
   const [matchOpen, setMatchOpen] = useState(false)
-  const isFresh = freshBoard && !hasLocalGameStarted(runtime.game)
+  const isFresh = runtime.game.id !== resumedGameId && !hasLocalGameStarted(runtime.game)
   const match = runtime.game.match
   const [endSource, setEndSource] = useState<GameEndSource | undefined>(
     initialEndOpen ? "stale_game_prompt" : undefined,
@@ -141,13 +142,11 @@ export function CurrentGameScreen({
       if (canContinueMatch(ended)) runtime.nextMatchGame()
       else runtime.holdMatchEnd(ended.match.id)
       setEndSource(undefined)
-      setFreshBoard(true)
       setMatchPrompt(ended)
       return
     }
     runtime.rematch()
     setEndSource(undefined)
-    setFreshBoard(true)
     setSaved({ gameId: ended.id, message: ended.match ? "Match saved" : "Game saved" })
   }
 
@@ -155,7 +154,6 @@ export function CurrentGameScreen({
     if (!matchEnding?.match) return
     const ended = runtime.endMatch(matchEnding.match.id, outcomes)
     setMatchEnding(undefined)
-    setFreshBoard(true)
     setSaved({ gameId: ended.id, message: "Match saved" })
   }
 
@@ -179,7 +177,6 @@ export function CurrentGameScreen({
     setEndSource(undefined)
     if (match) {
       runtime.restartMatchGame()
-      setFreshBoard(true)
       return
     }
     if (!onGameAbandoned) return
