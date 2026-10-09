@@ -11,7 +11,7 @@ OTA releases run as a train: every merge ships to beta, and promotion ships what
 3. Promote: `pnpm release:promote` reports, and `pnpm release:promote --yes` promotes. The `promote` workflow does the same without local secrets (`gh workflow run promote -f promote=true`). It takes the newest beta update that has been live for 60 minutes (`--soak-minutes`), stops if Sentry has new unresolved issues from it, republishes that same update group to production, and fast-forwards the `production` branch so Cloudflare Pages ships the matching web app.
 4. If beta shows a problem, revert or fix forward on main. Production never received it.
 
-For a hotfix, promote with `--soak-minutes 0`. Avoid `pnpm ota:prod`: it skips beta and leaves the web app behind. An update only reaches installs with a matching runtime, so after a native change merges, installs need new binaries before they get updates again. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
+For a hotfix, promote with `--soak-minutes 0`. Do not run `eas update` against the production channel: it skips beta and leaves the web app behind. An update only reaches installs with a matching runtime, so after a native change merges, installs need new binaries before they get updates again. Percentage rollouts (`--rollout-percentage`) become worthwhile once there is a real user base.
 
 Do not republish a preview update group to production. Preview has its own app identifier, runtime fingerprint, and RevenueCat Test Store key, so it installs beside the store app and `pnpm ota:preview` checks behavior but does not prove production compatibility. Test real store purchases with a TestFlight or Play internal production build.
 
