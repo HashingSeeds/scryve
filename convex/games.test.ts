@@ -1534,7 +1534,7 @@ describe("connected commander damage claims", () => {
         deviceId: "device-host-0001",
         clientCreatedAt: 1_700_000_000_003,
       }),
-    ).rejects.toThrow("Defending seat-owner")
+    ).rejects.toThrow("Seat-owner permission required for the defending seat")
     await expect(
       game.joiner.mutation(api.games.declineCommanderDamage, {
         publicId: game.publicId,
@@ -1578,7 +1578,7 @@ describe("connected commander damage claims", () => {
           "device-joiner-001",
         ),
       ),
-    ).rejects.toThrow("Attacking seat-owner")
+    ).rejects.toThrow("Seat-owner permission required for the attacking seat")
 
     const host = await synced(t, "noncommander-host", "Host")
     const created = await host.mutation(api.games.createLobby, {
@@ -1612,6 +1612,62 @@ describe("connected commander damage claims", () => {
         ),
       ),
     ).rejects.toThrow("only available in Commander games")
+  })
+
+  it("rejects claims queued behind a resolved claim with permanent codes", async () => {
+    const t = convexTest(schema, modules)
+    const game = await activeGame(t)
+    const claim = (operationId: string, delta: number) =>
+      game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta),
+      )
+    const confirm = (operationId: string) =>
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        publicId: game.publicId,
+        operationId,
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_001,
+      })
+    await claim("commander-queued-0001", 5)
+    await confirm("commander-queued-0001")
+    await claim("commander-queued-0002", -5)
+    await expect(claim("commander-queued-0003", -5)).rejects.toMatchObject({
+      data: {
+        code: "commander_claim_rejected",
+        message: expect.stringContaining("pending commander damage claim already exists"),
+      },
+    })
+    await confirm("commander-queued-0002")
+    await expect(claim("commander-queued-0003", -5)).rejects.toMatchObject({
+      data: {
+        code: "commander_claim_rejected",
+        message: expect.stringContaining("total must remain between 0 and 99"),
+      },
+    })
+
+    await expect(
+      game.joiner.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(
+          game.publicId,
+          game.hostPlayerId,
+          game.joinerPlayerId,
+          "commander-queued-0004",
+          1,
+          "device-joiner-001",
+        ),
+      ),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+    await claim("commander-queued-0005", 1)
+    await expect(
+      game.host.mutation(api.games.declineCommanderDamage, {
+        publicId: game.publicId,
+        operationId: "commander-queued-0005",
+        deviceId: "device-host-0001",
+        clientCreatedAt: 1_700_000_000_002,
+      }),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
   })
 
   it("does not acknowledge a resolution whose stored outcome conflicts with the queue", async () => {

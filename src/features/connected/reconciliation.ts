@@ -63,7 +63,7 @@ export function classifyWriteFailure(cause: unknown): WriteFailureKind {
   const code = convexErrorCode(cause)
   if (code !== undefined) return permanentWriteCodes.has(code) ? "permanent" : "retry"
   const message = cause instanceof Error ? cause.message : String(cause)
-  return /Seat-owner permission|Game membership required|Game is not active|Game not found|Operation identifier was reused|Invalid operation|Invalid device identifier|Invalid client timestamp|Life delta|ArgumentValidationError|Invalid argument|not a valid ID|acknowledgement did not match/.test(
+  return /[Ss]eat-owner permission|Commander damage total must remain|pending commander damage claim|Game membership required|Game is not active|Game not found|Operation identifier was reused|Invalid operation|Invalid device identifier|Invalid client timestamp|Life delta|ArgumentValidationError|Invalid argument|not a valid ID|acknowledgement did not match/.test(
     message,
   )
     ? "permanent"

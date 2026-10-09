@@ -10,6 +10,7 @@ export const PERMANENT_GAME_WRITE_CODES = [
   "invalid_device_id",
   "invalid_client_timestamp",
   "invalid_life_delta",
+  "commander_claim_rejected",
 ] as const
 
 export type GameWriteErrorCode = (typeof PERMANENT_GAME_WRITE_CODES)[number]
