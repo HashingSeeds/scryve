@@ -177,3 +177,51 @@ it("allowlists completion entry points without adding them to game starts", () =
     "end_source",
   )
 })
+
+it("sends timed sync events as sync_timing only if sharing was on when they happened", async () => {
+  jest.useFakeTimers()
+  global.fetch = fetchMock
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue({ status: 200, text: async () => "{}", json: async () => ({}) })
+  jest.spyOn(Math, "random").mockReturnValue(0)
+  jest.spyOn(console, "error").mockImplementation(() => undefined)
+  process.env.EXPO_PUBLIC_POSTHOG_KEY = "test-key"
+  process.env.EXPO_PUBLIC_POSTHOG_HOST = "https://analytics.invalid"
+  await jest.isolateModulesAsync(async () => {
+    const analytics: typeof import("./analytics") = require("./analytics")
+    const {
+      emitTelemetry,
+      setTelemetryAdapter,
+    }: typeof import("./telemetry") = require("./telemetry")
+    require("@/utils/storage").storage.clearAll()
+    setTelemetryAdapter(analytics.syncTimingAdapter)
+    const body = () => fetchMock.mock.calls.map(([, options]) => String(options.body)).join("")
+
+    emitTelemetry("join.completed", { durationMs: 900, outcome: "success" })
+    analytics.setAnalyticsEnabled(true, "settings")
+    await tick(31_000)
+    expect(body()).not.toContain("sync_timing")
+
+    emitTelemetry("mutation.ack", { durationMs: 120.4, attemptCount: 2, outcome: "success" })
+    emitTelemetry("outbox.drain", { acknowledgedCount: 1, outcome: "success" })
+    emitTelemetry("join.completed", { outcome: "success" })
+    await tick(31_000)
+    expect(body().match(/"event":"sync_timing"/g)).toHaveLength(1)
+    expect(body()).toContain('"timing":"mutation.ack","duration_ms":120,"attempt_count":2')
+
+    fetchMock.mockClear()
+    fetchMock.mockRejectedValue(new Error("offline"))
+    emitTelemetry("join.failed", { durationMs: 700, outcome: "rejected" })
+    await tick(31_000)
+    analytics.setAnalyticsEnabled(false)
+    await tick()
+    fetchMock.mockClear()
+    fetchMock.mockResolvedValue({ status: 200, text: async () => "{}", json: async () => ({}) })
+    analytics.setAnalyticsEnabled(true)
+    await tick(31_000)
+    expect(body()).not.toContain("join.failed")
+    analytics.setAnalyticsEnabled(false)
+    setTelemetryAdapter()
+    await tick()
+  })
+})
