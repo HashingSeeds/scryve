@@ -12,6 +12,7 @@ import {
 } from "./decksVersionWrites"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
+import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 import schema from "../../../convex/schema"
 import type { DurableStringStorage } from "../sync/durableOutbox"
 
@@ -139,6 +140,52 @@ describe("deck version card writes", () => {
     ])
     expect(controller.getSnapshot().pending[0].cards[0].quantity).toBe(2)
     expect(controller.getSnapshot().pending[1].cards[0].quantity).toBe(5)
+  })
+
+  it("queues two offline saves of a max-size deck and parks both when the first conflicts", async () => {
+    const fullDeck = (quantity: number) =>
+      Array.from({ length: MAX_DECK_CARDS }, (_, index) => {
+        const id = `${index.toString(16).padStart(8, "0")}-1a6c-4c0a-8d21-18f7d7350b68`
+        return {
+          game: "mtg",
+          identityNamespace: "scryfall-oracle",
+          cardId: id,
+          oracleId: id,
+          printingId: id,
+          providerCardId: id,
+          scryfallId: id,
+          entryKind: "card",
+          section: "main",
+          board: "main" as const,
+          name: `Card ${index}`,
+          imageUrl: `https://cards.scryfall.io/normal/front/1/3/${id}.jpg?1783909041`,
+          smallImageUrl: `https://cards.scryfall.io/small/front/1/3/${id}.jpg?1783909041`,
+          quantity,
+        }
+      })
+    expect(JSON.stringify(fullDeck(1)).length).toBeGreaterThan(128 * 1024)
+    const repository = new DeckVersionWriteRepository("owner", new MemoryStorage())
+    const client = {
+      mutation: jest
+        .fn()
+        .mockResolvedValueOnce({ status: "conflict" as const, version: versionSnapshot(4) }),
+    } as unknown as ConvexReactClient
+    const controller = new DeckVersionWriteController(client, repository, () => 1)
+
+    controller.update(deckId, versionId, fullDeck(1), 3)
+    controller.update(deckId, versionId, fullDeck(2), 4)
+    expect(controller.getSnapshot().pending.map((action) => action.cards[0].quantity)).toEqual([
+      1, 2,
+    ])
+
+    const stop = controller.start()
+    await flush()
+    stop()
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], capacityBlocked: false })
+    expect(controller.getSnapshot().failures.map((failure) => failure.reason)).toEqual([
+      DECK_VERSION_CONFLICT_REASON,
+      DECK_VERSION_QUEUE_CONFLICT_REASON,
+    ])
   })
 
   it("keeps fixed revisions and the exact operation through an uncertain retry", async () => {

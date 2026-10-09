@@ -8,6 +8,7 @@ import { ChoiceButton, CHOICE_RADIUS } from "@/components/ChoiceButton"
 import { DialogCard, $dialogActions, type DialogOrigin } from "@/components/DialogCard"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
 import { Text } from "@/components/Text"
+import { lastPlayerStanding } from "@/features/game/domain"
 import { counterValueLabel } from "@/features/game/playSystems"
 import type { LocalGame, LocalGameResult, PlayerId } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
@@ -43,7 +44,10 @@ export function LocalGameEndDialog({
     }
   }
   const system = game.system
-  const [winnerPlayerIds, setWinnerPlayerIds] = useState<PlayerId[]>([])
+  const [winnerPlayerIds, setWinnerPlayerIds] = useState<PlayerId[]>(() => {
+    const standing = lastPlayerStanding(game)
+    return standing ? [standing] : []
+  })
   const [drawSelected, setDrawSelected] = useState(false)
   const endResultSelected = winnerPlayerIds.length > 0 || drawSelected
   function toggleWinner(playerId: PlayerId) {
@@ -75,7 +79,7 @@ export function LocalGameEndDialog({
         <Text text="Choose a winner or record a draw." size="xs" style={themed($dialogSubtitle)} />
       </View>
       <View style={themed($resultChoices)}>
-        {game.players.map((player) => {
+        {game.players.map((player, seat) => {
           const selected = winnerPlayerIds.includes(player.id)
           return (
             <ChoiceButton
@@ -85,7 +89,7 @@ export function LocalGameEndDialog({
               detail={counterValueLabel(system, player.life)}
               accentColor={player.color}
               Leading={({ color }) => (
-                <PlayerMark seatNumber={player.seat} color={color} size={28} />
+                <PlayerMark seatNumber={seat + 1} shape={player.shape} color={color} size={28} />
               )}
               accessibilityLabel={`${player.name}, ${counterValueLabel(system, player.life)}${selected ? ", winner" : ""}`}
               selected={selected}

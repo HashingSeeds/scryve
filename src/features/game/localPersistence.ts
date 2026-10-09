@@ -436,6 +436,14 @@ function parseSummary(value: unknown): LocalGameSummary | null {
     : null
 }
 
+/** why: games still owed to the server stay past the cap, so a long offline streak never drops them before they upload. */
+function withinHistoryCap(games: readonly LocalGameSummary[]): LocalGameSummary[] {
+  return games.filter(
+    (game, index) =>
+      index < MAX_HISTORY_GAMES || game.publish === "pending" || game.matchPublish === "pending",
+  )
+}
+
 export type LocalGameAccountInput = Parameters<typeof localGameAccount>[1]
 
 export class LocalGameRepository {
@@ -642,8 +650,6 @@ export class LocalGameRepository {
         : {}),
     }
     const current = this.loadHistory().filter(({ id }) => id !== game.id)
-    const next = [summary, ...current].slice(0, MAX_HISTORY_GAMES)
-    const removed = current.filter(({ id }) => !next.some((candidate) => candidate.id === id))
     const boundedGame = {
       ...game,
       ...(account ? { account } : {}),
@@ -655,8 +661,7 @@ export class LocalGameRepository {
       eventsTruncated: game.events.length > MAX_HISTORY_EVENTS,
     }
     this.storage.set(LOCAL_KEYS.historyDetail(game.id), JSON.stringify(detail))
-    this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
-    removed.forEach(({ id }) => this.storage.delete(LOCAL_KEYS.historyDetail(id)))
+    this.saveHistory([summary, ...current], current)
     const active = this.loadActiveGame()
     if (active?.id === game.id) this.clearActiveGame()
     if (game.status === "finished") {
@@ -826,20 +831,31 @@ export class LocalGameRepository {
     const index = history.findIndex((game) => game.id === gameId)
     const next = index === -1 ? undefined : patch(history[index])
     if (!next) return
-    this.storage.set(
-      LOCAL_KEYS.historyIndex,
-      JSON.stringify(history.map((game) => (game.id === gameId ? next : game))),
+    this.saveHistory(
+      history.map((game) => (game.id === gameId ? next : game)),
+      history,
     )
     this.notifyHistoryChanged()
+  }
+
+  // why: a game that just finished uploading may be past the cap, so every write trims and drops the details it evicts.
+  private saveHistory(
+    games: readonly LocalGameSummary[],
+    previous: readonly LocalGameSummary[],
+  ): void {
+    const next = withinHistoryCap(games)
+    this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
+    previous
+      .filter(({ id }) => !next.some((game) => game.id === id))
+      .forEach(({ id }) => this.storage.delete(LOCAL_KEYS.historyDetail(id)))
   }
 
   loadHistory(): LocalGameSummary[] {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.historyIndex))
     if (!Array.isArray(raw)) return []
-    return raw
-      .map(parseSummary)
-      .filter((value): value is LocalGameSummary => value !== null)
-      .slice(0, MAX_HISTORY_GAMES)
+    return withinHistoryCap(
+      raw.map(parseSummary).filter((value): value is LocalGameSummary => value !== null),
+    )
   }
 
   loadHistoryDetail(gameId: string): { game: LocalGame; eventsTruncated: boolean } | null {

@@ -12,6 +12,7 @@ on:
       - "patches/**"
       - "assets/**"
       - "modules/**"
+      - ".github/workflows/fingerprints.yml"
       # verified against `eas fingerprint:generate` raw sources: package.json +
       # pnpm-lock.yaml (node_modules contents), expoConfig (app.json +
       # app.config.ts), eas.json, assets, and patches. Local Expo modules under
@@ -53,9 +54,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # expo doctor flags eas-cli as a project dependency, so CI installs a pinned global copy.
+      # expo doctor flags eas-cli as a project dependency, so CI installs a global copy pinned by
+      # package.json `config.easCli`, the version local scripts run too.
       - name: Install EAS CLI
-        run: npm install -g eas-cli@22.2.0
+        run: npm install -g "eas-cli@$(node -p "require('./package.json').config.easCli")"
 
       - name: Restore cached base fingerprints
         uses: actions/cache@v4
@@ -95,6 +97,24 @@ jobs:
           changed_inputs_file="$RUNNER_TEMP/native-fingerprint-inputs.txt"
           needs_build=false
           : > "$changed_inputs_file"
+
+          # why: `eas fingerprint:generate` also uploads a new fingerprint, which the Viewer robot
+          # cannot do. expo-updates computes the same hash offline from the build profile's
+          # eas.json env, resolving `extends`. EAS env vars are left out, as the Viewer robot
+          # cannot read them anyway; fingerprint-drift's token-parity proves they change nothing.
+          # Run from a project root; writes the fingerprint JSON to $3.
+          fingerprint() {
+            local profile="$1" platform="$2" out="$3"
+            (
+              while IFS= read -r var; do export "$var"; done < <(
+                jq -er --arg p "$profile" '
+                  def env($n): .build[$n] as $b
+                    | (if $b.extends then env($b.extends) else {} end) + ($b.env // {});
+                  env($p) | to_entries[] | "\(.key)=\(.value)"' eas.json
+              )
+              node_modules/.bin/expo-updates fingerprint:generate --platform "$platform"
+            ) > "$out"
+          }
 
           # Runs an eas command that prints a JSON document. Uses the global
           # pinned eas so it works from the base tree too. eas-cli
@@ -142,12 +162,7 @@ jobs:
               matching_file="$RUNNER_TEMP/matching-${profile//:/-}-$platform.json"
               latest_file="$RUNNER_TEMP/latest-${profile//:/-}-$platform.json"
 
-              eas_json "$fingerprint_file" \
-                fingerprint:generate \
-                --build-profile "$profile" \
-                --platform "$platform" \
-                --json \
-                --non-interactive
+              fingerprint "$profile" "$platform" "$fingerprint_file"
               current_hash=$(jq -er '.hash' "$fingerprint_file")
 
               cached_base_fingerprint_file="base-fingerprints/${profile//:/-}-$platform.json"
@@ -156,12 +171,7 @@ jobs:
               else
                 (
                   cd "$RUNNER_TEMP/base"
-                  eas_json "$base_fingerprint_file" \
-                    fingerprint:generate \
-                    --build-profile "$profile" \
-                    --platform "$platform" \
-                    --json \
-                    --non-interactive
+                  fingerprint "$profile" "$platform" "$base_fingerprint_file"
                 )
               fi
               base_hash=$(jq -er '.hash' "$base_fingerprint_file")
