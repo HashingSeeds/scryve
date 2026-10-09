@@ -61,7 +61,7 @@ sentry-release:
 
 The beta workflow (`.github/workflows/beta.yml`) deploys Convex to production with the `CONVEX_DEPLOY_KEY` repository secret before it publishes the app to beta. Merging to main is a production backend release. If the deploy fails, nothing is published.
 
-It skips the deploy only when the beta run that finished last succeeded and `convex/`, `convex.json`, `pnpm-lock.yaml`, and `package.json` other than its `version` match that run's commit (`scripts/convex-backend.cjs`). A burst of merges skips runs, so comparing with the previous commit could miss a backend change. Any other outcome, including a failed lookup, deploys.
+It skips the deploy only when the beta run that finished last succeeded and `convex/`, `pnpm-lock.yaml`, and `package.json` other than its `version` match that run's commit (`scripts/convex-backend.cjs`). A root `convex.json` always deploys, since it can move the functions. A burst of merges skips runs, so comparing with the previous commit could miss a backend change. Any other outcome, including a failed lookup, deploys.
 
 Cloudflare Pages builds the web app with `pnpm build:pages` (`scripts/pages-build.cjs`). Pages' production branch is `production`, which moves only on promotion:
 

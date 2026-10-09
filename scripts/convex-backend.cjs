@@ -3,8 +3,8 @@ const fs = require("node:fs")
 const path = require("node:path")
 
 const root = path.join(path.dirname(require.resolve("./convex-backend.cjs")), "..")
-// why: convex/ imports nothing outside it and only convex.json can relocate it, so these are everything `convex deploy` bundles.
-const BACKEND_PATHS = ["convex", "convex.json", "pnpm-lock.yaml"]
+// why: nothing in convex/ imports from outside it, so these paths are everything `convex deploy` bundles.
+const BACKEND_PATHS = ["convex", "pnpm-lock.yaml"]
 
 // why: every native release bumps `version` on main, which would otherwise count as a backend change.
 function packageJsonMatches(baseSource, headSource) {
@@ -26,9 +26,15 @@ function backendMatches(baseRef, headRef, cwd = root) {
     stdio: ["ignore", "ignore", "inherit"],
   })
   if (diff.status !== 0) return false
-  const packageJsonAt = (ref) =>
-    spawnSync("git", ["show", `${ref}:package.json`], { cwd, encoding: "utf8" }).stdout
-  return packageJsonMatches(packageJsonAt(baseRef), packageJsonAt(headRef))
+  const show = (ref, file) =>
+    spawnSync("git", ["show", `${ref}:${file}`], { cwd, encoding: "utf8" })
+  // why: convex.json can move the functions out of convex/, where BACKEND_PATHS would miss them.
+  if (show(baseRef, "convex.json").status === 0 || show(headRef, "convex.json").status === 0)
+    return false
+  return packageJsonMatches(
+    show(baseRef, "package.json").stdout,
+    show(headRef, "package.json").stdout,
+  )
 }
 
 /**

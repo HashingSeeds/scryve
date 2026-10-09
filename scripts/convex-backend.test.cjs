@@ -44,6 +44,12 @@ test("a change to convex/, the lockfile, or package.json dependencies is a backe
   }
 })
 
+test("any convex.json counts as a backend change, since it can move the functions", () => {
+  const config = { ...base, "convex.json": '{ "functions": "backend/" }' }
+  const [first, last] = repoWithCommits(config, { "src.ts": "x" })
+  assert.equal(backendMatches(first.sha, last.sha, last.cwd), false)
+})
+
 test("a commit git cannot find counts as a backend change", () => {
   const [only] = repoWithCommits(base)
   assert.equal(backendMatches("0".repeat(40), only.sha, only.cwd), false)
