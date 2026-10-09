@@ -621,6 +621,30 @@ describe("premium deck tracking", () => {
     ).rejects.toMatchObject({ data: { code: "deck_archived" } })
   })
 
+  it("lists active decks behind more than 100 newer deleted decks", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "many-deleted-owner", "Many Deleted Owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Keeper", format: "commander" })
+    await t.run(async (ctx) => {
+      const deck = await ctx.db.get(deckId)
+      if (!deck) throw new Error("missing deck")
+      for (let index = 0; index < 101; index++)
+        await ctx.db.insert("decks", {
+          ownerUserId: deck.ownerUserId,
+          name: `Deleted ${index}`,
+          format: "commander",
+          createdAt: deck.updatedAt + index + 1,
+          updatedAt: deck.updatedAt + index + 1,
+          archivedAt: deck.updatedAt + index + 1,
+        })
+    })
+
+    await expect(actor.query(api.decks.listMine)).resolves.toMatchObject({
+      decks: [{ _id: deckId, name: "Keeper" }],
+      capacity: { used: 1 },
+    })
+  })
+
   it("snapshots a selected deck version and records an explicit winning result", async () => {
     const t = convexTest(schema, modules)
     const host = await synced(t, "host", "Host")
@@ -1205,6 +1229,27 @@ describe("deck versions", () => {
     await expect(
       actor.mutation(api.decks.updateVersion, { versionId: extraId, name: "Revived" }),
     ).rejects.toMatchObject({ data: { code: "deck_version_not_found" } })
+  })
+
+  it("rejects a save to a deleted version instead of recreating it", async () => {
+    const t = convexTest(schema, modules)
+    const actor = await synced(t, "stray-owner", "Stray Owner")
+    await premiumVersions(t, "stray-owner")
+    const deckId = await actor.mutation(api.decks.create, { name: "Stray", format: "commander" })
+    const deletedId = await actor.mutation(api.decks.createVersion, { deckId, name: "Experiment" })
+    await actor.mutation(api.decks.deleteVersion, { versionId: deletedId })
+
+    await expect(
+      actor.mutation(api.decks.saveVersion, {
+        deckId,
+        versionId: deletedId,
+        cards: [testCard("Late Edit", "ccccccc1")],
+      }),
+    ).rejects.toMatchObject({ data: { code: "deck_version_not_found" } })
+    await expect(actor.query(api.decks.detail, { deckId })).resolves.toMatchObject({
+      versions: [{ versionNumber: 1, name: "Current", cardCount: 0 }],
+      cards: [],
+    })
   })
 
   it("round-trips deck and version notes", async () => {
