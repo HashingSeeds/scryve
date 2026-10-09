@@ -26,10 +26,11 @@ concurrency:
 
 jobs:
   sweep:
-    # why: pr-preview publishes from PR branches, so this environment cannot be limited to main.
-    # This keeps a dispatch from another branch from running that branch's copy of the sweep.
+    # why: its own environment, limited to main and with no reviewer, so sweeps never wait for
+    # approval. `delete` and `schedule` always run on the default branch, and the `if` keeps a
+    # dispatch from another branch from running that branch's copy of the sweep.
     if: github.ref == 'refs/heads/main'
-    environment: pr-preview
+    environment: pr-preview-cleanup
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
