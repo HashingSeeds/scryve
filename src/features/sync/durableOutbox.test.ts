@@ -121,18 +121,32 @@ describe("durable outbox", () => {
   it("quarantines unreadable records instead of deleting them", () => {
     const storage = new MemoryStorage()
     const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const quarantined = () =>
+      [...storage.values]
+        .filter(([key]) => key.startsWith(DURABLE_QUARANTINE_PREFIX))
+        .map(([, value]) => value)
+        .sort()
     const pendingKey = keys.pendingRecord("deck", "note-future", "owner")
-    const failedKey = keys.failedRecord("deck", "note-torn", "owner")
     const future = JSON.stringify({ ...operation("note-future", 1), payload: { body: "v2" } })
+    const done = operation("note-done", 1)
+    const staleDone = JSON.stringify({ ...done, payload: { body: "v2" } })
+    const failedDone = codec.createFailure(done, "rejected", 2)
     storage.set(pendingKey, future)
-    storage.set(failedKey, '{"action":')
+    storage.set(keys.failedRecord("deck", "note-torn", "owner"), '{"action":')
+    storage.set(keys.pendingRecord("deck", "note-done", "owner"), staleDone)
+    storage.set(keys.failedRecord("deck", "note-done", "owner"), JSON.stringify(failedDone))
 
     expect(outbox.loadPending("deck")).toEqual([])
-    expect(outbox.loadFailed("deck")).toEqual([])
-    expect(storage.getString(pendingKey)).toBeUndefined()
-    expect(storage.getString(failedKey)).toBeUndefined()
-    expect(storage.getString(`${DURABLE_QUARANTINE_PREFIX}${pendingKey}`)).toBe(future)
-    expect(storage.getString(`${DURABLE_QUARANTINE_PREFIX}${failedKey}`)).toBe('{"action":')
+    expect(outbox.loadFailed("deck")).toEqual([failedDone])
+    storage.set(pendingKey, future)
+    const now = jest.spyOn(Date, "now").mockReturnValue(1)
+    outbox.loadPending("deck")
+    now.mockRestore()
+
+    expect([...storage.values.keys()].filter((key) => key.startsWith("pending."))).toEqual([
+      keys.pendingIndex("deck", "owner"),
+    ])
+    expect(quarantined()).toEqual([future, future, staleDone, '{"action":'].sort())
   })
 
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {
