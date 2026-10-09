@@ -76,10 +76,14 @@ export function initObservability() {
     embeddedLaunch: String(Updates.isEmbeddedLaunch),
   })
 
+  const releaseCommit: unknown = Constants.expoConfig?.extra?.releaseCommit
   setOutboxWriter({
     app: Constants.expoConfig?.version ?? "unknown",
     update: updateId,
     runtime: runtimeVersion,
+    ...(typeof releaseCommit === "string" && releaseCommit
+      ? { commit: releaseCommit.slice(0, 12) }
+      : {}),
   })
   setQuarantineReporter(({ outbox, count, reasons, records }) => {
     const error = new Error("Unreadable outbox records were quarantined")

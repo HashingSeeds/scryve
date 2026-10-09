@@ -5,6 +5,7 @@ import {
   type DurableOutboxCodec,
   type DurableOutboxKeys,
   type DurablePendingRecord,
+  type QuarantineReport,
   setOutboxWriter,
   setQuarantineReporter,
 } from "./durableOutbox"
@@ -364,5 +365,56 @@ describe("durable outbox provenance", () => {
       ],
     ])
     expect(JSON.stringify(report.mock.calls)).not.toContain(sentinel)
+  })
+
+  it("describes nested failed fields and sampled array elements, masking keys that look like IDs", () => {
+    const report = jest.fn()
+    setQuarantineReporter(report)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const idKeys = [
+      "3f2b8c1e-9a4d-4c2b-8e1f-0a9b8c7d6e5f",
+      "deadbeefcafe1234",
+      "1700000000000",
+      "k57a8w3qz9x0mvrj2c4d",
+    ]
+    const writtenBy = {
+      app: "2.0.0",
+      update: "update-z",
+      runtime: "runtime-2",
+      commit: "0123456789ab",
+    }
+    storage.set(
+      keys.failedRecord("deck", "note-nested", "owner"),
+      JSON.stringify({
+        writtenBy,
+        schemaVersion: 1,
+        action: {
+          cards: [{ name: "Sol Ring" }, { name: "Island", quantity: 2 }, {}, { extra: true }],
+          byId: Object.fromEntries(idKeys.map((key) => [key, 1])),
+        },
+        reason: "x",
+        failedAt: 1,
+      }),
+    )
+
+    outbox.loadFailed("deck")
+
+    const [[{ records }]] = report.mock.calls as [[QuarantineReport]]
+    expect(records[0]).toMatchObject({
+      writtenBy,
+      shape: {
+        "action": "object",
+        "action.cards": "array",
+        "action.cards.0": "object",
+        "action.cards.0.name": "string",
+        "action.cards.1.quantity": "number",
+        "action.cards.2": "object",
+        "action.byId": "object",
+        "action.byId.<id>": "number",
+      },
+    })
+    expect(records[0].shape).not.toHaveProperty(["action.cards.3"])
+    for (const key of idKeys) expect(JSON.stringify(report.mock.calls)).not.toContain(key)
   })
 })

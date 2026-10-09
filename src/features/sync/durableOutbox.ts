@@ -80,6 +80,8 @@ export interface WrittenBy {
   app: string
   update: string
   runtime: string
+  /** why: web builds have no update id or runtime, so the release commit is what tells two deploys apart. */
+  commit?: string
 }
 
 export interface QuarantinedRecord {
@@ -100,7 +102,9 @@ export interface QuarantineReport {
 }
 
 const MAX_REPORTED_RECORDS = 16
-const MAX_SHAPE_ENTRIES = 48
+const MAX_SHAPE_ENTRIES = 64
+const SHAPE_DEPTH = 4
+const SHAPE_ARRAY_SAMPLE = 3
 
 let reportQuarantine: (report: QuarantineReport) => void = () => {}
 let currentWriter: WrittenBy | undefined
@@ -148,22 +152,45 @@ const parseWrittenBy = (value: unknown): WrittenBy | "unknown" =>
   provenancePart(value.app) &&
   provenancePart(value.update) &&
   provenancePart(value.runtime)
-    ? { app: value.app, update: value.update, runtime: value.runtime }
+    ? {
+        app: value.app,
+        update: value.update,
+        runtime: value.runtime,
+        ...(provenancePart(value.commit) ? { commit: value.commit } : {}),
+      }
     : "unknown"
 
 const typeLabel = (value: unknown): string =>
   value === null ? "null" : Array.isArray(value) ? "array" : typeof value
 
+// why: a key built from data (a uuid, a Convex id, a timestamp) would leak that value, so it is reported as a placeholder.
+const ID_LIKE_KEY =
+  /^(?:[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}|[\da-f]{12,}|\d{6,}|(?=[\w-]*\d)(?=[\w-]*[a-z])[\w-]{16,})$/i
+
+const shapeKey = (key: string): string => (ID_LIKE_KEY.test(key) ? "<id>" : key.slice(0, 40))
+
+const shapeChildren = (node: unknown): Array<[string, unknown]> =>
+  Array.isArray(node)
+    ? node.slice(0, SHAPE_ARRAY_SAMPLE).map((item, index) => [`${index}`, item])
+    : isRecord(node)
+      ? Object.entries(node).map(([key, child]) => [shapeKey(key), child])
+      : []
+
+/** why: deep enough for a failed record's `action.cards.0.quantity`; breadth-first so the entry cap drops the deepest paths, and arrays are sampled because their elements share a shape. */
 const shapeOf = (value: unknown): Record<string, string> => {
   if (!isRecord(value)) return value === null ? {} : { $: typeLabel(value) }
-  const entries: Array<[string, string]> = []
-  for (const [key, child] of Object.entries(value)) {
-    entries.push([key.slice(0, 40), typeLabel(child)])
-    if (isRecord(child))
-      for (const [nestedKey, nested] of Object.entries(child))
-        entries.push([`${key.slice(0, 40)}.${nestedKey.slice(0, 40)}`, typeLabel(nested)])
+  const shape: Record<string, string> = {}
+  let level: Array<[string, unknown]> = shapeChildren(value)
+  for (let depth = 1; depth <= SHAPE_DEPTH && level.length; depth += 1) {
+    const next: Array<[string, unknown]> = []
+    for (const [path, node] of level) {
+      if (Object.keys(shape).length >= MAX_SHAPE_ENTRIES) return shape
+      shape[path] = typeLabel(node)
+      for (const [key, child] of shapeChildren(node)) next.push([`${path}.${key}`, child])
+    }
+    level = next
   }
-  return Object.fromEntries(entries.slice(0, MAX_SHAPE_ENTRIES))
+  return shape
 }
 
 const operationTypeOf = (
