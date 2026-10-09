@@ -10,92 +10,26 @@ import { Text, TextProps } from "./Text"
 const sadFace = require("@assets/images/sad-face.png")
 
 interface EmptyStateProps {
-  /**
-   * Style override for the container.
-   */
   style?: StyleProp<ViewStyle>
-  /**
-   * An Image source to be displayed above the heading.
-   */
   imageSource?: ImageProps["source"] | null
-  /**
-   * Style overrides for image.
-   */
   imageStyle?: StyleProp<ImageStyle>
-  /**
-   * Pass any additional props directly to the Image component.
-   */
   ImageProps?: Omit<ImageProps, "source">
-  /**
-   * The heading text to display if not using `headingTx`.
-   */
   heading?: TextProps["text"]
-  /**
-   * Heading text which is looked up via i18n.
-   */
   headingTx?: TextProps["tx"]
-  /**
-   * Optional heading options to pass to i18n. Useful for interpolation
-   * as well as explicitly setting locale or translation fallbacks.
-   */
   headingTxOptions?: TextProps["txOptions"]
-  /**
-   * Style overrides for heading text.
-   */
   headingStyle?: StyleProp<TextStyle>
-  /**
-   * Pass any additional props directly to the heading Text component.
-   */
   HeadingTextProps?: TextProps
-  /**
-   * The content text to display if not using `contentTx`.
-   */
   content?: TextProps["text"]
-  /**
-   * Content text which is looked up via i18n.
-   */
   contentTx?: TextProps["tx"]
-  /**
-   * Optional content options to pass to i18n. Useful for interpolation
-   * as well as explicitly setting locale or translation fallbacks.
-   */
   contentTxOptions?: TextProps["txOptions"]
-  /**
-   * Style overrides for content text.
-   */
   contentStyle?: StyleProp<TextStyle>
-  /**
-   * Pass any additional props directly to the content Text component.
-   */
   ContentTextProps?: TextProps
-  /**
-   * The button text to display if not using `buttonTx`.
-   */
   button?: TextProps["text"]
-  /**
-   * Button text which is looked up via i18n.
-   */
   buttonTx?: TextProps["tx"]
-  /**
-   * Optional button options to pass to i18n. Useful for interpolation
-   * as well as explicitly setting locale or translation fallbacks.
-   */
   buttonTxOptions?: TextProps["txOptions"]
-  /**
-   * Style overrides for button.
-   */
   buttonStyle?: ButtonProps["style"]
-  /**
-   * Style overrides for button text.
-   */
   buttonTextStyle?: ButtonProps["textStyle"]
-  /**
-   * Called when the button is pressed.
-   */
   buttonOnPress?: ButtonProps["onPress"]
-  /**
-   * Pass any additional props directly to the Button component.
-   */
   ButtonProps?: ButtonProps
 }
 

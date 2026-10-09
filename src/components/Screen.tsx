@@ -25,46 +25,19 @@ import { ExtendedEdge, useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsS
 export const DEFAULT_BOTTOM_OFFSET = 50
 
 interface BaseScreenProps {
-  /**
-   * Children components.
-   */
   children?: ReactNode
-  /**
-   * Style for the outer content container useful for padding & margin.
-   */
   style?: StyleProp<ViewStyle>
-  /**
-   * Style for the inner content container useful for padding & margin.
-   */
   contentContainerStyle?: StyleProp<ViewStyle>
   contentInset?: "standard"
-  /**
-   * Override the default edges for the safe area.
-   */
   safeAreaEdges?: ExtendedEdge[]
-  /**
-   * Background color
-   */
   backgroundColor?: string
-  /**
-   * System bar setting. Defaults to dark.
-   */
   systemBarStyle?: SystemBarStyle
-  /**
-   * By how much should we offset the keyboard? Defaults to 0.
-   */
   keyboardOffset?: number
   /**
    * By how much we scroll up when the keyboard is shown. Defaults to 50.
    */
   keyboardBottomOffset?: number
-  /**
-   * Pass any additional props directly to the SystemBars component.
-   */
   SystemBarsProps?: SystemBarsProps
-  /**
-   * Pass any additional props directly to the KeyboardAvoidingView component.
-   */
   KeyboardAvoidingViewProps?: KeyboardAvoidingViewProps
   header?: HeaderProps & { collapseTitle?: boolean }
 }
@@ -74,14 +47,7 @@ interface FixedScreenProps extends BaseScreenProps {
 }
 interface ScrollScreenProps extends BaseScreenProps {
   preset?: "scroll"
-  /**
-   * Should keyboard persist on screen tap. Defaults to handled.
-   * Only applies to scroll preset.
-   */
   keyboardShouldPersistTaps?: "handled" | "always" | "never"
-  /**
-   * Pass any additional props directly to the ScrollView component.
-   */
   ScrollViewProps?: ScrollViewProps
 }
 
@@ -100,10 +66,6 @@ const isIos = Platform.OS === "ios"
 
 type ScreenPreset = "fixed" | "scroll" | "auto"
 
-/**
- * @param {ScreenPreset?} preset - The preset to check.
- * @returns {boolean} - Whether the preset is non-scrolling.
- */
 function isNonScrolling(preset?: ScreenPreset) {
   return !preset || preset === "fixed"
 }
@@ -139,9 +101,6 @@ function useAutoPreset(props: AutoScreenProps): {
     updateScrollState()
   }
 
-  /**
-   * @param {LayoutChangeEvent} e = The layout change event.
-   */
   function onLayout(e: LayoutChangeEvent) {
     const { height } = e.nativeEvent.layout
     scrollViewHeight.current = height

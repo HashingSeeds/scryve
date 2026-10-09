@@ -14,8 +14,6 @@ config.transformer.getTransformOptions = async () => ({
   },
 })
 
-// This helps support certain popular third-party libraries
-// such as Firebase that use the extension cjs.
 config.resolver.sourceExts.push("cjs")
 
 // why: obscenity's "import" export is an ESM shim that default-imports its own CJS build, which Metro's interop resolves to undefined on web.

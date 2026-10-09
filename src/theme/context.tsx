@@ -51,7 +51,6 @@ export const ThemeProvider: FC<PropsWithChildren<ThemeProviderProps>> = ({
   initialContext,
 }) => {
   const systemColorScheme = useColorScheme()
-  // Our saved theme context: can be "light", "dark", or undefined (system theme)
   const [themeScheme, setThemeScheme] = useMMKVString("ignite.themeScheme", storage)
 
   /**
@@ -67,11 +66,6 @@ export const ThemeProvider: FC<PropsWithChildren<ThemeProviderProps>> = ({
     [setThemeScheme],
   )
 
-  /**
-   * initialContext is the theme context passed in from the app.tsx file and always takes precedence.
-   * themeScheme is the value from MMKV. If undefined, we fall back to the system theme
-   * systemColorScheme is the value from the device. If undefined, we fall back to "light"
-   */
   const themeContext: ImmutableThemeContextModeT = useMemo(() => {
     const t = initialContext || themeScheme || (!!systemColorScheme ? systemColorScheme : "light")
     return t === "dark" ? "dark" : "light"
