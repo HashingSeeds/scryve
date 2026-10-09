@@ -101,7 +101,7 @@ export interface LifeCardProps {
   screenEdges?: LifeCardScreenEdges
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
-  lifeFontSize?: number
+  lifeFontSizeFor?: (digits: number) => number | undefined
   system?: PlaySystemId
   lifeStep?: number
   disabled?: boolean
@@ -142,7 +142,7 @@ export const LifeCard = memo(function LifeCard({
   screenEdges,
   menuCorner,
   menuEdgeCenter,
-  lifeFontSize,
+  lifeFontSizeFor,
   system,
   lifeStep,
   disabled,
@@ -170,14 +170,18 @@ export const LifeCard = memo(function LifeCard({
   const identity = `Seat ${seatNumber}, ${displayName}`
   const markSize = compact ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
+  // why: a press shows its change right away; the change itself is recorded on release.
+  const [preview, setPreview] = useState(0)
+  const shownLife = life + preview
+  const shownDigits = String(shownLife).length
   const resolvedLifeFontSize =
-    lifeFontSize ??
+    lifeFontSizeFor?.(shownDigits) ??
     Math.min(
       compact ? COMPACT_LIFE_FONT_SIZE : LIFE_FONT_SIZE,
       getLifeFontSizeThatFits({
         availableWidth: getLifeTargetTextSpace(lifeTargetSize),
         availableHeight: getLifeTargetTextSpace(lifeTargetSize),
-        digits: String(life).length,
+        digits: shownDigits,
         fontScale: 1,
       }),
     )
@@ -299,7 +303,7 @@ export const LifeCard = memo(function LifeCard({
     reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [editorOpen, setEditorOpen] = useState(false)
-  const recentDelta = useRecentDelta(life)
+  const recentDelta = useRecentDelta(shownLife)
   const previousLife = useRef(life)
   useEffect(() => {
     if (previousLife.current === life) return
@@ -484,7 +488,7 @@ export const LifeCard = memo(function LifeCard({
         >
           <Text
             testID={`life-total-seat-${seatNumber}`}
-            text={String(life)}
+            text={String(shownLife)}
             accessible
             accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
             accessibilityLiveRegion="polite"
@@ -638,6 +642,7 @@ export const LifeCard = memo(function LifeCard({
           lifeStep={lifeStep}
           recentDelta={recentDelta}
           onChange={onChange}
+          onPreview={setPreview}
           onLongChange={() => setEditorOpen(true)}
         />
       ) : null}

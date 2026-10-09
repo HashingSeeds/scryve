@@ -780,6 +780,51 @@ describe("LifeCard", () => {
     expect(view.getByText("−")).toBeTruthy()
   })
 
+  it("shows a held change right away and records it once on release", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    const plus = view.getByTestId("life-seat-1-1")
+
+    fireEvent(plus, "pressIn")
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("21")
+    expect(view.getByText("+1")).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+
+    fireEvent.press(plus)
+    view.rerender(interactiveCard(21, onChange))
+    fireEvent(plus, "pressOut")
+    expect(onChange.mock.calls).toEqual([[1]])
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("21")
+    expect(view.getByText("+1")).toBeTruthy()
+  })
+
+  it("drops a held change that slides off or becomes a long press", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    const minus = view.getByTestId("life-seat-1--1")
+
+    fireEvent(minus, "pressIn")
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("19")
+    fireEvent(minus, "pressOut")
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("20")
+
+    fireEvent(minus, "pressIn")
+    fireEvent(minus, "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("sizes a held change for the digits it shows", () => {
+    const fontSize = (view: ReturnType<typeof renderCard>) =>
+      StyleSheet.flatten(view.getByTestId("life-total-seat-1").props.style).fontSize
+    const threeDigits = fontSize(renderCard(100))
+    const view = renderCard(99)
+    expect(fontSize(view)).toBeGreaterThan(threeDigits)
+
+    fireEvent(view.getByTestId("life-seat-1-1"), "pressIn")
+    expect(fontSize(view)).toBe(threeDigits)
+  })
+
   it("lets the control zones handle touches at the life total", () => {
     const view = render(interactiveCard(20, jest.fn()))
     expect(view.queryByTestId("life-total-button-seat-1")).toBeNull()

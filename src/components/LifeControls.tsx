@@ -27,6 +27,7 @@ export interface LifeControlsProps {
   recentDelta?: RecentDelta
   onChange: (delta: LifeDelta) => void
   onLongChange?: (direction: -1 | 1) => void
+  onPreview?: (pendingDelta: number) => void
   style?: StyleProp<ViewStyle>
 }
 
@@ -108,11 +109,17 @@ export function LifeControls({
   recentDelta: recentDeltaStore = NO_RECENT_DELTA,
   onChange,
   onLongChange,
+  onPreview,
   style,
 }: LifeControlsProps) {
   const { themed } = useAppTheme()
   const recentDelta = useSyncExternalStore(recentDeltaStore.subscribe, recentDeltaStore.get)
   const longPressHandled = useRef<LifeDelta | null>(null)
+  // why: a zone that freezes or unmounts mid-press never reports press-out, so drop its preview.
+  useEffect(() => {
+    if (disabled) onPreview?.(0)
+    return () => onPreview?.(0)
+  }, [disabled, onPreview])
   const displayName = playerName.trim() || "unnamed player"
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
@@ -175,9 +182,13 @@ export function LifeControls({
               delayLongPress={450}
               onPressIn={() => {
                 longPressHandled.current = null
+                onPreview?.(delta)
               }}
+              // why: a press that slides off or is cancelled ends here without onPress.
+              onPressOut={() => onPreview?.(0)}
               onLongPress={() => {
                 longPressHandled.current = direction
+                onPreview?.(0)
                 onLongChange?.(direction)
               }}
               onAccessibilityAction={({ nativeEvent }) => {
@@ -188,6 +199,8 @@ export function LifeControls({
                   longPressHandled.current = null
                   return
                 }
+                // why: onPressOut can land after onPress; clearing here keeps a tap from counting twice.
+                onPreview?.(0)
                 onChange(delta)
               }}
             >
