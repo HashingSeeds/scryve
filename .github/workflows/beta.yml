@@ -49,7 +49,7 @@ jobs:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
 
       - name: Install EAS CLI
-        run: npm install -g eas-cli@22.2.0
+        run: npm install -g "eas-cli@$(node -p "require('./package.json').config.easCli")"
 
       - name: Publish to beta
         env:
