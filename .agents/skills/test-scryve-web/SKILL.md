@@ -99,8 +99,9 @@ the client, repository, screenshots, or report.
 Connected play needs two signed-in players in browser contexts with separate
 storage. Use T3 preview tabs when available: `preview_open` with
 `reuseExistingTab=false`, keeping each returned `tabId` for every call.
-Otherwise use Playwright with one `browser.newContext()` per identity. Sign in `jane+clerk_test@sow.care` in one and `john+clerk_test@sow.care` in the
-other through the flow above.
+Otherwise use Playwright with one `browser.newContext()` per identity. Sign in
+`jane+clerk_test@sow.care` in one and `john+clerk_test@sow.care` in the other
+through the flow above.
 
 Both players use the shared development Convex deployment, which any
 worktree's `convex dev` can overwrite with older code. Check it matches this
