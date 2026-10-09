@@ -13,11 +13,12 @@ onlyBuiltDependencies:
 
 # convex-test 0.0.54 leaves its event-loop MessagePorts open after scheduled functions finish.
 patchedDependencies:
-  convex-test@0.0.54: patches/convex-test@0.0.54.patch
+  convex-test@0.0.54: js-patches/convex-test@0.0.54.patch
   # react-native-screens 4.26.2 misses the screens stack when expo-dev-launcher wraps it, so
   # statusBarHidden is ignored in iOS dev builds.
   react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
   # react-native 0.86.3 spreads BridgelessUIManager into UIManager, which builds constants for
   # every native view manager at launch (~30ms on a Pixel 6a). JS-only patches live in js-patches/
   # because the native fingerprint hashes patches/, which would block OTA updates.
+  # scripts/js-patches.test.cjs keeps native packages and files out of js-patches/.
   react-native@0.86.3: js-patches/react-native@0.86.3.patch
