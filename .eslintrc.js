@@ -1,11 +1,9 @@
-// https://docs.expo.dev/guides/using-eslint/
 module.exports = {
   root: true,
   extends: [
     "plugin:@typescript-eslint/recommended",
     "plugin:react/recommended",
     "plugin:react-native/all",
-    // `expo` must come after `standard` or its globals configuration will be overridden
     "expo",
     // `jsx-runtime` must come after `expo` or it will be overridden
     "plugin:react/jsx-runtime",
@@ -21,7 +19,6 @@ module.exports = {
         allowPatterns: ["^(?:\\*\\s*)*why:"],
       },
     ],
-    // typescript-eslint
     "@typescript-eslint/array-type": 0,
     "@typescript-eslint/ban-ts-comment": 0,
     "@typescript-eslint/no-explicit-any": 0,
@@ -41,7 +38,6 @@ module.exports = {
       "error",
       {
         paths: [
-          // Prefer named exports from 'react' instead of importing `React`
           {
             name: "react",
             importNames: ["default"],
@@ -60,15 +56,12 @@ module.exports = {
         ],
       },
     ],
-    // react
     "react/prop-types": 0,
     "react-hooks/preserve-manual-memoization": 0,
     "react-hooks/purity": 0,
     "react-hooks/refs": 0,
     "react-hooks/set-state-in-effect": 0,
-    // react-native
     "react-native/no-raw-text": 0,
-    // reactotron
     "reactotron/no-tron-in-production": "error",
     // eslint-config-standard overrides
     "comma-dangle": 0,

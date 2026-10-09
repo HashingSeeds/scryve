@@ -16,7 +16,6 @@ export const customFontsToLoad = {
 
 const fonts = {
   spaceGrotesk: {
-    // Cross-platform Google font.
     light: "spaceGroteskLight",
     normal: "spaceGroteskRegular",
     medium: "spaceGroteskMedium",
@@ -30,8 +29,5 @@ export const typography = {
    * The fonts are available to use, but prefer using the semantic name.
    */
   fonts,
-  /**
-   * The primary font. Used in most places.
-   */
   primary: fonts.spaceGrotesk,
 }

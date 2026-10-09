@@ -14,14 +14,8 @@ import { useAppTheme } from "@/theme/context"
 export type IconTypes = keyof typeof iconRegistry
 
 type BaseIconProps = {
-  /**
-   * The name of the icon
-   */
   icon: IconTypes
 
-  /**
-   * An optional tint color for the icon
-   */
   color?: string
 
   /**
@@ -29,14 +23,8 @@ type BaseIconProps = {
    */
   size?: number
 
-  /**
-   * Style overrides for the icon image
-   */
   style?: StyleProp<ImageStyle>
 
-  /**
-   * Style overrides for the icon container
-   */
   containerStyle?: StyleProp<ViewStyle>
 }
 

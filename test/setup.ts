@@ -1,14 +1,11 @@
 import { createElement, forwardRef, useImperativeHandle, type ReactNode } from "react"
 import "react-native-url-polyfill/auto"
-// we always make sure 'react-native' gets included first
 // eslint-disable-next-line no-restricted-imports
 import * as ReactNative from "react-native"
 
 import mockFile from "./mockFile"
 
-// libraries to mock
 jest.doMock("react-native", () => {
-  // Extend ReactNative
   return Object.setPrototypeOf(
     {
       AccessibilityInfo: {

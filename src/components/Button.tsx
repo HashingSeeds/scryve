@@ -25,66 +25,20 @@ export interface ButtonAccessoryProps {
 }
 
 export interface ButtonProps extends PressableProps {
-  /**
-   * Text which is looked up via i18n.
-   */
   tx?: AppTextProps["tx"]
-  /**
-   * The text to display if not using `tx` or nested components.
-   */
   text?: AppTextProps["text"]
-  /**
-   * Optional options to pass to i18n. Useful for interpolation
-   * as well as explicitly setting locale or translation fallbacks.
-   */
   txOptions?: AppTextProps["txOptions"]
   TextProps?: ButtonTextProps
-  /**
-   * An optional style override useful for padding & margin.
-   */
   style?: StyleProp<ViewStyle>
-  /**
-   * An optional style override for the "pressed" state.
-   */
   pressedStyle?: StyleProp<ViewStyle>
-  /**
-   * An optional style override for the button text.
-   */
   textStyle?: StyleProp<TextStyle>
-  /**
-   * An optional style override for the button text when in the "pressed" state.
-   */
   pressedTextStyle?: StyleProp<TextStyle>
-  /**
-   * An optional style override for the button text when in the "disabled" state.
-   */
   disabledTextStyle?: StyleProp<TextStyle>
-  /**
-   * One of the different types of button presets.
-   */
   preset?: Presets
-  /**
-   * An optional component to render on the right side of the text.
-   * Example: `RightAccessory={(props) => <View {...props} />}`
-   */
   RightAccessory?: ComponentType<ButtonAccessoryProps>
-  /**
-   * An optional component to render on the left side of the text.
-   * Example: `LeftAccessory={(props) => <View {...props} />}`
-   */
   LeftAccessory?: ComponentType<ButtonAccessoryProps>
-  /**
-   * Children components.
-   */
   children?: React.ReactNode
-  /**
-   * disabled prop, accessed directly for declarative styling reasons.
-   * https://reactnative.dev/docs/pressable#disabled
-   */
   disabled?: boolean
-  /**
-   * An optional style override for the disabled state
-   */
   disabledStyle?: StyleProp<ViewStyle>
 }
 
@@ -110,11 +64,6 @@ export function Button(props: ButtonProps) {
   const { themed } = useAppTheme()
 
   const preset: Presets = props.preset ?? "default"
-  /**
-   * @param {PressableStateCallbackType} root0 - The root object containing the pressed state.
-   * @param {boolean} root0.pressed - The pressed state.
-   * @returns {StyleProp<ViewStyle>} The view style based on the pressed state.
-   */
   function $viewStyle({ pressed }: PressableStateCallbackType): StyleProp<ViewStyle> {
     return [
       themed($viewPresets[preset]),
@@ -124,11 +73,6 @@ export function Button(props: ButtonProps) {
       !!disabled && $disabledViewStyleOverride,
     ]
   }
-  /**
-   * @param {PressableStateCallbackType} root0 - The root object containing the pressed state.
-   * @param {boolean} root0.pressed - The pressed state.
-   * @returns {StyleProp<TextStyle>} The text style based on the pressed state.
-   */
   function $textStyle({ pressed }: PressableStateCallbackType): StyleProp<TextStyle> {
     return [
       themed($textPresets[preset]),
