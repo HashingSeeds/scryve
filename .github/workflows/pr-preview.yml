@@ -15,7 +15,12 @@ permissions:
   contents: read
 
 jobs:
-  bundle:
+  # why: a publish waiting for approval holds its concurrency group, so a newer push's publish
+  # queues behind it and GitHub cancels all but one pending run. Cancelling older runs that are
+  # not running yet frees the group. A run already in progress is left alone: its bundle is
+  # cancelled by the bundle group, and its publish may be inside `eas update`, which a cancel
+  # cannot retract. A separate job, so `actions: write` never meets the PR's dependencies.
+  supersede:
     # why: the author check is a filter, not the security boundary. Under `pull_request` this file
     # comes from the PR branch, so a branch could rewrite it. The boundary is that only Matthew's
     # account can push branches here, GitHub never gives fork PRs secrets, and publishing needs
@@ -25,6 +30,28 @@ jobs:
       (github.event.action != 'labeled' || github.event.label.name == 'preview') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login == 'mchisolm0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel older runs still waiting for approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/pr-preview.yml/runs" \
+            -f event=pull_request -f branch="$HEAD_REF" -F per_page=50 \
+            --jq ".workflow_runs[] | select(.id < $GITHUB_RUN_ID
+              and (.status | IN(\"waiting\", \"pending\", \"queued\", \"requested\"))) | .id")
+          for id in $runs; do
+            echo "cancelling run $id"
+            gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" \
+              || echo "::warning::could not cancel run $id; it may have finished"
+          done
+
+  bundle:
+    needs: supersede
     concurrency:
       group: pr-preview-bundle-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -164,8 +191,9 @@ jobs:
 
   publish:
     needs: bundle
-    # why: job level, so an unrelated label skips without touching the queue. Never cancel: EAS
-    # keeps an update it already accepted, so a cancelled older push could land after a newer one.
+    # why: job level, so an unrelated label skips without touching the queue. Never cancel in
+    # progress: EAS keeps an update it already accepted, so a cancelled older push could land after
+    # a newer one. The supersede job clears older runs that are only waiting.
     concurrency:
       group: pr-preview-${{ github.event.pull_request.number }}
       cancel-in-progress: false
