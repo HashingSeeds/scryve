@@ -135,6 +135,7 @@ describe("durable outbox", () => {
     storage.set(keys.failedRecord("deck", "note-torn", "owner"), '{"action":')
     storage.set(keys.pendingRecord("deck", "note-done", "owner"), staleDone)
     storage.set(keys.failedRecord("deck", "note-done", "owner"), JSON.stringify(failedDone))
+    storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
 
     expect(outbox.loadPending("deck")).toEqual([])
     expect(outbox.loadFailed("deck")).toEqual([failedDone])
@@ -146,7 +147,7 @@ describe("durable outbox", () => {
     expect([...storage.values.keys()].filter((key) => key.startsWith("pending."))).toEqual([
       keys.pendingIndex("deck", "owner"),
     ])
-    expect(quarantined()).toEqual([future, future, staleDone, '{"action":'].sort())
+    expect(quarantined()).toEqual([future, future, staleDone, '{"action":', ""].sort())
   })
 
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {
