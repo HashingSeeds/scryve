@@ -2354,7 +2354,10 @@ describe("connected rematch", () => {
 })
 
 describe("Convex game write rate limits", () => {
-  it("lets a fast burst through, then rate-limits only the player who keeps going", async () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => jest.useRealTimers())
+
+  it("lets a fast burst through, then rate-limits only new changes from the player who keeps going", async () => {
     const t = makeConvexTest()
     const game = await activeGame(t)
     for (let index = 0; index < 60; index += 1)
@@ -2368,6 +2371,12 @@ describe("Convex game write rate limits", () => {
         lifeArgs(game.publicId, game.hostPlayerId, "burst-operation-over", -1),
       ),
     ).rejects.toMatchObject({ data: { code: "rate_limited" } })
+    await expect(
+      game.host.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.hostPlayerId, "burst-operation-0".padEnd(16, "0"), -1),
+      ),
+    ).resolves.toMatchObject({ deduplicated: true })
     await expect(
       game.joiner.mutation(
         api.games.changeLife,

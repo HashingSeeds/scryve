@@ -1044,6 +1044,7 @@ export const publishLocalGame = mutation({
         players: receipt.players,
       }
     }
+    await limitGameRate(ctx, "lobbyCreate", user._id)
     await clearWayToHost(ctx, user._id)
     if (
       await ctx.db
@@ -1594,7 +1595,8 @@ export const updateLobbySettings = mutation({
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    await requireHost(ctx, game)
+    const host = await requireHost(ctx, game)
+    await limitGameRate(ctx, "gameWrite", host._id)
     if (game.status !== "lobby")
       throw new ConvexError({
         code: "lobby_settings_not_allowed",
@@ -1707,7 +1709,8 @@ export const rotateInvite = mutation({
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    await requireHost(ctx, game)
+    const host = await requireHost(ctx, game)
+    await limitGameRate(ctx, "gameWrite", host._id)
     if (game.status !== "lobby" && game.status !== "active")
       throw new Error("Only a lobby or active game invite can be rotated")
     assertInviteToken(args.inviteToken)
@@ -1746,7 +1749,6 @@ export const changeLife = mutation({
 
     const game = await gameByPublicIdForWrite(ctx, args.publicId)
     const user = await requireUser(ctx)
-    await limitGameRate(ctx, "gameWrite", user._id)
     const membership = await ctx.db
       .query("gamePlayers")
       .withIndex("by_game_user", (q) => q.eq("gameId", game._id).eq("userId", user._id))
@@ -1784,6 +1786,7 @@ export const changeLife = mutation({
         deduplicated: true,
       }
     }
+    await limitGameRate(ctx, "gameWrite", user._id)
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const now = Date.now()
@@ -1879,7 +1882,6 @@ export const submitCommanderDamage = mutation({
     const game = await gameByPublicIdForWrite(ctx, args.publicId)
     assertCommanderGame(game)
     const user = await requireUser(ctx)
-    await limitGameRate(ctx, "gameWrite", user._id)
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
     const source = await commanderPlayerForWrite(
       ctx,
@@ -1915,6 +1917,7 @@ export const submitCommanderDamage = mutation({
       )
       .unique()
     if (eventWithOperation) throw syncOperationMismatch()
+    await limitGameRate(ctx, "gameWrite", user._id)
 
     const pair = await ctx.db
       .query("gameCommanderDamage")
@@ -2015,7 +2018,6 @@ async function resolveCommanderClaim(
   const game = await gameByPublicIdForWrite(ctx, args.publicId)
   assertCommanderGame(game)
   const user = await requireUser(ctx)
-  await limitGameRate(ctx, "gameWrite", user._id)
   const claim = await ctx.db
     .query("gameCommanderClaims")
     .withIndex("by_game_operation", (q) =>
@@ -2096,6 +2098,7 @@ async function resolveCommanderClaim(
         : {}),
     }
   }
+  await limitGameRate(ctx, "gameWrite", user._id)
   if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
   const now = Date.now()
