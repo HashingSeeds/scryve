@@ -193,7 +193,7 @@ describe("PlayerGrid", () => {
     },
   )
 
-  it("keeps one card's life font size when another total gains a digit", () => {
+  it("sizes a held preview by its digits without resizing other cards", () => {
     const initialPlayers = players(2)
     initialPlayers[1].life = 999
     const onChange = jest.fn()
@@ -211,10 +211,17 @@ describe("PlayerGrid", () => {
     const firstBefore = fontSize(1)
     const secondBefore = fontSize(2)
 
+    fireEvent(view.getByTestId("life-seat-2-1"), "pressIn")
+    const secondPreview = fontSize(2)
+    expect(fontSize(1)).toBe(firstBefore)
+    fireEvent(view.getByTestId("life-seat-2-1"), "pressOut")
+    expect(fontSize(2)).toBe(secondBefore)
+
     view.rerender(renderGrid([initialPlayers[0], { ...initialPlayers[1], life: 1000 }]))
 
     expect(fontSize(1)).toBe(firstBefore)
     expect(fontSize(2)).toBeLessThan(secondBefore)
+    expect(fontSize(2)).toBe(secondPreview)
     view.unmount()
     jest.clearAllMocks()
   })
