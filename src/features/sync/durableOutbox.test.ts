@@ -1,4 +1,5 @@
 import {
+  DURABLE_QUARANTINE_PREFIX,
   DurableOutbox,
   type DurableFailedRecord,
   type DurableOutboxCodec,
@@ -115,6 +116,23 @@ describe("durable outbox", () => {
       "note-1",
       "note-2",
     ])
+  })
+
+  it("quarantines unreadable records instead of deleting them", () => {
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const pendingKey = keys.pendingRecord("deck", "note-future", "owner")
+    const failedKey = keys.failedRecord("deck", "note-torn", "owner")
+    const future = JSON.stringify({ ...operation("note-future", 1), payload: { body: "v2" } })
+    storage.set(pendingKey, future)
+    storage.set(failedKey, '{"action":')
+
+    expect(outbox.loadPending("deck")).toEqual([])
+    expect(outbox.loadFailed("deck")).toEqual([])
+    expect(storage.getString(pendingKey)).toBeUndefined()
+    expect(storage.getString(failedKey)).toBeUndefined()
+    expect(storage.getString(`${DURABLE_QUARANTINE_PREFIX}${pendingKey}`)).toBe(future)
+    expect(storage.getString(`${DURABLE_QUARANTINE_PREFIX}${failedKey}`)).toBe('{"action":')
   })
 
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {

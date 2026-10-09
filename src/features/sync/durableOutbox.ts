@@ -69,6 +69,8 @@ export const DURABLE_OUTBOX_LIMITS: DurableOutboxLimits = {
   maxFailureReasonBytes: 512,
 }
 
+export const DURABLE_QUARANTINE_PREFIX = "quarantine:"
+
 const parsedJson = (value: string | undefined): unknown => {
   if (!value) return null
   try {
@@ -194,8 +196,8 @@ export class DurableOutbox<
           this.storage.delete(pendingKey)
           continue
         }
-        this.storage.delete(failedKey)
-      } else if (failedValue) this.storage.delete(failedKey)
+        this.quarantine(failedKey)
+      } else if (failedValue) this.quarantine(failedKey)
       if (
         action &&
         this.codec.operationId(action) === operationId &&
@@ -203,7 +205,7 @@ export class DurableOutbox<
       ) {
         pending.push(action)
         validIds.push(operationId)
-      } else this.storage.delete(pendingKey)
+      } else this.quarantine(pendingKey)
     }
     this.storage.set(this.keys.pendingIndex(scopeId, this.ownerId), JSON.stringify(validIds))
     return oldestFirst(pending, this.codec.operationId, this.codec.compare)
@@ -310,7 +312,7 @@ export class DurableOutbox<
         this.codec.belongsToScope(failure.action, this.ownerId, scopeId)
       )
         failures.push(failure)
-      else this.storage.delete(key)
+      else this.quarantine(key)
     }
     failures.sort((left, right) => left.failedAt - right.failedAt)
     this.storage.set(
@@ -318,6 +320,13 @@ export class DurableOutbox<
       JSON.stringify(failures.map((failure) => this.codec.operationId(failure.action))),
     )
     return failures
+  }
+
+  /** why: a record this build can't read may be readable by a later one, so it is kept aside instead of deleted. */
+  private quarantine(key: string): void {
+    const value = this.storage.getString(key)
+    if (value) this.storage.set(`${DURABLE_QUARANTINE_PREFIX}${key}`, value)
+    this.storage.delete(key)
   }
 
   dismissFailed(scopeId: string, operationId: string): void {
