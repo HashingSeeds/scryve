@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useState } from "react"
 import { View, type ViewStyle } from "react-native"
 import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router"
 
@@ -10,7 +10,7 @@ import { useAuthAccess } from "@/features/auth/AuthContext"
 import type { ResumableGame } from "@/features/connected/connectedCopy"
 import { useNewestResumeGame } from "@/features/connected/useResumeGames"
 import { createLocalGame, hasLocalGameStarted, PLAYER_COLORS } from "@/features/game/domain"
-import { localGameRepository } from "@/features/game/localPersistence"
+import { localGameRepository, type LocalSettings } from "@/features/game/localPersistence"
 import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -33,6 +33,21 @@ function createPreparedGame(value: string | undefined) {
   } catch {
     return undefined
   }
+}
+
+function createFreshGame(prepared: string | undefined, settings: LocalSettings) {
+  return (
+    createPreparedGame(prepared) ??
+    createLocalGame({
+      players: Array.from({ length: settings.defaultPlayerCount }, (_, index) => ({
+        name: `Player ${index + 1}`,
+        color: PLAYER_COLORS[index],
+      })),
+      startingLife: settings.defaultStartingLife,
+      ...(settings.defaultSystem ? { system: settings.defaultSystem } : {}),
+      ...(settings.defaultFormat ? { format: settings.defaultFormat } : {}),
+    })
+  )
 }
 
 function resumeRedirectFor(
@@ -60,11 +75,15 @@ export default function Index() {
   const [dismissedGameId, setDismissedGameId] = useState<string>()
   const [oldGameChoice, setOldGameChoice] = useState<"continue" | "end">()
   const [loadedGame, setLoadedGame] = useState(() => localGameRepository.loadActiveGame())
+  const [freshGame, setFreshGame] = useState(() => createFreshGame(prepared, settings))
+  // why: with nothing stored, the board's last game ended or was never saved; a new id on every focus keeps an ended game from coming back.
   useFocusEffect(
     useCallback(() => {
-      setSettings(localGameRepository.loadSettings())
+      const nextSettings = localGameRepository.loadSettings()
+      setSettings(nextSettings)
       setLoadedGame(localGameRepository.loadActiveGame())
-    }, []),
+      setFreshGame(createFreshGame(prepared, nextSettings))
+    }, [prepared]),
   )
   const activeGame = loadedGame?.id === dismissedGameId ? null : loadedGame
   const newestResumeGame = useNewestResumeGame()
@@ -75,25 +94,6 @@ export default function Index() {
     newestResumeGame ?? null,
   )
   const restoringAccount = newestResumeGame === undefined && destination !== "play" && !prepared
-  const freshGame = useMemo(() => {
-    const preparedGame = createPreparedGame(prepared)
-    if (preparedGame) return preparedGame
-    return createLocalGame({
-      players: Array.from({ length: settings.defaultPlayerCount }, (_, index) => ({
-        name: `Player ${index + 1}`,
-        color: PLAYER_COLORS[index],
-      })),
-      startingLife: settings.defaultStartingLife,
-      ...(settings.defaultSystem ? { system: settings.defaultSystem } : {}),
-      ...(settings.defaultFormat ? { format: settings.defaultFormat } : {}),
-    })
-  }, [
-    prepared,
-    settings.defaultPlayerCount,
-    settings.defaultStartingLife,
-    settings.defaultSystem,
-    settings.defaultFormat,
-  ])
 
   const started = activeGame !== null && hasLocalGameStarted(activeGame)
   const stale = activeGame && started ? Date.now() - activeGame.updatedAt >= STALE_GAME_MS : false
