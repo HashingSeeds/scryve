@@ -28,8 +28,11 @@ import {
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import {
+  backToPreview,
   betaUpdatesChosen,
+  canOpenPrPreview,
   canSwitchToBeta,
+  isPrChannel,
   setBetaUpdates,
   updateChannelLabel,
 } from "@/features/updates/appUpdate"
@@ -407,6 +410,13 @@ export function SettingsScreen({
               onValueChange={(value) => {
                 if (setBetaUpdates(value)) setBeta(value)
               }}
+            />
+          ) : null}
+          {canOpenPrPreview() && isPrChannel(Updates.channel) ? (
+            <Button
+              testID="back-to-preview-button"
+              text="Back to preview"
+              onPress={() => void backToPreview().catch(() => undefined)}
             />
           ) : null}
           <Button

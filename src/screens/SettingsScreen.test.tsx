@@ -317,6 +317,16 @@ describe("SettingsScreen", () => {
       tapVersion(view, 5)
       expect(view.queryByTestId("beta-updates-switch")).toBeNull()
     })
+
+    it("offers Back to preview only while a preview build runs a PR channel", async () => {
+      expect(renderSettings().queryByTestId("back-to-preview-button")).toBeNull()
+      mockUpdates.channel = "pr-12"
+      const view = renderSettings()
+      expect(view.getByText("Channel: pr-12")).toBeTruthy()
+      fireEvent.press(view.getByTestId("back-to-preview-button"))
+      expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith(null)
+      await waitFor(() => expect(Updates.reloadAsync).toHaveBeenCalled())
+    })
   })
 
   it("exposes the two shipping menu button treatments", () => {

@@ -1,0 +1,153 @@
+name: pr preview
+
+# why: publishes a labeled PR as an EAS update on its own `pr-<number>` channel, so a preview build
+# can open it from the sticky comment without a new binary. Only `pull_request` runs this. Never
+# add pull_request_target or workflow_run: they run with secrets for code a fork controls.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  publish:
+    # why: the author check is a filter, not the security boundary. Under `pull_request` this file
+    # comes from the PR branch, so a branch could rewrite it. The boundary is that only Matthew's
+    # account can push branches here, and GitHub never gives fork PRs secrets.
+    if: >-
+      ${{ contains(github.event.pull_request.labels.*.name, 'preview') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'preview') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'mchisolm0' }}
+    # why: job level, so adding an unrelated label does not cancel a publish in progress.
+    concurrency:
+      group: pr-preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    environment: pr-preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CHANNEL: pr-${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # expo doctor flags eas-cli as a project dependency, so CI installs a pinned global copy.
+      - name: Install EAS CLI
+        run: npm install -g eas-cli@22.2.0
+
+      - name: Find preview builds that can run this commit
+        id: runtime
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_PREVIEW_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # eas-cli can log lines before the JSON on stdout (expo/eas-cli#3870).
+          json() { awk 'found{print} !found && /^[{[]/{found=1; print}'; }
+          ready=()
+          for platform in ios android; do
+            hash=$(eas fingerprint:generate --build-profile preview:device --platform "$platform" \
+              --json --non-interactive | json | jq -er .hash)
+            # why: a simulator build has the same runtime but cannot be installed on a phone.
+            builds=$(eas build:list --platform "$platform" --status finished --fingerprint-hash "$hash" \
+              --limit 10 --json --non-interactive | json | jq '[.[] | select(.isForIosSimulator | not)] | length')
+            if [ "$builds" -gt 0 ]; then
+              ready+=("$platform")
+              echo "$platform=ready" >> "$GITHUB_OUTPUT"
+            else
+              echo "$platform=native change: needs a new preview build (\`${hash:0:8}\`)" >> "$GITHUB_OUTPUT"
+            fi
+          done
+          case "${#ready[@]}" in
+            0) platform="" ;;
+            1) platform="${ready[0]}" ;;
+            *) platform=all ;;
+          esac
+          echo "platform=$platform" >> "$GITHUB_OUTPUT"
+
+      # Same key as the checks export job, restored read-only so that job stays the only writer.
+      - name: Restore Metro cache
+        if: steps.runtime.outputs.platform != ''
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/metro-cache
+          key: metro-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'babel.config.js', 'metro.config.js', 'app.json', 'app.config.ts') }}
+
+      # why: `--channel` creates the pr-<number> channel and branch when they are missing. This ships
+      # unmerged code, so the preview EAS environment must never point at production Convex.
+      - name: Publish to the PR channel
+        if: steps.runtime.outputs.platform != ''
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_PREVIEW_TOKEN }}
+          APP_VARIANT: preview
+          PLATFORM: ${{ steps.runtime.outputs.platform }}
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          eas update --channel "$CHANNEL" --environment preview --platform "$PLATFORM" \
+            --non-interactive --message "PR preview at ${HEAD_SHA:0:7}"
+
+      - name: Update pull request comment
+        uses: actions/github-script@v7
+        env:
+          IOS: ${{ steps.runtime.outputs.ios }}
+          ANDROID: ${{ steps.runtime.outputs.android }}
+          PUBLISHED: ${{ steps.runtime.outputs.platform != '' }}
+        with:
+          script: |
+            const marker = "<!-- pr-preview -->"
+            const { CHANNEL, HEAD_SHA, IOS, ANDROID, PUBLISHED } = process.env
+            const link = `scryve-preview://preview/${CHANNEL}`
+            // why: qr.expo.dev only encodes development-client links; the app accepts that form too.
+            const { projectId } = require(`${process.env.GITHUB_WORKSPACE}/app.json`).extra.eas
+            const updateUrl = `https://u.expo.dev/${projectId}?channel-name=${CHANNEL}`
+            const qr = `https://qr.expo.dev/development-client?appScheme=scryve-preview&url=${encodeURIComponent(updateUrl)}`
+            const lines = [
+              marker,
+              `**Preview** \`${CHANNEL}\` at ${HEAD_SHA.slice(0, 7)}`,
+              "",
+              `- iOS: ${IOS}`,
+              `- Android: ${ANDROID}`,
+            ]
+            if (PUBLISHED === "true") {
+              lines.push(
+                "",
+                `<img src="${qr}" width="180" alt="QR code for ${link}">`,
+                "",
+                `Scan with a phone that has Scryve (Preview), or open \`${link}\`.`,
+              )
+            }
+            const body = lines.join("\n")
+            const { owner, repo } = context.repo
+            const issue_number = context.issue.number
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+            })
+            const existing = comments.find(
+              (comment) => comment.user?.type === "Bot" && comment.body?.includes(marker),
+            )
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body })
+            }

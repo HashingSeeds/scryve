@@ -1,0 +1,97 @@
+name: pr preview cleanup
+
+# why: deletes the pr-<number> EAS channels and branches that pr-preview creates once their PR is
+# closed. Every trigger runs the same sweep, so a missed event is caught by the next run. Merged
+# PRs auto-delete their branch, so `delete` covers them; the daily sweep catches PRs closed
+# without merging. Never add pull_request or pull_request_target: this job can delete EAS
+# channels, and those triggers let a PR branch start it.
+on:
+  delete:
+  schedule:
+    - cron: "29 9 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: List closed PR channels without deleting them
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-preview-cleanup
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    # why: pr-preview publishes from PR branches, so this environment cannot be limited to main.
+    # This keeps a dispatch from another branch from running that branch's copy of the sweep.
+    if: github.ref == 'refs/heads/main'
+    environment: pr-preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # why: EAS evaluates app.config.ts, which imports expo/config-plugins.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli@22.2.0
+
+      - name: Delete channels whose PR is closed
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_PREVIEW_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # eas-cli can log lines before the JSON on stdout (expo/eas-cli#3870).
+          json() { awk 'found{print} !found && /^[{[]/{found=1; print}'; }
+
+          # why: list every page before deleting, since deleting shifts the offsets.
+          branches=()
+          offset=0
+          while :; do
+            page=$(eas branch:list --limit 25 --offset "$offset" --json --non-interactive | json \
+              | jq -r '.[].name')
+            [ -z "$page" ] && break
+            mapfile -t -O "${#branches[@]}" branches <<< "$page"
+            offset=$((offset + 25))
+          done
+
+          for name in "${branches[@]}"; do
+            # why: the token can delete beta, preview, and production too; touch only PR channels.
+            [[ "$name" =~ ^pr-[0-9]+$ ]] || continue
+            if ! state=$(gh pr view "${name#pr-}" --json state --jq .state); then
+              echo "::warning::could not read the state of PR ${name#pr-}; keeping $name"
+              continue
+            fi
+            if [ "$state" = OPEN ]; then
+              echo "keep   $name"
+              continue
+            fi
+            echo "$([ "$DRY_RUN" = true ] && echo stale || echo delete) $name ($state)"
+            [ "$DRY_RUN" = true ] && continue
+            # why: pr-preview creates the channel and branch together; the channel goes first so
+            # the branch is no longer linked. A failed half is retried by the next sweep.
+            eas channel:delete "$name" --non-interactive || echo "::warning::no channel $name"
+            eas branch:delete "$name" --non-interactive || echo "::warning::could not delete $name"
+          done

@@ -14,6 +14,13 @@ function isSafeInternalPath(path: string): boolean {
 const DEV_SEED_LINK =
   /^(?:(?:scryve|count)(?:-dev|-preview)?:\/\/\/?|\/)dev\/seed\/([a-z]+)(\?[^#\s\u0000-\u001F\u007F]*)?$/
 
+/**
+ * why: preview builds open PR previews from `scryve-preview://preview/pr-123`, or from the QR code
+ * in the pr-preview comment, which qr.expo.dev can only encode as a development-client link.
+ */
+const PR_PREVIEW_LINK =
+  /^(?:(?:scryve|count)-preview:\/\/(?:\/?preview\/|expo-development-client\/\?url=https:\/\/u\.expo\.dev\/[0-9a-f-]+\?channel-name=)|\/preview\/)(pr-[0-9]+)$/
+
 function devSeedPath(path: string): string | null {
   const match = DEV_SEED_LINK.exec(path)
   return match ? `/dev/seed/${match[1]}${match[2] ?? ""}` : null
@@ -24,6 +31,8 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   const invite = normalizeInvitePayload(path, trustedOrigin)
   if (invite?.kind === "token") return `/join/${encodeURIComponent(invite.token)}`
   if (invite?.kind === "code") return `/connected/join?code=${encodeURIComponent(invite.code)}`
+  const preview = PR_PREVIEW_LINK.exec(path)?.[1]
+  if (preview) return `/preview/${preview}`
   const seed = __DEV__ ? devSeedPath(path) : null
   if (seed) return seed
   // Warm intents may preserve only a deliberately small absolute in-app route grammar.

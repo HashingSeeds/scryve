@@ -106,6 +106,57 @@ export function setBetaUpdates(enabled: boolean) {
   return true
 }
 
+const PR_CHANNEL = /^pr-[0-9]+$/
+
+export function isPrChannel(channel: string | null | undefined): channel is string {
+  return !!channel && PR_CHANNEL.test(channel)
+}
+
+/** why: the `preview` EAS profile (APP_VARIANT=preview) is the only build on these channels. */
+export function canOpenPrPreview() {
+  return (
+    Platform.OS !== "web" &&
+    Updates.isEnabled &&
+    !__DEV__ &&
+    (Updates.channel === "preview" || isPrChannel(Updates.channel))
+  )
+}
+
+function overrideChannel(channel: string | null) {
+  Updates.setUpdateRequestHeadersOverride(channel ? { "expo-channel-name": channel } : null)
+}
+
+/**
+ * why: the pr-preview workflow publishes each labeled PR to its own `pr-<number>` channel. Without
+ * a compatible update there, the build keeps the channel it is running.
+ */
+export async function openPrPreview(channel: string): Promise<"current" | "missing" | "reloading"> {
+  if (!isPrChannel(channel)) return "missing"
+  const running = isPrChannel(Updates.channel) ? Updates.channel : null
+  overrideChannel(channel)
+  try {
+    const result = await Updates.checkForUpdateAsync()
+    if (!result.isAvailable) {
+      if (running === channel) return "current"
+      overrideChannel(running)
+      return "missing"
+    }
+    await Updates.fetchUpdateAsync()
+  } catch (error) {
+    overrideChannel(running)
+    throw error
+  }
+  await Updates.reloadAsync()
+  return "reloading"
+}
+
+export async function backToPreview() {
+  overrideChannel(null)
+  const result = await Updates.checkForUpdateAsync()
+  if (result.isAvailable) await Updates.fetchUpdateAsync()
+  await Updates.reloadAsync()
+}
+
 export function restartToUpdate() {
   Updates.reloadAsync().catch(() => undefined)
 }
