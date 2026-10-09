@@ -83,7 +83,9 @@ jobs:
       - name: Check native fingerprints
         id: fingerprints
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # why: PR workflows can read repo secrets, so they get a Viewer robot. It lists builds but
+          # cannot read EAS env vars or publish; fingerprint-drift checks that costs no accuracy.
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN_PR }}
         shell: bash
         run: |
           set -euo pipefail

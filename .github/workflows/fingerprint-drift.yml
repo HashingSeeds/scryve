@@ -5,10 +5,21 @@ name: fingerprint drift
 # `paths:` trigger is a hand-maintained subset of that list). Regenerate the
 # source inventory and open a PR when it differs from the committed snapshot so
 # someone updates the hand-maintained gate.
+#
+# token-parity: PR fingerprint checks use a Viewer robot that cannot read EAS env
+# vars. Fail when that changes any fingerprint, e.g. a native setting such as
+# EXPO_PUBLIC_INVITE_ORIGIN set only on EAS instead of in eas.json.
 
 on:
   schedule:
     - cron: "43 4 * * 3"
+  push:
+    branches: [main]
+    paths:
+      - "app.json"
+      - "app.config.ts"
+      - "eas.json"
+      - ".github/workflows/fingerprint-drift.yml"
   workflow_dispatch:
 
 concurrency:
@@ -21,7 +32,7 @@ permissions:
 
 jobs:
   drift:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -110,3 +121,72 @@ jobs:
             --head "$BRANCH_NAME" \
             --title "chore(ci): fingerprint inputs changed" \
             --body-file "$RUNNER_TEMP/body.md"
+
+  token-parity:
+    if: github.ref == 'refs/heads/main'
+    environment: release
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli@22.2.0
+
+      - name: Compare PR-token and release-token fingerprints
+        env:
+          EXPO_TOKEN_PR: ${{ secrets.EXPO_TOKEN_PR }}
+          EXPO_TOKEN_RELEASE: ${{ secrets.EXPO_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${EXPO_TOKEN_PR:?EXPO_TOKEN_PR is not set}"
+          : "${EXPO_TOKEN_RELEASE:?EXPO_TOKEN is not set in the release environment}"
+
+          # Prints the fingerprint hash. eas-cli can log lines before the JSON on stdout.
+          fingerprint() {
+            local token="$1" profile="$2" platform="$3" log="$4"
+            EXPO_TOKEN="$token" eas fingerprint:generate \
+              --build-profile "$profile" --platform "$platform" --json --non-interactive \
+              2> "$log" \
+              | awk 'found{print} !found && /^[{[]/{found=1; print}' \
+              | jq -er .hash
+          }
+
+          mismatch=false
+          for profile in development:device preview:device production; do
+            for platform in ios android; do
+              log="$RUNNER_TEMP/release.log"
+              release=$(fingerprint "$EXPO_TOKEN_RELEASE" "$profile" "$platform" "$log")
+              # why: if the release token cannot read EAS env vars either, both sides match
+              # trivially and this check proves nothing.
+              if grep -q "Failed to pull env variables" "$log"; then
+                cat "$log" >&2
+                echo "::error::EXPO_TOKEN could not read EAS env vars for $profile/$platform"
+                exit 1
+              fi
+              pr=$(fingerprint "$EXPO_TOKEN_PR" "$profile" "$platform" "$RUNNER_TEMP/pr.log")
+              if [ "$pr" = "$release" ]; then
+                echo "$profile/$platform: $pr"
+              else
+                echo "::error::$profile/$platform: PR token gives $pr, release token gives $release. An EAS env var changes native config; move it into eas.json."
+                mismatch=true
+              fi
+            done
+          done
+          [ "$mismatch" = false ]
