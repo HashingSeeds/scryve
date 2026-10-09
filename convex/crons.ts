@@ -10,11 +10,11 @@ export const RECEIPT_RETENTION_MS = 365 * DAY_MS
 export const RECEIPT_PRUNE_BATCH_SIZE = 100
 
 // why: deckVersionSyncReceipts stays until syncCreateVersion has another duplicate guard; its receipt is the only one.
+// why: revenueCatWebhookEvents stays because a resent old TRANSFER would revoke Pro from users who resubscribed since.
 const RECEIPT_TABLES = [
   "gamePublishReceipts",
   "gameCompletionReceipts",
   "deckSyncReceipts",
-  "revenueCatWebhookEvents",
 ] as const
 
 /** why: deletes at most one batch per transaction, then reschedules itself until nothing old is left. */

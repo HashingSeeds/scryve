@@ -10,6 +10,7 @@ const modules = {
   "./crons.ts": async () => jest.requireActual("./crons"),
   "./decks.ts": async () => jest.requireActual("./decks"),
   "./entitlements.ts": async () => jest.requireActual("./entitlements"),
+  "./games.ts": async () => jest.requireActual("./games"),
   "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
   "./users.ts": async () => jest.requireActual("./users"),
 }
@@ -35,7 +36,7 @@ describe("receipt pruning", () => {
   })
   afterEach(() => jest.useRealTimers())
 
-  it("deletes expired receipts in bounded batches and keeps recent ones", async () => {
+  it("deletes expired receipts in bounded batches and keeps recent ones and webhook events", async () => {
     const t = convexTest(schema, modules)
     const insertReceipts = (count: number, prefix: string) =>
       t.run(async (ctx) => {
@@ -101,7 +102,7 @@ describe("receipt pruning", () => {
       "recent-0",
       "recent-1",
     ])
-    expect(remaining.events.map((event) => event.eventId)).toEqual(["recent-event"])
+    expect(remaining.events.map((event) => event.eventId)).toEqual(["old-event", "recent-event"])
   })
 
   it("still deduplicates a retried operation inside the retention window", async () => {
@@ -173,5 +174,56 @@ describe("receipt pruning", () => {
         .collect(),
     )
     expect(versions).toHaveLength(2)
+  })
+
+  it("turns a game publish or completion retried after pruning into no new writes", async () => {
+    const t = convexTest(schema, modules)
+    const host = t.withIdentity({ subject: "publish-host" })
+    await host.mutation(api.users.syncCurrent, { displayName: "Host" })
+    const publish = {
+      operationId: "publish-operation-00000001",
+      publicId: "published-game-id-00001",
+      ruleset: "commander",
+      startingLife: 40,
+      inviteToken: "t".repeat(43),
+      manualCodeCandidates: ["ABC234"],
+      hostLocalId: "local-host-player",
+      players: [
+        {
+          localId: "local-host-player",
+          seat: 1,
+          displayName: "Host",
+          color: "#7C3AED",
+          currentLife: 40,
+        },
+        {
+          localId: "local-guest-player",
+          seat: 2,
+          displayName: "Guest",
+          color: "#2563EB",
+          currentLife: 40,
+        },
+      ],
+    }
+    await host.mutation(api.games.publishLocalGame, publish)
+    const finish = { publicId: publish.publicId, operationId: "completion-finish-prune-01" }
+    const finished = await host.mutation(api.games.finishGameWithOperation, finish)
+
+    jest.setSystemTime(startedAt + RECEIPT_RETENTION_MS + DAY_MS)
+    await t.mutation(internal.crons.pruneOldReceipts, {})
+
+    await expect(host.mutation(api.games.publishLocalGame, publish)).rejects.toThrow(
+      "Game identifier collision",
+    )
+    await expect(host.mutation(api.games.finishGameWithOperation, finish)).resolves.toMatchObject({
+      summaryId: finished.summaryId,
+      superseded: true,
+    })
+    const stored = await t.run(async (ctx) => ({
+      games: await ctx.db.query("games").collect(),
+      summaries: await ctx.db.query("gameSummaries").collect(),
+    }))
+    expect(stored.games).toHaveLength(1)
+    expect(stored.summaries).toHaveLength(1)
   })
 })
