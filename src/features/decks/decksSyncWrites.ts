@@ -13,6 +13,7 @@ import {
   type DurableOutboxKeys,
   type DurablePendingRecord,
   type DurableStringStorage,
+  type FieldName,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
 import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
@@ -132,7 +133,28 @@ function parseFailed(value: unknown): FailedDeckWrite | null {
   return action ? { schemaVersion: 1, action, reason, failedAt: value.failedAt } : null
 }
 
+const fieldNames: Record<FieldName<PendingDeckWrite>, true> = {
+  schemaVersion: true,
+  queuedAt: true,
+  attempts: true,
+  lastAttemptAt: true,
+  ownerId: true,
+  deckId: true,
+  supersedes: true,
+  id: true,
+  operationId: true,
+  expectedOwnerId: true,
+  returnConflict: true,
+  expectedRevision: true,
+  name: true,
+  format: true,
+  game: true,
+  note: true,
+  deleted: true,
+}
+
 const codec: DurableOutboxCodec<PendingDeckWrite, FailedDeckWrite> = {
+  knownKeys: Object.keys(fieldNames),
   parsePending,
   parseFailed,
   createFailure: (action, reason, failedAt) => ({ schemaVersion: 1, action, reason, failedAt }),

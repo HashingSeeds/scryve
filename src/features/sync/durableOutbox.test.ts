@@ -213,9 +213,27 @@ describe("durable outbox", () => {
 })
 
 describe("durable outbox provenance", () => {
-  const writer = { app: "1.4.0", update: "update-a", runtime: "runtime-1" }
+  const writer = {
+    app: "1.4.0",
+    update: "0b6f3c2e-5d1a-4f8e-9c7b-2a4d6e8f0a1c",
+    runtime: "3a5f9c1e7b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a",
+    commit: "0123456789ab",
+  }
+  const otherWriter = {
+    app: "2.0.0",
+    update: "embedded",
+    runtime: "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
+  }
+  const notes = {
+    ...codec,
+    operationTypes: ["create"],
+    knownKeys: ["id", "ownerId", "scopeId", "payload", "note", "op"],
+  }
+  const bytes = (value: string) => new TextEncoder().encode(value).length
   const stored = (storage: MemoryStorage, key: string): Record<string, unknown> =>
     JSON.parse(storage.getString(key)!) as Record<string, unknown>
+  const reported = (report: jest.Mock) =>
+    report.mock.calls.flatMap(([{ records }]: [QuarantineReport]) => records)
 
   afterEach(() => {
     setOutboxWriter(undefined)
@@ -235,14 +253,13 @@ describe("durable outbox provenance", () => {
     // why: the test codec passes the stored object through, like the deck codec does.
     expect(outbox.loadPending("deck")).toEqual([note])
 
-    const rolledForward = { ...writer, update: "update-b" }
-    setOutboxWriter(rolledForward)
+    setOutboxWriter(otherWriter)
     outbox.updateAttempt("deck", "note-1", 5)
-    expect(stored(storage, pendingKey).writtenBy).toEqual(rolledForward)
+    expect(stored(storage, pendingKey).writtenBy).toEqual(otherWriter)
 
     outbox.fail("deck", "note-1", "rejected", 6)
     const failed = stored(storage, keys.failedRecord("deck", "note-1", "owner"))
-    expect(failed.writtenBy).toEqual(rolledForward)
+    expect(failed.writtenBy).toEqual(otherWriter)
     expect(failed.action).not.toHaveProperty("writtenBy")
     expect(outbox.loadFailed("deck")[0].action).not.toHaveProperty("writtenBy")
   })
@@ -265,23 +282,53 @@ describe("durable outbox provenance", () => {
     expect(outbox.loadFailed("deck")).toEqual([codec.createFailure(rewrapped, "x", 3)])
   })
 
+  it("budgets the bytes on disk, not this build's re-serialization of them", () => {
+    const storage = new MemoryStorage()
+    setOutboxWriter(writer)
+    const first = operation("note-first", 1)
+    new DurableOutbox(storage, "owner", keys, codec).enqueue(first, "deck")
+    new DurableOutbox(storage, "owner", keys, codec).fail("deck", "note-first", "x", 2)
+    new DurableOutbox(storage, "owner", keys, codec).enqueue(operation("note-held", 3), "deck")
+    const onDisk = (key: string) => bytes(storage.getString(key)!)
+    setOutboxWriter(undefined)
+    const second = operation("note-second", 4)
+    const pendingLimit =
+      onDisk(keys.pendingRecord("deck", "note-held", "owner")) + bytes(JSON.stringify(second)) - 1
+    const failedLimit =
+      onDisk(keys.failedRecord("deck", "note-first", "owner")) +
+      bytes(JSON.stringify(codec.createFailure(second, "x", 5))) -
+      1
+    const outbox = new DurableOutbox(storage, "owner", keys, codec, {
+      maxPendingBytes: pendingLimit,
+      maxFailedBytes: failedLimit,
+    })
+
+    expect(outbox.enqueue(second, "deck")).toMatchObject({ accepted: false, reason: "byte_limit" })
+    expect(
+      outbox.failAction(
+        second,
+        "deck",
+        "x",
+        5,
+        outbox.loadFailed("deck"),
+        outbox.loadPending("deck"),
+      ),
+    ).toMatchObject({ accepted: false, reason: "byte_limit" })
+  })
+
   it("reports each quarantined record's structure and writer, never its values", () => {
     const sentinel = "sentinel-7f3a"
     const report = jest.fn()
     setQuarantineReporter(report)
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, {
-      ...codec,
-      operationTypes: ["create"],
-    })
+    const outbox = new DurableOutbox(storage, "owner", keys, notes)
     const future = JSON.stringify({
       ...operation("note-future", 1),
       op: "create",
       payload: { body: sentinel },
-      writtenBy: { app: "2.0.0", update: "update-z", runtime: "runtime-2" },
+      writtenBy: otherWriter,
     })
-    const tornWriter = { app: "1.9.0", update: "update-t", runtime: "runtime-2" }
-    const torn = JSON.stringify({ writtenBy: tornWriter, payload: { note: sentinel } }).slice(0, -8)
+    const torn = JSON.stringify({ writtenBy: writer, payload: { note: sentinel } }).slice(0, -8)
     const foreign = JSON.stringify({
       schemaVersion: 1,
       action: { op: sentinel, id: sentinel },
@@ -296,7 +343,6 @@ describe("durable outbox provenance", () => {
     outbox.loadPending("deck")
     outbox.loadFailed("deck")
 
-    const bytes = (value: string) => new TextEncoder().encode(value).length
     expect(report.mock.calls).toEqual([
       [
         {
@@ -316,7 +362,7 @@ describe("durable outbox provenance", () => {
                 "queuedAt": "number",
                 "attempts": "number",
                 "payload": "object",
-                "payload.body": "string",
+                "payload.<key1>": "string",
                 "op": "string",
                 "writtenBy": "object",
                 "writtenBy.app": "string",
@@ -324,7 +370,7 @@ describe("durable outbox provenance", () => {
                 "writtenBy.runtime": "string",
               },
               operationType: "create",
-              writtenBy: { app: "2.0.0", update: "update-z", runtime: "runtime-2" },
+              writtenBy: otherWriter,
             },
             {
               slot: "pending",
@@ -332,7 +378,7 @@ describe("durable outbox provenance", () => {
               bytes: bytes(torn),
               shape: {},
               operationType: "unknown",
-              writtenBy: tornWriter,
+              writtenBy: writer,
             },
           ],
         },
@@ -367,31 +413,27 @@ describe("durable outbox provenance", () => {
     expect(JSON.stringify(report.mock.calls)).not.toContain(sentinel)
   })
 
-  it("describes nested failed fields and sampled array elements, masking keys that look like IDs", () => {
+  it("describes nested fields and sampled array elements, and replaces every unknown key", () => {
     const report = jest.fn()
     setQuarantineReporter(report)
     const storage = new MemoryStorage()
-    const outbox = new DurableOutbox(storage, "owner", keys, codec)
-    const idKeys = [
+    const outbox = new DurableOutbox(storage, "owner", keys, {
+      ...notes,
+      knownKeys: ["cards", "name", "quantity", "byName"],
+    })
+    const dataKeys = [
+      "Sol Ring",
+      "abcdefghijklmnop",
       "3f2b8c1e-9a4d-4c2b-8e1f-0a9b8c7d6e5f",
-      "deadbeefcafe1234",
       "1700000000000",
-      "k57a8w3qz9x0mvrj2c4d",
     ]
-    const writtenBy = {
-      app: "2.0.0",
-      update: "update-z",
-      runtime: "runtime-2",
-      commit: "0123456789ab",
-    }
     storage.set(
       keys.failedRecord("deck", "note-nested", "owner"),
       JSON.stringify({
-        writtenBy,
         schemaVersion: 1,
         action: {
-          cards: [{ name: "Sol Ring" }, { name: "Island", quantity: 2 }, {}, { extra: true }],
-          byId: Object.fromEntries(idKeys.map((key) => [key, 1])),
+          cards: [{ name: "Island" }, { quantity: 2, foil: true }, {}, { name: "Swamp" }],
+          byName: Object.fromEntries(dataKeys.map((key, index) => [key, index])),
         },
         reason: "x",
         failedAt: 1,
@@ -400,21 +442,49 @@ describe("durable outbox provenance", () => {
 
     outbox.loadFailed("deck")
 
-    const [[{ records }]] = report.mock.calls as [[QuarantineReport]]
-    expect(records[0]).toMatchObject({
-      writtenBy,
-      shape: {
-        "action": "object",
-        "action.cards": "array",
-        "action.cards.0": "object",
-        "action.cards.0.name": "string",
-        "action.cards.1.quantity": "number",
-        "action.cards.2": "object",
-        "action.byId": "object",
-        "action.byId.<id>": "number",
-      },
+    const [record] = reported(report)
+    expect(record.shape).toEqual({
+      "schemaVersion": "number",
+      "action": "object",
+      "reason": "string",
+      "failedAt": "number",
+      "action.cards": "array",
+      "action.byName": "object",
+      "action.cards.0": "object",
+      "action.cards.1": "object",
+      "action.cards.2": "object",
+      "action.byName.<key1>": "number",
+      "action.byName.<key2>": "number",
+      "action.byName.<key3>": "number",
+      "action.byName.<key4>": "number",
+      "action.cards.0.name": "string",
+      "action.cards.1.quantity": "number",
+      "action.cards.1.<key1>": "boolean",
     })
-    expect(records[0].shape).not.toHaveProperty(["action.cards.3"])
-    for (const key of idKeys) expect(JSON.stringify(report.mock.calls)).not.toContain(key)
+    for (const key of [...dataKeys, "Island", "foil"])
+      expect(JSON.stringify(report.mock.calls)).not.toContain(key)
+  })
+
+  it("reports only build identifiers in the formats the app writes", () => {
+    const clerkId = "user_2NNEqL2nrIRdJ194ndJqAHwEfxC"
+    const report = jest.fn()
+    setQuarantineReporter(report)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, notes)
+    const stamped = (id: string, writtenBy: Record<string, string>) =>
+      storage.set(
+        keys.pendingRecord("deck", id, "owner"),
+        JSON.stringify({ writtenBy, id, payload: { body: 1 } }),
+      )
+    stamped("note-clerk", { ...writer, update: clerkId })
+    stamped("note-names", { app: "Sol Ring", update: "Island", runtime: clerkId, commit: clerkId })
+
+    outbox.loadPending("deck")
+
+    expect(reported(report).map((record) => record.writtenBy)).toEqual([
+      { ...writer, update: "unknown" },
+      "unknown",
+    ])
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(/user_|Sol Ring|Island/)
   })
 })

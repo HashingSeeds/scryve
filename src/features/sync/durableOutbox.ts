@@ -24,7 +24,12 @@ export interface DurableOutboxCodec<
   compare?(left: Pending, right: Pending): number
   /** why: a report names only these kinds, so a corrupt record can't pass a value off as its type. */
   operationTypes?: readonly string[]
+  /** why: a report names only field names this codec writes; any other key may be data (a card name, an ID), so it is reported as a numbered placeholder. */
+  knownKeys?: readonly string[]
 }
+
+/** why: `keyof` on a union keeps only shared keys; this keeps every member's, so a `knownKeys` record must list them all. */
+export type FieldName<T> = T extends unknown ? Extract<keyof T, string> : never
 
 export interface DurableOutboxKeys {
   pendingIndex(scopeId: string, ownerId: string): string
@@ -144,49 +149,70 @@ const withoutProvenance = (value: unknown): unknown => {
   return { ...rest, action }
 }
 
-const provenancePart = (value: unknown): value is string =>
-  typeof value === "string" && /^[\w.+:-]{1,64}$/.test(value)
+// why: each part is checked against the format the app actually writes, so a corrupt record can't carry any other string (an account ID, a name) into a report.
+const WRITTEN_BY_FORMATS = {
+  app: /^(?:\d{1,4}\.\d{1,4}\.\d{1,6}(?:-(?:alpha|beta|rc)(?:\.\d{1,4})?)?|unknown)$/,
+  update: /^(?:[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}|embedded)$/,
+  runtime: /^(?:[\da-f]{40}|unknown)$/,
+  commit: /^[\da-f]{7,40}$/,
+} satisfies Record<keyof WrittenBy, RegExp>
 
-const parseWrittenBy = (value: unknown): WrittenBy | "unknown" =>
-  isRecord(value) &&
-  provenancePart(value.app) &&
-  provenancePart(value.update) &&
-  provenancePart(value.runtime)
-    ? {
-        app: value.app,
-        update: value.update,
-        runtime: value.runtime,
-        ...(provenancePart(value.commit) ? { commit: value.commit } : {}),
-      }
-    : "unknown"
+const writtenByPart = (value: unknown, part: keyof WrittenBy): string | undefined =>
+  typeof value === "string" && WRITTEN_BY_FORMATS[part].test(value) ? value : undefined
+
+const parseWrittenBy = (value: unknown): WrittenBy | "unknown" => {
+  if (!isRecord(value)) return "unknown"
+  const app = writtenByPart(value.app, "app")
+  const update = writtenByPart(value.update, "update")
+  const runtime = writtenByPart(value.runtime, "runtime")
+  const commit = writtenByPart(value.commit, "commit")
+  if (!app && !update && !runtime && !commit) return "unknown"
+  return {
+    app: app ?? "unknown",
+    update: update ?? "unknown",
+    runtime: runtime ?? "unknown",
+    ...(commit ? { commit } : {}),
+  }
+}
 
 const typeLabel = (value: unknown): string =>
   value === null ? "null" : Array.isArray(value) ? "array" : typeof value
 
-// why: a key built from data (a uuid, a Convex id, a timestamp) would leak that value, so it is reported as a placeholder.
-const ID_LIKE_KEY =
-  /^(?:[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}|[\da-f]{12,}|\d{6,}|(?=[\w-]*\d)(?=[\w-]*[a-z])[\w-]{16,})$/i
+const ENVELOPE_KEYS: readonly string[] = [
+  "schemaVersion",
+  "queuedAt",
+  "attempts",
+  "lastAttemptAt",
+  "action",
+  "reason",
+  "failedAt",
+  "writtenBy",
+  ...Object.keys(WRITTEN_BY_FORMATS),
+]
 
-const shapeKey = (key: string): string => (ID_LIKE_KEY.test(key) ? "<id>" : key.slice(0, 40))
-
-const shapeChildren = (node: unknown): Array<[string, unknown]> =>
-  Array.isArray(node)
-    ? node.slice(0, SHAPE_ARRAY_SAMPLE).map((item, index) => [`${index}`, item])
-    : isRecord(node)
-      ? Object.entries(node).map(([key, child]) => [shapeKey(key), child])
-      : []
+const shapeChildren = (node: unknown, known: ReadonlySet<string>): Array<[string, unknown]> => {
+  if (Array.isArray(node))
+    return node.slice(0, SHAPE_ARRAY_SAMPLE).map((item, index) => [`${index}`, item])
+  if (!isRecord(node)) return []
+  let unknownKeys = 0
+  return Object.entries(node).map(([key, child]) => [
+    known.has(key) ? key : `<key${(unknownKeys += 1)}>`,
+    child,
+  ])
+}
 
 /** why: deep enough for a failed record's `action.cards.0.quantity`; breadth-first so the entry cap drops the deepest paths, and arrays are sampled because their elements share a shape. */
-const shapeOf = (value: unknown): Record<string, string> => {
+const shapeOf = (value: unknown, knownKeys: readonly string[]): Record<string, string> => {
   if (!isRecord(value)) return value === null ? {} : { $: typeLabel(value) }
+  const known = new Set([...ENVELOPE_KEYS, ...knownKeys])
   const shape: Record<string, string> = {}
-  let level: Array<[string, unknown]> = shapeChildren(value)
+  let level = shapeChildren(value, known)
   for (let depth = 1; depth <= SHAPE_DEPTH && level.length; depth += 1) {
     const next: Array<[string, unknown]> = []
     for (const [path, node] of level) {
       if (Object.keys(shape).length >= MAX_SHAPE_ENTRIES) return shape
       shape[path] = typeLabel(node)
-      for (const [key, child] of shapeChildren(node)) next.push([`${path}.${key}`, child])
+      for (const [key, child] of shapeChildren(node, known)) next.push([`${path}.${key}`, child])
     }
     level = next
   }
@@ -270,6 +296,11 @@ export class DurableOutbox<
     return withoutProvenance(parsedJson(this.storage.getString(key)))
   }
 
+  /** why: budgets count what is on disk; another build may have stamped a longer writer than this one would. */
+  private storedBytes(key: string, record: Pending | Failed): number {
+    return utf8ByteLength(this.storage.getString(key) ?? this.serialize(record))
+  }
+
   enqueue(
     action: Pending,
     scopeId: string,
@@ -287,7 +318,12 @@ export class DurableOutbox<
       return { accepted: false, reason: "record_limit", pending }
     const serialized = this.serialize(action)
     const pendingBytes = pending.reduce(
-      (total, candidate) => total + utf8ByteLength(this.serialize(candidate)),
+      (total, candidate) =>
+        total +
+        this.storedBytes(
+          this.keys.pendingRecord(scopeId, this.codec.operationId(candidate), this.ownerId),
+          candidate,
+        ),
       0,
     )
     if (pendingBytes + utf8ByteLength(serialized) > this.limits.maxPendingBytes)
@@ -413,7 +449,12 @@ export class DurableOutbox<
     if (failed.length >= this.limits.maxFailedRecords)
       return { accepted: false, reason: "record_limit", failed, pending }
     const failedBytes = failed.reduce(
-      (total, candidate) => total + utf8ByteLength(this.serialize(candidate)),
+      (total, candidate) =>
+        total +
+        this.storedBytes(
+          this.keys.failedRecord(scopeId, this.codec.operationId(candidate.action), this.ownerId),
+          candidate,
+        ),
       0,
     )
     const serialized = this.serialize(record)
@@ -488,7 +529,7 @@ export class DurableOutbox<
         slot,
         reason: value === "" ? "empty" : root === null ? "invalid_json" : "rejected",
         bytes: utf8ByteLength(value),
-        shape: shapeOf(root),
+        shape: shapeOf(root, this.codec.knownKeys ?? []),
         operationType: operationTypeOf(root, slot, this.codec.operationTypes ?? []),
         writtenBy: parseWrittenBy(
           isRecord(root)

@@ -13,6 +13,7 @@ import {
   type DurableOutboxKeys,
   type DurablePendingRecord,
   type DurableStringStorage,
+  type FieldName,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
 import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
@@ -193,6 +194,38 @@ function parseFailed(value: unknown): FailedVersionWrite | null {
   return action ? { schemaVersion: 1, action, reason, failedAt: value.failedAt } : null
 }
 
+const fieldNames: Record<FieldName<PendingVersionWrite | VersionCardPayload>, true> = {
+  schemaVersion: true,
+  queuedAt: true,
+  attempts: true,
+  lastAttemptAt: true,
+  ownerId: true,
+  deckId: true,
+  versionId: true,
+  operationId: true,
+  expectedRevision: true,
+  cards: true,
+  op: true,
+  name: true,
+  note: true,
+  game: true,
+  identityNamespace: true,
+  cardId: true,
+  providerCardId: true,
+  printingId: true,
+  section: true,
+  entryKind: true,
+  originalReference: true,
+  category: true,
+  oracleId: true,
+  scryfallId: true,
+  imageUrl: true,
+  smallImageUrl: true,
+  quantity: true,
+  board: true,
+  commanderColor: true,
+}
+
 const codec: DurableOutboxCodec<PendingVersionWrite, FailedVersionWrite> = {
   parsePending,
   parseFailed,
@@ -201,6 +234,7 @@ const codec: DurableOutboxCodec<PendingVersionWrite, FailedVersionWrite> = {
   belongsToScope: (action, ownerId, scope) => action.ownerId === ownerId && scope === SCOPE,
   compare: (left, right) => compareActions(left, right),
   operationTypes: [...lifecycleOps],
+  knownKeys: Object.keys(fieldNames),
 }
 
 function compareActions(left: PendingVersionWrite, right: PendingVersionWrite) {
