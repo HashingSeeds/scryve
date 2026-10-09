@@ -1,19 +1,21 @@
-const fs = require("node:fs")
-const path = require("node:path")
 const { ESLint } = require("eslint")
 const { BASELINE_PREFIX } = require("eslint-plugin-self-explanatory-code")
+const fs = require("node:fs")
+const path = require("node:path")
+
+const config = require("../.eslintrc.js")
+
+const ruleName = "self-explanatory-code/prefer-self-explanatory-code"
+const [severity, options] = config.rules[ruleName]
+// why: overrideConfig replaces the rule's whole options object, so recording keeps the configured allowPatterns.
+const baselineRule = [severity, { ...options, recordBaseline: true }]
 
 async function main() {
   const cwd = process.cwd()
   const eslint = new ESLint({
     cwd,
     overrideConfig: {
-      rules: {
-        "self-explanatory-code/prefer-self-explanatory-code": [
-          "error",
-          { recordBaseline: true },
-        ],
-      },
+      rules: { [ruleName]: baselineRule },
     },
   })
   const results = await eslint.lintFiles(["."])
@@ -34,15 +36,23 @@ async function main() {
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([filename, hashes]) => [
         filename,
-        Object.fromEntries(Object.entries(hashes).sort(([left], [right]) => left.localeCompare(right))),
+        Object.fromEntries(
+          Object.entries(hashes).sort(([left], [right]) => left.localeCompare(right)),
+        ),
       ]),
   )
   const output = `${JSON.stringify({ version: 1, files: sortedFiles }, null, 2)}\n`
   fs.writeFileSync(path.join(cwd, ".eslint-comments-baseline.json"), output)
-  process.stdout.write(`Recorded ${Object.keys(sortedFiles).length} files in the comment baseline.\n`)
+  process.stdout.write(
+    `Recorded ${Object.keys(sortedFiles).length} files in the comment baseline.\n`,
+  )
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error.stack ?? error}\n`)
-  process.exitCode = 1
-})
+if (require.main === module) {
+  main().catch((error) => {
+    process.stderr.write(`${error.stack ?? error}\n`)
+    process.exitCode = 1
+  })
+}
+
+module.exports = { ruleName, baselineRule }
