@@ -15,10 +15,11 @@ jest.mock("@sentry/react-native", () => ({
   reactNavigationIntegration: jest.fn(() => ({ type: "navigation" })),
 }))
 
-const mockSyncTimingSend = jest.fn()
+const mockAnalytics = { enabled: false, emit: jest.fn() }
 
 jest.mock("@/utils/analytics", () => ({
-  syncTimingSink: { send: (events: unknown) => mockSyncTimingSend(events) },
+  analyticsEnabled: () => mockAnalytics.enabled,
+  syncTimingAdapter: { emit: (event: unknown) => mockAnalytics.emit(event) },
 }))
 
 const mockUpdatesState = {
@@ -57,8 +58,8 @@ jest.mock("expo-constants", () => ({
 
 describe("observability initialization", () => {
   beforeEach(() => {
-    jest.useFakeTimers()
     jest.clearAllMocks()
+    mockAnalytics.enabled = false
     mockExpoConfig.extra = {}
     mockUpdatesState.updateId = "test-update-id"
     mockUpdatesState.channel = "test-channel"
@@ -67,39 +68,33 @@ describe("observability initialization", () => {
   })
 
   afterEach(() => {
-    jest.clearAllTimers()
-    jest.useRealTimers()
     jest.restoreAllMocks()
     setTelemetryAdapter()
   })
 
   it.each([
-    ["ios", 0, 0.2],
-    ["android", 1, 0.2],
-    ["web", 1, undefined],
-  ] as const)(
-    "configures replay and tracing for %s",
-    (platform, errorReplaySampleRate, tracesSampleRate) => {
-      jest.replaceProperty(Platform, "OS", platform)
-      initObservability()
+    ["ios", 0],
+    ["android", 1],
+    ["web", 1],
+  ] as const)("configures replay for %s", (platform, errorReplaySampleRate) => {
+    jest.replaceProperty(Platform, "OS", platform)
+    initObservability()
 
-      expect(Sentry.init).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sendDefaultPii: false,
-          enableLogs: false,
-          replaysSessionSampleRate: 0,
-          replaysOnErrorSampleRate: errorReplaySampleRate,
-          tracesSampleRate,
-          integrations: [
-            { type: platform === "web" ? "browserReplay" : "mobileReplay" },
-            { type: "tracing" },
-            { type: "navigation" },
-            { type: "feedback" },
-          ],
-        }),
-      )
-    },
-  )
+    expect(Sentry.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sendDefaultPii: false,
+        enableLogs: false,
+        replaysSessionSampleRate: 0,
+        replaysOnErrorSampleRate: errorReplaySampleRate,
+        integrations: [
+          { type: platform === "web" ? "browserReplay" : "mobileReplay" },
+          { type: "tracing" },
+          { type: "navigation" },
+          { type: "feedback" },
+        ],
+      }),
+    )
+  })
 
   it.each([
     ["production", "production", "production"],
@@ -167,18 +162,47 @@ describe("observability initialization", () => {
     })
   })
 
-  it("batches sync timings to the analytics sink", async () => {
+  it.each(["ios", "android"] as const)("traces %s only while usage sharing is on", (platform) => {
+    jest.replaceProperty(Platform, "OS", platform)
+    initObservability()
+    const { tracesSampler } = (Sentry.init as jest.Mock).mock.calls[0][0]
+
+    expect(tracesSampler()).toBe(0)
+    mockAnalytics.enabled = true
+    expect(tracesSampler()).toBe(0.2)
+  })
+
+  it("does not trace web", () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    initObservability()
+
+    expect((Sentry.init as jest.Mock).mock.calls[0][0].tracesSampler).toBeUndefined()
+  })
+
+  it("uploads transactions without breadcrumbs, so request URLs stay out", () => {
+    initObservability()
+    const { beforeSendTransaction } = (Sentry.init as jest.Mock).mock.calls[0][0]
+
+    const event = beforeSendTransaction({
+      type: "transaction",
+      transaction: "settings",
+      breadcrumbs: [{ category: "xhr", data: { url: "https://api.example.test/private?code=1" } }],
+    })
+
+    expect(event).toEqual({ type: "transaction", transaction: "settings", breadcrumbs: [] })
+  })
+
+  it("forwards telemetry to the sync timing adapter", () => {
     initObservability()
 
     emitTelemetry("join.completed", { durationMs: 840, outcome: "success" })
-    await jest.advanceTimersByTimeAsync(30_000)
 
-    expect(mockSyncTimingSend).toHaveBeenCalledWith([
+    expect(mockAnalytics.emit).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "join.completed",
         metadata: { durationMs: 840, outcome: "success" },
       }),
-    ])
+    )
   })
 
   it("sets release correlation tags from expo-updates", () => {

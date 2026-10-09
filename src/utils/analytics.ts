@@ -6,7 +6,7 @@ import type PostHog from "posthog-react-native"
 import { createClientId } from "@/features/game/domain"
 import { isPlaySystemId, playSystemFormats } from "@/features/game/playSystems"
 import { loadString, saveString, storage } from "@/utils/storage"
-import type { TelemetrySink } from "@/utils/telemetryBatch"
+import type { TelemetryAdapter } from "@/utils/telemetry"
 
 const CONSENT_KEY = "scryve.analytics.consent.v1"
 const SOURCE_KEY = "scryve.analytics.source.v1"
@@ -260,17 +260,18 @@ export function captureAnalytics<E extends keyof Events>(event: E, properties: E
 const isSyncTiming = (name: string): name is SyncTiming =>
   (values.timing as readonly string[]).includes(name)
 
-/** why: observability batches telemetry here; only timed sync events reach PostHog, and captureAnalytics drops them without consent. */
-export const syncTimingSink: TelemetrySink = {
-  send(events) {
-    for (const { name, metadata } of events) {
-      if (!isSyncTiming(name) || typeof metadata.durationMs !== "number") continue
-      captureAnalytics("sync_timing", {
-        timing: name,
-        duration_ms: metadata.durationMs,
-        ...(typeof metadata.attemptCount === "number" && { attempt_count: metadata.attemptCount }),
-      })
-    }
+const MUTATION_ACK_KEEP_PROBABILITY = 0.05
+
+/** why: consent is checked when the event happens, never later, so nothing recorded while sharing is off can upload after opting in; PostHog's own queue is already cleared on withdrawal. */
+export const syncTimingAdapter: TelemetryAdapter = {
+  emit({ name, metadata }) {
+    if (!enabled || !isSyncTiming(name) || metadata.durationMs === undefined) return
+    if (name === "mutation.ack" && Math.random() >= MUTATION_ACK_KEEP_PROBABILITY) return
+    captureAnalytics("sync_timing", {
+      timing: name,
+      duration_ms: metadata.durationMs,
+      ...(metadata.attemptCount !== undefined && { attempt_count: metadata.attemptCount }),
+    })
   },
 }
 

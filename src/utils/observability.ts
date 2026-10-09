@@ -1,18 +1,16 @@
-import { AppState, Platform } from "react-native"
+import { Platform } from "react-native"
 import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
-import { syncTimingSink } from "@/utils/analytics"
+import { analyticsEnabled, syncTimingAdapter } from "@/utils/analytics"
 import { setTelemetryAdapter } from "@/utils/telemetry"
-import { combineTelemetryAdapters, createBatchingTelemetryAdapter } from "@/utils/telemetryBatch"
+import { combineTelemetryAdapters } from "@/utils/telemetryBatch"
 
 const FALLBACK_SENTRY_DSN =
   "https://fb85fd67adf134394a15190b8a488404@o4507118738669568.ingest.us.sentry.io/4511870328635392"
 
-const TAP_FREQUENCY_EVENT_KEEP_PROBABILITY = 0.05
-
-// why: ~1,600 sessions a month at about 10 spans each is ~3,200 spans at this rate, under 0.1% of the plan's 5M monthly span quota.
+// why: ~1,600 sessions a month at about 10 spans each is at most ~3,200 spans at this rate, and only opted-in sessions are traced; the plan includes 5M spans a month.
 const NATIVE_TRACES_SAMPLE_RATE = 0.2
 
 export const navigationTracing = Sentry.reactNavigationIntegration()
@@ -37,8 +35,13 @@ export function initObservability() {
     enableLogs: false,
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: Platform.OS === "ios" ? 0 : 1,
-    // why: traces exist for native app start and slow or frozen frames, which web does not report.
-    tracesSampleRate: Platform.OS === "web" ? undefined : NATIVE_TRACES_SAMPLE_RATE,
+    // why: traces exist for native app start and slow or frozen frames, which web does not report; they follow the usage-sharing choice.
+    tracesSampler:
+      Platform.OS === "web"
+        ? undefined
+        : () => (analyticsEnabled() ? NATIVE_TRACES_SAMPLE_RATE : 0),
+    // why: JS and native breadcrumbs include request URLs; transactions upload without an error, so they carry none.
+    beforeSendTransaction: (event) => ({ ...event, breadcrumbs: [] }),
     integrations: [
       ...(Platform.OS === "web"
         ? [
@@ -79,14 +82,5 @@ export function initObservability() {
       }),
   }
 
-  const batching = createBatchingTelemetryAdapter({
-    sink: syncTimingSink,
-    keepProbabilityByEvent: { "mutation.ack": TAP_FREQUENCY_EVENT_KEEP_PROBABILITY },
-  })
-
-  AppState.addEventListener("change", (state) => {
-    if (state !== "active") void batching.flush()
-  })
-
-  setTelemetryAdapter(combineTelemetryAdapters(unbatchedBreadcrumbAdapter, batching))
+  setTelemetryAdapter(combineTelemetryAdapters(unbatchedBreadcrumbAdapter, syncTimingAdapter))
 }
