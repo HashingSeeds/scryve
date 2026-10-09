@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useLayoutEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
@@ -152,13 +152,22 @@ export function PlayerGrid({
     layout,
     gap: spacing.xxs,
   })
-  const lifeFontSizeInput = {
-    ...cellSize,
-    fontScale,
-    targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
-    sidewaysGlyphReserve:
-      2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs),
-  }
+  const lifeTargetSize = layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
+  const sidewaysGlyphReserve =
+    2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)
+  /** why: cards size the total they show, which can be a press-in preview with more digits. */
+  const lifeFontSizeFor = useCallback(
+    (digits: number) =>
+      getLifeFontSize({
+        cellWidth: cellSize.cellWidth,
+        cellHeight: cellSize.cellHeight,
+        digits,
+        fontScale,
+        targetSize: lifeTargetSize,
+        sidewaysGlyphReserve,
+      }),
+    [cellSize.cellWidth, cellSize.cellHeight, fontScale, lifeTargetSize, sidewaysGlyphReserve],
+  )
 
   function measureBoard(event: LayoutChangeEvent) {
     const { width: boardWidth, height: boardHeight } = event.nativeEvent.layout
@@ -286,10 +295,7 @@ export function PlayerGrid({
                     screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
                     menuCorner={menuCorner}
                     menuEdgeCenter={fallbackMenu?.edgeCenter}
-                    lifeFontSize={getLifeFontSize({
-                      ...lifeFontSizeInput,
-                      digits: String(player.life).length,
-                    })}
+                    lifeFontSizeFor={lifeFontSizeFor}
                     system={system}
                     lifeStep={lifeStep}
                     disabled={disabled || playerDisabled}
