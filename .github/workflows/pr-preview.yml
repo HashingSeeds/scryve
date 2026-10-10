@@ -112,7 +112,7 @@ jobs:
             // overwrites a newer run's comment.
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: issue_number })
             if (
-              pr.head.sha !== HEAD_SHA ||
+              pr.head.sha !== process.env.HEAD_SHA ||
               pr.state !== "open" ||
               !pr.labels.some((label) => label.name === "preview")
             ) {
