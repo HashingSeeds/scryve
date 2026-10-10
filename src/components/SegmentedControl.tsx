@@ -28,7 +28,15 @@ export interface SegmentedControlProps {
 
 const TRACK_INSET = 3
 const TRACK_BORDER_WIDTH = 1
+const SEGMENT_PADDING = 4
 const SLIDE_SPRING = { damping: 18, stiffness: 240, mass: 0.6 } as const
+
+/** why: at large font scales a single row ellipsizes labels, so it splits into two rows, then one. */
+function fittingColumns(count: number, trackWidth: number, widestLabel: number) {
+  if (trackWidth <= 0) return count
+  const fits = (columns: number) => trackWidth / columns >= widestLabel + SEGMENT_PADDING * 2
+  return [count, Math.ceil(count / 2)].find(fits) ?? 1
+}
 
 export function SegmentedControl({
   segments,
@@ -44,12 +52,15 @@ export function SegmentedControl({
   } = useAppTheme()
   const reducedMotion = useReducedMotion()
   const [trackWidth, setTrackWidth] = useState(0)
+  const [widestLabel, setWidestLabel] = useState(0)
   const offset = useSharedValue(0)
   const selectedIndex = Math.max(
     0,
     segments.findIndex((segment) => segment.id === selectedId),
   )
-  const segmentWidth = segments.length > 0 ? trackWidth / segments.length : 0
+  const columns = fittingColumns(segments.length, trackWidth, widestLabel)
+  const wrapped = columns < segments.length
+  const segmentWidth = segments.length > 0 && !wrapped ? trackWidth / segments.length : 0
   const accent = colors.tint
 
   function measureTrack(event: LayoutChangeEvent) {
@@ -74,9 +85,21 @@ export function SegmentedControl({
       testID={testID}
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
-      style={[themed($track), disabled ? $dimmed : undefined]}
+      style={[themed($track), wrapped && $wrappedTrack, disabled ? $dimmed : undefined]}
       onLayout={measureTrack}
     >
+      <View
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        testID={testID ? `${testID}-ruler` : undefined}
+        style={$labelRuler}
+        onLayout={(event) => setWidestLabel(event.nativeEvent.layout.width)}
+      >
+        {segments.map((segment) => (
+          <SegmentLabel key={segment.id} label={segment.label} />
+        ))}
+      </View>
       {segmentWidth > 0 ? (
         <Animated.View
           pointerEvents="none"
@@ -93,21 +116,15 @@ export function SegmentedControl({
             accessibilityState={{ selected, disabled }}
             disabled={disabled}
             style={[
-              themed($segment),
+              $segment,
+              wrapped && { flexBasis: `${100 / columns}%` },
               selected && { backgroundColor: accent, borderRadius: CHOICE_RADIUS - TRACK_INSET },
             ]}
             onPress={() => select(segment.id)}
           >
-            <Text
-              text={segment.label}
-              size="xs"
-              weight="medium"
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.4}
-              style={[
-                themed($segmentLabel),
-                { color: selected ? accessibleForeground(accent) : colors.text },
-              ]}
+            <SegmentLabel
+              label={segment.label}
+              color={selected ? accessibleForeground(accent) : colors.text}
             />
           </Pressable>
         )
@@ -131,12 +148,28 @@ const $thumbShape: ThemedStyle<ViewStyle> = () => ({
   left: TRACK_INSET,
   borderRadius: CHOICE_RADIUS - TRACK_INSET,
 })
-const $segment: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $wrappedTrack: ViewStyle = { flexWrap: "wrap" }
+const $segment: ViewStyle = {
   flex: 1,
   minHeight: 46,
   alignItems: "center",
   justifyContent: "center",
-  paddingHorizontal: spacing.xxs,
-})
-const $segmentLabel: ThemedStyle<TextStyle> = () => ({ textAlign: "center" })
+  paddingHorizontal: SEGMENT_PADDING,
+}
+const $segmentLabel: TextStyle = { textAlign: "center" }
+// why: an unconstrained, invisible copy of the labels measures the widest one at the current font scale.
+const $labelRuler: ViewStyle = { position: "absolute", top: 0, left: 0, opacity: 0 }
 const $dimmed: ViewStyle = { opacity: 0.5 }
+
+function SegmentLabel({ label, color }: { label: string; color?: string }) {
+  return (
+    <Text
+      text={label}
+      size="xs"
+      weight="medium"
+      numberOfLines={1}
+      maxFontSizeMultiplier={1.4}
+      style={[$segmentLabel, color ? { color } : undefined]}
+    />
+  )
+}

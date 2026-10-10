@@ -59,4 +59,23 @@ describe("SegmentedControl", () => {
       StyleSheet.flatten(view.getByTestId("system-none").props.style).backgroundColor,
     ).toBeUndefined()
   })
+
+  it("splits into rows instead of truncating labels that outgrow one row", () => {
+    const { view } = renderControl("mtg")
+    const layout = (testID: string, width: number) =>
+      fireEvent(view.getByTestId(testID, { includeHiddenElements: true }), "layout", {
+        nativeEvent: { layout: { width } },
+      })
+    const basis = () => StyleSheet.flatten(view.getByTestId("system-mtg").props.style).flexBasis
+
+    layout("system", 308)
+    layout("system-ruler", 90)
+    expect(basis()).toBeUndefined()
+
+    layout("system-ruler", 120)
+    expect(basis()).toBe("50%")
+
+    layout("system-ruler", 200)
+    expect(basis()).toBe("100%")
+  })
 })
