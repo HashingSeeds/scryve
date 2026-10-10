@@ -301,6 +301,13 @@ async function convexSwitch(context) {
     socket.onClose(() => open.delete(socket))
   })
   return {
+    /** Sockets opened before the route can't be closed, so reload the page through it first. */
+    async routeLive(page) {
+      await page.reload()
+      const end = Date.now() + 30_000
+      while (open.size === 0 && Date.now() < end) await page.waitForTimeout(250)
+      expect(open.size > 0, "the Convex socket did not reconnect through the test route")
+    },
     block() {
       blocked = true
       for (const socket of open) socket.close()
@@ -371,8 +378,17 @@ async function createScratchDeck(run, page, lines, format = "Constructed") {
   await reviewImport(run, page)
   await dismissDevToasts(page)
   await page.getByTestId("save-import-button").click()
-  await page.waitForURL(/\/connected\/decks\/(?!add)[^/?]+$/, { timeout: 60_000 })
-  const deckId = page.url().split("/").pop()
+  // Saving may already have created the deck, so if the deck screen never opens, name it.
+  const deckPath = /^\/connected\/decks\/(?!add$)([^/]+)$/
+  try {
+    await page.waitForURL((url) => deckPath.test(url.pathname), { timeout: 60_000 })
+  } catch (error) {
+    const id = deckPath.exec(new URL(page.url()).pathname)?.[1]
+    throw new Error(
+      `import may have created "${name}"${id ? ` (${id})` : ""}; delete it by hand if listed: ${error.message.split("\n")[0]}`,
+    )
+  }
+  const deckId = deckPath.exec(new URL(page.url()).pathname)[1]
   run.cleanups.push(() => deleteDeck(run, deckId, name))
   await openDeck(page, run.cli.url, deckId)
   return deckId
@@ -416,7 +432,12 @@ async function deleteDeck(run, deckId, name) {
     await openDecks(page, run.cli.url)
     await page.getByTestId(`deck-card-${deckId}`).waitFor({ state: "detached" })
   } catch (error) {
-    throw new Error(`delete "${name}" (${deckId}) by hand: ${error.message.split("\n")[0]}`)
+    await page
+      ?.screenshot({ path: path.join(run.dir, `${run.scenario}-delete-failed.png`) })
+      .catch(() => {})
+    throw new Error(
+      `delete "${name}" (${deckId}) by hand: ${error.message.split("\n").slice(0, 3).join(" ").replace(/\s+/g, " ")}`,
+    )
   } finally {
     await page?.context().close()
   }
@@ -567,6 +588,19 @@ async function searchCards(page, opener, query, exclude = []) {
   )
   const skip = new Set(exclude)
   return labels.map((label) => label.slice(4, -8)).filter((name) => !skip.has(name))
+}
+
+/** Fails unless card search says the app is offline (it checks the Convex socket itself). */
+async function searchOffline(page) {
+  await dismissDevToasts(page)
+  await page.getByTestId("deck-add-cards").click()
+  const note = page.getByText("You’re offline. Searching cards already in your decks.")
+  const shown = await note.waitFor({ timeout: 20_000 }).then(
+    () => true,
+    () => false,
+  )
+  expect(shown, "the app never showed it was offline, so this would not be an offline edit")
+  await closeSearch(page)
 }
 
 async function closeSearch(page) {
@@ -784,13 +818,22 @@ const SCENARIOS = {
       names.map((name) => `1 ${name}`),
     )
     const convex = await convexSwitch(context)
-    run.quiet = true // dropped sockets log errors while offline; those are expected
+    await convex.routeLive(page)
+    await openDeck(page, run.cli.url, deckId)
     await startEditing(page)
+    // setOffline alone can leave an open socket alive, so cut Convex too, then make sure the app
+    // agrees it is offline before editing.
+    run.quiet = true // dropped sockets log errors while offline; those are expected
+    convex.block()
     await context.setOffline(true)
+    await searchOffline(page)
     await page.getByRole("button", { name: `Increase ${names[0]}` }).click()
     const offlineStatus = await save(page, 10_000)
     await shot(run, page, "offline-saved")
-    convex.block()
+    expect(
+      offlineStatus === "Saved locally · Pending sync",
+      `offline save was not queued: "${offlineStatus}"`,
+    )
     await context.setOffline(false)
     await page.reload()
     await openDeck(page, run.cli.url, deckId)
