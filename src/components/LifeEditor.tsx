@@ -14,6 +14,7 @@ import { MAX_LIFE_DELTA } from "@/features/game/domain"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import { useAppTheme } from "@/theme/context"
 import { accessibleForeground } from "@/utils/colorContrast"
+import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
@@ -242,6 +243,8 @@ export function LifeEditor({
     draft.current = start.current.life + clampedSteps * scrubStep + edgeExtra.current
     setPreview(draft.current)
   }
+
+  useCloseOnBack(true, closeEditor)
 
   function closeEditor() {
     if (closing) return
