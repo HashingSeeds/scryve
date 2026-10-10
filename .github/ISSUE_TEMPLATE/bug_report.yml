@@ -1,0 +1,27 @@
+name: Bug report
+description: Something broke, crashed, or didn't do what you expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead? Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: debug-info
+    attributes:
+      label: Debug info
+      description: In Scryve, open Settings, scroll to App information, tap **Copy debug info**, and paste it here.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: Phone, tablet, or browser you were using.
+      placeholder: iPhone 16, iOS 26 / Pixel 9 / Chrome on macOS
+    validations:
+      required: true
