@@ -41,7 +41,8 @@ export function benchMenuClearance(
 ): number {
   const innerEdge = CONTENT_EDGES[rotation].top
   if (menuEdgeCenter === innerEdge) return MENU_CLEARANCE
-  if (menuCorner && menuCorner.toLowerCase().startsWith(innerEdge)) return MENU_CLEARANCE
+  // why: corner names carry both axes ("topRight"), and a sideways seat's inner edge is left or right.
+  if (menuCorner && menuCorner.toLowerCase().includes(innerEdge)) return MENU_CLEARANCE
   return 0
 }
 
@@ -68,6 +69,7 @@ export function rotatedLayerStyle(
 
 export const HERO_FONT_MAX = 96
 const HERO_FONT_FALLBACK = 80
+const HERO_FONT_MIN = 30
 // why: the tap halves show "+30" style feedback beside the number, so the number leaves room for it on each side.
 const HERO_GUTTER = 56
 
@@ -77,15 +79,19 @@ export function heroFontSize(input: {
   digits: number
   fontScale: number
 }): number {
-  if (!(input.width > 0) || !(input.height > 0)) return HERO_FONT_FALLBACK
-  return Math.min(
-    HERO_FONT_MAX,
-    getLifeFontSizeThatFits({
-      availableWidth: input.width - HERO_GUTTER * 2,
-      availableHeight: input.height,
-      digits: Math.max(input.digits, 2),
-      fontScale: input.fontScale,
-    }),
+  if (!(input.width > 0)) return HERO_FONT_FALLBACK
+  // why: a cramped seat still gets a legible number; the caption gives way before the HP does.
+  return Math.max(
+    HERO_FONT_MIN,
+    Math.min(
+      HERO_FONT_MAX,
+      getLifeFontSizeThatFits({
+        availableWidth: input.width - HERO_GUTTER * 2,
+        availableHeight: Math.max(input.height, 1),
+        digits: Math.max(input.digits, 2),
+        fontScale: input.fontScale,
+      }),
+    ),
   )
 }
 
