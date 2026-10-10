@@ -16,16 +16,29 @@ describe("pokemonCardLayout", () => {
     expect(contentInsetsFor(-90, insets)).toEqual({ top: 0, right: 50, bottom: 0, left: 34 })
   })
 
-  it("drops the bench below the game menu only when the menu sits on the inner edge", () => {
-    expect(benchMenuClearance(0, undefined, "top")).toBe(MENU_CLEARANCE)
-    expect(benchMenuClearance(180, undefined, "bottom")).toBe(MENU_CLEARANCE)
-    expect(benchMenuClearance(180, undefined, "top")).toBe(0)
-    expect(benchMenuClearance(90, "topRight", undefined)).toBe(MENU_CLEARANCE)
-    expect(benchMenuClearance(90, "bottomRight", undefined)).toBe(MENU_CLEARANCE)
-    expect(benchMenuClearance(90, "topLeft", undefined)).toBe(0)
-    expect(benchMenuClearance(-90, "bottomLeft", undefined)).toBe(MENU_CLEARANCE)
-    expect(benchMenuClearance(0, "topLeft", undefined)).toBe(MENU_CLEARANCE)
-    expect(benchMenuClearance(0, "bottomLeft", undefined)).toBe(0)
+  it("drops the bench below a centered menu and shortens it beside a corner menu", () => {
+    const none = { top: 0, left: 0, right: 0 }
+    expect(benchMenuClearance(0, undefined, "top")).toEqual({ ...none, top: MENU_CLEARANCE })
+    expect(benchMenuClearance(180, undefined, "bottom")).toEqual({ ...none, top: MENU_CLEARANCE })
+    expect(benchMenuClearance(180, undefined, "top")).toEqual(none)
+    // why: a corner at the inner edge sits on the bench's left or right in content space.
+    expect(benchMenuClearance(0, "topLeft", undefined)).toEqual({ ...none, left: MENU_CLEARANCE })
+    expect(benchMenuClearance(0, "topRight", undefined)).toEqual({ ...none, right: MENU_CLEARANCE })
+    expect(benchMenuClearance(0, "bottomLeft", undefined)).toEqual(none)
+    expect(benchMenuClearance(90, "topRight", undefined)).toEqual({ ...none, left: MENU_CLEARANCE })
+    expect(benchMenuClearance(90, "bottomRight", undefined)).toEqual({
+      ...none,
+      right: MENU_CLEARANCE,
+    })
+    expect(benchMenuClearance(90, "topLeft", undefined)).toEqual(none)
+    expect(benchMenuClearance(-90, "bottomLeft", undefined)).toEqual({
+      ...none,
+      left: MENU_CLEARANCE,
+    })
+    expect(benchMenuClearance(180, "bottomRight", undefined)).toEqual({
+      ...none,
+      left: MENU_CLEARANCE,
+    })
   })
 
   it("keeps the hero number legible when the seat leaves it no room", () => {

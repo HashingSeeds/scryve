@@ -36,7 +36,7 @@ function sheet(props: Partial<PokemonSheetProps> = {}) {
         cardWidth={390}
         cardHeight={400}
         insets={{ top: 0, right: 0, bottom: 0, left: 0 }}
-        topClearance={0}
+        clearance={{ top: 0, left: 0, right: 0 }}
         damageStep={10}
         mode={{ kind: "place", slot: "active" }}
         onPlace={jest.fn(() => true)}

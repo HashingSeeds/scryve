@@ -17,7 +17,7 @@ import {
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
-import { createTableActions } from "./tableRuntime"
+import { createTableActions, type TableRuntime } from "./tableRuntime"
 import type {
   GameCommand,
   LifeDelta,
@@ -174,11 +174,18 @@ export function useLocalGame(
     [repository],
   )
 
+  // why: the Pokémon seats memoize on this object, so it only changes when the table itself does, not on every life tap.
+  const tableState = game.table ?? EMPTY_TABLE
+  const tableRules = localTableRules(game)
+  const tableRuntime = useMemo(
+    (): TableRuntime => ({ ...tableActions, table: tableState, tableRules }),
+    [tableActions, tableState, tableRules],
+  )
+
   return {
     game,
-    ...tableActions,
-    table: game.table ?? EMPTY_TABLE,
-    tableRules: localTableRules(game),
+    ...tableRuntime,
+    tableRuntime,
     canUndo: canUndo(game, context.actorId),
     changeLife,
     assignCommanderDamage,

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import { AccessibilityInfo } from "react-native"
 import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import { applyLocalTableAction, createLocalGame, localTableRules } from "@/features/game/domain"
@@ -123,7 +124,7 @@ describe("PokemonSeatCard", () => {
     expect(board(table).active).toBeUndefined()
     expect(screen.getByText("No Active")).toBeTruthy()
 
-    expect(screen.getByTestId("pokemon-announcement-seat-1")).toHaveTextContent(
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith(
       "Charizard ex knocked out. Grace takes 2 prizes.",
     )
 
@@ -132,7 +133,7 @@ describe("PokemonSeatCard", () => {
     expect(board(table).active).toMatchObject({ id: pokemonId, damage: 320 })
     expect(screen.queryByTestId("pokemon-knockout-toast-seat-1")).toBeNull()
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("10")
-    expect(screen.getByTestId("pokemon-announcement-seat-1")).toHaveTextContent(
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith(
       "Undo. Charizard ex returns to Active, Grace gives back 2 prizes.",
     )
     jest.useRealTimers()
@@ -159,7 +160,7 @@ describe("PokemonSeatCard", () => {
     jest.useRealTimers()
   })
 
-  it("asks before retreating into a bench Pokémon, and promotes one straight away when the Active is gone", () => {
+  it("asks before retreating into a bench Pokémon, and offers Make Active or Edit when the Active is gone", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const me = table.game().players[0].id
     table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
@@ -187,7 +188,10 @@ describe("PokemonSeatCard", () => {
     act(() => void table.actions.knockOut(me, benched))
     const charizard = board(table).bench[0].id
     fireEvent.press(screen.getByTestId(`pokemon-bench-${charizard}`))
-    expect(screen.queryByTestId("pokemon-switch-ask-seat-1")).toBeNull()
+    expect(screen.getByText("Make Active")).toBeTruthy()
+    expect(screen.getByTestId("pokemon-switch-edit-seat-1")).toBeTruthy()
+    expect(board(table).active).toBeUndefined()
+    fireEvent.press(screen.getByTestId("pokemon-switch-confirm-seat-1"))
     expect(board(table).active?.name).toBe("Charizard ex")
   })
 

@@ -39,6 +39,34 @@ function game() {
 }
 
 describe("useLocalGame persistence", () => {
+  it("keeps one table runtime across a life change and replaces it when the table changes", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = createLocalGame({
+      now: 1,
+      system: "pokemon",
+      format: "standard",
+      startingLife: 6,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+    })
+    const { result } = renderHook(() => useLocalGame(initial, repository))
+    const before = result.current.tableRuntime
+
+    act(() => result.current.changeLife(initial.players[0].id, -1))
+    expect(result.current.game.players[0].life).toBe(5)
+    expect(result.current.tableRuntime).toBe(before)
+
+    act(() => {
+      result.current.placePokemon(initial.players[0].id, "active", { hp: 60, prizes: 1 })
+    })
+    expect(result.current.tableRuntime).not.toBe(before)
+    expect(
+      result.current.tableRuntime.table.players[initial.players[0].id]?.pokemon?.active,
+    ).toMatchObject({ hp: 60 })
+  })
+
   it("persists a life change before publishing it", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)
