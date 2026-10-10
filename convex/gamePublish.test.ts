@@ -440,7 +440,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("counts wrong codes from seat lookups toward the join limit", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     for (let index = 0; index < 10; index += 1) {
@@ -467,7 +467,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("counts wrong codes sent straight to claimSeat toward the join limit", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     for (let index = 0; index < 10; index += 1) {
@@ -487,7 +487,7 @@ describe("imported game invite renewal and discovery", () => {
   })
 
   it("keeps the lookup-then-claim flow of installed clients throwing for a wrong code", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await published(t)
     const guest = await signedIn(t, "guest-subject", "Guest")
     for (let index = 0; index < 9; index += 1) {
