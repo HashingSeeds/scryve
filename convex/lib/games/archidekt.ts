@@ -4,6 +4,7 @@ import type { ActionCtx } from "../../_generated/server"
 import { boundedText, deckSourceUrl, fetchDeckSource, invalidSourceDeck } from "../deckSources"
 import { MAX_DECK_CARDS } from "../policy"
 import { type CardReference, fetchScryfall, normalizeScryfallCard, objectRecord } from "../scryfall"
+import { hasCommandZone } from "../systems"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SCRYFALL_COLLECTION_SIZE = 75
@@ -144,7 +145,7 @@ export function parseArchidektDeck(payload: unknown, deckId: string) {
     )
       continue
     const board = category.premier ? "commander" : primary === "Sideboard" ? "sideboard" : "main"
-    if (board === "commander" && !["commander", "brawl"].includes(format)) invalidDeck()
+    if (board === "commander" && !hasCommandZone("mtg", format)) invalidDeck()
     const key = `${board}:${card.uid.toLowerCase()}`
     const previous = entries.get(key)
     const quantity = (previous?.quantity ?? 0) + row.quantity

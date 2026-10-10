@@ -379,14 +379,14 @@ export function NewGameScreen({
     const nextCounter = playSystemRules(next).counter
     setSystem(next)
     setFormat(next ? playSystemFormat(next) : undefined)
-    setStartingLife(defaultStartingLife(next))
+    setStartingLife(defaultStartingLife(next, undefined, playerCount))
     setLifeStep(nextCounter.tapStep)
     setDeck(undefined)
   }
 
   function chooseFormat(value: string | undefined) {
-    if (startingLife === defaultStartingLife(system, format))
-      setStartingLife(defaultStartingLife(system, value))
+    if (startingLife === defaultStartingLife(system, format, playerCount))
+      setStartingLife(defaultStartingLife(system, value, playerCount))
     setFormat(value)
     setDeck(undefined)
   }
@@ -452,6 +452,8 @@ export function NewGameScreen({
           })
         return next
       })
+    if (startingLife === defaultStartingLife(system, format, playerCount))
+      setStartingLife(defaultStartingLife(system, format, value))
     setPlayerCount(value)
     setLayout((current) => playerGridLayoutForCount(value, current))
   }

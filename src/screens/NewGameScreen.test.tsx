@@ -537,6 +537,22 @@ describe("NewGameScreen", () => {
     )
   })
 
+  it("follows Brawl life from two players to multiplayer", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
+    fireEvent.press(view.getByTestId("play-system-mtg"))
+    fireEvent.press(view.getByTestId("play-format"))
+    fireEvent.press(view.getByTestId("play-format-option-brawl"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      30,
+      expect.objectContaining({ format: "brawl" }),
+    )
+  })
+
   it("keeps the start button pinned outside the scrollable form", () => {
     const view = setup()
 
