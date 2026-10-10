@@ -452,10 +452,10 @@ describe("imported game invite renewal and discovery", () => {
     }
     await expect(
       guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
-    ).rejects.toThrow("Too many join attempts")
+    ).rejects.toMatchObject({ data: { code: "too_many_join_attempts" } })
     await expect(
       guest.mutation(api.games.claimSeat, { seat: 2, manualCode: created.manualCode }),
-    ).rejects.toThrow("Too many join attempts")
+    ).rejects.toMatchObject({ data: { code: "too_many_join_attempts" } })
 
     const other = await signedIn(t, "other-subject", "Other")
     await expect(

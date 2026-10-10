@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native"
+import { ConvexError } from "convex/values"
 
 import {
   applyGameCommand,
@@ -269,6 +270,26 @@ describe("JoinConnectedScreen", () => {
     )
     expect(mockClaimSeat).not.toHaveBeenCalled()
     expect(onJoined).not.toHaveBeenCalled()
+  })
+
+  it("shows the join limit message instead of the raw server error", async () => {
+    mockClaimableSeats.mockRejectedValue(
+      new ConvexError({
+        code: "too_many_join_attempts",
+        message: "Too many join attempts; wait a minute and try again",
+      }),
+    )
+    render(themed(<JoinConnectedScreen onJoined={jest.fn()} />))
+    fireEvent.changeText(screen.getByTestId("manual-code-input"), "AB12CD")
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("claim-seat-button"))
+    })
+
+    expect(screen.getByTestId("join-error")).toHaveTextContent(
+      "Too many join attempts; wait a minute and try again",
+    )
+    expect(mockClaimSeat).not.toHaveBeenCalled()
   })
 
   it("re-checks open seats on every attempt and rejects a seat taken meanwhile", async () => {

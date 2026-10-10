@@ -169,6 +169,11 @@ const MAX_JOIN_ATTEMPTS = 10
 const INVALID_INVITE_MESSAGE = "Invite is invalid, expired, or revoked"
 const TOO_MANY_JOINS_MESSAGE = "Too many join attempts; wait a minute and try again"
 
+// why: production redacts plain Error messages to "Server Error"; ConvexError data reaches the client.
+function tooManyJoinAttempts() {
+  return new ConvexError({ code: "too_many_join_attempts", message: TOO_MANY_JOINS_MESSAGE })
+}
+
 async function joinAttemptsFor(ctx: QueryCtx, clerkUserId: string, kind?: "seatLookup") {
   return await ctx.db
     .query("joinAttempts")
@@ -192,7 +197,7 @@ async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: 
   }
   if (record.attempts >= MAX_JOIN_ATTEMPTS) {
     if (kind === "seatLookup") return ctx.db.patch(record._id, { attempts: record.attempts + 1 })
-    throw new Error(TOO_MANY_JOINS_MESSAGE)
+    throw tooManyJoinAttempts()
   }
   await ctx.db.patch(record._id, { attempts: record.attempts + 1 })
 }
@@ -1315,7 +1320,7 @@ export const claimableSeats = mutation({
       Date.now() - joins.windowStartedAt < JOIN_ATTEMPT_WINDOW_MS &&
       joins.attempts >= MAX_JOIN_ATTEMPTS
     )
-      throw new Error(TOO_MANY_JOINS_MESSAGE)
+      throw tooManyJoinAttempts()
     await consumeJoinAttempt(ctx, clerkUserId, "seatLookup")
     const game = await joinableInviteGame(ctx, args)
     if (!game) {
