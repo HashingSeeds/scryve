@@ -1,27 +1,21 @@
-import {
-  SpaceGrotesk_300Light as spaceGroteskLight,
-  SpaceGrotesk_400Regular as spaceGroteskRegular,
-  SpaceGrotesk_500Medium as spaceGroteskMedium,
-  SpaceGrotesk_600SemiBold as spaceGroteskSemiBold,
-  SpaceGrotesk_700Bold as spaceGroteskBold,
-} from "@expo-google-fonts/space-grotesk"
-
-export const customFontsToLoad = {
-  spaceGroteskLight,
-  spaceGroteskRegular,
-  spaceGroteskMedium,
-  spaceGroteskSemiBold,
-  spaceGroteskBold,
+/** why: the files are named after their PostScript names so one fontFamily resolves on iOS and Android. */
+const fonts = {
+  rubik: {
+    light: "Rubik-Light",
+    normal: "Rubik-Regular",
+    medium: "Rubik-Medium",
+    semiBold: "Rubik-SemiBold",
+    bold: "Rubik-Bold",
+  },
 }
 
-const fonts = {
-  spaceGrotesk: {
-    light: "spaceGroteskLight",
-    normal: "spaceGroteskRegular",
-    medium: "spaceGroteskMedium",
-    semiBold: "spaceGroteskSemiBold",
-    bold: "spaceGroteskBold",
-  },
+/** why: only the web has no native binary carrying these fonts, so it loads them at runtime. */
+export const webFontsToLoad = {
+  [fonts.rubik.light]: require("../../assets/fonts/Rubik-Light.ttf"),
+  [fonts.rubik.normal]: require("../../assets/fonts/Rubik-Regular.ttf"),
+  [fonts.rubik.medium]: require("../../assets/fonts/Rubik-Medium.ttf"),
+  [fonts.rubik.semiBold]: require("../../assets/fonts/Rubik-SemiBold.ttf"),
+  [fonts.rubik.bold]: require("../../assets/fonts/Rubik-Bold.ttf"),
 }
 
 export const typography = {
@@ -29,5 +23,5 @@ export const typography = {
    * The fonts are available to use, but prefer using the semantic name.
    */
   fonts,
-  primary: fonts.spaceGrotesk,
+  primary: fonts.rubik,
 }

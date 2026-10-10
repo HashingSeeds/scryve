@@ -23,6 +23,7 @@ import {
   getScreenCornerSquaringStyle,
   PlayerGrid,
 } from "./PlayerGrid"
+import { getPlayerContentRotation } from "./playerGridGeometry"
 import { PlayerMark } from "./PlayerMark"
 
 function players(count: number) {
@@ -408,6 +409,27 @@ describe("PlayerGrid", () => {
       })
       expect(getPlayerGridRows(5, layout)).toEqual(expectedRows)
     }
+  })
+
+  it("turns the lone fifth seat of an even grid with its column", () => {
+    const layout = getPlayerGridLayout({
+      playerCount: 5,
+      width: 390,
+      height: 844,
+      layoutVariant: "even-grid",
+    })
+    const rows = getPlayerGridRows(5, layout)
+    const rotationAt = (rowIndex: number, columnIndex: number) =>
+      getPlayerContentRotation({
+        playerCount: 5,
+        layout,
+        row: rows[rowIndex],
+        rowIndex,
+        columnIndex,
+        playerIndex: rows[rowIndex][columnIndex] as number,
+      })
+    expect(rotationAt(2, 0)).toBe(90)
+    expect(rotationAt(2, 0)).toBe(rotationAt(0, 0))
   })
 
   it("supports the four-player tabletop arrangement", () => {

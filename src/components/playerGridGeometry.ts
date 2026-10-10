@@ -102,7 +102,9 @@ export function getPlayerContentRotation(input: {
     return input.playerIndex === 0 ? 180 : 0
 
   const occupiedColumns = input.row.flatMap((seat, column) => (seat === null ? [] : [column]))
-  if (occupiedColumns.length === 1) return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
+  /** why: a seat beside an empty cell (the fifth of an even grid) turns with its column, not the viewer. */
+  if (occupiedColumns.length === 1 && input.row.length === 1)
+    return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0
   if (input.columnIndex === occupiedColumns[0]) return 90
   if (input.columnIndex === occupiedColumns[occupiedColumns.length - 1]) return -90
   return input.rowIndex < input.layout.rowCount / 2 ? 180 : 0

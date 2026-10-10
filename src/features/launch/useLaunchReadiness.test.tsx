@@ -1,5 +1,5 @@
+import { useFonts } from "expo-font"
 import { SplashScreen } from "expo-router"
-import { useFonts } from "@expo-google-fonts/space-grotesk"
 import { act, renderHook, waitFor } from "@testing-library/react-native"
 
 import { initI18n } from "@/i18n"
@@ -14,7 +14,7 @@ import {
 jest.mock("expo-router", () => ({
   SplashScreen: { hideAsync: jest.fn(() => Promise.resolve()) },
 }))
-jest.mock("@expo-google-fonts/space-grotesk", () => ({ useFonts: jest.fn() }))
+jest.mock("expo-font", () => ({ useFonts: jest.fn() }))
 jest.mock("@/i18n", () => ({ initI18n: jest.fn() }))
 jest.mock("@/utils/crashReporting", () => ({ reportCrash: jest.fn() }))
 

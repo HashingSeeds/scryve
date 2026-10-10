@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react"
+import { Platform } from "react-native"
+import { useFonts } from "expo-font"
 import { SplashScreen } from "expo-router"
-import { useFonts } from "@expo-google-fonts/space-grotesk"
 
 import { initI18n } from "@/i18n"
-import { customFontsToLoad } from "@/theme/typography"
+import { webFontsToLoad } from "@/theme/typography"
 import { reportCrash } from "@/utils/crashReporting"
 
 export const LAUNCH_DEADLINE_MS = 8000
 export const LAUNCH_FALLBACK_REVEAL_MS = 700
 
 export function useLaunchReadiness(isConsentResolved: boolean) {
-  const [fontsLoaded, fontError] = useFonts(customFontsToLoad)
+  const [fontsLoaded, fontError] = useFonts(Platform.OS === "web" ? webFontsToLoad : {})
   const [isI18nInitialized, setIsI18nInitialized] = useState(false)
   const [launchDeadlineReached, setLaunchDeadlineReached] = useState(false)
   const [fallbackRevealReached, setFallbackRevealReached] = useState(false)
