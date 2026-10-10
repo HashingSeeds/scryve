@@ -1,4 +1,5 @@
 import type { ConvexReactClient } from "convex/react"
+import type { FunctionArgs } from "convex/server"
 import { ConvexError } from "convex/values"
 import { convexTest } from "convex-test"
 
@@ -16,7 +17,7 @@ import {
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import schema from "../../../convex/schema"
-import type { DurableStringStorage } from "../sync/durableOutbox"
+import { setOutboxWriter, type DurableStringStorage } from "../sync/durableOutbox"
 
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("../../../convex/_generated/api"),
@@ -567,5 +568,47 @@ describe("deck metadata writes", () => {
     expect(stored).toMatchObject({ name: "Renamed once", syncRevision: 1 })
     expect(restarted.getSnapshot().pending).toEqual([])
     stopRestarted()
+  })
+
+  it("keeps the stored writer provenance out of the real backend's strict args", async () => {
+    const t = convexTest(schema, modules)
+    const actor = t.withIdentity({ subject: "owner" })
+    await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
+    const id = await actor.mutation(api.decks.create, { name: "Original", format: "commander" })
+    const page = await actor.query(api.decks.syncPage, {
+      paginationOpts: { numItems: 100, cursor: null },
+    })
+    const local = new MemoryStorage()
+    new DeckSyncRepository("owner", local).mergeMetadata(page.page)
+    const writer = { app: "1.4.0", update: "update-a", runtime: "runtime-1" }
+    const sent: Array<FunctionArgs<typeof api.decks.syncWrite>> = []
+    const client = {
+      mutation: async (
+        reference: typeof api.decks.syncWrite,
+        args: FunctionArgs<typeof api.decks.syncWrite>,
+      ) => {
+        sent.push(args)
+        return actor.mutation(reference, args)
+      },
+    } as unknown as ConvexReactClient
+    setOutboxWriter(writer)
+    const controller = new DeckMetadataWriteController(
+      client,
+      new DeckSyncWriteRepository("owner", local),
+    )
+    controller.update(id, { name: "Renamed" })
+    setOutboxWriter(undefined)
+    expect([...local.values.values()].some((value) => value.includes('"writtenBy"'))).toBe(true)
+
+    const stop = controller.start()
+    await flush()
+    stop()
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).not.toHaveProperty("writtenBy")
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+    // why: proves this harness would catch a leak: the same args with provenance attached are rejected by the validator.
+    const withProvenance = { ...sent[0], writtenBy: writer }
+    await expect(actor.mutation(api.decks.syncWrite, withProvenance)).rejects.toThrow(/writtenBy/)
   })
 })

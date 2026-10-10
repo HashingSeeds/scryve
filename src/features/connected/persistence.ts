@@ -7,6 +7,7 @@ import {
   type DurableOutboxKeys,
   type DurableOutboxLimits,
   type DurableStringStorage,
+  type FieldName,
 } from "@/features/sync/durableOutbox"
 import { storage as mmkvStorage } from "@/utils/storage"
 
@@ -369,6 +370,27 @@ function resumeEntrySignature(entry: ResumableGame): string {
   ].join("|")
 }
 
+const fieldNames: Record<FieldName<PendingLifeAction | ConnectedActionEvent>, true> = {
+  schemaVersion: true,
+  event: true,
+  queuedAt: true,
+  attempts: true,
+  lastAttemptAt: true,
+  type: true,
+  operationId: true,
+  gameId: true,
+  playerId: true,
+  delta: true,
+  actorId: true,
+  deviceId: true,
+  clientCreatedAt: true,
+  compensatesOperationId: true,
+  fromPlayerId: true,
+  toPlayerId: true,
+  claimOperationId: true,
+  accepted: true,
+}
+
 const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
   parsePending,
   parseFailed,
@@ -380,6 +402,12 @@ const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
     left.queuedAt - right.queuedAt ||
     left.event.clientCreatedAt - right.event.clientCreatedAt ||
     left.event.operationId.localeCompare(right.event.operationId),
+  operationTypes: [
+    "life.changed",
+    "commanderDamage.submitted",
+    "commanderDamage.resolved",
+  ] satisfies ConnectedActionEvent["type"][],
+  knownKeys: Object.keys(fieldNames),
 }
 
 export class ConnectedGameRepository {

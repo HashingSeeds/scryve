@@ -13,6 +13,7 @@ import {
   type DurableOutboxKeys,
   type DurablePendingRecord,
   type DurableStringStorage,
+  type FieldName,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
 import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
@@ -191,6 +192,38 @@ function parseFailed(value: unknown): FailedVersionWrite | null {
   return action ? { schemaVersion: 1, action, reason, failedAt: value.failedAt } : null
 }
 
+const fieldNames: Record<FieldName<PendingVersionWrite | VersionCardPayload>, true> = {
+  schemaVersion: true,
+  queuedAt: true,
+  attempts: true,
+  lastAttemptAt: true,
+  ownerId: true,
+  deckId: true,
+  versionId: true,
+  operationId: true,
+  expectedRevision: true,
+  cards: true,
+  op: true,
+  name: true,
+  note: true,
+  game: true,
+  identityNamespace: true,
+  cardId: true,
+  providerCardId: true,
+  printingId: true,
+  section: true,
+  entryKind: true,
+  originalReference: true,
+  category: true,
+  oracleId: true,
+  scryfallId: true,
+  imageUrl: true,
+  smallImageUrl: true,
+  quantity: true,
+  board: true,
+  commanderColor: true,
+}
+
 const codec: DurableOutboxCodec<PendingVersionWrite, FailedVersionWrite> = {
   parsePending,
   parseFailed,
@@ -198,6 +231,8 @@ const codec: DurableOutboxCodec<PendingVersionWrite, FailedVersionWrite> = {
   operationId: (action) => action.operationId,
   belongsToScope: (action, ownerId, scope) => action.ownerId === ownerId && scope === SCOPE,
   compare: (left, right) => compareActions(left, right),
+  operationTypes: [...lifecycleOps],
+  knownKeys: Object.keys(fieldNames),
 }
 
 function compareActions(left: PendingVersionWrite, right: PendingVersionWrite) {
@@ -222,7 +257,6 @@ function replayChain(actions: readonly PendingVersionWrite[]): PendingVersionWri
 
 export class DeckVersionWriteRepository {
   private readonly outbox: DurableOutbox<PendingVersionWrite, FailedVersionWrite>
-  private readonly keys: DurableOutboxKeys
   private readonly local: DurableStringStorage
   private readonly deploymentUrl?: string
 
@@ -233,8 +267,13 @@ export class DeckVersionWriteRepository {
   ) {
     this.local = local
     this.deploymentUrl = deploymentUrl
-    this.keys = outboxKeys(deploymentUrl)
-    this.outbox = new DurableOutbox(local, ownerId, this.keys, codec, VERSION_OUTBOX_LIMITS)
+    this.outbox = new DurableOutbox(
+      local,
+      ownerId,
+      outboxKeys(deploymentUrl),
+      codec,
+      VERSION_OUTBOX_LIMITS,
+    )
   }
 
   get cache() {
@@ -284,10 +323,7 @@ export class DeckVersionWriteRepository {
       .filter((action) => action.versionId === versionId && action.attempts === 0)
       .entries())
       if (tail.expectedRevision !== ackRevision + offset)
-        this.local.set(
-          this.keys.pendingRecord(SCOPE, tail.operationId, this.ownerId),
-          JSON.stringify({ ...tail, expectedRevision: ackRevision + offset }),
-        )
+        this.outbox.replacePending(SCOPE, { ...tail, expectedRevision: ackRevision + offset })
   }
 }
 

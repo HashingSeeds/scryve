@@ -1,6 +1,7 @@
 import { Platform } from "react-native"
 import * as Sentry from "@sentry/react-native"
 
+import * as durableOutbox from "@/features/sync/durableOutbox"
 import { initObservability } from "@/utils/observability"
 import { emitTelemetry, setTelemetryAdapter } from "@/utils/telemetry"
 
@@ -45,7 +46,8 @@ jest.mock("expo-updates", () => ({
   },
 }))
 
-const mockExpoConfig: { extra: { appVariant?: string } } = { extra: {} }
+const mockExpoConfig: { version?: string; extra: { appVariant?: string; releaseCommit?: string } } =
+  { extra: {} }
 
 jest.mock("expo-constants", () => ({
   __esModule: true,
@@ -61,6 +63,7 @@ describe("observability initialization", () => {
     jest.clearAllMocks()
     mockAnalytics.enabled = false
     mockExpoConfig.extra = {}
+    delete mockExpoConfig.version
     mockUpdatesState.updateId = "test-update-id"
     mockUpdatesState.channel = "test-channel"
     mockUpdatesState.runtimeVersion = "1.0.0"
@@ -226,6 +229,19 @@ describe("observability initialization", () => {
       runtimeVersion: "1.0.0",
       embeddedLaunch: "false",
     })
+  })
+
+  it("stamps outbox records with the same build identity as the Sentry tags", () => {
+    const setOutboxWriter = jest.spyOn(durableOutbox, "setOutboxWriter")
+    mockExpoConfig.version = "1.4.0"
+    initObservability()
+    mockExpoConfig.extra = { releaseCommit: "0123456789abcdef0123456789abcdef01234567" }
+    initObservability()
+
+    expect(setOutboxWriter.mock.calls).toEqual([
+      [{ app: "1.4.0", update: "test-update-id", runtime: "1.0.0" }],
+      [{ app: "1.4.0", update: "test-update-id", runtime: "1.0.0", commit: "0123456789ab" }],
+    ])
   })
 
   it("wires telemetry adapter to emit breadcrumbs with only allowed metadata", () => {

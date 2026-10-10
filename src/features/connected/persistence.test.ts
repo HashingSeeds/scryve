@@ -9,7 +9,9 @@ import {
   removeResumeEntryEverywhere,
   subscribeResumeIndex,
 } from "./persistence"
+import { sendQueuedAction } from "./useConnectedGame"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
+import { setOutboxWriter } from "../sync/durableOutbox"
 
 class MemoryStorage {
   values = new Map<string, string>()
@@ -541,6 +543,64 @@ describe("connected MMKV repository", () => {
     expect(repository.loadProjection("game-public")).toBeNull()
     expect(repository.loadOutbox("game-public")).toEqual([])
     expect(repository.loadFailed("game-public")).toEqual([])
+  })
+
+  it("sends every queued action kind without the stored writer provenance", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    const life = action("operation-life-0001", 1)
+    const { actorId, deviceId, gameId } = life.event
+    const claim: PendingLifeAction = {
+      ...action("operation-claim-0001", 2),
+      event: {
+        type: "commanderDamage.submitted",
+        operationId: asOperationId("operation-claim-0001"),
+        gameId,
+        fromPlayerId: asPlayerId("player-1"),
+        toPlayerId: asPlayerId("player-2"),
+        delta: 3,
+        actorId,
+        deviceId,
+        clientCreatedAt: 2,
+      },
+    }
+    const resolution: PendingLifeAction = {
+      ...action("operation-resolve-0001", 3),
+      event: {
+        type: "commanderDamage.resolved",
+        operationId: asOperationId("operation-resolve-0001"),
+        claimOperationId: asOperationId("operation-claim-0001"),
+        gameId,
+        toPlayerId: asPlayerId("player-2"),
+        accepted: true,
+        actorId,
+        deviceId,
+        clientCreatedAt: 3,
+      },
+    }
+    setOutboxWriter({ app: "1.4.0", update: "update-a", runtime: "runtime-1" })
+    for (const queued of [life, claim, resolution])
+      repository.enqueue(queued, repository.loadOutbox("game-public"))
+    setOutboxWriter(undefined)
+    expect(
+      [...storage.values.values()].filter((value) => value.includes('"writtenBy"')),
+    ).toHaveLength(3)
+
+    const acknowledge = async (args: { operationId: string }) => ({
+      operationId: args.operationId,
+    })
+    const mutations = {
+      changeLife: jest.fn(acknowledge),
+      submitCommanderDamage: jest.fn(acknowledge),
+      confirmCommanderDamage: jest.fn(acknowledge),
+      declineCommanderDamage: jest.fn(acknowledge),
+    }
+    for (const queued of repository.loadOutbox("game-public"))
+      await sendQueuedAction(mutations, "game-public", queued)
+
+    const sent = Object.values(mutations).flatMap((mutation) => mutation.mock.calls)
+    expect(sent).toHaveLength(3)
+    for (const [args] of sent) expect(args).not.toHaveProperty("writtenBy")
   })
 })
 

@@ -22,7 +22,14 @@ export interface DurableOutboxCodec<
   operationId(action: Pending): string
   belongsToScope(action: Pending, ownerId: string, scopeId: string): boolean
   compare?(left: Pending, right: Pending): number
+  /** why: a report names only these kinds, so a corrupt record can't pass a value off as its type. */
+  operationTypes?: readonly string[]
+  /** why: a report names only field names this codec writes; any other key may be data (a card name, an ID), so it is reported as a numbered placeholder. */
+  knownKeys?: readonly string[]
 }
+
+/** why: `keyof` on a union keeps only shared keys; this keeps every member's, so a `knownKeys` record must list them all. */
+export type FieldName<T> = T extends unknown ? Extract<keyof T, string> : never
 
 export interface DurableOutboxKeys {
   pendingIndex(scopeId: string, ownerId: string): string
@@ -73,17 +80,49 @@ export const DURABLE_QUARANTINE_PREFIX = "quarantine:"
 
 export type QuarantineReason = "empty" | "invalid_json" | "rejected"
 
+/** why: the last writer, not the first, because its serializer produced the bytes on disk. */
+export interface WrittenBy {
+  app: string
+  update: string
+  runtime: string
+  /** why: web builds have no update id or runtime, so the release commit is what tells two deploys apart. */
+  commit?: string
+}
+
+export interface QuarantinedRecord {
+  slot: "pending" | "failed"
+  reason: QuarantineReason
+  bytes: number
+  /** why: key paths and `typeof` labels only; values can hold player data. */
+  shape: Record<string, string>
+  operationType: string
+  /** why: `update`, `runtime` and `commit` are 8-hex digests here; `scripts/outbox-provenance-lookup.cjs` maps them back. */
+  writtenBy: WrittenBy | "unknown"
+}
+
 export interface QuarantineReport {
   outbox: string
   count: number
   reasons: QuarantineReason[]
+  records: QuarantinedRecord[]
 }
 
+const MAX_REPORTED_RECORDS = 16
+const MAX_SHAPE_ENTRIES = 64
+const SHAPE_DEPTH = 4
+const SHAPE_ARRAY_SAMPLE = 3
+
 let reportQuarantine: (report: QuarantineReport) => void = () => {}
+let currentWriter: WrittenBy | undefined
 
 /** why: sync code stays free of React Native, so the app wires its error reporter in at startup. */
 export function setQuarantineReporter(reporter: (report: QuarantineReport) => void): void {
   reportQuarantine = reporter
+}
+
+/** why: the app stamps its build onto every record it writes, so a quarantined record says which codec produced it. */
+export function setOutboxWriter(writer: WrittenBy | undefined): void {
+  currentWriter = writer
 }
 
 // why: reports name the outbox by its fixed `<namespace>.vN` key prefix so owner, game, and operation IDs never leave the device.
@@ -97,6 +136,120 @@ const parsedJson = (value: string | undefined): unknown => {
   } catch {
     return null
   }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+// why: provenance lives on the stored envelope only. Codecs and send paths never see it, so it can't reach a strict Convex validator whatever a codec passes through.
+const withoutProvenance = (value: unknown): unknown => {
+  if (!isRecord(value)) return value
+  const { writtenBy: _record, ...rest } = value
+  if (!isRecord(rest.action)) return rest
+  const { writtenBy: _action, ...action } = rest.action
+  return { ...rest, action }
+}
+
+// why: each part is checked against the format the app actually writes, so a corrupt record can't carry any other string (an account ID, a name) into a report.
+const WRITTEN_BY_FORMATS = {
+  app: /^(?:\d{1,4}\.\d{1,4}\.\d{1,6}(?:-(?:alpha|beta|rc)(?:\.\d{1,4})?)?|unknown)$/,
+  update: /^(?:[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}|embedded)$/,
+  runtime: /^(?:[\da-f]{40}|unknown)$/,
+  commit: /^[\da-f]{7,40}$/,
+} satisfies Record<keyof WrittenBy, RegExp>
+
+const writtenByPart = (value: unknown, part: keyof WrittenBy): string | undefined =>
+  typeof value === "string" && WRITTEN_BY_FORMATS[part].test(value) ? value : undefined
+
+/** why: FNV-1a, so `scripts/outbox-provenance-lookup.cjs` can hash known builds and match without expo-crypto. */
+const provenanceDigest = (value: string): string => {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0")
+}
+
+// why: a well-formed UUID or hex string could still be an operation or account ID copied in, so only a digest leaves the device.
+const digestPart = (value: string | undefined): string =>
+  value === undefined || value === "embedded" || value === "unknown"
+    ? (value ?? "unknown")
+    : provenanceDigest(value)
+
+const parseWrittenBy = (value: unknown): WrittenBy | "unknown" => {
+  if (!isRecord(value)) return "unknown"
+  const app = writtenByPart(value.app, "app")
+  const update = writtenByPart(value.update, "update")
+  const runtime = writtenByPart(value.runtime, "runtime")
+  const commit = writtenByPart(value.commit, "commit")
+  if (!app && !update && !runtime && !commit) return "unknown"
+  return {
+    app: app ?? "unknown",
+    update: digestPart(update),
+    runtime: digestPart(runtime),
+    ...(commit ? { commit: digestPart(commit) } : {}),
+  }
+}
+
+const typeLabel = (value: unknown): string =>
+  value === null ? "null" : Array.isArray(value) ? "array" : typeof value
+
+const ENVELOPE_KEYS: readonly string[] = [
+  "schemaVersion",
+  "queuedAt",
+  "attempts",
+  "lastAttemptAt",
+  "action",
+  "reason",
+  "failedAt",
+  "writtenBy",
+  ...Object.keys(WRITTEN_BY_FORMATS),
+]
+
+const shapeChildren = (node: unknown, known: ReadonlySet<string>): Array<[string, unknown]> => {
+  if (Array.isArray(node))
+    return node.slice(0, SHAPE_ARRAY_SAMPLE).map((item, index) => [`${index}`, item])
+  if (!isRecord(node)) return []
+  let unknownKeys = 0
+  return Object.entries(node).map(([key, child]) => [
+    known.has(key) ? key : `<key${(unknownKeys += 1)}>`,
+    child,
+  ])
+}
+
+/** why: deep enough for a failed record's `action.cards.0.quantity`; breadth-first so the entry cap drops the deepest paths, and arrays are sampled because their elements share a shape. */
+const shapeOf = (value: unknown, knownKeys: readonly string[]): Record<string, string> => {
+  if (!isRecord(value)) return value === null ? {} : { $: typeLabel(value) }
+  const known = new Set([...ENVELOPE_KEYS, ...knownKeys])
+  const shape: Record<string, string> = {}
+  let level = shapeChildren(value, known)
+  for (let depth = 1; depth <= SHAPE_DEPTH && level.length; depth += 1) {
+    const next: Array<[string, unknown]> = []
+    for (const [path, node] of level) {
+      if (Object.keys(shape).length >= MAX_SHAPE_ENTRIES) return shape
+      shape[path] = typeLabel(node)
+      for (const [key, child] of shapeChildren(node, known)) next.push([`${path}.${key}`, child])
+    }
+    level = next
+  }
+  return shape
+}
+
+const operationTypeOf = (
+  root: unknown,
+  slot: QuarantinedRecord["slot"],
+  allowed: readonly string[],
+): string => {
+  const body = slot === "failed" && isRecord(root) ? root.action : root
+  if (!isRecord(body)) return "unknown"
+  const candidates = [body.op, body.type, isRecord(body.event) ? body.event.type : undefined]
+  return (
+    candidates.find(
+      (candidate): candidate is string =>
+        typeof candidate === "string" && allowed.includes(candidate),
+    ) ?? "unknown"
+  )
 }
 
 const stringIndex = (value: unknown): string[] =>
@@ -151,6 +304,20 @@ export class DurableOutbox<
     this.limits = { ...DURABLE_OUTBOX_LIMITS, ...limits }
   }
 
+  /** why: provenance goes first so a record cut short mid-write still names its writer. */
+  private serialize(record: Pending | Failed): string {
+    return JSON.stringify(currentWriter ? { writtenBy: currentWriter, ...record } : record)
+  }
+
+  private read(key: string): unknown {
+    return withoutProvenance(parsedJson(this.storage.getString(key)))
+  }
+
+  /** why: budgets count what is on disk; another build may have stamped a longer writer than this one would. */
+  private storedBytes(key: string, record: Pending | Failed): number {
+    return utf8ByteLength(this.storage.getString(key) ?? this.serialize(record))
+  }
+
   enqueue(
     action: Pending,
     scopeId: string,
@@ -166,9 +333,14 @@ export class DurableOutbox<
       return { accepted: true, pending }
     if (pending.length >= this.limits.maxPendingRecords)
       return { accepted: false, reason: "record_limit", pending }
-    const serialized = JSON.stringify(action)
+    const serialized = this.serialize(action)
     const pendingBytes = pending.reduce(
-      (total, candidate) => total + utf8ByteLength(JSON.stringify(candidate)),
+      (total, candidate) =>
+        total +
+        this.storedBytes(
+          this.keys.pendingRecord(scopeId, this.codec.operationId(candidate), this.ownerId),
+          candidate,
+        ),
       0,
     )
     if (pendingBytes + utf8ByteLength(serialized) > this.limits.maxPendingBytes)
@@ -201,24 +373,24 @@ export class DurableOutbox<
     ])
     const pending: Pending[] = []
     const validIds: string[] = []
-    const quarantined: QuarantineReason[] = []
+    const quarantined: QuarantinedRecord[] = []
     for (const operationId of index) {
       const pendingKey = this.keys.pendingRecord(scopeId, operationId, this.ownerId)
       const failedKey = this.keys.failedRecord(scopeId, operationId, this.ownerId)
-      const action = this.codec.parsePending(parsedJson(this.storage.getString(pendingKey)))
+      const action = this.codec.parsePending(this.read(pendingKey))
       const failedValue = this.storage.getString(failedKey)
-      const failed = this.codec.parseFailed(parsedJson(failedValue))
+      const failed = this.codec.parseFailed(withoutProvenance(parsedJson(failedValue)))
       if (failedValue && failed) {
         if (
           this.codec.operationId(failed.action) === operationId &&
           this.codec.belongsToScope(failed.action, this.ownerId, scopeId)
         ) {
           if (action) this.storage.delete(pendingKey)
-          else this.quarantine(pendingKey, quarantined)
+          else this.quarantine(pendingKey, "pending", quarantined)
           continue
         }
-        this.quarantine(failedKey, quarantined)
-      } else if (failedValue) this.quarantine(failedKey, quarantined)
+        this.quarantine(failedKey, "failed", quarantined)
+      } else if (failedValue) this.quarantine(failedKey, "failed", quarantined)
       if (
         action &&
         this.codec.operationId(action) === operationId &&
@@ -226,7 +398,7 @@ export class DurableOutbox<
       ) {
         pending.push(action)
         validIds.push(operationId)
-      } else this.quarantine(pendingKey, quarantined)
+      } else this.quarantine(pendingKey, "pending", quarantined)
     }
     this.storage.set(this.keys.pendingIndex(scopeId, this.ownerId), JSON.stringify(validIds))
     this.reportQuarantined(scopeId, quarantined)
@@ -235,11 +407,18 @@ export class DurableOutbox<
 
   updateAttempt(scopeId: string, operationId: string, attemptedAt: number): Pending | null {
     const key = this.keys.pendingRecord(scopeId, operationId, this.ownerId)
-    const action = this.codec.parsePending(parsedJson(this.storage.getString(key)))
+    const action = this.codec.parsePending(this.read(key))
     if (!action) return null
     const updated = { ...action, attempts: action.attempts + 1, lastAttemptAt: attemptedAt }
-    this.storage.set(key, JSON.stringify(updated))
+    this.storage.set(key, this.serialize(updated))
     return updated
+  }
+
+  replacePending(scopeId: string, action: Pending): void {
+    this.storage.set(
+      this.keys.pendingRecord(scopeId, this.codec.operationId(action), this.ownerId),
+      this.serialize(action),
+    )
   }
 
   acknowledge(scopeId: string, operationId: string): void {
@@ -292,15 +471,18 @@ export class DurableOutbox<
     if (failed.length >= this.limits.maxFailedRecords)
       return { accepted: false, reason: "record_limit", failed, pending }
     const failedBytes = failed.reduce(
-      (total, candidate) => total + utf8ByteLength(JSON.stringify(candidate)),
+      (total, candidate) =>
+        total +
+        this.storedBytes(
+          this.keys.failedRecord(scopeId, this.codec.operationId(candidate.action), this.ownerId),
+          candidate,
+        ),
       0,
     )
-    if (failedBytes + utf8ByteLength(JSON.stringify(record)) > this.limits.maxFailedBytes)
+    const serialized = this.serialize(record)
+    if (failedBytes + utf8ByteLength(serialized) > this.limits.maxFailedBytes)
       return { accepted: false, reason: "byte_limit", failed, pending }
-    this.storage.set(
-      this.keys.failedRecord(scopeId, operationId, this.ownerId),
-      JSON.stringify(record),
-    )
+    this.storage.set(this.keys.failedRecord(scopeId, operationId, this.ownerId), serialized)
     const nextFailed = [...failed, record].sort((left, right) => left.failedAt - right.failedAt)
     this.storage.set(
       this.keys.failedIndex(scopeId, this.ownerId),
@@ -330,17 +512,17 @@ export class DurableOutbox<
       ...discovered,
     ])
     const failures: Failed[] = []
-    const quarantined: QuarantineReason[] = []
+    const quarantined: QuarantinedRecord[] = []
     for (const operationId of index) {
       const key = this.keys.failedRecord(scopeId, operationId, this.ownerId)
-      const failure = this.codec.parseFailed(parsedJson(this.storage.getString(key)))
+      const failure = this.codec.parseFailed(this.read(key))
       if (
         failure &&
         this.codec.operationId(failure.action) === operationId &&
         this.codec.belongsToScope(failure.action, this.ownerId, scopeId)
       )
         failures.push(failure)
-      else this.quarantine(key, quarantined)
+      else this.quarantine(key, "failed", quarantined)
     }
     this.reportQuarantined(scopeId, quarantined)
     failures.sort((left, right) => left.failedAt - right.failedAt)
@@ -352,7 +534,11 @@ export class DurableOutbox<
   }
 
   /** why: a record this build can't read may be readable by a later one, so it is kept aside instead of deleted. */
-  private quarantine(key: string, quarantined: QuarantineReason[]): void {
+  private quarantine(
+    key: string,
+    slot: QuarantinedRecord["slot"],
+    quarantined: QuarantinedRecord[],
+  ): void {
     const value = this.storage.getString(key)
     if (value !== undefined) {
       const base = `${DURABLE_QUARANTINE_PREFIX}${Date.now()}:${key}`
@@ -360,20 +546,31 @@ export class DurableOutbox<
       for (let copy = 1; this.storage.getString(target) !== undefined; copy += 1)
         target = `${base}:${copy}`
       this.storage.set(target, value)
-      quarantined.push(
-        value === "" ? "empty" : parsedJson(value) === null ? "invalid_json" : "rejected",
-      )
+      const root = parsedJson(value)
+      quarantined.push({
+        slot,
+        reason: value === "" ? "empty" : root === null ? "invalid_json" : "rejected",
+        bytes: utf8ByteLength(value),
+        shape: shapeOf(root, this.codec.knownKeys ?? []),
+        operationType: operationTypeOf(root, slot, this.codec.operationTypes ?? []),
+        writtenBy: parseWrittenBy(
+          isRecord(root)
+            ? root.writtenBy
+            : parsedJson(/^\{"writtenBy":(\{[^{}]*\})/.exec(value)?.[1]),
+        ),
+      })
     }
     this.storage.delete(key)
   }
 
-  /** why: quarantine is otherwise silent; one report per load pass tells us a release needs a recovery path, without sending record contents. */
-  private reportQuarantined(scopeId: string, quarantined: readonly QuarantineReason[]): void {
+  /** why: quarantine is otherwise silent; one report per load pass carries enough structure to write a recovering codec, never record values. */
+  private reportQuarantined(scopeId: string, quarantined: readonly QuarantinedRecord[]): void {
     if (!quarantined.length) return
     reportQuarantine({
       outbox: outboxLabel(this.keys.pendingRecord(scopeId, "", this.ownerId)),
       count: quarantined.length,
-      reasons: [...new Set(quarantined)],
+      reasons: [...new Set(quarantined.map((record) => record.reason))],
+      records: quarantined.slice(0, MAX_REPORTED_RECORDS),
     })
   }
 

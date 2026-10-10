@@ -1,3 +1,6 @@
+import { spawnSync } from "node:child_process"
+import { join } from "node:path"
+
 import {
   DURABLE_QUARANTINE_PREFIX,
   DurableOutbox,
@@ -5,6 +8,8 @@ import {
   type DurableOutboxCodec,
   type DurableOutboxKeys,
   type DurablePendingRecord,
+  type QuarantineReport,
+  setOutboxWriter,
   setQuarantineReporter,
 } from "./durableOutbox"
 
@@ -167,7 +172,13 @@ describe("durable outbox", () => {
     outbox.loadPending("deck")
 
     expect(report.mock.calls).toEqual([
-      [{ outbox: "notes.pending.v1", count: 2, reasons: ["rejected", "empty"] }],
+      [
+        expect.objectContaining({
+          outbox: "notes.pending.v1",
+          count: 2,
+          reasons: ["rejected", "empty"],
+        }),
+      ],
     ])
     expect(JSON.stringify(report.mock.calls)).not.toMatch(/owner|private|note-secret/)
   })
@@ -221,5 +232,315 @@ describe("durable outbox", () => {
       accepted: false,
       reason: "byte_limit",
     })
+  })
+})
+
+describe("durable outbox provenance", () => {
+  const writer = {
+    app: "1.4.0",
+    update: "0b6f3c2e-5d1a-4f8e-9c7b-2a4d6e8f0a1c",
+    runtime: "3a5f9c1e7b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a",
+    commit: "0123456789ab",
+  }
+  const otherWriter = {
+    app: "2.0.0",
+    update: "embedded",
+    runtime: "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
+  }
+  const notes = {
+    ...codec,
+    operationTypes: ["create"],
+    knownKeys: ["id", "ownerId", "scopeId", "payload", "note", "op"],
+  }
+  const bytes = (value: string) => new TextEncoder().encode(value).length
+  const digest: unknown = expect.stringMatching(/^[\da-f]{8}$/)
+  const stored = (storage: MemoryStorage, key: string): Record<string, unknown> =>
+    JSON.parse(storage.getString(key)!) as Record<string, unknown>
+  const reported = (report: jest.Mock) =>
+    report.mock.calls.flatMap(([{ records }]: [QuarantineReport]) => records)
+
+  afterEach(() => {
+    setOutboxWriter(undefined)
+    setQuarantineReporter(() => {})
+  })
+
+  it("stamps the writing build on every record and never hands it to the codec's caller", () => {
+    setOutboxWriter(writer)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const note = operation("note-1", 1)
+    const pendingKey = keys.pendingRecord("deck", "note-1", "owner")
+    outbox.enqueue(note, "deck")
+
+    expect(stored(storage, pendingKey)).toEqual({ ...note, writtenBy: writer })
+    expect(storage.getString(pendingKey)).toMatch(/^\{"writtenBy":/)
+    // why: the test codec passes the stored object through, like the deck codec does.
+    expect(outbox.loadPending("deck")).toEqual([note])
+
+    setOutboxWriter(otherWriter)
+    outbox.updateAttempt("deck", "note-1", 5)
+    expect(stored(storage, pendingKey).writtenBy).toEqual(otherWriter)
+
+    outbox.fail("deck", "note-1", "rejected", 6)
+    const failed = stored(storage, keys.failedRecord("deck", "note-1", "owner"))
+    expect(failed.writtenBy).toEqual(otherWriter)
+    expect(failed.action).not.toHaveProperty("writtenBy")
+    expect(outbox.loadFailed("deck")[0].action).not.toHaveProperty("writtenBy")
+  })
+
+  it("reads records with no provenance, and one an older build wrapped with the action's", () => {
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const legacy = operation("note-legacy", 1)
+    const rewrapped = operation("note-rewrapped", 2)
+    storage.set(keys.pendingRecord("deck", "note-legacy", "owner"), JSON.stringify(legacy))
+    // why: an older pass-through codec copies the pending record, provenance included, into `action`.
+    storage.set(
+      keys.failedRecord("deck", "note-rewrapped", "owner"),
+      JSON.stringify(
+        codec.createFailure({ ...rewrapped, writtenBy: writer } as NoteOperation, "x", 3),
+      ),
+    )
+
+    expect(outbox.loadPending("deck")).toEqual([legacy])
+    expect(outbox.loadFailed("deck")).toEqual([codec.createFailure(rewrapped, "x", 3)])
+  })
+
+  it("budgets the bytes on disk, not this build's re-serialization of them", () => {
+    const storage = new MemoryStorage()
+    setOutboxWriter(writer)
+    const first = operation("note-first", 1)
+    new DurableOutbox(storage, "owner", keys, codec).enqueue(first, "deck")
+    new DurableOutbox(storage, "owner", keys, codec).fail("deck", "note-first", "x", 2)
+    new DurableOutbox(storage, "owner", keys, codec).enqueue(operation("note-held", 3), "deck")
+    const onDisk = (key: string) => bytes(storage.getString(key)!)
+    setOutboxWriter(undefined)
+    const second = operation("note-second", 4)
+    const pendingLimit =
+      onDisk(keys.pendingRecord("deck", "note-held", "owner")) + bytes(JSON.stringify(second)) - 1
+    const failedLimit =
+      onDisk(keys.failedRecord("deck", "note-first", "owner")) +
+      bytes(JSON.stringify(codec.createFailure(second, "x", 5))) -
+      1
+    const outbox = new DurableOutbox(storage, "owner", keys, codec, {
+      maxPendingBytes: pendingLimit,
+      maxFailedBytes: failedLimit,
+    })
+
+    expect(outbox.enqueue(second, "deck")).toMatchObject({ accepted: false, reason: "byte_limit" })
+    expect(
+      outbox.failAction(
+        second,
+        "deck",
+        "x",
+        5,
+        outbox.loadFailed("deck"),
+        outbox.loadPending("deck"),
+      ),
+    ).toMatchObject({ accepted: false, reason: "byte_limit" })
+  })
+
+  it("reports each quarantined record's structure and writer, never its values", () => {
+    const sentinel = "sentinel-7f3a"
+    const report = jest.fn()
+    setQuarantineReporter(report)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, notes)
+    const future = JSON.stringify({
+      ...operation("note-future", 1),
+      op: "create",
+      payload: { body: sentinel },
+      writtenBy: otherWriter,
+    })
+    const torn = JSON.stringify({ writtenBy: writer, payload: { note: sentinel } }).slice(0, -8)
+    const foreign = JSON.stringify({
+      schemaVersion: 1,
+      action: { op: sentinel, id: sentinel },
+      reason: sentinel,
+      failedAt: 1,
+      writtenBy: { app: sentinel },
+    })
+    storage.set(keys.pendingRecord("deck", "note-future", "owner"), future)
+    storage.set(keys.pendingRecord("deck", "note-torn", "owner"), torn)
+    storage.set(keys.failedRecord("deck", "note-foreign", "owner"), foreign)
+
+    outbox.loadPending("deck")
+    outbox.loadFailed("deck")
+
+    expect(report.mock.calls).toEqual([
+      [
+        {
+          outbox: "notes.pending.v1",
+          count: 2,
+          reasons: ["rejected", "invalid_json"],
+          records: [
+            {
+              slot: "pending",
+              reason: "rejected",
+              bytes: bytes(future),
+              shape: {
+                "schemaVersion": "number",
+                "id": "string",
+                "ownerId": "string",
+                "scopeId": "string",
+                "queuedAt": "number",
+                "attempts": "number",
+                "payload": "object",
+                "payload.<key1>": "string",
+                "op": "string",
+                "writtenBy": "object",
+                "writtenBy.app": "string",
+                "writtenBy.update": "string",
+                "writtenBy.runtime": "string",
+              },
+              operationType: "create",
+              writtenBy: { ...otherWriter, runtime: digest },
+            },
+            {
+              slot: "pending",
+              reason: "invalid_json",
+              bytes: bytes(torn),
+              shape: {},
+              operationType: "unknown",
+              writtenBy: { app: writer.app, update: digest, runtime: digest, commit: digest },
+            },
+          ],
+        },
+      ],
+      [
+        {
+          outbox: "notes.pending.v1",
+          count: 1,
+          reasons: ["rejected"],
+          records: [
+            {
+              slot: "failed",
+              reason: "rejected",
+              bytes: bytes(foreign),
+              shape: {
+                "schemaVersion": "number",
+                "action": "object",
+                "action.op": "string",
+                "action.id": "string",
+                "reason": "string",
+                "failedAt": "number",
+                "writtenBy": "object",
+                "writtenBy.app": "string",
+              },
+              operationType: "unknown",
+              writtenBy: "unknown",
+            },
+          ],
+        },
+      ],
+    ])
+    expect(JSON.stringify(report.mock.calls)).not.toContain(sentinel)
+  })
+
+  it("describes nested fields and sampled array elements, and replaces every unknown key", () => {
+    const report = jest.fn()
+    setQuarantineReporter(report)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, {
+      ...notes,
+      knownKeys: ["cards", "name", "quantity", "byName"],
+    })
+    const dataKeys = [
+      "Sol Ring",
+      "abcdefghijklmnop",
+      "3f2b8c1e-9a4d-4c2b-8e1f-0a9b8c7d6e5f",
+      "1700000000000",
+    ]
+    storage.set(
+      keys.failedRecord("deck", "note-nested", "owner"),
+      JSON.stringify({
+        schemaVersion: 1,
+        action: {
+          cards: [{ name: "Island" }, { quantity: 2, foil: true }, {}, { name: "Swamp" }],
+          byName: Object.fromEntries(dataKeys.map((key, index) => [key, index])),
+        },
+        reason: "x",
+        failedAt: 1,
+      }),
+    )
+
+    outbox.loadFailed("deck")
+
+    const [record] = reported(report)
+    expect(record.shape).toEqual({
+      "schemaVersion": "number",
+      "action": "object",
+      "reason": "string",
+      "failedAt": "number",
+      "action.cards": "array",
+      "action.byName": "object",
+      "action.cards.0": "object",
+      "action.cards.1": "object",
+      "action.cards.2": "object",
+      "action.byName.<key1>": "number",
+      "action.byName.<key2>": "number",
+      "action.byName.<key3>": "number",
+      "action.byName.<key4>": "number",
+      "action.cards.0.name": "string",
+      "action.cards.1.quantity": "number",
+      "action.cards.1.<key1>": "boolean",
+    })
+    for (const key of [...dataKeys, "Island", "foil"])
+      expect(JSON.stringify(report.mock.calls)).not.toContain(key)
+  })
+
+  it("reports only build identifiers in the formats the app writes", () => {
+    const clerkId = "user_2NNEqL2nrIRdJ194ndJqAHwEfxC"
+    const report = jest.fn()
+    setQuarantineReporter(report)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, notes)
+    const stamped = (id: string, writtenBy: Record<string, string>) =>
+      storage.set(
+        keys.pendingRecord("deck", id, "owner"),
+        JSON.stringify({ writtenBy, id, payload: { body: 1 } }),
+      )
+    stamped("note-clerk", { ...writer, update: clerkId })
+    stamped("note-names", { app: "Sol Ring", update: "Island", runtime: clerkId, commit: clerkId })
+
+    outbox.loadPending("deck")
+
+    expect(reported(report).map((record) => record.writtenBy)).toEqual([
+      { app: writer.app, update: "unknown", runtime: digest, commit: digest },
+      "unknown",
+    ])
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(/user_|Sol Ring|Island/)
+  })
+
+  it("reports build IDs only as digests that the lookup script maps back", () => {
+    const operationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    const report = jest.fn()
+    setQuarantineReporter(report)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, notes)
+    for (const [id, update] of [
+      ["note-copied", operationId],
+      ["note-real", writer.update],
+    ])
+      storage.set(
+        keys.pendingRecord("deck", id, "owner"),
+        JSON.stringify({ writtenBy: { ...writer, update }, id, payload: { body: 1 } }),
+      )
+
+    outbox.loadPending("deck")
+
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(
+      new RegExp([operationId, writer.update, writer.runtime, writer.commit].join("|")),
+    )
+    const [, real] = reported(report)
+    const lookup = spawnSync(
+      process.execPath,
+      [
+        join(__dirname, "../../../scripts/outbox-provenance-lookup.cjs"),
+        real.writtenBy === "unknown" ? "" : real.writtenBy.update,
+      ],
+      { input: `${operationId}\n${writer.update}\n`, encoding: "utf8" },
+    )
+    expect(lookup.stdout.trim().split(" ")[1]).toBe(writer.update)
   })
 })
