@@ -15,6 +15,8 @@ import {
   parseTableMessage,
   tablePatch,
   tableSnapshot,
+  unconfirmedCommands,
+  withPendingCommands,
 } from "./protocol"
 
 const game = createLocalGame({
@@ -73,6 +75,22 @@ describe("table protocol", () => {
     expect(applyTablePatch({ ...guestBoard, players: guestBoard.players.slice(1) }, patch)).toBe(
       undefined,
     )
+  })
+
+  it("shows a guest's taps until the host confirms them, without counting them twice", () => {
+    const context = defaultCommandContext(asDeviceId("guest"))
+    const playerId = game.players[0]!.id
+    const tap = { type: "life.change" as const, playerId, delta: 1 }
+    const pending = [
+      { id: 1, command: tap },
+      { id: 2, command: tap },
+    ]
+    expect(withPendingCommands(game, pending, context).players[0]!.life).toBe(42)
+
+    const hostBoard = applyGameCommand(game, tap, context)
+    const stillPending = unconfirmedCommands(pending, 1)
+    expect(stillPending).toEqual([{ id: 2, command: tap }])
+    expect(withPendingCommands(hostBoard, stillPending, context).players[0]!.life).toBe(42)
   })
 
   it("accepts only life and commander damage commands from guests", () => {

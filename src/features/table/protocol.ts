@@ -1,5 +1,15 @@
-import { commanderDamageBetween, commanderDamageKey } from "@/features/game/domain"
-import type { GameCommand, GameStatus, LocalGame, LocalGameResult } from "@/features/game/types"
+import {
+  applyGameCommand,
+  commanderDamageBetween,
+  commanderDamageKey,
+} from "@/features/game/domain"
+import type {
+  CommandContext,
+  GameCommand,
+  GameStatus,
+  LocalGame,
+  LocalGameResult,
+} from "@/features/game/types"
 
 /** why: guests may only touch life and commander damage; ending or undoing stays with the host. */
 export type TableCommand = Extract<GameCommand, { type: "life.change" | "commanderDamage.assign" }>
@@ -191,3 +201,28 @@ export function applyTablePatch(game: LocalGame, patch: TablePatch): LocalGame |
     result: patch.result,
   }
 }
+
+export interface PendingTableCommand {
+  id: number
+  command: TableCommand
+}
+
+/**
+ * why: a guest's taps show at once, on top of the host's last board, through the same rules
+ * the host will apply, so the count never snaps back while the host's answer is in flight.
+ */
+export function withPendingCommands(
+  board: LocalGame,
+  pending: readonly PendingTableCommand[],
+  context: CommandContext,
+): LocalGame {
+  return pending.reduce(
+    (current, { command }) => applyGameCommand(current, command, context),
+    board,
+  )
+}
+
+export const unconfirmedCommands = (
+  pending: readonly PendingTableCommand[],
+  acked: number,
+): PendingTableCommand[] => pending.filter(({ id }) => id > acked)

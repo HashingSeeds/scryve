@@ -7,7 +7,9 @@ export default function TableGuestRoute() {
   const { sessionId, stress } = useLocalSearchParams<{ sessionId: string; stress?: string }>()
   if (!__DEV__ || !sessionId) return <Redirect href="/" />
   return (
+    // why: a second link reuses this screen with new params; the key starts a fresh guest for the new session.
     <TableGuestScreen
+      key={sessionId}
       sessionId={sessionId}
       stressTaps={stress ? Number(stress) : undefined}
       onLeave={() => router.replace({ pathname: "/", params: { destination: "play" } })}

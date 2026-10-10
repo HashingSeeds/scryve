@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
+import { asDeviceId, defaultCommandContext } from "@/features/game/domain"
 import type { LocalGame } from "@/features/game/types"
 import type { useLocalGame } from "@/features/game/useLocalGame"
 
@@ -8,6 +9,9 @@ import {
   applyTablePatch,
   tablePatch,
   tableSnapshot,
+  unconfirmedCommands,
+  withPendingCommands,
+  type PendingTableCommand,
   type TableAcks,
   type TableCommand,
   type TableMessage,
@@ -120,7 +124,8 @@ function percentile(sorted: readonly number[], fraction: number) {
 }
 
 export function useTableGuest(sessionId: string) {
-  const [game, setGame] = useState<LocalGame>()
+  const [board, setBoard] = useState<LocalGame>()
+  const [pending, setPending] = useState<PendingTableCommand[]>([])
   const [timing, setTiming] = useState<TableTiming>({ samples: 0, unanswered: 0 })
   const [guestId] = useState(() => Math.random().toString(36).slice(2, 8))
   const nextId = useRef(0)
@@ -134,6 +139,7 @@ export function useTableGuest(sessionId: string) {
 
   function settle(acks: TableAcks) {
     const acked = acks[guestId] ?? 0
+    setPending((current) => unconfirmedCommands(current, acked))
     const now = Date.now()
     for (const [id, at] of sentAt.current) {
       if (id > acked) continue
@@ -152,9 +158,9 @@ export function useTableGuest(sessionId: string) {
   }
 
   const { status, link } = useLinkLifecycle(start, (message, reply) => {
-    if (message.type === "game") setGame(message.game)
+    if (message.type === "game") setBoard(message.game)
     if (message.type === "patch")
-      setGame((current) => {
+      setBoard((current) => {
         const patched = current && applyTablePatch(current, message.patch)
         if (!patched) reply?.send({ type: "sync" })
         return patched ?? current
@@ -165,8 +171,14 @@ export function useTableGuest(sessionId: string) {
   const send = (command: TableCommand) => {
     const id = ++nextId.current
     sentAt.current.set(id, Date.now())
+    setPending((current) => [...current, { id, command }])
     link.current?.send({ type: "command", command, guest: guestId, id })
   }
+  const context = useMemo(() => defaultCommandContext(asDeviceId(`table-${guestId}`)), [guestId])
+  const game = useMemo(
+    () => board && withPendingCommands(board, pending, context),
+    [board, context, pending],
+  )
   return { status, game, send, timing }
 }
 
