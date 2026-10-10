@@ -115,6 +115,22 @@ describe("buildLocalGameSnapshot", () => {
     ).toBeUndefined()
   })
 
+  it("carries the table by local player id and leaves behind one the server would reject", () => {
+    const game = commanderGame()
+    const [ada, grace] = game.players.map(({ id }) => id)
+    const table = {
+      designations: { monarch: ada },
+      players: { [grace]: { counters: { poison: 3, commanderTax: 4 } } },
+    }
+    const build = (candidate: LocalGame) =>
+      buildLocalGameSnapshot({ game: candidate, hostPlayerId: ada, ...identifiers })
+
+    expect(build({ ...game, table }).table).toEqual(table)
+    expect(
+      build({ ...game, table: { ...table, designations: { notADesignation: ada } } }),
+    ).not.toHaveProperty("table")
+  })
+
   it("falls back to a system-less ruleset when the game has no format", () => {
     const game = createLocalGame({
       players: [

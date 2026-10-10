@@ -2,6 +2,7 @@ import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import type { PlaySystemId } from "./playSystems"
 import type { PlayerMarkShape } from "../../../convex/lib/appearance"
 import type { MatchBestOf } from "../../../convex/lib/matchResults"
+import type { TableState } from "../../../convex/lib/table"
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name }
 
@@ -104,6 +105,8 @@ export interface LocalGame {
   players: GamePlayer[]
   events: GameEvent[]
   commanderDamage?: CommanderDamageTotals
+  /** why: counters, designations, and Pokémon are current state, not events, so an older build that cannot read them still opens the game. */
+  table?: TableState
   createdAt: number
   updatedAt: number
   finishedAt?: number

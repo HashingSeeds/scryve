@@ -5,6 +5,8 @@ import type { FunctionArgs } from "convex/server"
 
 import { asDeviceId } from "@/features/game/domain"
 import { LocalGameRepository } from "@/features/game/localPersistence"
+import { playTableRules } from "@/features/game/playSystems"
+import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { LifeDelta } from "@/features/game/types"
 import type { OutboxAcknowledgement } from "@/features/sync/drainOutbox"
 import { captureGame } from "@/utils/analytics"
@@ -27,10 +29,11 @@ import { useConvexOnline } from "./useConvexOnline"
 import { useRemoteReady } from "./useRemoteReady"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
+import { EMPTY_TABLE } from "../../../convex/lib/table"
 
 export { mergeDrainSnapshot } from "./OutboxSyncController"
 
-interface ConnectedGameRuntimeBase {
+interface ConnectedGameRuntimeBase extends TableRuntime {
   pending: PendingLifeAction[]
   failed: FailedLifeAction[]
   connectionStatus: ConnectionStatus
@@ -71,6 +74,14 @@ function operationCheckFor(event: ConnectedActionEvent) {
       deviceId: event.deviceId,
       clientCreatedAt: event.clientCreatedAt,
     } as const
+  if (event.type === "table.action")
+    return {
+      kind: event.type,
+      operationId: event.operationId,
+      action: event.action,
+      deviceId: event.deviceId,
+      clientCreatedAt: event.clientCreatedAt,
+    } as const
   if (event.type === "commanderDamage.submitted")
     return {
       kind: event.type,
@@ -102,7 +113,11 @@ function acknowledgementForQueuedResolution(
 type QueuedActionMutations = {
   [
     Name in
-      "changeLife" | "submitCommanderDamage" | "confirmCommanderDamage" | "declineCommanderDamage"
+      | "changeLife"
+      | "tableAction"
+      | "submitCommanderDamage"
+      | "confirmCommanderDamage"
+      | "declineCommanderDamage"
   ]: (args: FunctionArgs<(typeof api.games)[Name]>) => Promise<OutboxAcknowledgement>
 }
 
@@ -120,6 +135,14 @@ export function sendQueuedAction(
       delta: event.delta,
       deviceId: event.deviceId,
       clientCreatedAt: event.clientCreatedAt,
+    })
+  if (event.type === "table.action")
+    return mutations.tableAction({
+      publicId,
+      operationId: event.operationId,
+      deviceId: event.deviceId,
+      clientCreatedAt: event.clientCreatedAt,
+      action: event.action,
     })
   if (event.type === "commanderDamage.submitted")
     return mutations.submitCommanderDamage({
@@ -160,11 +183,13 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
   const submitCommanderDamageMutation = useMutation(api.games.submitCommanderDamage)
   const confirmCommanderDamageMutation = useMutation(api.games.confirmCommanderDamage)
   const declineCommanderDamageMutation = useMutation(api.games.declineCommanderDamage)
+  const tableActionMutation = useMutation(api.games.tableAction)
   const mutations = useRef({
     changeLifeMutation,
     submitCommanderDamageMutation,
     confirmCommanderDamageMutation,
     declineCommanderDamageMutation,
+    tableActionMutation,
     finishMutation,
     abandonMutation,
   })
@@ -173,6 +198,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
     submitCommanderDamageMutation,
     confirmCommanderDamageMutation,
     declineCommanderDamageMutation,
+    tableActionMutation,
     finishMutation,
     abandonMutation,
   }
@@ -188,6 +214,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
           sendQueuedAction(
             {
               changeLife: mutations.current.changeLifeMutation,
+              tableAction: mutations.current.tableActionMutation,
               submitCommanderDamage: mutations.current.submitCommanderDamageMutation,
               confirmCommanderDamage: mutations.current.confirmCommanderDamageMutation,
               declineCommanderDamage: mutations.current.declineCommanderDamageMutation,
@@ -283,7 +310,11 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
 
   // why: the projection query re-renders this hook on every resubscribe, so the board only sees a new runtime when the snapshot or readiness changed.
   return useMemo((): ConnectedGameRuntime => {
+    const projection = snapshot.projection
     const runtime = {
+      ...controller.table,
+      table: projection?.table ?? EMPTY_TABLE,
+      tableRules: playTableRules(projection?.system, projection?.format),
       pending: snapshot.pending,
       failed: snapshot.failed,
       connectionStatus: snapshot.connectionStatus,
@@ -297,12 +328,12 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
       abandon: controller.abandon,
       dismissFailed: controller.dismissFailed,
     }
-    return snapshot.projection
+    return projection
       ? {
           ...runtime,
           status: "ready",
           source: remoteReady ? "remote" : "cache",
-          projection: snapshot.projection,
+          projection,
         }
       : unreachableTimedOut
         ? {

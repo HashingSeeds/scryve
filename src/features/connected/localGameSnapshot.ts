@@ -1,8 +1,9 @@
-import { matchScoreAfter } from "@/features/game/domain"
+import { localTableRules, matchScoreAfter } from "@/features/game/domain"
 import { NO_PLAY_SYSTEM, supportsCommanderDamage } from "@/features/game/playSystems"
 import type { LocalGame, LocalGameSummary, PlayerId } from "@/features/game/types"
 
 import type { Id } from "../../../convex/_generated/dataModel"
+import { isValidTableSnapshot, type TableState } from "../../../convex/lib/table"
 
 // why: seats rebase to 1..n like `buildLocalGameSnapshot`, and local ids double as winner references so the server needs no id translation.
 export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
@@ -93,6 +94,8 @@ export interface LocalGameSnapshot {
     currentLife: number
   }[]
   commanderTotals?: { fromSeat: number; toSeat: number; total: number }[]
+  /** why: counters, designations, and Pokémon keyed by local player id; the server remaps them to the new seats. */
+  table?: TableState
 }
 
 export interface LocalGameSnapshotInput {
@@ -143,6 +146,7 @@ export function buildLocalGameSnapshot({
     ordered.map((player, index) => [player.id, index + 1]),
   )
   const commanderTotals = commanderTotalsFor(game, seatsByPlayerId)
+  const table = tableFor(game)
   return {
     operationId,
     publicId,
@@ -164,5 +168,14 @@ export function buildLocalGameSnapshot({
       currentLife: player.life,
     })),
     ...(commanderTotals ? { commanderTotals } : {}),
+    ...(table ? { table } : {}),
   }
+}
+
+// why: the server rejects a table its own reducer could not have produced, so a table that would fail the whole publish is left behind instead.
+function tableFor(game: LocalGame) {
+  const table = game.table
+  if (!table) return undefined
+  const playerIds = new Set<string>(game.players.map(({ id }) => id))
+  return isValidTableSnapshot(table, localTableRules(game), playerIds) ? table : undefined
 }

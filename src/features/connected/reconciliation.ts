@@ -1,7 +1,9 @@
+import { playTableRules } from "@/features/game/playSystems"
 import { convexErrorCode } from "@/utils/convexError"
 
 import type { ConnectedDisplayProjection, ConnectedProjection, PendingLifeAction } from "./model"
 import { PERMANENT_GAME_WRITE_CODES } from "../../../convex/lib/gameWriteErrors"
+import { applyTableAction, EMPTY_TABLE } from "../../../convex/lib/table"
 
 export function mergeConfirmedProjection(
   current: ConnectedProjection | null,
@@ -24,21 +26,41 @@ export function overlayPendingDeltas(
   if (confirmed.status === "finished" || confirmed.status === "abandoned") {
     return {
       ...confirmed,
+      table: confirmed.table ?? EMPTY_TABLE,
       players: confirmed.players.map((player) => ({ ...player, pendingDelta: 0 })),
     }
   }
   const confirmedOperations = new Set(confirmed.recentOperationIds)
   const deltas = new Map<string, number>()
+  const addDelta = (playerId: string, delta: number) =>
+    deltas.set(playerId, (deltas.get(playerId) ?? 0) + delta)
+  const rules = playTableRules(confirmed.system, confirmed.format)
+  let table = confirmed.table ?? EMPTY_TABLE
   for (const action of pending) {
-    if (action.event.gameId !== confirmed.publicId) continue
-    if (confirmedOperations.has(action.event.operationId)) continue
+    const { event } = action
+    if (event.gameId !== confirmed.publicId) continue
+    if (confirmedOperations.has(event.operationId)) continue
+    if (event.type === "life.changed") addDelta(event.playerId, event.delta)
+    // why: table actions replay through the shared reducer, so a queued knockout also shows the prizes it takes.
+    if (event.type === "table.action") {
+      const change = applyTableAction(table, event.action, {
+        rules,
+        operationId: event.operationId,
+        lifeOf: (playerId) => {
+          const player = confirmed.players.find((candidate) => candidate.playerId === playerId)
+          return player && player.currentLife + (deltas.get(playerId) ?? 0)
+        },
+      })
+      if (!change) continue
+      table = change.table
+      for (const life of change.life) addDelta(life.playerId, life.delta)
+    }
     // Commander damage only moves life once the defender confirms it, so queued
     // claims and resolutions contribute no optimistic delta.
-    if (action.event.type !== "life.changed") continue
-    deltas.set(action.event.playerId, (deltas.get(action.event.playerId) ?? 0) + action.event.delta)
   }
   return {
     ...confirmed,
+    table,
     players: confirmed.players.map((player) => {
       const pendingDelta = deltas.get(player.playerId) ?? 0
       return { ...player, currentLife: player.currentLife + pendingDelta, pendingDelta }

@@ -47,6 +47,21 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
+import { tableRules } from "./lib/systems"
+import {
+  applyTableAction as reduceTableAction,
+  canonicalJson,
+  isValidTableSnapshot,
+  remapTableState,
+  tableActionDelta,
+  tableActionIdentity,
+  tableStateValidator,
+  tableActionValidator,
+  type PlayerTable,
+  type PokemonCard,
+  type TableAction,
+  type TableState,
+} from "./lib/table"
 import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 
 const MAX_PLAYERS_PER_GAME_READ = 7
@@ -930,6 +945,8 @@ export const publishLocalGame = mutation({
     commanderTotals: v.optional(
       v.array(v.object({ fromSeat: v.number(), toSeat: v.number(), total: v.number() })),
     ),
+    // why: counters, designations, and Pokémon keyed by local player id; remapped to the new seats on insert.
+    table: v.optional(tableStateValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -959,6 +976,8 @@ export const publishLocalGame = mutation({
     }
     if (totalPairs.size > MAX_PLAYERS_PER_GAME_READ * (MAX_PLAYERS_PER_GAME_READ - 1))
       throw new Error("Too many commander damage totals")
+    if (args.table && !isValidTableSnapshot(args.table, tableRules(gameSystem, format), localIds))
+      throw new Error("Table state does not fit this game")
     const requestKey = JSON.stringify([
       args.publicId,
       args.system ?? null,
@@ -979,6 +998,8 @@ export const publishLocalGame = mutation({
         player.currentLife,
       ]),
       args.commanderTotals ?? null,
+      // why: appended only when sent, so receipts written before tables existed keep their key.
+      ...(args.table ? [canonicalJson(args.table)] : []),
     ])
     const receipt = await ctx.db
       .query("gamePublishReceipts")
@@ -1045,6 +1066,20 @@ export const publishLocalGame = mutation({
       })
       mapping.push({ localId: player.localId, playerId, seat: player.seat })
       playerIdsBySeat.set(player.seat, playerId)
+    }
+    if (args.table) {
+      const playerIdsByLocalId = new Map(
+        mapping.map(({ localId, playerId }) => [localId, playerId]),
+      )
+      const table = remapTableState(gatedTableState(args.table), (localId) =>
+        playerIdsByLocalId.get(localId)!,
+      )
+      for (const [playerId, player] of Object.entries(table.players)) {
+        const id = ctx.db.normalizeId("gamePlayers", playerId)
+        if (id) await ctx.db.patch(id, playerTableFromRow(player))
+      }
+      if (Object.keys(table.designations).length > 0)
+        await ctx.db.patch(gameId, { designations: storedDesignations(ctx, table.designations) })
     }
     for (const total of totals) {
       await ctx.db.insert("gameCommanderDamage", {
@@ -1318,6 +1353,13 @@ const connectedOperation = v.union(
     deviceId: v.string(),
     clientCreatedAt: v.number(),
   }),
+  v.object({
+    kind: v.literal("table.action"),
+    operationId: v.string(),
+    action: tableActionValidator,
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  }),
 )
 
 export const lobbyProjection = query({
@@ -1409,9 +1451,21 @@ export const lobbyProjection = query({
           })),
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
+      ...(tableRulesApply(gameTableRules(game)) ? { table: tableProjection(game, players) } : {}),
     }
   },
 })
+
+function tableRulesApply(rules: ReturnType<typeof gameTableRules>) {
+  return rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
+}
+
+function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): TableState {
+  return {
+    designations: game.designations ?? {},
+    players: Object.fromEntries(players.map((player) => [player._id, playerTableFromRow(player)])),
+  }
+}
 
 export const connectedOperationStatus = query({
   args: { publicId: v.string(), operation: connectedOperation },
@@ -1508,10 +1562,14 @@ async function statusForOperation(
       ? event.kind === "life.changed" &&
         event.playerId === operation.playerId &&
         event.delta === operation.delta
-      : event.kind === "commanderDamage.claimed" &&
-        event.fromPlayerId === operation.fromPlayerId &&
-        event.toPlayerId === operation.toPlayerId &&
-        event.delta === operation.delta)
+      : operation.kind === "table.action"
+        ? event.kind === operation.action.kind &&
+          event.playerId === operation.action.playerId &&
+          event.actionIdentity === tableActionIdentity(operation.action)
+        : event.kind === "commanderDamage.claimed" &&
+          event.fromPlayerId === operation.fromPlayerId &&
+          event.toPlayerId === operation.toPlayerId &&
+          event.delta === operation.delta)
   return matches ? acknowledged() : conflict("Operation identifier was reused with different data")
 }
 
@@ -1766,6 +1824,185 @@ export const changeLife = mutation({
       currentLife,
       deduplicated: false,
     }
+  },
+})
+
+function gameTableRules(game: Doc<"games">) {
+  return tableRules(game.system ?? game.game ?? DEFAULT_DECK_GAME, game.format ?? game.ruleset)
+}
+
+function storedDesignations(ctx: QueryCtx, designations: TableState["designations"]) {
+  const stored: Record<string, Id<"gamePlayers">> = {}
+  for (const [designationId, holder] of Object.entries(designations)) {
+    const holderId = ctx.db.normalizeId("gamePlayers", holder)
+    if (holderId) stored[designationId] = holderId
+  }
+  return stored
+}
+
+function playerTableFromRow(player: PlayerTable): PlayerTable {
+  return {
+    ...(player.counters ? { counters: player.counters } : {}),
+    ...(player.pokemon ? { pokemon: player.pokemon } : {}),
+  }
+}
+
+// why: a knockout and its undo also move the other seat's prize counter, so that row is read too.
+function relatedPlayerId(action: TableAction, actor: Doc<"gamePlayers">) {
+  if (action.kind === "pokemon.knockedOut" || action.kind === "pokemon.damaged")
+    return action.takerPlayerId
+  if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
+  return undefined
+}
+
+// why: a hand-typed Pokémon name is shown to every seat, so one that fails the name gate is stored without it, like a hidden deck name.
+function gatedCard<Card extends PokemonCard>(card: Card): Card {
+  return card.name !== undefined && nameFailsGate(card.name) ? { ...card, name: undefined } : card
+}
+
+function gatedTableAction(action: TableAction): TableAction {
+  if (action.kind !== "pokemon.placed" && action.kind !== "pokemon.updated") return action
+  return { ...action, card: gatedCard(action.card) }
+}
+
+function gatedTableState(table: TableState): TableState {
+  return {
+    ...table,
+    players: Object.fromEntries(
+      Object.entries(table.players).map(([playerId, player]) => {
+        const board = player.pokemon
+        if (!board) return [playerId, player]
+        const knockout = board.lastKnockout
+        return [
+          playerId,
+          {
+            ...player,
+            pokemon: {
+              ...(board.active ? { active: gatedCard(board.active) } : {}),
+              bench: board.bench.map(gatedCard),
+              ...(knockout
+                ? { lastKnockout: { ...knockout, pokemon: gatedCard(knockout.pokemon) } }
+                : {}),
+            },
+          },
+        ]
+      }),
+    ),
+  }
+}
+
+// why: counters, designations, and Pokémon all go through one replay-safe write that runs the shared table reducer. Only the acting seat's owner may write, like life.
+export const tableAction = mutation({
+  args: {
+    publicId: v.string(),
+    operationId: v.string(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+    action: tableActionValidator,
+  },
+  handler: async (ctx, args) => {
+    assertGameWriteOperationId(args.operationId)
+    assertGameWriteDeviceId(args.deviceId)
+    if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
+      throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
+    const action = gatedTableAction(args.action)
+
+    const game = await gameByPublicIdForWrite(ctx, args.publicId)
+    const user = await requireUser(ctx)
+    const actorId = ctx.db.normalizeId("gamePlayers", action.playerId)
+    const actor = actorId ? await ctx.db.get(actorId) : null
+    if (
+      !actor ||
+      actor.gameId !== game._id ||
+      (actor.userId === undefined ? game.hostUserId !== user._id : actor.userId !== user._id) ||
+      (actor.deviceId !== undefined && actor.deviceId !== args.deviceId)
+    )
+      throw gameWriteError("seat_owner_required", "Seat-owner permission required")
+
+    // why: identity comes from the action as sent, so a retry matches even when the name gate trimmed what was stored.
+    const actionIdentity = tableActionIdentity(args.action)
+    const actionDelta = tableActionDelta(action)
+    const duplicate = await ctx.db
+      .query("gameEvents")
+      .withIndex("by_game_operation", (q) =>
+        q.eq("gameId", game._id).eq("operationId", args.operationId),
+      )
+      .unique()
+    if (duplicate) {
+      if (
+        duplicate.kind !== action.kind ||
+        duplicate.playerId !== actor._id ||
+        duplicate.actionIdentity !== actionIdentity ||
+        duplicate.actorUserId !== user._id ||
+        duplicate.deviceId !== args.deviceId ||
+        duplicate.clientCreatedAt !== args.clientCreatedAt
+      )
+        throw syncOperationMismatch()
+      return { operationId: duplicate.operationId, eventId: duplicate._id, deduplicated: true }
+    }
+    await limitGameRate(ctx, "gameWrite", user._id)
+    if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
+
+    const rows = new Map<string, Doc<"gamePlayers">>([[actor._id, actor]])
+    const relatedId = ctx.db.normalizeId("gamePlayers", relatedPlayerId(action, actor) ?? "")
+    const related = relatedId ? await ctx.db.get(relatedId) : null
+    if (related?.gameId === game._id) rows.set(related._id, related)
+    const table: TableState = {
+      designations: game.designations ?? {},
+      players: Object.fromEntries(
+        [...rows.values()].map((row) => [row._id, playerTableFromRow(row)]),
+      ),
+    }
+    const result = reduceTableAction(table, action, {
+      rules: gameTableRules(game),
+      operationId: args.operationId,
+      lifeOf: (playerId) => rows.get(playerId)?.currentLife,
+    })
+    if (!result) throw gameWriteError("invalid_table_action", "This table change no longer applies")
+
+    const now = Date.now()
+    for (const row of rows.values()) {
+      const before = table.players[row._id]
+      const after = result.table.players[row._id]
+      const lifeDelta = result.life
+        .filter((change) => change.playerId === row._id)
+        .reduce((total, change) => total + change.delta, 0)
+      const isActor = row._id === actor._id
+      if (!isActor && after === before && lifeDelta === 0) continue
+      await ctx.db.patch(row._id, {
+        ...(after === before ? {} : { counters: after?.counters, pokemon: after?.pokemon }),
+        ...(lifeDelta === 0 ? {} : { currentLife: row.currentLife + lifeDelta }),
+        ...(isActor ? { eventCount: (row.eventCount ?? 0) + 1 } : {}),
+        lastEventAt: now,
+      })
+    }
+    if (result.table.designations !== table.designations)
+      await ctx.db.patch(game._id, {
+        designations: storedDesignations(ctx, result.table.designations),
+      })
+
+    const lifeChange = result.life[0]
+    const lifeChangeTarget = lifeChange && ctx.db.normalizeId("gamePlayers", lifeChange.playerId)
+    const eventId = await ctx.db.insert("gameEvents", {
+      gameId: game._id,
+      playerId: actor._id,
+      operationId: args.operationId,
+      kind: action.kind,
+      actionIdentity,
+      ...(lifeChange && lifeChangeTarget
+        ? { toPlayerId: lifeChangeTarget, delta: lifeChange.delta }
+        : actionDelta === undefined
+          ? {}
+          : { delta: actionDelta }),
+      ...(action.kind === "pokemon.knockoutUndone"
+        ? { undoOfOperationId: action.knockoutOperationId }
+        : {}),
+      actorUserId: user._id,
+      deviceId: args.deviceId,
+      clientCreatedAt: args.clientCreatedAt,
+      serverCreatedAt: now,
+    })
+    return { operationId: args.operationId, eventId, deduplicated: false }
   },
 })
 
