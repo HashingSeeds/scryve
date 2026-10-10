@@ -18,6 +18,7 @@ function pokemonTable(playerNames: string[]) {
     players: playerNames.map((name, index) => ({ name, color: `#${index}${index}${index}` })),
   })
   let operation = 0
+  let refusing = false
   const listeners = new Set<() => void>()
   const actions = createTableActions(
     () => ({
@@ -28,6 +29,7 @@ function pokemonTable(playerNames: string[]) {
       canAct: () => true,
     }),
     (action, operationId) => {
+      if (refusing) return false
       current = applyLocalTableAction(current, action, { operationId, now: 2 })
       listeners.forEach((listener) => listener())
       return true
@@ -38,7 +40,14 @@ function pokemonTable(playerNames: string[]) {
     listeners.add(listener)
     return () => void listeners.delete(listener)
   }
-  return { actions, subscribe, game: () => current }
+  return {
+    actions,
+    subscribe,
+    game: () => current,
+    refuse: (value: boolean) => {
+      refusing = value
+    },
+  }
 }
 
 type Harness = ReturnType<typeof pokemonTable>
@@ -114,11 +123,39 @@ describe("PokemonSeatCard", () => {
     expect(board(table).active).toBeUndefined()
     expect(screen.getByText("No Active")).toBeTruthy()
 
+    expect(screen.getByTestId("pokemon-announcement-seat-1")).toHaveTextContent(
+      "Charizard ex knocked out. Grace takes 2 prizes.",
+    )
+
     fireEvent.press(screen.getByTestId("pokemon-knockout-undo-seat-1"))
     expect(table.game().players.map(({ life }) => life)).toEqual([6, 6])
     expect(board(table).active).toMatchObject({ id: pokemonId, damage: 320 })
     expect(screen.queryByTestId("pokemon-knockout-toast-seat-1")).toBeNull()
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("10")
+    expect(screen.getByTestId("pokemon-announcement-seat-1")).toHaveTextContent(
+      "Undo. Charizard ex returns to Active, Grace gives back 2 prizes.",
+    )
+    jest.useRealTimers()
+  })
+
+  it("withholds Undo when the knocked out Pokémon has nowhere to return", () => {
+    jest.useFakeTimers()
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    const active = table.actions.placePokemon(me, "active", { name: "Pikachu", hp: 60, prizes: 1 })!
+    const bench = Array.from({ length: 5 }, (_, index) =>
+      table.actions.placePokemon(me, "bench", { name: `Bench ${index}`, hp: 60, prizes: 1 }),
+    )
+    table.actions.adjustPokemonDamage(me, active, 50)
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    expect(screen.getByTestId("pokemon-knockout-undo-seat-1")).toBeTruthy()
+
+    act(() => void table.actions.switchActive(me, bench[0]!))
+    act(() => void table.actions.placePokemon(me, "bench", { name: "Late", hp: 60, prizes: 1 }))
+    expect(screen.queryByTestId("pokemon-knockout-undo-seat-1")).toBeNull()
+    expect(screen.getByTestId("pokemon-knockout-no-undo-seat-1")).toBeTruthy()
     jest.useRealTimers()
   })
 
@@ -131,10 +168,18 @@ describe("PokemonSeatCard", () => {
       hp: 280,
       prizes: 2,
     })!
+    table.actions.adjustPokemonDamage(me, benched, 30)
     render(<Seat harness={table} seat={0} />)
+    expect(screen.getByTestId(`pokemon-bench-hp-${benched}`)).toHaveTextContent("250")
 
     fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
     expect(board(table).active?.name).toBe("Charizard ex")
+    fireEvent.press(screen.getByTestId("pokemon-switch-edit-seat-1"))
+    expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
+    expect(screen.queryByTestId("pokemon-damage-seat-1-10")).toBeNull()
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
     fireEvent.press(screen.getByTestId("pokemon-switch-confirm-seat-1"))
     expect(board(table).active?.name).toBe("Pidgeot ex")
     expect(board(table).bench.map(({ name }) => name)).toEqual(["Charizard ex"])
@@ -169,6 +214,38 @@ describe("PokemonSeatCard", () => {
     )
   })
 
+  it("closes the edit sheet before asking who took the prizes", () => {
+    const table = pokemonTable(["Ada", "Grace", "Linus"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Pikachu", hp: 60, prizes: 1 })
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId("pokemon-edit-active-seat-1"))
+    fireEvent.press(screen.getByTestId("pokemon-sheet-step-100-seat-1"))
+    expect(screen.queryByTestId("pokemon-sheet-seat-1")).toBeNull()
+    expect(screen.getByTestId("pokemon-taker-ask-seat-1")).toBeTruthy()
+    expect(board(table).active).toBeDefined()
+  })
+
+  it("keeps the placement sheet open when the board refuses the Pokémon", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId("pokemon-place-active-seat-1"))
+    fireEvent.changeText(screen.getByTestId("pokemon-name-input-seat-1"), "Pikachu")
+    fireEvent.changeText(screen.getByTestId("pokemon-hp-input-seat-1"), "60")
+    table.refuse(true)
+    fireEvent.press(screen.getByTestId("pokemon-place-seat-1"))
+    expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
+    expect(screen.getByText("Could not place it. Try again.")).toBeTruthy()
+    expect(board(table).active).toBeUndefined()
+
+    table.refuse(false)
+    fireEvent.press(screen.getByTestId("pokemon-place-seat-1"))
+    expect(screen.queryByTestId("pokemon-sheet-seat-1")).toBeNull()
+    expect(board(table).active).toMatchObject({ name: "Pikachu", hp: 60 })
+  })
+
   it("keeps a seat this device does not control read-only", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const me = table.game().players[0].id
@@ -193,5 +270,8 @@ describe("PokemonSeatCard", () => {
     expect(onChangePrizes).toHaveBeenLastCalledWith(-1)
     fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "longPress")
     expect(onChangePrizes).toHaveBeenLastCalledWith(1)
+    onChangePrizes.mockClear()
+    fireEvent.press(screen.getByTestId("pokemon-prize-back-seat-1"))
+    expect(onChangePrizes).toHaveBeenCalledWith(1)
   })
 })

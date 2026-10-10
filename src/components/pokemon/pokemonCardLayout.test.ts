@@ -1,6 +1,7 @@
 import {
   benchMenuClearance,
   contentInsetsFor,
+  heroFontSize,
   knockoutMessage,
   MENU_CLEARANCE,
   parseHp,
@@ -19,9 +20,17 @@ describe("pokemonCardLayout", () => {
     expect(benchMenuClearance(0, undefined, "top")).toBe(MENU_CLEARANCE)
     expect(benchMenuClearance(180, undefined, "bottom")).toBe(MENU_CLEARANCE)
     expect(benchMenuClearance(180, undefined, "top")).toBe(0)
-    expect(benchMenuClearance(90, "topRight", undefined)).toBe(0)
-    expect(benchMenuClearance(90, "bottomRight", undefined)).toBe(0)
+    expect(benchMenuClearance(90, "topRight", undefined)).toBe(MENU_CLEARANCE)
+    expect(benchMenuClearance(90, "bottomRight", undefined)).toBe(MENU_CLEARANCE)
+    expect(benchMenuClearance(90, "topLeft", undefined)).toBe(0)
+    expect(benchMenuClearance(-90, "bottomLeft", undefined)).toBe(MENU_CLEARANCE)
     expect(benchMenuClearance(0, "topLeft", undefined)).toBe(MENU_CLEARANCE)
+    expect(benchMenuClearance(0, "bottomLeft", undefined)).toBe(0)
+  })
+
+  it("keeps the hero number legible when the seat leaves it no room", () => {
+    expect(heroFontSize({ width: 420, height: -20, digits: 3, fontScale: 1 })).toBe(30)
+    expect(heroFontSize({ width: 390, height: 260, digits: 3, fontScale: 1 })).toBe(96)
   })
 
   it("accepts only whole HP values a printed card could carry", () => {
