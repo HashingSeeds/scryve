@@ -137,6 +137,8 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
+  /** why: the open sheet covers the card, so the card drops its own controls from touch, focus, and screen readers meanwhile. */
+  onSheetOpenChange?: (open: boolean) => void
 }
 
 /** why: counters and designations sit on the card's inner edge, facing the table. Tap a chip to bump it, hold it to edit or remove, and the faint + adds a counter or takes a designation. */
@@ -151,6 +153,7 @@ export const CounterChips = memo(function CounterChips({
   contentInsets,
   menuEdgeCenter,
   cardSize,
+  onSheetOpenChange,
 }: CounterChipsProps) {
   const {
     themed,
@@ -161,12 +164,18 @@ export const CounterChips = memo(function CounterChips({
   const { rules, counters, held, editable } = seat
   const shown = rules.counters.filter(({ id }) => (counters[id] ?? 0) > 0)
   const heldDesignations = rules.designations.filter(({ id }) => held.includes(id))
-  const canAdd = editable && (rules.designations.length > 0 || shown.length < rules.counters.length)
-  useAnnouncements(seat, identity)
+  const webAnnouncement = useAnnouncements(seat, identity)
+  const sheetOpen = sheet !== null
 
   useEffect(() => {
     if (!editable) setSheet(null)
   }, [editable])
+
+  useEffect(() => {
+    if (!sheetOpen) return
+    onSheetOpenChange?.(true)
+    return () => onSheetOpenChange?.(false)
+  }, [onSheetOpenChange, sheetOpen])
 
   if (cardSize.width === 0 || cardSize.height === 0) return null
   const frame = contentFrame(contentRotation, cardSize)
@@ -184,12 +193,19 @@ export const CounterChips = memo(function CounterChips({
 
   return (
     <>
-      {shown.length > 0 || heldDesignations.length > 0 || canAdd ? (
-        <View pointerEvents="box-none" style={[frame, $layer]}>
+      {Platform.OS === "web" ? (
+        <Text text={webAnnouncement} accessibilityLiveRegion="polite" style={$visuallyHidden} />
+      ) : null}
+      {!sheetOpen && (shown.length > 0 || heldDesignations.length > 0 || editable) ? (
+        <View
+          testID={`counter-chips-frame-seat-${seatNumber}`}
+          pointerEvents="box-none"
+          style={[frame, $layer]}
+        >
           <View
             testID={`counter-chips-seat-${seatNumber}`}
             pointerEvents="box-none"
-            style={[themed($row), { top }]}
+            style={[themed(compact ? $compactRow : $row), { top }]}
           >
             {shown.map((counter) => {
               const value = counters[counter.id] ?? 0
@@ -290,11 +306,11 @@ export const CounterChips = memo(function CounterChips({
                 )}
               </View>
             ))}
-            {canAdd ? (
+            {editable ? (
               <BoardPressable
                 testID={`counter-add-seat-${seatNumber}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${identity}, add a counter or designation`}
+                accessibilityLabel={`${identity}, counters and designations`}
                 hitSlop={{ top: 6, bottom: 6 }}
                 onPress={() => setSheet({ kind: "add" })}
                 style={({ pressed }) => [
@@ -321,6 +337,7 @@ export const CounterChips = memo(function CounterChips({
           contentRotation={contentRotation}
           contentInsets={contentInsets}
           menuClearance={menuClearance}
+          onEdit={(counterId) => setSheet({ kind: "edit", counterId })}
           onClose={() => setSheet(null)}
         />
       ) : null}
@@ -328,22 +345,30 @@ export const CounterChips = memo(function CounterChips({
   )
 }, structurallyEqual)
 
+/**
+ * why: like life, every change to a seat's counters is spoken once, whether this device or another made it. A moved designation is spoken only for the seat that took it. Native platforms announce directly; react-native-web's announce is a no-op, so web gets the message back for a polite live region.
+ */
 function useAnnouncements({ rules, counters, held }: SeatTable, identity: string) {
   const previous = useRef({ counters, held })
+  const [webMessage, setWebMessage] = useState("")
   useEffect(() => {
     const before = previous.current
     previous.current = { counters, held }
-    if (Platform.OS !== "ios") return
-    for (const counter of rules.counters) {
-      const value = counters[counter.id] ?? 0
-      if (value !== (before.counters[counter.id] ?? 0))
-        AccessibilityInfo.announceForAccessibility(`${identity}, ${counter.label} ${value}`)
-    }
-    for (const designation of rules.designations) {
-      if (held.includes(designation.id) && !before.held.includes(designation.id))
-        AccessibilityInfo.announceForAccessibility(`${identity}, now ${designation.label}`)
-    }
+    const changes = [
+      ...rules.counters.flatMap(({ id, label }) => {
+        const value = counters[id] ?? 0
+        return value === (before.counters[id] ?? 0) ? [] : [`${label} ${value}`]
+      }),
+      ...rules.designations.flatMap(({ id, label }) =>
+        held.includes(id) && !before.held.includes(id) ? [`now ${label}`] : [],
+      ),
+    ]
+    if (changes.length === 0) return
+    const message = `${identity}, ${changes.join(", ")}`
+    if (Platform.OS === "web") setWebMessage(message)
+    else AccessibilityInfo.announceForAccessibility(message)
   }, [counters, held, identity, rules])
+  return webMessage
 }
 
 function CounterSheet({
@@ -357,6 +382,7 @@ function CounterSheet({
   contentRotation,
   contentInsets,
   menuClearance,
+  onEdit,
   onClose,
 }: {
   sheet: Sheet
@@ -369,6 +395,7 @@ function CounterSheet({
   contentRotation: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
   menuClearance: number
+  onEdit: (counterId: string) => void
   onClose: () => void
 }) {
   const {
@@ -454,7 +481,6 @@ function CounterSheet({
             <Text
               testID={`counter-edit-value-${seatNumber}`}
               text={String(value)}
-              accessibilityLiveRegion="polite"
               maxFontSizeMultiplier={1.2}
               style={[themed(compact ? $compactSheetValue : $sheetValue), { color: ink }]}
             />
@@ -475,22 +501,28 @@ function CounterSheet({
       ) : (
         <>
           <View style={[$sheetCenter, themed($options)]}>
-            {seat.rules.counters
-              .filter(({ id }) => (seat.counters[id] ?? 0) === 0)
-              .map((option) => (
+            {seat.rules.counters.map((option) => {
+              const current = seat.counters[option.id] ?? 0
+              // why: a counter in play opens its editor from here too, so keyboard users can correct it without a long press.
+              return (
                 <SheetOption
                   key={option.id}
                   testID={`counter-option-${seatNumber}-${option.id}`}
                   id={option.id}
                   label={option.label}
-                  accessibilityLabel={`Add ${option.label}`}
+                  value={current > 0 ? current : undefined}
+                  accessibilityLabel={
+                    current > 0 ? `Edit ${option.label}, ${current}` : `Add ${option.label}`
+                  }
                   ink={ink}
                   onPress={() => {
+                    if (current > 0) return onEdit(option.id)
                     seat.adjustCounter(option.id, option.step)
                     onClose()
                   }}
                 />
-              ))}
+              )
+            })}
             {seat.rules.designations.map((option) => {
               const holds = seat.held.includes(option.id)
               return (
@@ -524,6 +556,7 @@ function SheetOption({
   testID,
   id,
   label,
+  value,
   accessibilityLabel,
   selected,
   ink,
@@ -532,6 +565,7 @@ function SheetOption({
   testID: string
   id: string
   label: string
+  value?: number
   accessibilityLabel: string
   selected?: boolean
   ink: string
@@ -558,6 +592,14 @@ function SheetOption({
         numberOfLines={1}
         style={[themed($optionLabel), { color: ink }, !selected && $muted]}
       />
+      {value !== undefined ? (
+        <Text
+          text={String(value)}
+          weight="bold"
+          size="xs"
+          style={[themed($optionValue), { color: ink }]}
+        />
+      ) : null}
       {selected ? <View style={[themed($selectedDot), { backgroundColor: ink }]} /> : null}
     </BoardPressable>
   )
@@ -565,14 +607,26 @@ function SheetOption({
 
 const $layer: ViewStyle = { zIndex: 10 }
 
+// why: the row stays inside the seat's reading frame and wraps toward the life total when a narrow sideways card cannot fit every chip on one line.
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
-  left: 0,
-  right: 0,
+  left: spacing.xs,
+  right: spacing.xs,
   flexDirection: "row",
+  flexWrap: "wrap",
   justifyContent: "center",
   alignItems: "center",
   gap: spacing.xxxs,
+})
+
+const $compactRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  position: "absolute",
+  left: spacing.xxs,
+  right: spacing.xxs,
+  flexDirection: "row",
+  flexWrap: "wrap",
+  justifyContent: "center",
+  alignItems: "center",
 })
 
 const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
@@ -593,9 +647,9 @@ const $compactChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   alignItems: "center",
   gap: spacing.xxxs,
   minHeight: 32,
-  minWidth: 32,
+  minWidth: 28,
   justifyContent: "center",
-  paddingHorizontal: spacing.xxs + spacing.xxxs,
+  paddingHorizontal: spacing.xxs,
   borderRadius: spacing.xs,
   borderWidth: 1.5,
   borderColor: "transparent",
@@ -687,6 +741,19 @@ const $option: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $optionLabel: ThemedStyle<TextStyle> = () => ({ flexShrink: 1 })
 
 const $muted: TextStyle = { opacity: 0.78 }
+
+const $optionValue: ThemedStyle<TextStyle> = () => ({
+  marginLeft: "auto",
+  fontVariant: ["tabular-nums"],
+})
+
+const $visuallyHidden: TextStyle = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  opacity: 0,
+}
 
 const $selectedDot: ThemedStyle<ViewStyle> = () => ({
   width: 6,

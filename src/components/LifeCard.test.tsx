@@ -440,6 +440,28 @@ describe("LifeCard", () => {
     },
   )
 
+  it("keeps a sideways status layer inside the card so web never scrolls the card", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={90}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 158, height: 187, x: 0, y: 0 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-status-layer-seat-1").props.style),
+    ).toMatchObject({ width: 171, height: 142, left: -14.5, top: 14.5 })
+  })
+
   it("puts the name and assign sword in the corner opposite the commander grid", () => {
     const onPressSword = jest.fn()
     const view = render(

@@ -307,6 +307,8 @@ export const LifeCard = memo(function LifeCard({
     reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [editorOpen, setEditorOpen] = useState(false)
+  // why: while a counter sheet covers the card, the card's own controls leave touch, keyboard focus, and the accessibility tree; accessibilityViewIsModal only isolates on iOS.
+  const [tableSheetOpen, setTableSheetOpen] = useState(false)
   const recentDelta = useRecentDelta(life)
   const previousLife = useRef(life)
   useEffect(() => {
@@ -378,6 +380,20 @@ export const LifeCard = memo(function LifeCard({
     21 -
     (staleSince !== undefined ? spacing.xxxs + 18 : 0)
   const nameInCorner = !!commanderDamage?.inspection
+  // why: a sideways status layer swaps its sides before turning, so it never pokes past the card. On web an overflowing layer makes the hidden-overflow card scrollable, and focusing a chip by keyboard would shift the whole card.
+  const contentWidth = cardSize.width - cardPadding * 2
+  const contentHeight = cardSize.height - cardPadding * 2
+  const statusLayerBounds: ViewStyle | undefined =
+    Math.abs(contentRotation) === 90 && contentWidth > 0 && contentHeight > 0
+      ? {
+          width: contentHeight,
+          height: contentWidth,
+          left: (contentWidth - contentHeight) / 2,
+          top: (contentHeight - contentWidth) / 2,
+          right: undefined,
+          bottom: undefined,
+        }
+      : undefined
   const showStatus =
     !nameInCorner && (statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0)
   const statusTopOffset =
@@ -471,10 +487,10 @@ export const LifeCard = memo(function LifeCard({
       <View
         pointerEvents={commanderOverviewOpen || commanderCardMode ? "none" : "box-none"}
         accessibilityElementsHidden={
-          (!localCommander && commanderOverviewOpen) || !!commanderCardMode
+          (!localCommander && commanderOverviewOpen) || !!commanderCardMode || tableSheetOpen
         }
         importantForAccessibility={
-          (!localCommander && commanderOverviewOpen) || commanderCardMode
+          (!localCommander && commanderOverviewOpen) || commanderCardMode || tableSheetOpen
             ? "no-hide-descendants"
             : "auto"
         }
@@ -511,7 +527,11 @@ export const LifeCard = memo(function LifeCard({
           <View
             testID={`life-status-layer-seat-${seatNumber}`}
             pointerEvents="none"
-            style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
+            style={[
+              themed($statusLayer),
+              statusLayerBounds,
+              { transform: [{ rotate: `${contentRotation}deg` }] },
+            ]}
           >
             {showStatus ? (
               <View
@@ -634,7 +654,10 @@ export const LifeCard = memo(function LifeCard({
           mode={commanderCardMode}
           life={localCommander ? life : undefined}
         />
-      ) : !commanderOverviewOpen && !localOverviewVisible && ownership !== "unowned" ? (
+      ) : !commanderOverviewOpen &&
+        !localOverviewVisible &&
+        !tableSheetOpen &&
+        ownership !== "unowned" ? (
         <LifeControls
           playerName={displayName}
           seatNumber={seatNumber}
@@ -651,7 +674,11 @@ export const LifeCard = memo(function LifeCard({
           onLongChange={() => setEditorOpen(true)}
         />
       ) : null}
-      {commanderDamage && !localCommander && !commanderCardMode && !commanderOverviewOpen ? (
+      {commanderDamage &&
+      !localCommander &&
+      !commanderCardMode &&
+      !commanderOverviewOpen &&
+      !tableSheetOpen ? (
         <BoardPressable
           testID={`commander-mark-seat-${seatNumber}`}
           accessibilityRole="button"
@@ -667,7 +694,7 @@ export const LifeCard = memo(function LifeCard({
           ]}
         />
       ) : null}
-      {commanderDamage?.inspection && !commanderCardMode ? (
+      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -687,7 +714,7 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {cornerStatus && !commanderCardMode ? (
+      {cornerStatus && !commanderCardMode && !tableSheetOpen ? (
         <View
           testID={`life-corner-layer-seat-${seatNumber}`}
           pointerEvents="box-none"
@@ -754,6 +781,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
+          onSheetOpenChange={setTableSheetOpen}
         />
       ) : null}
       {editorOpen ? (
