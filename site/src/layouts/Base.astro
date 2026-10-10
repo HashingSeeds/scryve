@@ -1,10 +1,8 @@
 ---
-import bold from "@expo-google-fonts/space-grotesk/700Bold/SpaceGrotesk_700Bold.ttf?url"
-import medium from "@expo-google-fonts/space-grotesk/500Medium/SpaceGrotesk_500Medium.ttf?url"
-import regular from "@expo-google-fonts/space-grotesk/400Regular/SpaceGrotesk_400Regular.ttf?url"
-
 import favicon from "../../../assets/images/app-icon-web-favicon.png?url"
 import shareImage from "../../../assets/images/app-icon-all.png?url"
+// Rubik, latin subset, one variable file for every weight (license beside it).
+import rubik from "../assets/fonts/Rubik-latin.woff2?url"
 import { APP_LINKS, APP_STORE_ID } from "../links"
 import "../styles/site.css"
 
@@ -15,17 +13,9 @@ interface Props {
 
 const { title, description } = Astro.props
 const canonical = new URL(Astro.url.pathname, Astro.site)
-const fonts = [
-  { url: regular, weight: 400 },
-  { url: medium, weight: 500 },
-  { url: bold, weight: 700 },
-]
-const fontFaces = fonts
-  .map(
-    ({ url, weight }) =>
-      `@font-face{font-family:"Space Grotesk";src:url("${url}") format("truetype");font-weight:${weight};font-display:swap}`,
-  )
-  .join("")
+// `optional` never swaps fonts in after first paint: the file is preloaded, so it is almost
+// always ready, and when it isn't the page keeps the system font rather than reflowing.
+const fontFace = `@font-face{font-family:"Rubik";src:url("${rubik}") format("woff2");font-weight:300 900;font-display:optional}`
 ---
 
 <!doctype html>
@@ -49,8 +39,8 @@ const fontFaces = fonts
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={new URL(shareImage, Astro.site)} />
     <meta name="twitter:card" content="summary" />
-    <link rel="preload" href={medium} as="font" type="font/ttf" crossorigin />
-    <style set:html={fontFaces}></style>
+    <link rel="preload" href={rubik} as="font" type="font/woff2" crossorigin />
+    <style set:html={fontFace}></style>
   </head>
   <body>
     <slot />

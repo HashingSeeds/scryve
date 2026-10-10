@@ -37,7 +37,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: "Rubik", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -229,7 +229,7 @@ figure {
   color: #fff;
   font-size: calc(min(100cqw, 100cqh) * 0.42);
   font-variant-numeric: tabular-nums;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 0.85;
 }
@@ -597,7 +597,9 @@ figure {
   line-height: 1.3;
 }
 
+/* The dare sits on its own line under the claim, wherever the claim wraps. */
 .hero-foot h1 span {
+  display: block;
   color: var(--dim);
 }
 
@@ -809,6 +811,7 @@ figure {
 .stage[data-scene="intro"] [data-for~="intro"],
 .stage[data-scene="features"] [data-for~="features"],
 .stage[data-scene="connected"] [data-for~="connected"],
+.stage[data-scene="record"] [data-for~="record"],
 .stage[data-scene="pro"] [data-for~="pro"] {
   opacity: 1;
   pointer-events: auto;
@@ -1354,7 +1357,8 @@ figure {
 }
 
 /* The bar above the screen replaces the notch the deck's top padding leaves room for. */
-.stage.full .deck {
+.stage.full .deck,
+.stage.full .hist {
   padding-top: 1.385em;
 }
 
@@ -1394,6 +1398,222 @@ html:has(.stage.full) {
   overflow: hidden;
 }
 
+/* ---------- hero game picker ---------- */
+
+.hero-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.hero-games {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  font-size: 14px;
+}
+
+/* ---------- next up: the games behind the three in the app ---------- */
+
+.next-list {
+  display: grid;
+  max-width: 30rem;
+  margin: 0;
+  padding: 0;
+  gap: 6px;
+  list-style: none;
+}
+
+.next-list li {
+  display: grid;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  gap: 2px 14px;
+  grid-template-columns: 1fr auto;
+  font-size: 15px;
+}
+
+.next-list b {
+  font-weight: 500;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.next-list span {
+  color: var(--mute);
+  font-size: 14px;
+  grid-column: 1;
+}
+
+.next-list em {
+  align-self: center;
+  color: var(--tint);
+  font-size: 13px;
+  font-style: normal;
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+
+a.demo-replay {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---------- History screen, drawn like the deck screen ---------- */
+
+.hist {
+  display: flex;
+  flex-direction: column;
+  padding: 3.385em 1.385em 1.385em;
+  background: #000;
+  font-size: max(8px, 4.25cqw);
+}
+
+.hist-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.462em;
+  margin-bottom: 0.615em;
+}
+
+.hist-tabs span {
+  padding: 0.385em 0.769em;
+  border-radius: 999em;
+  background: var(--raised);
+  color: var(--dim);
+  font-size: 0.846em;
+}
+
+.hist-tabs span[aria-current] {
+  background: var(--tint);
+  color: var(--surface);
+}
+
+.hist-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.hist-day {
+  margin: 0.923em 0 0.308em;
+  color: var(--mute);
+  font-size: 0.769em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hist-game {
+  display: grid;
+  align-items: center;
+  padding: 0.615em 0;
+  border-bottom: 1px solid var(--raised);
+  gap: 0.615em;
+  grid-template-columns: auto 1fr auto;
+}
+
+.hist-sys {
+  padding: 0.231em 0.462em;
+  border-radius: 0.308em;
+  color: var(--surface);
+  font-size: 0.692em;
+  font-weight: 700;
+}
+
+.hist-sys[data-sys="mtg"] {
+  background: var(--tint);
+}
+
+.hist-sys[data-sys="ygo"] {
+  background: #dcdde9;
+}
+
+.hist-sys[data-sys="pokemon"] {
+  background: #fbc878;
+}
+
+.hist-text {
+  display: grid;
+  min-width: 0;
+}
+
+.hist-text small {
+  overflow: hidden;
+  color: var(--dim);
+  font-size: 0.846em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hist-result {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hist-result.win {
+  color: var(--success);
+}
+
+.hist-result.loss {
+  color: var(--dim);
+}
+
+.hist-record {
+  flex-shrink: 0;
+  margin-top: 0.615em;
+  padding-top: 0.615em;
+  border-top: 1px solid var(--raised);
+  color: var(--dim);
+  font-size: 0.846em;
+}
+
+/* ---------- facts: the quiet differences, in one strip ---------- */
+
+.facts {
+  display: grid;
+  width: min(1240px, 100% - 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 4svh 0 2svh;
+  gap: 32px 32px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 900px) {
+  .facts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .facts {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.facts div {
+  padding-top: 14px;
+  border-top: 1px solid #2a2125;
+}
+
+.facts b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 17px;
+}
+
+.facts span {
+  color: var(--mute);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.facts a {
+  color: var(--tint);
+}
+
 /* ---------- small screens: the stage pins above the steps ---------- */
 
 @media (max-width: 900px) {
@@ -1416,7 +1636,7 @@ html:has(.stage.full) {
     --stage-height: calc(var(--phone-long) * 9 / 19.5 + 28px);
     display: grid;
     grid-template-columns: 100%;
-    grid-template-rows: var(--stage-height) auto auto auto;
+    grid-template-rows: var(--stage-height) auto auto auto auto;
   }
 
   .landing {
@@ -1459,9 +1679,14 @@ html:has(.stage.full) {
     grid-row: 3;
   }
 
-  .closing {
+  .facts {
     grid-column: 1;
     grid-row: 4;
+  }
+
+  .closing {
+    grid-column: 1;
+    grid-row: 5;
   }
 
   /* The rig keeps its portrait box, so its height is the phone's long side, and it overflows
@@ -1513,12 +1738,14 @@ html:has(.stage.full) {
     translate: -36% -5%;
   }
 
-  /* The deck screen is portrait only, so the phones stand up and shrink to the strip. Tapping
-     it opens it full screen (stage/page.ts). */
+  /* The History and deck screens are portrait only, so the phones stand up and shrink to the
+     strip. Tapping one opens it full screen (stage/page.ts). */
+  .stage[data-scene="record"] .phone,
   .stage[data-scene="pro"] .phone {
     --turn: 0deg;
   }
 
+  .stage[data-scene="record"] .rig,
   .stage[data-scene="pro"] .rig {
     scale: calc(9 / 19.5);
   }
@@ -1588,6 +1815,15 @@ html:has(.stage.full) {
 @media (max-width: 520px) {
   .header-actions .quiet {
     display: none;
+  }
+
+  /* The game chips and the "What's next" link share one line on a 390px phone. */
+  .hero-games {
+    gap: 8px 12px;
+  }
+
+  .hero-games .picker button {
+    padding: 0 11px;
   }
 
   .get {
