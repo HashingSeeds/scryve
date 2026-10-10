@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -12,6 +12,7 @@ import {
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
+import { DiceSheet } from "@/components/DiceSheet"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { type RadialMenuAction } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
@@ -103,13 +104,11 @@ export function CurrentGameScreen({
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
+  const [diceOpen, setDiceOpen] = useState(false)
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
-
-  const runtimeRef = useRef(runtime)
-  runtimeRef.current = runtime
 
   function toggleSword(player: GamePlayer) {
     setInspectedPlayerId(null)
@@ -202,11 +201,6 @@ export function CurrentGameScreen({
     setMenuOpen((current) => !current)
   }, [])
 
-  const undoAndCloseMenu = useCallback(() => {
-    runtimeRef.current.undo()
-    setMenuOpen(false)
-  }, [])
-
   const exitCommanderMode = useCallback(() => {
     setArmedPlayerId(null)
     setInspectedPlayerId(null)
@@ -229,10 +223,13 @@ export function CurrentGameScreen({
         },
       },
       {
-        kind: "undo",
-        label: "Undo",
-        disabled: !runtime.canUndo,
-        onPress: undoAndCloseMenu,
+        kind: "dice",
+        label: "Dice",
+        onPress: (event) => {
+          captureMenuDialogOrigin(event)
+          setMenuOpen(false)
+          setDiceOpen(true)
+        },
       },
       {
         kind: "setup",
@@ -279,9 +276,7 @@ export function CurrentGameScreen({
       onConnect,
       onHistory,
       onSetup,
-      runtime.canUndo,
       showEndConfirmation,
-      undoAndCloseMenu,
     ],
   )
 
@@ -385,6 +380,14 @@ export function CurrentGameScreen({
           />
           <Button tx="game:cancel" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>
+      ) : null}
+
+      {diceOpen ? (
+        <DiceSheet
+          players={runtime.game.players}
+          origin={menuDialogOrigin}
+          onClose={() => setDiceOpen(false)}
+        />
       ) : null}
 
       {match && !menuOpen ? (

@@ -41,7 +41,7 @@ function game(playerCount = 2) {
 describe("CurrentGameScreen", () => {
   beforeEach(() => jest.mocked(Haptics.impactAsync).mockClear())
 
-  it("renders changes immediately, allows negative life, and undoes once", () => {
+  it("renders changes immediately and allows negative life", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
@@ -52,11 +52,6 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-editor-step-1--5"))
     fireEvent.press(view.getByTestId("life-editor-close-seat-1"))
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("-3")
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("undo-button"))
-    expect(view.getByTestId("life-total-seat-1").props.children).toBe("2")
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.getByTestId("undo-button").props.accessibilityState.disabled).toBe(true)
     expect(useKeepAwake).toHaveBeenCalledWith("count-local-game", {
       suppressDeactivateWarnings: true,
     })
@@ -129,7 +124,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-button")).toBeTruthy()
     expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
-    expect(view.queryByTestId("undo-button")).toBeNull()
+    expect(view.queryByTestId("dice-button")).toBeNull()
     expect(view.queryByTestId("home-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
@@ -137,11 +132,29 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.queryByTestId("home-button")).toBeNull()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
+    expect(view.getByTestId("dice-button")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
     expect(view.getByTestId("history-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.getByTestId("open-decks-button")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+  })
+
+  it("opens the dice sheet from the menu and closes the menu", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game()}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("dice-button"))
+
+    expect(view.getByTestId("dice-dialog")).toBeTruthy()
+    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
   })
 
   it("offers Connect instead of End on a fresh board", () => {
@@ -691,19 +704,6 @@ describe("CurrentGameScreen", () => {
       fireEvent.press(view.getByTestId("game-menu-button"))
       expect(view.getByTestId("end-game-button")).toBeTruthy()
       expect(view.queryByTestId("connect-button")).toBeNull()
-    })
-
-    it("undoes one assignment press as a single action", () => {
-      const view = renderGame()
-      armCommander(view, 1)
-      for (let press = 0; press < 5; press += 1)
-        fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
-      expect(life(view, 2)).toBe("35")
-      fireEvent.press(view.getByTestId("commander-done-seat-1"))
-
-      fireEvent.press(view.getByTestId("game-menu-button"))
-      fireEvent.press(view.getByTestId("undo-button"))
-      expect(life(view, 2)).toBe("36")
     })
   })
 })
