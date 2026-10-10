@@ -23,10 +23,16 @@ import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import { addCommander, getCommanderWarnings } from "@/features/decks/commanderSelection"
+import { getCommanderWarnings } from "@/features/decks/commanderSelection"
 import { DeckCardRow, DeckCardSectionHeader } from "@/features/decks/DeckCardRow"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel, deckNameWarning } from "@/features/decks/deckCopy"
+import {
+  addCommanderCard,
+  adjustCardQuantity,
+  cardLimitError,
+  incrementCard,
+} from "@/features/decks/deckDraft"
 import { creationFormat, useDeckFilters } from "@/features/decks/deckFilters"
 import { DeckLimitDialog } from "@/features/decks/DeckLimit"
 import {
@@ -53,7 +59,7 @@ import {
   defaultDeckFormat,
   preconstructedFormat,
 } from "../../convex/lib/deckGames"
-import { FREE_DECK_LIMIT, MAX_DECK_CARDS, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
+import { FREE_DECK_LIMIT, MAX_PREMIUM_DECKS } from "../../convex/lib/policy"
 
 type CreationMode = "precon" | "paste" | "blank"
 
@@ -97,6 +103,29 @@ const DECK_LINK_SOURCES = new Map([
     },
   ],
 ])
+
+type PastedDraft = {
+  source: string
+  kind: "text" | "link"
+  attribution?: { sourceName: string; sourceUrl: string; author?: string }
+  game: string
+  format: string
+  resolved: Pick<
+    FunctionReturnType<typeof api.deckImports.resolvePasted>,
+    "unresolved" | "invalidLines"
+  >
+  cards: GuestDeckPayload["cards"]
+  omitted: boolean
+}
+
+function importableCards(draft: PastedDraft) {
+  return draft.cards.filter(
+    (card) =>
+      !draft.omitted ||
+      !card.originalReference ||
+      !draft.resolved.unresolved.includes(card.originalReference),
+  )
+}
 
 function attributionLabel(attribution: { sourceName: string; author?: string }, separator: string) {
   return attribution.author
@@ -384,19 +413,13 @@ export function AddDeckScreen({
   const [deckLink, setDeckLink] = useState("")
   const linkSource = DECK_LINK_SOURCES.get(game)
   const importSource = importKind === "link" ? deckLink : deckList
-  const [pastedDraft, setPastedDraft] = useState<{
-    source: string
-    kind: "text" | "link"
-    attribution?: { sourceName: string; sourceUrl: string; author?: string }
-    game: string
-    format: string
-    resolved: Pick<
-      FunctionReturnType<typeof api.deckImports.resolvePasted>,
-      "unresolved" | "invalidLines"
-    >
-    cards: GuestDeckPayload["cards"]
-    omitted: boolean
-  }>()
+  const [pastedDraft, setPastedDraftState] = useState<PastedDraft>()
+  // why: search taps can land before a re-render, so import edits read this ref, which every draft write updates first.
+  const latestPastedDraft = useRef(pastedDraft)
+  function setPastedDraft(next: PastedDraft | undefined) {
+    latestPastedDraft.current = next
+    setPastedDraftState(next)
+  }
   const [resolvingPasted, setResolvingPasted] = useState(false)
   const [reviewingPasted, setReviewingPasted] = useState(false)
   const [editingPasted, setEditingPasted] = useState(false)
@@ -412,14 +435,7 @@ export function AddDeckScreen({
   const pastedProblems = pastedDraft
     ? [...pastedDraft.resolved.unresolved, ...pastedDraft.resolved.invalidLines]
     : []
-  const pastedCards = pastedDraft
-    ? pastedDraft.cards.filter(
-        (card) =>
-          !pastedDraft.omitted ||
-          !card.originalReference ||
-          !pastedDraft.resolved.unresolved.includes(card.originalReference),
-      )
-    : []
+  const pastedCards = pastedDraft ? importableCards(pastedDraft) : []
   const sourceAttribution = pastedDraft?.attribution
     ? `Imported from ${attributionLabel(pastedDraft.attribution, " by ")}\n${pastedDraft.attribution.sourceUrl}`
     : ""
@@ -927,20 +943,12 @@ export function AddDeckScreen({
   }
 
   function changeImportQuantity(card: DeckCard, delta: number) {
-    if (!pastedDraft || busy) return
+    const draft = latestPastedDraft.current
+    if (!draft || busy) return
     setGuestConflict(false)
     setPendingGuestPayload(undefined)
     if (card.quantity + delta <= 0) setFocusedPreviewCard(undefined)
-    setPastedDraft({
-      ...pastedDraft,
-      cards: pastedDraft.cards.flatMap((entry) =>
-        printingKey(entry) !== printingKey(card)
-          ? [entry]
-          : entry.quantity + delta > 0
-            ? [{ ...entry, quantity: Math.min(999, entry.quantity + delta) }]
-            : [],
-      ),
-    })
+    setPastedDraft({ ...draft, cards: adjustCardQuantity(draft.cards, card, delta) })
   }
 
   function changeImportFormat(next?: string) {
@@ -962,33 +970,19 @@ export function AddDeckScreen({
 
   function addImportCard(card: GuestDeckPayload["cards"][number]) {
     if (busy) return "Wait for the deck to finish saving."
-    if (!pastedDraft) return "Review the import before adding cards."
+    const draft = latestPastedDraft.current
+    if (!draft) return "Review the import before adding cards."
+    const cards = importableCards(draft)
     if (game === "mtg" && format === "commander" && cardSection(card) === "commander") {
       const cached = loadCardDetails()
-      const result = addCommander(
-        pastedCards,
-        card,
-        (entry) => cached[cardDetailsKey(entry, game)],
-        card.commanderColor,
-      )
+      const result = addCommanderCard(cards, card, (entry) => cached[cardDetailsKey(entry, game)])
       if ("error" in result) return result.error
-      if (result.cards.length > MAX_DECK_CARDS)
-        return `A deck can have at most ${MAX_DECK_CARDS} entries.`
-      setPastedDraft({ ...pastedDraft, cards: result.cards })
+      setPastedDraft({ ...draft, cards: result.cards })
       setPastedCommanderSelected(true)
     } else {
-      const existing = pastedCards.find((entry) => printingKey(entry) === printingKey(card))
-      if (existing && existing.quantity >= 999) return "A card can have at most 999 copies."
-      if (!existing && pastedCards.length >= MAX_DECK_CARDS)
-        return `A deck can have at most ${MAX_DECK_CARDS} entries.`
-      setPastedDraft({
-        ...pastedDraft,
-        cards: existing
-          ? pastedCards.map((entry) =>
-              entry === existing ? { ...entry, quantity: entry.quantity + 1 } : entry,
-            )
-          : [...pastedCards, card],
-      })
+      const limitError = cardLimitError(cards, card)
+      if (limitError) return limitError
+      setPastedDraft({ ...draft, cards: incrementCard(cards, card) })
     }
     if (choosingPastedCommander) setAddingPastedCard(false)
     setGuestConflict(false)

@@ -22,28 +22,39 @@ import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
 import { loadCardDetails, prefetchCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
-import {
-  addCommander,
-  getCommanderWarnings,
-  selectCommander,
-} from "@/features/decks/commanderSelection"
 import { cardDetailsKey, cardSection, printingKey, type DeckCard } from "@/features/decks/deckCards"
 import { cardCountLabel } from "@/features/decks/deckCopy"
-import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
-import { DECK_CONFLICT_REASON, useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
-import { deckStatLines, type StatsSource } from "@/features/decks/deckStatLines"
 import {
-  DECK_VERSION_CONFLICT_REASON,
-  DECK_VERSION_QUEUE_CONFLICT_REASON,
-  useDeckVersionWrites,
-  type PendingVersionWrite,
-} from "@/features/decks/decksVersionWrites"
+  addDraftCard,
+  addDraftCommander,
+  cardLimitError,
+  chooseDraftCommander,
+  closeDeckDraft,
+  closedDeckDraft,
+  isCommanderPick,
+  openDeckDraft,
+  planDeckSave,
+  removeDraftCard,
+  reseedDeckDraft,
+  restoreDraftUndo,
+  setDraftNote,
+  type DeckDraft,
+} from "@/features/decks/deckDraft"
+import { isDeckSyncEnabled, useDeckSync } from "@/features/decks/decksSync"
+import { useDeckMetadataWrites } from "@/features/decks/decksSyncWrites"
+import { deckStatLines, type StatsSource } from "@/features/decks/deckStatLines"
+import { useDeckVersionWrites } from "@/features/decks/decksVersionWrites"
 import {
   cachedCardIdentity,
   useDeckVersionCache,
   type KnownCardEntry,
 } from "@/features/decks/deckVersionsCache"
 import { DeckView } from "@/features/decks/DeckView"
+import {
+  deckQueryVersionId,
+  isDeckKnownDeleted,
+  resolveDeckView,
+} from "@/features/decks/resolveDeckView"
 import { useCardDetails } from "@/features/decks/useCardDetails"
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -55,7 +66,6 @@ import { api } from "../../convex/_generated/api"
 import type { Id } from "../../convex/_generated/dataModel"
 import { deckFormatLabel, deckGame, deckSections } from "../../convex/lib/deckGames"
 import { versionLabel } from "../../convex/lib/deckVersions"
-import { MAX_DECK_CARDS } from "../../convex/lib/policy"
 
 type DeckDialog =
   | "none"
@@ -71,30 +81,6 @@ const OFFLINE_CARD_MESSAGE = "You’re offline. Cards already in your decks can 
 
 function boardLabel(sections: readonly { id: string; label: string }[], board: string) {
   return sections.find((section) => section.id === board)?.label ?? board
-}
-
-function mergedPrintings(cards: DeckCard[]) {
-  const merged = new Map<string, DeckCard>()
-  for (const card of cards) {
-    const current = merged.get(printingKey(card))
-    merged.set(
-      printingKey(card),
-      current ? { ...current, quantity: current.quantity + card.quantity } : card,
-    )
-  }
-  return [...merged.values()]
-}
-
-function cardsChanged(draft: DeckCard[], stored: DeckCard[]) {
-  return (
-    draft.length !== stored.length ||
-    draft.some(
-      (card, index) =>
-        printingKey(card) !== printingKey(stored[index]) ||
-        card.quantity !== stored[index].quantity ||
-        card.commanderColor !== stored[index].commanderColor,
-    )
-  )
 }
 
 export type DeckDetailSummary = {
@@ -275,9 +261,7 @@ function DeckDetailContent({
   const synced = useDeckSync(syncEnabled, access?.ownerId, access?.ready ?? false)
   const metadataWrites = useDeckMetadataWrites(syncEnabled, access?.ownerId, access?.ready ?? false)
   const versionWrites = useDeckVersionWrites(syncEnabled, access?.ownerId, access?.ready ?? false)
-  const knownDeleted = [...synced.metadata, ...metadataWrites.metadata].some(
-    (deck) => deck.deckId === deckId && deck.deleted,
-  )
+  const knownDeleted = isDeckKnownDeleted(deckId, synced.metadata, metadataWrites.metadata)
   const [selectedVersionId, setSelectedVersionId] = useState<Id<"deckVersions">>()
   const pinnedVersionTarget = useRef<
     { versionId: Id<"deckVersions">; expectedRevision: number } | undefined
@@ -290,16 +274,11 @@ function DeckDetailContent({
     deckId,
     mappedSelection,
   )
-  const isProvisionalSelection =
-    selectedVersionId !== undefined &&
-    mappedSelection === selectedVersionId &&
-    versionCache.versions.some(
-      (candidate) => candidate.versionId === selectedVersionId && candidate.local,
-    )
-  const queryVersionId =
-    mappedSelection === undefined || isProvisionalSelection
-      ? undefined
-      : (mappedSelection as Id<"deckVersions">)
+  const queryVersionId = deckQueryVersionId(
+    selectedVersionId,
+    mappedSelection,
+    versionCache.versions,
+  )
   const detail = useQuery(
     api.decks.detail,
     (access?.ready ?? true) && !knownDeleted
@@ -331,36 +310,46 @@ function DeckDetailContent({
   const archiveDeck = useMutation(api.decks.archive)
   const [tab, setTab] = useState<"cards" | "notes">("cards")
   const [statsSource, setStatsSource] = useState<StatsSource>("scryve")
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<DeckCard[]>([])
+  const [draft, setDraftState] = useState(closedDeckDraft)
+  // why: search taps can land before a re-render, so limit checks read this ref, which every draft write updates first.
+  const latestDraft = useRef(draft)
+  const setDraft = useCallback((update: DeckDraft | ((current: DeckDraft) => DeckDraft)) => {
+    latestDraft.current = typeof update === "function" ? update(latestDraft.current) : update
+    setDraftState(latestDraft.current)
+  }, [])
   const [dialog, setDialog] = useState<DeckDialog>("none")
   const [pendingNavigation, setPendingNavigation] =
     useState<Parameters<typeof navigation.dispatch>[0]>()
   const [adding, setAdding] = useState(false)
   const [choosingCommander, setChoosingCommander] = useState(false)
-  const [commanderSelected, setCommanderSelected] = useState(false)
-  const [draftNote, setDraftNote] = useState("")
-  const [draftMetadataRevision, setDraftMetadataRevision] = useState<number>()
   const [settingsMetadataRevision, setSettingsMetadataRevision] = useState<number>()
-  const [undo, setUndo] = useState<{ name: string; cards: DeckCard[] }>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [focusedKey, setFocusedKey] = useState<string>()
   const metadataSaveStarted = useRef(false)
   const settingsSaveStarted = useRef(false)
 
-  const pendingMetadata = metadataWrites.pending.filter((write) => write.deckId === deckId)
-  const pendingCards = versionWrites.pending.filter((write) => write.deckId === deckId)
-  const failedEdit = metadataWrites.failures
-    .filter((failure) => failure.action.deckId === deckId)
-    .sort(
-      (left, right) =>
-        right.failedAt - left.failedAt ||
-        right.action.expectedRevision - left.action.expectedRevision,
-    )[0]
-  const failedCardEdit = versionWrites.failures
-    .filter((failure) => failure.action.deckId === deckId)
-    .sort((left, right) => right.failedAt - left.failedAt)[0]
+  const view = resolveDeckView({
+    deckId,
+    detail,
+    draft,
+    sync: { enabled: syncEnabled, ownerId: access?.ownerId },
+    syncedMetadata: synced.metadata,
+    metadataWrites,
+    versionWrites,
+    versionCache,
+    selectedVersionId,
+    loadCardDetails,
+  })
+  const { deck, cards, cardsUnavailable, cardsCached, version, versionTarget } = view
+  const { activeVersionId, activeVersionSummary, failedEdit, failedCardEdit } = view
+  const game = deck?.game ?? "mtg"
+  // Known cards from this account's cached versions, filtered to the deck's game system.
+  // why: memoized because the card search reruns its offline filter whenever this list changes identity.
+  const offlineCandidates = useMemo(
+    () => Object.values(versionCache.knownCards).filter((entry) => entry.game === game),
+    [versionCache.knownCards, game],
+  )
   const reviewRequested = useRef(reviewChanges)
   useEffect(() => {
     if (reviewRequested.current && (failedEdit || failedCardEdit)) {
@@ -368,98 +357,6 @@ function DeckDetailContent({
       setDialog("syncConflict")
     }
   }, [failedEdit, failedCardEdit])
-  const optimisticMetadata = pendingMetadata.length
-    ? metadataWrites.metadata.find((deck) => deck.deckId === deckId && !deck.deleted)
-    : undefined
-  const cachedMetadata = syncEnabled
-    ? (optimisticMetadata ??
-      synced.metadata.find((deck) => deck.deckId === deckId && !deck.deleted) ??
-      metadataWrites.metadata.find((deck) => deck.deckId === deckId && !deck.deleted))
-    : undefined
-  const deck = optimisticMetadata ?? detail?.deck ?? cachedMetadata ?? failedEdit?.action
-  const canQueueMetadata = Boolean(
-    syncEnabled &&
-    access?.ownerId &&
-    metadataWrites.metadata.some((item) => item.deckId === deckId),
-  )
-  const canQueueCards = syncEnabled && Boolean(access?.ownerId)
-  const currentMetadataRevision = metadataWrites.metadata.find(
-    (item) => item.deckId === deckId && !item.deleted,
-  )?.revision
-
-  const cachedVersion = versionCache.version
-  const staleSelection = selectedVersionId !== undefined && detail?.version?._id !== mappedSelection
-  const version = staleSelection ? undefined : detail?.version
-  const activeVersionId = version?._id ?? cachedVersion?.versionId
-  // why: a manual result attaches to a server version, so a cached or provisional one cannot host it.
-  const liveVersionId = version?._id
-  const storedCards = useMemo(
-    () =>
-      version
-        ? mergedPrintings(
-            (detail?.cards ?? []).map(
-              ({ _id: _, _creationTime: __, deckVersionId: ___, ...card }) => card,
-            ),
-          )
-        : [],
-    [version, detail?.cards],
-  )
-  const cachedCards = useMemo(
-    () =>
-      (detail === undefined || staleSelection) && versionCache.cards !== undefined
-        ? mergedPrintings(
-            versionCache.cards.map(
-              ({ _id: _, _creationTime: __, deckVersionId: ___, ...card }) => card,
-            ),
-          )
-        : undefined,
-    [versionCache.cards, detail, staleSelection],
-  )
-  const canQueueVersionLifecycle = syncEnabled && Boolean(access?.ownerId)
-  const versionTarget = version
-    ? { versionId: version._id, expectedRevision: version.syncRevision ?? 0 }
-    : cachedVersion && versionCache.cards !== undefined
-      ? {
-          versionId: cachedVersion.versionId as Id<"deckVersions">,
-          expectedRevision: cachedVersion.revision,
-        }
-      : undefined
-  const overlayVersionId = selectedVersionId ?? activeVersionId
-  const overlayVersionIds = new Set<string>()
-  if (overlayVersionId) {
-    overlayVersionIds.add(overlayVersionId)
-    const mapped = versionWrites.mappedVersion(overlayVersionId)
-    if (mapped !== overlayVersionId) overlayVersionIds.add(mapped)
-  }
-  const pendingCardWrite = versionWrites.pending
-    .filter((write) => write.deckId === deckId && (write.op ?? "cards") === "cards")
-    .filter((write) => {
-      const mapped = versionWrites.mappedVersion(write.versionId)
-      return (
-        overlayVersionIds.has(write.versionId) ||
-        (mapped !== write.versionId && overlayVersionIds.has(mapped))
-      )
-    })
-    .reduce<PendingVersionWrite | undefined>(
-      (newest, action) =>
-        !newest || action.expectedRevision > newest.expectedRevision ? action : newest,
-      undefined,
-    )
-  const displayCards = pendingCardWrite
-    ? mergedPrintings(pendingCardWrite.cards as DeckCard[])
-    : storedCards.length > 0
-      ? storedCards
-      : (cachedCards ?? storedCards)
-  const cardsUnavailable = !detail && cachedCards === undefined && !pendingCardWrite
-  const cards = editing ? draft : displayCards
-  // Known cards from this account's cached versions, filtered to the deck's game system.
-  const offlineCandidates = useMemo(
-    () =>
-      Object.values(versionCache.knownCards).filter(
-        (entry) => entry.game === (deck?.game ?? "mtg"),
-      ),
-    [versionCache.knownCards, deck?.game],
-  )
   const writeMotion = versionWrites.pending.length + versionWrites.failures.length
   const lastWriteMotion = useRef(-1)
   const refreshVersionCache = versionCache.refresh
@@ -468,17 +365,6 @@ function DeckDetailContent({
     lastWriteMotion.current = writeMotion
     refreshVersionCache()
   }, [refreshVersionCache, writeMotion])
-  const editingBase = useRef<DeckCard[]>([])
-  const editingFromCache = useRef(false)
-  const cardsCached = editing
-    ? versionTarget
-      ? false
-      : editingFromCache.current
-    : cachedCards !== undefined
-  const cardsDirty =
-    editing && !editingFromCache.current && cardsChanged(draft, editingBase.current)
-  const noteDirty = editing && draftNote !== (deck?.note ?? "")
-  const draftChanged = cardsDirty || noteDirty
   const focusedCard = cards.find((card) => printingKey(card) === focusedKey)
   const { details, detailsError, detailsRetryAfterMs, retryDetails } = useCardDetails(
     focusedCard
@@ -489,52 +375,14 @@ function DeckDetailContent({
           catalogCardId: focusedCard.cardId ?? focusedCard.printingId ?? focusedCard.providerCardId,
         }
       : undefined,
-    (deck?.game ?? "mtg") === "mtg" && deck?.format === "commander",
+    game === "mtg" && deck?.format === "commander",
   )
-  const versionSummary = detail?.versions.find((candidate) => candidate._id === version?._id)
-  // Offline selection resolves through the cached rows; saved drafts included.
-  const activeVersionSummary =
-    versionSummary ??
-    versionCache.versions.find((candidate) => candidate.versionId === activeVersionId)
-  const cachedVersionRows = useMemo(
-    () =>
-      versionCache.versions
-        .filter((candidate) => !candidate.deleted)
-        .map((candidate) => ({
-          _id: candidate.versionId as Id<"deckVersions">,
-          versionNumber: candidate.versionNumber,
-          name: candidate.name,
-          note: candidate.note,
-          cardCount: candidate.cardCount,
-          cardQuantity: candidate.cardQuantity,
-          record: undefined,
-        })),
-    [versionCache.versions],
-  )
-  const versionRows = detail?.versions ?? cachedVersionRows
-  const cachedVersionCount = versionCache.versions.filter((version) => !version.deleted).length
-  const canAddVersion =
-    detail?.capacity.canCreate === true ||
-    (detail === undefined &&
-      canQueueVersionLifecycle &&
-      cachedVersionCount < (versionCache.capacity?.limit ?? 0))
-  const canDeleteVersion = detail
-    ? (detail.versions.length ?? 0) > 1
-    : canQueueVersionLifecycle && cachedVersionCount > 1
-  const canManageVersion =
-    Boolean(detail) || (canQueueVersionLifecycle && activeVersionSummary !== undefined)
-  const premium = detail?.capacity.premium === true || versionCache.capacity?.premium === true
-  const versionCapture =
-    pendingCardWrite || storedCards.length > 0 || cachedCards !== undefined
-      ? displayCards
-      : undefined
 
+  const { displayCards } = view
   useEffect(() => {
-    if (!editing || !editingFromCache.current || detail === undefined) return
-    editingFromCache.current = false
-    setDraft(displayCards)
-    editingBase.current = displayCards
-  }, [detail, displayCards, editing])
+    if (!draft.editing || !draft.fromCache || detail === undefined) return
+    setDraft((current) => reseedDeckDraft(current, displayCards))
+  }, [detail, displayCards, draft.editing, draft.fromCache, setDraft])
 
   // Keeps the persistent cache fresh with live reads so the next offline session is current.
   useEffect(() => {
@@ -555,17 +403,17 @@ function DeckDetailContent({
     })
   }, [detail, client])
 
-  usePreventRemove(draftChanged, ({ data }) => {
+  usePreventRemove(view.changes.any, ({ data }) => {
     setPendingNavigation(data.action)
     setDialog("discard")
   })
 
   useEffect(() => {
-    if (editing || !pendingNavigation) return
+    if (draft.editing || !pendingNavigation) return
     const action = pendingNavigation
     setPendingNavigation(undefined)
     navigation.dispatch(action)
-  }, [editing, navigation, pendingNavigation])
+  }, [draft.editing, navigation, pendingNavigation])
 
   function fail(cause: unknown, fallback: string) {
     setError(convexErrorMessage(cause, fallback))
@@ -602,27 +450,24 @@ function DeckDetailContent({
     if (knownDeleted) return
     metadataSaveStarted.current = false
     pinVersionTarget()
-    editingFromCache.current = detail === undefined && !versionTarget
-    editingBase.current = displayCards
-    setDraft(displayCards)
-    setDraftNote(deck?.note ?? "")
-    setDraftMetadataRevision(currentMetadataRevision)
-    setUndo(undefined)
+    setDraft(
+      openDeckDraft({
+        cards: displayCards,
+        note: deck?.note ?? "",
+        metadataRevision: view.currentMetadataRevision,
+        fromCache: detail === undefined && !versionTarget,
+      }),
+    )
     setError(undefined)
-    setCommanderSelected(false)
-    setEditing(true)
   }
 
   function discardEdits() {
-    setDraft([])
-    setUndo(undefined)
+    setDraft(closedDeckDraft)
     setError(undefined)
-    setCommanderSelected(false)
-    setEditing(false)
   }
 
   function requestDiscard() {
-    if (draftChanged) {
+    if (view.changes.any) {
       setDialog("discard")
       return
     }
@@ -631,7 +476,9 @@ function DeckDetailContent({
 
   function addCard(card: DeckCard) {
     if (knownDeleted) return
-    const alreadyInDraft = draft.some((candidate) => printingKey(candidate) === printingKey(card))
+    const alreadyInDraft = latestDraft.current.cards.some(
+      (candidate) => printingKey(candidate) === printingKey(card),
+    )
     if (!alreadyInDraft && offline) {
       const entry = offlineCardEntry(card)
       if (!entry) {
@@ -646,17 +493,7 @@ function DeckDetailContent({
         ...(card.board ? { board: card.board } : {}),
       }
     }
-    setUndo(undefined)
-    setDraft((current) => {
-      const existing = current.find((candidate) => printingKey(candidate) === printingKey(card))
-      return existing
-        ? current.map((candidate) =>
-            candidate === existing
-              ? { ...candidate, quantity: Math.min(999, candidate.quantity + 1) }
-              : candidate,
-          )
-        : [...current, card]
-    })
+    setDraft((current) => addDraftCard(current, card))
   }
 
   /**
@@ -666,59 +503,34 @@ function DeckDetailContent({
    */
   function offlineCardEntry(card: DeckCard): KnownCardEntry | undefined {
     const entry = versionCache.knownCards[cachedCardIdentity(card)]
-    return entry !== undefined && entry.game === (deck?.game ?? "mtg") ? entry : undefined
+    return entry !== undefined && entry.game === game ? entry : undefined
   }
 
   function removeCard(card: DeckCard) {
     if (knownDeleted) return
-    setUndo(card.quantity === 1 ? { name: card.name, cards: draft } : undefined)
-    setDraft((current) =>
-      current.flatMap((candidate) =>
-        printingKey(candidate) === printingKey(card)
-          ? candidate.quantity > 1
-            ? [{ ...candidate, quantity: candidate.quantity - 1 }]
-            : []
-          : [candidate],
-      ),
-    )
+    setDraft((current) => removeDraftCard(current, card))
   }
 
   function focusCard(card: DeckCard) {
     setFocusedKey(printingKey(card))
   }
 
-  const singleCommander =
-    deck?.game === "mtg" &&
-    deck.format === "commander" &&
-    cards.reduce(
-      (count, card) => count + (cardSection(card) === "commander" ? card.quantity : 0),
-      0,
-    ) <= 1
-
-  const cachedRules = commanderSelected ? loadCardDetails() : {}
-  const commanderWarnings = commanderSelected
-    ? getCommanderWarnings(cards, (card) => cachedRules[cardDetailsKey(card, deck?.game ?? "mtg")])
-    : []
-
   function chooseCommander(color?: DeckCard["commanderColor"]) {
     if (!focusedCard || knownDeleted || cardsUnavailable || cardsCached) return
     const cached = loadCardDetails()
-    const result = selectCommander(
-      draft,
+    const next = chooseDraftCommander(
+      latestDraft.current,
       printingKey(focusedCard),
-      (card) =>
-        card === focusedCard ? details : cached[cardDetailsKey(card, deck?.game ?? "mtg")],
+      (card) => (card === focusedCard ? details : cached[cardDetailsKey(card, game)]),
       color,
     )
     setFocusedKey(undefined)
-    if ("error" in result) {
-      setError(result.error)
+    if ("error" in next) {
+      setError(next.error)
       return
     }
     setError(undefined)
-    setUndo(undefined)
-    setDraft(result.cards)
-    setCommanderSelected(true)
+    setDraft(next)
   }
 
   function decrementFocusedCard(card: DeckCard) {
@@ -734,33 +546,32 @@ function DeckDetailContent({
       fail(new Error("This deck was deleted."), "Could not save deck")
       return
     }
-    if (noteDirty && !cardsDirty && canQueueMetadata && draftMetadataRevision !== undefined) {
-      try {
-        setError(undefined)
-        metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
-        captureAnalytics("deck_used", { feature: "saved" })
-        setEditing(false)
-        setUndo(undefined)
-      } catch (cause) {
-        metadataSaveStarted.current = false
-        fail(cause, "Could not save deck")
-      }
-      return
-    }
     const cardTarget = pinnedVersionTarget.current ?? versionTarget
-    const queueCard = cardsDirty && canQueueCards && Boolean(cardTarget)
-    const queueNote = noteDirty && canQueueMetadata && draftMetadataRevision !== undefined
-    if (queueCard || (noteDirty && queueNote && !cardsDirty)) {
+    const noteRevision = draft.metadataRevision
+    const plan = planDeckSave({
+      changes: view.changes,
+      canQueueCards: view.canQueueVersions && Boolean(cardTarget),
+      canQueueNote: view.canQueueMetadata && noteRevision !== undefined,
+    })
+    const finish = () => {
+      captureAnalytics("deck_used", { feature: "saved" })
+      setDraft(closeDeckDraft)
+    }
+    if (plan.immediate) {
       try {
         setError(undefined)
-        if (queueCard && cardTarget)
-          versionWrites.update(deckId, cardTarget.versionId, draft, cardTarget.expectedRevision)
-        if (queueNote) metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
-        if (noteDirty && !queueNote)
-          await updateDeck({ deckId: deckId as Id<"decks">, note: draftNote })
-        captureAnalytics("deck_used", { feature: "saved" })
-        setEditing(false)
-        setUndo(undefined)
+        if (plan.cards === "queue" && cardTarget)
+          versionWrites.update(
+            deckId,
+            cardTarget.versionId,
+            draft.cards,
+            cardTarget.expectedRevision,
+          )
+        if (plan.note === "queue" && noteRevision !== undefined)
+          metadataWrites.update(deckId, { note: draft.note }, noteRevision)
+        if (plan.note === "mutation")
+          await updateDeck({ deckId: deckId as Id<"decks">, note: draft.note })
+        finish()
       } catch (cause) {
         metadataSaveStarted.current = false
         fail(cause, "Could not save deck")
@@ -768,21 +579,18 @@ function DeckDetailContent({
       return
     }
     const saved = await run(async () => {
-      if (cardsDirty) {
+      if (plan.cards === "mutation") {
         await saveVersion({
           deckId: deckId as Id<"decks">,
           ...(version ? { versionId: version._id } : {}),
-          cards: draft,
+          cards: draft.cards,
         })
       }
-      if (noteDirty) {
-        if (canQueueMetadata && draftMetadataRevision !== undefined)
-          metadataWrites.update(deckId, { note: draftNote }, draftMetadataRevision)
-        else await updateDeck({ deckId: deckId as Id<"decks">, note: draftNote })
-      }
-      captureAnalytics("deck_used", { feature: "saved" })
-      setEditing(false)
-      setUndo(undefined)
+      if (plan.note === "queue" && noteRevision !== undefined)
+        metadataWrites.update(deckId, { note: draft.note }, noteRevision)
+      else if (plan.note === "mutation")
+        await updateDeck({ deckId: deckId as Id<"decks">, note: draft.note })
+      finish()
     }, "Could not save deck")
     if (!saved) metadataSaveStarted.current = false
   }
@@ -793,8 +601,8 @@ function DeckDetailContent({
 
   function startNewVersion() {
     setError(undefined)
-    if (!canAddVersion) {
-      const limit = detail?.capacity.limit ?? versionCache.capacity?.limit ?? 0
+    if (!view.canAddVersion) {
+      const limit = view.versionLimit
       setError(
         `This deck holds up to ${limit} version${limit === 1 ? "" : "s"}. Delete one to add another.`,
       )
@@ -804,10 +612,10 @@ function DeckDetailContent({
   }
 
   async function submitNewVersion({ name, note, copyCards }: DeckVersionDraft) {
-    if (canQueueVersionLifecycle) {
+    if (view.canQueueVersions) {
       // Copy captures what the user currently sees locally, queue overlay included;
       // a server snapshot fromVersionId would silently miss pending offline cards.
-      const captured = copyCards ? versionCapture : undefined
+      const captured = copyCards ? view.versionCapture : undefined
       if (copyCards && captured === undefined) {
         setError("Saved cards are not available. Reconnect or create an empty version.")
         return
@@ -843,7 +651,7 @@ function DeckDetailContent({
   }
 
   async function submitRenameVersion({ name, note }: DeckVersionDraft) {
-    if (canQueueVersionLifecycle && activeVersionId) {
+    if (view.canQueueVersions && activeVersionId) {
       try {
         versionWrites.renameVersion(
           deckId,
@@ -866,7 +674,7 @@ function DeckDetailContent({
 
   function startDeleteVersion() {
     setError(undefined)
-    if (!editing) pinVersionTarget()
+    if (!draft.editing) pinVersionTarget()
     setDialog("deleteVersion")
   }
 
@@ -875,7 +683,7 @@ function DeckDetailContent({
       version?._id ?? (activeVersionSummary ? (activeVersionId as Id<"deckVersions">) : undefined)
     if (!versionId) return
     const expectedRevision = pinnedRevisionFor(versionId) ?? versionTarget?.expectedRevision ?? 0
-    if (canQueueVersionLifecycle) {
+    if (view.canQueueVersions) {
       try {
         versionWrites.deleteVersion(deckId, versionId, expectedRevision)
         setSelectedVersionId(undefined)
@@ -899,7 +707,7 @@ function DeckDetailContent({
       fail(new Error("This deck was deleted."), "Could not update deck")
       return
     }
-    if (canQueueMetadata && settingsMetadataRevision !== undefined) {
+    if (view.canQueueMetadata && settingsMetadataRevision !== undefined) {
       if (settingsSaveStarted.current) return
       settingsSaveStarted.current = true
       try {
@@ -929,42 +737,8 @@ function DeckDetailContent({
   if (!deck) return <DeckDetailPlaceholder summary={summary} onBack={onBack} access={access} />
 
   const configuredSections = deckSections(deck.game, deck.format)
-  const accountMetadata =
-    metadataWrites.metadata.find((item) => item.deckId === deckId && !item.deleted) ??
-    cachedMetadata ??
-    detail?.deck
-  const versionConflict = failedEdit?.reason === DECK_CONFLICT_REASON
-  const versionCardConflict =
-    failedCardEdit?.reason === DECK_VERSION_CONFLICT_REASON ||
-    failedCardEdit?.reason === DECK_VERSION_QUEUE_CONFLICT_REASON
-  const failedVersionSnapshot = failedCardEdit
-    ? versionCache.versions.find(
-        (snapshot) => snapshot.versionId === failedCardEdit.action.versionId,
-      )
-    : undefined
-  const comparedFields =
-    failedEdit && accountMetadata
-      ? [
-          { label: "Name", local: failedEdit.action.name, account: accountMetadata.name },
-          {
-            label: "Format",
-            local: deckFormatLabel(failedEdit.action.game, failedEdit.action.format),
-            account: deckFormatLabel(accountMetadata.game, accountMetadata.format),
-          },
-          {
-            label: "Notes",
-            local: failedEdit.action.note ?? "",
-            account: accountMetadata.note ?? "",
-          },
-        ].filter((field) => field.local !== field.account)
-      : []
-  const failureMessage =
-    (failedCardEdit &&
-    !/\[CONVEX|Server Error|ArgumentValidationError|\n/i.test(failedCardEdit.reason)
-      ? failedCardEdit.reason
-      : failedEdit && !/\[CONVEX|Server Error|ArgumentValidationError|\n/i.test(failedEdit.reason)
-        ? failedEdit.reason
-        : undefined) ?? "This edit could not be synced. Try again or discard it."
+  const { accountMetadata, versionConflict, versionCardConflict, failureMessage } = view
+  const copyFromVersion = activeVersionSummary ?? version
   const syncError =
     failedEdit || failedCardEdit ? (
       <Button text="Review changes" onPress={() => setDialog("syncConflict")} />
@@ -984,9 +758,9 @@ function DeckDetailContent({
         game={deck.game}
         format={deck.format}
         cards={cards}
-        note={editing ? draftNote : (deck.note ?? "")}
-        editing={editing}
-        dirty={draftChanged}
+        note={view.note}
+        editing={draft.editing}
+        dirty={view.changes.any}
         busy={busy}
         cardsUnavailable={cardsUnavailable}
         cardsCached={cardsCached}
@@ -997,17 +771,7 @@ function DeckDetailContent({
             : undefined
         }
         editingDisabled={knownDeleted}
-        saveStatus={
-          syncEnabled && access?.ownerId
-            ? failedEdit || failedCardEdit
-              ? "Local edit not synced"
-              : metadataWrites.capacityBlocked || versionWrites.capacityBlocked
-                ? "Sync paused. Resolve a saved local edit to continue."
-                : pendingMetadata.length || pendingCards.length
-                  ? "Saved locally · Pending sync"
-                  : "Synced"
-            : undefined
-        }
+        saveStatus={view.saveStatus}
         onBack={onBack}
         onEdit={startEditing}
         onSave={save}
@@ -1018,45 +782,39 @@ function DeckDetailContent({
             : undefined
         }
         onAddMatch={
-          onAddMatch && liveVersionId && !knownDeleted
-            ? () => onAddMatch(liveVersionId, deck.name)
+          onAddMatch && version && !knownDeleted
+            ? () => onAddMatch(version._id, deck.name)
             : undefined
         }
         onDetails={() => {
           if (knownDeleted) return
           settingsSaveStarted.current = false
-          setSettingsMetadataRevision(currentMetadataRevision)
+          setSettingsMetadataRevision(view.currentMetadataRevision)
           setDialog("settings")
         }}
         onAdd={() => {
           if (knownDeleted) return
-          if (!editing) startEditing()
+          if (!draft.editing) startEditing()
           setChoosingCommander(false)
           setAdding(true)
         }}
         onChooseCommander={
-          singleCommander && !cardsUnavailable && (!cardsCached || versionTarget)
+          view.singleCommander && !cardsUnavailable && (!cardsCached || versionTarget)
             ? () => {
-                if (!editing) startEditing()
+                if (!draft.editing) startEditing()
                 setChoosingCommander(true)
                 setAdding(true)
               }
             : undefined
         }
-        commanderWarnings={commanderWarnings}
-        onNoteChange={setDraftNote}
+        commanderWarnings={view.commanderWarnings}
+        onNoteChange={(note) => setDraft((current) => setDraftNote(current, note))}
         onFocus={focusCard}
         onIncrement={addCard}
         onDecrement={removeCard}
         undo={
-          undo
-            ? {
-                name: undo.name,
-                restore: () => {
-                  setDraft(undo.cards)
-                  setUndo(undefined)
-                },
-              }
+          draft.undo
+            ? { name: draft.undo.name, restore: () => setDraft(restoreDraftUndo) }
             : undefined
         }
         error={
@@ -1108,10 +866,10 @@ function DeckDetailContent({
                 }
                 numberOfLines={2}
               />
-              {failedVersionSnapshot ? (
+              {view.failedVersionSnapshot ? (
                 <Text
                   size="sm"
-                  text={`Account copy: ${failedVersionSnapshot.cardQuantity} cards · ${failedVersionSnapshot.cardCount} entries · revision ${failedVersionSnapshot.revision}`}
+                  text={`Account copy: ${view.failedVersionSnapshot.cardQuantity} cards · ${view.failedVersionSnapshot.cardCount} entries · revision ${view.failedVersionSnapshot.revision}`}
                 />
               ) : null}
             </View>
@@ -1166,7 +924,7 @@ function DeckDetailContent({
                   <Text weight="bold" size="sm" text="This device" style={$comparisonCell} />
                   <Text weight="bold" size="sm" text="Account" style={$comparisonCell} />
                 </View>
-                {comparedFields.map((field) => (
+                {view.comparedFields.map((field) => (
                   <View key={field.label} style={themed($conflictVersion)}>
                     <Text weight="medium" size="xs" text={field.label} />
                     <View style={themed($comparisonRow)}>
@@ -1185,7 +943,7 @@ function DeckDetailContent({
                     </View>
                   </View>
                 ))}
-                {comparedFields.length === 0 ? (
+                {view.comparedFields.length === 0 ? (
                   <Text size="sm" text="Both versions match." />
                 ) : null}
               </>
@@ -1246,34 +1004,23 @@ function DeckDetailContent({
           format={detail?.deck.format ?? deck.format}
           offlineCandidates={offlineCandidates}
           initialSection={choosingCommander ? "commander" : undefined}
-          commanderCards={draft}
+          commanderCards={draft.cards}
           onClose={() => setAdding(false)}
           onAdd={(card) => {
-            if (
-              deck.game === "mtg" &&
-              deck.format === "commander" &&
-              cardSection(card) === "commander"
-            ) {
+            if (isCommanderPick(deck, card)) {
               const cached = loadCardDetails()
-              const result = addCommander(
-                draft,
+              const next = addDraftCommander(
+                latestDraft.current,
                 card,
                 (entry) => cached[cardDetailsKey(entry, deck.game)],
-                card.commanderColor,
               )
-              if ("error" in result) return result.error
-              if (result.cards.length > MAX_DECK_CARDS)
-                return `A deck can have at most ${MAX_DECK_CARDS} entries.`
-              setDraft(result.cards)
-              setUndo(undefined)
-              setCommanderSelected(true)
+              if ("error" in next) return next.error
+              setDraft(next)
               if (choosingCommander) setAdding(false)
               return undefined
             }
-            const existing = draft.find((entry) => printingKey(entry) === printingKey(card))
-            if (existing && existing.quantity >= 999) return "A card can have at most 999 copies."
-            if (!existing && draft.length >= MAX_DECK_CARDS)
-              return `A deck can have at most ${MAX_DECK_CARDS} entries.`
+            const limitError = cardLimitError(latestDraft.current.cards, card)
+            if (limitError) return limitError
             addCard(card)
             return undefined
           }}
@@ -1302,18 +1049,19 @@ function DeckDetailContent({
           detailsRetryAfterMs={detailsRetryAfterMs}
           onRetryDetails={retryDetails}
           onSetCommander={
-            editing && singleCommander && !cardsUnavailable && !cardsCached && !knownDeleted
+            draft.editing &&
+            view.singleCommander &&
+            !cardsUnavailable &&
+            !cardsCached &&
+            !knownDeleted
               ? chooseCommander
               : undefined
           }
-          {...(editing
+          {...(draft.editing
             ? {
-                onIncrement:
-                  deck.game === "mtg" &&
-                  deck.format === "commander" &&
-                  cardSection(focusedCard) === "commander"
-                    ? undefined
-                    : () => addCard(focusedCard),
+                onIncrement: isCommanderPick(deck, focusedCard)
+                  ? undefined
+                  : () => addCard(focusedCard),
                 onDecrement: () => decrementFocusedCard(focusedCard),
               }
             : {})}
@@ -1321,17 +1069,11 @@ function DeckDetailContent({
         />
       ) : null}
 
-      {dialog === "newVersion" && (detail || canQueueVersionLifecycle) ? (
+      {dialog === "newVersion" && (detail || view.canQueueVersions) ? (
         <DeckVersionDialog
           title="New version"
           submitLabel="Create version"
-          copyFromLabel={
-            (versionSummary ?? activeVersionSummary ?? version) !== undefined
-              ? versionLabel(
-                  (versionSummary ?? activeVersionSummary ?? version) as { versionNumber: number },
-                )
-              : undefined
-          }
+          copyFromLabel={copyFromVersion ? versionLabel(copyFromVersion) : undefined}
           busy={busy}
           error={error}
           onSubmit={submitNewVersion}
@@ -1345,11 +1087,11 @@ function DeckDetailContent({
           submitLabel="Save"
           initialName={versionLabel(activeVersionSummary)}
           initialNote={activeVersionSummary.note ?? ""}
-          notesLocked={!premium}
+          notesLocked={!view.premium}
           busy={busy}
           error={error}
           onSubmit={submitRenameVersion}
-          {...(canDeleteVersion ? { onDelete: startDeleteVersion } : {})}
+          {...(view.canDeleteVersion ? { onDelete: startDeleteVersion } : {})}
           onClose={() => setDialog("none")}
         />
       ) : null}
@@ -1367,23 +1109,23 @@ function DeckDetailContent({
           onDelete={() => setDialog("deleteDeck")}
           onClose={() => setDialog("none")}
         >
-          {detail || cachedVersionRows.length > 0 ? (
+          {view.hasVersionRows ? (
             <View style={themed($versions)}>
               <View style={themed($versionHeading)}>
                 <Text weight="bold" size="sm" text="Versions" />
-                {detail || canQueueVersionLifecycle ? (
+                {detail || view.canQueueVersions ? (
                   <TouchableOpacity
                     testID="version-picker-__new__"
                     accessibilityRole="button"
                     accessibilityLabel="New version"
-                    disabled={editing}
+                    disabled={draft.editing}
                     onPress={startNewVersion}
                   >
                     <Text weight="bold" size="sm" style={themed($textAction)} text="New version" />
                   </TouchableOpacity>
                 ) : null}
               </View>
-              {versionRows.map((candidate) => {
+              {view.versionRows.map((candidate) => {
                 const selected = candidate._id === activeVersionId
                 // Live records only; cached rows must not present unknown stats as fresh.
                 const recordLines = candidate.record
@@ -1401,7 +1143,7 @@ function DeckDetailContent({
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     style={themed($versionRow)}
-                    disabled={editing}
+                    disabled={draft.editing}
                     onPress={() => {
                       chooseVersion(candidate._id)
                       setDialog("none")
@@ -1432,12 +1174,12 @@ function DeckDetailContent({
                         text={cardCountLabel(candidate.cardQuantity)}
                       />
                     </View>
-                    {selected && canManageVersion ? (
+                    {selected && view.canManageVersion ? (
                       <TouchableOpacity
                         testID="rename-version-button"
                         accessibilityRole="button"
                         onPress={() => {
-                          if (!editing) pinVersionTarget()
+                          if (!draft.editing) pinVersionTarget()
                           setDialog("renameVersion")
                         }}
                       >
