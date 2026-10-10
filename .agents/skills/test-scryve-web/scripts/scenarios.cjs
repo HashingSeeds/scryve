@@ -292,13 +292,21 @@ async function signIn(page, email) {
  * backend. `context.setOffline` alone can't do that: the page itself would fail to load.
  */
 async function convexSwitch(context) {
-  const open = new Set()
+  const open = new Map()
   let blocked = false
   await context.routeWebSocket(/convex\.cloud/, (socket) => {
     if (blocked) return socket.close()
-    socket.connectToServer()
-    open.add(socket)
-    socket.onClose(() => open.delete(socket))
+    const server = socket.connectToServer()
+    open.set(socket, server)
+    // An onClose handler turns off Playwright's close forwarding, so forward it by hand.
+    socket.onClose((code, reason) => {
+      open.delete(socket)
+      server.close({ code, reason })
+    })
+    server.onClose((code, reason) => {
+      open.delete(socket)
+      socket.close({ code, reason })
+    })
   })
   return {
     /** Sockets opened before the route can't be closed, so reload the page through it first. */
@@ -310,7 +318,11 @@ async function convexSwitch(context) {
     },
     block() {
       blocked = true
-      for (const socket of open) socket.close()
+      for (const [socket, server] of open) {
+        server.close()
+        socket.close()
+      }
+      open.clear()
     },
     unblock() {
       blocked = false
@@ -377,10 +389,10 @@ async function createScratchDeck(run, page, lines, format = "Constructed") {
   await page.getByRole("textbox", { name: "Deck list" }).fill(lines.join("\n"))
   await reviewImport(run, page)
   await dismissDevToasts(page)
-  await page.getByTestId("save-import-button").click()
   // Saving may already have created the deck, so if the deck screen never opens, name it.
   const deckPath = /^\/connected\/decks\/(?!add$)([^/]+)$/
   try {
+    await page.getByTestId("save-import-button").click()
     await page.waitForURL((url) => deckPath.test(url.pathname), { timeout: 60_000 })
   } catch (error) {
     const id = deckPath.exec(new URL(page.url()).pathname)?.[1]
