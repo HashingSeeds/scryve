@@ -398,6 +398,8 @@ export function applyTableAction(
 
   if (action.kind === "pokemon.updated") {
     if (!isValidCard(action.card)) return null
+    // why: an edit has no prize taker, so it can't knock out; HP at or below the damage is refused instead.
+    if (action.card.hp <= pokemon.damage) return null
     const next: PokemonInPlay = { ...action.card, id: pokemon.id, damage: pokemon.damage }
     return { table: withBoard(table, action.playerId, replacePokemon(board, next)), life: [] }
   }

@@ -106,6 +106,29 @@ describe("Pokémon board", () => {
     expect(board.bench).toEqual([expect.objectContaining({ id: "active-001", damage: 120 })])
   })
 
+  it("refuses an edit that lowers HP to or below the damage on the Pokémon", () => {
+    const table = boardWith(
+      {
+        kind: "pokemon.placed",
+        playerId: "me",
+        pokemonId: "active-001",
+        slot: "active",
+        card: charizard,
+      },
+      { kind: "pokemon.damaged", playerId: "me", pokemonId: "active-001", delta: 120 },
+    )
+    const edit = (hp: number) =>
+      run(table, {
+        kind: "pokemon.updated",
+        playerId: "me",
+        pokemonId: "active-001",
+        card: { ...charizard, hp },
+      })
+    expect(edit(100)).toBeNull()
+    expect(edit(120)).toBeNull()
+    expect(pokemonBoardOf(edit(130)!.table, "me").active).toMatchObject({ hp: 130, damage: 120 })
+  })
+
   it("caps the bench at the registry size", () => {
     const full = boardWith(
       ...Array.from({ length: 5 }, (_, index): TableAction => ({
