@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { type PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
+import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { CommanderBoardPlayer, GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
@@ -13,6 +14,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
+import { losingCounter, seatTableState } from "./CounterChips"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
@@ -71,8 +73,10 @@ export interface PlayerGridProps {
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
   getStaleSince?: (player: GamePlayer) => number | undefined
+  /** why: commander damage elimination; a losing table counter like 10 poison is read from `table`. */
   isPlayerEliminated?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
+  table?: TableRuntime
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -89,6 +93,7 @@ export function PlayerGrid({
   getStaleSince,
   isPlayerEliminated,
   commanderDamage,
+  table,
   onChange,
   style,
 }: PlayerGridProps) {
@@ -276,6 +281,10 @@ export function PlayerGrid({
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
+              const seatTable = seatTableState(table, player.id)
+              const eliminated = isPlayerEliminated?.(player)
+                ? "commander damage"
+                : seatTable && losingCounter(seatTable)?.label.toLowerCase()
               return (
                 <View
                   key={player.id}
@@ -301,7 +310,7 @@ export function PlayerGrid({
                     disabled={disabled || playerDisabled}
                     ownership={ownership}
                     staleSince={getStaleSince?.(player)}
-                    eliminated={isPlayerEliminated?.(player)}
+                    eliminated={eliminated}
                     commanderDamage={
                       commanderDamage && boardSeats
                         ? {
@@ -348,6 +357,27 @@ export function PlayerGrid({
                                   },
                                 }
                               : {}),
+                          }
+                        : undefined
+                    }
+                    seatTable={
+                      table && seatTable
+                        ? {
+                            ...seatTable,
+                            editable: !(disabled || playerDisabled),
+                            adjustCounter: stable(
+                              `counter:${player.id}`,
+                              (counterId: string, delta: number) =>
+                                table.adjustCounter(player.id, counterId, delta),
+                            ),
+                            takeDesignation: stable(`take:${player.id}`, (designationId: string) =>
+                              table.takeDesignation(player.id, designationId),
+                            ),
+                            releaseDesignation: stable(
+                              `release:${player.id}`,
+                              (designationId: string) =>
+                                table.releaseDesignation(player.id, designationId),
+                            ),
                           }
                         : undefined
                     }

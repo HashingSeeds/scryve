@@ -440,6 +440,32 @@ describe("LifeCard", () => {
     },
   )
 
+  it("keeps a sideways name inside a short card that has no insets", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={90}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 158, height: 187, x: 0, y: 0 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-status-layer-seat-1").props.style),
+    ).toMatchObject({ width: 171, height: 142, left: -14.5, top: 14.5 })
+    // why: 71 to the layer's middle, 50 down, and the 21 tall name ends at the layer's 142 edge.
+    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
+      marginTop: 50,
+    })
+  })
+
   it("puts the name and assign sword in the corner opposite the commander grid", () => {
     const onPressSword = jest.fn()
     const view = render(
@@ -738,7 +764,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          eliminated
+          eliminated="commander damage"
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -1207,7 +1233,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={13}
           color="#41476E"
-          eliminated
+          eliminated="commander damage"
           onChange={onChange}
         />
       </ThemeProvider>,
