@@ -1,3 +1,4 @@
+import { AccessibilityInfo } from "react-native"
 import { fireEvent, render } from "@testing-library/react-native"
 
 import type { PlayerId } from "@/features/game/types"
@@ -27,6 +28,24 @@ function renderSheet(onClose = jest.fn()) {
 
 describe("DiceSheet", () => {
   afterEach(() => jest.restoreAllMocks())
+
+  it("announces each result, including a repeat and the picked player's name", () => {
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility")
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const { view } = renderSheet()
+
+    fireEvent.press(view.getByTestId("dice-d20-roll"))
+    fireEvent.press(view.getByTestId("dice-d20-roll"))
+    fireEvent.press(view.getByTestId("dice-coin-flip"))
+    fireEvent.press(view.getByTestId("dice-first-pick"))
+
+    expect(announce.mock.calls.map(([message]) => message)).toEqual([
+      "d20, 11",
+      "d20, 11",
+      "Coin, Tails",
+      "Grace goes first",
+    ])
+  })
 
   it("rolls a d20 from 1 to 20", () => {
     const random = jest.spyOn(Math, "random")
