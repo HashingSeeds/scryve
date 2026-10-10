@@ -18,6 +18,7 @@ import {
   normalizeScryfallCard,
   objectRecord,
 } from "./lib/scryfall"
+import { POKEMON_HP_FACET } from "./lib/table"
 
 const MAX_SEARCH_RESULTS = 20
 
@@ -61,6 +62,14 @@ function hasCatalogImage(card: CatalogCard) {
     card.imageUrl ??
     card.smallImageUrl ??
     card.faces.find((face) => face.imageUrl !== undefined || face.smallImageUrl !== undefined),
+  )
+}
+
+// why: brief search results lack a type line, and Pokémon cached before HP was stored lack HP, so both refetch once.
+function isFullPokemonCard(card: CatalogCard) {
+  return (
+    card.typeLabel !== undefined &&
+    (card.category !== "Pokemon" || card.facets.some((facet) => facet.key === POKEMON_HP_FACET))
   )
 }
 
@@ -235,7 +244,7 @@ export const byCatalogId = action({
     })
     if (
       cached &&
-      (game !== "pokemon" || cached.typeLabel !== undefined) &&
+      (game !== "pokemon" || isFullPokemonCard(cached)) &&
       (!includeImages || game === "mtg" || cardId.startsWith("rush:") || hasCatalogImage(cached))
     )
       return includeImages ? cached : catalogWithoutImages(cached)

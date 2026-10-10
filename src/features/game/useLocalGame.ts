@@ -6,15 +6,18 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
   applyGameCommand,
+  applyLocalTableAction,
   canUndo,
   createNextMatchGame,
   createRematch,
   defaultCommandContext,
   hasLocalGameStarted,
+  localTableRules,
   restartMatchGame,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
+import { createTableActions } from "./tableRuntime"
 import type {
   GameCommand,
   LifeDelta,
@@ -23,6 +26,7 @@ import type {
   MatchSeatOutcome,
   PlayerId,
 } from "./types"
+import { EMPTY_TABLE } from "../../../convex/lib/table"
 
 /**
  * why: `storedGame` is the game as the route last read it from storage. The route rereads on
@@ -100,6 +104,34 @@ export function useLocalGame(
     [dispatch, reduceMotion, settings.hapticsEnabled],
   )
 
+  const tableActions = useMemo(
+    () =>
+      createTableActions(
+        () => {
+          const current = gameRef.current
+          if (current.status !== "active") return null
+          return {
+            table: current.table ?? EMPTY_TABLE,
+            rules: localTableRules(current),
+            playerIds: current.players.map(({ id }) => id),
+            lifeOf: (playerId) => current.players.find(({ id }) => id === playerId)?.life,
+            canAct: () => true,
+          }
+        },
+        (action, operationId) => {
+          const previous = gameRef.current
+          const next = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
+          if (next === previous) return
+          repository.saveActiveGame(next)
+          if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
+            captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
+          gameRef.current = next
+          setGame(next)
+        },
+      ),
+    [repository],
+  )
+
   const replaceBoard = useCallback(
     (next: LocalGame) => {
       repository.saveActiveGame(next)
@@ -143,6 +175,9 @@ export function useLocalGame(
 
   return {
     game,
+    ...tableActions,
+    table: game.table ?? EMPTY_TABLE,
+    tableRules: localTableRules(game),
     canUndo: canUndo(game, context.actorId),
     changeLife,
     assignCommanderDamage,

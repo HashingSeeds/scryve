@@ -7,6 +7,12 @@ import {
   isCommanderDamageDelta,
   MAX_COMMANDER_DAMAGE,
 } from "@/features/game/domain"
+import { playTableRules } from "@/features/game/playSystems"
+import {
+  createTableActions,
+  type TableActions,
+  type TableSource,
+} from "@/features/game/tableRuntime"
 import type { DeviceId, LifeDelta } from "@/features/game/types"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
 import { emitTelemetry } from "@/utils/telemetry"
@@ -26,6 +32,7 @@ import type {
 import { toConnectedProjection } from "./model"
 import type { ConnectedGameRepository } from "./persistence"
 import { mergeConfirmedProjection, oldestFirst, overlayPendingDeltas } from "./reconciliation"
+import type { TableAction } from "../../../convex/lib/table"
 
 const DEFAULT_PROJECTION_BARRIER_TIMEOUT_MS = 5_000
 
@@ -131,6 +138,7 @@ export class OutboxSyncController {
   private drainScheduled = false
   private stopped = false
   private readonly outbox: OutboxController<OutboxSyncSnapshot>
+  readonly table: TableActions
 
   constructor(options: OutboxSyncControllerOptions) {
     this.options = options
@@ -154,6 +162,10 @@ export class OutboxSyncController {
       clearTimeoutFn: this.clearTimeoutFn,
     })
     this.outbox.start()
+    this.table = createTableActions(
+      () => this.tableSource(),
+      (action, operationId) => this.enqueueTableAction(action, operationId),
+    )
   }
 
   get state$() {
@@ -328,6 +340,51 @@ export class OutboxSyncController {
       attempts: 0,
     }
     const result = this.options.repository.enqueue(action, this.pending)
+    if (!result.accepted) {
+      this.changeError =
+        "The offline queue for pending changes is full. Reconnect and sync before making more changes."
+      this.publish()
+      return
+    }
+    this.pending = result.pending
+    this.changeError = undefined
+    this.publish()
+  }
+
+  /** why: table actions check against what this device shows, queued changes included, and only for seats it controls. */
+  private tableSource(): TableSource | null {
+    const projection = this.displayProjection()
+    if (projection?.status !== "active") return null
+    const playerOf = (playerId: string) =>
+      projection.players.find((player) => player.playerId === playerId)
+    return {
+      table: projection.table,
+      rules: playTableRules(projection.system, projection.format),
+      playerIds: projection.players.map((player) => player.playerId),
+      lifeOf: (playerId) => playerOf(playerId)?.currentLife,
+      canAct: (playerId) => playerOf(playerId)?.controlledByMe === true,
+    }
+  }
+
+  private enqueueTableAction(action: TableAction, operationId: string): void {
+    const now = this.now()
+    const result = this.options.repository.enqueue(
+      {
+        schemaVersion: 1,
+        event: {
+          type: "table.action",
+          operationId: asOperationId(operationId),
+          gameId: asGameId(this.options.publicId),
+          action,
+          actorId: asActorId(this.options.ownerId),
+          deviceId: this.options.deviceId,
+          clientCreatedAt: now,
+        },
+        queuedAt: now,
+        attempts: 0,
+      },
+      this.pending,
+    )
     if (!result.accepted) {
       this.changeError =
         "The offline queue for pending changes is full. Reconnect and sync before making more changes."

@@ -2,10 +2,13 @@ import { deckFormatLabel, deckFormats } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
   isSystemId,
+  NO_TABLE,
   SYSTEM_IDS,
   SYSTEMS,
+  tableRules,
   type CounterDefinition,
   type SystemId,
+  type TableDefinition,
 } from "../../../convex/lib/systems"
 
 export const PLAY_SYSTEM_IDS = SYSTEM_IDS
@@ -13,6 +16,7 @@ export type PlaySystemId = SystemId
 export const NO_PLAY_SYSTEM = "none"
 
 export type CounterRules = CounterDefinition
+export type TableRules = TableDefinition
 
 export type PlaySystemRules = {
   id: PlaySystemId
@@ -95,6 +99,11 @@ export function defaultStartingLife(system?: unknown, format?: string, playerCou
 
 export function supportsCommanderDamage(value: unknown, format?: string): boolean {
   return playFormatDefinition(playSystemId(value), format)?.hasCommanderDamage ?? false
+}
+
+/** why: which counters, designations, and Pokémon board a game shows comes from the system registry, never from system checks in the UI. */
+export function playTableRules(value: unknown, format?: string): TableRules {
+  return isPlaySystemId(value) ? tableRules(value, playSystemFormat(value, format)) : NO_TABLE
 }
 
 export function playFormatLabel(value: unknown, format?: string): string {
