@@ -85,7 +85,6 @@ type Sheet = { kind: "place"; slot: "active" | "bench" } | { kind: "edit"; pokem
 const EDIT_ACTIVE_TRIGGER = "edit-active"
 const PLACE_ACTIVE_TRIGGER = "place-active"
 const ADD_TRIGGER = "add"
-const SWITCH_EDIT_TRIGGER = "switch-edit"
 type TakerAsk = { pokemonId: string; delta?: number }
 
 /**
@@ -583,7 +582,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                 />
               </BoardPressable>
               <BoardPressable
-                ref={trigger(SWITCH_EDIT_TRIGGER)}
                 testID={`pokemon-switch-edit-seat-${seatNumber}`}
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${pokemonName(switching)}`}
