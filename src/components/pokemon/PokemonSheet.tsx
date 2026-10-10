@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, type ComponentRef } from "react"
 import type { TextStyle, View as ViewRef, ViewStyle } from "react-native"
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native"
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
@@ -46,7 +53,8 @@ export interface PokemonSheetProps {
   mode: PokemonSheetMode
   /** why: returns false when the board refused the placement, so the sheet stays open with the draft. */
   onPlace: (card: PokemonCard) => boolean
-  onUpdate: (pokemonId: string, card: PokemonCard) => void
+  /** why: returns false when the board refused the edit, so the sheet stays open with the draft. */
+  onUpdate: (pokemonId: string, card: PokemonCard) => boolean
   onDamage: (pokemonId: string, delta: number) => void
   onMakeActive: (pokemonId: string) => void
   onKnockOut: (pokemonId: string) => void
@@ -105,6 +113,7 @@ export function PokemonSheet({
   const [lookupOpen, setLookupOpen] = useState(mode.kind === "place")
   const [picking, setPicking] = useState<string>()
   const [pickError, setPickError] = useState<string>()
+  const [editError, setEditError] = useState<string>()
   // why: a lookup that resolves after the sheet was dismissed must not place anything. Set on mount as well, since Strict Mode and Fast Refresh run the cleanup and then mount again.
   const mounted = useRef(true)
   useEffect(() => {
@@ -193,8 +202,17 @@ export function PokemonSheet({
   }
 
   function finish() {
-    if (editing && changed && card) onUpdate(editing.id, card)
+    if (editing && changed && card) {
+      if (card.hp <= editing.damage) return refuseEdit("HP must be above the damage on it.")
+      if (!onUpdate(editing.id, card)) return refuseEdit("Could not save it. Try again.")
+    }
     onClose()
+  }
+
+  // why: focus stays on Save, so native speaks the note; web reads it through the alert role.
+  function refuseEdit(message: string) {
+    setEditError(message)
+    if (Platform.OS !== "web") AccessibilityInfo.announceForAccessibility(message)
   }
 
   const hits = catalog.hits
@@ -317,7 +335,10 @@ export function PokemonSheet({
             inputMode="numeric"
             keyboardType="number-pad"
             maxLength={3}
-            onChangeText={(hp) => setDraft((current) => ({ ...current, hp }))}
+            onChangeText={(hp) => {
+              setEditError(undefined)
+              setDraft((current) => ({ ...current, hp }))
+            }}
             containerStyle={$hpField}
             inputWrapperStyle={themed($fieldWrapper)}
             style={$hpInput}
@@ -341,6 +362,15 @@ export function PokemonSheet({
             </BoardPressable>
           ) : null}
         </View>
+        {editError ? (
+          <Text
+            testID={`pokemon-edit-error-seat-${seatNumber}`}
+            accessibilityRole="alert"
+            text={editError}
+            size="xxs"
+            style={inkStyle}
+          />
+        ) : null}
         {!catalog.available ? (
           <Text text="Catalog offline. Type the name and HP." size="xxs" style={[inkStyle, $dim]} />
         ) : null}
