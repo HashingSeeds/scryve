@@ -1,5 +1,10 @@
 import type { ConfigContext, ExpoConfig } from "expo/config"
-import { CodeGenerator, withMainActivity } from "expo/config-plugins"
+import {
+  AndroidConfig,
+  CodeGenerator,
+  withAndroidManifest,
+  withMainActivity,
+} from "expo/config-plugins"
 
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
@@ -153,7 +158,16 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     },
   }
 
-  return withMainActivity(expoConfig, (config) => {
+  // why: React Native re-measures text on a fontScale change, so keep the activity (and JS state) alive.
+  const withFontScaleConfigChange = withAndroidManifest(expoConfig, (config) => {
+    const activity = AndroidConfig.Manifest.getMainActivityOrThrow(config.modResults)
+    const changes = activity.$["android:configChanges"]?.split("|") ?? []
+    if (!changes.includes("fontScale"))
+      activity.$["android:configChanges"] = [...changes, "fontScale"].join("|")
+    return config
+  })
+
+  return withMainActivity(withFontScaleConfigChange, (config) => {
     const { modResults } = config
     modResults.contents = CodeGenerator.mergeContents({
       src: modResults.contents,
