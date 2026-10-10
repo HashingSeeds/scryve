@@ -85,7 +85,7 @@ export const colors = {
     shadow: palette.neutral900,
     actions: {
       "layout": palette.primary600,
-      "undo": palette.success500,
+      "dice": palette.success500,
       "players": "#77558A",
       "status": palette.info500,
       "home": "#356A86",
