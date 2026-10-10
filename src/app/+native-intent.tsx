@@ -12,7 +12,11 @@ function isSafeInternalPath(path: string): boolean {
  * Matching the raw link, not a normalized URL, keeps `//`, `..`, and other schemes out.
  */
 const DEV_SEED_LINK =
-  /^(?:(?:scryve|count)(?:-dev|-preview)?:\/\/\/?|\/)dev\/seed\/([a-z]+)(\?[^#\s\u0000-\u001F\u007F]*)?$/
+  /^(?:(?:scryve|count)(?:-dev|-preview|-table)?:\/\/\/?|\/)dev\/seed\/([a-z]+)(\?[^#\s\u0000-\u001F\u007F]*)?$/
+
+/** why: the table spike's QR code is a cold or warm link to `dev/table/<session uuid>` or `dev/table/host`. */
+const DEV_TABLE_LINK =
+  /^(?:scryve-table:\/\/\/?|\/)dev\/table\/(host|[0-9a-f-]{36}(?:\?stress=\d+)?)$/i
 
 /**
  * why: preview builds open PR previews from `scryve-preview://preview/pr-123`, or from the QR code
@@ -35,6 +39,8 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   if (preview) return `/preview/${preview}`
   const seed = __DEV__ ? devSeedPath(path) : null
   if (seed) return seed
+  const table = __DEV__ ? DEV_TABLE_LINK.exec(path)?.[1] : undefined
+  if (table) return `/dev/table/${table}`
   // Warm intents may preserve only a deliberately small absolute in-app route grammar.
   return !initial && isSafeInternalPath(path) ? path : "/"
 }

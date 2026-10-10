@@ -44,18 +44,16 @@ async function retryUntilPowered(action: () => void) {
 }
 
 /**
- * why: a newer message waiting to go out replaces an older one, since each game
- * message is a whole snapshot.
+ * why: every guest tap must arrive, so messages queue in order; only a waiting patch is
+ * dropped when a newer board update comes, since that update already carries its state.
  */
 function createSender(writeFrame: (frame: string) => Promise<void>, gapMs: number) {
   let messageId = 0
-  let waiting: TableMessage | undefined
+  let queue: TableMessage[] = []
   let sending = false
   async function pump() {
     sending = true
-    while (waiting) {
-      const message = waiting
-      waiting = undefined
+    for (let message = queue.shift(); message; message = queue.shift()) {
       messageId = (messageId + 1) & 0xff
       for (const frame of encodeFrames(message, messageId)) {
         await writeFrame(frame).catch(() => undefined)
@@ -65,7 +63,9 @@ function createSender(writeFrame: (frame: string) => Promise<void>, gapMs: numbe
     sending = false
   }
   return (message: TableMessage) => {
-    waiting = message
+    if (message.type === "patch" || message.type === "game")
+      queue = queue.filter((waiting) => waiting.type !== "patch")
+    queue.push(message)
     if (!sending) void pump()
   }
 }

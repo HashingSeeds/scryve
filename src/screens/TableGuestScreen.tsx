@@ -9,20 +9,24 @@ import { Text } from "@/components/Text"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
-import { useTableGuest } from "@/features/table/useTableLink"
+import { useTableGuest, useTableStress } from "@/features/table/useTableLink"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
 /** why: the guest draws only what the host sends back, so the host's game is the single source of truth. */
 export function TableGuestScreen({
   sessionId,
+  stressTaps,
   onLeave,
 }: {
   sessionId: string
+  stressTaps?: number
   onLeave: () => void
 }) {
   useKeepAwake("count-table-guest", { suppressDeactivateWarnings: true })
-  const { status, game, send } = useTableGuest(sessionId)
+  const guest = useTableGuest(sessionId)
+  const { status, game, send, timing } = guest
+  useTableStress(guest, stressTaps)
   const menuButtonStyle = useMenuButtonStyle()
   const { themed } = useAppTheme()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -64,7 +68,10 @@ export function TableGuestScreen({
           variant: menuButtonStyle,
           seatColors,
           statusLine: {
-            text: status.state === "connected" ? "Table connected" : `Table ${status.state}`,
+            text:
+              status.state === "connected"
+                ? `Table connected${timing.p50 === undefined ? "" : ` · ${timing.p50} ms`}`
+                : `Table ${status.state}`,
             tone: status.state === "connected" ? "caughtUp" : "offline",
             onPress: () => setMenuOpen(false),
           },

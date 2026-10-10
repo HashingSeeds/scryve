@@ -1,10 +1,25 @@
-import type { GameCommand, LocalGame } from "@/features/game/types"
+import { commanderDamageBetween, commanderDamageKey } from "@/features/game/domain"
+import type { GameCommand, GameStatus, LocalGame, LocalGameResult } from "@/features/game/types"
 
 /** why: guests may only touch life and commander damage; ending or undoing stays with the host. */
 export type TableCommand = Extract<GameCommand, { type: "life.change" | "commanderDamage.assign" }>
 
+/** why: each guest's highest applied command id, so a guest can time its taps even when the host merged several into one update. */
+export type TableAcks = Record<string, number>
+
+/** why: after the first full board only life, commander damage, and status change; keyed by seat index they fit one frame. */
+export interface TablePatch {
+  life: number[]
+  damage: [from: number, to: number, total: number][]
+  status: GameStatus
+  result?: LocalGameResult
+}
+
 export type TableMessage =
-  { type: "sync" } | { type: "command"; command: TableCommand } | { type: "game"; game: LocalGame }
+  | { type: "sync" }
+  | { type: "command"; command: TableCommand; guest: string; id: number }
+  | { type: "game"; game: LocalGame; acks: TableAcks }
+  | { type: "patch"; patch: TablePatch; acks: TableAcks }
 
 /**
  * why: 180 bytes fits one notification at the smallest MTU either platform negotiates
@@ -69,6 +84,18 @@ function isTableCommand(value: unknown): value is TableCommand {
   return false
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+function readAcks(value: unknown): TableAcks {
+  if (!isRecord(value)) return {}
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number",
+    ),
+  )
+}
+
 export function parseTableMessage(text: string): TableMessage | undefined {
   let value: unknown
   try {
@@ -76,18 +103,23 @@ export function parseTableMessage(text: string): TableMessage | undefined {
   } catch {
     return undefined
   }
-  if (typeof value !== "object" || value === null) return undefined
-  const message = value as Record<string, unknown>
-  if (message.type === "sync") return { type: "sync" }
-  if (message.type === "command" && isTableCommand(message.command))
-    return { type: "command", command: message.command }
+  if (!isRecord(value)) return undefined
+  if (value.type === "sync") return { type: "sync" }
   if (
-    message.type === "game" &&
-    typeof message.game === "object" &&
-    message.game !== null &&
-    Array.isArray((message.game as LocalGame).players)
+    value.type === "command" &&
+    isTableCommand(value.command) &&
+    typeof value.guest === "string" &&
+    typeof value.id === "number"
   )
-    return { type: "game", game: message.game as LocalGame }
+    return { type: "command", command: value.command, guest: value.guest, id: value.id }
+  if (value.type === "game" && isRecord(value.game) && Array.isArray(value.game.players))
+    return { type: "game", game: value.game as unknown as LocalGame, acks: readAcks(value.acks) }
+  if (value.type === "patch" && isRecord(value.patch) && Array.isArray(value.patch.life))
+    return {
+      type: "patch",
+      patch: value.patch as unknown as TablePatch,
+      acks: readAcks(value.acks),
+    }
   return undefined
 }
 
@@ -123,4 +155,39 @@ export function createReassembler() {
 /** why: the guest only draws the board, so the host leaves the event log behind and frames stay few. */
 export function tableSnapshot(game: LocalGame): LocalGame {
   return { ...game, events: [] }
+}
+
+export function tablePatch(game: LocalGame): TablePatch {
+  const damage: TablePatch["damage"] = []
+  game.players.forEach((from, fromIndex) =>
+    game.players.forEach((to, toIndex) => {
+      const total = commanderDamageBetween(game, from.id, to.id)
+      if (total) damage.push([fromIndex, toIndex, total])
+    }),
+  )
+  return {
+    life: game.players.map((player) => player.life),
+    damage,
+    status: game.status,
+    ...(game.result ? { result: game.result } : {}),
+  }
+}
+
+/** why: undefined means the guest's board is not the one the patch was made from, so it should ask for a full board. */
+export function applyTablePatch(game: LocalGame, patch: TablePatch): LocalGame | undefined {
+  if (patch.life.length !== game.players.length) return undefined
+  const commanderDamage: Record<string, number> = {}
+  for (const [from, to, total] of patch.damage) {
+    const fromPlayer = game.players[from]
+    const toPlayer = game.players[to]
+    if (!fromPlayer || !toPlayer) return undefined
+    commanderDamage[commanderDamageKey(fromPlayer.id, toPlayer.id)] = total
+  }
+  return {
+    ...game,
+    players: game.players.map((player, index) => ({ ...player, life: patch.life[index]! })),
+    commanderDamage,
+    status: patch.status,
+    result: patch.result,
+  }
 }
