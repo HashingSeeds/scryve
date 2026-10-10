@@ -368,11 +368,7 @@ function parseSettings(value: unknown): LocalSettings | null {
   return {
     schemaVersion: 1,
     defaultPlayerCount: migrated.defaultPlayerCount,
-    defaultStartingLife: migrateBrawlStartingLife(
-      systemPreference,
-      migrated.defaultStartingLife,
-      migrated.defaultPlayerCount,
-    ),
+    defaultStartingLife: migrated.defaultStartingLife,
     hapticsEnabled: migrated.hapticsEnabled,
     themePreference: migrated.themePreference,
     menuButtonStyle: isMenuButtonStyle(migrated.menuButtonStyle)
@@ -384,14 +380,18 @@ function parseSettings(value: unknown): LocalSettings | null {
 }
 
 // why: Brawl preferences saved before Brawl had its own default stored Magic's 20, which would otherwise read as a custom value and stop following format changes.
-function migrateBrawlStartingLife(
-  { defaultSystem, defaultFormat }: ReturnType<typeof parseSystemPreference>,
-  startingLife: number,
-  playerCount: number,
-) {
+function migrateBrawlStartingLife(settings: LocalSettings): LocalSettings {
+  const { defaultSystem, defaultFormat, defaultStartingLife: startingLife } = settings
   return defaultSystem === "mtg" && defaultFormat === "brawl" && startingLife === 20
-    ? defaultStartingLife(defaultSystem, defaultFormat, playerCount)
-    : startingLife
+    ? {
+        ...settings,
+        defaultStartingLife: defaultStartingLife(
+          defaultSystem,
+          defaultFormat,
+          settings.defaultPlayerCount,
+        ),
+      }
+    : settings
 }
 
 function parseSystemPreference(
@@ -524,18 +524,23 @@ export class LocalGameRepository {
   }
 
   loadSettings(): LocalSettings {
-    const current = parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.settings)))
-    if (current) return current
-    const legacy = parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.legacySettings)))
-    const settings = legacy ?? DEFAULT_LOCAL_SETTINGS
+    const stored = parseJson(this.storage.getString(LOCAL_KEYS.settings))
+    const current = parseSettings(stored)
+    if (current && isRecord(stored) && stored.brawlLifeMigrated === true) return current
+    const legacy = current
+      ? null
+      : parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.legacySettings)))
+    const found = current ?? legacy
+    const settings = found ? migrateBrawlStartingLife(found) : DEFAULT_LOCAL_SETTINGS
     this.saveSettings(settings)
     if (legacy) this.storage.delete(LOCAL_KEYS.legacySettings)
     return settings
   }
 
   saveSettings(settings: LocalSettings): void {
-    const valid = parseSettings(settings)
-    this.storage.set(LOCAL_KEYS.settings, JSON.stringify(valid ?? DEFAULT_LOCAL_SETTINGS))
+    const valid = parseSettings(settings) ?? DEFAULT_LOCAL_SETTINGS
+    // why: anything this build saves is past the one-time Brawl fix, so a 20 chosen afterward is never migrated again.
+    this.storage.set(LOCAL_KEYS.settings, JSON.stringify({ ...valid, brawlLifeMigrated: true }))
   }
 
   loadLayoutPreference(playerCount: number): PlayerGridLayoutVariant {

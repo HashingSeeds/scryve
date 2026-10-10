@@ -232,6 +232,18 @@ describe("LocalGameRepository", () => {
     expect(new LocalGameRepository(storage).loadSettings().defaultStartingLife).toBe(expected)
   })
 
+  it("keeps a Brawl starting life of 20 chosen after the migration", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    repository.saveSettings({
+      ...repository.loadSettings(),
+      defaultSystem: "mtg",
+      defaultFormat: "brawl",
+      defaultStartingLife: 20,
+    })
+    expect(new LocalGameRepository(storage).loadSettings().defaultStartingLife).toBe(20)
+  })
+
   it("stores a default system and format only when both are known", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)
