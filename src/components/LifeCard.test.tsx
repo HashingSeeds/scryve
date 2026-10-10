@@ -440,7 +440,7 @@ describe("LifeCard", () => {
     },
   )
 
-  it("keeps a sideways status layer inside the card so web never scrolls the card", () => {
+  it("keeps a sideways name inside a short card that has no insets", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -460,6 +460,10 @@ describe("LifeCard", () => {
     expect(
       StyleSheet.flatten(view.getByTestId("life-status-layer-seat-1").props.style),
     ).toMatchObject({ width: 171, height: 142, left: -14.5, top: 14.5 })
+    // why: 71 to the layer's middle, 50 down, and the 21 tall name ends at the layer's 142 edge.
+    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
+      marginTop: 50,
+    })
   })
 
   it("puts the name and assign sword in the corner opposite the commander grid", () => {

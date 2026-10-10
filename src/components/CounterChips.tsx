@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef, useState, type Ref } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native"
 import Svg, { Circle, Path } from "react-native-svg"
@@ -126,6 +126,16 @@ const COMPACT_MENU_CLEARANCE = 37
 
 type Sheet = { kind: "edit"; counterId: string } | { kind: "add" }
 
+const ADD_TRIGGER = "add"
+const LIVE_REGION_REISSUE_MS = 100
+
+/** why: the sheet replaces the controls that opened it, so focus has to move by hand: into the sheet when it opens and back to its trigger when it closes. Web moves keyboard focus; native moves the screen reader. */
+function moveFocus(target: View | null | undefined) {
+  if (!target) return
+  if (Platform.OS === "web") target.focus()
+  else AccessibilityInfo.sendAccessibilityEvent(target, "focus")
+}
+
 export interface CounterChipsProps {
   seat: SeatTable
   seatNumber: number
@@ -161,6 +171,16 @@ export const CounterChips = memo(function CounterChips({
   } = useAppTheme()
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const longPressed = useRef(false)
+  const triggers = useRef(new Map<string, View>()).current
+  const returnFocusTo = useRef<string | null>(null)
+  const trigger = (key: string) => (node: View | null) => {
+    if (node) triggers.set(key, node)
+    else triggers.delete(key)
+  }
+  const openSheet = (next: Sheet, from: string) => {
+    returnFocusTo.current = from
+    setSheet(next)
+  }
   const { rules, counters, held, editable } = seat
   const shown = rules.counters.filter(({ id }) => (counters[id] ?? 0) > 0)
   const heldDesignations = rules.designations.filter(({ id }) => held.includes(id))
@@ -168,8 +188,17 @@ export const CounterChips = memo(function CounterChips({
   const sheetOpen = sheet !== null
 
   useEffect(() => {
-    if (!editable) setSheet(null)
+    if (editable) return
+    returnFocusTo.current = null
+    setSheet(null)
   }, [editable])
+
+  useEffect(() => {
+    if (sheetOpen || returnFocusTo.current === null) return
+    const from = returnFocusTo.current
+    returnFocusTo.current = null
+    moveFocus(triggers.get(from) ?? triggers.get(ADD_TRIGGER))
+  }, [sheetOpen, triggers])
 
   useEffect(() => {
     if (!sheetOpen) return
@@ -194,7 +223,12 @@ export const CounterChips = memo(function CounterChips({
   return (
     <>
       {Platform.OS === "web" ? (
-        <Text text={webAnnouncement} accessibilityLiveRegion="polite" style={$visuallyHidden} />
+        <Text
+          testID={`counter-announcer-seat-${seatNumber}`}
+          text={webAnnouncement}
+          accessibilityLiveRegion="polite"
+          style={$visuallyHidden}
+        />
       ) : null}
       {!sheetOpen && (shown.length > 0 || heldDesignations.length > 0 || editable) ? (
         <View
@@ -245,6 +279,7 @@ export const CounterChips = memo(function CounterChips({
               return (
                 <BoardPressable
                   key={counter.id}
+                  ref={trigger(counter.id)}
                   testID={`counter-chip-${seatNumber}-${counter.id}`}
                   accessibilityRole="adjustable"
                   accessibilityLabel={label}
@@ -261,7 +296,7 @@ export const CounterChips = memo(function CounterChips({
                     else if (nativeEvent.actionName === "decrement")
                       seat.adjustCounter(counter.id, -Math.min(counter.step, value))
                     else if (nativeEvent.actionName === "longpress")
-                      setSheet({ kind: "edit", counterId: counter.id })
+                      openSheet({ kind: "edit", counterId: counter.id }, counter.id)
                   }}
                   hitSlop={{ top: 6, bottom: 6 }}
                   delayLongPress={450}
@@ -270,7 +305,7 @@ export const CounterChips = memo(function CounterChips({
                   }}
                   onLongPress={() => {
                     longPressed.current = true
-                    setSheet({ kind: "edit", counterId: counter.id })
+                    openSheet({ kind: "edit", counterId: counter.id }, counter.id)
                   }}
                   onPress={() => {
                     if (longPressed.current) return
@@ -308,11 +343,12 @@ export const CounterChips = memo(function CounterChips({
             ))}
             {editable ? (
               <BoardPressable
+                ref={trigger(ADD_TRIGGER)}
                 testID={`counter-add-seat-${seatNumber}`}
                 accessibilityRole="button"
                 accessibilityLabel={`${identity}, counters and designations`}
                 hitSlop={{ top: 6, bottom: 6 }}
-                onPress={() => setSheet({ kind: "add" })}
+                onPress={() => openSheet({ kind: "add" }, ADD_TRIGGER)}
                 style={({ pressed }) => [
                   themed(compact ? $compactChip : $chip),
                   themed($addChip),
@@ -351,6 +387,8 @@ export const CounterChips = memo(function CounterChips({
 function useAnnouncements({ rules, counters, held }: SeatTable, identity: string) {
   const previous = useRef({ counters, held })
   const [webMessage, setWebMessage] = useState("")
+  const reissue = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(reissue.current), [])
   useEffect(() => {
     const before = previous.current
     previous.current = { counters, held }
@@ -365,8 +403,11 @@ function useAnnouncements({ rules, counters, held }: SeatTable, identity: string
     ]
     if (changes.length === 0) return
     const message = `${identity}, ${changes.join(", ")}`
-    if (Platform.OS === "web") setWebMessage(message)
-    else AccessibilityInfo.announceForAccessibility(message)
+    if (Platform.OS !== "web") return AccessibilityInfo.announceForAccessibility(message)
+    // why: a live region only speaks when its text changes, so it clears first and the message lands a beat later; retaking Monarch is read again.
+    clearTimeout(reissue.current)
+    setWebMessage("")
+    reissue.current = setTimeout(() => setWebMessage(message), LIVE_REGION_REISSUE_MS)
   }, [counters, held, identity, rules])
   return webMessage
 }
@@ -414,6 +455,9 @@ function CounterSheet({
   const counter =
     sheet.kind === "edit" ? seat.rules.counters.find(({ id }) => id === sheet.counterId) : undefined
   const value = counter ? (seat.counters[counter.id] ?? 0) : 0
+  const firstControl = useRef<View>(null)
+  const sheetKey = sheet.kind === "edit" ? sheet.counterId : sheet.kind
+  useEffect(() => moveFocus(firstControl.current), [sheetKey])
 
   function textButton(testID: string, text: string, onPress: () => void, label = text) {
     return (
@@ -445,6 +489,7 @@ function CounterSheet({
             {([-1, 1] as const).map((direction) => (
               <BoardPressable
                 key={direction}
+                ref={direction < 0 ? firstControl : undefined}
                 testID={`counter-edit-${seatNumber}-${counter.id}-${direction > 0 ? "plus" : "minus"}`}
                 accessibilityRole="button"
                 accessibilityLabel={`${identity}, ${direction > 0 ? "add" : "subtract"} ${counter.step} ${counter.label}`}
@@ -501,12 +546,13 @@ function CounterSheet({
       ) : (
         <>
           <View style={[$sheetCenter, themed($options)]}>
-            {seat.rules.counters.map((option) => {
+            {seat.rules.counters.map((option, index) => {
               const current = seat.counters[option.id] ?? 0
               // why: a counter in play opens its editor from here too, so keyboard users can correct it without a long press.
               return (
                 <SheetOption
                   key={option.id}
+                  ref={index === 0 ? firstControl : undefined}
                   testID={`counter-option-${seatNumber}-${option.id}`}
                   id={option.id}
                   label={option.label}
@@ -523,11 +569,12 @@ function CounterSheet({
                 />
               )
             })}
-            {seat.rules.designations.map((option) => {
+            {seat.rules.designations.map((option, index) => {
               const holds = seat.held.includes(option.id)
               return (
                 <SheetOption
                   key={option.id}
+                  ref={index === 0 && seat.rules.counters.length === 0 ? firstControl : undefined}
                   testID={`designation-option-${seatNumber}-${option.id}`}
                   id={option.id}
                   label={option.label}
@@ -553,6 +600,7 @@ function CounterSheet({
 }
 
 function SheetOption({
+  ref,
   testID,
   id,
   label,
@@ -562,6 +610,7 @@ function SheetOption({
   ink,
   onPress,
 }: {
+  ref?: Ref<View>
   testID: string
   id: string
   label: string
@@ -574,6 +623,7 @@ function SheetOption({
   const { themed } = useAppTheme()
   return (
     <BoardPressable
+      ref={ref}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}

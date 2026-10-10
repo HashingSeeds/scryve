@@ -1,5 +1,5 @@
-import { AccessibilityInfo, StyleSheet } from "react-native"
-import { fireEvent, render } from "@testing-library/react-native"
+import { AccessibilityInfo, Platform, StyleSheet } from "react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { playTableRules } from "@/features/game/playSystems"
 import { ThemeProvider } from "@/theme/context"
@@ -128,6 +128,7 @@ describe("CounterChips", () => {
 
   it("speaks every counter change and a newly taken designation, but not a lost one", () => {
     const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility")
+    announce.mockClear()
     const view = render(chipsElement(seat({ counters: { poison: 1 } })))
 
     view.rerender(chipsElement(seat({ counters: { poison: 2 }, held: ["monarch"] })))
@@ -137,6 +138,43 @@ describe("CounterChips", () => {
     view.rerender(chipsElement(seat({ counters: { poison: 2 } })))
     expect(announce).not.toHaveBeenCalled()
     announce.mockRestore()
+  })
+
+  it("moves focus into an opened sheet and back to the control that opened it", () => {
+    const focus = jest.spyOn(AccessibilityInfo, "sendAccessibilityEvent")
+    focus.mockClear()
+    const view = chips(seat({ counters: { poison: 2 } }))
+
+    fireEvent(view.getByTestId("counter-chip-1-poison"), "longPress")
+    expect(focus).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getByTestId("counter-done-1"))
+    expect(focus).toHaveBeenCalledTimes(2)
+    expect(focus).toHaveBeenLastCalledWith(expect.anything(), "focus")
+
+    fireEvent.press(view.getByTestId("counter-add-seat-1"))
+    fireEvent.press(view.getByLabelText("Edit Poison, 2"))
+    expect(focus).toHaveBeenCalledTimes(4)
+    focus.mockRestore()
+  })
+
+  it("re-reads a repeated message on web, such as retaking Monarch", () => {
+    jest.useFakeTimers()
+    jest.replaceProperty(Platform, "OS", "web")
+    const view = render(chipsElement(seat()))
+    const spoken = () =>
+      view.getByTestId("counter-announcer-seat-1", { includeHiddenElements: true })
+
+    view.rerender(chipsElement(seat({ held: ["monarch"] })))
+    act(() => jest.advanceTimersByTime(100))
+    expect(spoken()).toHaveTextContent("Seat 1, Ada, now Monarch")
+
+    view.rerender(chipsElement(seat()))
+    view.rerender(chipsElement(seat({ held: ["monarch"] })))
+    expect(spoken()).toHaveTextContent("")
+    act(() => jest.advanceTimersByTime(100))
+    expect(spoken()).toHaveTextContent("Seat 1, Ada, now Monarch")
+    jest.restoreAllMocks()
+    jest.useRealTimers()
   })
 
   it("takes the card's own controls out of reach while a sheet covers it", () => {

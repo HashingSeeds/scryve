@@ -394,10 +394,10 @@ export const LifeCard = memo(function LifeCard({
           bottom: undefined,
         }
       : undefined
-  const showStatus =
-    !nameInCorner && (statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0)
+  // why: once measured, the name moves up to fit a short card, and hides only when even that leaves no room.
+  const showStatus = !nameInCorner && (statusEdgeLength === 0 || availableStatusOffset >= 0)
   const statusTopOffset =
-    statusEdgeInset > 0 && statusEdgeLength > 0
+    statusEdgeLength > 0
       ? Math.min(defaultStatusOffset, availableStatusOffset)
       : defaultStatusOffset
 
