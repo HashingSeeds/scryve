@@ -21,7 +21,12 @@ Scenarios (each makes its own "Scenario scratch" deck and deletes it after)
   two-tab-edit   tab B saves while tab A holds an unsaved edit; A's edit is kept or flagged
   offline-edit   edit + save offline, reload with Convex unreachable, reconnect; sync settles
   reseed-add     open a deck from cache, edit, reconnect, add from search at once; nothing lost
-  cleanup        delete leftover "Scenario scratch" decks (not part of all)
+  commander-race "+" and "Set as commander" in one frame; both reach the server
+  cleanup        delete scratch decks this script recorded creating (not part of all)
+
+Before any browser opens, the bundle's Clerk key must be a pk_test_ key and its Convex URL must be
+Scryve's dev deployment or a preview (checked with your Convex CLI login). Saves must reach
+"Synced" and are read back in a fresh context with no local copy of the deck.
 
 Options
   --url <origin>         local dev server origin (required)
@@ -35,7 +40,8 @@ per scenario and exits 1 when any fails.
 `
 
 const OTP = "424242"
-const PRODUCTION_DEPLOYMENT = "dashing-curlew-34"
+const SCRYVE_CONVEX_PROJECT = 2679899
+const SAFE_DEPLOYMENT_TYPES = new Set(["dev", "preview"])
 const SCRATCH = "Scenario scratch"
 // Not app failures: Reactotron (not running), RevenueCat events (blocked by local DNS), and React
 // DOM-prop and nested-button warnings that main already prints on every deck screen.
@@ -105,13 +111,94 @@ function expect(condition, message) {
   if (!condition) throw new Failure(message)
 }
 
+/** Writes a file only the current user can read, in a directory only they can open. */
+function writePrivate(file, contents) {
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
+  fs.chmodSync(path.dirname(file), 0o700)
+  fs.writeFileSync(file, contents, { mode: 0o600 })
+  fs.chmodSync(file, 0o600)
+}
+
+// ---------------------------------------------------------------- target safety
+
+/**
+ * Reads the public config the dev server actually bundled and refuses unless Clerk uses a test
+ * key and Convex is this project's dev deployment or a preview, confirmed with the Convex
+ * Management API. Runs before any browser opens, so cached sessions are covered too. Values are
+ * never printed. Returns the Convex host every page must stay on.
+ */
+async function assertSafeTarget(cli) {
+  const html = await (await fetchRetrying(`${cli.url}/`, {}, "the dev server page")).text()
+  const src = /<script[^>]+src="([^"]*entry\.bundle[^"]*)"/.exec(html)?.[1]
+  expect(src, "Refusing: the dev server did not serve an app bundle")
+  const bundle = await (await fetchRetrying(new URL(src, cli.url), {}, "the app bundle")).text()
+  // Expo inlines EXPO_PUBLIC_* as `"NAME": "value"` or `"NAME": { ..., value: "value" }`.
+  const inlined = (name) =>
+    new Set(
+      [...bundle.matchAll(new RegExp(`"${name}":\\s*(?:\\{[^}]*?value:\\s*)?"([^"]*)"`, "g"))].map(
+        (match) => match[1],
+      ),
+    )
+  const clerkKeys = [...inlined("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY")]
+  expect(
+    clerkKeys.length === 1 && clerkKeys[0].startsWith("pk_test_"),
+    "Refusing: the bundle's Clerk publishable key is not one development (pk_test_) key",
+  )
+  const convexUrls = [...inlined("EXPO_PUBLIC_CONVEX_URL")]
+  const host =
+    convexUrls.length === 1
+      ? /^https:\/\/([a-z0-9-]+)\.convex\.cloud\/?$/.exec(convexUrls[0])
+      : null
+  expect(host, "Refusing: the bundle does not name exactly one Convex deployment URL")
+  const deployment = await convexDeployment(host[1])
+  expect(
+    deployment?.projectId === SCRYVE_CONVEX_PROJECT &&
+      SAFE_DEPLOYMENT_TYPES.has(deployment.deploymentType),
+    "Refusing: the bundle's Convex deployment is not Scryve's dev deployment or a preview",
+  )
+  return `${host[1]}.convex.cloud`
+}
+
+/** Looks a deployment up with the Convex CLI login (or CONVEX_TEAM_TOKEN); undefined if unknown. */
+async function convexDeployment(name) {
+  const config = path.join(os.homedir(), ".convex", "config.json")
+  const token =
+    process.env.CONVEX_TEAM_TOKEN ??
+    (fs.existsSync(config) ? JSON.parse(fs.readFileSync(config, "utf8")).accessToken : undefined)
+  expect(token, "Refusing: no Convex login to confirm the deployment type (run npx convex login)")
+  const response = await fetchRetrying(
+    `https://api.convex.dev/v1/projects/${SCRYVE_CONVEX_PROJECT}/list_deployments`,
+    { headers: { Authorization: `Bearer ${token}` } },
+    "the Convex deployment list",
+  )
+  expect(response.ok, `Refusing: could not list Convex deployments (${response.status})`)
+  const deployments = await response.json()
+  return deployments.find((deployment) => deployment.name === name)
+}
+
+/** fetch with three tries for network errors (not HTTP errors), naming what it was fetching. */
+async function fetchRetrying(url, init, what) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await fetch(url, { ...init, signal: AbortSignal.timeout(120_000) })
+    } catch (error) {
+      if (attempt === 3)
+        throw new Error(`Could not fetch ${what}: ${error.cause?.code ?? error.message}`)
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+    }
+  }
+}
+
 // ---------------------------------------------------------------- identity
 
 /** A browser context for the test identity, signed in through the real consent and Clerk flows. */
+function authStatePath(cli) {
+  return path.join(cli.artifacts, "auth", `${cli.email}@${new URL(cli.url).port}.json`)
+}
+
 async function signedInContext(run) {
   const { browser, cli } = run
-  const statePath = path.join(cli.artifacts, "auth", `${cli.email}@${new URL(cli.url).port}.json`)
-  fs.mkdirSync(path.dirname(statePath), { recursive: true })
+  const statePath = authStatePath(cli)
   const context = await browser.newContext({
     viewport: { width: 430, height: 900 },
     ...(fs.existsSync(statePath) ? { storageState: statePath } : {}),
@@ -125,16 +212,17 @@ async function signedInContext(run) {
     await acceptLegal(page)
     expect(await signedInAs(page, cli.email), `Not signed in as ${cli.email} after a reload`)
   }
-  await context.storageState({ path: statePath })
+  writePrivate(statePath, JSON.stringify(await context.storageState()))
   return { context, page }
 }
 
-/** A tab that records console errors and refuses to talk to production Convex. */
+/** A tab that records console errors and closes if it talks to any Convex but the checked one. */
 async function newPage(run, context) {
   const page = await context.newPage()
   page.on("websocket", (socket) => {
-    if (socket.url().includes(PRODUCTION_DEPLOYMENT)) {
-      run.consoleErrors.push(`STOP: page opened a socket to production (${PRODUCTION_DEPLOYMENT})`)
+    const host = new URL(socket.url()).hostname
+    if (host.endsWith(".convex.cloud") && host !== run.convexHost) {
+      run.consoleErrors.push("STOP: page opened a socket to an unchecked Convex deployment")
       void page.close()
     }
   })
@@ -285,9 +373,27 @@ async function createScratchDeck(run, page, lines, format = "Constructed") {
   await page.getByTestId("save-import-button").click()
   await page.waitForURL(/\/connected\/decks\/(?!add)[^/?]+$/, { timeout: 60_000 })
   const deckId = page.url().split("/").pop()
+  writeLedger(run.cli, [...readLedger(run.cli), deckId])
   run.cleanups.push(() => deleteDeck(run, deckId))
   await openDeck(page, run.cli.url, deckId)
   return deckId
+}
+
+/**
+ * Deck IDs this script created and has not deleted yet. Deletes only ever target these, never a
+ * deck matched by name, so a user's own deck can't be removed.
+ */
+function ledgerPath(cli) {
+  return path.join(cli.artifacts, "auth", `created-decks-${cli.email}.json`)
+}
+
+function readLedger(cli) {
+  const file = ledgerPath(cli)
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : []
+}
+
+function writeLedger(cli, ids) {
+  writePrivate(ledgerPath(cli), JSON.stringify([...new Set(ids)]))
 }
 
 /**
@@ -311,6 +417,8 @@ async function reviewImport(run, page) {
 }
 
 async function deleteDeck(run, deckId) {
+  if (!readLedger(run.cli).includes(deckId))
+    throw new Error(`refusing to delete ${deckId}: this script did not record creating it`)
   const { page } = await signedInContext(run)
   // Open it from the list, as a user would, so delete has a screen to go back to.
   await openDecks(page, run.cli.url)
@@ -329,6 +437,10 @@ async function deleteDeck(run, deckId) {
     )
   await page.context().close()
   if (!gone) throw new Error(`scratch deck ${deckId} is still listed after delete`)
+  writeLedger(
+    run.cli,
+    readLedger(run.cli).filter((id) => id !== deckId),
+  )
 }
 
 async function openDeck(page, url, deckId) {
@@ -358,6 +470,26 @@ async function copies(page, name) {
     }
     return 0
   }, name)
+}
+
+/**
+ * What the server holds for a deck: read in a fresh signed-in context whose starting storage has
+ * nothing about it (checked, not cleared), so a save parked in a local outbox can't pass as synced.
+ */
+async function serverView(run, deckId, names) {
+  const saved = fs.readFileSync(authStatePath(run.cli), "utf8")
+  expect(!saved.includes(deckId), `the saved session already holds local data for deck ${deckId}`)
+  const { context, page } = await signedInContext(run)
+  await openDeck(page, run.cli.url, deckId)
+  const view = {
+    total: await totalCards(page),
+    copies: [],
+    text: await page.getByTestId("deck-cards-list").innerText(),
+  }
+  for (const name of names) view.copies.push(await copies(page, name))
+  await page.screenshot({ path: path.join(run.dir, `${run.scenario}-server-view.png`) })
+  await context.close()
+  return view
 }
 
 async function saveStatus(page) {
@@ -414,6 +546,15 @@ async function dismissDevToasts(page) {
       .last()
       .click({ timeout: 2000 })
       .catch(() => {})
+}
+
+/** Waits for a button to become enabled (RN-web marks disabled buttons with aria-disabled). */
+async function expectEnabled(locator, timeout = 30_000) {
+  await locator.waitFor({ timeout })
+  const end = Date.now() + timeout
+  while ((await locator.getAttribute("aria-disabled")) === "true" && Date.now() < end)
+    await locator.page().waitForTimeout(250)
+  expect((await locator.getAttribute("aria-disabled")) !== "true", "button stayed disabled")
 }
 
 async function startEditing(page) {
@@ -487,13 +628,10 @@ const SCENARIOS = {
     const afterBurst = await totalCards(page)
     const status = await save(page)
     await shot(run, page, "after-save")
-    await page.reload()
-    await openDeck(page, run.cli.url, deckId)
-    const afterReload = await totalCards(page)
-    await shot(run, page, "after-reload")
-    const seen = `burst -> ${afterBurst}, save "${status}", reload -> ${afterReload}, limit message ${limitShown}`
+    const server = await serverView(run, deckId, [])
+    const seen = `burst -> ${afterBurst}, save "${status}", server -> ${server.total}, limit message ${limitShown}`
     expect(afterBurst <= 300, `deck passed 300 entries: ${seen}`)
-    expect(afterReload === afterBurst, `save was not kept: ${seen}`)
+    expect(status === "Synced" && server.total === afterBurst, `save did not sync: ${seen}`)
     return seen
   },
 
@@ -520,14 +658,11 @@ const SCENARIOS = {
     const afterDecrement = await copies(page, capped)
     await page.getByRole("button", { name: `Decrease ${capped}` }).click()
     const status = await save(page)
-    await page.reload()
-    await openDeck(page, run.cli.url, deckId)
-    const afterReload = await copies(page, capped)
-    await shot(run, page, "after-reload")
-    const seen = `+x3 -> ${atCap}, search +x3 -> ${afterSearch} ("${searchMessage}"), − -> ${afterDecrement}, −, save "${status}", reload -> ${afterReload}`
+    const server = await serverView(run, deckId, [capped])
+    const seen = `+x3 -> ${atCap}, search +x3 -> ${afterSearch} ("${searchMessage}"), − -> ${afterDecrement}, −, save "${status}", server -> ${server.copies[0]}`
     expect(atCap === 999 && afterSearch === 999, `copies did not stop at 999: ${seen}`)
     expect(afterDecrement === 998, `decrement at the cap did not work: ${seen}`)
-    expect(afterReload === 997, `save was not kept: ${seen}`)
+    expect(status === "Synced" && server.copies[0] === 997, `save did not sync: ${seen}`)
     return seen
   },
 
@@ -591,10 +726,12 @@ const SCENARIOS = {
     await page.reload()
     await openDeck(page, run.cli.url, deckId)
     const afterReload = `${await copies(page, target)}/${await totalCards(page)}`
-    await shot(run, page, "after-reload")
-    const seen = `copies/total after 6 undo ${afterUndo}, remove ${afterRemove}, save "${status}", reload ${afterReload}`
+    const server = await serverView(run, deckId, [target])
+    const onServer = `${server.copies[0]}/${server.total}`
+    const seen = `copies/total after 6 undo ${afterUndo}, remove ${afterRemove}, save "${status}", reload ${afterReload}, server ${onServer}`
     expect(afterUndo === "1/5", `undo did not restore the card: ${seen}`)
     expect(afterRemove === "0/4" && afterReload === "0/4", `counts drifted: ${seen}`)
+    expect(status === "Synced" && onServer === "0/4", `save did not sync: ${seen}`)
     return seen
   },
 
@@ -618,14 +755,18 @@ const SCENARIOS = {
     await shot(run, tabA, "a-before-save")
     const statusA = await save(tabA)
     await shot(run, tabA, "a-after-save")
-    // A conflict is fine when it is flagged: resolve it the way a user keeping their edit would.
+    // Overwriting B is only fine when A was shown the conflict and chose to keep its own list.
     const review = tabA.getByRole("button", { name: "Review changes" })
     const flagged = await review.isVisible()
-    let choice = ""
+    let resolution = "none"
     if (flagged) {
       await review.click()
-      choice = (await tabA.getByTestId("reapply-version-cards").textContent()) ?? ""
-      await tabA.getByTestId("reapply-version-cards").click()
+      const conflict = tabA.getByTestId("version-sync-conflict")
+      await conflict.waitFor()
+      const question = await conflict.getByText("Keep which card list?").isVisible()
+      const keep = tabA.getByTestId("reapply-version-cards")
+      resolution = `${question ? "Keep which card list?" : "no conflict question"} -> ${await keep.textContent()}`
+      await keep.click()
       await waitForSettled(tabA)
     }
     await Promise.all([tabA.reload(), tabB.reload()])
@@ -638,11 +779,18 @@ const SCENARIOS = {
     const statuses = [await saveStatus(tabA), await saveStatus(tabB)]
     await shot(run, tabA, "a-reload")
     await shot(run, tabB, "b-reload")
-    const seen = `B saved "${statusB}"; A held ${aHeld}; A saved "${statusA}", flagged ${flagged}${flagged ? ` -> "${choice}"` : ""}; after reload A ${a} "${statuses[0]}", B ${b} "${statuses[1]}"`
-    expect(a[0] === 2, `A's unsaved edit was lost: ${seen}`)
-    expect(a.join() === b.join(), `tabs disagree after reload: ${seen}`)
+    const server = await serverView(run, deckId, names.slice(0, 2))
+    const seen = `B saved "${statusB}"; A held ${aHeld}; A saved "${statusA}", resolution: ${resolution}; reload A ${a} "${statuses[0]}", B ${b} "${statuses[1]}"; server ${server.copies}`
+    expect(statusB === "Synced", `B's save did not sync: ${seen}`)
+    expect(a[0] === 2 && server.copies[0] === 2, `A's edit was lost: ${seen}`)
+    const resolvedByUser = resolution.startsWith("Keep which card list? -> Keep mine")
     expect(
-      statuses.every((status) => !/Saving|Pending|not synced|paused/.test(status)),
+      server.copies[1] === 2 || resolvedByUser,
+      `B's synced edit was overwritten without the user choosing it: ${seen}`,
+    )
+    expect(a.join() === b.join() && a.join() === server.copies.join(), `tabs disagree: ${seen}`)
+    expect(
+      statuses.every((status) => status === "Synced"),
       `a tab never settled: ${seen}`,
     )
     return seen
@@ -674,14 +822,11 @@ const SCENARIOS = {
     await page.reload()
     await openDeck(page, run.cli.url, deckId)
     const onlineStatus = await waitForSettled(page)
-    const fresh = await signedInContext(run)
-    await openDeck(fresh.page, run.cli.url, deckId)
-    const server = await copies(fresh.page, names[0])
-    await shot(run, fresh.page, "server-copy")
-    const seen = `offline save "${offlineStatus}"; reload w/o Convex ${reloaded}; online "${onlineStatus}"; fresh tab ${server}`
+    const server = await serverView(run, deckId, [names[0]])
+    const seen = `offline save "${offlineStatus}"; reload w/o Convex ${reloaded}; online "${onlineStatus}"; server ${server.copies[0]}`
     expect(reloaded.startsWith("2,"), `offline edit did not survive a reload: ${seen}`)
-    expect(!/Pending|not synced|paused|Saving/.test(onlineStatus), `sync did not settle: ${seen}`)
-    expect(server === 2, `edit did not reach the server: ${seen}`)
+    expect(onlineStatus === "Synced", `sync did not settle: ${seen}`)
+    expect(server.copies[0] === 2, `edit did not reach the server: ${seen}`)
     return seen
   },
 
@@ -707,25 +852,52 @@ const SCENARIOS = {
     await closeSearch(page)
     const beforeSave = `${await copies(page, names[0])}/${await totalCards(page)}`
     const status = await save(page)
-    await page.reload()
-    await openDeck(page, run.cli.url, deckId)
-    const afterReload = `${await copies(page, names[0])}/${await totalCards(page)}`
-    await shot(run, page, "after-reload")
-    const seen = `copies/total before save ${beforeSave}, save "${status}", reload ${afterReload}`
-    expect(afterReload === "2/7", `an edit was lost around the reconnect: ${seen}`)
+    const server = await serverView(run, deckId, [names[0]])
+    const onServer = `${server.copies[0]}/${server.total}`
+    const seen = `copies/total before save ${beforeSave}, save "${status}", server ${onServer}`
+    expect(status === "Synced", `save did not sync: ${seen}`)
+    expect(onServer === "2/7", `an edit was lost around the reconnect: ${seen}`)
     return seen
   },
 
-  async "cleanup"(run) {
+  async "commander-race"(run) {
     const { page } = await signedInContext(run)
-    await openDecks(page, run.cli.url)
-    const ids = await page
-      .locator('[data-testid^="deck-card-"]')
-      .filter({ hasText: SCRATCH })
-      .evaluateAll((rows) => rows.map((row) => row.dataset.testid.slice("deck-card-".length)))
+    // A Commander-legal mono-blue legend with blue cards, so nothing falls outside its identity.
+    const commander = "Barrin, Tolarian Archmage"
+    const names = ["Aether Gust", "Agent of Treachery"]
+    const lines = [commander, ...names].map((name) => `1 ${name}`)
+    const deckId = await createScratchDeck(run, page, lines, "Commander")
+    await startEditing(page)
+    await page.getByTestId("deck-cards-list").getByText(commander, { exact: true }).click()
+    const setCommander = page.getByTestId("set-commander")
+    await expectEnabled(setCommander)
+    // One frame: an increase lands first, then the commander choice must not drop it.
+    await page.evaluate((label) => {
+      document.querySelector(`[aria-label="${label}"]`).click()
+      document.querySelector('[data-testid="set-commander"]').click()
+    }, `Increase ${names[0]}`)
+    await page.waitForTimeout(500)
+    const local = await copies(page, names[0])
+    await shot(run, page, "after-race")
+    const status = await save(page)
+    const server = await serverView(run, deckId, [names[0]])
+    // Chosen, it is listed in the Commander section, above the "Main deck" heading.
+    const listed = server.text.indexOf(commander)
+    const commanderSet = listed >= 0 && listed < server.text.indexOf("Main deck")
+    const seen = `local ${names[0]}=${local}; save "${status}"; server ${names[0]}=${server.copies[0]}, commander set ${commanderSet}`
+    expect(status === "Synced", `save did not sync: ${seen}`)
+    expect(
+      commanderSet && server.copies[0] === 2,
+      `the commander choice or the add was lost: ${seen}`,
+    )
+    return seen
+  },
+
+  // Only decks this script recorded creating (left by a run that crashed before its cleanup).
+  async "cleanup"(run) {
+    const ids = readLedger(run.cli)
     for (const id of ids) await deleteDeck(run, id)
-    const count = ids.length
-    return `deleted ${count} scratch deck(s)`
+    return `deleted ${ids.length} recorded scratch deck(s)`
   },
 }
 
@@ -735,6 +907,7 @@ async function main() {
   const cli = parseCli(process.argv.slice(2))
   if (cli.help) return void process.stdout.write(USAGE)
   const { chromium } = loadPlaywright()
+  const convexHost = await assertSafeTarget(cli)
   const stamp = new Date().toISOString().replace(/[:.]/g, "-")
   const dir = path.join(cli.artifacts, `${cli.label}-${stamp}`)
   fs.mkdirSync(dir, { recursive: true })
@@ -746,6 +919,7 @@ async function main() {
       cli,
       dir,
       scenario: name,
+      convexHost,
       consoleErrors: [],
       consoleLog: [],
       cleanups: [],
@@ -774,6 +948,8 @@ async function main() {
       for (const context of browser.contexts()) await context.close().catch(() => {})
       for (const cleanup of run.cleanups.reverse())
         await cleanup().catch((error) => {
+          // A scratch deck left behind is a failed run, even when the scenario itself passed.
+          verdict = "FAIL"
           detail += ` (cleanup failed: ${error.message.split("\n")[0]})`
         })
       for (const context of browser.contexts()) await context.close().catch(() => {})
@@ -790,6 +966,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message ?? error)
+  const cause = error.cause ? ` (${error.cause.code ?? error.cause.message ?? error.cause})` : ""
+  console.error(`${error.message ?? error}${cause}`)
   process.exitCode = 1
 })
