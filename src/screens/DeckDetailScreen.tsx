@@ -519,7 +519,7 @@ function DeckDetailContent({
     if (!focusedCard || knownDeleted || cardsUnavailable || cardsCached) return
     const cached = loadCardDetails()
     const next = chooseDraftCommander(
-      draft,
+      latestDraft.current,
       printingKey(focusedCard),
       (card) => (card === focusedCard ? details : cached[cardDetailsKey(card, game)]),
       color,
