@@ -328,6 +328,8 @@ describe("durable outbox provenance", () => {
     })
 
     expect(outbox.enqueue(second, "deck")).toMatchObject({ accepted: false, reason: "byte_limit" })
+    // failAction only fails an operation that is still pending.
+    new DurableOutbox(storage, "owner", keys, codec).enqueue(second, "deck")
     expect(
       outbox.failAction(
         second,
