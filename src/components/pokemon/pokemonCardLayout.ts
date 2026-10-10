@@ -1,4 +1,5 @@
-import type { ViewStyle } from "react-native"
+import type { View, ViewStyle } from "react-native"
+import { AccessibilityInfo, Platform } from "react-native"
 
 import type { PokemonInPlay } from "../../../convex/lib/table"
 import {
@@ -33,17 +34,30 @@ export function contentInsetsFor(
 
 export const MENU_CLEARANCE = 44
 
-/** why: the bench sits on the inner edge, where the game menu button also lives, so it drops below the button when the menu is centered on or cornered at that edge. */
+export type BenchClearance = { top: number; left: number; right: number }
+const NO_CLEARANCE: BenchClearance = { top: 0, left: 0, right: 0 }
+
+/** why: the bench sits on the inner edge, where the game menu button also lives. A menu centered on that edge pushes the bench down; a menu at a corner only shortens the bench on that side, which keeps the height a cramped seat needs. */
 export function benchMenuClearance(
   rotation: LifeCardContentRotation,
   menuCorner: LifeCardMenuCorner | undefined,
   menuEdgeCenter: LifeCardMenuEdge | undefined,
-): number {
-  const innerEdge = CONTENT_EDGES[rotation].top
-  if (menuEdgeCenter === innerEdge) return MENU_CLEARANCE
+): BenchClearance {
+  const edges = CONTENT_EDGES[rotation]
+  if (menuEdgeCenter === edges.top) return { ...NO_CLEARANCE, top: MENU_CLEARANCE }
   // why: corner names carry both axes ("topRight"), and a sideways seat's inner edge is left or right.
-  if (menuCorner && menuCorner.toLowerCase().includes(innerEdge)) return MENU_CLEARANCE
-  return 0
+  const corner = menuCorner?.toLowerCase()
+  if (!corner || !corner.includes(edges.top)) return NO_CLEARANCE
+  return corner.includes(edges.left)
+    ? { ...NO_CLEARANCE, left: MENU_CLEARANCE }
+    : { ...NO_CLEARANCE, right: MENU_CLEARANCE }
+}
+
+/** why: a sheet replaces the controls that opened it, so focus moves by hand: into the sheet when it opens and back to its trigger when it closes. Web moves keyboard focus; native moves the screen reader. */
+export function moveFocus(target: View | null | undefined) {
+  if (!target) return
+  if (Platform.OS === "web") target.focus()
+  else AccessibilityInfo.sendAccessibilityEvent(target, "focus")
 }
 
 /** why: a sideways seat lays out in a frame with its sides swapped, then turns into place, like the life editor. */

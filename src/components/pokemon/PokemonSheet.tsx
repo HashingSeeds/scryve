@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from "react"
-import type { TextStyle, ViewStyle } from "react-native"
+import type { TextStyle, View as ViewRef, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native"
 
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 
-import { parseHp, pokemonName, rotatedLayerStyle } from "./pokemonCardLayout"
+import {
+  moveFocus,
+  parseHp,
+  pokemonName,
+  rotatedLayerStyle,
+  type BenchClearance,
+} from "./pokemonCardLayout"
 import { usePokemonCatalog, type PokemonSearchHit } from "./usePokemonCatalog"
 import {
   pokemonPrizeValue,
@@ -33,7 +39,8 @@ export interface PokemonSheetProps {
   cardHeight: number
   /** why: already mapped into content space by the seat card. */
   insets: LifeCardContentInsets
-  topClearance: number
+  /** why: the game menu button overlaps the inner edge; the header keeps clear of it the same way the bench does. */
+  clearance: BenchClearance
   compact?: boolean
   damageStep: number
   mode: PokemonSheetMode
@@ -68,7 +75,7 @@ export function PokemonSheet({
   cardWidth,
   cardHeight,
   insets,
-  topClearance,
+  clearance,
   compact,
   damageStep,
   mode,
@@ -98,14 +105,16 @@ export function PokemonSheet({
   const [lookupOpen, setLookupOpen] = useState(mode.kind === "place")
   const [picking, setPicking] = useState<string>()
   const [pickError, setPickError] = useState<string>()
-  // why: a lookup that resolves after the sheet was dismissed must not place anything.
+  // why: a lookup that resolves after the sheet was dismissed must not place anything. Set on mount as well, since Strict Mode and Fast Refresh run the cleanup and then mount again.
   const mounted = useRef(true)
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true
+    return () => {
       mounted.current = false
-    },
-    [],
-  )
+    }
+  }, [])
+  const firstControl = useRef<ViewRef>(null)
+  useEffect(() => moveFocus(firstControl.current), [])
   const catalog = usePokemonCatalog(lookupOpen ? query : "")
   const hp = parseHp(draft.hp)
   const card: PokemonCard | undefined = hp
@@ -194,22 +203,24 @@ export function PokemonSheet({
     <View
       testID={`pokemon-sheet-seat-${seatNumber}`}
       accessibilityViewIsModal
+      aria-modal
       style={[
         StyleSheet.absoluteFill,
         rotatedLayerStyle(rotation, cardWidth, cardHeight),
         themed(compact ? $compactSheet : $sheet),
         {
           backgroundColor: sheetColor,
-          paddingTop: (compact ? 6 : 10) + insets.top + topClearance,
+          paddingTop: (compact ? 6 : 10) + insets.top + clearance.top,
           paddingBottom: (compact ? 6 : 10) + insets.bottom,
           paddingLeft: (compact ? 8 : 12) + insets.left,
           paddingRight: (compact ? 8 : 12) + insets.right,
         },
       ]}
     >
-      <View style={themed($header)}>
+      <View style={[themed($header), { marginLeft: clearance.left, marginRight: clearance.right }]}>
         <Text text={title} weight="bold" size="xs" style={inkStyle} />
         <BoardPressable
+          ref={firstControl}
           testID={`pokemon-sheet-done-seat-${seatNumber}`}
           accessibilityRole="button"
           accessibilityLabel={editing && changed ? "Save and close" : editing ? "Close" : "Cancel"}

@@ -15,6 +15,7 @@ import {
   contentInsetsFor,
   heroFontSize,
   knockoutMessage,
+  moveFocus,
   pokemonName,
   prizeWord,
   rotatedLayerStyle,
@@ -81,6 +82,10 @@ const BAR_ON_DARK = "rgba(0,0,0,0.62)"
 const BAR_ON_LIGHT = "rgba(255,255,255,0.78)"
 
 type Sheet = { kind: "place"; slot: "active" | "bench" } | { kind: "edit"; pokemonId: string }
+const EDIT_ACTIVE_TRIGGER = "edit-active"
+const PLACE_ACTIVE_TRIGGER = "place-active"
+const ADD_TRIGGER = "add"
+const SWITCH_EDIT_TRIGGER = "switch-edit"
 type TakerAsk = { pokemonId: string; delta?: number }
 
 /**
@@ -118,7 +123,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const canEdit = !readOnly && !frozen
   const displayName = playerName.trim() || "unnamed player"
   const identity = `Seat ${seatNumber}, ${displayName}`
-  const padding = compact ? spacing.xxs : spacing.xs
   const insets = contentInsetsFor(contentRotation, contentInsets)
   const clearance = benchMenuClearance(contentRotation, menuCorner, menuEdgeCenter)
   const sideways = Math.abs(contentRotation) === 90
@@ -127,6 +131,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     ? { width: cardSize.height, height: cardSize.width }
     : { width: cardSize.width, height: cardSize.height }
   const cramped = Boolean(compact) || (layer.height > 0 && layer.height < CRAMPED_CONTENT_HEIGHT)
+  const padding = cramped ? spacing.xxs : spacing.xs
   const benchHeight = cramped ? COMPACT_BENCH_HEIGHT : BENCH_HEIGHT
   const bottomRowHeight = cramped ? COMPACT_BOTTOM_ROW_HEIGHT : BOTTOM_ROW_HEIGHT
   const markSize = cramped ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
@@ -134,8 +139,21 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const [switchAsk, setSwitchAsk] = useState<string | null>(null)
   const [takerAsk, setTakerAsk] = useState<TakerAsk | null>(null)
   const [knockout, setKnockout] = useState<TableKnockout | null>(null)
-  // why: web and Android read a live region, iOS gets a spoken announcement; both hear knockouts and undos.
+  // why: an undo is announced once the board shows it landed, since the runtime does not report whether the restore was accepted.
+  const [pendingUndo, setPendingUndo] = useState<TableKnockout | null>(null)
+  // why: native gets a spoken announcement; web reads a live region. One path each, so nothing is heard twice.
   const [announcement, setAnnouncement] = useState("")
+  // why: the sheet replaces the control that opened it, so the card remembers which one to hand focus back to.
+  const triggers = useRef(new Map<string, View>()).current
+  const returnFocusTo = useRef<string | null>(null)
+  const trigger = (key: string) => (node: View | null) => {
+    if (node) triggers.set(key, node)
+    else triggers.delete(key)
+  }
+  const openSheet = (next: Sheet, from: string) => {
+    returnFocusTo.current = from
+    setSheet(next)
+  }
   const elapsed = useElapsedSince(staleSince)
 
   const editing = sheet?.kind === "edit" ? findPokemon(board, sheet.pokemonId) : undefined
@@ -152,11 +170,26 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
 
   useEffect(() => {
     if (!canEdit) {
+      returnFocusTo.current = null
       setSheet(null)
       setSwitchAsk(null)
       setTakerAsk(null)
+      setKnockout(null)
     }
   }, [canEdit])
+
+  const sheetOpen = sheetMode !== null
+  useEffect(() => {
+    if (sheetOpen || returnFocusTo.current === null) return
+    const from = returnFocusTo.current
+    returnFocusTo.current = null
+    moveFocus(
+      triggers.get(from) ??
+        triggers.get(EDIT_ACTIVE_TRIGGER) ??
+        triggers.get(PLACE_ACTIVE_TRIGGER) ??
+        triggers.get(ADD_TRIGGER),
+    )
+  }, [sheetOpen, triggers])
 
   // why: the toast lasts a moment and only while this knockout is still the one the board can undo.
   const undoable = knockout && board.lastKnockout?.operationId === knockout.operationId
@@ -172,23 +205,34 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   }, [knockout]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function announce(message: string) {
-    setAnnouncement(message)
-    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(message)
+    if (Platform.OS === "web") setAnnouncement(message)
+    else AccessibilityInfo.announceForAccessibility(message)
   }
 
   function undo(ko: TableKnockout) {
-    const restoredTo = ko.slot === "active" && !board.active ? "Active" : "the bench"
-    const takerName = opponents.find(({ id }) => id === ko.takerPlayerId)?.name
     table.undoKnockout(playerId, ko.operationId)
     setKnockout(null)
+    setPendingUndo(ko)
+  }
+
+  const lastKnockoutId = board.lastKnockout?.operationId
+  useEffect(() => {
+    if (!pendingUndo) return
+    setPendingUndo(null)
+    if (lastKnockoutId === pendingUndo.operationId) {
+      announce(`Could not undo. ${pokemonName(pendingUndo.pokemon)} stays knocked out.`)
+      return
+    }
+    const restored = findPokemon(board, pendingUndo.pokemon.id)
+    const takerName = opponents.find(({ id }) => id === pendingUndo.takerPlayerId)?.name
     announce(
-      `Undo. ${pokemonName(ko.pokemon)} returns to ${restoredTo}${
-        takerName && ko.prizesTaken > 0
-          ? `, ${takerName} gives back ${prizeWord(ko.prizesTaken)}`
+      `Undo. ${pokemonName(pendingUndo.pokemon)} returns to ${restored?.slot === "active" ? "Active" : "the bench"}${
+        takerName && pendingUndo.prizesTaken > 0
+          ? `, ${takerName} gives back ${prizeWord(pendingUndo.prizesTaken)}`
           : ""
       }.`,
     )
-  }
+  }, [pendingUndo, lastKnockoutId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toastMessage(ko: TableKnockout) {
     return knockoutMessage({
@@ -238,10 +282,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     else damage(takerAsk.pokemonId, takerAsk.delta, takerPlayerId)
   }
 
+  // why: one bar for every bench tap, so keyboard and screen reader users reach Edit without a long press, even after a knockout.
   function pressBench(pokemon: PokemonInPlay) {
     if (!canEdit) return
-    if (board.active) setSwitchAsk(pokemon.id)
-    else table.switchActive(playerId, pokemon.id)
+    setSwitchAsk(pokemon.id)
   }
 
   const ownershipLabel =
@@ -260,7 +304,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       padding * 2 -
       insets.top -
       insets.bottom -
-      clearance -
+      clearance.top -
       benchHeight -
       bottomRowHeight -
       (cramped ? COMPACT_HERO_CAPTION_HEIGHT : HERO_CAPTION_HEIGHT),
@@ -295,22 +339,25 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         style,
       ]}
     >
-      <Text
-        testID={`pokemon-announcement-seat-${seatNumber}`}
-        accessibilityLiveRegion="polite"
-        text={announcement}
-        style={$liveRegion}
-      />
+      {Platform.OS === "web" ? (
+        <Text
+          testID={`pokemon-announcement-seat-${seatNumber}`}
+          accessibilityLiveRegion="polite"
+          text={announcement}
+          style={$liveRegion}
+        />
+      ) : null}
       <View
         testID={`pokemon-layer-seat-${seatNumber}`}
         pointerEvents={sheetMode ? "none" : "box-none"}
         accessibilityElementsHidden={!!sheetMode}
         importantForAccessibility={sheetMode ? "no-hide-descendants" : "auto"}
+        aria-hidden={!!sheetMode}
         style={[
           StyleSheet.absoluteFill,
           rotatedLayerStyle(contentRotation, cardSize.width, cardSize.height),
           {
-            paddingTop: padding + insets.top + clearance,
+            paddingTop: padding + insets.top + clearance.top,
             paddingBottom: padding + insets.bottom,
             paddingLeft: padding + insets.left,
             paddingRight: padding + insets.right,
@@ -318,10 +365,25 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           !readyToLayout && $hidden,
         ]}
       >
+        {/* why: the seat mark is drawn first and sits behind the content in the content-space corner, as on the life card, so it costs the cramped seats no room and never covers a tap target. */}
+        <PlayerMark
+          seatNumber={seatNumber}
+          shape={shape}
+          color={ink}
+          spinning={ownership === "owned"}
+          size={markSize}
+          style={[
+            themed($mark),
+            { right: padding + insets.right, bottom: padding + insets.bottom },
+          ]}
+        />
         <View
           testID={`pokemon-bench-seat-${seatNumber}`}
           accessibilityLabel={`${identity}, bench, ${board.bench.length} of ${rules.benchSize}`}
-          style={[themed($bench), { height: benchHeight }]}
+          style={[
+            themed($bench),
+            { height: benchHeight, marginLeft: clearance.left, marginRight: clearance.right },
+          ]}
         >
           {board.bench.map((pokemon) => (
             <BenchChip
@@ -331,16 +393,20 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               compact={cramped}
               interactive={controlsLive}
               promotes={!board.active}
+              triggerRef={trigger(`bench:${pokemon.id}`)}
               onPress={() => pressBench(pokemon)}
-              onLongPress={() => setSheet({ kind: "edit", pokemonId: pokemon.id })}
+              onLongPress={() =>
+                openSheet({ kind: "edit", pokemonId: pokemon.id }, `bench:${pokemon.id}`)
+              }
             />
           ))}
           {controlsLive && board.bench.length < rules.benchSize ? (
             <BoardPressable
+              ref={trigger(ADD_TRIGGER)}
               testID={`pokemon-bench-add-seat-${seatNumber}`}
               accessibilityRole="button"
               accessibilityLabel={`${identity}, add a bench Pokémon`}
-              onPress={() => setSheet({ kind: "place", slot: "bench" })}
+              onPress={() => openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)}
               style={({ pressed }) => [
                 themed($chip),
                 themed($addChip),
@@ -364,11 +430,15 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             compact={cramped}
             step={rules.damageStep}
             interactive={controlsLive}
+            editRef={trigger(EDIT_ACTIVE_TRIGGER)}
             onDamage={(delta) => damage(board.active!.id, delta)}
-            onEdit={() => setSheet({ kind: "edit", pokemonId: board.active!.id })}
+            onEdit={() =>
+              openSheet({ kind: "edit", pokemonId: board.active!.id }, EDIT_ACTIVE_TRIGGER)
+            }
           />
         ) : (
           <BoardPressable
+            ref={trigger(PLACE_ACTIVE_TRIGGER)}
             testID={`pokemon-place-active-seat-${seatNumber}`}
             accessibilityRole={controlsLive ? "button" : undefined}
             accessibilityLabel={`${identity}, no Active Pokémon`}
@@ -380,7 +450,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                 : undefined
             }
             disabled={!controlsLive}
-            onPress={() => setSheet({ kind: "place", slot: "active" })}
+            onPress={() => openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)}
             style={({ pressed }) => [themed($hero), pressed && { opacity: 0.7 }]}
           >
             <Text
@@ -399,18 +469,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           </BoardPressable>
         )}
 
-        {/* why: the seat mark sits behind the content in the content-space corner, as on the life card, so it costs the cramped seats no room. */}
-        <PlayerMark
-          seatNumber={seatNumber}
-          shape={shape}
-          color={ink}
-          spinning={ownership === "owned"}
-          size={markSize}
-          style={[
-            themed($mark),
-            { right: padding + insets.right, bottom: padding + insets.bottom },
-          ]}
-        />
         <View style={[themed($bottomRow), { height: bottomRowHeight }]}>
           <View style={themed($prizeGroup)}>
             <BoardPressable
@@ -479,21 +537,25 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           </View>
         </View>
 
-        {switching && board.active ? (
+        {switching ? (
           <View
             testID={`pokemon-switch-ask-seat-${seatNumber}`}
             accessibilityLiveRegion="polite"
             style={bar}
           >
             <Text size="xs" style={{ color: barInk }}>
-              Retreat{" "}
-              <Text
-                weight="bold"
-                size="xs"
-                style={{ color: barInk }}
-                text={pokemonName(board.active)}
-              />
-              .{" "}
+              {board.active ? (
+                <>
+                  Retreat{" "}
+                  <Text
+                    weight="bold"
+                    size="xs"
+                    style={{ color: barInk }}
+                    text={pokemonName(board.active)}
+                  />
+                  .{" "}
+                </>
+              ) : null}
               <Text
                 weight="bold"
                 size="xs"
@@ -506,22 +568,28 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               <BoardPressable
                 testID={`pokemon-switch-confirm-seat-${seatNumber}`}
                 accessibilityRole="button"
-                accessibilityLabel={`Switch, ${pokemonName(switching)} becomes Active`}
+                accessibilityLabel={`${board.active ? "Switch" : "Make Active"}, ${pokemonName(switching)} becomes Active`}
                 onPress={() => {
                   table.switchActive(playerId, switching.id)
                   setSwitchAsk(null)
                 }}
                 style={[themed($barButton), { backgroundColor: barInk }]}
               >
-                <Text text="Switch" size="xs" weight="bold" style={{ color: onBarInk }} />
+                <Text
+                  text={board.active ? "Switch" : "Make Active"}
+                  size="xs"
+                  weight="bold"
+                  style={{ color: onBarInk }}
+                />
               </BoardPressable>
               <BoardPressable
+                ref={trigger(SWITCH_EDIT_TRIGGER)}
                 testID={`pokemon-switch-edit-seat-${seatNumber}`}
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${pokemonName(switching)}`}
                 onPress={() => {
                   setSwitchAsk(null)
-                  setSheet({ kind: "edit", pokemonId: switching.id })
+                  openSheet({ kind: "edit", pokemonId: switching.id }, `bench:${switching.id}`)
                 }}
                 style={[
                   themed($barButton),
@@ -598,8 +666,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         {undoable ? (
           <View
             testID={`pokemon-knockout-toast-seat-${seatNumber}`}
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
             style={[bar, themed($toastRow)]}
           >
             <Text
@@ -608,7 +674,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               size="xs"
               style={[$grow, { color: barInk }]}
             />
-            {undoLands ? (
+            {undoLands && controlsLive ? (
               <BoardPressable
                 testID={`pokemon-knockout-undo-seat-${seatNumber}`}
                 accessibilityRole="button"
@@ -638,8 +704,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           cardWidth={cardSize.width}
           cardHeight={cardSize.height}
           insets={insets}
-          topClearance={clearance}
-          compact={compact}
+          clearance={clearance}
+          compact={cramped}
           damageStep={rules.damageStep}
           mode={sheetMode}
           onPlace={(card) => {
@@ -678,6 +744,7 @@ function ActiveHero({
   compact,
   step,
   interactive,
+  editRef,
   onDamage,
   onEdit,
 }: {
@@ -689,6 +756,7 @@ function ActiveHero({
   compact?: boolean
   step: number
   interactive: boolean
+  editRef: (node: View | null) => void
   onDamage: (delta: number) => void
   onEdit: () => void
 }) {
@@ -789,12 +857,17 @@ function ActiveHero({
           />
           {interactive ? (
             <BoardPressable
+              ref={editRef}
               testID={`pokemon-edit-active-seat-${seatNumber}`}
               accessibilityRole="button"
               accessibilityLabel={`Edit ${name}`}
               hitSlop={8}
               onPress={onEdit}
-              style={({ pressed }) => [themed($inlineAction), pressed && $pressed]}
+              style={({ pressed }) => [
+                themed($inlineAction),
+                compact && $inlineActionCramped,
+                pressed && $pressed,
+              ]}
             >
               <Text text="Edit" size="xxs" weight="medium" style={[{ color: ink }, $dim75]} />
             </BoardPressable>
@@ -819,6 +892,7 @@ function BenchChip({
   compact,
   interactive,
   promotes,
+  triggerRef,
   onPress,
   onLongPress,
 }: {
@@ -827,6 +901,7 @@ function BenchChip({
   compact?: boolean
   interactive: boolean
   promotes: boolean
+  triggerRef: (node: View | null) => void
   onPress: () => void
   onLongPress: () => void
 }) {
@@ -835,13 +910,12 @@ function BenchChip({
   const longPressHandled = useRef(false)
   return (
     <BoardPressable
+      ref={triggerRef}
       testID={`pokemon-bench-${pokemon.id}`}
       accessibilityRole={interactive ? "button" : undefined}
       accessibilityLabel={`Bench, ${name}, ${remainingHp(pokemon)} of ${pokemon.hp} HP, ${pokemon.damage} damage`}
       accessibilityHint={
-        interactive
-          ? `${promotes ? "Tap to make Active" : "Tap to switch in"}. Long press to edit.`
-          : undefined
+        interactive ? `${promotes ? "Tap to make Active" : "Tap to switch in"} or edit.` : undefined
       }
       accessibilityActions={
         interactive ? [{ name: "longpress", label: `Edit ${name}` }] : undefined
@@ -879,7 +953,14 @@ function BenchChip({
         numberOfLines={1}
         style={[themed(compact ? $compactChipHp : $chipHp), { color: ink }]}
       />
-      <Text text={`/${pokemon.hp}`} size="xxs" numberOfLines={1} style={[{ color: ink }, $dim70]} />
+      {compact ? null : (
+        <Text
+          text={`/${pokemon.hp}`}
+          size="xxs"
+          numberOfLines={1}
+          style={[{ color: ink }, $dim70]}
+        />
+      )}
     </BoardPressable>
   )
 }
@@ -894,6 +975,7 @@ const $dim85: TextStyle = { opacity: 0.85 }
 const $pipGone: ViewStyle = { opacity: 0.25 }
 const $pressed: ViewStyle = { opacity: 0.6 }
 const $shrink: ViewStyle = { flexShrink: 1 }
+const $inlineActionCramped: ViewStyle = { minHeight: 18 }
 const $liveRegion: TextStyle = { position: "absolute", width: 1, height: 1, opacity: 0 }
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
