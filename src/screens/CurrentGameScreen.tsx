@@ -328,7 +328,7 @@ export function CurrentGameScreen({
                   }
                 : undefined
             }
-            table={runtime}
+            table={runtime.tableRuntime}
             onChange={runtime.changeLife}
           />
         )}
