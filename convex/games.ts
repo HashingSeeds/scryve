@@ -1940,6 +1940,7 @@ export const tableAction = mutation({
         throw syncOperationMismatch()
       return { operationId: duplicate.operationId, eventId: duplicate._id, deduplicated: true }
     }
+    await limitGameRate(ctx, "gameWrite", user._id)
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const rows = new Map<string, Doc<"gamePlayers">>([[actor._id, actor]])

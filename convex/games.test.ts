@@ -2392,6 +2392,31 @@ describe("Convex game write rate limits", () => {
     ).resolves.toBeDefined()
   })
 
+  it("rate-limits table actions the same way and still acknowledges a replay", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const poison = (operationId: string) =>
+      game.host.mutation(api.games.tableAction, {
+        publicId: game.publicId,
+        operationId,
+        deviceId: "device-host-0001",
+        clientCreatedAt: 1_700_000_000_000,
+        action: {
+          kind: "counter.changed",
+          playerId: game.hostPlayerId,
+          counterId: "poison",
+          delta: 1,
+        },
+      })
+    for (let index = 0; index < 60; index += 1) await poison(`table-burst-op-${index}`)
+    await expect(poison("table-burst-op-over")).rejects.toMatchObject({
+      data: { code: "rate_limited" },
+    })
+    await expect(poison("table-burst-op-0")).resolves.toMatchObject({
+      deduplicated: true,
+    })
+  })
+
   it("rate-limits a host who keeps recreating lobbies", async () => {
     const t = makeConvexTest()
     const host = await synced(t, "lobby-spammer", "Host")
