@@ -58,6 +58,7 @@ const mockPreviewPrecon = jest.fn(async () => ({
   ],
 }))
 const mockConvexClient = { action: jest.fn() }
+const mockConnection = { isWebSocketConnected: true }
 const mockConvexState: { client: typeof mockConvexClient | undefined } = { client: undefined }
 const mockResolvePasted = jest.fn()
 const mockResolveLink = jest.fn()
@@ -164,7 +165,7 @@ jest.mock("@/features/billing/RevenueCatContext", () => ({
 
 jest.mock("convex/react", () => ({
   useConvex: () => mockConvexState.client,
-  useConvexConnectionState: () => ({ isWebSocketConnected: true }),
+  useConvexConnectionState: () => mockConnection,
   useQuery: (reference: string) => {
     if (reference === "deckCatalogs.detail") return mockCatalogDetail.value
     if (mockListMine.error) throw mockListMine.error
@@ -278,6 +279,7 @@ describe("AddDeckScreen", () => {
     }
     mockListMine.error = undefined
     mockCatalogDetail.value = undefined
+    mockConnection.isWebSocketConnected = true
   })
 
   it("keeps a pasted draft through sign-in and waits to call private APIs", async () => {
@@ -1784,6 +1786,51 @@ describe("AddDeckScreen", () => {
     })
     fireEvent.press(view.getByText("Cached deck"))
     expect(view.getByTestId("catalog-deck-preview")).toBeTruthy()
+  })
+
+  it("shows an offline note instead of loading forever and retries on reconnect", async () => {
+    mockConnection.isWebSocketConnected = false
+    mockBrowse.mockReturnValueOnce(new Promise(() => {}))
+    const view = renderAddDeck()
+    chooseGame(view, "ygo")
+    await act(async () => jest.advanceTimersByTime(400))
+    expect(view.getByText(/You're offline/)).toBeTruthy()
+    expect(view.queryByText("Loading decks…")).toBeNull()
+    mockSearchTopDecks.mockResolvedValueOnce([
+      { _id: "back", game: "ygo", name: "Back online deck", kind: "tournament" },
+    ])
+    mockConnection.isWebSocketConnected = true
+    view.rerender(
+      <ThemeProvider initialContext="light">
+        <AddDeckScreen onBack={jest.fn()} onCreated={jest.fn()} />
+      </ThemeProvider>,
+    )
+    await waitFor(() => expect(view.getByText("Back online deck")).toBeTruthy())
+    expect(view.queryByText(/You're offline/)).toBeNull()
+    expect(mockBrowse).toHaveBeenCalledTimes(2)
+  })
+
+  it("retries a failed Load more from its cursor and keeps loaded decks", async () => {
+    mockBrowse
+      .mockResolvedValueOnce({
+        decks: [{ _id: "first", game: "ygo", name: "First deck", kind: "tournament" }],
+        cursor: "next-page",
+        status: "ready",
+        retryAfterMs: undefined,
+      })
+      .mockRejectedValueOnce(new Error("Connection lost while action was in flight"))
+    const view = renderAddDeck()
+    chooseGame(view, "ygo")
+    await act(async () => jest.advanceTimersByTime(400))
+    fireEvent.press(view.getByText("Load more"))
+    await waitFor(() => expect(view.getByText("Retry")).toBeTruthy())
+    mockSearchTopDecks.mockResolvedValueOnce([
+      { _id: "next", game: "ygo", name: "Next deck", kind: "tournament" },
+    ])
+    fireEvent.press(view.getByText("Retry"))
+    await waitFor(() => expect(view.getByText("Next deck")).toBeTruthy())
+    expect(view.getByText("First deck")).toBeTruthy()
+    expect(mockBrowse).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "next-page" }))
   })
 
   it.each(["ygo", "pokemon"])("browses all %s sources without requiring sign-in", async (game) => {
