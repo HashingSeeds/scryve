@@ -22,7 +22,6 @@ Scenarios (each makes its own "Scenario scratch" deck and deletes it after)
   offline-edit   edit + save offline, reload with Convex unreachable, reconnect; sync settles
   reseed-add     open a deck from cache, edit, reconnect, add from search at once; nothing lost
   commander-race "+" and "Set as commander" in one frame; both reach the server
-  cleanup        delete scratch decks this script recorded creating (not part of all)
 
 Before any browser opens, the bundle's Clerk key must be a pk_test_ key and its Convex URL must be
 Scryve's dev deployment or a preview (checked with your Convex CLI login). Saves must reach
@@ -90,9 +89,7 @@ function parseCli(argv) {
     throw new Error("Scenarios only run against a local dev server")
   if (!/^[a-z0-9._%-]+\+clerk_test@sow\.care$/i.test(values.email))
     throw new Error("--email must be a *+clerk_test@sow.care test account")
-  const names = positionals.includes("all")
-    ? Object.keys(SCENARIOS).filter((name) => name !== "cleanup")
-    : positionals
+  const names = positionals.includes("all") ? Object.keys(SCENARIOS) : positionals
   for (const name of names) if (!SCENARIOS[name]) throw new Error(`Unknown scenario: ${name}`)
   return {
     names,
@@ -350,7 +347,7 @@ async function openDecks(page, url) {
 
 /**
  * Imports a scratch deck through Add deck > Import > Paste text and opens it. Registers a cleanup
- * that deletes it, so a failed scenario still leaves the account as it was.
+ * that deletes it after the scenario, pass or fail.
  */
 async function createScratchDeck(run, page, lines, format = "Constructed") {
   await openDecks(page, run.cli.url)
@@ -359,7 +356,10 @@ async function createScratchDeck(run, page, lines, format = "Constructed") {
     const [used, limit] = ((await capacity.getAttribute("aria-label")) ?? "")
       .match(/\d+/g)
       .map(Number)
-    expect(used < limit, `${run.cli.email} has no free deck slot (${used}/${limit}); run cleanup`)
+    expect(
+      used < limit,
+      `${run.cli.email} has no free deck slot (${used}/${limit}); delete leftover "${SCRATCH}" decks by hand`,
+    )
   }
   const name = `${SCRATCH} ${run.scenario}`
   await page.getByRole("button", { name: "Add deck" }).click()
@@ -373,27 +373,9 @@ async function createScratchDeck(run, page, lines, format = "Constructed") {
   await page.getByTestId("save-import-button").click()
   await page.waitForURL(/\/connected\/decks\/(?!add)[^/?]+$/, { timeout: 60_000 })
   const deckId = page.url().split("/").pop()
-  writeLedger(run.cli, [...readLedger(run.cli), deckId])
-  run.cleanups.push(() => deleteDeck(run, deckId))
+  run.cleanups.push(() => deleteDeck(run, deckId, name))
   await openDeck(page, run.cli.url, deckId)
   return deckId
-}
-
-/**
- * Deck IDs this script created and has not deleted yet. Deletes only ever target these, never a
- * deck matched by name, so a user's own deck can't be removed.
- */
-function ledgerPath(cli) {
-  return path.join(cli.artifacts, "auth", `created-decks-${cli.email}.json`)
-}
-
-function readLedger(cli) {
-  const file = ledgerPath(cli)
-  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : []
-}
-
-function writeLedger(cli, ids) {
-  writePrivate(ledgerPath(cli), JSON.stringify([...new Set(ids)]))
 }
 
 /**
@@ -416,31 +398,27 @@ async function reviewImport(run, page) {
   run.consoleErrors = run.consoleErrors.filter((error) => !throttleError.test(error))
 }
 
-async function deleteDeck(run, deckId) {
-  if (!readLedger(run.cli).includes(deckId))
-    throw new Error(`refusing to delete ${deckId}: this script did not record creating it`)
+/**
+ * Deletes a deck this scenario created in this run (the only decks ever deleted). On failure the
+ * error names the deck so a person can remove it; a crash simply leaves it behind.
+ */
+async function deleteDeck(run, deckId, name) {
   const { page } = await signedInContext(run)
-  // Open it from the list, as a user would, so delete has a screen to go back to.
-  await openDecks(page, run.cli.url)
-  await page.getByTestId(`deck-card-${deckId}`).click()
-  await page.getByTestId("deck-settings-button").click({ timeout: 30_000 })
-  await page.getByTestId("delete-deck-button").click()
-  await page.getByTestId("delete-deck-confirm").click()
-  await page.getByTestId("delete-deck-dialog").waitFor({ state: "hidden", timeout: 30_000 })
-  await openDecks(page, run.cli.url)
-  const gone = await page
-    .getByTestId(`deck-card-${deckId}`)
-    .waitFor({ state: "detached" })
-    .then(
-      () => true,
-      () => false,
-    )
-  await page.context().close()
-  if (!gone) throw new Error(`scratch deck ${deckId} is still listed after delete`)
-  writeLedger(
-    run.cli,
-    readLedger(run.cli).filter((id) => id !== deckId),
-  )
+  try {
+    // Open it from the list, as a user would, so delete has a screen to go back to.
+    await openDecks(page, run.cli.url)
+    await page.getByTestId(`deck-card-${deckId}`).click()
+    await page.getByTestId("deck-settings-button").click({ timeout: 30_000 })
+    await page.getByTestId("delete-deck-button").click()
+    await page.getByTestId("delete-deck-confirm").click()
+    await page.getByTestId("delete-deck-dialog").waitFor({ state: "hidden", timeout: 30_000 })
+    await openDecks(page, run.cli.url)
+    await page.getByTestId(`deck-card-${deckId}`).waitFor({ state: "detached" })
+  } catch (error) {
+    throw new Error(`delete "${name}" (${deckId}) by hand: ${error.message.split("\n")[0]}`)
+  } finally {
+    await page.context().close()
+  }
 }
 
 async function openDeck(page, url, deckId) {
@@ -891,13 +869,6 @@ const SCENARIOS = {
       `the commander choice or the add was lost: ${seen}`,
     )
     return seen
-  },
-
-  // Only decks this script recorded creating (left by a run that crashed before its cleanup).
-  async "cleanup"(run) {
-    const ids = readLedger(run.cli)
-    for (const id of ids) await deleteDeck(run, id)
-    return `deleted ${ids.length} recorded scratch deck(s)`
   },
 }
 

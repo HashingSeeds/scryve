@@ -141,11 +141,11 @@ node .claude/skills/test-scryve-web/scripts/scenarios.cjs --help
 - It signs in through the real consent and Clerk flows and keeps the session
   in `/tmp/scryve-scenarios/auth`, which only you can read. It refuses
   non-local URLs and non-test emails.
-- Each scenario imports a "Scenario scratch" deck, records its ID, and deletes
-  only that ID afterwards, so the account needs a free deck slot. The default
-  account is `john+clerk_test@sow.care` (jane's free slots are used).
-  `cleanup` deletes recorded IDs left by a crashed run, never decks matched by
-  name. A failed delete fails the run.
+- Each scenario imports a "Scenario scratch" deck and, pass or fail, deletes
+  only the decks it created in that run, so the account needs a free deck
+  slot. The default account is `john+clerk_test@sow.care` (jane's free slots
+  are used). A failed delete fails the scenario and prints the deck's name and
+  ID; a crash leaves the deck behind. Remove either by hand.
 - A save passes only once it shows "Synced" and a fresh context, whose saved
   session holds nothing for that deck, reads the same cards back.
 - It prints one PASS/FAIL line per scenario with what it saw. Screenshots and
