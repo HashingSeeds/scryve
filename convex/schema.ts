@@ -225,8 +225,8 @@ export default defineSchema({
     clientCreatedAt: v.number(),
     serverCreatedAt: v.number(),
     undoOfOperationId: v.optional(v.string()),
-    // why: table actions record the counter, designation, or Pokémon they target so a replay can be matched.
-    key: v.optional(v.string()),
+    // why: table actions keep the canonical action they were sent with, so a replayed operation id must carry the same action.
+    actionIdentity: v.optional(v.string()),
     // Legacy global ordering only. New events use serverCreatedAt + document ID.
     sequence: v.optional(v.number()),
   })

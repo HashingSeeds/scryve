@@ -366,7 +366,7 @@ export class OutboxSyncController {
     }
   }
 
-  private enqueueTableAction(action: TableAction, operationId: string): void {
+  private enqueueTableAction(action: TableAction, operationId: string): boolean {
     const now = this.now()
     const result = this.options.repository.enqueue(
       {
@@ -389,11 +389,12 @@ export class OutboxSyncController {
       this.changeError =
         "The offline queue for pending changes is full. Reconnect and sync before making more changes."
       this.publish()
-      return
+      return false
     }
     this.pending = result.pending
     this.changeError = undefined
     this.publish()
+    return true
   }
 
   private endGame = async (

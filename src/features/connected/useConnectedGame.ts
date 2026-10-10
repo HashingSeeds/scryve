@@ -78,8 +78,7 @@ function operationCheckFor(event: ConnectedActionEvent) {
     return {
       kind: event.type,
       operationId: event.operationId,
-      tableKind: event.action.kind,
-      playerId: event.action.playerId as Id<"gamePlayers">,
+      action: event.action,
       deviceId: event.deviceId,
       clientCreatedAt: event.clientCreatedAt,
     } as const

@@ -29,7 +29,9 @@ function localTable(game: LocalGame) {
       canAct: () => true,
     }),
     (action, operationId) => {
+      const previous = current
       current = applyLocalTableAction(current, action, { operationId, now: 2 })
+      return current !== previous
     },
     () => `operation-${String(++operation).padStart(12, "0")}`,
   )
@@ -87,8 +89,38 @@ describe("table runtime", () => {
     expect(isPlayerOut(restored, me)).toBe(true)
   })
 
+  it("never knocks out on a damage step the reducer rejects", () => {
+    const { actions, game } = localTable(newGame("pokemon", 6))
+    const [me] = game().players.map(({ id }) => id)
+    const pokemonId = actions.placePokemon(me, "active", { name: "Pidgey", hp: 60, prizes: 1 })!
+    for (const delta of [Infinity, 1000, 60.5])
+      expect(actions.adjustPokemonDamage(me, pokemonId, delta)).toBeNull()
+    expect(game().players.map(({ life }) => life)).toEqual([6, 6])
+    expect(pokemonBoardOf(game().table!, me).active).toMatchObject({ damage: 0 })
+  })
+
+  it("hands back no id or undo handle when the action could not be queued", () => {
+    const pikachu = { id: "pikachu-0001", name: "Pikachu", hp: 60, prizes: 1, damage: 50 }
+    const actions = createTableActions(
+      () => ({
+        table: {
+          designations: {},
+          players: { me: { pokemon: { active: pikachu, bench: [] } } },
+        },
+        rules: localTableRules({ system: "pokemon", format: "standard" }),
+        playerIds: ["me", "them"],
+        lifeOf: () => 6,
+        canAct: () => true,
+      }),
+      () => false,
+    )
+    expect(actions.placePokemon("me", "bench", { name: "Pidgey", hp: 60, prizes: 1 })).toBeNull()
+    expect(actions.adjustPokemonDamage("me", "pikachu-0001", 10)).toBeNull()
+    expect(actions.knockOut("me", "pikachu-0001")).toBeNull()
+  })
+
   it("does nothing for seats this device cannot act for", () => {
-    const submit = jest.fn()
+    const submit = jest.fn(() => true)
     const actions = createTableActions(
       () => ({
         table: EMPTY_TABLE,

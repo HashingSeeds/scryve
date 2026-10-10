@@ -121,12 +121,13 @@ export function useLocalGame(
         (action, operationId) => {
           const previous = gameRef.current
           const next = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
-          if (next === previous) return
+          if (next === previous) return false
           repository.saveActiveGame(next)
           if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
             captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
           gameRef.current = next
           setGame(next)
+          return true
         },
       ),
     [repository],

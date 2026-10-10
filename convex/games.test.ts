@@ -2528,23 +2528,35 @@ describe("connected table actions", () => {
     await expect(game.host.mutation(api.games.tableAction, args)).resolves.toMatchObject({
       deduplicated: true,
     })
-    await expect(
-      game.host.mutation(api.games.tableAction, {
-        ...args,
-        action: { ...args.action, pokemonId: "pidgey-00002" },
-      }),
-    ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+    const changed = [
+      { ...args.action, slot: "active" as const },
+      { ...args.action, card: { ...args.action.card, hp: 70 } },
+      { ...args.action, card: { ...args.action.card, prizes: 2 } },
+    ]
+    for (const action of changed) {
+      await expect(
+        game.host.mutation(api.games.tableAction, { ...args, action }),
+      ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+    }
 
-    const projection = await game.host.query(api.games.lobbyProjection, {
-      publicId: game.publicId,
-      operation: {
-        kind: "table.action",
-        operationId: args.operationId,
-        tableKind: "pokemon.placed",
-        playerId: game.hostPlayerId,
-        deviceId: args.deviceId,
-        clientCreatedAt: args.clientCreatedAt,
-      },
+    const status = (action: TableAction) =>
+      game.host.query(api.games.lobbyProjection, {
+        publicId: game.publicId,
+        operation: {
+          kind: "table.action",
+          operationId: args.operationId,
+          action,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        },
+      })
+    const projection = await status({
+      // why: key order differs from the original send and still matches.
+      card: { prizes: 1, hp: 60, name: "Pidgey" },
+      slot: "bench",
+      pokemonId: "pidgey-00001",
+      playerId: game.hostPlayerId,
+      kind: "pokemon.placed",
     })
     expect(projection.operationStatus).toEqual({
       status: "acknowledged",
@@ -2552,6 +2564,128 @@ describe("connected table actions", () => {
       projectionEventSequence: 1,
     })
     expect(projection.table?.players[game.hostPlayerId].pokemon?.bench).toHaveLength(1)
+    await expect(status(changed[1])).resolves.toMatchObject({
+      operationStatus: { status: "conflict" },
+    })
+  })
+
+  it("knocks out on damage that is lethal against the stored damage, even when each device saw a safe total", async () => {
+    const t = makeConvexTest()
+    const game = await pokemonGame(t)
+    const send = (operationId: string, action: TableAction) =>
+      game.host.mutation(api.games.tableAction, tableArgs(game.publicId, operationId, action))
+    await send("table-operation-0001", {
+      kind: "pokemon.placed",
+      playerId: game.hostPlayerId,
+      pokemonId: "pikachu-0001",
+      slot: "active",
+      card: { name: "Pikachu", hp: 100, prizes: 1 },
+    })
+    await send("table-operation-0002", {
+      kind: "pokemon.damaged",
+      playerId: game.hostPlayerId,
+      pokemonId: "pikachu-0001",
+      delta: 70,
+    })
+    const hit = {
+      kind: "pokemon.damaged" as const,
+      playerId: game.hostPlayerId,
+      pokemonId: "pikachu-0001",
+      delta: 20,
+      takerPlayerId: game.joinerPlayerId,
+    }
+    await send("table-operation-0003", hit)
+    await send("table-operation-0004", hit)
+
+    const projection = await game.host.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.players[1].currentLife).toBe(5)
+    expect(projection.table?.players[game.hostPlayerId].pokemon).toMatchObject({
+      bench: [],
+      lastKnockout: {
+        operationId: "table-operation-0004",
+        pokemon: { damage: 90 },
+        prizesTaken: 1,
+      },
+    })
+  })
+
+  it("carries a local game's table into the connected game under the new seat ids", async () => {
+    const t = makeConvexTest()
+    const host = await synced(t, "publish-host", "Host")
+    const charizard = { id: "charizard-01", name: "Charizard ex", hp: 330, prizes: 2, damage: 0 }
+    const base = {
+      operationId: "publish-table-operation",
+      publicId: "publish-table-game-1234",
+      system: "pokemon",
+      format: "standard",
+      ruleset: "standard",
+      startingLife: 6,
+      inviteToken: token,
+      manualCodeCandidates: ["TBL234"],
+      hostLocalId: "local-a",
+      players: [
+        {
+          localId: "local-a",
+          seat: 1,
+          displayName: "Ada",
+          color: "#7C3AED",
+          currentLife: 6,
+        },
+        {
+          localId: "local-b",
+          seat: 2,
+          displayName: "Grace",
+          color: "#2563EB",
+          currentLife: 4,
+        },
+      ],
+    }
+    const table = {
+      designations: {},
+      players: {
+        "local-a": {
+          pokemon: {
+            bench: [],
+            lastKnockout: {
+              operationId: "local-knockout-00001",
+              pokemon: charizard,
+              slot: "active" as const,
+              takerPlayerId: "local-b",
+              prizesTaken: 2,
+            },
+          },
+        },
+      },
+    }
+    await expect(
+      host.mutation(api.games.publishLocalGame, {
+        ...base,
+        table: { ...table, designations: { monarch: "local-a" } },
+      }),
+    ).rejects.toThrow("Table state does not fit this game")
+
+    const published = await host.mutation(api.games.publishLocalGame, { ...base, table })
+    const [hostSeat, opponentSeat] = published.players.map(({ playerId }) => playerId)
+    await host.mutation(api.games.tableAction, {
+      publicId: published.publicId,
+      operationId: "table-operation-0001",
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1,
+      action: {
+        kind: "pokemon.knockoutUndone",
+        playerId: hostSeat,
+        knockoutOperationId: "local-knockout-00001",
+      },
+    })
+    const projection = await host.query(api.games.lobbyProjection, {
+      publicId: published.publicId,
+    })
+    expect(projection.players.find(({ playerId }) => playerId === opponentSeat)?.currentLife).toBe(
+      6,
+    )
+    expect(projection.table?.players[hostSeat].pokemon).toEqual({ active: charizard, bench: [] })
   })
 
   it("lets only a seat's owner act for it and keeps a designation on one seat", async () => {

@@ -50,10 +50,15 @@ import { recordGameResults } from "./lib/results"
 import { tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
+  canonicalJson,
+  isValidTableSnapshot,
+  remapTableState,
   tableActionDelta,
-  tableActionKey,
+  tableActionIdentity,
+  tableStateValidator,
   tableActionValidator,
   type PlayerTable,
+  type PokemonCard,
   type TableAction,
   type TableState,
 } from "./lib/table"
@@ -940,6 +945,8 @@ export const publishLocalGame = mutation({
     commanderTotals: v.optional(
       v.array(v.object({ fromSeat: v.number(), toSeat: v.number(), total: v.number() })),
     ),
+    // why: counters, designations, and Pokémon keyed by local player id; remapped to the new seats on insert.
+    table: v.optional(tableStateValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -969,6 +976,8 @@ export const publishLocalGame = mutation({
     }
     if (totalPairs.size > MAX_PLAYERS_PER_GAME_READ * (MAX_PLAYERS_PER_GAME_READ - 1))
       throw new Error("Too many commander damage totals")
+    if (args.table && !isValidTableSnapshot(args.table, tableRules(gameSystem, format), localIds))
+      throw new Error("Table state does not fit this game")
     const requestKey = JSON.stringify([
       args.publicId,
       args.system ?? null,
@@ -989,6 +998,8 @@ export const publishLocalGame = mutation({
         player.currentLife,
       ]),
       args.commanderTotals ?? null,
+      // why: appended only when sent, so receipts written before tables existed keep their key.
+      ...(args.table ? [canonicalJson(args.table)] : []),
     ])
     const receipt = await ctx.db
       .query("gamePublishReceipts")
@@ -1055,6 +1066,20 @@ export const publishLocalGame = mutation({
       })
       mapping.push({ localId: player.localId, playerId, seat: player.seat })
       playerIdsBySeat.set(player.seat, playerId)
+    }
+    if (args.table) {
+      const playerIdsByLocalId = new Map(
+        mapping.map(({ localId, playerId }) => [localId, playerId]),
+      )
+      const table = remapTableState(gatedTableState(args.table), (localId) =>
+        playerIdsByLocalId.get(localId)!,
+      )
+      for (const [playerId, player] of Object.entries(table.players)) {
+        const id = ctx.db.normalizeId("gamePlayers", playerId)
+        if (id) await ctx.db.patch(id, playerTableFromRow(player))
+      }
+      if (Object.keys(table.designations).length > 0)
+        await ctx.db.patch(gameId, { designations: storedDesignations(ctx, table.designations) })
     }
     for (const total of totals) {
       await ctx.db.insert("gameCommanderDamage", {
@@ -1331,8 +1356,7 @@ const connectedOperation = v.union(
   v.object({
     kind: v.literal("table.action"),
     operationId: v.string(),
-    tableKind: v.string(),
-    playerId: v.id("gamePlayers"),
+    action: tableActionValidator,
     deviceId: v.string(),
     clientCreatedAt: v.number(),
   }),
@@ -1539,7 +1563,9 @@ async function statusForOperation(
         event.playerId === operation.playerId &&
         event.delta === operation.delta
       : operation.kind === "table.action"
-        ? event.kind === operation.tableKind && event.playerId === operation.playerId
+        ? event.kind === operation.action.kind &&
+          event.playerId === operation.action.playerId &&
+          event.actionIdentity === tableActionIdentity(operation.action)
         : event.kind === "commanderDamage.claimed" &&
           event.fromPlayerId === operation.fromPlayerId &&
           event.toPlayerId === operation.toPlayerId &&
@@ -1805,7 +1831,16 @@ function gameTableRules(game: Doc<"games">) {
   return tableRules(game.system ?? game.game ?? DEFAULT_DECK_GAME, game.format ?? game.ruleset)
 }
 
-function playerTableFromRow(player: Doc<"gamePlayers">): PlayerTable {
+function storedDesignations(ctx: QueryCtx, designations: TableState["designations"]) {
+  const stored: Record<string, Id<"gamePlayers">> = {}
+  for (const [designationId, holder] of Object.entries(designations)) {
+    const holderId = ctx.db.normalizeId("gamePlayers", holder)
+    if (holderId) stored[designationId] = holderId
+  }
+  return stored
+}
+
+function playerTableFromRow(player: PlayerTable): PlayerTable {
   return {
     ...(player.counters ? { counters: player.counters } : {}),
     ...(player.pokemon ? { pokemon: player.pokemon } : {}),
@@ -1814,17 +1849,46 @@ function playerTableFromRow(player: Doc<"gamePlayers">): PlayerTable {
 
 // why: a knockout and its undo also move the other seat's prize counter, so that row is read too.
 function relatedPlayerId(action: TableAction, actor: Doc<"gamePlayers">) {
-  if (action.kind === "pokemon.knockedOut") return action.takerPlayerId
+  if (action.kind === "pokemon.knockedOut" || action.kind === "pokemon.damaged")
+    return action.takerPlayerId
   if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
   return undefined
 }
 
 // why: a hand-typed Pokémon name is shown to every seat, so one that fails the name gate is stored without it, like a hidden deck name.
+function gatedCard<Card extends PokemonCard>(card: Card): Card {
+  return card.name !== undefined && nameFailsGate(card.name) ? { ...card, name: undefined } : card
+}
+
 function gatedTableAction(action: TableAction): TableAction {
   if (action.kind !== "pokemon.placed" && action.kind !== "pokemon.updated") return action
-  if (action.card.name === undefined || !nameFailsGate(action.card.name)) return action
-  const { name: _hidden, ...card } = action.card
-  return { ...action, card }
+  return { ...action, card: gatedCard(action.card) }
+}
+
+function gatedTableState(table: TableState): TableState {
+  return {
+    ...table,
+    players: Object.fromEntries(
+      Object.entries(table.players).map(([playerId, player]) => {
+        const board = player.pokemon
+        if (!board) return [playerId, player]
+        const knockout = board.lastKnockout
+        return [
+          playerId,
+          {
+            ...player,
+            pokemon: {
+              ...(board.active ? { active: gatedCard(board.active) } : {}),
+              bench: board.bench.map(gatedCard),
+              ...(knockout
+                ? { lastKnockout: { ...knockout, pokemon: gatedCard(knockout.pokemon) } }
+                : {}),
+            },
+          },
+        ]
+      }),
+    ),
+  }
 }
 
 // why: counters, designations, and Pokémon all go through one replay-safe write that runs the shared table reducer. Only the acting seat's owner may write, like life.
@@ -1855,7 +1919,8 @@ export const tableAction = mutation({
     )
       throw gameWriteError("seat_owner_required", "Seat-owner permission required")
 
-    const key = tableActionKey(action)
+    // why: identity comes from the action as sent, so a retry matches even when the name gate trimmed what was stored.
+    const actionIdentity = tableActionIdentity(args.action)
     const actionDelta = tableActionDelta(action)
     const duplicate = await ctx.db
       .query("gameEvents")
@@ -1867,8 +1932,7 @@ export const tableAction = mutation({
       if (
         duplicate.kind !== action.kind ||
         duplicate.playerId !== actor._id ||
-        duplicate.key !== key ||
-        (actionDelta !== undefined && duplicate.delta !== actionDelta) ||
+        duplicate.actionIdentity !== actionIdentity ||
         duplicate.actorUserId !== user._id ||
         duplicate.deviceId !== args.deviceId ||
         duplicate.clientCreatedAt !== args.clientCreatedAt
@@ -1911,14 +1975,10 @@ export const tableAction = mutation({
         lastEventAt: now,
       })
     }
-    if (result.table.designations !== table.designations) {
-      const designations: Record<string, Id<"gamePlayers">> = {}
-      for (const [designationId, holder] of Object.entries(result.table.designations)) {
-        const holderId = ctx.db.normalizeId("gamePlayers", holder)
-        if (holderId) designations[designationId] = holderId
-      }
-      await ctx.db.patch(game._id, { designations })
-    }
+    if (result.table.designations !== table.designations)
+      await ctx.db.patch(game._id, {
+        designations: storedDesignations(ctx, result.table.designations),
+      })
 
     const lifeChange = result.life[0]
     const lifeChangeTarget = lifeChange && ctx.db.normalizeId("gamePlayers", lifeChange.playerId)
@@ -1927,7 +1987,7 @@ export const tableAction = mutation({
       playerId: actor._id,
       operationId: args.operationId,
       kind: action.kind,
-      key,
+      actionIdentity,
       ...(lifeChange && lifeChangeTarget
         ? { toPlayerId: lifeChangeTarget, delta: lifeChange.delta }
         : actionDelta === undefined

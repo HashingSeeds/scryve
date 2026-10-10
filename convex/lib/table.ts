@@ -1,6 +1,6 @@
 import { v, type GenericValidator, type Infer } from "convex/values"
 
-import type { TableDefinition } from "./systems"
+import type { PokemonBoardDefinition, TableDefinition } from "./systems"
 
 export const MAX_POKEMON_HP = 999
 export const MAX_POKEMON_DAMAGE = 999
@@ -8,6 +8,7 @@ export const POKEMON_HP_FACET = "hp"
 const MAX_POKEMON_CARD_ID_LENGTH = 200
 const MAX_POKEMON_NAME_LENGTH = 100
 const POKEMON_ID = /^[A-Za-z0-9_-]{8,64}$/
+const OPERATION_ID = /^[A-Za-z0-9_-]{16,128}$/
 
 export const pokemonSlotValidator = v.union(v.literal("active"), v.literal("bench"))
 
@@ -82,6 +83,8 @@ export const tableActionValidator = v.union(
     playerId: v.string(),
     pokemonId: v.string(),
     delta: v.number(),
+    /** why: damage that turns out lethal on the current table knocks out, and this seat takes the prizes. */
+    takerPlayerId: v.optional(v.string()),
   }),
   v.object({ kind: v.literal("pokemon.switched"), playerId: v.string(), pokemonId: v.string() }),
   v.object({ kind: v.literal("pokemon.removed"), playerId: v.string(), pokemonId: v.string() }),
@@ -403,6 +406,9 @@ export function applyTableAction(
     if (!isNonZeroStep(action.delta, MAX_POKEMON_DAMAGE)) return null
     const damage = Math.max(0, Math.min(MAX_POKEMON_DAMAGE, pokemon.damage + action.delta))
     if (damage === pokemon.damage) return unchanged
+    // why: lethal damage is judged against the damage already on the table, so two devices adding damage at once still knock the Pokémon out.
+    if (action.delta > 0 && damage >= pokemon.hp)
+      return knockOut(table, action.playerId, board, found, action.takerPlayerId, context)
     return {
       table: withBoard(table, action.playerId, replacePokemon(board, { ...pokemon, damage })),
       life: [],
@@ -423,8 +429,19 @@ export function applyTableAction(
   if (action.kind === "pokemon.removed")
     return { table: withBoard(table, action.playerId, withoutPokemon(board, pokemon.id)), life: [] }
 
-  const taker = action.takerPlayerId
-  if (taker !== undefined && taker === action.playerId) return null
+  return knockOut(table, action.playerId, board, found, action.takerPlayerId, context)
+}
+
+// why: the board keeps the Pokémon as it stood before the knockout, so undo puts it back with its earlier damage.
+function knockOut(
+  table: TableState,
+  playerId: string,
+  board: PokemonBoard,
+  { pokemon, slot }: { pokemon: PokemonInPlay; slot: PokemonSlot },
+  taker: string | undefined,
+  context: TableContext,
+): TableChange | null {
+  if (taker !== undefined && taker === playerId) return null
   const takerLife = taker === undefined ? undefined : context.lifeOf(taker)
   if (taker !== undefined && takerLife === undefined) return null
   const prizesTaken = Math.min(pokemon.prizes, Math.max(0, takerLife ?? 0))
@@ -436,7 +453,7 @@ export function applyTableAction(
     prizesTaken,
   }
   return {
-    table: withBoard(table, action.playerId, {
+    table: withBoard(table, playerId, {
       ...withoutPokemon(board, pokemon.id),
       lastKnockout: knockout,
     }),
@@ -444,19 +461,107 @@ export function applyTableAction(
   }
 }
 
-/** why: the gameEvents row keeps the one id each action targets, so a replayed operation can be matched. */
-export function tableActionKey(action: TableAction): string {
-  switch (action.kind) {
-    case "counter.changed":
-      return action.counterId
-    case "designation.taken":
-    case "designation.released":
-      return action.designationId
-    case "pokemon.knockoutUndone":
-      return action.knockoutOperationId
-    default:
-      return action.pokemonId
+function isValidPokemon(pokemon: PokemonInPlay) {
+  return (
+    POKEMON_ID.test(pokemon.id) &&
+    isValidCard(pokemon) &&
+    isWholeNumber(pokemon.damage, 0, MAX_POKEMON_DAMAGE)
+  )
+}
+
+function isValidBoard(
+  board: PokemonBoard,
+  owner: string,
+  rules: PokemonBoardDefinition,
+  playerIds: ReadonlySet<string>,
+) {
+  const inPlay = [...(board.active ? [board.active] : []), ...board.bench]
+  const knockout = board.lastKnockout
+  const ids = new Set(inPlay.map(({ id }) => id))
+  return (
+    board.bench.length <= rules.benchSize &&
+    ids.size === inPlay.length &&
+    inPlay.every(isValidPokemon) &&
+    (knockout === undefined ||
+      (OPERATION_ID.test(knockout.operationId) &&
+        isValidPokemon(knockout.pokemon) &&
+        !ids.has(knockout.pokemon.id) &&
+        isWholeNumber(knockout.prizesTaken, 0, knockout.pokemon.prizes) &&
+        (knockout.takerPlayerId === undefined
+          ? knockout.prizesTaken === 0
+          : knockout.takerPlayerId !== owner && playerIds.has(knockout.takerPlayerId))))
+  )
+}
+
+/** why: a local game handed to a connected one brings its table along, and the server accepts only what its own reducer could have produced. */
+export function isValidTableSnapshot(
+  table: TableState,
+  rules: TableDefinition,
+  playerIds: ReadonlySet<string>,
+): boolean {
+  return (
+    Object.entries(table.designations).every(
+      ([designationId, holder]) =>
+        rules.designations.some(({ id }) => id === designationId) && playerIds.has(holder),
+    ) &&
+    Object.entries(table.players).every(
+      ([playerId, player]) =>
+        playerIds.has(playerId) &&
+        Object.entries(player.counters ?? {}).every(([counterId, value]) => {
+          const counter = rules.counters.find(({ id }) => id === counterId)
+          return counter !== undefined && isWholeNumber(value, 0, counter.max)
+        }) &&
+        (player.pokemon === undefined ||
+          (rules.pokemon !== undefined &&
+            isValidBoard(player.pokemon, playerId, rules.pokemon, playerIds))),
+    )
+  )
+}
+
+/** why: local seats and connected seats have different ids; every place a table names a seat moves to the new id. */
+export function remapTableState(table: TableState, idOf: (playerId: string) => string): TableState {
+  return {
+    designations: Object.fromEntries(
+      Object.entries(table.designations).map(([designationId, holder]) => [
+        designationId,
+        idOf(holder),
+      ]),
+    ),
+    players: Object.fromEntries(
+      Object.entries(table.players).map(([playerId, player]) => {
+        const knockout = player.pokemon?.lastKnockout
+        return [
+          idOf(playerId),
+          knockout?.takerPlayerId && player.pokemon
+            ? {
+                ...player,
+                pokemon: {
+                  ...player.pokemon,
+                  lastKnockout: { ...knockout, takerPlayerId: idOf(knockout.takerPlayerId) },
+                },
+              }
+            : player,
+        ]
+      }),
+    ),
   }
+}
+
+/** why: JSON whose key order and absent optional fields do not matter, for comparing replayed payloads. */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`
+  if (isPlainRecord(value))
+    return `{${Object.keys(value)
+      .filter((key) => value[key] !== undefined)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(",")}}`
+  return JSON.stringify(value)
+}
+
+/** why: a replayed operation must carry the exact action it was first sent with; key order and absent optional fields do not change the identity. */
+export function tableActionIdentity(action: TableAction): string {
+  return canonicalJson(action)
 }
 
 export function tableActionDelta(action: TableAction): number | undefined {

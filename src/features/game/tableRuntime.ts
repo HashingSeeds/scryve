@@ -2,7 +2,6 @@ import { createClientId } from "./domain"
 import type { TableRules } from "./playSystems"
 import {
   applyTableAction,
-  findPokemon,
   pokemonBoardOf,
   type PokemonCard,
   type PokemonKnockout,
@@ -56,7 +55,8 @@ export interface TableSource {
  */
 export function createTableActions(
   read: () => TableSource | null,
-  submit: (action: TableAction, operationId: string) => void,
+  /** why: returns false when the action could not be stored or queued, such as a full offline queue. */
+  submit: (action: TableAction, operationId: string) => boolean,
   newOperationId: () => string = () => createClientId("operation"),
 ): TableActions {
   const run = (action: TableAction) => {
@@ -69,8 +69,7 @@ export function createTableActions(
       lifeOf: source.lifeOf,
     })
     if (!change || change.table === source.table) return null
-    submit(action, operationId)
-    return change
+    return submit(action, operationId) ? { change, operationId } : null
   }
 
   // why: Pokémon is a two-player game, so the one opponent takes the prizes unless the UI names a taker.
@@ -80,16 +79,18 @@ export function createTableActions(
     return others.length === 1 ? others[0] : undefined
   }
 
-  const knockOut = (playerId: string, pokemonId: string, takerPlayerId?: string) => {
-    const taker = takerFor(playerId, takerPlayerId)
-    const change = run({
-      kind: "pokemon.knockedOut",
-      playerId,
-      pokemonId,
-      ...(taker === undefined ? {} : { takerPlayerId: taker }),
-    })
-    const knockout = change && pokemonBoardOf(change.table, playerId).lastKnockout
-    return knockout ? { ...knockout, playerId } : null
+  // why: the shared reducer decides whether damage is lethal, so the knockout is only reported when this very operation made it.
+  const runKnockout = ({
+    takerPlayerId,
+    ...action
+  }: TableAction & { kind: "pokemon.damaged" | "pokemon.knockedOut" }) => {
+    const taker = takerFor(action.playerId, takerPlayerId)
+    const result = run({ ...action, ...(taker === undefined ? {} : { takerPlayerId: taker }) })
+    if (!result) return null
+    const knockout = pokemonBoardOf(result.change.table, action.playerId).lastKnockout
+    return knockout?.operationId === result.operationId
+      ? { ...knockout, playerId: action.playerId }
+      : null
   }
 
   return {
@@ -109,21 +110,16 @@ export function createTableActions(
     updatePokemon: (playerId, pokemonId, card) => {
       run({ kind: "pokemon.updated", playerId, pokemonId, card })
     },
-    adjustPokemonDamage: (playerId, pokemonId, delta, takerPlayerId) => {
-      const source = read()
-      const found = source && findPokemon(pokemonBoardOf(source.table, playerId), pokemonId)
-      if (found && delta > 0 && found.pokemon.damage + delta >= found.pokemon.hp)
-        return knockOut(playerId, pokemonId, takerPlayerId)
-      run({ kind: "pokemon.damaged", playerId, pokemonId, delta })
-      return null
-    },
+    adjustPokemonDamage: (playerId, pokemonId, delta, takerPlayerId) =>
+      runKnockout({ kind: "pokemon.damaged", playerId, pokemonId, delta, takerPlayerId }),
     switchActive: (playerId, benchPokemonId) => {
       run({ kind: "pokemon.switched", playerId, pokemonId: benchPokemonId })
     },
     removePokemon: (playerId, pokemonId) => {
       run({ kind: "pokemon.removed", playerId, pokemonId })
     },
-    knockOut,
+    knockOut: (playerId, pokemonId, takerPlayerId) =>
+      runKnockout({ kind: "pokemon.knockedOut", playerId, pokemonId, takerPlayerId }),
     undoKnockout: (playerId, knockoutOperationId) => {
       run({ kind: "pokemon.knockoutUndone", playerId, knockoutOperationId })
     },
