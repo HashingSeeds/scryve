@@ -45,7 +45,6 @@
     "./modules/lazy-view-managers/app.plugin.js",
     "expo-secure-store",
     "expo-localization",
-    "expo-font",
     "expo-web-browser",
     [
       "expo-camera",
