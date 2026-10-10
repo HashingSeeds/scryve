@@ -14,7 +14,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
-import { seatTableState } from "./CounterChips"
+import { losingCounter, seatTableState } from "./CounterChips"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
@@ -73,6 +73,7 @@ export interface PlayerGridProps {
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
   getStaleSince?: (player: GamePlayer) => number | undefined
+  /** why: commander damage elimination; a losing table counter like 10 poison is read from `table`. */
   isPlayerEliminated?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
   table?: TableRuntime
@@ -281,6 +282,9 @@ export function PlayerGrid({
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
               const seatTable = seatTableState(table, player.id)
+              const eliminated = isPlayerEliminated?.(player)
+                ? "commander damage"
+                : seatTable && losingCounter(seatTable)?.label.toLowerCase()
               return (
                 <View
                   key={player.id}
@@ -306,7 +310,7 @@ export function PlayerGrid({
                     disabled={disabled || playerDisabled}
                     ownership={ownership}
                     staleSince={getStaleSince?.(player)}
-                    eliminated={isPlayerEliminated?.(player)}
+                    eliminated={eliminated}
                     commanderDamage={
                       commanderDamage && boardSeats
                         ? {

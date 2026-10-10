@@ -109,7 +109,8 @@ export interface LifeCardProps {
   ownership?: "owned" | "unowned" | "disabled"
   staleSince?: number
   commanderDamage?: LifeCardCommanderDamage
-  eliminated?: boolean
+  /** why: what knocked the seat out, such as "commander damage" or "poison"; the card dims and its label says why. */
+  eliminated?: string
   seatTable?: SeatTable
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
@@ -164,7 +165,7 @@ export const LifeCard = memo(function LifeCard({
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
-  const frozen = disabled || eliminated
+  const frozen = disabled || !!eliminated
   const inspectDisabled = disabled && ownership !== "unowned"
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
@@ -424,7 +425,7 @@ export const LifeCard = memo(function LifeCard({
     <View
       testID={`life-card-seat-${seatNumber}`}
       accessibilityLabel={`${identity}${ownershipLabel ? `, ${ownershipLabel}` : ""}${
-        eliminated ? ", eliminated by commander damage" : ""
+        eliminated ? `, out: ${eliminated}` : ""
       }`}
       onLayout={measureCard}
       style={[

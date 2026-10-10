@@ -52,6 +52,13 @@ export function seatTableState(
   }
 }
 
+/** why: a counter at its losing count (10 poison) knocks the seat out, just as lethal commander damage does. */
+export function losingCounter({ rules, counters }: Pick<SeatTable, "rules" | "counters">) {
+  return rules.counters.find(
+    ({ id, losesAt }) => losesAt !== undefined && (counters[id] ?? 0) >= losesAt,
+  )
+}
+
 // why: glyphs are keyed by counter or designation id, so any system that reuses an id gets its glyph and new ids fall back to a plain dot.
 const GLYPHS: Record<string, string> = {
   poison: "M12 2v20",

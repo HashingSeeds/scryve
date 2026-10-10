@@ -738,7 +738,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          eliminated
+          eliminated="commander damage"
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -1207,7 +1207,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={13}
           color="#41476E"
-          eliminated
+          eliminated="commander damage"
           onChange={onChange}
         />
       </ThemeProvider>,

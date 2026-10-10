@@ -26,6 +26,7 @@ import {
   PlayerGrid,
 } from "./PlayerGrid"
 import { PlayerMark } from "./PlayerMark"
+import type { TableState } from "../../convex/lib/table"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -35,6 +36,36 @@ function players(count: number) {
     life: 20,
     seat,
   }))
+}
+
+function tableGrid(table: TableState) {
+  const seats = players(2)
+  const rules = playTableRules("mtg", "commander")
+  const submit = jest.fn(() => true)
+  const runtime: TableRuntime = {
+    table,
+    tableRules: rules,
+    ...createTableActions(
+      () => ({
+        table,
+        rules,
+        playerIds: seats.map(({ id }) => id),
+        lifeOf: () => 40,
+        canAct: () => true,
+      }),
+      submit,
+    ),
+  }
+  const view = render(
+    <ThemeProvider>
+      <PlayerGrid players={seats} table={runtime} onChange={jest.fn()} />
+    </ThemeProvider>,
+  )
+  for (const seat of seats.keys())
+    fireEvent(view.getByTestId(`life-card-seat-${seat + 1}`), "layout", {
+      nativeEvent: { layout: { width: 300, height: 400, x: 0, y: 0 } },
+    })
+  return { view, submit }
 }
 
 describe("PlayerGrid", () => {
@@ -86,36 +117,10 @@ describe("PlayerGrid", () => {
   })
 
   it("shows each seat its own counters and designations and sends chip taps for that seat", () => {
-    const gamePlayers = players(2)
-    const rules = playTableRules("mtg", "commander")
-    const table = {
+    const { view, submit } = tableGrid({
       designations: { monarch: "player-1" },
       players: { "player-0": { counters: { poison: 2 } } },
-    }
-    const submit = jest.fn(() => true)
-    const runtime: TableRuntime = {
-      table,
-      tableRules: rules,
-      ...createTableActions(
-        () => ({
-          table,
-          rules,
-          playerIds: gamePlayers.map(({ id }) => id),
-          lifeOf: () => 40,
-          canAct: () => true,
-        }),
-        submit,
-      ),
-    }
-    const view = render(
-      <ThemeProvider>
-        <PlayerGrid players={gamePlayers} table={runtime} onChange={jest.fn()} />
-      </ThemeProvider>,
-    )
-    for (const seat of [1, 2])
-      fireEvent(view.getByTestId(`life-card-seat-${seat}`), "layout", {
-        nativeEvent: { layout: { width: 300, height: 400, x: 0, y: 0 } },
-      })
+    })
 
     expect(view.queryByTestId("designation-chip-1-monarch")).toBeNull()
     expect(view.getByTestId("designation-chip-2-monarch")).toBeTruthy()
@@ -123,6 +128,26 @@ describe("PlayerGrid", () => {
     fireEvent.press(view.getByTestId("counter-chip-1-poison"))
     expect(submit).toHaveBeenCalledWith(
       { kind: "counter.changed", playerId: "player-0", counterId: "poison", delta: 1 },
+      expect.any(String),
+    )
+  })
+
+  it("reads a seat at its losing poison count as out, and keeps its counters editable", () => {
+    const { view, submit } = tableGrid({
+      designations: {},
+      players: { "player-0": { counters: { poison: 10 } } },
+    })
+
+    expect(view.getByTestId("life-eliminated-seat-1")).toBeTruthy()
+    expect(view.getByTestId("life-card-seat-1")).toHaveProp(
+      "accessibilityLabel",
+      "Seat 1, Player 1, out: poison",
+    )
+    expect(view.queryByTestId("life-eliminated-seat-2")).toBeNull()
+    fireEvent(view.getByTestId("counter-chip-1-poison"), "longPress")
+    fireEvent.press(view.getByTestId("counter-edit-1-poison-minus"))
+    expect(submit).toHaveBeenCalledWith(
+      { kind: "counter.changed", playerId: "player-0", counterId: "poison", delta: -1 },
       expect.any(String),
     )
   })
