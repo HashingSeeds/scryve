@@ -9,7 +9,6 @@ const es: Translations = {
     generic: {
       heading: "Todavía no hay nada",
       content: "No se encontraron datos. Intenta actualizar o recargar la app.",
-      button: "Intentar de nuevo",
     },
   },
 }
