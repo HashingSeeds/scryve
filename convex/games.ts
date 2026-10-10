@@ -46,6 +46,7 @@ import {
   STALE_GAME_INACTIVITY_MS,
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
+import { recordGameResults } from "./lib/results"
 import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 
 const MAX_PLAYERS_PER_GAME_READ = 7
@@ -445,23 +446,6 @@ async function inviteIsCurrent(
   return current?._id === invite._id
 }
 
-type DeckRecord = { games: number; wins: number; losses: number; draws: number; unknown: number }
-
-function incrementedRecord(
-  current: DeckRecord | null,
-  outcome: "win" | "loss" | "draw" | "unknown",
-  now: number,
-) {
-  return {
-    games: (current?.games ?? 0) + 1,
-    wins: (current?.wins ?? 0) + (outcome === "win" ? 1 : 0),
-    losses: (current?.losses ?? 0) + (outcome === "loss" ? 1 : 0),
-    draws: (current?.draws ?? 0) + (outcome === "draw" ? 1 : 0),
-    unknown: (current?.unknown ?? 0) + (outcome === "unknown" ? 1 : 0),
-    updatedAt: now,
-  }
-}
-
 async function terminalizeGame(
   ctx: MutationCtx,
   game: Doc<"games">,
@@ -578,39 +562,7 @@ async function terminalizeGame(
       outcome,
     })
   }
-  // why: an abandoned game has no result, so counting it as a played game would drag down deck win rates.
-  const recordsDeckResults = recordsHistory && status === "finished"
-  for (const player of recordsDeckResults ? summaryPlayers : []) {
-    if (!player.userId || !player.deckId || !player.deckVersionId) continue
-    await ctx.db.insert("deckGameResults", {
-      deckId: player.deckId,
-      deckVersionId: player.deckVersionId,
-      gameId: game._id,
-      playerId: player.playerId,
-      userId: player.userId,
-      outcome: player.outcome,
-      finishedAt,
-    })
-    const stats = await ctx.db
-      .query("deckStats")
-      .withIndex("by_deck", (q) => q.eq("deckId", player.deckId!))
-      .unique()
-    const increment = incrementedRecord(stats, player.outcome, now)
-    if (stats) await ctx.db.patch(stats._id, increment)
-    else await ctx.db.insert("deckStats", { deckId: player.deckId, ...increment })
-    const versionStats = await ctx.db
-      .query("deckVersionStats")
-      .withIndex("by_version", (q) => q.eq("deckVersionId", player.deckVersionId!))
-      .unique()
-    const versionIncrement = incrementedRecord(versionStats, player.outcome, now)
-    if (versionStats) await ctx.db.patch(versionStats._id, versionIncrement)
-    else
-      await ctx.db.insert("deckVersionStats", {
-        deckId: player.deckId,
-        deckVersionId: player.deckVersionId,
-        ...versionIncrement,
-      })
-  }
+  await recordGameResults(ctx, summary, now)
   await ctx.db.patch(game._id, { status, updatedAt: now })
   for (const player of players) await ctx.db.patch(player._id, { resumable: false })
   return summary
