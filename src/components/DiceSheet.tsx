@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
-import { AccessibilityInfo, ScrollView, View } from "react-native"
+import { AccessibilityInfo, Platform, ScrollView, View } from "react-native"
 
 import type { GamePlayer } from "@/features/game/types"
 import { useAppTheme } from "@/theme/context"
@@ -23,9 +23,24 @@ function randomIndex(count: number) {
   return Math.floor(Math.random() * count)
 }
 
-// why: a result is a state change with no focus move, and a repeat of the same result changes no text, so every press announces itself.
-function announceResult(message: string) {
-  AccessibilityInfo.announceForAccessibility(message)
+const LIVE_REGION_REISSUE_MS = 100
+
+/**
+ * why: a result is a state change with no focus move, and a repeat of the same result changes no text, so every press announces itself.
+ * react-native-web's announce is a no-op, so web gets the message back for a polite live region.
+ */
+function useResultAnnouncer() {
+  const [webMessage, setWebMessage] = useState("")
+  const reissue = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(reissue.current), [])
+  function announce(message: string) {
+    if (Platform.OS !== "web") return AccessibilityInfo.announceForAccessibility(message)
+    // why: a live region only speaks when its text changes, so it clears first and the message lands a beat later; a repeated roll is read again.
+    clearTimeout(reissue.current)
+    setWebMessage("")
+    reissue.current = setTimeout(() => setWebMessage(message), LIVE_REGION_REISSUE_MS)
+  }
+  return { announce, webMessage }
 }
 
 /** why: dice results are table talk, so they live in this sheet's state only and are gone when it closes. */
@@ -37,6 +52,7 @@ export function DiceSheet({ players, origin, onClose }: DiceSheetProps) {
   const [d20, setD20] = useState<number>()
   const [coin, setCoin] = useState<(typeof COIN_FACES)[number]>()
   const [firstId, setFirstId] = useState<GamePlayer["id"]>()
+  const { announce: announceResult, webMessage } = useResultAnnouncer()
 
   function rollD20() {
     const roll = randomIndex(D20_SIDES) + 1
@@ -68,6 +84,14 @@ export function DiceSheet({ players, origin, onClose }: DiceSheetProps) {
       accessibilityViewIsModal
     >
       <Text text="Dice" preset="subheading" />
+      {Platform.OS === "web" ? (
+        <Text
+          testID="dice-announcer"
+          text={webMessage}
+          accessibilityLiveRegion="polite"
+          style={$visuallyHidden}
+        />
+      ) : null}
 
       {/* why: six seats make this taller than a landscape phone; the list scrolls and Close stays reachable. */}
       <ScrollView style={$scroll} contentContainerStyle={themed($scrollContent)}>
@@ -134,6 +158,13 @@ export function DiceSheet({ players, origin, onClose }: DiceSheetProps) {
   )
 }
 
+const $visuallyHidden: TextStyle = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  opacity: 0,
+}
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",

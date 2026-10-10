@@ -1,5 +1,5 @@
-import { AccessibilityInfo } from "react-native"
-import { fireEvent, render } from "@testing-library/react-native"
+import { AccessibilityInfo, Platform } from "react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import type { PlayerId } from "@/features/game/types"
 import { ThemeProvider } from "@/theme/context"
@@ -27,7 +27,10 @@ function renderSheet(onClose = jest.fn()) {
 }
 
 describe("DiceSheet", () => {
-  afterEach(() => jest.restoreAllMocks())
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.useRealTimers()
+  })
 
   it("announces each result, including a repeat and the picked player's name", () => {
     const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility")
@@ -45,6 +48,23 @@ describe("DiceSheet", () => {
       "Coin, Tails",
       "Grace goes first",
     ])
+  })
+
+  it("reads each result through a live region on web, including a repeat", () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    jest.useFakeTimers()
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const { view } = renderSheet()
+    const region = () => view.getByTestId("dice-announcer", { includeHiddenElements: true })
+
+    fireEvent.press(view.getByTestId("dice-d20-roll"))
+    act(() => jest.runOnlyPendingTimers())
+    expect(region()).toHaveTextContent("d20, 11")
+
+    fireEvent.press(view.getByTestId("dice-d20-roll"))
+    expect(region()).toHaveTextContent("")
+    act(() => jest.runOnlyPendingTimers())
+    expect(region()).toHaveTextContent("d20, 11")
   })
 
   it("rolls a d20 from 1 to 20", () => {
