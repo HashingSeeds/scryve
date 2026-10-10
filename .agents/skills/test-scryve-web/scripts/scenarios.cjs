@@ -403,8 +403,9 @@ async function reviewImport(run, page) {
  * error names the deck so a person can remove it; a crash simply leaves it behind.
  */
 async function deleteDeck(run, deckId, name) {
-  const { page } = await signedInContext(run)
+  let page
   try {
+    ;({ page } = await signedInContext(run))
     // Open it from the list, as a user would, so delete has a screen to go back to.
     await openDecks(page, run.cli.url)
     await page.getByTestId(`deck-card-${deckId}`).click()
@@ -417,7 +418,7 @@ async function deleteDeck(run, deckId, name) {
   } catch (error) {
     throw new Error(`delete "${name}" (${deckId}) by hand: ${error.message.split("\n")[0]}`)
   } finally {
-    await page.context().close()
+    await page?.context().close()
   }
 }
 
