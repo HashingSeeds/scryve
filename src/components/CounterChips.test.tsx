@@ -43,6 +43,12 @@ const chips = (table: SeatTable, props?: Partial<CounterChipsProps>) =>
   render(chipsElement(table, props))
 
 describe("CounterChips", () => {
+  // why: spies, the web platform swap, and fake timers are undone even when a test fails midway.
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.useRealTimers()
+  })
+
   it("bumps a chip by its counter's step", () => {
     const table = seat({ counters: { poison: 3, commanderTax: 2 } })
     const view = chips(table)
@@ -137,7 +143,6 @@ describe("CounterChips", () => {
     announce.mockClear()
     view.rerender(chipsElement(seat({ counters: { poison: 2 } })))
     expect(announce).not.toHaveBeenCalled()
-    announce.mockRestore()
   })
 
   it("moves focus into an opened sheet and back to the control that opened it", () => {
@@ -154,7 +159,6 @@ describe("CounterChips", () => {
     fireEvent.press(view.getByTestId("counter-add-seat-1"))
     fireEvent.press(view.getByLabelText("Edit Poison, 2"))
     expect(focus).toHaveBeenCalledTimes(4)
-    focus.mockRestore()
   })
 
   it("re-reads a repeated message on web, such as retaking Monarch", () => {
@@ -173,8 +177,6 @@ describe("CounterChips", () => {
     expect(spoken()).toHaveTextContent("")
     act(() => jest.advanceTimersByTime(100))
     expect(spoken()).toHaveTextContent("Seat 1, Ada, now Monarch")
-    jest.restoreAllMocks()
-    jest.useRealTimers()
   })
 
   it("takes the card's own controls out of reach while a sheet covers it", () => {
