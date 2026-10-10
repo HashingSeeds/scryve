@@ -13,7 +13,7 @@ describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
   const actions: RadialMenuAction[] = [
     { kind: "layout", label: "Layout", onPress: callbacks[0] },
-    { kind: "undo", label: "Undo", onPress: callbacks[1] },
+    { kind: "dice", label: "Dice", onPress: callbacks[1] },
     { kind: "status", label: "Status", onPress: callbacks[2] },
     { kind: "home", label: "Home", onPress: callbacks[3] },
     { kind: "end-game", label: "End game", onPress: callbacks[4] },
@@ -236,7 +236,7 @@ describe("GameRadialMenu", () => {
     const onClose = jest.fn()
     const view = render(menu(true, onClose))
 
-    fireEvent.press(view.getByTestId("undo-button"))
+    fireEvent.press(view.getByTestId("dice-button"))
     fireEvent.press(view.getByTestId("game-menu-backdrop"))
 
     expect(callbacks[1]).toHaveBeenCalledTimes(1)
