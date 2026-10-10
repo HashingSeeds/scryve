@@ -1,0 +1,115 @@
+import type { ViewStyle } from "react-native"
+
+import type { PokemonInPlay } from "../../../convex/lib/table"
+import {
+  getLifeFontSizeThatFits,
+  type LifeCardContentInsets,
+  type LifeCardContentRotation,
+  type LifeCardEdge,
+  type LifeCardMenuCorner,
+  type LifeCardMenuEdge,
+} from "../playerCardTypes"
+
+/** why: the whole seat lays out in content space (bench along the top, prizes bottom-left) and turns as one layer, so screen-space insets are mapped onto content edges here. */
+const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
+  0: { top: "top", right: "right", bottom: "bottom", left: "left" },
+  90: { top: "right", right: "bottom", bottom: "left", left: "top" },
+  [-90]: { top: "left", right: "top", bottom: "right", left: "bottom" },
+  180: { top: "bottom", right: "left", bottom: "top", left: "right" },
+}
+
+export function contentInsetsFor(
+  rotation: LifeCardContentRotation,
+  insets: LifeCardContentInsets | undefined,
+): LifeCardContentInsets {
+  const edges = CONTENT_EDGES[rotation]
+  return {
+    top: insets?.[edges.top] ?? 0,
+    right: insets?.[edges.right] ?? 0,
+    bottom: insets?.[edges.bottom] ?? 0,
+    left: insets?.[edges.left] ?? 0,
+  }
+}
+
+export const MENU_CLEARANCE = 44
+
+/** why: the bench sits on the inner edge, where the game menu button also lives, so it drops below the button when the menu is centered on or cornered at that edge. */
+export function benchMenuClearance(
+  rotation: LifeCardContentRotation,
+  menuCorner: LifeCardMenuCorner | undefined,
+  menuEdgeCenter: LifeCardMenuEdge | undefined,
+): number {
+  const innerEdge = CONTENT_EDGES[rotation].top
+  if (menuEdgeCenter === innerEdge) return MENU_CLEARANCE
+  if (menuCorner && menuCorner.toLowerCase().startsWith(innerEdge)) return MENU_CLEARANCE
+  return 0
+}
+
+/** why: a sideways seat lays out in a frame with its sides swapped, then turns into place, like the life editor. */
+export function rotatedLayerStyle(
+  rotation: LifeCardContentRotation,
+  cardWidth: number,
+  cardHeight: number,
+): ViewStyle {
+  const sideways = Math.abs(rotation) === 90
+  const bounds: ViewStyle =
+    sideways && cardWidth > 0 && cardHeight > 0
+      ? {
+          width: cardHeight,
+          height: cardWidth,
+          left: (cardWidth - cardHeight) / 2,
+          top: (cardHeight - cardWidth) / 2,
+          right: undefined,
+          bottom: undefined,
+        }
+      : {}
+  return { ...bounds, transform: [{ rotate: `${rotation}deg` }] }
+}
+
+export const HERO_FONT_MAX = 96
+const HERO_FONT_FALLBACK = 80
+// why: the tap halves show "+30" style feedback beside the number, so the number leaves room for it on each side.
+const HERO_GUTTER = 56
+
+export function heroFontSize(input: {
+  width: number
+  height: number
+  digits: number
+  fontScale: number
+}): number {
+  if (!(input.width > 0) || !(input.height > 0)) return HERO_FONT_FALLBACK
+  return Math.min(
+    HERO_FONT_MAX,
+    getLifeFontSizeThatFits({
+      availableWidth: input.width - HERO_GUTTER * 2,
+      availableHeight: input.height,
+      digits: Math.max(input.digits, 2),
+      fontScale: input.fontScale,
+    }),
+  )
+}
+
+export function pokemonName(pokemon: Pick<PokemonInPlay, "name">): string {
+  return pokemon.name?.trim() || "Pokémon"
+}
+
+export function prizeWord(count: number): string {
+  return `${count} ${Math.abs(count) === 1 ? "prize" : "prizes"}`
+}
+
+export function knockoutMessage(input: {
+  pokemon: Pick<PokemonInPlay, "name">
+  takerName?: string
+  prizesTaken: number
+}): string {
+  const head = `${pokemonName(input.pokemon)} knocked out.`
+  if (!input.takerName || input.prizesTaken === 0) return head
+  return `${head} ${input.takerName} takes ${prizeWord(input.prizesTaken)}.`
+}
+
+export function parseHp(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (!/^\d{1,3}$/.test(trimmed)) return undefined
+  const hp = Number(trimmed)
+  return hp > 0 ? hp : undefined
+}
