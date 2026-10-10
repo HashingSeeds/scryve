@@ -33,6 +33,7 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import { CommanderStrip } from "./CommanderStrip"
+import { CounterChips, type SeatTable } from "./CounterChips"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
@@ -109,6 +110,7 @@ export interface LifeCardProps {
   staleSince?: number
   commanderDamage?: LifeCardCommanderDamage
   eliminated?: boolean
+  seatTable?: SeatTable
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -150,6 +152,7 @@ export const LifeCard = memo(function LifeCard({
   staleSince,
   commanderDamage,
   eliminated,
+  seatTable,
   onChange,
   style,
 }: LifeCardProps) {
@@ -733,6 +736,24 @@ export const LifeCard = memo(function LifeCard({
             </View>
           </BoardPressable>
         </View>
+      ) : null}
+      {seatTable &&
+      !commanderCardMode &&
+      !commanderOverviewOpen &&
+      !localOverviewVisible &&
+      !editorOpen ? (
+        <CounterChips
+          seat={seatTable}
+          seatNumber={seatNumber}
+          identity={identity}
+          color={color}
+          foreground={foreground}
+          compact={compact}
+          contentRotation={contentRotation}
+          contentInsets={contentInsets}
+          menuEdgeCenter={menuEdgeCenter}
+          cardSize={cardSize}
+        />
       ) : null}
       {editorOpen ? (
         <LifeEditor

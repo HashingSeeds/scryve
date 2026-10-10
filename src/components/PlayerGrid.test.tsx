@@ -2,6 +2,8 @@ import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
+import { playTableRules } from "@/features/game/playSystems"
+import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 
@@ -81,6 +83,48 @@ describe("PlayerGrid", () => {
     expect(measuredFontSize).toBeGreaterThan(initialFontSize)
     expect(initialOpacity).toBe(0)
     expect(measuredOpacity).toBe(1)
+  })
+
+  it("shows each seat its own counters and designations and sends chip taps for that seat", () => {
+    const gamePlayers = players(2)
+    const rules = playTableRules("mtg", "commander")
+    const table = {
+      designations: { monarch: "player-1" },
+      players: { "player-0": { counters: { poison: 2 } } },
+    }
+    const submit = jest.fn(() => true)
+    const runtime: TableRuntime = {
+      table,
+      tableRules: rules,
+      ...createTableActions(
+        () => ({
+          table,
+          rules,
+          playerIds: gamePlayers.map(({ id }) => id),
+          lifeOf: () => 40,
+          canAct: () => true,
+        }),
+        submit,
+      ),
+    }
+    const view = render(
+      <ThemeProvider>
+        <PlayerGrid players={gamePlayers} table={runtime} onChange={jest.fn()} />
+      </ThemeProvider>,
+    )
+    for (const seat of [1, 2])
+      fireEvent(view.getByTestId(`life-card-seat-${seat}`), "layout", {
+        nativeEvent: { layout: { width: 300, height: 400, x: 0, y: 0 } },
+      })
+
+    expect(view.queryByTestId("designation-chip-1-monarch")).toBeNull()
+    expect(view.getByTestId("designation-chip-2-monarch")).toBeTruthy()
+    expect(view.queryByTestId("counter-chip-2-poison")).toBeNull()
+    fireEvent.press(view.getByTestId("counter-chip-1-poison"))
+    expect(submit).toHaveBeenCalledWith(
+      { kind: "counter.changed", playerId: "player-0", counterId: "poison", delta: 1 },
+      expect.any(String),
+    )
   })
 
   it("keeps commander callbacks stable across renders while calling the latest handler", () => {
