@@ -21,6 +21,7 @@ import { Text } from "@/components/Text"
 import { TextField } from "@/components/TextField"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
 import type { CloudAccess } from "@/features/auth/CloudScreen"
+import { useConvexOnline } from "@/features/connected/useConvexOnline"
 import { loadCardDetails } from "@/features/decks/cardDetailsCache"
 import { CardSearchScreen } from "@/features/decks/CardSearchScreen"
 import { getCommanderWarnings } from "@/features/decks/commanderSelection"
@@ -478,6 +479,10 @@ export function AddDeckScreen({
   }, [guestFull, guestMode])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string>()
+  const online = useConvexOnline()
+  const browseOffline = !online && (searching || Boolean(searchError))
+  // why: Retry and reconnect repeat the last request, so a failed "Load more" keeps its page.
+  const searchCursor = useRef<string | undefined>(undefined)
   const [previewError, setPreviewError] = useState<string>()
   const [previewRetryAfterMs, setPreviewRetryAfterMs] = useState<number>()
   const searchToken = useRef(0)
@@ -591,6 +596,7 @@ export function AddDeckScreen({
   const runCatalogSearch = useCallback(
     async (query: string, cursor?: string) => {
       const token = ++searchToken.current
+      searchCursor.current = cursor
       try {
         setSearching(true)
         setSearchError(undefined)
@@ -654,6 +660,16 @@ export function AddDeckScreen({
       searchToken.current += 1
     }
   }, [mode, preconQuery, runCatalogSearch])
+
+  const retryUnfinishedSearch = useEffectEvent(() => {
+    if (mode === "precon" && (searching || searchError))
+      void runCatalogSearch(preconQuery, searchCursor.current)
+  })
+  const wasOnline = useRef(online)
+  useEffect(() => {
+    if (online && !wasOnline.current) retryUnfinishedSearch()
+    wasOnline.current = online
+  }, [online])
 
   async function createBlank() {
     if (guestMode) {
@@ -1775,7 +1791,9 @@ export function AddDeckScreen({
               clearButtonMode="while-editing"
               onChangeText={setPreconQuery}
             />
-            {searching ? (
+            {browseOffline ? (
+              <AlertNote tone="info" text="You're offline. Decks will load when you reconnect." />
+            ) : searching ? (
               <Text size="xs" style={themed($label)} text="Loading decks…" />
             ) : searchError ? (
               <View style={themed($inlineStatus)}>
@@ -1783,7 +1801,7 @@ export function AddDeckScreen({
                 <TouchableOpacity
                   accessibilityRole="button"
                   style={themed($plainAction)}
-                  onPress={() => void runCatalogSearch(preconQuery)}
+                  onPress={() => void runCatalogSearch(preconQuery, searchCursor.current)}
                 >
                   <Text text="Retry" style={themed($textAction)} />
                 </TouchableOpacity>
