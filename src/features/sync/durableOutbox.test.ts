@@ -1,9 +1,11 @@
 import {
+  DURABLE_QUARANTINE_PREFIX,
   DurableOutbox,
   type DurableFailedRecord,
   type DurableOutboxCodec,
   type DurableOutboxKeys,
   type DurablePendingRecord,
+  setQuarantineReporter,
 } from "./durableOutbox"
 
 interface NoteOperation extends DurablePendingRecord {
@@ -39,10 +41,10 @@ class MemoryStorage {
 }
 
 const keys: DurableOutboxKeys = {
-  pendingIndex: (scope, owner) => `pending.${owner}.${scope}`,
-  pendingRecord: (scope, operationId, owner) => `pending.${owner}.${scope}.${operationId}`,
-  failedIndex: (scope, owner) => `failed.${owner}.${scope}`,
-  failedRecord: (scope, operationId, owner) => `failed.${owner}.${scope}.${operationId}`,
+  pendingIndex: (scope, owner) => `notes.pendingIndex.v1.${owner}.${scope}`,
+  pendingRecord: (scope, operationId, owner) => `notes.pending.v1.${owner}.${scope}.${operationId}`,
+  failedIndex: (scope, owner) => `notes.failedIndex.v1.${owner}.${scope}`,
+  failedRecord: (scope, operationId, owner) => `notes.failed.v1.${owner}.${scope}.${operationId}`,
 }
 
 const codec: DurableOutboxCodec<NoteOperation, NoteFailure> = {
@@ -115,6 +117,59 @@ describe("durable outbox", () => {
       "note-1",
       "note-2",
     ])
+  })
+
+  it("quarantines unreadable records instead of deleting them", () => {
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    const quarantined = () =>
+      [...storage.values]
+        .filter(([key]) => key.startsWith(DURABLE_QUARANTINE_PREFIX))
+        .map(([, value]) => value)
+        .sort()
+    const pendingKey = keys.pendingRecord("deck", "note-future", "owner")
+    const future = JSON.stringify({ ...operation("note-future", 1), payload: { body: "v2" } })
+    const rewritten = JSON.stringify({ ...operation("note-future", 2), payload: { body: "v3" } })
+    const done = operation("note-done", 1)
+    const staleDone = JSON.stringify({ ...done, payload: { body: "v2" } })
+    const failedDone = codec.createFailure(done, "rejected", 2)
+    storage.set(pendingKey, future)
+    storage.set(keys.failedRecord("deck", "note-torn", "owner"), '{"action":')
+    storage.set(keys.pendingRecord("deck", "note-done", "owner"), staleDone)
+    storage.set(keys.failedRecord("deck", "note-done", "owner"), JSON.stringify(failedDone))
+    storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
+
+    const now = jest.spyOn(Date, "now").mockReturnValue(1)
+    const pending = outbox.loadPending("deck")
+    const failed = outbox.loadFailed("deck")
+    storage.set(pendingKey, rewritten)
+    outbox.loadPending("deck")
+    now.mockRestore()
+
+    expect(pending).toEqual([])
+    expect(failed).toEqual([failedDone])
+    expect([...storage.values.keys()].filter((key) => key.startsWith("notes.pending."))).toEqual([])
+    expect(quarantined()).toEqual([future, rewritten, staleDone, '{"action":', ""].sort())
+  })
+
+  it("reports each quarantine once with metadata only, and a clean load not at all", () => {
+    const report = jest.fn()
+    setQuarantineReporter(report)
+    const storage = new MemoryStorage()
+    const outbox = new DurableOutbox(storage, "owner", keys, codec)
+    outbox.enqueue(operation("note-valid", 1), "deck")
+    outbox.loadPending("deck")
+    expect(report).not.toHaveBeenCalled()
+
+    storage.set(keys.pendingRecord("deck", "note-secret", "owner"), '{"note":"private"}')
+    storage.set(keys.pendingRecord("deck", "note-empty", "owner"), "")
+    outbox.loadPending("deck")
+    outbox.loadPending("deck")
+
+    expect(report.mock.calls).toEqual([
+      [{ outbox: "notes.pending.v1", count: 2, reasons: ["rejected", "empty"] }],
+    ])
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(/owner|private|note-secret/)
   })
 
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {
