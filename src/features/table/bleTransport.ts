@@ -12,6 +12,7 @@ const TO_GUESTS = "5c3e0002-7b1a-4c8e-9a52-1f6d2b7e9a10"
 
 // why: Android's GATT server drops a notification sent before the last one went out, and the library does not wait.
 const ANDROID_NOTIFY_GAP_MS = 40
+const SERVICE_PUBLISH_MS = 500
 
 const sameUuid = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -108,6 +109,8 @@ export async function hostTable(
       },
     ]),
   )
+  // why: advertising before Android's onServiceAdded makes the library rebuild the GATT server, which can stop answering subscribes.
+  await sleep(SERVICE_PUBLISH_MS)
   await retryUntilPowered(() => Bluetooth.startAdvertising({ serviceUUIDs: [sessionId] }))
   handlers.onState("advertising")
 
