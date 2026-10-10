@@ -1,5 +1,5 @@
 import { AccessibilityInfo, StyleSheet } from "react-native"
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { Polygon, Polyline } from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
@@ -7,6 +7,7 @@ import { darkTheme, lightTheme } from "@/theme/theme"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./GameRadialMenu"
+import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
@@ -240,6 +241,30 @@ describe("GameRadialMenu", () => {
 
     expect(callbacks[1]).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it("lets Android Back close the menu or exit commander damage, and passes it through otherwise", () => {
+    const pressBack = mockHardwareBack()
+    const onClose = jest.fn()
+    const onExit = jest.fn()
+    const view = render(menu(false, onClose))
+
+    expect(pressBack()).toBe(false)
+
+    view.rerender(menu(true, onClose))
+    act(() => void pressBack())
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    view.rerender(
+      menu(false, onClose, { exitAction: { label: "Exit commander damage", onPress: onExit } }),
+    )
+    act(() => void pressBack())
+    expect(onExit).toHaveBeenCalledTimes(1)
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    view.rerender(menu(false, onClose))
+    expect(pressBack()).toBe(false)
+    jest.restoreAllMocks()
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

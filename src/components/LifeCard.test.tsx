@@ -12,6 +12,7 @@ import { commanderBoardSeats } from "./commanderDamageLayout"
 import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
+import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 const commanderIds = [asPlayerId("player-1"), asPlayerId("player-2")]
 const commanderSeats = commanderBoardSeats([[0], [1]], commanderIds)
@@ -711,6 +712,19 @@ describe("LifeCard", () => {
     const caption = StyleSheet.flatten(view.getByText("Confirm commander damage").props.style)
     expect(headline.color).toBe("#FFFFFF")
     expect(caption.color).toBe("#FFFFFF")
+  })
+
+  it("closes the life editor on Android Back", () => {
+    const pressBack = mockHardwareBack()
+    const view = render(interactiveCard(20, jest.fn()))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+
+    act(() => void pressBack())
+
+    expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
+    expect(pressBack()).toBe(false)
+    jest.restoreAllMocks()
   })
 
   it("closes the life editor when the card freezes", () => {
