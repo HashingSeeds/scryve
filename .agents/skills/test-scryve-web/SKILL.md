@@ -119,6 +119,32 @@ join the code it prints. `pnpm bots --help` lists play and failure options
 (commander damage, socket drops, bursts, duplicates); `--json` prints one event
 per line.
 
+## Scripted deck scenarios
+
+`scripts/scenarios.cjs` (in this skill) drives the web app with Playwright to
+force known bad deck-editing states: several taps in one frame near the
+300-entry and 999-copy limits, import editor races, remove and undo, two tabs
+saving at once, offline saves, and reconnecting mid-edit. Run it after the
+health checks above, against a dev server you started:
+
+```sh
+node .claude/skills/test-scryve-web/scripts/scenarios.cjs all --url http://localhost:<port> --label main
+node .claude/skills/test-scryve-web/scripts/scenarios.cjs --help
+```
+
+- It signs in through the real consent and Clerk flows and keeps the session
+  in `/tmp/scryve-scenarios/auth`. It refuses non-local URLs, non-test emails,
+  and pages that open a socket to production Convex.
+- Each scenario imports a "Scenario scratch" deck and deletes it afterwards,
+  so the account needs a free deck slot. The default account is
+  `john+clerk_test@sow.care` (jane's free slots are used). `cleanup` removes
+  any scratch decks left behind.
+- It prints one PASS/FAIL line per scenario with what it saw. Screenshots and
+  console logs go to `/tmp/scryve-scenarios/<label>-<time>/`.
+- To compare a branch with main, run the same scenarios against both servers.
+  Scryfall sometimes returns 429 to the dev deployment during imports. The
+  script waits and retries; a persistent 429 fails the run.
+
 ## Drive the flow
 
 - Interact like a user: navigate to the changed screen, perform its primary
