@@ -37,6 +37,7 @@ import {
   getPlayerGridRowFlex,
   getPlayerGridRows,
 } from "./playerGridGeometry"
+import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 
 export interface CommanderDamageGridBinding {
   incomingFor: (player: GamePlayer) => Record<PlayerId, number>
@@ -76,6 +77,7 @@ export interface PlayerGridProps {
   /** why: commander damage elimination; a losing table counter like 10 poison is read from `table`. */
   isPlayerEliminated?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
+  /** why: Magic seats show counter chips from it; Pokémon rules swap the life card for a Pokémon board. */
   table?: TableRuntime
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
@@ -285,6 +287,45 @@ export function PlayerGrid({
               const eliminated = isPlayerEliminated?.(player)
                 ? "commander damage"
                 : seatTable && losingCounter(seatTable)?.label.toLowerCase()
+              if (table?.tableRules.pokemon) {
+                return (
+                  <View
+                    key={player.id}
+                    testID={`player-cell-seat-${seatNumber}`}
+                    style={themed($cell)}
+                  >
+                    <PokemonSeatCard
+                      playerId={player.id}
+                      playerName={player.name}
+                      seatNumber={seatNumber}
+                      shape={player.shape}
+                      prizes={player.life}
+                      color={player.color}
+                      compact={layout.compact}
+                      contentRotation={contentRotation}
+                      contentInsets={contentInsets}
+                      menuCorner={menuCorner}
+                      menuEdgeCenter={fallbackMenu?.edgeCenter}
+                      disabled={disabled || playerDisabled}
+                      ownership={ownership}
+                      staleSince={getStaleSince?.(player)}
+                      opponents={players
+                        .filter(({ id }) => id !== player.id)
+                        .map(({ id, name }) => ({ id, name }))}
+                      table={table}
+                      onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
+                        onChange(player.id, delta),
+                      )}
+                      style={getScreenCornerSquaringStyle({
+                        rows,
+                        rowIndex,
+                        columnIndex,
+                        insets: Platform.OS === "web" ? insets : undefined,
+                      })}
+                    />
+                  </View>
+                )
+              }
               return (
                 <View
                   key={player.id}
