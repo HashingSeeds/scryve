@@ -101,7 +101,7 @@ const plans = [
           <div class="step" data-step="intro">
             <div class="step-copy">
               <h2>On the table in seconds.</h2>
-              <p>Browser, iPhone, iPad, or Android. No account to make, no signal needed.</p>
+              <p>Browser, iPhone, iPad, or Android. A local game needs no account, and the apps need no signal.</p>
             </div>
           </div>
         </section>
@@ -132,7 +132,7 @@ const plans = [
               <p>Life, Life Points, and prize cards are in, with each game's formats. Lore counts up to 20, so it's the first game where the board counts the other way. After that, your vote decides.</p>
               <ul class="next-list">
                 <li><b>Lorcana</b><span>Lore, 0 to 20</span><em>Next</em></li>
-                <li><b>Star Wars Unlimited</b><span>Base, 30 to 0, up to six players</span><em>Vote</em></li>
+                <li><b>Star Wars Unlimited</b><span>Base damage, usually to 30, up to six players</span><em>Vote</em></li>
                 <li><b>Riftbound</b><span>Points to 8, two to four players</span><em>Vote</em></li>
               </ul>
               <a class="demo-replay" href={GITHUB_ISSUES}>Vote on GitHub</a>
@@ -159,7 +159,7 @@ const plans = [
           <div class="step" data-step="record">
             <div class="step-copy">
               <h2>Every game, one record.</h2>
-              <p>Commander on Thursday, Yu-Gi-Oh! locals on Tuesday, a Pokémon League Cup on Saturday. Local and connected games land in one history, and every deck gets a win rate.</p>
+              <p>Commander on Thursday, Yu-Gi-Oh! locals on Tuesday, a Pokémon League Cup on Saturday. Local and connected games land in one history, and Pro adds a win rate for every deck.</p>
             </div>
           </div>
         </section>
@@ -196,7 +196,7 @@ const plans = [
                 <div class="board-holder" data-board="features"></div>
               </div>
               <div class="scene-screen" data-for="connected"><div class="board-holder" data-board="connected"></div></div>
-              <div class="scene-screen hist" data-for="record" aria-label="History">
+              <div class="scene-screen hist" data-for="record" role="group" aria-label="History">
                 <div class="deck-top"><span>Account</span><b>History</b><span>Filter</span></div>
                 <div class="hist-tabs"><span aria-current="true">All</span><span>Local</span><span>Connected</span></div>
                 <div class="hist-list">
@@ -294,11 +294,11 @@ const plans = [
 
     <section class="facts" aria-label="Facts">
       <div><b>No account for local play</b><span>Open it and count. Sign in only for connected games and synced decks.</span></div>
-      <div><b>Works offline</b><span>Games save on the phone. Nothing waits on a network.</span></div>
+      <div><b>No signal needed</b><span>The iPhone, iPad, and Android apps save games on the phone and never wait on a network.</span></div>
       <div><b>Open source</b><span>MIT licensed <a href={GITHUB}>on GitHub</a>. Read it, fork it, file a bug.</span></div>
       <div><b>No ads</b><span>Pro pays for the servers. The counter stays free.</span></div>
       <div><b>Straight to the game</b><span>No loading screen, no login screen. Your first tap is a life change.</span></div>
-      <div><b>One history</b><span>Magic, Yu-Gi-Oh!, and Pokémon games, local and connected, with a win rate per deck.</span></div>
+      <div><b>One history</b><span>Magic, Yu-Gi-Oh!, and Pokémon games, local and connected. Pro adds a win rate per deck.</span></div>
     </section>
 
     <section class="closing">

@@ -1471,6 +1471,11 @@ a.demo-replay {
   font-size: max(8px, 4.25cqw);
 }
 
+/* The deck header leaves room for its ••• button; History has none. */
+.hist .deck-top {
+  padding-right: 0;
+}
+
 .hist-tabs {
   display: flex;
   flex-shrink: 0;
@@ -1511,11 +1516,12 @@ a.demo-replay {
   padding: 0.615em 0;
   border-bottom: 1px solid var(--raised);
   gap: 0.615em;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 4.8em 1fr auto;
 }
 
 .hist-sys {
   padding: 0.231em 0.462em;
+  text-align: center;
   border-radius: 0.308em;
   color: var(--surface);
   font-size: 0.692em;
@@ -1629,7 +1635,7 @@ a.demo-replay {
 @media (max-width: 900px) and (orientation: portrait) {
   /* The phone pins under the header from the very top and everything scrolls beneath it,
      with plain sticky positioning and no scroll script. The stage spans the first three
-     rows so it lets go before the closing section. */
+     rows so it lets go before the facts strip. */
   main {
     /* The phone lies on its side across the full width. */
     --phone-long: calc(100vw - 2 * var(--gutter));
