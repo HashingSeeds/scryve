@@ -93,6 +93,15 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
       microphonePermission: false,
     },
   ])
+  // why: Bluetooth table play spike; boards stay open at the table, so no background modes.
+  plugins.push([
+    "munim-bluetooth",
+    {
+      bluetoothBackground: false,
+      androidBluetoothPermissions: ["scan", "connect", "advertise"],
+      bluetoothAlwaysUsageDescription: "Connect phones at the same table to share a game.",
+    },
+  ])
 
   const normalizedInviteOrigin = normalizeHttpsOrigin(process.env.EXPO_PUBLIC_INVITE_ORIGIN)
   const inviteUrl = normalizedInviteOrigin ? new URL(normalizedInviteOrigin) : undefined

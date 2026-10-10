@@ -43,6 +43,8 @@ import type {
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
+import { TableHostPanel } from "@/features/table/TableHostPanel"
+import { useTableHost } from "@/features/table/useTableLink"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import type { GameEndSource } from "@/utils/analytics"
@@ -63,6 +65,8 @@ export interface CurrentGameScreenProps {
   repository?: LocalGameRepository
   /** why: the signed-in account that a finished game uploads to. */
   ownerId?: string
+  /** why: set only by the Bluetooth table spike, which hosts this board under that session id. */
+  tableSessionId?: string
 }
 
 export function CurrentGameScreen({
@@ -80,12 +84,14 @@ export function CurrentGameScreen({
   onGameAbandoned,
   repository,
   ownerId,
+  tableSessionId,
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
   const menuButtonStyle = useMenuButtonStyle()
   const { themed } = useAppTheme()
   const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)
+  const tableStatus = useTableHost(tableSessionId, runtime.game, runtime)
   const system = runtime.game.system
   const [menuOpen, setMenuOpen] = useState(false)
   // why: a board opened on a game already in play keeps End for it; every later game here starts fresh.
@@ -400,6 +406,8 @@ export function CurrentGameScreen({
           />
         </View>
       ) : null}
+
+      {tableSessionId ? <TableHostPanel sessionId={tableSessionId} status={tableStatus} /> : null}
 
       {endSource ? (
         <LocalGameEndDialog
