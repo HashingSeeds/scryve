@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ComponentRef } from "react"
 import type { TextStyle, View as ViewRef, ViewStyle } from "react-native"
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native"
 
@@ -114,7 +114,9 @@ export function PokemonSheet({
     }
   }, [])
   const firstControl = useRef<ViewRef>(null)
-  useEffect(() => moveFocus(firstControl.current), [])
+  // why: a placement opens on the search field, which autofocuses, so focus stays there instead of jumping to Done.
+  const searchField = useRef<ComponentRef<typeof TextField>>(null)
+  useEffect(() => moveFocus(searchField.current ?? firstControl.current), [])
   const catalog = usePokemonCatalog(lookupOpen ? query : "")
   const hp = parseHp(draft.hp)
   const card: PokemonCard | undefined = hp
@@ -239,6 +241,7 @@ export function PokemonSheet({
 
       {showSearch ? (
         <TextField
+          ref={searchField}
           testID={`pokemon-search-seat-${seatNumber}`}
           accessibilityLabel="Search the card catalog"
           placeholder="Search cards"

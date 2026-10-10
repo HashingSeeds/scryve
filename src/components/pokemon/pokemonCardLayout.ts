@@ -1,4 +1,4 @@
-import type { View, ViewStyle } from "react-native"
+import type { HostInstance, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform } from "react-native"
 
 import type { PokemonInPlay } from "../../../convex/lib/table"
@@ -54,7 +54,7 @@ export function benchMenuClearance(
 }
 
 /** why: a sheet replaces the controls that opened it, so focus moves by hand: into the sheet when it opens and back to its trigger when it closes. Web moves keyboard focus; native moves the screen reader. */
-export function moveFocus(target: View | null | undefined) {
+export function moveFocus(target: HostInstance | null | undefined) {
   if (!target) return
   if (Platform.OS === "web") target.focus()
   else AccessibilityInfo.sendAccessibilityEvent(target, "focus")
