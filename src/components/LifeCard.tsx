@@ -489,6 +489,7 @@ export const LifeCard = memo(function LifeCard({
           <Text
             testID={`life-total-seat-${seatNumber}`}
             text={String(shownLife)}
+            weight="bold"
             accessible
             accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
             accessibilityLiveRegion="polite"
