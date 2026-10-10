@@ -40,7 +40,7 @@ function sheet(props: Partial<PokemonSheetProps> = {}) {
         damageStep={10}
         mode={{ kind: "place", slot: "active" }}
         onPlace={jest.fn(() => true)}
-        onUpdate={jest.fn()}
+        onUpdate={jest.fn(() => true)}
         onDamage={jest.fn()}
         onMakeActive={jest.fn()}
         onKnockOut={jest.fn()}
@@ -108,5 +108,27 @@ describe("PokemonSheet", () => {
     expect(screen.getByText("Could not place it. Try again.")).toBeTruthy()
     expect(screen.getByTestId("pokemon-hp-input-seat-1").props.value).toBe("330")
     expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Charizard ex")
+  })
+
+  it("keeps an HP edit open when it would leave the Pokémon at or below its damage", () => {
+    const onUpdate = jest.fn(() => false)
+    const onClose = jest.fn()
+    const pokemon = { id: "active-001", name: "Charizard ex", hp: 330, prizes: 2, damage: 120 }
+    render(sheet({ mode: { kind: "edit", pokemon, slot: "active" }, onUpdate, onClose }))
+
+    fireEvent.changeText(screen.getByTestId("pokemon-hp-input-seat-1"), "120")
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(screen.getByText("HP must be above the damage on it.")).toBeTruthy()
+
+    fireEvent.changeText(screen.getByTestId("pokemon-hp-input-seat-1"), "130")
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+    expect(onUpdate).toHaveBeenCalledWith("active-001", {
+      name: "Charizard ex",
+      hp: 130,
+      prizes: 2,
+    })
+    expect(screen.getByText("Could not save it. Try again.")).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
   })
 })

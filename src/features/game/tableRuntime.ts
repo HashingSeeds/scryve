@@ -20,8 +20,8 @@ export interface TableActions {
   releaseDesignation: (playerId: string, designationId: string) => void
   /** why: returns the new Pokémon's id, or null when the slot is taken or the bench is full. */
   placePokemon: (playerId: string, slot: PokemonSlot, card: PokemonCard) => string | null
-  /** why: evolving or correcting HP keeps the damage on the Pokémon. */
-  updatePokemon: (playerId: string, pokemonId: string, card: PokemonCard) => void
+  /** why: evolving or correcting HP keeps the damage on the Pokémon; returns false when the board refused, e.g. HP at or below that damage. */
+  updatePokemon: (playerId: string, pokemonId: string, card: PokemonCard) => boolean
   /** why: damage that brings remaining HP to 0 knocks the Pokémon out instead, and returns the knockout for the Undo toast. */
   adjustPokemonDamage: (
     playerId: string,
@@ -107,9 +107,8 @@ export function createTableActions(
       const pokemonId = createClientId("pokemon")
       return run({ kind: "pokemon.placed", playerId, pokemonId, slot, card }) ? pokemonId : null
     },
-    updatePokemon: (playerId, pokemonId, card) => {
-      run({ kind: "pokemon.updated", playerId, pokemonId, card })
-    },
+    updatePokemon: (playerId, pokemonId, card) =>
+      run({ kind: "pokemon.updated", playerId, pokemonId, card }) !== null,
     adjustPokemonDamage: (playerId, pokemonId, delta, takerPlayerId) =>
       runKnockout({ kind: "pokemon.damaged", playerId, pokemonId, delta, takerPlayerId }),
     switchActive: (playerId, benchPokemonId) => {
