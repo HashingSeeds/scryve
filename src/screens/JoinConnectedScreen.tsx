@@ -24,11 +24,14 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
+import { convexErrorMessage } from "@/utils/convexError"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import { InviteScannerScreen } from "./InviteScannerScreen"
 import { api } from "../../convex/_generated/api"
 import { PLAYER_COLOR_CHOICES } from "../../convex/lib/appearance"
+
+const INVALID_INVITE = "Invite is invalid, expired, or revoked"
 
 export function JoinConnectedScreen({
   inviteToken,
@@ -127,7 +130,9 @@ export function JoinConnectedScreen({
         return
       }
       failureReason = "request"
-      const seats = (await claimableSeats({ token, manualCode: manualCode ?? undefined })).seats
+      const lookup = await claimableSeats({ token, manualCode: manualCode ?? undefined })
+      if ("invalid" in lookup) throw new Error(INVALID_INVITE)
+      const seats = lookup.seats
       if (seats.length > 1 && seat === undefined) {
         setOpenSeats(seats)
         return
@@ -145,6 +150,7 @@ export function JoinConnectedScreen({
         color: PLAYER_COLOR_CHOICES[0],
         deviceId,
       })
+      if (!result) throw new Error(INVALID_INVITE)
       requestSucceeded = true
       emitTelemetry("join.completed", { durationMs: Date.now() - startedAt, outcome: "success" })
       captureAnalytics("connection_attempt", { action: "join", stage: "succeeded" })
@@ -158,7 +164,9 @@ export function JoinConnectedScreen({
         })
         emitTelemetry("join.failed", { durationMs: Date.now() - startedAt, outcome: "rejected" })
       }
-      setError(cause instanceof Error ? cause.message : "Could not join lobby")
+      setError(
+        convexErrorMessage(cause, cause instanceof Error ? cause.message : "Could not join lobby"),
+      )
     } finally {
       setBusy(false)
     }

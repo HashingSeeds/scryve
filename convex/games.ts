@@ -164,13 +164,27 @@ function assertSnapshotLife(life: number) {
     throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
 }
 
-async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: "seatLookup") {
-  const now = Date.now()
-  const record = await ctx.db
+const JOIN_ATTEMPT_WINDOW_MS = 60_000
+const MAX_JOIN_ATTEMPTS = 10
+const INVALID_INVITE_MESSAGE = "Invite is invalid, expired, or revoked"
+const TOO_MANY_JOINS_MESSAGE = "Too many join attempts; wait a minute and try again"
+
+// why: production redacts plain Error messages to "Server Error"; ConvexError data reaches the client.
+function tooManyJoinAttempts() {
+  return new ConvexError({ code: "too_many_join_attempts", message: TOO_MANY_JOINS_MESSAGE })
+}
+
+async function joinAttemptsFor(ctx: QueryCtx, clerkUserId: string, kind?: "seatLookup") {
+  return await ctx.db
     .query("joinAttempts")
     .withIndex("by_clerk_user_kind", (q) => q.eq("clerkUserId", clerkUserId).eq("kind", kind))
     .unique()
-  if (!record || now - record.windowStartedAt >= 60_000) {
+}
+
+async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: "seatLookup") {
+  const now = Date.now()
+  const record = await joinAttemptsFor(ctx, clerkUserId, kind)
+  if (!record || now - record.windowStartedAt >= JOIN_ATTEMPT_WINDOW_MS) {
     if (record) await ctx.db.patch(record._id, { windowStartedAt: now, attempts: 1 })
     else
       await ctx.db.insert("joinAttempts", {
@@ -181,11 +195,43 @@ async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: 
       })
     return
   }
-  if (record.attempts >= 10) {
+  if (record.attempts >= MAX_JOIN_ATTEMPTS) {
     if (kind === "seatLookup") return ctx.db.patch(record._id, { attempts: record.attempts + 1 })
-    throw new Error("Too many join attempts; wait a minute and try again")
+    throw tooManyJoinAttempts()
   }
   await ctx.db.patch(record._id, { attempts: record.attempts + 1 })
+}
+
+function inviteKey(args: { token?: string; manualCode?: string }) {
+  if (args.token) return args.token
+  return args.manualCode ? normalizeManualCode(args.manualCode) : ""
+}
+
+/**
+ * why: callers must return rather than throw after this, because a thrown error rolls the
+ * counter back. The remembered invite lets claimSeat keep throwing for clients that predate this.
+ */
+async function recordFailedInvite(
+  ctx: MutationCtx,
+  clerkUserId: string,
+  args: { token?: string; manualCode?: string },
+) {
+  await consumeJoinAttempt(ctx, clerkUserId)
+  const record = await joinAttemptsFor(ctx, clerkUserId)
+  if (record) await ctx.db.patch(record._id, { failedInvite: inviteKey(args) })
+}
+
+async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualCode?: string }) {
+  const invite = await findInvite(ctx, args)
+  if (!invite) return null
+  const game = await ctx.db.get(invite.gameId)
+  if (
+    !game ||
+    (game.status !== "lobby" && game.status !== "active") ||
+    !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+  )
+    return null
+  return game
 }
 
 function seatLabelFor(player: { seat: number }) {
@@ -773,19 +819,20 @@ export const claimSeat = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
-    await consumeJoinAttempt(ctx, String(user.clerkUserId))
+    const clerkUserId = String(user.clerkUserId)
+    await consumeJoinAttempt(ctx, clerkUserId)
     if (args.color !== undefined) assertAllowedColor(args.color)
     if (args.shape !== undefined) assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
     if (args.deviceId) assertDeviceId(args.deviceId)
-    const invite = await findInvite(ctx, args)
-    if (!invite) throw new Error("Invite is invalid, expired, or revoked")
-    const game = await ctx.db.get(invite.gameId)
-    if (
-      !game ||
-      (game.status !== "lobby" && game.status !== "active") ||
-      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
-    )
-      throw new Error("Invite is invalid, expired, or revoked")
+    const game = await joinableInviteGame(ctx, args)
+    if (!game) {
+      /* why: installed clients claim right after claimableSeats rejected the same invite and
+         expect this throw; that lookup already counted the failure. Any other wrong invite
+         returns null so the attempt counted above commits. */
+      if ((await joinAttemptsFor(ctx, clerkUserId))?.failedInvite === inviteKey(args))
+        throw new Error(INVALID_INVITE_MESSAGE)
+      return null
+    }
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
       if (!seated.userId || seated.userId === user._id) continue
@@ -1264,16 +1311,23 @@ export const claimableSeats = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
-    await consumeJoinAttempt(ctx, String(user.clerkUserId), "seatLookup")
-    const invite = await findInvite(ctx, args)
-    if (!invite) throw new Error("Invite is invalid, expired, or revoked")
-    const game = await ctx.db.get(invite.gameId)
+    const clerkUserId = String(user.clerkUserId)
+    /* why: a lookup reveals whether a code is live, so it stops once wrong codes or claims have
+       spent the join budget, even though repeat lookups of a good code never spend it. */
+    const joins = await joinAttemptsFor(ctx, clerkUserId)
     if (
-      !game ||
-      (game.status !== "active" && game.status !== "lobby") ||
-      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+      joins &&
+      Date.now() - joins.windowStartedAt < JOIN_ATTEMPT_WINDOW_MS &&
+      joins.attempts >= MAX_JOIN_ATTEMPTS
     )
-      throw new Error("Invite is invalid, expired, or revoked")
+      throw tooManyJoinAttempts()
+    await consumeJoinAttempt(ctx, clerkUserId, "seatLookup")
+    const game = await joinableInviteGame(ctx, args)
+    if (!game) {
+      await recordFailedInvite(ctx, clerkUserId, args)
+      // why: clients that predate `invalid` see no seats and fall through to claimSeat, which throws.
+      return { invalid: true as const, seats: [] }
+    }
     const players = await playersForGame(ctx, game._id)
     for (const seated of players) {
       if (!seated.userId || seated.userId === user._id) continue

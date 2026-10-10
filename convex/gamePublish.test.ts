@@ -334,7 +334,7 @@ describe("claiming an imported seat through claimSeat", () => {
         seat: 2,
         manualCode: "ZZZ999",
       }),
-    ).rejects.toThrow("Invite is invalid, expired, or revoked")
+    ).resolves.toBeNull()
 
     const legacyHost = await signedIn(t, "legacy-host-subject", "LegacyHost")
     const legacy = await legacyHost.mutation(api.games.createLobby, {
@@ -398,7 +398,7 @@ describe("imported game invite renewal and discovery", () => {
     const guest = await signedIn(t, "guest-subject", "Guest")
     await expect(
       guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
-    ).rejects.toThrow("Invite is invalid, expired, or revoked")
+    ).resolves.toEqual({ invalid: true, seats: [] })
     await expect(
       guest.mutation(api.games.claimSeat, {
         seat: 2,
@@ -429,7 +429,7 @@ describe("imported game invite renewal and discovery", () => {
     ).rejects.toThrow("Authentication required")
     await expect(
       guest.mutation(api.games.claimableSeats, { manualCode: "ZZZ999" }),
-    ).rejects.toThrow("Invite is invalid, expired, or revoked")
+    ).resolves.toEqual({ invalid: true, seats: [] })
     await guest.mutation(api.games.claimSeat, {
       seat: 2,
       manualCode: created.manualCode,
@@ -437,6 +437,75 @@ describe("imported game invite renewal and discovery", () => {
     await expect(
       guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
     ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [] })
+  })
+
+  it("counts wrong codes from seat lookups toward the join limit", async () => {
+    const t = makeConvexTest()
+    const { created } = await published(t)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    for (let index = 0; index < 10; index += 1) {
+      await expect(
+        guest.mutation(api.games.claimableSeats, {
+          manualCode: `ZZZ${String(index).padStart(3, "0")}`,
+        }),
+      ).resolves.toEqual({ invalid: true, seats: [] })
+    }
+    await expect(
+      guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
+    ).rejects.toMatchObject({ data: { code: "too_many_join_attempts" } })
+    await expect(
+      guest.mutation(api.games.claimSeat, { seat: 2, manualCode: created.manualCode }),
+    ).rejects.toMatchObject({ data: { code: "too_many_join_attempts" } })
+
+    const other = await signedIn(t, "other-subject", "Other")
+    await expect(
+      other.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
+    ).resolves.toEqual({ publicId: created.publicId, mode: "connected", seats: [2] })
+    await expect(t.mutation(api.games.claimableSeats, { manualCode: "ZZZ999" })).rejects.toThrow(
+      "Authentication required",
+    )
+  })
+
+  it("counts wrong codes sent straight to claimSeat toward the join limit", async () => {
+    const t = makeConvexTest()
+    const { created } = await published(t)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    for (let index = 0; index < 10; index += 1) {
+      await expect(
+        guest.mutation(api.games.claimSeat, {
+          seat: 2,
+          manualCode: `ZZZ${String(index).padStart(3, "0")}`,
+        }),
+      ).resolves.toBeNull()
+    }
+    await expect(
+      guest.mutation(api.games.claimSeat, { seat: 2, manualCode: created.manualCode }),
+    ).rejects.toThrow("Too many join attempts")
+    await expect(
+      t.mutation(api.games.claimSeat, { seat: 2, manualCode: "ZZZ999" }),
+    ).rejects.toThrow("Authentication required")
+  })
+
+  it("keeps the lookup-then-claim flow of installed clients throwing for a wrong code", async () => {
+    const t = makeConvexTest()
+    const { created } = await published(t)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    for (let index = 0; index < 9; index += 1) {
+      const manualCode = `ZZZ${String(index).padStart(3, "0")}`
+      await expect(guest.mutation(api.games.claimableSeats, { manualCode })).resolves.toEqual({
+        invalid: true,
+        seats: [],
+      })
+      await expect(guest.mutation(api.games.claimSeat, { seat: 2, manualCode })).rejects.toThrow(
+        "Invite is invalid, expired, or revoked",
+      )
+    }
+    await expect(
+      guest.mutation(api.games.claimableSeats, { manualCode: "ZZZ009" }),
+    ).resolves.toEqual({ invalid: true, seats: [] })
+    await expect(
+      guest.mutation(api.games.claimableSeats, { manualCode: created.manualCode }),
+    ).rejects.toThrow("Too many join attempts")
   })
 
   it("leaves seat lookups out of the join rate-limit budget", async () => {

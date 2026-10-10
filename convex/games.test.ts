@@ -332,7 +332,7 @@ describe("Convex connected-game authorization", () => {
     })
     await expect(
       joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" }),
-    ).rejects.toThrow("invalid, expired, or revoked")
+    ).resolves.toBeNull()
     await t.run(async (ctx) => {
       const invite = await ctx.db
         .query("invitations")
@@ -343,7 +343,7 @@ describe("Convex connected-game authorization", () => {
     await host.mutation(api.games.revokeInvite, { publicId: created.publicId })
     await expect(
       joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" }),
-    ).rejects.toThrow("invalid, expired, or revoked")
+    ).resolves.toBeNull()
     const secondHost = await synced(t, "second-host", "Second host")
     await expect(
       secondHost.mutation(api.games.createLobby, {
@@ -2192,7 +2192,9 @@ describe("hosted player appearances", () => {
     const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "legacy-rename-joiner", "Joiner")
-    const { seat } = await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner" })
+    const claim = await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner" })
+    if (!claim) throw new Error("Expected the lobby claim to succeed")
+    const { seat } = claim
     const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
     const [first, second] = projection.players
     await t.run((ctx) =>
