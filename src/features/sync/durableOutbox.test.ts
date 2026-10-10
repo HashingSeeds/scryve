@@ -172,6 +172,26 @@ describe("durable outbox", () => {
     expect(JSON.stringify(report.mock.calls)).not.toMatch(/owner|private|note-secret/)
   })
 
+  it("won't revive an operation another tab failed and dismissed", () => {
+    const storage = new MemoryStorage()
+    const staleTab = new DurableOutbox(storage, "owner", keys, codec)
+    const otherTab = new DurableOutbox(storage, "owner", keys, codec)
+    const rejected = operation("note-rejected", 1)
+    otherTab.enqueue(rejected, "deck")
+    const stalePending = staleTab.loadPending("deck")
+    otherTab.fail("deck", "note-rejected", "rejected", 2)
+    otherTab.dismissFailed("deck", "note-rejected")
+
+    expect(staleTab.updateAttempt("deck", "note-rejected", 3)).toBeNull()
+    expect(staleTab.failAction(rejected, "deck", "rejected", 3, [], stalePending)).toEqual({
+      accepted: true,
+      failed: [],
+      pending: [],
+    })
+    expect(staleTab.loadFailed("deck")).toEqual([])
+    expect(staleTab.loadPending("deck")).toEqual([])
+  })
+
   it("makes acknowledgements and replay-safe cleanup idempotent", () => {
     const storage = new MemoryStorage()
     const outbox = new DurableOutbox(storage, "owner", keys, codec)
