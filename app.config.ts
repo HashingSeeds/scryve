@@ -3,6 +3,8 @@ import { CodeGenerator, withMainActivity } from "expo/config-plugins"
 
 const IS_DEV = process.env.APP_VARIANT === "development"
 const IS_PREVIEW = process.env.APP_VARIANT === "preview"
+// why: the table spike installs beside the EAS-signed dev client instead of replacing it and its data.
+const TABLE_SPIKE = process.env.TABLE_SPIKE === "1"
 
 /**
  * why: safe only because fingerprint.config.js skips ExpoConfigExtraSection; otherwise notes change
@@ -114,12 +116,12 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
       ...config.experiments,
       ...(webExportBaseUrl ? { baseUrl: webExportBaseUrl } : {}),
     },
-    name: getAppName(),
+    name: TABLE_SPIKE ? "Scryve Table" : getAppName(),
     slug: config.slug ?? "count",
-    scheme: [getAppScheme(), getLegacyAppScheme()],
+    scheme: TABLE_SPIKE ? ["scryve-table"] : [getAppScheme(), getLegacyAppScheme()],
     ios: {
       ...config.ios,
-      bundleIdentifier: getUniqueIdentifier(),
+      bundleIdentifier: TABLE_SPIKE ? "com.sowinghope.count.table" : getUniqueIdentifier(),
       associatedDomains: inviteUrl ? [`applinks:${inviteUrl.host}`] : [],
       // This privacyManifests is to get you started.
       // See Expo's guide on apple privacy manifests here:
@@ -138,7 +140,7 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     },
     android: {
       ...config.android,
-      package: getUniqueIdentifier(),
+      package: TABLE_SPIKE ? "com.sowinghope.count.table" : getUniqueIdentifier(),
       intentFilters: inviteUrl
         ? [
             {
