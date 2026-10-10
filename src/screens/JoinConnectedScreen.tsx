@@ -24,6 +24,7 @@ import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
 import type { ThemedStyle } from "@/theme/types"
 import { captureAnalytics } from "@/utils/analytics"
+import { convexErrorMessage } from "@/utils/convexError"
 import { emitTelemetry } from "@/utils/telemetry"
 
 import { InviteScannerScreen } from "./InviteScannerScreen"
@@ -163,7 +164,9 @@ export function JoinConnectedScreen({
         })
         emitTelemetry("join.failed", { durationMs: Date.now() - startedAt, outcome: "rejected" })
       }
-      setError(cause instanceof Error ? cause.message : "Could not join lobby")
+      setError(
+        convexErrorMessage(cause, cause instanceof Error ? cause.message : "Could not join lobby"),
+      )
     } finally {
       setBusy(false)
     }
