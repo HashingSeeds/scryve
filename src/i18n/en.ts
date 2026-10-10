@@ -10,14 +10,13 @@ const en = {
     ending: "Ending…",
     cancel: "Cancel",
     gameSummary: "Game summary",
-    noGames: "No local games yet",
-    noGamesContent: "Finished and abandoned games will appear here.",
+    noGames: "No games yet",
+    noGamesContent: "Finished games will appear here.",
   },
   emptyStateComponent: {
     generic: {
       heading: "Nothing here yet",
       content: "No data found. Try refreshing or reloading the app.",
-      button: "Try again",
     },
   },
 }

@@ -9,7 +9,6 @@ const fr: Translations = {
     generic: {
       heading: "Rien pour le moment",
       content: "Aucune donnée trouvée. Essayez d’actualiser ou de recharger l’application.",
-      button: "Réessayer",
     },
   },
 }

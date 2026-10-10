@@ -41,7 +41,7 @@ export function EmptyState(props: EmptyStateProps) {
   } = useAppTheme()
 
   const {
-    button = translate("emptyStateComponent:generic.button"),
+    button,
     buttonTx,
     buttonOnPress,
     buttonTxOptions,
@@ -67,7 +67,7 @@ export function EmptyState(props: EmptyStateProps) {
   const isImagePresent = !!imageSource
   const isHeadingPresent = !!(heading || headingTx)
   const isContentPresent = !!(content || contentTx)
-  const isButtonPresent = !!(button || buttonTx)
+  const isButtonPresent = !!((button || buttonTx) && (buttonOnPress || ButtonProps?.onPress))
 
   const $containerStyles = [$containerStyleOverride]
   const $imageStyles = [
