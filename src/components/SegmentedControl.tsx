@@ -31,11 +31,11 @@ const TRACK_BORDER_WIDTH = 1
 const SEGMENT_PADDING = 4
 const SLIDE_SPRING = { damping: 18, stiffness: 240, mass: 0.6 } as const
 
-/** why: at large font scales a single row ellipsizes labels, so it splits into two rows, then one. */
+/** why: at large font scales a single row ellipsizes labels, so it falls back to two columns, then one. */
 function fittingColumns(count: number, trackWidth: number, widestLabel: number) {
   if (trackWidth <= 0) return count
   const fits = (columns: number) => trackWidth / columns >= widestLabel + SEGMENT_PADDING * 2
-  return [count, Math.ceil(count / 2)].find(fits) ?? 1
+  return [count, 2].find(fits) ?? 1
 }
 
 export function SegmentedControl({
@@ -90,8 +90,7 @@ export function SegmentedControl({
     >
       <View
         pointerEvents="none"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
+        aria-hidden
         testID={testID ? `${testID}-ruler` : undefined}
         style={$labelRuler}
         onLayout={(event) => setWidestLabel(event.nativeEvent.layout.width)}
@@ -117,7 +116,7 @@ export function SegmentedControl({
             disabled={disabled}
             style={[
               $segment,
-              wrapped && { flexBasis: `${100 / columns}%` },
+              wrapped && [$wrappedSegment, { flexBasis: `${100 / columns}%` }],
               selected && { backgroundColor: accent, borderRadius: CHOICE_RADIUS - TRACK_INSET },
             ]}
             onPress={() => select(segment.id)}
@@ -149,6 +148,8 @@ const $thumbShape: ThemedStyle<ViewStyle> = () => ({
   borderRadius: CHOICE_RADIUS - TRACK_INSET,
 })
 const $wrappedTrack: ViewStyle = { flexWrap: "wrap" }
+// why: an odd last cell keeps its column width instead of stretching across the row.
+const $wrappedSegment: ViewStyle = { flexGrow: 0 }
 const $segment: ViewStyle = {
   flex: 1,
   minHeight: 46,
