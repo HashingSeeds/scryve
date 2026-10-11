@@ -1693,7 +1693,7 @@ describe("connected commander damage claims", () => {
   })
 
   it("declines claims that can never land so the attacker's queue drains", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const claimArgs = (operationId: string, delta: number) =>
       commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta)
@@ -1777,7 +1777,7 @@ describe("connected commander damage claims", () => {
   })
 
   it("declines totals above 99 and refuses a decline id another event already uses", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const claim = (operationId: string, delta: number) =>
       game.host.mutation(
