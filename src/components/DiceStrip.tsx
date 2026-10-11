@@ -4,7 +4,6 @@ import { View } from "react-native"
 import type { DiceTool } from "@/features/game/dice"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
-import { accessibleForeground } from "@/utils/colorContrast"
 import { useCloseOnBack } from "@/utils/useCloseOnBack"
 
 import { BoardPressable } from "./BoardPressable"
@@ -35,12 +34,8 @@ export function DiceStrip({
   onFirst,
   onClose,
 }: DiceStripProps) {
-  const {
-    themed,
-    theme: { colors },
-  } = useAppTheme()
+  const { themed } = useAppTheme()
   useCloseOnBack(true, onClose)
-  const go = colors.gameMenu.actions.dice
 
   return (
     <View
@@ -67,8 +62,6 @@ export function DiceStrip({
         testID="dice-rolloff"
         label={tie ? "Re-roll" : "Roll-off"}
         accessibilityLabel={tie ? "Re-roll the tied seats" : "Every seat rolls, highest goes first"}
-        style={{ backgroundColor: go }}
-        color={accessibleForeground(go)}
         onPress={onRollOff}
       />
       <Tool
@@ -94,7 +87,6 @@ function Tool({
   label,
   accessibilityLabel,
   selected,
-  color,
   style,
   labelStyle,
   onPress,
@@ -103,7 +95,6 @@ function Tool({
   label: string
   accessibilityLabel: string
   selected?: boolean
-  color?: string
   style?: ViewStyle
   labelStyle?: TextStyle
   onPress: () => void
@@ -131,7 +122,11 @@ function Tool({
         weight="bold"
         numberOfLines={1}
         maxFontSizeMultiplier={1.2}
-        style={[themed($label), { color: color ?? colors.board.text }, labelStyle]}
+        style={[
+          themed($label),
+          { color: selected ? colors.board.background : colors.board.text },
+          labelStyle,
+        ]}
       />
     </BoardPressable>
   )
@@ -154,10 +149,7 @@ const $tool: ThemedStyle<ViewStyle> = ({ colors }) => ({
   justifyContent: "center",
   backgroundColor: colors.board.surface,
 })
-const $armed: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  borderWidth: 2,
-  borderColor: colors.board.text,
-})
+const $armed: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.board.text })
 const $close: ThemedStyle<ViewStyle> = ({ colors }) => ({ backgroundColor: colors.transparent })
 const $pressed: ViewStyle = { opacity: 0.72 }
 const $label: ThemedStyle<TextStyle> = () => ({ fontSize: 11, lineHeight: 14 })

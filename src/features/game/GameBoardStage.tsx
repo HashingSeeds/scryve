@@ -117,8 +117,12 @@ function PinnedGameBoardStage({
               exitAction={menu.exitAction}
               signal={menu.signal}
               statusLine={menu.statusLine}
+              // why: the dock turns with the holder, so a seam that runs across the hardware board runs the other way in the holder's view after a quarter turn.
               dock={menu.dock?.({
-                seam: gridLayout.layout === "two-side-by-side" ? "vertical" : "horizontal",
+                seam:
+                  (gridLayout.layout === "two-side-by-side") !== (holderAngle % 180 !== 0)
+                    ? "vertical"
+                    : "horizontal",
               })}
               onToggle={menu.onToggle}
             />

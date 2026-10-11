@@ -488,20 +488,18 @@ export const LifeCard = memo(function LifeCard({
         />
       )}
       <View
-        pointerEvents={
-          commanderOverviewOpen || commanderCardMode || dice?.view ? "none" : "box-none"
-        }
+        pointerEvents={commanderOverviewOpen || commanderCardMode || dice ? "none" : "box-none"}
         accessibilityElementsHidden={
           (!localCommander && commanderOverviewOpen) ||
           !!commanderCardMode ||
           tableSheetOpen ||
-          !!dice?.view
+          !!dice
         }
         importantForAccessibility={
           (!localCommander && commanderOverviewOpen) ||
           commanderCardMode ||
           tableSheetOpen ||
-          dice?.view
+          !!dice
             ? "no-hide-descendants"
             : "auto"
         }
@@ -669,6 +667,7 @@ export const LifeCard = memo(function LifeCard({
       ) : !commanderOverviewOpen &&
         !localOverviewVisible &&
         !tableSheetOpen &&
+        !dice &&
         ownership !== "unowned" ? (
         <LifeControls
           playerName={displayName}
@@ -701,7 +700,8 @@ export const LifeCard = memo(function LifeCard({
       !localCommander &&
       !commanderCardMode &&
       !commanderOverviewOpen &&
-      !tableSheetOpen ? (
+      !tableSheetOpen &&
+      !dice ? (
         <BoardPressable
           testID={`commander-mark-seat-${seatNumber}`}
           accessibilityRole="button"
@@ -717,7 +717,7 @@ export const LifeCard = memo(function LifeCard({
           ]}
         />
       ) : null}
-      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen ? (
+      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !dice ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -737,7 +737,7 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {cornerStatus && !commanderCardMode && !tableSheetOpen ? (
+      {cornerStatus && !commanderCardMode && !tableSheetOpen && !dice ? (
         <View
           testID={`life-corner-layer-seat-${seatNumber}`}
           pointerEvents="box-none"
@@ -789,6 +789,7 @@ export const LifeCard = memo(function LifeCard({
         </View>
       ) : null}
       {seatTable &&
+      !dice &&
       !commanderCardMode &&
       !commanderOverviewOpen &&
       !localOverviewVisible &&

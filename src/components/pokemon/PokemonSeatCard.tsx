@@ -351,10 +351,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       ) : null}
       <View
         testID={`pokemon-layer-seat-${seatNumber}`}
-        pointerEvents={sheetMode ? "none" : "box-none"}
-        accessibilityElementsHidden={!!sheetMode}
-        importantForAccessibility={sheetMode ? "no-hide-descendants" : "auto"}
-        aria-hidden={!!sheetMode}
+        pointerEvents={sheetMode || dice ? "none" : "box-none"}
+        accessibilityElementsHidden={!!sheetMode || !!dice}
+        importantForAccessibility={sheetMode || dice ? "no-hide-descendants" : "auto"}
+        aria-hidden={!!sheetMode || !!dice}
         style={[
           StyleSheet.absoluteFill,
           rotatedLayerStyle(contentRotation, cardSize.width, cardSize.height),

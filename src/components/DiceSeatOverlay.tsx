@@ -162,9 +162,10 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
   return armed === "coin" ? `Flip a coin for ${playerName}` : `Roll a d20 for ${playerName}`
 }
 
+// why: a seat with dice on it is the dice's; the overlay sits above counter chips (10) and the Pokémon bar (15) so no control underneath takes the tap.
 const $overlay: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   ...StyleSheet.absoluteFill,
-  zIndex: 8,
+  zIndex: 16,
   overflow: "hidden",
   borderRadius: spacing.lg,
   alignItems: "center",

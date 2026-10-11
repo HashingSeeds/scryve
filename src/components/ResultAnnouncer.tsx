@@ -21,7 +21,11 @@ export function useResultAnnouncer() {
     setWebMessage("")
     reissue.current = setTimeout(() => setWebMessage(message), LIVE_REGION_REISSUE_MS)
   }
-  return { announce, webMessage }
+  function reset() {
+    clearTimeout(reissue.current)
+    setWebMessage("")
+  }
+  return { announce, reset, webMessage }
 }
 
 export function ResultLiveRegion({ message, testID }: { message: string; testID: string }) {

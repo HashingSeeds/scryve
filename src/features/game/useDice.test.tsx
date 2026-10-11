@@ -16,8 +16,8 @@ const players: GamePlayer[] = [
   { id: asPlayerId("p3"), name: "Katherine", color: "#7B5A91", life: 20, seat: 2 },
 ]
 
-function Table() {
-  const dice = useDice(players, "game-1")
+function Table({ gameId = "game-1" }: { gameId?: string }) {
+  const dice = useDice(players, gameId)
   if (!dice.open) dice.show()
   if (!dice.strip || !dice.grid) return null
   const { grid } = dice
@@ -43,11 +43,19 @@ function Table() {
 }
 
 function renderTable() {
-  return render(
+  const view = render(
     <ThemeProvider initialContext="dark">
       <Table />
     </ThemeProvider>,
   )
+  return Object.assign(view, {
+    changeGame: (gameId: string) =>
+      view.rerender(
+        <ThemeProvider initialContext="dark">
+          <Table gameId={gameId} />
+        </ThemeProvider>,
+      ),
+  })
 }
 
 describe("useDice", () => {
@@ -115,6 +123,57 @@ describe("useDice", () => {
     fireEvent.press(view.getByTestId("dice-d20"))
     fireEvent.press(view.getByTestId("dice-first"))
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent("Goes first")
+  })
+
+  it("drops a sweep when the game changes, so the next game's dice stay untouched", () => {
+    jest.useFakeTimers()
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear()
+    jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderTable()
+
+    fireEvent.press(view.getByTestId("dice-first"))
+    act(() => jest.advanceTimersByTime(1))
+    view.changeGame("game-2")
+    act(() => jest.runAllTimers())
+
+    expect(view.getByTestId("dice-strip")).toBeTruthy()
+    expect(view.queryByText("Goes first")).toBeNull()
+    expect(announce).not.toHaveBeenCalled()
+  })
+
+  it("stops the sweep when a seat is tapped to clear it", () => {
+    jest.useFakeTimers()
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear()
+    jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderTable()
+
+    fireEvent.press(view.getByTestId("dice-first"))
+    act(() => jest.advanceTimersByTime(1))
+    fireEvent.press(view.getByLabelText("Picking who goes first"))
+    act(() => jest.runAllTimers())
+
+    expect(view.queryByLabelText("Picking who goes first")).toBeNull()
+    expect(view.queryByText("Goes first")).toBeNull()
+    expect(announce).not.toHaveBeenCalled()
+  })
+
+  it("does not read a cleared result into a reopened strip on web", () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    jest.useFakeTimers()
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderTable()
+
+    fireEvent.press(view.getByTestId("dice-d20"))
+    fireEvent.press(view.getByTestId("dice-seat-1"))
+    fireEvent.press(view.getByTestId("dice-close"))
+    act(() => jest.runOnlyPendingTimers())
+
+    expect(view.getByTestId("dice-strip")).toBeTruthy()
+    expect(view.getByTestId("dice-announcer", { includeHiddenElements: true })).toHaveTextContent(
+      "",
+    )
   })
 
   it("reads each result through a live region on web, including a repeat", () => {

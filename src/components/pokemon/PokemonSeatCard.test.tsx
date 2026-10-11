@@ -88,6 +88,18 @@ function board(table: Harness, seat = 0) {
 }
 
 describe("PokemonSeatCard", () => {
+  it("drops its controls from touch and screen readers while dice sit on the seat", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const onPress = jest.fn()
+    render(<Seat harness={table} seat={0} dice={{ armed: "coin", onPress }} />)
+
+    const layer = screen.getByTestId("pokemon-layer-seat-1", { includeHiddenElements: true })
+    expect(layer.props.pointerEvents).toBe("none")
+    expect(layer.props.accessibilityElementsHidden).toBe(true)
+    fireEvent.press(screen.getByTestId("dice-seat-1"))
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
   it("shows the Active's remaining HP and moves it by the damage step from the tap halves", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const me = table.game().players[0].id

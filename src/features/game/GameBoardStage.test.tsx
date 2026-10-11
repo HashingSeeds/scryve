@@ -58,6 +58,32 @@ describe("GameBoardStage on a pinned screen", () => {
     )
   })
 
+  it("tells the dock which way the two-seat seam runs in the holder's view", () => {
+    const dock = jest.fn(() => <View testID="dock" />)
+    render(
+      <ThemeProvider initialContext="dark">
+        <GameBoardStage
+          playerCount={2}
+          layoutVariant="auto"
+          renderGrid={() => <View testID="grid" />}
+          menu={{ open: false, actions: [], dock, onToggle: jest.fn(), onClose: jest.fn() }}
+        />
+      </ThemeProvider>,
+    )
+    const insets = { top: 0, right: 0, bottom: 0, left: 0 }
+
+    act(() =>
+      mockNative.report?.({ pinned: true, holderAngle: 0, width: 390, height: 844, insets }),
+    )
+    expect(dock).toHaveBeenLastCalledWith({ seam: "horizontal" })
+
+    act(() =>
+      mockNative.report?.({ pinned: true, holderAngle: 90, width: 390, height: 844, insets }),
+    )
+    expect(dock).toHaveBeenLastCalledWith({ seam: "vertical" })
+    expect(screen.getByTestId("dock")).toBeTruthy()
+  })
+
   it("turns the connected sync status with the menu so the holder can read it", () => {
     const onPress = jest.fn()
     render(

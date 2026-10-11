@@ -28,15 +28,24 @@ const sweepStepMs = (step: number) => 55 + step * step * 4
 export function useDice(players: readonly GamePlayer[], gameId: string) {
   const [state, setState] = useState<{ gameId: string; dice: DiceState }>()
   const dice = state?.gameId === gameId ? state.dice : undefined
-  const { announce, webMessage } = useResultAnnouncer()
+  const { announce, reset: resetAnnouncer, webMessage } = useResultAnnouncer()
   const reducedMotion = useReducedMotion()
   const sweep = useRef<ReturnType<typeof setTimeout>[]>([])
+  const seatKey = players.map(({ id }) => id).join(",")
 
   function stopSweep() {
     sweep.current.forEach(clearTimeout)
     sweep.current = []
   }
-  useEffect(() => stopSweep, [])
+  // why: a sweep or a pending web announcement from the last game must not land on the next one.
+  useEffect(
+    () => () => {
+      stopSweep()
+      resetAnnouncer()
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [gameId, seatKey],
+  )
 
   function set(next: DiceState) {
     setState({ gameId, dice: next })
@@ -45,6 +54,7 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
 
   function close() {
     stopSweep()
+    resetAnnouncer()
     setState(undefined)
   }
 
@@ -91,6 +101,7 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
 
   function pressSeat(player: GamePlayer) {
     if (!dice) return
+    stopSweep()
     const rolled = rollForSeat(dice, player.id)
     if (!rolled) return set(clearSeat(dice, player.id))
     set(rolled.state)
