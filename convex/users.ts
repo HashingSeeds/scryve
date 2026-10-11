@@ -32,7 +32,11 @@ async function enforceUsernameFilter(ctx: MutationCtx, userId: Id<"users">, user
     if (!wasHeld) await ctx.scheduler.runAfter(0, internal.moderation.sendHoldAlert, { userId })
     return
   }
-  if (user.moderationHold?.reason === "filter") {
+  // why: a report can place a filter hold on a name the gate passes, so only a different name lifts it.
+  if (
+    user.moderationHold?.reason === "filter" &&
+    username.toLowerCase() !== user.moderationHold.heldUsername.toLowerCase()
+  ) {
     await releaseUsernameHold(ctx, user)
     return
   }
@@ -167,6 +171,7 @@ export const refreshUsernameFromClerk = internalAction({
   args: { clerkUserId: v.string() },
   handler: async (ctx, { clerkUserId }) => {
     if (!env.CLERK_SECRET_KEY) return null
+    const fetchStartedAt = Date.now()
     const response = await fetch(
       `https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`,
       { headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` } },
@@ -183,13 +188,18 @@ export const refreshUsernameFromClerk = internalAction({
       typeof clerkUser.username === "string"
         ? clerkUser.username
         : ""
-    await ctx.runMutation(internal.users.applyClerkUsername, { clerkUserId, username })
+    await ctx.runMutation(internal.users.applyClerkUsername, {
+      clerkUserId,
+      username,
+      fetchStartedAt,
+    })
     return null
   },
 })
 
 export const applyClerkUsername = internalMutation({
-  args: { clerkUserId: v.string(), username: v.string() },
+  // why: optional so refreshes already scheduled by the previous deploy still apply.
+  args: { clerkUserId: v.string(), username: v.string(), fetchStartedAt: v.optional(v.number()) },
   handler: async (ctx, args) => {
     if (await hasAccountDeletion(ctx, args.clerkUserId)) return null
     const user = await ctx.db
@@ -197,6 +207,8 @@ export const applyClerkUsername = internalMutation({
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
       .unique()
     if (!user) return null
+    // why: a webhook or sync that landed during the fetch is newer than this response, so it wins.
+    if (args.fetchStartedAt !== undefined && user.updatedAt > args.fetchStartedAt) return null
     const sync = await usernameForSync(ctx, args.username, args.clerkUserId)
     if (sync.action === "keep") return null
     if (sync.action === "clear") {

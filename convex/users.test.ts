@@ -1,24 +1,5 @@
-import { convexTest } from "convex-test"
-
-import { registerRateLimiter } from "../test/registerRateLimiter"
-import { api } from "./_generated/api"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./moderation.ts": async () => jest.requireActual("./moderation"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
-
-type Harness = ReturnType<typeof convexTest<(typeof schema)["tables"]>>
-
-function harness() {
-  const t = convexTest(schema, modules)
-  registerRateLimiter(t)
-  return t
-}
+import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
+import { api, internal } from "./_generated/api"
 
 function clerkUsernames(usernames: Record<string, string | null>) {
   return jest.spyOn(global, "fetch").mockImplementation(async (input) => {
@@ -30,11 +11,11 @@ function clerkUsernames(usernames: Record<string, string | null>) {
   })
 }
 
-async function settle(t: Harness) {
+async function settle(t: ConvexTestHarness) {
   await t.finishAllScheduledFunctions(() => jest.runAllTimers())
 }
 
-async function storedUser(t: Harness, clerkUserId: string) {
+async function storedUser(t: ConvexTestHarness, clerkUserId: string) {
   return await t.run((ctx) =>
     ctx.db
       .query("users")
@@ -61,7 +42,7 @@ describe("users.syncCurrent usernames", () => {
   })
 
   it("stores the Clerk username for the caller, not the one the client sent", async () => {
-    const t = harness()
+    const t = makeConvexTest()
     const fetchSpy = clerkUsernames({ owner: "real_owner", impostor: "impostor_handle" })
     const owner = t.withIdentity({ subject: "owner" })
     await owner.mutation(api.users.syncCurrent, { displayName: "Owner", username: "real_owner" })
@@ -82,14 +63,14 @@ describe("users.syncCurrent usernames", () => {
   })
 
   it("rejects an unauthenticated sync", async () => {
-    const t = harness()
+    const t = makeConvexTest()
     await expect(
       t.mutation(api.users.syncCurrent, { displayName: "Nobody", username: "real_owner" }),
     ).rejects.toThrow("Authentication required")
   })
 
   it("runs the name filter on the Clerk username", async () => {
-    const t = harness()
+    const t = makeConvexTest()
     clerkUsernames({ rude: "sh1t-lord" })
     const rude = t.withIdentity({ subject: "rude" })
     await rude.mutation(api.users.syncCurrent, { displayName: "Rude", username: "sh1t-lord" })
@@ -97,8 +78,63 @@ describe("users.syncCurrent usernames", () => {
     expect((await storedUser(t, "rude"))?.moderationHold).toMatchObject({ reason: "filter" })
   })
 
+  it("keeps a filter hold when Clerk clears the username", async () => {
+    const t = makeConvexTest()
+    const usernames: Record<string, string | null> = { rude: "sh1t-lord" }
+    clerkUsernames(usernames)
+    const rude = t.withIdentity({ subject: "rude" })
+    await rude.mutation(api.users.syncCurrent, { displayName: "Rude", username: "sh1t-lord" })
+    await settle(t)
+
+    usernames.rude = null
+    await rude.mutation(api.users.syncCurrent, { displayName: "Rude", username: "" })
+    await settle(t)
+    const rudeUser = await storedUser(t, "rude")
+    expect(rudeUser?.username).toBeUndefined()
+    expect(rudeUser?.moderationHold).toMatchObject({ reason: "filter" })
+  })
+
+  it("keeps a filter hold placed by reports when the same name syncs again", async () => {
+    const t = makeConvexTest()
+    clerkUsernames({ reported: "fine_name" })
+    const reported = t.withIdentity({ subject: "reported" })
+    await reported.mutation(api.users.syncCurrent, { displayName: "R", username: "fine_name" })
+    await settle(t)
+    const user = await storedUser(t, "reported")
+    await t.run((ctx) =>
+      ctx.db.patch(user!._id, {
+        moderationHold: {
+          placeholderUsername: "player_held",
+          heldUsername: "fine_name",
+          reason: "filter",
+          createdAt: Date.now(),
+        },
+      }),
+    )
+
+    await reported.mutation(api.users.syncCurrent, { displayName: "R", username: "other_name" })
+    await settle(t)
+    expect((await storedUser(t, "reported"))?.moderationHold).toMatchObject({ reason: "filter" })
+  })
+
+  it("drops a Clerk refresh that a newer change overtook", async () => {
+    const t = makeConvexTest()
+    clerkUsernames({ renamer: "new_handle" })
+    const renamer = t.withIdentity({ subject: "renamer" })
+    await renamer.mutation(api.users.syncCurrent, { displayName: "R", username: "new_handle" })
+    await settle(t)
+    const { updatedAt } = (await storedUser(t, "renamer"))!
+
+    await t.mutation(internal.users.applyClerkUsername, {
+      clerkUserId: "renamer",
+      username: "old_handle",
+      fetchStartedAt: updatedAt - 1,
+    })
+    expect(await storedUser(t, "renamer")).toMatchObject({ username: "new_handle" })
+  })
+
   it("clears the stored username once Clerk has none", async () => {
-    const t = harness()
+    const t = makeConvexTest()
     const usernames: Record<string, string | null> = { renamer: "old_handle" }
     clerkUsernames(usernames)
     const renamer = t.withIdentity({ subject: "renamer" })
@@ -113,7 +149,7 @@ describe("users.syncCurrent usernames", () => {
   })
 
   it("skips Clerk when the client's username already matches, and caps refreshes", async () => {
-    const t = harness()
+    const t = makeConvexTest()
     const fetchSpy = clerkUsernames({ steady: "steady_handle" })
     const steady = t.withIdentity({ subject: "steady" })
     await steady.mutation(api.users.syncCurrent, { displayName: "S", username: "steady_handle" })
@@ -134,7 +170,7 @@ describe("users.syncCurrent usernames", () => {
   })
 
   it("shows the synced username on a connected board", async () => {
-    const t = harness()
+    const t = makeConvexTest()
     clerkUsernames({ host: "host_handle", joiner: "joiner_cool" })
     const host = t.withIdentity({ subject: "host" })
     await host.mutation(api.users.syncCurrent, { displayName: "Host" })
