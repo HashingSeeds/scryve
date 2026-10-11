@@ -217,9 +217,18 @@ async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: 
   await ctx.db.patch(record._id, { attempts: record.attempts + 1 })
 }
 
+// why: a malformed code can never match an invite, so it counts as a wrong one instead of throwing and rolling back the attempt.
+function manualCodeOrUndefined(code: string) {
+  try {
+    return normalizeManualCode(code)
+  } catch {
+    return undefined
+  }
+}
+
 function inviteKey(args: { token?: string; manualCode?: string }) {
   if (args.token) return args.token
-  return args.manualCode ? normalizeManualCode(args.manualCode) : ""
+  return args.manualCode ? (manualCodeOrUndefined(args.manualCode) ?? args.manualCode) : ""
 }
 
 /**
@@ -451,10 +460,11 @@ async function findInvite(
       .query("invitations")
       .withIndex("by_token", (q) => q.eq("token", args.token!))
       .unique()
-  if (args.manualCode)
+  const manualCode = args.manualCode ? manualCodeOrUndefined(args.manualCode) : undefined
+  if (manualCode)
     return await ctx.db
       .query("invitations")
-      .withIndex("by_manual_code", (q) => q.eq("manualCode", normalizeManualCode(args.manualCode!)))
+      .withIndex("by_manual_code", (q) => q.eq("manualCode", manualCode))
       .unique()
   return null
 }

@@ -486,6 +486,23 @@ describe("imported game invite renewal and discovery", () => {
     ).rejects.toThrow("Authentication required")
   })
 
+  it("counts malformed codes toward the join limit like any wrong code", async () => {
+    const t = makeConvexTest()
+    const { created } = await published(t)
+    const guest = await signedIn(t, "guest-subject", "Guest")
+    for (let index = 0; index < 5; index += 1) {
+      await expect(
+        guest.mutation(api.games.claimableSeats, { manualCode: `AB${index}` }),
+      ).resolves.toEqual({ invalid: true, seats: [] })
+      await expect(
+        guest.mutation(api.games.claimSeat, { seat: 2, manualCode: `CD${index}` }),
+      ).resolves.toBeNull()
+    }
+    await expect(
+      guest.mutation(api.games.claimSeat, { seat: 2, manualCode: created.manualCode }),
+    ).rejects.toMatchObject({ data: { code: "too_many_join_attempts" } })
+  })
+
   it("keeps the lookup-then-claim flow of installed clients throwing for a wrong code", async () => {
     const t = makeConvexTest()
     const { created } = await published(t)
