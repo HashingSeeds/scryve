@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import type { ConnectedGameStatus } from "@/features/connected/model"
+import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 
 type ActiveConnectedGame = {
@@ -71,7 +72,7 @@ type RuntimeActionEvent = {
   accepted?: boolean
 }
 
-export type MockConnectedRuntime = {
+export type MockConnectedRuntime = TableRuntime & {
   status: "loading" | "ready" | "unavailable"
   source: "cache" | "remote"
   message?: string
@@ -191,6 +192,13 @@ function defaultRuntime(): MockConnectedRuntime {
     abandon: mockRuntimeAbandon,
     dismissFailed: mockDismissFailed,
     finishing: false,
+    // why: the board reads the table from the runtime; these tests cover life and commander damage, so the table stays empty.
+    table: { designations: {}, players: {} },
+    tableRules: { counters: [], designations: [] },
+    ...createTableActions(
+      () => null,
+      () => false,
+    ),
   }
 }
 
