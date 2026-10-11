@@ -584,15 +584,20 @@ export function applyGameCommand(
   return event ? reduceGameEvent(game, event) : game
 }
 
-/** why: who goes first is settled by the first point of play, not by setting the table: a life, prize, commander damage, or Pokémon damage change. */
+/** why: who goes first is settled by the first point of play: life, prizes, commander damage, counters, designations, or Pokémon damage. Placing Pokémon and picking a layout set the table and do not count. */
 export function hasPlayBegun(game: LocalGame): boolean {
   if (
     game.events.some(({ type }) => type === "life.changed" || type === "commanderDamage.assigned")
   )
     return true
   if (game.players.some((player) => player.life !== game.startingLife)) return true
-  return Object.values(game.table?.players ?? {}).some(({ pokemon }) =>
-    [pokemon?.active, ...(pokemon?.bench ?? [])].some((card) => (card?.damage ?? 0) > 0),
+  const table = game.table
+  if (!table) return false
+  if (Object.keys(table.designations).length > 0) return true
+  return Object.values(table.players).some(
+    ({ counters, pokemon }) =>
+      Object.values(counters ?? {}).some((value) => value !== 0) ||
+      [pokemon?.active, ...(pokemon?.bench ?? [])].some((card) => (card?.damage ?? 0) > 0),
   )
 }
 

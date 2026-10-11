@@ -6,9 +6,14 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
+import { reportCrash } from "@/utils/crashReporting"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
 
+jest.mock("@/utils/crashReporting", () => ({
+  ...jest.requireActual<typeof import("@/utils/crashReporting")>("@/utils/crashReporting"),
+  reportCrash: jest.fn(),
+}))
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),
@@ -221,7 +226,7 @@ describe("CurrentGameScreen", () => {
     expect(inProgress.queryByTestId("first-player-badge")).toBeNull()
   })
 
-  it("keeps the first-player offer through table setup and withdraws it at the first point of play", () => {
+  it("keeps the first-player offer through Pokémon setup and withdraws it at the first point of play", () => {
     const context = { operationId: "op-1", now: 2 }
     const mtg = createLocalGame({
       players: [
@@ -238,7 +243,8 @@ describe("CurrentGameScreen", () => {
       context,
     )
     expect(withPoison).not.toBe(mtg)
-    expect(renderGame(withPoison).getByTestId("first-player-badge")).toBeTruthy()
+    // why: poison is damage dealt, so a counter counts as play even with life untouched.
+    expect(renderGame(withPoison).queryByTestId("first-player-badge")).toBeNull()
 
     const pokemon = game(2, "pokemon")
     const placed = applyLocalTableAction(
@@ -257,6 +263,48 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("first-player-badge")).toBeTruthy()
     fireEvent.press(view.getByTestId("pokemon-damage-seat-1-10"))
     expect(view.queryByTestId("first-player-badge")).toBeNull()
+  })
+
+  it("keeps the board playing when the first-player record cannot be stored", () => {
+    class RefusingStorage extends MemoryStorage {
+      set(key: string, value: string) {
+        if (key.includes("firstPlayer")) throw new Error("quota")
+        super.set(key, value)
+      }
+    }
+    jest.mocked(reportCrash).mockClear()
+    const played = { ...game(), players: game().players.map((p, i) => ({ ...p, life: i ? 2 : 1 })) }
+    const reopened = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={played}
+          repository={new LocalGameRepository(new RefusingStorage())}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(reopened.getByTestId("life-total-seat-1").props.children).toBe("1")
+    fireEvent.press(reopened.getByTestId("life-seat-1-1"))
+    expect(reopened.getByTestId("life-total-seat-1").props.children).toBe("2")
+    expect(reportCrash).toHaveBeenCalled()
+    reopened.unmount()
+
+    const rolls = [0.9, 0.1]
+    const random = jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const fresh = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game()}
+          repository={new LocalGameRepository(new RefusingStorage())}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    layoutSeats(fresh)
+    fireEvent.press(fresh.getByTestId("first-player-badge"))
+    expect(fresh.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
+    expect(fresh.queryByTestId("first-player-badge")).toBeNull()
+    random.mockRestore()
   })
 
   it("remembers a used offer and a rematch's loser across a reopen", () => {

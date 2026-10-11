@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react"
 import * as Haptics from "expo-haptics"
 
 import { captureGame, type GameEndSource } from "@/utils/analytics"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
@@ -138,22 +139,38 @@ export function useLocalGame(
     [repository],
   )
 
-  // why: the first-player offer is per game and survives a reopen, so it is read with the game and written as it changes.
+  // why: the first-player offer is per game and survives a reopen, so it is read with the game and written as it changes. It is table talk, so a storage failure is reported and the board plays on.
   const [firstPlayer, setFirstPlayer] = useState<{ gameId: string; record: FirstPlayerRecord }>()
+  const readFirstPlayer = useCallback(
+    (gameId: string): FirstPlayerRecord => {
+      try {
+        return repository.loadFirstPlayer(gameId)
+      } catch (error) {
+        reportFirstPlayerStorage(error)
+        return { used: false }
+      }
+    },
+    [repository],
+  )
   const firstPlayerRecord =
-    firstPlayer?.gameId === game.id ? firstPlayer.record : repository.loadFirstPlayer(game.id)
+    firstPlayer?.gameId === game.id ? firstPlayer.record : readFirstPlayer(game.id)
   const saveFirstPlayer = useCallback(
     (gameId: string, record: FirstPlayerRecord) => {
-      repository.saveFirstPlayer(gameId, record)
+      try {
+        repository.saveFirstPlayer(gameId, record)
+      } catch (error) {
+        reportFirstPlayerStorage(error)
+      }
       setFirstPlayer({ gameId, record })
     },
     [repository],
   )
   const markFirstPlayerUsed = useCallback(() => {
     const current = gameRef.current
-    const record = repository.loadFirstPlayer(current.id)
+    const record =
+      firstPlayer?.gameId === current.id ? firstPlayer.record : readFirstPlayer(current.id)
     if (!record.used) saveFirstPlayer(current.id, { ...record, used: true })
-  }, [repository, saveFirstPlayer])
+  }, [firstPlayer, readFirstPlayer, saveFirstPlayer])
 
   const replaceBoard = useCallback(
     (next: LocalGame) => {
@@ -188,10 +205,14 @@ export function useLocalGame(
     [replaceAfter],
   )
 
-  const restartMatchGameBoard = useCallback(
-    () => replaceBoard(restartMatchGame(gameRef.current)),
-    [replaceBoard],
-  )
+  // why: a restarted game is the same game of the match, so the loser of the game before it keeps the first choice.
+  const restartMatchGameBoard = useCallback(() => {
+    const current = gameRef.current
+    const { loserSeat } = readFirstPlayer(current.id)
+    const next = restartMatchGame(current)
+    saveFirstPlayer(next.id, loserSeat === undefined ? { used: false } : { used: false, loserSeat })
+    return replaceBoard(next)
+  }, [readFirstPlayer, replaceBoard, saveFirstPlayer])
 
   /** why: the match's last finished game is in history; ending it also hands the table a fresh match. */
   const endMatch = useCallback(
@@ -253,4 +274,10 @@ export function useLocalGame(
       return gameRef.current
     },
   }
+}
+
+function reportFirstPlayerStorage(error: unknown) {
+  reportCrash(error instanceof Error ? error : new Error(String(error)), ErrorType.HANDLED, {
+    tags: { feature: "firstPlayer" },
+  })
 }
