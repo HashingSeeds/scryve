@@ -190,6 +190,11 @@ describe("NewGameScreen", () => {
     ).toBeNull()
   })
 
+  it("drops the empty status row from a fresh local setup", () => {
+    expect(setup().queryByTestId("setup-status")).toBeNull()
+    expect(setup({ localGame: runningLocalGame() }).getByTestId("setup-status")).toBeTruthy()
+  })
+
   it("surfaces a hosted live game in local setup only", () => {
     const onResumeConnected = jest.fn()
     const hosted = {
