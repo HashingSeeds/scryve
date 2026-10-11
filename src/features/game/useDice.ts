@@ -93,7 +93,10 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
     let delay = 0
     for (let step = 0; step < steps; step += 1) {
       const seatId = players[(start + step) % count].id
-      sweep.current.push(setTimeout(() => set(showFirst(seatId, false)), delay))
+      const show = () => set(showFirst(seatId, false))
+      // why: the first step lands now, so the tap that opens dice does not see them closed and replay the row's arrival.
+      if (step === 0) show()
+      else sweep.current.push(setTimeout(show, delay))
       delay += sweepStepMs(step)
     }
     sweep.current.push(setTimeout(settle, delay))

@@ -125,7 +125,7 @@ describe("useDice", () => {
     const view = renderTable()
 
     fireEvent.press(view.getByTestId("dice-first"))
-    act(() => jest.advanceTimersByTime(1))
+    // why: the sweep starts in the same tick as the tap, so dice are open before any timer runs.
     expect(view.getByLabelText("Picking who goes first")).toBeTruthy()
     expect(view.queryByText("Goes first")).toBeNull()
     act(() => jest.runAllTimers())

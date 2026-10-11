@@ -778,7 +778,9 @@ function RadialAction({
     >
       <BoardPressable
         testID={open ? `${action.kind}-button` : undefined}
-        disabled={action.disabled}
+        // why: a hidden action stays mounted, so it must leave the tab order or a keyboard could fire it unseen on web.
+        disabled={action.disabled || !open}
+        tabIndex={open ? undefined : -1}
         accessibilityRole="button"
         accessibilityLabel={action.detail ? `${action.label}, ${action.detail}` : action.label}
         accessibilityState={{ disabled: !!action.disabled }}
@@ -852,6 +854,7 @@ function RadialToolRow({
           <RadialTool
             key={tool.key}
             testID={open ? `${kind}-${tool.key}` : undefined}
+            open={open}
             tool={tool}
             left={firstLeft}
             travel={offsets[index] - offsets[0]}
@@ -866,6 +869,7 @@ function RadialToolRow({
 
 function RadialTool({
   testID,
+  open,
   tool,
   left,
   travel,
@@ -873,6 +877,7 @@ function RadialTool({
   background,
 }: {
   testID?: string
+  open: boolean
   tool: RadialMenuTool
   left: number
   travel: number
@@ -897,6 +902,8 @@ function RadialTool({
     <Animated.View style={[$toolSlot, { left }, rollStyle]}>
       <BoardPressable
         testID={testID}
+        disabled={!open}
+        tabIndex={open ? undefined : -1}
         accessibilityRole="button"
         accessibilityLabel={tool.accessibilityLabel}
         accessibilityState={tool.selected === undefined ? undefined : { selected: tool.selected }}

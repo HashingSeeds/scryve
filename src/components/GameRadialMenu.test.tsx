@@ -314,6 +314,24 @@ describe("GameRadialMenu", () => {
     }
   })
 
+  it("disables hidden tools and pills and takes them out of the tab order", () => {
+    const view = render(menu(false, jest.fn(), { actions: actionsWithDiceTools }))
+    const hidden = { includeHiddenElements: true }
+
+    for (const label of ["d20", "Layout"]) {
+      const button = view.getByLabelText(label, hidden)
+      expect(button.props.tabIndex).toBe(-1)
+      expect(button.props.accessibilityState.disabled).toBe(true)
+    }
+
+    view.rerender(menu(true, jest.fn(), { actions: actionsWithDiceTools }))
+    for (const label of ["d20", "Layout"]) {
+      const button = view.getByLabelText(label, hidden)
+      expect(button.props.tabIndex).toBeUndefined()
+      expect(button.props.accessibilityState.disabled).toBe(false)
+    }
+  })
+
   it("keeps a held action's tools out and pressable while the menu is closed", () => {
     const view = render(
       menu(false, jest.fn(), {
