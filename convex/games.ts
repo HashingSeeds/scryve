@@ -242,7 +242,8 @@ async function recordFailedInvite(
 ) {
   await consumeJoinAttempt(ctx, clerkUserId)
   const record = await joinAttemptsFor(ctx, clerkUserId)
-  if (record) await ctx.db.patch(record._id, { failedInvite: inviteKey(args) })
+  if (record)
+    await ctx.db.patch(record._id, { failedInvite: inviteKey(args), failedInviteAt: Date.now() })
 }
 
 async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualCode?: string }) {
@@ -852,9 +853,16 @@ export const claimSeat = mutation({
     const game = await joinableInviteGame(ctx, args)
     if (!game) {
       /* why: installed clients claim right after claimableSeats rejected the same invite and
-         expect this throw; that lookup already counted the failure. Any other wrong invite
-         returns null so the attempt counted above commits. */
-      if ((await joinAttemptsFor(ctx, clerkUserId))?.failedInvite === inviteKey(args))
+         expect this throw; that lookup already counted the failure. The grace is timed from the
+         lookup, not the window, so a rollover between the two calls still throws, yet retries
+         stop being free a minute later. Any other wrong invite returns null so the attempt
+         counted above commits. */
+      const joins = await joinAttemptsFor(ctx, clerkUserId)
+      if (
+        joins?.failedInvite === inviteKey(args) &&
+        joins.failedInviteAt !== undefined &&
+        Date.now() - joins.failedInviteAt < JOIN_ATTEMPT_WINDOW_MS
+      )
         throw new Error(INVALID_INVITE_MESSAGE)
       return null
     }

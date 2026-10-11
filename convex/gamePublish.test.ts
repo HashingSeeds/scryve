@@ -503,6 +503,45 @@ describe("imported game invite renewal and discovery", () => {
     ).rejects.toMatchObject({ data: { code: "too_many_join_attempts" } })
   })
 
+  it("counts a claim of a remembered wrong code once its window has passed", async () => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] })
+    try {
+      const t = makeConvexTest()
+      const { created } = await published(t)
+      const guest = await signedIn(t, "guest-subject", "Guest")
+      await guest.mutation(api.games.claimableSeats, { manualCode: "ABC" })
+      jest.advanceTimersByTime(61_000)
+      for (let index = 0; index < 10; index += 1) {
+        await expect(
+          guest.mutation(api.games.claimSeat, { seat: 2, manualCode: "ABC" }),
+        ).resolves.toBeNull()
+      }
+      await expect(
+        guest.mutation(api.games.claimSeat, { seat: 2, manualCode: created.manualCode }),
+      ).rejects.toMatchObject({ data: { code: "too_many_join_attempts" } })
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it("keeps an installed client's claim throwing when the window rolls over after its lookup", async () => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] })
+    try {
+      const t = makeConvexTest()
+      await published(t)
+      const guest = await signedIn(t, "guest-subject", "Guest")
+      await guest.mutation(api.games.claimableSeats, { manualCode: "ZZZ000" })
+      jest.advanceTimersByTime(59_999)
+      await guest.mutation(api.games.claimableSeats, { manualCode: "ZZZ001" })
+      jest.advanceTimersByTime(1)
+      await expect(
+        guest.mutation(api.games.claimSeat, { seat: 2, manualCode: "ZZZ001" }),
+      ).rejects.toThrow("Invite is invalid, expired, or revoked")
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it("keeps the lookup-then-claim flow of installed clients throwing for a wrong code", async () => {
     const t = makeConvexTest()
     const { created } = await published(t)

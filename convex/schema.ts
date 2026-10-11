@@ -192,6 +192,7 @@ export default defineSchema({
     attempts: v.number(),
     kind: v.optional(v.literal("seatLookup")),
     failedInvite: v.optional(v.string()),
+    failedInviteAt: v.optional(v.number()),
   })
     .index("by_clerk_user", ["clerkUserId"])
     .index("by_clerk_user_kind", ["clerkUserId", "kind"]),
