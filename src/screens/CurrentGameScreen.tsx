@@ -23,11 +23,11 @@ import {
   canContinueMatch,
   drawsLabel,
   hasLocalGameStarted,
+  hasPlayBegun,
   incomingCommanderDamage,
   isEliminatedByCommanderDamage,
   matchContextLabel,
   matchScoreAfter,
-  soleLoserSeat,
 } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
@@ -110,57 +110,53 @@ export function CurrentGameScreen({
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const dice = useDice(runtime.game.players, runtime.game.id)
-  const started = hasLocalGameStarted(runtime.game)
+  const playBegun = hasPlayBegun(runtime.game)
   const diceGameStarted = dice.gameStarted
+  const markFirstPlayerUsed = runtime.markFirstPlayerUsed
   useEffect(() => {
-    if (started) diceGameStarted()
-  }, [started, diceGameStarted])
-  // why: the game that was just finished is remembered against the board that replaced it, so its loser can be offered the first choice.
-  const [lastGame, setLastGame] = useState<{ nextGameId: string; loserSeat: number }>()
-  const matchId = runtime.game.match?.id
-  const matchGameNumber = runtime.game.match?.gameNumber
-  const latestMatchGame = runtime.latestMatchGame
-  const loserSeat = useMemo(() => {
-    if (lastGame?.nextGameId === runtime.game.id) return lastGame.loserSeat
-    if (matchId !== undefined && matchGameNumber !== undefined && matchGameNumber > 1) {
-      const latest = latestMatchGame(matchId)
-      return latest ? soleLoserSeat(latest) : undefined
-    }
-    return undefined
-  }, [lastGame, latestMatchGame, matchGameNumber, matchId, runtime.game.id])
+    if (!playBegun) return
+    diceGameStarted()
+    markFirstPlayerUsed()
+  }, [playBegun, diceGameStarted, markFirstPlayerUsed])
+  const { used: firstPlayerUsed, loserSeat } = runtime.firstPlayer
   const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
-  const diceAsk = dice.ask
+  const { ask: diceAsk, flip: diceFlip, rollOff: diceRollOff } = dice
   const badge = useMemo<GameMenuBadge | undefined>(() => {
-    if (started || dice.firstUsed) return undefined
+    if (playBegun || firstPlayerUsed) return undefined
+    const offer = (run: () => void) => () => {
+      markFirstPlayerUsed()
+      run()
+    }
     if (loser && loserSeat !== undefined)
       return {
         color: loser.color,
         glyph: { seatNumber: loserSeat + 1, shape: loser.shape },
         accessibilityLabel: `${loser.name} lost the last game. Choose who goes first`,
-        onPress: () => diceAsk(loser.id, "loss"),
+        onPress: offer(() => diceAsk(loser.id, "loss")),
       }
     if (system === "pokemon")
       return {
         color: colors.gameMenu.actions.dice,
         glyph: { tool: "coin" },
         accessibilityLabel: "Flip for who goes first",
-        onPress: dice.flip,
+        onPress: offer(diceFlip),
       }
     return {
       color: colors.gameMenu.actions.dice,
       glyph: { tool: "d20" },
       accessibilityLabel: "Roll for who goes first",
-      onPress: dice.rollOff,
+      onPress: offer(diceRollOff),
     }
   }, [
     colors.gameMenu.actions.dice,
-    dice.firstUsed,
-    dice.flip,
-    dice.rollOff,
     diceAsk,
+    diceFlip,
+    diceRollOff,
+    firstPlayerUsed,
     loser,
     loserSeat,
-    started,
+    markFirstPlayerUsed,
+    playBegun,
     system,
   ])
   // why: a dice tool tapped from the open menu acts at once, and the menu folds away around the row.
@@ -199,11 +195,6 @@ export function CurrentGameScreen({
   const layoutVariant = runtime.game.layout ?? "auto"
   const layoutOptions = getPlayerGridLayoutOptions(playerCount)
 
-  function rememberLoser(ended: LocalGame, next: LocalGame) {
-    const seat = soleLoserSeat(ended)
-    setLastGame(seat === undefined ? undefined : { nextGameId: next.id, loserSeat: seat })
-  }
-
   function confirmEnd(result: LocalGameResult) {
     const ended = runtime.finish(result, endSource)
     if (ended.status === "active") {
@@ -213,13 +204,13 @@ export function CurrentGameScreen({
     // why: a failed rematch save throws here, and the open dialog shows the error.
     if (ended.match && !ended.match.result) {
       // why: at the game cap the board waits for the match result, so Cancel or a restart cannot orphan the match.
-      if (canContinueMatch(ended)) rememberLoser(ended, runtime.nextMatchGame())
+      if (canContinueMatch(ended)) runtime.nextMatchGame()
       else runtime.holdMatchEnd(ended.match.id)
       setEndSource(undefined)
       setMatchPrompt(ended)
       return
     }
-    rememberLoser(ended, runtime.rematch())
+    runtime.rematch()
     setEndSource(undefined)
     setSaved({ gameId: ended.id, message: ended.match ? "Match saved" : "Game saved" })
   }

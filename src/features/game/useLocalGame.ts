@@ -14,8 +14,13 @@ import {
   hasLocalGameStarted,
   localTableRules,
   restartMatchGame,
+  soleLoserSeat,
 } from "./domain"
-import { localGameRepository, type LocalGameRepository } from "./localPersistence"
+import {
+  type FirstPlayerRecord,
+  localGameRepository,
+  type LocalGameRepository,
+} from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
 import { createTableActions, type TableRuntime } from "./tableRuntime"
 import type {
@@ -133,6 +138,23 @@ export function useLocalGame(
     [repository],
   )
 
+  // why: the first-player offer is per game and survives a reopen, so it is read with the game and written as it changes.
+  const [firstPlayer, setFirstPlayer] = useState<{ gameId: string; record: FirstPlayerRecord }>()
+  const firstPlayerRecord =
+    firstPlayer?.gameId === game.id ? firstPlayer.record : repository.loadFirstPlayer(game.id)
+  const saveFirstPlayer = useCallback(
+    (gameId: string, record: FirstPlayerRecord) => {
+      repository.saveFirstPlayer(gameId, record)
+      setFirstPlayer({ gameId, record })
+    },
+    [repository],
+  )
+  const markFirstPlayerUsed = useCallback(() => {
+    const current = gameRef.current
+    const record = repository.loadFirstPlayer(current.id)
+    if (!record.used) saveFirstPlayer(current.id, { ...record, used: true })
+  }, [repository, saveFirstPlayer])
+
   const replaceBoard = useCallback(
     (next: LocalGame) => {
       repository.saveActiveGame(next)
@@ -143,11 +165,27 @@ export function useLocalGame(
     [repository],
   )
 
-  const rematch = useCallback(() => replaceBoard(createRematch(gameRef.current)), [replaceBoard])
+  /** why: the board that follows a finished game remembers who lost it, so that player can be offered the first choice. */
+  const replaceAfter = useCallback(
+    (ended: LocalGame, next: LocalGame) => {
+      const loserSeat = soleLoserSeat(ended)
+      saveFirstPlayer(
+        next.id,
+        loserSeat === undefined ? { used: false } : { used: false, loserSeat },
+      )
+      return replaceBoard(next)
+    },
+    [replaceBoard, saveFirstPlayer],
+  )
+
+  const rematch = useCallback(
+    () => replaceAfter(gameRef.current, createRematch(gameRef.current)),
+    [replaceAfter],
+  )
 
   const nextMatchGame = useCallback(
-    () => replaceBoard(createNextMatchGame(gameRef.current)),
-    [replaceBoard],
+    () => replaceAfter(gameRef.current, createNextMatchGame(gameRef.current)),
+    [replaceAfter],
   )
 
   const restartMatchGameBoard = useCallback(
@@ -160,10 +198,13 @@ export function useLocalGame(
     (matchId: string, outcomes: MatchSeatOutcome[]) => {
       const ended = repository.finishMatch(matchId, outcomes)
       if (!ended) throw new Error("This match has no finished game to end.")
-      if (gameRef.current.match?.id === matchId) rematch()
+      if (gameRef.current.match?.id === matchId) {
+        const last = repository.loadHistoryDetail(ended.id)?.game
+        replaceAfter(last ?? gameRef.current, createRematch(gameRef.current))
+      }
       return ended
     },
-    [rematch, repository],
+    [replaceAfter, repository],
   )
 
   const latestMatchGame = useCallback(
@@ -198,6 +239,8 @@ export function useLocalGame(
     nextMatchGame,
     restartMatchGame: restartMatchGameBoard,
     endMatch,
+    firstPlayer: firstPlayerRecord,
+    markFirstPlayerUsed,
     latestMatchGame,
     /** why: a match that hit the game cap still owes its result after a restart; the board reopens the prompt from it. */
     pendingMatchEnd: () => {

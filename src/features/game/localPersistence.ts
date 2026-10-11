@@ -60,9 +60,15 @@ export const LOCAL_KEYS = {
   historyIndex: "count.local.history.index.v1",
   meSeat: "count.local.meSeat.v1",
   pendingMatchEnd: "count.local.matchEnd.v1",
+  firstPlayer: "count.local.firstPlayer.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
 } as const
+
+export interface FirstPlayerRecord {
+  used: boolean
+  loserSeat?: number
+}
 
 export type ThemePreference = "system" | "light" | "dark"
 export type LaunchDestination = "play" | "decks"
@@ -821,6 +827,20 @@ export class LocalGameRepository {
   savePendingMatchEnd(matchId: string | undefined): void {
     if (matchId === undefined) this.storage.delete(LOCAL_KEYS.pendingMatchEnd)
     else this.storage.set(LOCAL_KEYS.pendingMatchEnd, matchId)
+  }
+
+  /** why: the first-player offer is one per game and survives a reopen; a rematch also carries which seat lost the game before it. */
+  loadFirstPlayer(gameId: string): FirstPlayerRecord {
+    const stored = parseJson(this.storage.getString(LOCAL_KEYS.firstPlayer))
+    if (!isRecord(stored) || stored.gameId !== gameId) return { used: false }
+    return {
+      used: stored.used === true,
+      ...(typeof stored.loserSeat === "number" ? { loserSeat: stored.loserSeat } : {}),
+    }
+  }
+
+  saveFirstPlayer(gameId: string, record: FirstPlayerRecord): void {
+    this.storage.set(LOCAL_KEYS.firstPlayer, JSON.stringify({ gameId, ...record }))
   }
 
   // why: ending a match happens after its last game was archived, so the result is written onto that game.

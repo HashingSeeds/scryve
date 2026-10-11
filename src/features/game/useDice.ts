@@ -38,12 +38,10 @@ type State = {
   gameId: string
   /** why: dice mode is the Dice petal held out with the seats live; a first-player pick from the badge never enters it. */
   mode: boolean
-  /** why: the badge offers one pick per game, so it leaves once used even after the chip is cleared. */
-  firstUsed: boolean
   dice: DiceState
 }
 
-const CLOSED: Omit<State, "gameId"> = { mode: false, firstUsed: false, dice: EMPTY_DICE }
+const CLOSED: Omit<State, "gameId"> = { mode: false, dice: EMPTY_DICE }
 
 /** why: dice results are table talk, so they live on this device only and are gone when the game changes. Rolls belong to dice mode; who goes first belongs to the game's start and clears on its first life change. */
 export function useDice(players: readonly GamePlayer[], gameId: string) {
@@ -123,24 +121,24 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
     const next = startRollOff(dice, seatIds())
     const message = rollOffAnnouncement(next.first, players)
     if (message) announce(message)
-    set(holdFirst(next), { firstUsed: true })
+    set(holdFirst(next))
   })
 
   const flip = stable("flip", () => {
     const winner = flipForFirst(seatIds())
     announce(`${name(winner)} won the flip. Go first or second`)
-    set(offerChoice(dice, winner, "flip"), { firstUsed: true })
+    set(offerChoice(dice, winner, "flip"))
   })
 
   const ask = stable("ask", (seatId: PlayerId, reason: ChoiceReason) => {
     announce(`${name(seatId)}, go first or second`)
-    set(offerChoice(dice, seatId, reason), { firstUsed: true })
+    set(offerChoice(dice, seatId, reason))
   })
 
-  // why: the first life change means play has begun, so a pick still on its way out settles without leaving a chip.
+  // why: once play has begun, a pick still on its way out settles without leaving a chip.
   const gameStarted = stable("gameStarted", () => {
     dropHold(FIRST_HOLD)
-    set(clearFirst(dice), { firstUsed: true })
+    set(clearFirst(dice))
   })
 
   const pressSeat = stable("pressSeat", (player: GamePlayer) => {
@@ -207,7 +205,6 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
     close,
     tools,
     webMessage,
-    firstUsed: state.firstUsed,
     rollOff,
     flip,
     ask,

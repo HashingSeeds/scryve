@@ -64,6 +64,21 @@ function endGame(view: ReturnType<typeof render>, winner: number | "draw") {
 }
 
 describe("CurrentGameScreen match mode", () => {
+  it("offers the next match's first choice to the loser of the last game", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(matchGame(3))
+    const { view } = mount(repository)
+    endGame(view, 0)
+    fireEvent.press(view.getByTestId("match-prompt-end-button"))
+    fireEvent.press(view.getByTestId("match-outcome-0-win"))
+    fireEvent.press(view.getByTestId("confirm-end-match-button"))
+
+    expect(view.queryByTestId("end-match-dialog")).toBeNull()
+    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+      "Grace lost the last game. Choose who goes first",
+    )
+  })
+
   it("plays a best of three to its end and then starts a fresh match", async () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.saveActiveGame(matchGame(3))

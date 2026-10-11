@@ -29,7 +29,7 @@ import {
   type PokemonInPlay,
 } from "../../../convex/lib/table"
 import { BoardPressable } from "../BoardPressable"
-import { DiceChips } from "../DiceChips"
+import { COMPACT_DICE_CHIP_HEIGHT, DICE_CHIP_HEIGHT, DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
@@ -130,6 +130,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const clearance = benchMenuClearance(contentRotation, menuCorner, menuEdgeCenter)
   const sideways = Math.abs(contentRotation) === 90
   const diceCovers = diceCoversSeat(dice)
+  const diceChips = dice?.chips
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const layer = sideways
     ? { width: cardSize.height, height: cardSize.width }
@@ -137,6 +138,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const cramped = Boolean(compact) || (layer.height > 0 && layer.height < CRAMPED_CONTENT_HEIGHT)
   const padding = cramped ? spacing.xxs : spacing.xs
   const benchHeight = cramped ? COMPACT_BENCH_HEIGHT : BENCH_HEIGHT
+  // why: a settled dice chip takes its own row above the bench, so it never sits on a bench Pokémon.
+  const chipClearance = diceChips?.length
+    ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
+    : 0
   const bottomRowHeight = cramped ? COMPACT_BOTTOM_ROW_HEIGHT : BOTTOM_ROW_HEIGHT
   const markSize = cramped ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
   const [sheet, setSheet] = useState<Sheet | null>(null)
@@ -309,6 +314,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.top -
       insets.bottom -
       clearance.top -
+      chipClearance -
       benchHeight -
       bottomRowHeight -
       (cramped ? COMPACT_HERO_CAPTION_HEIGHT : HERO_CAPTION_HEIGHT),
@@ -361,7 +367,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           StyleSheet.absoluteFill,
           rotatedLayerStyle(contentRotation, cardSize.width, cardSize.height),
           {
-            paddingTop: padding + insets.top + clearance.top,
+            paddingTop: padding + insets.top + clearance.top + chipClearance,
             paddingBottom: padding + insets.bottom,
             paddingLeft: padding + insets.left,
             paddingRight: padding + insets.right,
@@ -710,7 +716,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           dice={dice}
         />
       ) : null}
-      {dice?.chips?.length && dice.onClearChip && !dice.view && !sheetMode ? (
+      {diceChips?.length && dice?.onClearChip && !dice.view && !sheetMode ? (
         <DiceChips
           seatNumber={seatNumber}
           playerName={playerName}
@@ -720,7 +726,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           cardSize={cardSize}
           top={padding + insets.top + clearance.top}
           left={padding + insets.left + clearance.left}
-          chips={dice.chips}
+          chips={diceChips}
           onClear={dice.onClearChip}
         />
       ) : null}

@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { commanderDamageKey, createLocalGame } from "@/features/game/domain"
+import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -219,6 +219,93 @@ describe("CurrentGameScreen", () => {
       players: game().players.map((p, i) => ({ ...p, life: i ? 2 : 1 })),
     })
     expect(inProgress.queryByTestId("first-player-badge")).toBeNull()
+  })
+
+  it("keeps the first-player offer through table setup and withdraws it at the first point of play", () => {
+    const context = { operationId: "op-1", now: 2 }
+    const mtg = createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 20,
+      system: "mtg",
+      now: 1,
+    })
+    const withPoison = applyLocalTableAction(
+      mtg,
+      { kind: "counter.changed", playerId: mtg.players[0].id, counterId: "poison", delta: 1 },
+      context,
+    )
+    expect(withPoison).not.toBe(mtg)
+    expect(renderGame(withPoison).getByTestId("first-player-badge")).toBeTruthy()
+
+    const pokemon = game(2, "pokemon")
+    const placed = applyLocalTableAction(
+      pokemon,
+      {
+        kind: "pokemon.placed",
+        playerId: pokemon.players[0].id,
+        pokemonId: "pokemon_1",
+        slot: "active",
+        card: { name: "Pikachu", hp: 60, prizes: 1 },
+      },
+      context,
+    )
+    expect(placed).not.toBe(pokemon)
+    const view = renderGame(placed)
+    expect(view.getByTestId("first-player-badge")).toBeTruthy()
+    fireEvent.press(view.getByTestId("pokemon-damage-seat-1-10"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+  })
+
+  it("remembers a used offer and a rematch's loser across a reopen", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(game())
+    const rolls = [0.9, 0.1]
+    const random = jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const first = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={repository.loadActiveGame()!}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(first.getByTestId("first-player-badge"))
+    first.unmount()
+    random.mockRestore()
+
+    const reopened = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={repository.loadActiveGame()!}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(reopened.queryByTestId("first-player-badge")).toBeNull()
+    fireEvent.press(reopened.getByTestId("life-seat-1-1"))
+    fireEvent.press(reopened.getByTestId("game-menu-button"))
+    fireEvent.press(reopened.getByTestId("end-game-button"))
+    fireEvent.press(reopened.getByTestId("end-game-winner-0"))
+    fireEvent.press(reopened.getByTestId("confirm-end-game-button"))
+    reopened.unmount()
+
+    const rematch = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={repository.loadActiveGame()!}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(rematch.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+      "Grace lost the last game. Choose who goes first",
+    )
   })
 
   it("flips a coin for Pokémon and lets the winner choose first or second", () => {

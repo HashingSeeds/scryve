@@ -108,6 +108,25 @@ export function DiceSeatOverlay({
     ? bloomExit(contentRotation, compact ? COMPACT_BLOOM_EXIT_RISE : BLOOM_EXIT_RISE)
     : undefined
   const interactive = view?.kind !== "waiting" && view?.kind !== "choice"
+  const overlayStyle = [
+    themed($overlay),
+    compact && themed($compactOverlay),
+    covers && !scrim && { backgroundColor: color },
+    scrim && themed($scrim),
+    armed && !view && [themed($ring), { borderColor: foreground }],
+  ]
+  const content =
+    view && covers && !scrim ? (
+      <View style={[themed($content), rotationStyle, dim && $dim]}>
+        <Result
+          view={view}
+          playerName={playerName}
+          foreground={foreground}
+          compact={compact}
+          onChoose={dice.onChoose}
+        />
+      </View>
+    ) : null
 
   return (
     <Animated.View
@@ -118,33 +137,24 @@ export function DiceSeatOverlay({
       pointerEvents="box-none"
       style={$layer}
     >
-      <BoardPressable
-        testID={`dice-seat-${seatNumber}`}
-        accessibilityRole={interactive ? "button" : undefined}
-        accessibilityLabel={accessibilityLabel(playerName, view, armed)}
-        accessibilityHint={interactive && view ? "Settles this result" : undefined}
-        disabled={!interactive}
-        onPress={dice.onPress}
-        style={[
-          themed($overlay),
-          compact && themed($compactOverlay),
-          covers && !scrim && { backgroundColor: color },
-          scrim && themed($scrim),
-          armed && !view && [themed($ring), { borderColor: foreground }],
-        ]}
-      >
-        {view && covers && !scrim ? (
-          <View style={[themed($content), rotationStyle, dim && $dim]}>
-            <Result
-              view={view}
-              playerName={playerName}
-              foreground={foreground}
-              compact={compact}
-              onChoose={dice.onChoose}
-            />
-          </View>
-        ) : null}
-      </BoardPressable>
+      {view?.kind === "choice" ? (
+        // why: the two choices must reach a screen reader one at a time, so nothing accessible wraps them.
+        <View testID={`dice-seat-${seatNumber}`} accessible={false} style={overlayStyle}>
+          {content}
+        </View>
+      ) : (
+        <BoardPressable
+          testID={`dice-seat-${seatNumber}`}
+          accessibilityRole={interactive ? "button" : undefined}
+          accessibilityLabel={accessibilityLabel(playerName, view, armed)}
+          accessibilityHint={interactive && view ? "Settles this result" : undefined}
+          disabled={!interactive}
+          onPress={dice.onPress}
+          style={overlayStyle}
+        >
+          {content}
+        </BoardPressable>
+      )}
     </Animated.View>
   )
 }
