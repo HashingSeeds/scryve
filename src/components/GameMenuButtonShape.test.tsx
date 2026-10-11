@@ -148,9 +148,9 @@ describe("GameMenuButtonShape", () => {
       expect(path.endsWith("Z")).toBe(true)
     })
 
-    it("shortens the outline compared with sharp corners", () => {
-      const sharp = buildSoftCorners({ sides: 5, center: 50, radius: 46, cornerRadius: 0 })
-      expect(softPolygonLength(corners)).toBeLessThan(softPolygonLength(sharp))
+    // why: the trace's dash is sized from this length, so a wrong length makes the trace repeat or fall short around the rim.
+    it("measures the rounded outline's full length", () => {
+      expect(softPolygonLength(corners)).toBeCloseTo(259.17, 1)
     })
 
     it("keeps the badge anchor on a straight stretch of the border", () => {
