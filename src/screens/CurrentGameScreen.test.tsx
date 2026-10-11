@@ -307,6 +307,31 @@ describe("CurrentGameScreen", () => {
     random.mockRestore()
   })
 
+  it("reports a failed first-player read once per game, not on every render", () => {
+    class UnreadableStorage extends MemoryStorage {
+      getString(key: string) {
+        if (key.includes("firstPlayer")) throw new Error("corrupt")
+        return super.getString(key)
+      }
+    }
+    jest.mocked(reportCrash).mockClear()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game()}
+          repository={new LocalGameRepository(new UnreadableStorage())}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(view.getByTestId("first-player-badge")).toBeTruthy()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    expect(reportCrash).toHaveBeenCalledTimes(1)
+  })
+
   it("remembers a used offer and a rematch's loser across a reopen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.saveActiveGame(game())
