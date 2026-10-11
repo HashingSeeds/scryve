@@ -154,7 +154,11 @@ function accessibilityLabel(playerName: string, view?: DiceSeatView, armed?: Dic
     return `${playerName} rolled ${view.value}${status}`
   }
   if (view?.kind === "first")
-    return view.status === "won" ? `${playerName} goes first` : `${playerName} does not go first`
+    return view.status === "sweep"
+      ? "Picking who goes first"
+      : view.status === "won"
+        ? `${playerName} goes first`
+        : `${playerName} does not go first`
   return armed === "coin" ? `Flip a coin for ${playerName}` : `Roll a d20 for ${playerName}`
 }
 

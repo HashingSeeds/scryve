@@ -103,7 +103,7 @@ describe("useDice", () => {
 
     fireEvent.press(view.getByTestId("dice-first"))
     act(() => jest.advanceTimersByTime(1))
-    expect(view.getByTestId("dice-seat-3")).toBeTruthy()
+    expect(view.getByLabelText("Picking who goes first")).toBeTruthy()
     expect(view.queryByText("Goes first")).toBeNull()
     act(() => jest.runAllTimers())
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent("Goes first")

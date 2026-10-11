@@ -347,9 +347,7 @@ export function CurrentGameScreen({
               }
             : {}),
           dock: diceStrip
-            ? (layout) => (
-                <DiceStrip {...diceStrip} vertical={layout.layout === "two-side-by-side"} />
-              )
+            ? ({ seam }) => <DiceStrip {...diceStrip} vertical={seam === "vertical"} />
             : undefined,
           onToggle: toggleMenu,
           onClose: closeMenu,

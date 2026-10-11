@@ -20,9 +20,9 @@ import {
 } from "./dice"
 import type { GamePlayer } from "./types"
 
-// why: the first-player sweep visits every seat about twice, slowing as it lands, so the stop reads as chance rather than a jump.
-const SWEEP_EXTRA_STEPS = 2
-const sweepStepMs = (step: number) => 45 + step * step * 3
+// why: the first-player sweep passes every seat once and then some, slowing as it lands, so the stop reads as chance rather than a jump.
+const SWEEP_EXTRA_STEPS = 3
+const sweepStepMs = (step: number) => 55 + step * step * 4
 
 /** why: dice results are table talk, so they live on this device only and are gone when the strip closes or the game changes. */
 export function useDice(players: readonly GamePlayer[], gameId: string) {
