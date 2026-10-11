@@ -1,6 +1,6 @@
 import { AccessibilityInfo, StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
-import { Polygon, Polyline } from "react-native-svg"
+import { Path } from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme, lightTheme } from "@/theme/theme"
@@ -54,13 +54,11 @@ describe("GameRadialMenu", () => {
     const view = render(menu(false))
 
     expect(view.getByTestId("game-menu-pentagon")).toBeTruthy()
-    const pentagon = view
-      .UNSAFE_getAllByType(Polygon)
-      .find((polygon) => polygon.props.strokeWidth === 7)
+    const pentagon = view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 7)
     expect(pentagon).toBeTruthy()
     expect(lightTheme.colors.gameMenu.anchorBorder).toBe("#FFFFFF")
     expect(pentagon!.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
-    expect(pentagon!.props.points.split(" ")).toHaveLength(5)
+    expect(pentagon!.props.d.match(/Q/g)).toHaveLength(5)
   })
 
   it("uses the flat Keystone II treatment by default in dark mode", () => {
@@ -76,18 +74,15 @@ describe("GameRadialMenu", () => {
       </ThemeProvider>,
     )
 
-    const pentagon = view
-      .UNSAFE_getAllByType(Polygon)
-      .find((polygon) => polygon.props.strokeWidth === 7)
+    const pentagon = view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 7)
     expect(pentagon).toBeTruthy()
     expect(pentagon!.props.fill).toBe("url(#keystoneTwoFill)")
     expect(darkTheme.colors.gameMenu.anchorBorder).toBe("#000000")
     expect(pentagon!.props.stroke).toBe(darkTheme.colors.gameMenu.anchorBorder)
     expect(
-      view.UNSAFE_getAllByType(Polygon).find((polygon) => polygon.props.strokeWidth === 1.4)!.props
-        .stroke,
+      view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 1.4)!.props.stroke,
     ).toBe(darkTheme.colors.gameMenu.anchorBorder)
-    expect(view.UNSAFE_queryAllByType(Polyline)).toHaveLength(0)
+    expect(view.queryByTestId("game-menu-bevel")).toBeNull()
   })
 
   it("keeps the menu glyph in centered square bounds", () => {
@@ -157,7 +152,7 @@ describe("GameRadialMenu", () => {
 
   // why: queried by component type because the host element only carries processed SVG props.
   const signalLayer = (view: ReturnType<typeof render>, testID: string) =>
-    view.UNSAFE_queryAllByType(Polygon).find((polygon) => polygon.props.testID === testID)
+    view.UNSAFE_queryAllByType(Path).find((path) => path.props.testID === testID)
 
   it("rings and badges the pentagon while a sync signal is set, fading the ring out in its last color", () => {
     const signal = {
