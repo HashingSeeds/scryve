@@ -38,29 +38,43 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
+const online = { isConnected: true, isInternetReachable: true }
+const offline = { isConnected: false, isInternetReachable: false }
+
 describe("reconnectConvexOnNetworkReturn", () => {
   // why: this reaches Convex's private reconnect. If it fails after a Convex upgrade, native apps are back on full backoff.
   it("opens a new Convex socket as soon as the network returns, without waiting out backoff", () => {
     const emit = connectedClient()
-    emit({ isConnected: false, isInternetReachable: false })
+    emit(online)
+    emit(offline)
     sockets[0].drop()
     expect(sockets).toHaveLength(1)
 
-    emit({ isConnected: true, isInternetReachable: true })
+    emit(online)
 
     expect(sockets).toHaveLength(2)
   })
 
-  it("waits for a validated network and ignores updates while the network stays up", () => {
+  it("retries on the first usable network, so a launch while offline recovers too", () => {
     const emit = connectedClient()
     sockets[0].drop()
-    emit({ isConnected: true, isInternetReachable: true })
+
+    emit(online)
+
+    expect(sockets).toHaveLength(2)
+  })
+
+  it("keeps Convex's backoff while the same network stays up or is still validating", () => {
+    const emit = connectedClient()
+    emit(online)
+    sockets[0].drop()
+    emit(online)
     expect(sockets).toHaveLength(1)
 
-    emit({ isConnected: false, isInternetReachable: false })
-    emit({ isConnected: true, isInternetReachable: false })
+    emit(offline)
+    emit({ ...online, isInternetReachable: false })
     expect(sockets).toHaveLength(1)
-    emit({ isConnected: true, isInternetReachable: true })
+    emit(online)
     expect(sockets).toHaveLength(2)
   })
 })

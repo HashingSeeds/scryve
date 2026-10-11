@@ -2,17 +2,19 @@ import { Platform } from "react-native"
 import { addNetworkStateListener, type NetworkState } from "expo-network"
 import type { ConvexReactClient } from "convex/react"
 
-const reachable = ({ isConnected, isInternetReachable }: NetworkState) =>
-  isConnected === true && isInternetReachable !== false
+const reachableNetwork = ({ isConnected, isInternetReachable, type }: NetworkState) =>
+  isConnected === true && isInternetReachable !== false ? (type ?? "unknown") : null
 
 // why: Convex skips its reconnect backoff only on the browser `online` event, which React Native never fires, so native apps waited up to ~24 s for the socket after the network returned.
 export function reconnectConvexOnNetworkReturn(client: ConvexReactClient) {
   if (Platform.OS === "web") return () => undefined
-  let wasReachable = true
+  // why: starts unknown so the first usable network also retries; a launch while offline may never report offline first.
+  let lastNetwork: string | null | undefined
   const subscription = addNetworkStateListener((state) => {
-    const isReachable = reachable(state)
-    if (isReachable && !wasReachable) reconnectNow(client)
-    wasReachable = isReachable
+    const network = reachableNetwork(state)
+    // why: a new usable network (back from offline, or Wi-Fi taking over from cellular) gets one more try; repeats of the same network keep Convex's backoff.
+    if (network && network !== lastNetwork) reconnectNow(client)
+    lastNetwork = network
   })
   return () => subscription.remove()
 }
