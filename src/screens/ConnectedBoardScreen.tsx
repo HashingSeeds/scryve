@@ -364,6 +364,50 @@ function ConnectedBoardRuntime({
   const lives = useStructurallyStable(
     runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
   )
+  const tableState = useStructurallyStable(runtime.table)
+  const {
+    tableRules,
+    adjustCounter,
+    takeDesignation,
+    releaseDesignation,
+    placePokemon,
+    updatePokemon,
+    adjustPokemonDamage,
+    switchActive,
+    removePokemon,
+    knockOut,
+    undoKnockout,
+  } = runtime
+  const table = useMemo(
+    (): TableRuntime => ({
+      table: tableState,
+      tableRules,
+      adjustCounter,
+      takeDesignation,
+      releaseDesignation,
+      placePokemon,
+      updatePokemon,
+      adjustPokemonDamage,
+      switchActive,
+      removePokemon,
+      knockOut,
+      undoKnockout,
+    }),
+    [
+      tableState,
+      tableRules,
+      adjustCounter,
+      takeDesignation,
+      releaseDesignation,
+      placePokemon,
+      updatePokemon,
+      adjustPokemonDamage,
+      switchActive,
+      removePokemon,
+      knockOut,
+      undoKnockout,
+    ],
+  )
   const latest = useRef(runtime)
   useLayoutEffect(() => {
     latest.current = runtime
@@ -412,7 +456,7 @@ function ConnectedBoardRuntime({
   if (!view) return null
   return (
     <ConnectedLivesContext.Provider value={lives}>
-      <ConnectedTableContext.Provider value={runtime}>
+      <ConnectedTableContext.Provider value={table}>
         <ConnectedUnsentContext.Provider value={runtime.pending.length}>
           <ConnectedBoardReady
             publicId={publicId}
