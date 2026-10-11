@@ -1,4 +1,4 @@
-import { type ComponentProps, memo, useEffect } from "react"
+import { type ComponentProps, memo, type ReactNode, useEffect } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
@@ -76,6 +76,8 @@ export interface GameRadialMenuProps {
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
+  // why: the dice strip takes the hub while it is open, so it replaces the menu button instead of stacking on it.
+  dock?: ReactNode
 }
 
 export interface RadialActionPose {
@@ -198,6 +200,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   exitAction,
   signal,
   statusLine,
+  dock,
 }: GameRadialMenuProps) {
   const { themed } = useAppTheme()
   const menuOpen = open && !exitAction
@@ -220,17 +223,21 @@ export const GameRadialMenu = memo(function GameRadialMenu({
         anchorStyle={[anchorStyle, nativeAnchorStyle]}
         actions={actions}
       />
-      <GameMenuAnchor
-        open={menuOpen}
-        anchor={anchor}
-        anchorStyle={[anchorStyle, nativeAnchorStyle]}
-        compact={compact}
-        variant={variant}
-        seatColors={seatColors}
-        exitAction={exitAction}
-        signal={signal}
-        onToggle={onToggle}
-      />
+      {dock ? (
+        <GameMenuDock anchorStyle={[anchorStyle, nativeAnchorStyle]}>{dock}</GameMenuDock>
+      ) : (
+        <GameMenuAnchor
+          open={menuOpen}
+          anchor={anchor}
+          anchorStyle={[anchorStyle, nativeAnchorStyle]}
+          compact={compact}
+          variant={variant}
+          seatColors={seatColors}
+          exitAction={exitAction}
+          signal={signal}
+          onToggle={onToggle}
+        />
+      )}
 
       {menuOpen && statusLine ? (
         <GameMenuStatusRow
@@ -360,6 +367,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle,
   actions,
   statusLine,
+  dock,
   ...anchorProps
 }: Omit<GameMenuAnchorProps, "anchorStyle"> & {
   holderAnchor: { x: number; y: number }
@@ -367,6 +375,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle: number
   actions: readonly RadialMenuAction[]
   statusLine?: GameMenuStatusLine
+  dock?: ReactNode
 }) {
   const menuOpen = anchorProps.open && !anchorProps.exitAction
   const reducedMotion = useReducedMotion()
@@ -395,7 +404,11 @@ export const GameMenuCluster = memo(function GameMenuCluster({
         actions={actions}
         poseTurnMs={FACING_TURN_MS}
       />
-      <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
+      {dock ? (
+        <GameMenuDock anchorStyle={$clusterCenter}>{dock}</GameMenuDock>
+      ) : (
+        <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
+      )}
       {menuOpen && statusLine ? (
         <GameMenuStatusRow
           statusLine={statusLine}
@@ -409,6 +422,21 @@ export const GameMenuCluster = memo(function GameMenuCluster({
     </Animated.View>
   )
 })
+
+/** why: a zero-size box at the anchor centers whatever docks there on its own size, the way the signal badge is centered. */
+function GameMenuDock({
+  anchorStyle,
+  children,
+}: {
+  anchorStyle: AnchorStyle
+  children: ReactNode
+}) {
+  return (
+    <Animated.View testID="game-menu-dock" pointerEvents="box-none" style={[$dock, anchorStyle]}>
+      {children}
+    </Animated.View>
+  )
+}
 
 function GameMenuAnchor({
   open,
@@ -754,6 +782,14 @@ const $anchor: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
   zIndex: 30,
 })
+const $dock: ViewStyle = {
+  position: "absolute",
+  zIndex: 30,
+  width: 0,
+  height: 0,
+  alignItems: "center",
+  justifyContent: "center",
+}
 const $largeAnchor: ThemedStyle<ViewStyle> = () => ({
   width: MENU_BUTTON_SIZE,
   height: MENU_BUTTON_SIZE,

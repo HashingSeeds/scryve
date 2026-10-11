@@ -29,6 +29,7 @@ import {
   type PokemonInPlay,
 } from "../../../convex/lib/table"
 import { BoardPressable } from "../BoardPressable"
+import { DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
   COMPACT_PLAYER_MARK_SIZE,
@@ -62,6 +63,7 @@ export interface PokemonSeatCardProps {
   /** why: the sole opponent takes prizes on a knockout; with more seats the card asks who did. */
   opponents: readonly { id: string; name: string }[]
   table: TableRuntime
+  dice?: LifeCardDice
   onChangePrizes: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -98,6 +100,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   prizes,
   color,
   compact,
+  dice,
   contentRotation = 0,
   contentInsets,
   menuCorner,
@@ -694,6 +697,17 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         ) : null}
       </View>
 
+      {dice ? (
+        <DiceSeatOverlay
+          seatNumber={seatNumber}
+          playerName={playerName}
+          color={color}
+          foreground={ink}
+          contentRotation={contentRotation}
+          compact={cramped}
+          dice={dice}
+        />
+      ) : null}
       {sheetMode && canEdit ? (
         <PokemonSheet
           seatNumber={seatNumber}

@@ -15,6 +15,7 @@ import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { losingCounter, seatTableState } from "./CounterChips"
+import type { LifeCardDice } from "./DiceSeatOverlay"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
@@ -59,6 +60,12 @@ export interface CommanderDamageGridBinding {
   onStage: (player: GamePlayer, step: number) => void
 }
 
+export interface DiceGridBinding {
+  armed: LifeCardDice["armed"] | null
+  seatFor: (player: GamePlayer) => LifeCardDice["view"]
+  onPressSeat: (player: GamePlayer) => void
+}
+
 export interface PlayerGridProps {
   players: GamePlayer[]
   boardOrientation?: Omit<ReturnType<typeof useGameBoardOrientation>, "frameRef" | "nativeFrame"> &
@@ -79,6 +86,7 @@ export interface PlayerGridProps {
   commanderDamage?: CommanderDamageGridBinding
   /** why: Magic seats show counter chips from it; Pokémon rules swap the life card for a Pokémon board. */
   table?: TableRuntime
+  dice?: DiceGridBinding
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -96,6 +104,7 @@ export function PlayerGrid({
   isPlayerEliminated,
   commanderDamage,
   table,
+  dice,
   onChange,
   style,
 }: PlayerGridProps) {
@@ -283,6 +292,15 @@ export function PlayerGrid({
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
+              const diceView = dice?.seatFor(player)
+              const seatDice =
+                dice && (diceView || dice.armed)
+                  ? {
+                      view: diceView,
+                      armed: dice.armed ?? undefined,
+                      onPress: stable(`dice:${player.id}`, () => dice.onPressSeat(player)),
+                    }
+                  : undefined
               const seatTable = seatTableState(table, player.id)
               const eliminated = isPlayerEliminated?.(player)
                 ? "commander damage"
@@ -313,6 +331,7 @@ export function PlayerGrid({
                         .filter(({ id }) => id !== player.id)
                         .map(({ id, name }) => ({ id, name }))}
                       table={table}
+                      dice={seatDice}
                       onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
                         onChange(player.id, delta),
                       )}
@@ -422,6 +441,7 @@ export function PlayerGrid({
                           }
                         : undefined
                     }
+                    dice={seatDice}
                     onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
                       onChange(player.id, delta),
                     )}

@@ -30,7 +30,10 @@ export interface GameBoardStageProps {
   playerCount: number
   layoutVariant: PlayerGridLayoutVariant
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
-  menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
+  menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact" | "dock"> & {
+    /** why: what docks at the hub is laid out for the seam it sits on, which only the stage's grid layout knows. */
+    dock?: (layout: ReturnType<typeof getPlayerGridLayout>) => ReactNode
+  }
   windowOverlay?: ReactNode
   testID?: string
 }
@@ -114,6 +117,7 @@ function PinnedGameBoardStage({
               exitAction={menu.exitAction}
               signal={menu.signal}
               statusLine={menu.statusLine}
+              dock={menu.dock?.(gridLayout)}
               onToggle={menu.onToggle}
             />
           </View>
@@ -158,6 +162,7 @@ function LegacyGameBoardStage({
       {renderGrid(boardOrientation)}
       <GameRadialMenu
         {...menu}
+        dock={menu.dock?.(gridLayout)}
         anchor={menuAnchor}
         boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
         nativeFrame={boardOrientation.nativeFrame}

@@ -140,7 +140,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
-  it("opens the dice sheet from the menu and closes the menu", () => {
+  it("docks the dice strip at the hub from the menu and closes the menu", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <CurrentGameScreen
@@ -153,8 +153,18 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("dice-button"))
 
-    expect(view.getByTestId("dice-dialog")).toBeTruthy()
+    expect(view.getByTestId("dice-strip")).toBeTruthy()
+    expect(view.queryByTestId("game-menu-button")).toBeNull()
     expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
+
+    fireEvent.press(view.getByTestId("dice-rolloff"))
+    expect(view.getByTestId("dice-seat-1")).toBeTruthy()
+    expect(view.getByTestId("dice-seat-2")).toBeTruthy()
+
+    fireEvent.press(view.getByTestId("dice-close"))
+    expect(view.queryByTestId("dice-strip")).toBeNull()
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(view.getByTestId("game-menu-button")).toBeTruthy()
   })
 
   it("offers Connect instead of End on a fresh board", () => {

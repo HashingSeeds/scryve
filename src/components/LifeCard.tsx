@@ -34,6 +34,7 @@ import {
 } from "./CommanderDamageCardControls"
 import { CommanderStrip } from "./CommanderStrip"
 import { CounterChips, type SeatTable } from "./CounterChips"
+import { DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
@@ -112,6 +113,7 @@ export interface LifeCardProps {
   /** why: what knocked the seat out, such as "commander damage" or "poison"; the card dims and its label says why. */
   eliminated?: string
   seatTable?: SeatTable
+  dice?: LifeCardDice
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -152,6 +154,7 @@ export const LifeCard = memo(function LifeCard({
   ownership,
   staleSince,
   commanderDamage,
+  dice,
   eliminated,
   seatTable,
   onChange,
@@ -485,12 +488,20 @@ export const LifeCard = memo(function LifeCard({
         />
       )}
       <View
-        pointerEvents={commanderOverviewOpen || commanderCardMode ? "none" : "box-none"}
+        pointerEvents={
+          commanderOverviewOpen || commanderCardMode || dice?.view ? "none" : "box-none"
+        }
         accessibilityElementsHidden={
-          (!localCommander && commanderOverviewOpen) || !!commanderCardMode || tableSheetOpen
+          (!localCommander && commanderOverviewOpen) ||
+          !!commanderCardMode ||
+          tableSheetOpen ||
+          !!dice?.view
         }
         importantForAccessibility={
-          (!localCommander && commanderOverviewOpen) || commanderCardMode || tableSheetOpen
+          (!localCommander && commanderOverviewOpen) ||
+          commanderCardMode ||
+          tableSheetOpen ||
+          dice?.view
             ? "no-hide-descendants"
             : "auto"
         }
@@ -673,6 +684,17 @@ export const LifeCard = memo(function LifeCard({
           onChange={onChange}
           onPreview={setPreview}
           onLongChange={() => setEditorOpen(true)}
+        />
+      ) : null}
+      {dice ? (
+        <DiceSeatOverlay
+          seatNumber={seatNumber}
+          playerName={displayName}
+          color={color}
+          foreground={foreground}
+          contentRotation={contentRotation}
+          compact={compact}
+          dice={dice}
         />
       ) : null}
       {commanderDamage &&

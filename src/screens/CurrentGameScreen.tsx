@@ -12,7 +12,7 @@ import {
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
-import { DiceSheet } from "@/components/DiceSheet"
+import { DiceStrip } from "@/components/DiceStrip"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { type RadialMenuAction } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
@@ -41,6 +41,7 @@ import type {
   MatchSeatOutcome,
   PlayerId,
 } from "@/features/game/types"
+import { useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
@@ -104,7 +105,8 @@ export function CurrentGameScreen({
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
-  const [diceOpen, setDiceOpen] = useState(false)
+  const dice = useDice(runtime.game.players, runtime.game.id)
+  const showDice = dice.show
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
@@ -225,10 +227,9 @@ export function CurrentGameScreen({
       {
         kind: "dice",
         label: "Dice",
-        onPress: (event) => {
-          captureMenuDialogOrigin(event)
+        onPress: () => {
           setMenuOpen(false)
-          setDiceOpen(true)
+          showDice()
         },
       },
       {
@@ -276,11 +277,13 @@ export function CurrentGameScreen({
       onConnect,
       onHistory,
       onSetup,
+      showDice,
       showEndConfirmation,
     ],
   )
 
   const seatColors = useSeatColors(runtime.game.players)
+  const diceStrip = dice.strip
   const exitAction = useMemo(
     () =>
       armedPlayerId || inspectedPlayerId
@@ -324,6 +327,7 @@ export function CurrentGameScreen({
                 : undefined
             }
             table={runtime.tableRuntime}
+            dice={dice.grid}
             onChange={runtime.changeLife}
           />
         )}
@@ -342,6 +346,11 @@ export function CurrentGameScreen({
                 },
               }
             : {}),
+          dock: diceStrip
+            ? (layout) => (
+                <DiceStrip {...diceStrip} vertical={layout.layout === "two-side-by-side"} />
+              )
+            : undefined,
           onToggle: toggleMenu,
           onClose: closeMenu,
         }}
@@ -381,14 +390,6 @@ export function CurrentGameScreen({
           />
           <Button tx="game:cancel" style={themed($menuItem)} onPress={closePanel} />
         </DialogCard>
-      ) : null}
-
-      {diceOpen ? (
-        <DiceSheet
-          players={runtime.game.players}
-          origin={menuDialogOrigin}
-          onClose={() => setDiceOpen(false)}
-        />
       ) : null}
 
       {match && !menuOpen ? (
