@@ -42,7 +42,7 @@ describe("shipping Maestro selectors", () => {
     fireEvent.press(view.getByTestId("life-editor-close-seat-1"))
     fireEvent.press(view.getByTestId("game-menu-button"))
     rememberMountedIds()
-    fireEvent.press(view.getByTestId("dice-rolloff"))
+    fireEvent.press(view.getByTestId("dice-d20"))
     rememberMountedIds()
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("game-menu-button"))

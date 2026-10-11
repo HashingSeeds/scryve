@@ -33,8 +33,9 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import { CommanderStrip } from "./CommanderStrip"
-import { CounterChips, type SeatTable } from "./CounterChips"
-import { DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
+import { chipRowOrigin, CounterChips, type SeatTable } from "./CounterChips"
+import { DICE_CHIP_HEIGHT, COMPACT_DICE_CHIP_HEIGHT, DiceChips } from "./DiceChips"
+import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
@@ -165,6 +166,8 @@ export const LifeCard = memo(function LifeCard({
     theme: { spacing },
   } = useAppTheme()
   const localCommander = !!commanderDamage?.inspection
+  const diceCovers = diceCoversSeat(dice)
+  const diceChips = dice?.chips
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
@@ -488,18 +491,20 @@ export const LifeCard = memo(function LifeCard({
         />
       )}
       <View
-        pointerEvents={commanderOverviewOpen || commanderCardMode || dice ? "none" : "box-none"}
+        pointerEvents={
+          commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
+        }
         accessibilityElementsHidden={
           (!localCommander && commanderOverviewOpen) ||
           !!commanderCardMode ||
           tableSheetOpen ||
-          !!dice
+          diceCovers
         }
         importantForAccessibility={
           (!localCommander && commanderOverviewOpen) ||
           commanderCardMode ||
           tableSheetOpen ||
-          !!dice
+          diceCovers
             ? "no-hide-descendants"
             : "auto"
         }
@@ -667,7 +672,7 @@ export const LifeCard = memo(function LifeCard({
       ) : !commanderOverviewOpen &&
         !localOverviewVisible &&
         !tableSheetOpen &&
-        !dice &&
+        !diceCovers &&
         ownership !== "unowned" ? (
         <LifeControls
           playerName={displayName}
@@ -685,7 +690,7 @@ export const LifeCard = memo(function LifeCard({
           onLongChange={() => setEditorOpen(true)}
         />
       ) : null}
-      {dice ? (
+      {dice && diceCovers ? (
         <DiceSeatOverlay
           seatNumber={seatNumber}
           playerName={displayName}
@@ -701,7 +706,7 @@ export const LifeCard = memo(function LifeCard({
       !commanderCardMode &&
       !commanderOverviewOpen &&
       !tableSheetOpen &&
-      !dice ? (
+      !diceCovers ? (
         <BoardPressable
           testID={`commander-mark-seat-${seatNumber}`}
           accessibilityRole="button"
@@ -717,7 +722,7 @@ export const LifeCard = memo(function LifeCard({
           ]}
         />
       ) : null}
-      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !dice ? (
+      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -737,7 +742,7 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {cornerStatus && !commanderCardMode && !tableSheetOpen && !dice ? (
+      {cornerStatus && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
         <View
           testID={`life-corner-layer-seat-${seatNumber}`}
           pointerEvents="box-none"
@@ -789,7 +794,7 @@ export const LifeCard = memo(function LifeCard({
         </View>
       ) : null}
       {seatTable &&
-      !dice &&
+      !diceCovers &&
       !commanderCardMode &&
       !commanderOverviewOpen &&
       !localOverviewVisible &&
@@ -805,7 +810,25 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
+          clearanceAbove={
+            diceChips?.length
+              ? (compact ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
+              : 0
+          }
           onSheetOpenChange={setTableSheetOpen}
+        />
+      ) : null}
+      {diceChips?.length && dice?.onClearChip && !dice.view && !commanderCardMode && !editorOpen ? (
+        <DiceChips
+          seatNumber={seatNumber}
+          playerName={displayName}
+          foreground={foreground}
+          compact={compact}
+          contentRotation={contentRotation}
+          cardSize={cardSize}
+          {...chipRowOrigin({ compact, contentRotation, contentInsets, menuEdgeCenter, spacing })}
+          chips={diceChips}
+          onClear={dice.onClearChip}
         />
       ) : null}
       {editorOpen ? (

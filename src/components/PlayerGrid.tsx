@@ -4,6 +4,7 @@ import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import type { DiceSeatChip } from "@/features/game/dice"
 import { type PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
@@ -64,7 +65,10 @@ export interface CommanderDamageGridBinding {
 export interface DiceGridBinding {
   armed: LifeCardDice["armed"] | null
   seatFor: (player: GamePlayer) => LifeCardDice["view"]
+  chipsFor: (player: GamePlayer) => readonly DiceSeatChip[]
   onPressSeat: (player: GamePlayer) => void
+  onChoose: (player: GamePlayer, order: "first" | "second") => void
+  onClearChip: (player: GamePlayer, chip: DiceSeatChip) => void
 }
 
 export interface PlayerGridProps {
@@ -294,12 +298,20 @@ export function PlayerGrid({
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
               const diceView = dice?.seatFor(player)
+              const diceChips = dice?.chipsFor(player)
               const seatDice =
-                dice && (diceView || dice.armed)
+                dice && (diceView || dice.armed || diceChips?.length)
                   ? {
                       view: diceView,
                       armed: dice.armed ?? undefined,
+                      chips: diceChips,
                       onPress: stable(`dice:${player.id}`, () => dice.onPressSeat(player)),
+                      onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
+                        dice.onChoose(player, order),
+                      ),
+                      onClearChip: stable(`dice-chip:${player.id}`, (chip: DiceSeatChip) =>
+                        dice.onClearChip(player, chip),
+                      ),
                     }
                   : undefined
               const seatTable = seatTableState(table, player.id)

@@ -282,6 +282,15 @@ export function meSeatOf(game: Pick<LocalGame, "players" | "account">): number |
   return index === -1 ? undefined : index
 }
 
+/** why: a rematch hands the choice of who goes first to the one player who lost; a draw or several losers has no one to ask. */
+export function soleLoserSeat(game: Pick<LocalGame, "players" | "result">): number | undefined {
+  if (game.result?.kind !== "win") return undefined
+  const losers = game.players.flatMap((player, seat) =>
+    game.result?.kind === "win" && game.result.winnerPlayerIds.includes(player.id) ? [] : [seat],
+  )
+  return losers.length === 1 ? losers[0] : undefined
+}
+
 export function createRematch(game: LocalGame, now?: number): LocalGame {
   return createLocalGame({
     players: game.players.map(({ name, color, shape }) => ({ name, color, shape })),

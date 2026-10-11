@@ -24,7 +24,7 @@ describe("GameRadialMenu", () => {
     { kind: "home", label: "Home", onPress: callbacks[3] },
     { kind: "end-game", label: "End game", onPress: callbacks[4] },
   ]
-  const tools: RadialMenuTool[] = ["first", "rolloff", "coin", "d20"].map((key) => ({
+  const tools: RadialMenuTool[] = ["coin", "d20"].map((key) => ({
     key,
     label: key,
     accessibilityLabel: key,
@@ -288,30 +288,50 @@ describe("GameRadialMenu", () => {
     jest.restoreAllMocks()
   })
 
-  it("lays an action's tools out as circles from the pill's inner cap outward", () => {
+  it("lays an action's two tools out inside the pill, the first nearer the pentagon", () => {
     const view = render(menu(true, jest.fn(), { actions: actionsWithDiceTools }))
 
     expect(view.queryByTestId("dice-button")).toBeNull()
     for (const tool of tools) expect(view.getByTestId(`dice-${tool.key}`)).toBeTruthy()
     fireEvent.press(view.getByTestId("dice-d20"))
-    expect(tools[3].onPress).toHaveBeenCalledTimes(1)
+    expect(tools[1].onPress).toHaveBeenCalledTimes(1)
 
-    // why: the first tool takes the cap nearer the pentagon whichever way the pill points, and the rest step one circle outward.
+    // why: the first tool takes the half nearer the pentagon whichever way the pill points.
     for (const anchor of [
       { x: 0.5, y: 0.5 },
       { x: 0.2, y: 0.5 },
       { x: 0.8, y: 0.5 },
     ]) {
       const pose = getRadialActionPoses(anchor)[1]
-      const offsets = getRadialToolOffsets(pose, 4)
+      const [inner, outer] = getRadialToolOffsets(pose)
       const angle = (pose.rotationDeg * Math.PI) / 180
-      const distances = offsets.map((offset) =>
-        Math.hypot(pose.x + offset * Math.cos(angle), pose.y + offset * Math.sin(angle)),
-      )
-      expect(distances).toEqual([...distances].sort((a, b) => a - b))
-      expect(Math.abs(offsets[0])).toBe(32)
-      expect(offsets.map((offset) => Math.abs(offset - offsets[0]))).toEqual([0, 56, 112, 168])
+      const distance = (offset: number) =>
+        Math.hypot(pose.x + offset * Math.cos(angle), pose.y + offset * Math.sin(angle))
+      expect(distance(inner)).toBeLessThan(distance(outer))
+      expect([Math.abs(inner), Math.abs(outer)]).toEqual([28, 28])
     }
+  })
+
+  it("offers the first-player badge on the pentagon only while the menu is closed and free", () => {
+    const onPress = jest.fn()
+    const badge = {
+      color: "#55C894",
+      glyph: { tool: "d20" },
+      accessibilityLabel: "Roll for who goes first",
+      onPress,
+    } as const
+    const view = render(menu(false, jest.fn(), { badge }))
+
+    fireEvent.press(view.getByTestId("first-player-badge"))
+    expect(onPress).toHaveBeenCalledTimes(1)
+
+    view.rerender(menu(true, jest.fn(), { badge }))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+
+    view.rerender(
+      menu(false, jest.fn(), { badge, exitAction: { label: "Close dice", onPress: jest.fn() } }),
+    )
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
   })
 
   it("disables hidden tools and pills and takes them out of the tab order", () => {
@@ -343,11 +363,11 @@ describe("GameRadialMenu", () => {
 
     expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
     expect(view.queryByTestId("layout-button")).toBeNull()
-    fireEvent.press(view.getByTestId("dice-rolloff"))
-    expect(tools[1].onPress).toHaveBeenCalledTimes(1)
+    fireEvent.press(view.getByTestId("dice-coin"))
+    expect(tools[0].onPress).toHaveBeenCalledTimes(1)
 
     view.rerender(menu(false, jest.fn(), { actions: actionsWithDiceTools }))
-    expect(view.queryByTestId("dice-rolloff")).toBeNull()
+    expect(view.queryByTestId("dice-coin")).toBeNull()
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

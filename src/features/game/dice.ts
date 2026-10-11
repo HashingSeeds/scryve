@@ -4,24 +4,41 @@ export type DiceTool = "d20" | "coin"
 export type CoinFace = "Heads" | "Tails"
 export type DiceRoll = { tool: "d20"; value: number } | { tool: "coin"; value: CoinFace }
 
+/** why: a result blooms over the card, then shrinks into a chip on the card's edge facing the table. */
+export type DicePhase = "bloom" | "chip"
+
+export type SeatResult = { roll: DiceRoll; phase: DicePhase }
+
+/** why: the chooser is the seat that won the flip or lost the last game; which one decides what the card says. */
+export type ChoiceReason = "flip" | "loss"
+
 // why: a roll-off keeps every seat's die on the table; `pool` is who is still rolling, so one seat left is the winner and more is a tie.
-export type DiceBoard =
-  | { kind: "rolloff"; rolls: Partial<Record<PlayerId, number>>; pool: PlayerId[] }
-  | { kind: "first"; seatId: PlayerId; settled: boolean }
+export type FirstPlayer =
+  | {
+      kind: "rolloff"
+      rolls: Partial<Record<PlayerId, number>>
+      pool: PlayerId[]
+      phase: DicePhase
+    }
+  | { kind: "choice"; seatId: PlayerId; reason: ChoiceReason }
+  | { kind: "picked"; seatId: PlayerId; phase: DicePhase; note?: string }
 
 export interface DiceState {
   armed: DiceTool | null
-  newestRollsBySeat: Partial<Record<PlayerId, DiceRoll[]>>
-  board: DiceBoard | null
+  results: Partial<Record<PlayerId, SeatResult>>
+  first: FirstPlayer | null
 }
 
 export type DiceSeatView =
-  | { kind: "rolls"; rolls: DiceRoll[] }
+  | { kind: "roll"; roll: DiceRoll }
   | { kind: "rolloff"; value: number; status: "won" | "tied" | "out" | "lost" }
-  | { kind: "first"; status: "sweep" | "won" | "lost" }
+  | { kind: "choice"; reason: ChoiceReason }
+  | { kind: "waiting" }
+  | { kind: "first"; status: "won" | "lost"; note?: string }
 
-export const EMPTY_DICE: DiceState = { armed: null, newestRollsBySeat: {}, board: null }
-export const SEAT_HISTORY = 3
+export type DiceSeatChip = { kind: "roll"; roll: DiceRoll } | { kind: "first" }
+
+export const EMPTY_DICE: DiceState = { armed: null, results: {}, first: null }
 const D20_SIDES = 20
 const COIN_FACES: readonly CoinFace[] = ["Heads", "Tails"]
 
@@ -44,9 +61,10 @@ export function toolLabel(tool: DiceTool) {
 }
 
 export function armTool(state: DiceState, tool: DiceTool): DiceState {
-  return { ...state, armed: state.armed === tool ? null : tool, board: null }
+  return { ...state, armed: state.armed === tool ? null : tool }
 }
 
+/** why: the tool stays armed so the next tap rolls again; tapping the tool itself puts it down. */
 export function rollForSeat(
   state: DiceState,
   seatId: PlayerId,
@@ -54,76 +72,129 @@ export function rollForSeat(
 ): { state: DiceState; roll: DiceRoll } | undefined {
   if (!state.armed) return undefined
   const result = roll(state.armed, random)
-  const history = [result, ...(state.newestRollsBySeat[seatId] ?? [])].slice(0, SEAT_HISTORY)
   return {
-    state: {
-      ...state,
-      armed: null,
-      newestRollsBySeat: { ...state.newestRollsBySeat, [seatId]: history },
-    },
+    state: { ...state, results: { ...state.results, [seatId]: { roll: result, phase: "bloom" } } },
     roll: result,
   }
 }
 
-export function startRollOff(seatIds: readonly PlayerId[], random = Math.random): DiceState {
-  return { ...EMPTY_DICE, board: resolveRollOff({}, seatIds, random) }
+export function settleResult(state: DiceState, seatId: PlayerId): DiceState {
+  const result = state.results[seatId]
+  if (!result || result.phase === "chip") return state
+  return { ...state, results: { ...state.results, [seatId]: { ...result, phase: "chip" } } }
+}
+
+export function clearResult(state: DiceState, seatId: PlayerId): DiceState {
+  const { [seatId]: _cleared, ...results } = state.results
+  return { ...state, results }
+}
+
+export function startRollOff(
+  state: DiceState,
+  seatIds: readonly PlayerId[],
+  random = Math.random,
+): DiceState {
+  return { ...state, first: resolveRollOff({}, seatIds, random) }
 }
 
 export function rerollTies(state: DiceState, random = Math.random): DiceState {
-  if (state.board?.kind !== "rolloff" || state.board.pool.length < 2) return state
-  return { ...state, board: resolveRollOff(state.board.rolls, state.board.pool, random) }
+  if (state.first?.kind !== "rolloff" || state.first.pool.length < 2) return state
+  return { ...state, first: resolveRollOff(state.first.rolls, state.first.pool, random) }
 }
 
 function resolveRollOff(
   previous: Partial<Record<PlayerId, number>>,
   pool: readonly PlayerId[],
   random: () => number,
-): DiceBoard {
+): FirstPlayer {
   const rolls = { ...previous }
   for (const seatId of pool) rolls[seatId] = rollD20(random)
   const high = Math.max(...pool.map((seatId) => rolls[seatId] ?? 0))
-  return { kind: "rolloff", rolls, pool: pool.filter((seatId) => rolls[seatId] === high) }
+  return {
+    kind: "rolloff",
+    rolls,
+    pool: pool.filter((seatId) => rolls[seatId] === high),
+    phase: "bloom",
+  }
 }
 
 export function rollOffAnnouncement(
-  board: DiceBoard | null,
+  first: FirstPlayer | null,
   players: readonly Pick<GamePlayer, "id" | "name">[],
 ) {
-  if (board?.kind !== "rolloff") return undefined
+  if (first?.kind !== "rolloff") return undefined
   const name = (seatId: PlayerId) => players.find(({ id }) => id === seatId)?.name ?? "Player"
-  const high = board.rolls[board.pool[0]]
-  if (board.pool.length === 1) return `${name(board.pool[0])} rolled ${high}, goes first`
-  return `Tie at ${high}, ${board.pool.map(name).join(" and ")}. Roll again`
+  const high = first.rolls[first.pool[0]]
+  if (first.pool.length === 1) return `${name(first.pool[0])} rolled ${high}, goes first`
+  return `Tie at ${high}, ${first.pool.map(name).join(" and ")}. Roll again`
 }
 
-export function showFirst(seatId: PlayerId, settled: boolean): DiceState {
-  return { ...EMPTY_DICE, board: { kind: "first", seatId, settled } }
+export function flipForFirst(seatIds: readonly PlayerId[], random = Math.random): PlayerId {
+  return seatIds[randomIndex(seatIds.length, random)]
 }
 
-/** why: a seat's own rolls clear one card at a time; a roll-off or first pick belongs to the table, so one tap clears it everywhere. */
-export function clearSeat(state: DiceState, seatId: PlayerId): DiceState {
-  if (state.board) return { ...state, board: null }
-  const { [seatId]: _cleared, ...newestRollsBySeat } = state.newestRollsBySeat
-  return { ...state, newestRollsBySeat }
+export function offerChoice(state: DiceState, seatId: PlayerId, reason: ChoiceReason): DiceState {
+  return { ...state, first: { kind: "choice", seatId, reason } }
+}
+
+export function pickFirst(state: DiceState, seatId: PlayerId, note?: string): DiceState {
+  return { ...state, first: { kind: "picked", seatId, phase: "bloom", ...(note ? { note } : {}) } }
+}
+
+/** why: a decided roll-off and a pick both end as one "1st" chip on the winner; a tie stays on the table until it is re-rolled. */
+export function settleFirst(state: DiceState): DiceState {
+  const { first } = state
+  if (!first || first.kind === "choice" || first.phase === "chip") return state
+  if (first.kind === "rolloff") {
+    if (first.pool.length !== 1) return state
+    return { ...state, first: { kind: "picked", seatId: first.pool[0], phase: "chip" } }
+  }
+  return { ...state, first: { ...first, phase: "chip" } }
+}
+
+export function clearFirst(state: DiceState): DiceState {
+  return state.first ? { ...state, first: null } : state
+}
+
+export function firstPlayerSeat(state: DiceState): PlayerId | undefined {
+  const { first } = state
+  if (first?.kind === "picked") return first.seatId
+  if (first?.kind === "rolloff" && first.pool.length === 1) return first.pool[0]
+  return undefined
 }
 
 export function diceSeatView(state: DiceState, seatId: PlayerId): DiceSeatView | undefined {
-  const { board } = state
-  if (board?.kind === "rolloff") {
-    const value = board.rolls[seatId]
-    if (value === undefined) return undefined
-    const inPool = board.pool.includes(seatId)
-    const decided = board.pool.length === 1
-    return {
-      kind: "rolloff",
-      value,
-      status: decided ? (inPool ? "won" : "lost") : inPool ? "tied" : "out",
+  const { first } = state
+  if (first?.kind === "choice") {
+    return first.seatId === seatId ? { kind: "choice", reason: first.reason } : { kind: "waiting" }
+  }
+  if (first?.kind === "picked" && first.phase === "bloom") {
+    return first.seatId === seatId
+      ? { kind: "first", status: "won", ...(first.note ? { note: first.note } : {}) }
+      : { kind: "first", status: "lost" }
+  }
+  if (first?.kind === "rolloff" && first.phase === "bloom") {
+    const value = first.rolls[seatId]
+    if (value !== undefined) {
+      const inPool = first.pool.includes(seatId)
+      const decided = first.pool.length === 1
+      return {
+        kind: "rolloff",
+        value,
+        status: decided ? (inPool ? "won" : "lost") : inPool ? "tied" : "out",
+      }
     }
   }
-  if (board?.kind === "first") {
-    if (board.settled) return { kind: "first", status: board.seatId === seatId ? "won" : "lost" }
-    return board.seatId === seatId ? { kind: "first", status: "sweep" } : undefined
-  }
-  const rolls = state.newestRollsBySeat[seatId]
-  return rolls?.length ? { kind: "rolls", rolls } : undefined
+  const result = state.results[seatId]
+  return result?.phase === "bloom" ? { kind: "roll", roll: result.roll } : undefined
+}
+
+export function diceSeatChips(state: DiceState, seatId: PlayerId): DiceSeatChip[] {
+  const chips: DiceSeatChip[] = []
+  const { first } = state
+  if (first?.kind === "picked" && first.phase === "chip" && first.seatId === seatId)
+    chips.push({ kind: "first" })
+  const result = state.results[seatId]
+  if (result?.phase === "chip") chips.push({ kind: "roll", roll: result.roll })
+  return chips
 }

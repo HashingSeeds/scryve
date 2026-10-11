@@ -18,7 +18,7 @@ onFlowStart:
 - tapOn:
     id: "game-menu-button"
 - tapOn:
-    id: "dice-rolloff"
+    id: "dice-d20"
 - tapOn:
     id: "game-menu-button"
 - assertVisible: "Seat 1, Player 1, 15 life"

@@ -20,6 +20,7 @@ import {
   meSeatOf,
   reduceGameEvent,
   validatePlayerNames,
+  soleLoserSeat,
 } from "./domain"
 import type { CommandContext, GameEvent, LifeDelta, LocalGame } from "./types"
 
@@ -479,5 +480,29 @@ describe("local game account", () => {
       deckName: "Atraxa",
     })
     expect(rematch.players[1].id).not.toBe(seated.players[1].id)
+  })
+})
+
+describe("soleLoserSeat", () => {
+  const game = createLocalGame({
+    players: [
+      { name: "Ada", color: "#41476E" },
+      { name: "Grace", color: "#39755C" },
+      { name: "Katherine", color: "#7B5A91" },
+    ],
+    startingLife: 20,
+    now: 1,
+  })
+  const [ada, grace] = game.players
+
+  it("names the one seat that lost, and nobody for a draw, several losers, or an unfinished game", () => {
+    expect(
+      soleLoserSeat({ ...game, result: { kind: "win", winnerPlayerIds: [ada.id, grace.id] } }),
+    ).toBe(2)
+    expect(
+      soleLoserSeat({ ...game, result: { kind: "win", winnerPlayerIds: [ada.id] } }),
+    ).toBeUndefined()
+    expect(soleLoserSeat({ ...game, result: { kind: "draw" } })).toBeUndefined()
+    expect(soleLoserSeat(game)).toBeUndefined()
   })
 })

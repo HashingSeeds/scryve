@@ -27,15 +27,34 @@ class MemoryStorage implements StringStorage {
   }
 }
 
-function game(playerCount = 2) {
+function game(playerCount = 2, system?: "pokemon") {
   return createLocalGame({
     players: Array.from({ length: playerCount }, (_, index) => ({
       name: ["Ada", "Grace", "Katherine", "Dorothy", "Evelyn", "Mary"][index],
       color: ["#41476E", "#39755C", "#7B5A91", "#A06A2B", "#B03A58", "#C76542"][index],
     })),
-    startingLife: 2,
+    startingLife: system === "pokemon" ? 6 : 2,
+    system,
     now: 1,
   })
+}
+
+function renderGame(initialGame = game()) {
+  return render(
+    <ThemeProvider initialContext="light">
+      <CurrentGameScreen
+        initialGame={initialGame}
+        repository={new LocalGameRepository(new MemoryStorage())}
+        onViewSummary={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+}
+
+// why: chips lay out in the card's measured frame, which never arrives in a test unless the layout event is fired by hand.
+function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat") {
+  for (const card of view.queryAllByTestId(new RegExp(`^${prefix}-\\d+$`)))
+    fireEvent(card, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 400 } } })
 }
 
 describe("CurrentGameScreen", () => {
@@ -124,7 +143,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-button")).toBeTruthy()
     expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
-    expect(view.queryByTestId("dice-first")).toBeNull()
+    expect(view.queryByTestId("dice-coin")).toBeNull()
     expect(view.queryByTestId("home-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
@@ -132,7 +151,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.queryByTestId("home-button")).toBeNull()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
-    expect(view.getByTestId("dice-first")).toBeTruthy()
+    expect(view.getByTestId("dice-coin")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
     expect(view.getByTestId("history-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
@@ -140,51 +159,104 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
-  it("enters dice mode from a tool in the menu and closes it from the pentagon", () => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game()}
-          repository={new LocalGameRepository(new MemoryStorage())}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
+  it("enters dice mode from a pea in the menu and closes it from the pentagon", () => {
+    const view = renderGame()
     fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("dice-rolloff"))
+    fireEvent.press(view.getByTestId("dice-coin"))
 
     expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
     expect(view.queryByTestId("layout-button")).toBeNull()
-    expect(view.getByTestId("dice-rolloff")).toBeTruthy()
-    expect(view.getByTestId("dice-seat-1")).toBeTruthy()
-    expect(view.getByTestId("dice-seat-2")).toBeTruthy()
+    expect(view.getByTestId("dice-coin").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip a coin for Ada")
     expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice")
 
     fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.queryByTestId("dice-rolloff")).toBeNull()
+    expect(view.queryByTestId("dice-coin")).toBeNull()
     expect(view.queryByTestId("dice-seat-1")).toBeNull()
     expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
   })
 
-  it("arms a die from the menu and rolls it for the tapped seat", () => {
+  it("arms a die from the menu and rolls it for the tapped seat, leaving a chip", () => {
     const random = jest.spyOn(Math, "random").mockReturnValue(0.5)
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <CurrentGameScreen
-          initialGame={game()}
-          repository={new LocalGameRepository(new MemoryStorage())}
-          onViewSummary={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
+    const view = renderGame()
+    layoutSeats(view)
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByTestId("dice-d20"))
-    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(true)
 
     fireEvent.press(view.getByTestId("dice-seat-1"))
-    expect(view.getByTestId("dice-seat-1")).toHaveTextContent("d2011")
-    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(false)
+    expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
+    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(true)
+
+    // why: putting the tool down frees the seat; the chip stays beside the live controls.
+    fireEvent.press(view.getByTestId("dice-d20"))
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
+    expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
     random.mockRestore()
+  })
+
+  it("offers the first-player roll only while the game is fresh, and its chip leaves on the first life change", () => {
+    const rolls = [0.9, 0.1]
+    const random = jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const view = renderGame()
+    layoutSeats(view)
+    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+      "Roll for who goes first",
+    )
+
+    fireEvent.press(view.getByTestId("first-player-badge"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
+    expect(view.queryByTestId("dice-chip-2-first")).toBeNull()
+
+    fireEvent.press(view.getByTestId("life-seat-2-1"))
+    expect(view.queryByTestId("dice-chip-1-first")).toBeNull()
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    random.mockRestore()
+
+    const inProgress = renderGame({
+      ...game(),
+      players: game().players.map((p, i) => ({ ...p, life: i ? 2 : 1 })),
+    })
+    expect(inProgress.queryByTestId("first-player-badge")).toBeNull()
+  })
+
+  it("flips a coin for Pokémon and lets the winner choose first or second", () => {
+    const random = jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderGame(game(2, "pokemon"))
+    layoutSeats(view, "pokemon-card-seat")
+    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+      "Flip for who goes first",
+    )
+
+    fireEvent.press(view.getByTestId("first-player-badge"))
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Won the flip/)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Waiting for the choice")
+
+    fireEvent.press(view.getByTestId("dice-go-second"))
+    expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
+    expect(view.queryByTestId("dice-seat-2")).toBeNull()
+    random.mockRestore()
+  })
+
+  it("hands a rematch's first choice to the player who lost", () => {
+    const view = renderGame()
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    layoutSeats(view)
+
+    const badge = view.getByTestId("first-player-badge")
+    expect(badge.props.accessibilityLabel).toBe("Grace lost the last game. Choose who goes first")
+    expect(StyleSheet.flatten(badge.props.style).backgroundColor).toBe("#39755C")
+
+    fireEvent.press(badge)
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
+    fireEvent.press(view.getByTestId("dice-go-first"))
+    expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
   })
 
   it("offers Connect instead of End on a fresh board", () => {

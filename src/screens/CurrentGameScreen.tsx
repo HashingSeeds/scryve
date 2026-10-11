@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -13,7 +13,7 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import { type RadialMenuAction } from "@/components/GameRadialMenu"
+import { type GameMenuBadge, type RadialMenuAction } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { ResultLiveRegion } from "@/components/ResultAnnouncer"
@@ -27,6 +27,7 @@ import {
   isEliminatedByCommanderDamage,
   matchContextLabel,
   matchScoreAfter,
+  soleLoserSeat,
 } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
 import { GameSavedToast } from "@/features/game/GameSavedToast"
@@ -85,7 +86,10 @@ export function CurrentGameScreen({
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
   const menuButtonStyle = useMenuButtonStyle()
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const system = runtime.game.system
@@ -106,6 +110,59 @@ export function CurrentGameScreen({
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const dice = useDice(runtime.game.players, runtime.game.id)
+  const started = hasLocalGameStarted(runtime.game)
+  const diceGameStarted = dice.gameStarted
+  useEffect(() => {
+    if (started) diceGameStarted()
+  }, [started, diceGameStarted])
+  // why: the game that was just finished is remembered against the board that replaced it, so its loser can be offered the first choice.
+  const [lastGame, setLastGame] = useState<{ nextGameId: string; loserSeat: number }>()
+  const matchId = runtime.game.match?.id
+  const matchGameNumber = runtime.game.match?.gameNumber
+  const latestMatchGame = runtime.latestMatchGame
+  const loserSeat = useMemo(() => {
+    if (lastGame?.nextGameId === runtime.game.id) return lastGame.loserSeat
+    if (matchId !== undefined && matchGameNumber !== undefined && matchGameNumber > 1) {
+      const latest = latestMatchGame(matchId)
+      return latest ? soleLoserSeat(latest) : undefined
+    }
+    return undefined
+  }, [lastGame, latestMatchGame, matchGameNumber, matchId, runtime.game.id])
+  const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
+  const diceAsk = dice.ask
+  const badge = useMemo<GameMenuBadge | undefined>(() => {
+    if (started || dice.firstUsed) return undefined
+    if (loser && loserSeat !== undefined)
+      return {
+        color: loser.color,
+        glyph: { seatNumber: loserSeat + 1, shape: loser.shape },
+        accessibilityLabel: `${loser.name} lost the last game. Choose who goes first`,
+        onPress: () => diceAsk(loser.id, "loss"),
+      }
+    if (system === "pokemon")
+      return {
+        color: colors.gameMenu.actions.dice,
+        glyph: { tool: "coin" },
+        accessibilityLabel: "Flip for who goes first",
+        onPress: dice.flip,
+      }
+    return {
+      color: colors.gameMenu.actions.dice,
+      glyph: { tool: "d20" },
+      accessibilityLabel: "Roll for who goes first",
+      onPress: dice.rollOff,
+    }
+  }, [
+    colors.gameMenu.actions.dice,
+    dice.firstUsed,
+    dice.flip,
+    dice.rollOff,
+    diceAsk,
+    loser,
+    loserSeat,
+    started,
+    system,
+  ])
   // why: a dice tool tapped from the open menu acts at once, and the menu folds away around the row.
   const diceTools = useMemo(
     () =>
@@ -142,6 +199,11 @@ export function CurrentGameScreen({
   const layoutVariant = runtime.game.layout ?? "auto"
   const layoutOptions = getPlayerGridLayoutOptions(playerCount)
 
+  function rememberLoser(ended: LocalGame, next: LocalGame) {
+    const seat = soleLoserSeat(ended)
+    setLastGame(seat === undefined ? undefined : { nextGameId: next.id, loserSeat: seat })
+  }
+
   function confirmEnd(result: LocalGameResult) {
     const ended = runtime.finish(result, endSource)
     if (ended.status === "active") {
@@ -151,13 +213,13 @@ export function CurrentGameScreen({
     // why: a failed rematch save throws here, and the open dialog shows the error.
     if (ended.match && !ended.match.result) {
       // why: at the game cap the board waits for the match result, so Cancel or a restart cannot orphan the match.
-      if (canContinueMatch(ended)) runtime.nextMatchGame()
+      if (canContinueMatch(ended)) rememberLoser(ended, runtime.nextMatchGame())
       else runtime.holdMatchEnd(ended.match.id)
       setEndSource(undefined)
       setMatchPrompt(ended)
       return
     }
-    runtime.rematch()
+    rememberLoser(ended, runtime.rematch())
     setEndSource(undefined)
     setSaved({ gameId: ended.id, message: ended.match ? "Match saved" : "Game saved" })
   }
@@ -354,6 +416,7 @@ export function CurrentGameScreen({
               }
             : {}),
           heldAction: diceOpen ? "dice" : undefined,
+          badge,
           onToggle: toggleMenu,
           onClose: closeMenu,
         }}

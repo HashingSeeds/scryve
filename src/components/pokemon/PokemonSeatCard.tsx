@@ -29,7 +29,8 @@ import {
   type PokemonInPlay,
 } from "../../../convex/lib/table"
 import { BoardPressable } from "../BoardPressable"
-import { DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
+import { DiceChips } from "../DiceChips"
+import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
   COMPACT_PLAYER_MARK_SIZE,
@@ -128,6 +129,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const insets = contentInsetsFor(contentRotation, contentInsets)
   const clearance = benchMenuClearance(contentRotation, menuCorner, menuEdgeCenter)
   const sideways = Math.abs(contentRotation) === 90
+  const diceCovers = diceCoversSeat(dice)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
   const layer = sideways
     ? { width: cardSize.height, height: cardSize.width }
@@ -351,10 +353,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       ) : null}
       <View
         testID={`pokemon-layer-seat-${seatNumber}`}
-        pointerEvents={sheetMode || dice ? "none" : "box-none"}
-        accessibilityElementsHidden={!!sheetMode || !!dice}
-        importantForAccessibility={sheetMode || dice ? "no-hide-descendants" : "auto"}
-        aria-hidden={!!sheetMode || !!dice}
+        pointerEvents={sheetMode || diceCovers ? "none" : "box-none"}
+        accessibilityElementsHidden={!!sheetMode || diceCovers}
+        importantForAccessibility={sheetMode || diceCovers ? "no-hide-descendants" : "auto"}
+        aria-hidden={!!sheetMode || diceCovers}
         style={[
           StyleSheet.absoluteFill,
           rotatedLayerStyle(contentRotation, cardSize.width, cardSize.height),
@@ -697,7 +699,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         ) : null}
       </View>
 
-      {dice ? (
+      {dice && diceCovers ? (
         <DiceSeatOverlay
           seatNumber={seatNumber}
           playerName={playerName}
@@ -706,6 +708,20 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           contentRotation={contentRotation}
           compact={cramped}
           dice={dice}
+        />
+      ) : null}
+      {dice?.chips?.length && dice.onClearChip && !dice.view && !sheetMode ? (
+        <DiceChips
+          seatNumber={seatNumber}
+          playerName={playerName}
+          foreground={ink}
+          compact={cramped}
+          contentRotation={contentRotation}
+          cardSize={cardSize}
+          top={padding + insets.top + clearance.top}
+          left={padding + insets.left + clearance.left}
+          chips={dice.chips}
+          onClear={dice.onClearChip}
         />
       ) : null}
       {sheetMode && canEdit ? (
