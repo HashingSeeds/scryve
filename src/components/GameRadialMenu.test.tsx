@@ -6,7 +6,13 @@ import { ThemeProvider } from "@/theme/context"
 import { darkTheme, lightTheme } from "@/theme/theme"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
-import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./GameRadialMenu"
+import {
+  GameRadialMenu,
+  getRadialActionPoses,
+  getRadialToolOffsets,
+  type RadialMenuAction,
+  type RadialMenuTool,
+} from "./GameRadialMenu"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 describe("GameRadialMenu", () => {
@@ -18,6 +24,15 @@ describe("GameRadialMenu", () => {
     { kind: "home", label: "Home", onPress: callbacks[3] },
     { kind: "end-game", label: "End game", onPress: callbacks[4] },
   ]
+  const tools: RadialMenuTool[] = ["first", "rolloff", "coin", "d20"].map((key) => ({
+    key,
+    label: key,
+    accessibilityLabel: key,
+    onPress: jest.fn(),
+  }))
+  const actionsWithDiceTools: RadialMenuAction[] = actions.map((action) =>
+    action.kind === "dice" ? { kind: "dice", label: "Dice", tools } : action,
+  )
 
   function menu(
     open: boolean,
@@ -211,7 +226,13 @@ describe("GameRadialMenu", () => {
     const onEnd = jest.fn()
     const blockedActions: RadialMenuAction[] = actions.map((action) =>
       action.kind === "end-game"
-        ? { ...action, detail: "needs connection", blocked: true, onPress: onEnd }
+        ? {
+            kind: "end-game",
+            label: "End game",
+            detail: "needs connection",
+            blocked: true,
+            onPress: onEnd,
+          }
         : action,
     )
     const statusLine = {
@@ -265,6 +286,50 @@ describe("GameRadialMenu", () => {
     view.rerender(menu(false, onClose))
     expect(pressBack()).toBe(false)
     jest.restoreAllMocks()
+  })
+
+  it("lays an action's tools out as circles from the pill's inner cap outward", () => {
+    const view = render(menu(true, jest.fn(), { actions: actionsWithDiceTools }))
+
+    expect(view.queryByTestId("dice-button")).toBeNull()
+    for (const tool of tools) expect(view.getByTestId(`dice-${tool.key}`)).toBeTruthy()
+    fireEvent.press(view.getByTestId("dice-d20"))
+    expect(tools[3].onPress).toHaveBeenCalledTimes(1)
+
+    // why: the first tool takes the cap nearer the pentagon whichever way the pill points, and the rest step one circle outward.
+    for (const anchor of [
+      { x: 0.5, y: 0.5 },
+      { x: 0.2, y: 0.5 },
+      { x: 0.8, y: 0.5 },
+    ]) {
+      const pose = getRadialActionPoses(anchor)[1]
+      const offsets = getRadialToolOffsets(pose, 4)
+      const angle = (pose.rotationDeg * Math.PI) / 180
+      const distances = offsets.map((offset) =>
+        Math.hypot(pose.x + offset * Math.cos(angle), pose.y + offset * Math.sin(angle)),
+      )
+      expect(distances).toEqual([...distances].sort((a, b) => a - b))
+      expect(Math.abs(offsets[0])).toBe(32)
+      expect(offsets.map((offset) => Math.abs(offset - offsets[0]))).toEqual([0, 56, 112, 168])
+    }
+  })
+
+  it("keeps a held action's tools out and pressable while the menu is closed", () => {
+    const view = render(
+      menu(false, jest.fn(), {
+        actions: actionsWithDiceTools,
+        heldAction: "dice",
+        exitAction: { label: "Close dice", onPress: jest.fn() },
+      }),
+    )
+
+    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
+    expect(view.queryByTestId("layout-button")).toBeNull()
+    fireEvent.press(view.getByTestId("dice-rolloff"))
+    expect(tools[1].onPress).toHaveBeenCalledTimes(1)
+
+    view.rerender(menu(false, jest.fn(), { actions: actionsWithDiceTools }))
+    expect(view.queryByTestId("dice-rolloff")).toBeNull()
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

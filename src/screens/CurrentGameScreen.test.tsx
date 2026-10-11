@@ -124,7 +124,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-button")).toBeTruthy()
     expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
-    expect(view.queryByTestId("dice-button")).toBeNull()
+    expect(view.queryByTestId("dice-first")).toBeNull()
     expect(view.queryByTestId("home-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
@@ -132,7 +132,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.queryByTestId("home-button")).toBeNull()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
-    expect(view.getByTestId("dice-button")).toBeTruthy()
+    expect(view.getByTestId("dice-first")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
     expect(view.getByTestId("history-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
@@ -140,7 +140,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
   })
 
-  it("docks the dice strip at the hub from the menu and closes the menu", () => {
+  it("enters dice mode from a tool in the menu and closes it from the pentagon", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <CurrentGameScreen
@@ -151,20 +151,40 @@ describe("CurrentGameScreen", () => {
       </ThemeProvider>,
     )
     fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("dice-button"))
-
-    expect(view.getByTestId("dice-strip")).toBeTruthy()
-    expect(view.queryByTestId("game-menu-button")).toBeNull()
-    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
-
     fireEvent.press(view.getByTestId("dice-rolloff"))
+
+    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
+    expect(view.queryByTestId("layout-button")).toBeNull()
+    expect(view.getByTestId("dice-rolloff")).toBeTruthy()
     expect(view.getByTestId("dice-seat-1")).toBeTruthy()
     expect(view.getByTestId("dice-seat-2")).toBeTruthy()
+    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice")
 
-    fireEvent.press(view.getByTestId("dice-close"))
-    expect(view.queryByTestId("dice-strip")).toBeNull()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.queryByTestId("dice-rolloff")).toBeNull()
     expect(view.queryByTestId("dice-seat-1")).toBeNull()
-    expect(view.getByTestId("game-menu-button")).toBeTruthy()
+    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
+  })
+
+  it("arms a die from the menu and rolls it for the tapped seat", () => {
+    const random = jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={game()}
+          repository={new LocalGameRepository(new MemoryStorage())}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("dice-d20"))
+    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(true)
+
+    fireEvent.press(view.getByTestId("dice-seat-1"))
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent("d2011")
+    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(false)
+    random.mockRestore()
   })
 
   it("offers Connect instead of End on a fresh board", () => {

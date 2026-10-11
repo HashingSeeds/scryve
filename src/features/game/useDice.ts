@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
+import type { RadialMenuTool } from "@/components/GameRadialMenu"
 import { useResultAnnouncer } from "@/components/ResultAnnouncer"
 import { useReducedMotion } from "@/utils/useReducedMotion"
+import { useStableCallbacks } from "@/utils/useStableCallbacks"
 
 import {
   armTool,
@@ -24,13 +26,15 @@ import type { GamePlayer } from "./types"
 const SWEEP_EXTRA_STEPS = 3
 const sweepStepMs = (step: number) => 55 + step * step * 4
 
-/** why: dice results are table talk, so they live on this device only and are gone when the strip closes or the game changes. */
+/** why: dice results are table talk, so they live on this device only and are gone when dice close or the game changes. Any tool works from closed, so one tap on the menu both opens dice and acts. */
 export function useDice(players: readonly GamePlayer[], gameId: string) {
   const [state, setState] = useState<{ gameId: string; dice: DiceState }>()
   const dice = state?.gameId === gameId ? state.dice : undefined
+  const current = dice ?? EMPTY_DICE
   const { announce, reset: resetAnnouncer, webMessage } = useResultAnnouncer()
   const reducedMotion = useReducedMotion()
   const sweep = useRef<ReturnType<typeof setTimeout>[]>([])
+  const stable = useStableCallbacks()
   const seatKey = players.map(({ id }) => id).join(",")
 
   function stopSweep() {
@@ -50,34 +54,30 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
   function set(next: DiceState) {
     setState({ gameId, dice: next })
   }
-  const show = useCallback(() => setState({ gameId, dice: EMPTY_DICE }), [gameId])
 
-  function close() {
+  const close = stable("close", () => {
     stopSweep()
     resetAnnouncer()
     setState(undefined)
-  }
+  })
 
-  function arm(tool: DiceTool) {
-    if (!dice) return
+  const arm = stable("arm", (tool: DiceTool) => {
     stopSweep()
-    set(armTool(dice, tool))
-  }
+    set(armTool(current, tool))
+  })
 
-  function rollOff() {
-    if (!dice) return
+  const rollOff = stable("rollOff", () => {
     stopSweep()
     const next =
-      dice.board?.kind === "rolloff" && dice.board.pool.length > 1
-        ? rerollTies(dice)
+      current.board?.kind === "rolloff" && current.board.pool.length > 1
+        ? rerollTies(current)
         : startRollOff(players.map(({ id }) => id))
     set(next)
     const message = rollOffAnnouncement(next.board, players)
     if (message) announce(message)
-  }
+  })
 
-  function first() {
-    if (!dice) return
+  const first = stable("first", () => {
     stopSweep()
     const count = players.length
     const finalIndex = randomIndex(count)
@@ -97,7 +97,7 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
       delay += sweepStepMs(step)
     }
     sweep.current.push(setTimeout(settle, delay))
-  }
+  })
 
   function pressSeat(player: GamePlayer) {
     if (!dice) return
@@ -108,21 +108,50 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
     announce(`${player.name}, ${toolLabel(rolled.roll.tool)}, ${rolled.roll.value}`)
   }
 
+  const armed = current.armed
+  const tie = current.board?.kind === "rolloff" && current.board.pool.length > 1
+  // why: innermost first, the order the menu lays them out from the pentagon outward.
+  const tools: readonly RadialMenuTool[] = useMemo(
+    () => [
+      {
+        key: "first",
+        label: "First",
+        accessibilityLabel: "Pick who goes first",
+        dimmed: armed !== null,
+        onPress: first,
+      },
+      {
+        key: "rolloff",
+        label: tie ? "Again" : "Roll\noff",
+        accessibilityLabel: tie ? "Re-roll the tied seats" : "Every seat rolls, highest goes first",
+        dimmed: armed !== null,
+        onPress: rollOff,
+      },
+      {
+        key: "coin",
+        label: "Coin",
+        accessibilityLabel: armed === "coin" ? "Coin armed, tap a seat" : "Flip a coin for a seat",
+        selected: armed === "coin",
+        dimmed: armed !== null && armed !== "coin",
+        onPress: () => arm("coin"),
+      },
+      {
+        key: "d20",
+        label: "d20",
+        accessibilityLabel: armed === "d20" ? "d20 armed, tap a seat" : "Roll a d20 for a seat",
+        selected: armed === "d20",
+        dimmed: armed !== null && armed !== "d20",
+        onPress: () => arm("d20"),
+      },
+    ],
+    [arm, armed, first, rollOff, tie],
+  )
+
   return {
     open: dice !== undefined,
-    show,
     close,
-    strip: dice
-      ? {
-          armed: dice.armed,
-          tie: dice.board?.kind === "rolloff" && dice.board.pool.length > 1,
-          webMessage,
-          onArm: arm,
-          onRollOff: rollOff,
-          onFirst: first,
-          onClose: close,
-        }
-      : undefined,
+    tools,
+    webMessage,
     grid: dice
       ? {
           armed: dice.armed,

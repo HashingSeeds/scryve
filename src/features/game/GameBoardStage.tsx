@@ -30,10 +30,7 @@ export interface GameBoardStageProps {
   playerCount: number
   layoutVariant: PlayerGridLayoutVariant
   renderGrid: (boardOrientation: PlayerGridProps["boardOrientation"]) => ReactNode
-  menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact" | "dock"> & {
-    /** why: what docks at the hub lies along the seam between the seats, and only the stage knows which way the seam runs on screen. */
-    dock?: (hub: { seam: "horizontal" | "vertical" }) => ReactNode
-  }
+  menu: Omit<GameRadialMenuProps, "anchor" | "boardAnchor" | "nativeFrame" | "compact">
   windowOverlay?: ReactNode
   testID?: string
 }
@@ -117,13 +114,7 @@ function PinnedGameBoardStage({
               exitAction={menu.exitAction}
               signal={menu.signal}
               statusLine={menu.statusLine}
-              // why: the dock turns with the holder, so a seam that runs across the hardware board runs the other way in the holder's view after a quarter turn.
-              dock={menu.dock?.({
-                seam:
-                  (gridLayout.layout === "two-side-by-side") !== (holderAngle % 180 !== 0)
-                    ? "vertical"
-                    : "horizontal",
-              })}
+              heldAction={menu.heldAction}
               onToggle={menu.onToggle}
             />
           </View>
@@ -168,14 +159,6 @@ function LegacyGameBoardStage({
       {renderGrid(boardOrientation)}
       <GameRadialMenu
         {...menu}
-        // why: the legacy board lays two seats out stacked and turns the whole board sideways, so their seam runs vertically whenever the board is turned.
-        dock={menu.dock?.({
-          seam:
-            gridLayout.layout === "two-side-by-side" ||
-            (gridLayout.layout === "two-stacked" && rotation !== 0)
-              ? "vertical"
-              : "horizontal",
-        })}
         anchor={menuAnchor}
         boardAnchor={rotateGameBoardAnchor(menuAnchor, -rotation)}
         nativeFrame={boardOrientation.nativeFrame}

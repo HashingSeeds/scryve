@@ -12,11 +12,11 @@ import {
   DialogCard,
   type DialogOrigin,
 } from "@/components/DialogCard"
-import { DiceStrip } from "@/components/DiceStrip"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
 import { type RadialMenuAction } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
+import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import {
@@ -106,7 +106,18 @@ export function CurrentGameScreen({
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   const dice = useDice(runtime.game.players, runtime.game.id)
-  const showDice = dice.show
+  // why: a dice tool tapped from the open menu acts at once, and the menu folds away around the row.
+  const diceTools = useMemo(
+    () =>
+      dice.tools.map((tool) => ({
+        ...tool,
+        onPress: () => {
+          setMenuOpen(false)
+          tool.onPress()
+        },
+      })),
+    [dice.tools],
+  )
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
@@ -224,14 +235,7 @@ export function CurrentGameScreen({
           setLayoutPickerOpen(true)
         },
       },
-      {
-        kind: "dice",
-        label: "Dice",
-        onPress: () => {
-          setMenuOpen(false)
-          showDice()
-        },
-      },
+      { kind: "dice", label: "Dice", tools: diceTools },
       {
         kind: "setup",
         label: "Game",
@@ -272,24 +276,27 @@ export function CurrentGameScreen({
     [
       captureMenuDialogOrigin,
       closeMenu,
+      diceTools,
       isFresh,
       layoutOptions.length,
       onConnect,
       onHistory,
       onSetup,
-      showDice,
       showEndConfirmation,
     ],
   )
 
   const seatColors = useSeatColors(runtime.game.players)
-  const diceStrip = dice.strip
+  const diceOpen = dice.open
+  const closeDice = dice.close
   const exitAction = useMemo(
     () =>
-      armedPlayerId || inspectedPlayerId
-        ? { label: "Exit commander damage", onPress: exitCommanderMode }
-        : undefined,
-    [armedPlayerId, inspectedPlayerId, exitCommanderMode],
+      diceOpen
+        ? { label: "Close dice", onPress: closeDice }
+        : armedPlayerId || inspectedPlayerId
+          ? { label: "Exit commander damage", onPress: exitCommanderMode }
+          : undefined,
+    [armedPlayerId, closeDice, diceOpen, inspectedPlayerId, exitCommanderMode],
   )
 
   return (
@@ -346,9 +353,7 @@ export function CurrentGameScreen({
                 },
               }
             : {}),
-          dock: diceStrip
-            ? ({ seam }) => <DiceStrip {...diceStrip} vertical={seam === "vertical"} />
-            : undefined,
+          heldAction: diceOpen ? "dice" : undefined,
           onToggle: toggleMenu,
           onClose: closeMenu,
         }}
@@ -364,6 +369,7 @@ export function CurrentGameScreen({
           ) : null
         }
       />
+      <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
 
       {layoutPickerOpen ? (
         <DialogCard

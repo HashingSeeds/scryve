@@ -1,9 +1,10 @@
-import { type ComponentProps, memo, type ReactNode, useEffect } from "react"
+import { type ComponentProps, memo, useEffect } from "react"
 import type { GestureResponderEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
   Easing,
   ReduceMotion,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -39,14 +40,26 @@ import {
 } from "./GameMenuButtonShape"
 import { Text } from "./Text"
 
-export interface RadialMenuAction {
+export interface RadialMenuTool {
+  key: string
+  label: string
+  accessibilityLabel: string
+  selected?: boolean
+  dimmed?: boolean
+  onPress: () => void
+}
+
+/** why: an action is one pill, or a row of round tools the pill's own height: `tools[0]` sits in the pill's inner cap and the rest roll out past its outer end. */
+export type RadialMenuAction = {
   kind: GameMenuActionKind
   label: string
   detail?: string
   disabled?: boolean
   blocked?: boolean
-  onPress: (event?: GestureResponderEvent) => void
-}
+} & (
+  | { onPress: (event?: GestureResponderEvent) => void; tools?: undefined }
+  | { tools: readonly RadialMenuTool[]; onPress?: undefined }
+)
 
 export type GameMenuSignalTone = "slow" | "offline" | "catchingUp" | "caughtUp" | "attention"
 
@@ -76,8 +89,8 @@ export interface GameRadialMenuProps {
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
-  // why: the dice strip takes the hub while it is open, so it replaces the menu button instead of stacking on it.
-  dock?: ReactNode
+  // why: this action stays out after the menu closes, so its tools keep working once the backdrop lifts and the seats are live.
+  heldAction?: GameMenuActionKind
 }
 
 export interface RadialActionPose {
@@ -96,6 +109,19 @@ export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
 
 const ACTION_WIDTH = 116
 const ACTION_HEIGHT = 52
+
+const TOOL_SIZE = ACTION_HEIGHT
+const TOOL_RADIUS = TOOL_SIZE / 2
+const TOOL_GAP = 4
+const TOOL_PITCH = TOOL_SIZE + TOOL_GAP
+// why: the first tool is the pill's own inner end cap, so the row keeps the pill's arrival path.
+const PILL_CAP_OFFSET = ACTION_WIDTH / 2 - TOOL_RADIUS
+// why: the row starts rolling out a beat after the pill starts arriving, so the circles emerge from under the first one as it lands.
+const TOOL_ROLL_LAG_MS = 120
+const TOOL_ROLL_MS = 420
+const TOOL_ROLL_EASING = Easing.bezier(0.25, 1.15, 0.45, 1)
+// why: the widest petal is a row of four tools (dice); the cluster box must contain it because Android drops touches outside a parent's bounds.
+const MAX_TOOLS = 4
 
 const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
 const STATUS_LINE_DISTANCE = 128
@@ -186,6 +212,29 @@ export function getRadialActionStart(pose: { x: number; y: number }): { x: numbe
   }
 }
 
+export function getRadialToolOffsets(
+  pose: Pick<RadialActionPose, "x" | "y" | "rotationDeg">,
+  count: number,
+): readonly number[] {
+  const angle = (pose.rotationDeg * Math.PI) / 180
+  const plusEnd = {
+    x: pose.x + PILL_CAP_OFFSET * Math.cos(angle),
+    y: pose.y + PILL_CAP_OFFSET * Math.sin(angle),
+  }
+  const plusEndIsNearerThePentagon = Math.hypot(plusEnd.x, plusEnd.y) < Math.hypot(pose.x, pose.y)
+  const towardInnerCap = plusEndIsNearerThePentagon ? 1 : -1
+  return Array.from(
+    { length: count },
+    (_, index) => towardInnerCap * (PILL_CAP_OFFSET - index * TOOL_PITCH),
+  )
+}
+
+/** why: the row's box is centered on the pill and wide enough for the farthest tool on either side, so it turns about the pill's center and Android keeps every circle tappable. */
+function getRadialToolReach(count: number): number {
+  const outermost = Math.abs(PILL_CAP_OFFSET - (count - 1) * TOOL_PITCH)
+  return Math.max(PILL_CAP_OFFSET, outermost) + TOOL_RADIUS
+}
+
 export const GameRadialMenu = memo(function GameRadialMenu({
   open,
   anchor,
@@ -200,7 +249,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   exitAction,
   signal,
   statusLine,
-  dock,
+  heldAction,
 }: GameRadialMenuProps) {
   const { themed } = useAppTheme()
   const menuOpen = open && !exitAction
@@ -219,25 +268,22 @@ export const GameRadialMenu = memo(function GameRadialMenu({
       <GameMenuBackdrop open={menuOpen} onClose={onClose} />
       <GameRadialFan
         open={menuOpen}
+        heldAction={heldAction}
         anchor={anchor}
         anchorStyle={[anchorStyle, nativeAnchorStyle]}
         actions={actions}
       />
-      {dock ? (
-        <GameMenuDock anchorStyle={[anchorStyle, nativeAnchorStyle]}>{dock}</GameMenuDock>
-      ) : (
-        <GameMenuAnchor
-          open={menuOpen}
-          anchor={anchor}
-          anchorStyle={[anchorStyle, nativeAnchorStyle]}
-          compact={compact}
-          variant={variant}
-          seatColors={seatColors}
-          exitAction={exitAction}
-          signal={signal}
-          onToggle={onToggle}
-        />
-      )}
+      <GameMenuAnchor
+        open={menuOpen}
+        anchor={anchor}
+        anchorStyle={[anchorStyle, nativeAnchorStyle]}
+        compact={compact}
+        variant={variant}
+        seatColors={seatColors}
+        exitAction={exitAction}
+        signal={signal}
+        onToggle={onToggle}
+      />
 
       {menuOpen && statusLine ? (
         <GameMenuStatusRow
@@ -315,12 +361,14 @@ export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: ()
 
 function GameRadialFan({
   open,
+  heldAction,
   anchor,
   anchorStyle = percentAnchorStyle(anchor),
   actions,
   poseTurnMs = 0,
 }: {
   open: boolean
+  heldAction?: GameMenuActionKind
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
   actions: readonly RadialMenuAction[]
@@ -337,7 +385,7 @@ function GameRadialFan({
           anchorStyle={anchorStyle}
           pose={poses[index]}
           reducedMotion={reducedMotion}
-          open={open}
+          open={open || action.kind === heldAction}
           poseTurnMs={poseTurnMs}
         />
       ))}
@@ -346,7 +394,7 @@ function GameRadialFan({
 }
 
 const FACING_TURN_MS = 260
-const CLUSTER_SIZE = 2 * (EDGE_POSE_DISTANCE + ACTION_WIDTH)
+const CLUSTER_SIZE = 2 * (EDGE_POSE_DISTANCE + getRadialToolReach(MAX_TOOLS))
 
 type GameMenuAnchorProps = {
   open: boolean
@@ -367,7 +415,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle,
   actions,
   statusLine,
-  dock,
+  heldAction,
   ...anchorProps
 }: Omit<GameMenuAnchorProps, "anchorStyle"> & {
   holderAnchor: { x: number; y: number }
@@ -375,7 +423,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle: number
   actions: readonly RadialMenuAction[]
   statusLine?: GameMenuStatusLine
-  dock?: ReactNode
+  heldAction?: GameMenuActionKind
 }) {
   const menuOpen = anchorProps.open && !anchorProps.exitAction
   const reducedMotion = useReducedMotion()
@@ -399,16 +447,13 @@ export const GameMenuCluster = memo(function GameMenuCluster({
     >
       <GameRadialFan
         open={menuOpen}
+        heldAction={heldAction}
         anchor={holderAnchor}
         anchorStyle={$clusterCenter}
         actions={actions}
         poseTurnMs={FACING_TURN_MS}
       />
-      {dock ? (
-        <GameMenuDock anchorStyle={$clusterCenter}>{dock}</GameMenuDock>
-      ) : (
-        <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
-      )}
+      <GameMenuAnchor {...anchorProps} anchorStyle={$clusterCenter} />
       {menuOpen && statusLine ? (
         <GameMenuStatusRow
           statusLine={statusLine}
@@ -422,21 +467,6 @@ export const GameMenuCluster = memo(function GameMenuCluster({
     </Animated.View>
   )
 })
-
-/** why: a zero-size box at the anchor centers whatever docks there on its own size, the way the signal badge is centered. */
-function GameMenuDock({
-  anchorStyle,
-  children,
-}: {
-  anchorStyle: AnchorStyle
-  children: ReactNode
-}) {
-  return (
-    <Animated.View testID="game-menu-dock" pointerEvents="box-none" style={[$dock, anchorStyle]}>
-      {children}
-    </Animated.View>
-  )
-}
 
 function GameMenuAnchor({
   open,
@@ -721,6 +751,25 @@ function RadialAction({
     }
   })
 
+  if (action.tools) {
+    return (
+      <Animated.View
+        style={[themed($actionAnchor), toolRowBox(action.tools.length), anchorStyle, animatedStyle]}
+        pointerEvents={open ? "box-none" : "none"}
+        aria-hidden={!open}
+      >
+        <RadialToolRow
+          kind={action.kind}
+          tools={action.tools}
+          pose={pose}
+          open={open}
+          animateFully={animateFully}
+          background={background}
+        />
+      </Animated.View>
+    )
+  }
+
   return (
     <Animated.View
       style={[themed($actionAnchor), anchorStyle, animatedStyle]}
@@ -762,6 +811,116 @@ function RadialAction({
   )
 }
 
+/** why: every tool starts under the first one and rolls out to its place along the pill's axis, turning one radian per radius traveled so it rolls without slipping and lands upright in the pill's frame. */
+function RadialToolRow({
+  kind,
+  tools,
+  pose,
+  open,
+  animateFully,
+  background,
+}: {
+  kind: GameMenuActionKind
+  tools: readonly RadialMenuTool[]
+  pose: RadialActionPose
+  open: boolean
+  animateFully: boolean
+  background: string
+}) {
+  const offsets = getRadialToolOffsets(pose, tools.length)
+  const firstLeft = getRadialToolReach(tools.length) + offsets[0] - TOOL_RADIUS
+  const roll = useSharedValue(0)
+
+  useEffect(() => {
+    if (!open) {
+      roll.value = 0
+      return
+    }
+    roll.value = animateFully
+      ? withDelay(
+          pose.delayMs + TOOL_ROLL_LAG_MS,
+          withTiming(1, { duration: TOOL_ROLL_MS, easing: TOOL_ROLL_EASING }),
+        )
+      : 1
+  }, [animateFully, open, pose.delayMs, roll])
+
+  // why: drawn outermost first so the first tool paints on top and the rest emerge from beneath it.
+  return (
+    <>
+      {tools
+        .map((tool, index) => (
+          <RadialTool
+            key={tool.key}
+            testID={open ? `${kind}-${tool.key}` : undefined}
+            tool={tool}
+            left={firstLeft}
+            travel={offsets[index] - offsets[0]}
+            roll={roll}
+            background={background}
+          />
+        ))
+        .reverse()}
+    </>
+  )
+}
+
+function RadialTool({
+  testID,
+  tool,
+  left,
+  travel,
+  roll,
+  background,
+}: {
+  testID?: string
+  tool: RadialMenuTool
+  left: number
+  travel: number
+  roll: SharedValue<number>
+  background: string
+}) {
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  const fill = tool.selected ? colors.gameMenu.anchorGlyph : background
+  const foreground = accessibleForeground(fill)
+  const stacked = tool.label.includes("\n")
+  const rollStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: travel * roll.value },
+      { rotate: `${(-travel / TOOL_RADIUS) * (1 - roll.value)}rad` },
+    ],
+  }))
+
+  return (
+    <Animated.View style={[$toolSlot, { left }, rollStyle]}>
+      <BoardPressable
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={tool.accessibilityLabel}
+        accessibilityState={tool.selected === undefined ? undefined : { selected: tool.selected }}
+        style={({ pressed }) => [
+          themed($action),
+          themed($tool),
+          { backgroundColor: fill },
+          tool.dimmed && $dimmedTool,
+          pressed && themed($pressedAction),
+        ]}
+        onPress={tool.onPress}
+      >
+        <Text
+          text={tool.label}
+          weight="bold"
+          numberOfLines={stacked ? 2 : 1}
+          maxFontSizeMultiplier={1.2}
+          style={[themed($actionText), stacked && $stackedToolText, { color: foreground }]}
+        />
+      </BoardPressable>
+    </Animated.View>
+  )
+}
+
 const $cluster: ViewStyle = {
   position: "absolute",
   zIndex: 30,
@@ -782,14 +941,6 @@ const $anchor: ThemedStyle<ViewStyle> = () => ({
   position: "absolute",
   zIndex: 30,
 })
-const $dock: ViewStyle = {
-  position: "absolute",
-  zIndex: 30,
-  width: 0,
-  height: 0,
-  alignItems: "center",
-  justifyContent: "center",
-}
 const $largeAnchor: ThemedStyle<ViewStyle> = () => ({
   width: MENU_BUTTON_SIZE,
   height: MENU_BUTTON_SIZE,
@@ -853,6 +1004,22 @@ const $actionDetail: ThemedStyle<TextStyle> = () => ({
   lineHeight: 12,
   textAlign: "center",
 })
+function toolRowBox(count: number): ViewStyle {
+  const reach = getRadialToolReach(count)
+  return { width: 2 * reach, marginLeft: -reach }
+}
+const $toolSlot: ViewStyle = {
+  position: "absolute",
+  top: 0,
+  width: TOOL_SIZE,
+  height: TOOL_SIZE,
+}
+const $tool: ThemedStyle<ViewStyle> = () => ({
+  paddingHorizontal: 0,
+  borderRadius: TOOL_RADIUS,
+})
+const $dimmedTool: ViewStyle = { opacity: 0.45 }
+const $stackedToolText: TextStyle = { fontSize: 13, lineHeight: 14 }
 const SIGNAL_BADGE_SIZE = 22
 // why: a zero-size box at the anchor centers the badge on its real width, so "100" sits where "1" does.
 const $signalBadgeCenter: ViewStyle = {

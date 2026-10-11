@@ -1,8 +1,8 @@
-import { AccessibilityInfo, Platform } from "react-native"
+import { AccessibilityInfo, Platform, Pressable } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { DiceSeatOverlay } from "@/components/DiceSeatOverlay"
-import { DiceStrip } from "@/components/DiceStrip"
+import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { ThemeProvider } from "@/theme/context"
 import * as reducedMotion from "@/utils/useReducedMotion"
 
@@ -16,28 +16,43 @@ const players: GamePlayer[] = [
   { id: asPlayerId("p3"), name: "Katherine", color: "#7B5A91", life: 20, seat: 2 },
 ]
 
+// why: every table starts with dice closed, so each tool press here also proves a tool works from closed.
 function Table({ gameId = "game-1" }: { gameId?: string }) {
   const dice = useDice(players, gameId)
-  if (!dice.open) dice.show()
-  if (!dice.strip || !dice.grid) return null
   const { grid } = dice
   return (
     <>
-      <DiceStrip {...dice.strip} />
-      {players.map((player, index) => {
-        const view = grid.seatFor(player)
-        return view || grid.armed ? (
-          <DiceSeatOverlay
-            key={player.id}
-            seatNumber={index + 1}
-            playerName={player.name}
-            color={player.color}
-            foreground="#FFFFFF"
-            contentRotation={0}
-            dice={{ view, armed: grid.armed ?? undefined, onPress: () => grid.onPressSeat(player) }}
-          />
-        ) : null
-      })}
+      <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
+      {dice.tools.map((tool) => (
+        <Pressable
+          key={tool.key}
+          testID={`dice-${tool.key}`}
+          accessibilityLabel={tool.accessibilityLabel}
+          accessibilityState={tool.selected === undefined ? undefined : { selected: tool.selected }}
+          onPress={tool.onPress}
+        />
+      ))}
+      <Pressable testID="dice-close" accessibilityLabel="Close dice" onPress={dice.close} />
+      {grid
+        ? players.map((player, index) => {
+            const view = grid.seatFor(player)
+            return view || grid.armed ? (
+              <DiceSeatOverlay
+                key={player.id}
+                seatNumber={index + 1}
+                playerName={player.name}
+                color={player.color}
+                foreground="#FFFFFF"
+                contentRotation={0}
+                dice={{
+                  view,
+                  armed: grid.armed ?? undefined,
+                  onPress: () => grid.onPressSeat(player),
+                }}
+              />
+            ) : null
+          })
+        : null}
     </>
   )
 }
@@ -137,7 +152,6 @@ describe("useDice", () => {
     view.changeGame("game-2")
     act(() => jest.runAllTimers())
 
-    expect(view.getByTestId("dice-strip")).toBeTruthy()
     expect(view.queryByText("Goes first")).toBeNull()
     expect(announce).not.toHaveBeenCalled()
   })
@@ -159,7 +173,7 @@ describe("useDice", () => {
     expect(announce).not.toHaveBeenCalled()
   })
 
-  it("does not read a cleared result into a reopened strip on web", () => {
+  it("does not read a cleared result after dice close on web", () => {
     jest.replaceProperty(Platform, "OS", "web")
     jest.useFakeTimers()
     jest.spyOn(Math, "random").mockReturnValue(0.5)
@@ -170,7 +184,6 @@ describe("useDice", () => {
     fireEvent.press(view.getByTestId("dice-close"))
     act(() => jest.runOnlyPendingTimers())
 
-    expect(view.getByTestId("dice-strip")).toBeTruthy()
     expect(view.getByTestId("dice-announcer", { includeHiddenElements: true })).toHaveTextContent(
       "",
     )
