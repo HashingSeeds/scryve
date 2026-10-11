@@ -107,6 +107,7 @@ jest.mock("expo-keep-awake", () => ({
 }))
 
 jest.mock("expo-network", () => ({
+  NetworkStateType: jest.requireActual("expo-network/build/Network.types").NetworkStateType,
   addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
   useNetworkState: jest.fn(() => ({})),
 }))
