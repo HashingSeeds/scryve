@@ -558,6 +558,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       return `A ${event.delta > 0 ? "+" : ""}${event.delta} ${counter.label} change could not sync`
     if (event.type === "commanderDamage.submitted")
       return `A ${event.delta > 0 ? "+" : ""}${event.delta} commander damage assignment could not sync`
+    if (event.type === "table.action") return "A table change could not sync"
     return `${event.accepted ? "Confirming" : "Declining"} commander damage could not sync`
   }
   const displayNameOf = (playerId: string) =>

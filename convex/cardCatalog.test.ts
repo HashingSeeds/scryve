@@ -1,6 +1,8 @@
 import { convexTest } from "convex-test"
 
 import { internal } from "./_generated/api"
+import { normalizePokemonCards } from "./lib/games/pokemon"
+import { pokemonCardFromCatalog } from "./lib/table"
 import schema from "./schema"
 
 const modules = {
@@ -61,6 +63,37 @@ describe("normalized card catalog", () => {
     await expect(
       t.run(async (ctx) => await ctx.db.query("cardPrintings").collect()),
     ).resolves.toHaveLength(100)
+  })
+
+  it("keeps a full TCGdex card's HP when a brief search result for it is cached", async () => {
+    const t = convexTest(schema, modules)
+    const [full] = normalizePokemonCards({
+      id: "sv03.5-006",
+      localId: "006",
+      name: "Charizard ex",
+      category: "Pokemon",
+      hp: 330,
+      stage: "Stage2",
+    })
+    const [brief] = normalizePokemonCards({
+      id: "sv03.5-006",
+      localId: "006",
+      name: "Charizard ex",
+    })
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: [full] })
+    await t.mutation(internal.cardCatalog.cacheMany, { cards: [brief] })
+
+    const cached = await t.query(internal.cardCatalog.lookupCached, {
+      game: "pokemon",
+      cardId: "sv03.5-006",
+    })
+    expect(cached).toMatchObject({ category: "Pokemon" })
+    expect(cached && pokemonCardFromCatalog(cached)).toEqual({
+      cardId: "sv03.5-006",
+      name: "Charizard ex",
+      hp: 330,
+      prizes: 2,
+    })
   })
 
   it("rejects cards without a printing", async () => {

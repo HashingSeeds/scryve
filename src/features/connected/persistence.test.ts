@@ -137,6 +137,26 @@ describe("connected MMKV repository", () => {
     ])
   })
 
+  it("recovers a queued table action after process death", () => {
+    const storage = new MemoryStorage()
+    const tableAction: PendingLifeAction = {
+      schemaVersion: 1,
+      event: {
+        type: "table.action",
+        operationId: asOperationId("operation-table-01"),
+        gameId: asGameId("game-public"),
+        action: { kind: "designation.taken", playerId: "player-1", designationId: "monarch" },
+        actorId: asActorId("user-1"),
+        deviceId: asDeviceId("device-1"),
+        clientCreatedAt: 1,
+      },
+      queuedAt: 1,
+      attempts: 0,
+    }
+    new ConnectedGameRepository(storage).enqueue(tableAction)
+    expect(new ConnectedGameRepository(storage).loadOutbox("game-public")).toEqual([tableAction])
+  })
+
   it("keeps client-created time as the tie-breaker for equal queue times", () => {
     const storage = new MemoryStorage()
     const repository = new ConnectedGameRepository(storage)
@@ -591,6 +611,7 @@ describe("connected MMKV repository", () => {
     })
     const mutations = {
       changeLife: jest.fn(acknowledge),
+      tableAction: jest.fn(acknowledge),
       submitCommanderDamage: jest.fn(acknowledge),
       confirmCommanderDamage: jest.fn(acknowledge),
       declineCommanderDamage: jest.fn(acknowledge),

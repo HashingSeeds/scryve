@@ -58,6 +58,30 @@ export type IntegrationDefinition = {
   }
 }
 
+/** why: an in-game counter beside the main one, like poison or commander tax, that each player tracks. */
+export type TableCounterDefinition = {
+  readonly id: string
+  readonly label: string
+  readonly step: number
+  readonly max: number
+  /** why: reaching this count loses the game (10 poison, Comprehensive Rules 104.3d). */
+  readonly losesAt?: number
+  /** why: commander tax only exists where a command zone does. */
+  readonly commandZoneOnly?: boolean
+}
+
+/** why: a designation is held by at most one player; taking it moves it from whoever had it. */
+export type DesignationDefinition = { readonly id: string; readonly label: string }
+
+export type PokemonBoardDefinition = { readonly benchSize: number; readonly damageStep: number }
+
+export type TableDefinition = {
+  readonly counters: readonly TableCounterDefinition[]
+  readonly designations: readonly DesignationDefinition[]
+  /** why: Pokémon tracks HP and damage per Pokémon in play, and a knockout moves the opponent's prize counter. */
+  readonly pokemon?: PokemonBoardDefinition
+}
+
 export type SystemDefinition = {
   readonly label: string
   readonly shortLabel: string
@@ -66,6 +90,7 @@ export type SystemDefinition = {
   readonly defaultFormat: { readonly deck: string; readonly play: string }
   readonly counter: CounterDefinition
   readonly formats: readonly FormatDefinition[]
+  readonly table: TableDefinition
   readonly integration: IntegrationDefinition
 }
 
@@ -185,6 +210,16 @@ export const SYSTEMS = {
         sections: MTG_CONSTRUCTED_SECTIONS,
       },
     ],
+    table: {
+      counters: [
+        { id: "poison", label: "Poison", step: 1, max: 99, losesAt: 10 },
+        { id: "commanderTax", label: "Commander tax", step: 2, max: 98, commandZoneOnly: true },
+      ],
+      designations: [
+        { id: "monarch", label: "Monarch" },
+        { id: "initiative", label: "Initiative" },
+      ],
+    },
     integration: {
       identityNamespace: "scryfall-oracle",
       capabilities: {
@@ -229,6 +264,7 @@ export const SYSTEMS = {
       { id: "traditional", label: "Traditional", sections: YUGIOH_SECTIONS },
       { id: "rush", label: "Rush Duel", sections: YUGIOH_SECTIONS },
     ],
+    table: { counters: [], designations: [] },
     integration: {
       identityNamespace: "ygoprodeck-card",
       capabilities: {
@@ -274,6 +310,7 @@ export const SYSTEMS = {
       { id: "expanded", label: "Expanded", sections: POKEMON_SECTIONS },
       { id: "unlimited", label: "Unlimited", sections: POKEMON_SECTIONS },
     ],
+    table: { counters: [], designations: [], pokemon: { benchSize: 5, damageStep: 10 } },
     integration: {
       identityNamespace: "tcgdex-card",
       capabilities: {

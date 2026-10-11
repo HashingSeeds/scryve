@@ -43,6 +43,7 @@ import type {
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
+import { parseTableState } from "../../../convex/lib/table"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -319,6 +320,8 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   if (!players || events.some((event) => event.gameId !== value.id)) return null
   const result = parseResult(value.result)
   const commanderDamage = parseCommanderDamage(value.commanderDamage)
+  // why: a table that fails to parse is dropped rather than losing the whole game.
+  const table = parseTableState(value.table)
   const account = parseAccount(value.account)
   const match = parseMatch(value.match, players.length)
   return {
@@ -336,6 +339,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     players,
     events,
     ...(commanderDamage ? { commanderDamage } : {}),
+    ...(table ? { table } : {}),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     ...(typeof value.finishedAt === "number" ? { finishedAt: value.finishedAt } : {}),

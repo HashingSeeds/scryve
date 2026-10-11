@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
 import { syncedDeckValidator, syncedVersionValidator } from "./lib/deckSync"
+import { pokemonBoardValidator } from "./lib/table"
 
 const genericDeckCardFields = {
   game: v.optional(v.string()),
@@ -137,6 +138,8 @@ export default defineSchema({
     // Reserved for a future event stream without enabling connected mutations in Phase 2.
     // Legacy event-count base. New life writes never patch this shared row.
     eventSequence: v.optional(v.number()),
+    // why: Monarch and Initiative belong to at most one seat; keyed by designation id. Rare writes, so they live on the game row.
+    designations: v.optional(v.record(v.string(), v.id("gamePlayers"))),
   })
     .index("by_public_id", ["publicId"])
     .index("by_host_status", ["hostUserId", "status"])
@@ -161,6 +164,9 @@ export default defineSchema({
     // Optional during the Phase 2→3 staged migration; migrateMyGameMemberships backfills it.
     resumable: v.optional(v.boolean()),
     joinedAt: v.number(),
+    // why: per-seat table state beside life. Bounded by the system registry: a few counters, one Active, and a five-Pokémon bench.
+    counters: v.optional(v.record(v.string(), v.number())),
+    pokemon: v.optional(pokemonBoardValidator),
   })
     .index("by_game", ["gameId"])
     .index("by_game_seat", ["gameId", "seat"])
@@ -219,6 +225,8 @@ export default defineSchema({
     clientCreatedAt: v.number(),
     serverCreatedAt: v.number(),
     undoOfOperationId: v.optional(v.string()),
+    // why: table actions keep the canonical action they were sent with, so a replayed operation id must carry the same action.
+    actionIdentity: v.optional(v.string()),
     // Legacy global ordering only. New events use serverCreatedAt + document ID.
     sequence: v.optional(v.number()),
   })

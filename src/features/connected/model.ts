@@ -8,6 +8,8 @@ import type {
   PlayerId,
 } from "@/features/game/types"
 
+import { parseTableState, type TableAction, type TableState } from "../../../convex/lib/table"
+
 export type ConnectedGameStatus = "lobby" | "active" | "finished" | "abandoned"
 export const CONNECTED_RECENT_OPERATION_LIMIT = 100
 
@@ -80,6 +82,17 @@ export interface CommanderDamageResolvedEvent {
   clientCreatedAt: number
 }
 
+/** why: counters, designations, and Pokémon changes share one outbox event that carries the shared table action. */
+export interface TableActionEvent {
+  type: "table.action"
+  operationId: OperationId
+  gameId: GameId
+  action: TableAction
+  actorId: ActorId
+  deviceId: DeviceId
+  clientCreatedAt: number
+}
+
 export interface ConnectedProjection {
   schemaVersion: 1
   publicId: string
@@ -98,6 +111,8 @@ export interface ConnectedProjection {
   recentOperationIds: string[]
   /** Optional so projections from before commander damage remain readable. */
   commanderDamage?: ConnectedCommanderDamageProjection
+  /** why: only sent for systems with table features; optional so projections from older servers stay readable. */
+  table?: TableState
   /** Only the host sees this, and only while the invite is still usable. */
   invitation?: { token: string; manualCode: string; expiresAt: number }
   players: ConnectedPlayerProjection[]
@@ -113,7 +128,7 @@ export type ConnectedOperationStatus =
   | { status: "conflict"; operationId: string; reason: string }
 
 export type ConnectedActionEvent =
-  LifeChangedEvent | CommanderDamageSubmittedEvent | CommanderDamageResolvedEvent
+  LifeChangedEvent | CommanderDamageSubmittedEvent | CommanderDamageResolvedEvent | TableActionEvent
 
 export interface PendingConnectedAction {
   schemaVersion: 1
@@ -135,6 +150,8 @@ export type FailedLifeAction = FailedConnectedAction
 
 export interface ConnectedDisplayProjection extends ConnectedProjection {
   players: Array<ConnectedPlayerProjection & { pendingDelta: number }>
+  /** why: the confirmed table with queued table actions applied, empty when the system has none. */
+  table: TableState
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -273,6 +290,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       eliminatedPlayerIds: commanderDamageValue.eliminatedPlayerIds,
     }
   }
+  const table = parseTableState(value.table)
   const system = value.system === NO_PLAY_SYSTEM ? undefined : playSystemId(value.system)
   return {
     schemaVersion: 1,
@@ -301,6 +319,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
       .filter((operationId: unknown): operationId is string => typeof operationId === "string")
       .slice(0, CONNECTED_RECENT_OPERATION_LIMIT),
     ...(commanderDamage ? { commanderDamage } : {}),
+    ...(table ? { table } : {}),
     ...(invitation ? { invitation } : {}),
     players,
   }
