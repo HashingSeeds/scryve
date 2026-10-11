@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react"
 import { Platform } from "react-native"
+import { useNetworkState } from "expo-network"
 import { useConvexConnectionState } from "convex/react"
 
 const isBrowser = Platform.OS === "web" && typeof window !== "undefined"
@@ -23,5 +24,9 @@ export function useConvexOnline() {
     browserReportsNetwork,
     () => true,
   )
-  return isWebSocketConnected && networkReachable
+  // why: a native socket can still read as connected after the network drops, so the device's own signal shows offline at once.
+  const { isConnected } = useNetworkState()
+  return (
+    isWebSocketConnected && networkReachable && (Platform.OS === "web" || isConnected !== false)
+  )
 }

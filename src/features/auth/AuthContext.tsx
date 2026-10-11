@@ -1,4 +1,12 @@
-import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from "react"
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 import { ClerkProvider, useAuth, useUser } from "@clerk/expo"
 import { tokenCache } from "@clerk/expo/token-cache"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
@@ -7,6 +15,7 @@ import { APP_ROOT_URL, readPublicCloudConfig } from "@/features/auth/config"
 import { readRevenueCatConfig } from "@/features/billing/config"
 import { RevenueCatProvider } from "@/features/billing/RevenueCatContext"
 import { RevenueCatSyncSession } from "@/features/billing/RevenueCatSyncSession"
+import { reconnectConvexOnNetworkReturn } from "@/features/connected/convexReconnect"
 import { DeckSyncSession } from "@/features/decks/DeckSyncSession"
 import { LocalGamePublishSession } from "@/features/game/LocalGamePublishSession"
 
@@ -86,6 +95,7 @@ export function ConfiguredAuth({
     () => new ConvexReactClient(convexUrl, { initialAuthTokenReuse: true }),
     [convexUrl],
   )
+  useEffect(() => reconnectConvexOnNetworkReturn(client), [client])
   const convexUseAuth = useMemo(
     () => createConvexAuthHook(useAuth, convexAuthRetryKey),
     [convexAuthRetryKey],
