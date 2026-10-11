@@ -7,7 +7,6 @@ import { useConvexOnline } from "./useConvexOnline"
 jest.mock("convex/react", () => ({
   useConvexConnectionState: () => ({ isWebSocketConnected: true }),
 }))
-jest.mock("expo-network", () => ({ useNetworkState: jest.fn() }))
 
 describe("useConvexOnline", () => {
   it("goes offline on native when the device loses its network, before the socket notices", () => {

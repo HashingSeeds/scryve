@@ -3,10 +3,6 @@ import { ConvexReactClient } from "convex/react"
 
 import { reconnectConvexOnNetworkReturn } from "./convexReconnect"
 
-jest.mock("expo-network", () => ({
-  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
-}))
-
 const sockets: FakeSocket[] = []
 
 class FakeSocket {
