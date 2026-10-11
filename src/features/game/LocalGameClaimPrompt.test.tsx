@@ -101,9 +101,8 @@ describe("LocalGameClaimPrompt", () => {
     expect(screen.getByText("Add 2 games")).toBeTruthy()
     fireEvent.press(screen.getByTestId(`claim-game-${older.id}`))
     expect(screen.getByText("Add 1 game")).toBeTruthy()
-    expect(screen.queryByTestId(`claim-me-seat-${older.id}`)).toBeNull()
-    fireEvent.press(screen.getByTestId(`claim-me-seat-${newer.id}`))
-    fireEvent.press(screen.getByTestId(`claim-me-seat-${newer.id}-option-1`))
+    expect(screen.queryByTestId(`claim-me-${older.id}-seat-0`)).toBeNull()
+    fireEvent.press(screen.getByTestId(`claim-me-${newer.id}-seat-1`))
     fireEvent.press(screen.getByTestId("claim-games-confirm"))
 
     expect(screen.queryByTestId("claim-games-dialog")).toBeNull()
@@ -115,6 +114,33 @@ describe("LocalGameClaimPrompt", () => {
       }),
       expect.objectContaining({ id: older.id, skippedBy: ["owner-a"] }),
     ])
+  })
+
+  it("sets one seat for every game, which each game can override or clear", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveMeSeat(1)
+    const pair = finishedGame(1)
+    const trio = finishedGame(10, ["Ada", "Grace", "Katherine"])
+    const quad = finishedGame(20, ["Ada", "Grace", "Katherine", "Dorothy"])
+    repository.archiveGame(pair)
+    repository.archiveGame(trio)
+    repository.archiveGame(quad)
+    setup(repository)
+
+    const chosen = (id: string, seat: number) =>
+      screen.getByTestId(`claim-me-${id}-seat-${seat}`).props.accessibilityState.selected
+    expect(chosen(trio.id, 1)).toBe(false)
+    fireEvent.press(screen.getByTestId("claim-me-all-seat-2"))
+    expect(chosen(trio.id, 2)).toBe(true)
+    expect(chosen(quad.id, 2)).toBe(true)
+    fireEvent.press(screen.getByTestId(`claim-me-${quad.id}-seat-0`))
+    fireEvent.press(screen.getByTestId(`claim-me-${trio.id}-seat-2`))
+    fireEvent.press(screen.getByTestId("claim-games-confirm"))
+
+    const account = (id: string) => repository.loadHistory().find((game) => game.id === id)?.account
+    expect(account(quad.id)).toEqual({ ownerId: "owner-a", mePlayerId: quad.players[0].id })
+    expect(account(trio.id)).toEqual({ ownerId: "owner-a" })
+    expect(account(pair.id)).toEqual({ ownerId: "owner-a" })
   })
 
   it("waits for a game in progress to end or the route to change", () => {
@@ -212,8 +238,7 @@ describe("LocalGameClaimPrompt", () => {
     expect(screen.getByTestId(`claim-game-${matchId}`)).toHaveAccessibleName(
       /Best of 3 · 0-2 · Won by Grace/,
     )
-    fireEvent.press(screen.getByTestId(`claim-me-seat-${matchId}`))
-    fireEvent.press(screen.getByTestId(`claim-me-seat-${matchId}-option-1`))
+    fireEvent.press(screen.getByTestId(`claim-me-${matchId}-seat-1`))
     fireEvent.press(screen.getByTestId("claim-games-confirm"))
 
     const history = repository.loadHistory()
