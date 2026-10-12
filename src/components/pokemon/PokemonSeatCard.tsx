@@ -1,6 +1,13 @@
 import { memo, useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
 import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native"
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated"
 
 import type { TableKnockout, TableRuntime } from "@/features/game/tableRuntime"
 import type { LifeDelta } from "@/features/game/types"
@@ -9,6 +16,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useElapsedSince } from "@/utils/useElapsedSince"
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
   benchMenuClearance,
@@ -70,13 +78,19 @@ export interface PokemonSeatCardProps {
 }
 
 const KNOCKOUT_TOAST_MS = 6_000
+// why: a focused bench Pokémon holds the hero long enough for a few taps, then the Active comes back on its own so the seat never stays on the wrong Pokémon.
+const FOCUS_MS = 3_000
 const STANDARD_PRIZES = 6
 const BENCH_HEIGHT = 56
 const COMPACT_BENCH_HEIGHT = 44
-const BOTTOM_ROW_HEIGHT = 44
-const COMPACT_BOTTOM_ROW_HEIGHT = 36
-const HERO_CAPTION_HEIGHT = 40
-const COMPACT_HERO_CAPTION_HEIGHT = 20
+const PRIZE_ROW_HEIGHT = 60
+const COMPACT_PRIZE_ROW_HEIGHT = 40
+const PRIZE_COUNT_SIZE = 46
+const COMPACT_PRIZE_COUNT_SIZE = 28
+const PRIZE_PIP = { width: 13, height: 17, gap: 3 }
+const COMPACT_PRIZE_PIP = { width: 9, height: 12, gap: 2 }
+const HERO_CAPTION_HEIGHT = 44
+const COMPACT_HERO_CAPTION_HEIGHT = 24
 const CRAMPED_CONTENT_HEIGHT = 260
 const LONG_PRESS_MS = 450
 const BAR_ON_DARK = "rgba(0,0,0,0.62)"
@@ -87,6 +101,8 @@ const EDIT_ACTIVE_TRIGGER = "edit-active"
 const PLACE_ACTIVE_TRIGGER = "place-active"
 const ADD_TRIGGER = "add"
 type TakerAsk = { pokemonId: string; delta?: number }
+// why: a new tick per tap restarts the focus timer and the drain bar, even when the same Pokémon is tapped again.
+type Focus = { pokemonId: string; tick: number }
 
 export const PokemonSeatCard = memo(function PokemonSeatCard({
   playerId,
@@ -137,10 +153,11 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const chipClearance = diceChips?.length
     ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
     : 0
-  const bottomRowHeight = cramped ? COMPACT_BOTTOM_ROW_HEIGHT : BOTTOM_ROW_HEIGHT
+  const prizeRowHeight = cramped ? COMPACT_PRIZE_ROW_HEIGHT : PRIZE_ROW_HEIGHT
   const markSize = cramped ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
   const [sheet, setSheet] = useState<Sheet | null>(null)
-  const [switchAsk, setSwitchAsk] = useState<string | null>(null)
+  const [focus, setFocus] = useState<Focus | null>(null)
+  const focusTick = useRef(0)
   const [takerAsk, setTakerAsk] = useState<TakerAsk | null>(null)
   const [knockout, setKnockout] = useState<TableKnockout | null>(null)
   const [pendingUndo, setPendingUndo] = useState<TableKnockout | null>(null)
@@ -164,7 +181,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       : editing
         ? { kind: "edit", pokemon: editing.pokemon, slot: editing.slot }
         : null
-  const switching = switchAsk ? board.bench.find(({ id }) => id === switchAsk) : undefined
+  const focused = focus ? board.bench.find(({ id }) => id === focus.pokemonId) : undefined
+  const shown = focused ?? board.active
   const asking = takerAsk ? findPokemon(board, takerAsk.pokemonId)?.pokemon : undefined
   const controlsLive = canEdit && !sheetMode
 
@@ -172,11 +190,17 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     if (!canEdit) {
       returnFocusTo.current = null
       setSheet(null)
-      setSwitchAsk(null)
+      setFocus(null)
       setTakerAsk(null)
       setKnockout(null)
     }
   }, [canEdit])
+
+  useEffect(() => {
+    if (!focus) return
+    const timer = setTimeout(() => setFocus(null), FOCUS_MS)
+    return () => clearTimeout(timer)
+  }, [focus])
 
   const sheetOpen = sheetMode !== null
   useEffect(() => {
@@ -280,9 +304,23 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     else damage(takerAsk.pokemonId, takerAsk.delta, takerPlayerId)
   }
 
+  function touchFocus(pokemonId: string) {
+    setFocus({ pokemonId, tick: ++focusTick.current })
+  }
+
   function pressBench(pokemon: PokemonInPlay) {
     if (!canEdit) return
-    setSwitchAsk(pokemon.id)
+    if (!board.active) {
+      table.switchActive(playerId, pokemon.id)
+      return
+    }
+    if (focused?.id === pokemon.id) setFocus(null)
+    else touchFocus(pokemon.id)
+  }
+
+  function switchIn(pokemonId: string) {
+    table.switchActive(playerId, pokemonId)
+    setFocus(null)
   }
 
   const ownershipLabel =
@@ -293,7 +331,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         : ownership === "disabled"
           ? "Controls unavailable"
           : undefined
-  const heroDigits = board.active ? String(remainingHp(board.active)).length : 1
+  const heroDigits = shown ? String(remainingHp(shown)).length : 1
   const fontSize = heroFontSize({
     width: layer.width - padding * 2 - insets.left - insets.right,
     height:
@@ -304,18 +342,20 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       clearance.top -
       chipClearance -
       benchHeight -
-      bottomRowHeight -
+      prizeRowHeight -
       (cramped ? COMPACT_HERO_CAPTION_HEIGHT : HERO_CAPTION_HEIGHT),
     digits: heroDigits,
     fontScale: 1,
   })
   const prizePips = Math.max(STANDARD_PRIZES, prizes)
+  const pip = cramped ? COMPACT_PRIZE_PIP : PRIZE_PIP
+  const prizeCountSize = cramped ? COMPACT_PRIZE_COUNT_SIZE : PRIZE_COUNT_SIZE
   const tint = (alpha: number) => overlayTint(ink, alpha)
   const bar = [
     themed($bar),
     {
       backgroundColor: ink === "#FFFFFF" ? BAR_ON_DARK : BAR_ON_LIGHT,
-      bottom: padding + insets.bottom + bottomRowHeight,
+      bottom: padding + insets.bottom + prizeRowHeight,
     },
   ]
   const barInk = ink
@@ -382,55 +422,85 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             { height: benchHeight, marginLeft: clearance.left, marginRight: clearance.right },
           ]}
         >
-          {board.bench.map((pokemon) => (
-            <BenchChip
-              key={pokemon.id}
-              pokemon={pokemon}
-              ink={ink}
-              compact={cramped}
-              interactive={controlsLive}
-              promotes={!board.active}
-              triggerRef={trigger(`bench:${pokemon.id}`)}
-              onPress={() => pressBench(pokemon)}
-              onLongPress={() =>
-                openSheet({ kind: "edit", pokemonId: pokemon.id }, `bench:${pokemon.id}`)
-              }
-            />
-          ))}
-          {controlsLive && board.bench.length < rules.benchSize ? (
-            <BoardPressable
-              ref={trigger(ADD_TRIGGER)}
-              testID={`pokemon-bench-add-seat-${seatNumber}`}
-              accessibilityRole="button"
-              accessibilityLabel={`${identity}, add a bench Pokémon`}
-              onPress={() => openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)}
-              style={({ pressed }) => [
-                themed($chip),
-                themed($addChip),
-                { borderColor: tint(0.3) },
-                pressed && { backgroundColor: tint(0.14) },
-              ]}
-            >
-              <Text text="+" size="lg" weight="medium" style={[{ color: ink }, $dim80]} />
-            </BoardPressable>
-          ) : null}
+          {/* why: every bench spot is drawn, filled or not, so the row reads as a bench and the next free spot is the add target. */}
+          {Array.from({ length: Math.max(rules.benchSize, board.bench.length) }, (_, index) => {
+            const pokemon = board.bench[index]
+            if (pokemon)
+              return (
+                <BenchChip
+                  key={pokemon.id}
+                  pokemon={pokemon}
+                  ink={ink}
+                  compact={cramped}
+                  interactive={controlsLive}
+                  promotes={!board.active}
+                  focused={focused?.id === pokemon.id}
+                  triggerRef={trigger(`bench:${pokemon.id}`)}
+                  onPress={() => pressBench(pokemon)}
+                  onLongPress={() =>
+                    openSheet({ kind: "edit", pokemonId: pokemon.id }, `bench:${pokemon.id}`)
+                  }
+                />
+              )
+            if (index === board.bench.length && controlsLive)
+              return (
+                <BoardPressable
+                  key="add"
+                  ref={trigger(ADD_TRIGGER)}
+                  testID={`pokemon-bench-add-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${identity}, add a bench Pokémon`}
+                  onPress={() => openSheet({ kind: "place", slot: "bench" }, ADD_TRIGGER)}
+                  style={({ pressed }) => [
+                    themed($chip),
+                    $slot,
+                    { borderColor: tint(0.45) },
+                    pressed && { backgroundColor: tint(0.14) },
+                  ]}
+                >
+                  <Text text="+" size="lg" weight="medium" style={[{ color: ink }, $dim80]} />
+                </BoardPressable>
+              )
+            return (
+              <View
+                key={`slot-${index}`}
+                testID={`pokemon-bench-slot-${index}-seat-${seatNumber}`}
+                style={[themed($chip), $slot, { borderColor: tint(0.3) }]}
+              />
+            )
+          })}
         </View>
 
-        {board.active ? (
-          <ActiveHero
-            key={board.active.id}
+        {shown ? (
+          <PokemonHero
+            key={shown.id}
             identity={identity}
             seatNumber={seatNumber}
-            pokemon={board.active}
+            pokemon={shown}
             ink={ink}
             fontSize={fontSize}
             compact={cramped}
             step={rules.damageStep}
             interactive={controlsLive}
             editRef={trigger(EDIT_ACTIVE_TRIGGER)}
-            onDamage={(delta) => damage(board.active!.id, delta)}
+            bench={
+              focused && focus
+                ? {
+                    restartKey: focus.tick,
+                    switchLabel: board.active ? "Switch in" : "Make Active",
+                    onSwitchIn: () => switchIn(focused.id),
+                  }
+                : undefined
+            }
+            onDamage={(delta) => {
+              damage(shown.id, delta)
+              if (focused) touchFocus(focused.id)
+            }}
             onEdit={() =>
-              openSheet({ kind: "edit", pokemonId: board.active!.id }, EDIT_ACTIVE_TRIGGER)
+              openSheet(
+                { kind: "edit", pokemonId: shown.id },
+                focused ? `bench:${focused.id}` : EDIT_ACTIVE_TRIGGER,
+              )
             }
           />
         ) : (
@@ -448,63 +518,76 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             }
             disabled={!controlsLive}
             onPress={() => openSheet({ kind: "place", slot: "active" }, PLACE_ACTIVE_TRIGGER)}
-            style={({ pressed }) => [themed($hero), pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [
+              themed($placeActive),
+              {
+                borderColor: tint(canEdit ? 0.55 : 0.3),
+                marginHorizontal: cramped ? spacing.sm : spacing.xl,
+                marginVertical: cramped ? spacing.xxs : spacing.xs,
+              },
+              pressed && { backgroundColor: tint(0.14) },
+            ]}
           >
             <Text
-              text="No Active"
-              size={compact ? "md" : "lg"}
+              text={canEdit ? "Place Active" : "No Active"}
+              size={cramped ? "md" : "lg"}
               weight="medium"
-              style={[{ color: ink }, $dim80]}
+              style={{ color: ink }}
             />
-            {canEdit ? (
-              <Text
-                text={board.bench.length ? "Tap a bench Pokémon or + to place" : "Tap to place"}
-                size="xxs"
-                style={[{ color: ink }, $dim70]}
-              />
+            {canEdit && board.bench.length ? (
+              <Text text="or tap a bench Pokémon" size="xxs" style={[{ color: ink }, $dim70]} />
             ) : null}
           </BoardPressable>
         )}
 
-        <View style={[themed($bottomRow), { height: bottomRowHeight }]}>
-          <View style={themed($prizeGroup)}>
-            <BoardPressable
-              testID={`pokemon-prizes-seat-${seatNumber}`}
-              accessibilityRole={controlsLive ? "button" : undefined}
-              accessibilityLabel={`${identity}, ${prizes} Prize ${prizes === 1 ? "card" : "cards"}`}
-              accessibilityHint={
-                controlsLive ? "Tap to take a prize. Long press to put one back." : undefined
-              }
-              disabled={!controlsLive}
-              delayLongPress={LONG_PRESS_MS}
-              onPress={() => onChangePrizes(-1)}
-              onLongPress={() => onChangePrizes(1)}
-              style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
+        {/* why: prizes are the score, so the count is big enough to read across the table and the pips sit two by three like the cards do. */}
+        <View style={[themed($bottomRow), { height: prizeRowHeight }]}>
+          <BoardPressable
+            testID={`pokemon-prizes-seat-${seatNumber}`}
+            accessibilityRole={controlsLive ? "button" : undefined}
+            accessibilityLabel={`${identity}, ${prizes} Prize ${prizes === 1 ? "card" : "cards"}`}
+            accessibilityHint={
+              controlsLive ? "Tap to take a prize. Long press to put one back." : undefined
+            }
+            disabled={!controlsLive}
+            delayLongPress={LONG_PRESS_MS}
+            onPress={() => onChangePrizes(-1)}
+            onLongPress={() => onChangePrizes(1)}
+            style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
+          >
+            <Text
+              testID={`pokemon-prize-count-seat-${seatNumber}`}
+              text={String(prizes)}
+              weight="bold"
+              maxFontSizeMultiplier={1.2}
+              style={[
+                $prizeCount,
+                { fontSize: prizeCountSize, lineHeight: prizeCountSize, color: ink },
+              ]}
+            />
+            <View
+              style={[$prizeGrid, { width: pip.width * 2 + pip.gap, gap: pip.gap }]}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
             >
-              <View style={themed($pipRow)}>
-                <Text
-                  testID={`pokemon-prize-count-seat-${seatNumber}`}
-                  text={String(prizes)}
-                  weight="bold"
-                  size="xs"
-                  style={{ color: ink }}
-                />
+              {Array.from({ length: prizePips }, (_, index) => (
                 <View
-                  style={themed($pips)}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no-hide-descendants"
-                >
-                  {Array.from({ length: prizePips }, (_, index) => (
-                    <View
-                      key={index}
-                      style={[themed($pip), { backgroundColor: ink }, index >= prizes && $pipGone]}
-                    />
-                  ))}
-                </View>
-              </View>
+                  key={index}
+                  testID={`pokemon-prize-pip-${index}-seat-${seatNumber}`}
+                  style={[
+                    $prizePip,
+                    { width: pip.width, height: pip.height },
+                    index < prizes
+                      ? { backgroundColor: ink }
+                      : [$prizePipGone, { borderColor: tint(0.45) }],
+                  ]}
+                />
+              ))}
+            </View>
+            <View style={$prizeMeta}>
               <Text
                 testID={`player-name-seat-${seatNumber}`}
-                text={`${displayName} · prizes`}
+                text={displayName}
                 size="xxs"
                 numberOfLines={1}
                 style={[{ color: ink }, $dim75]}
@@ -518,99 +601,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                   style={{ color: ink }}
                 />
               ) : null}
-            </BoardPressable>
-            {controlsLive ? (
-              <BoardPressable
-                testID={`pokemon-prize-back-seat-${seatNumber}`}
-                accessibilityRole="button"
-                accessibilityLabel={`${identity}, put a prize back`}
-                hitSlop={6}
-                onPress={() => onChangePrizes(1)}
-                style={({ pressed }) => [themed($inlineAction), pressed && $pressed]}
-              >
-                <Text text="+1" size="xxs" weight="medium" style={[{ color: ink }, $dim70]} />
-              </BoardPressable>
-            ) : null}
-          </View>
-        </View>
-
-        {switching ? (
-          <View
-            testID={`pokemon-switch-ask-seat-${seatNumber}`}
-            accessibilityLiveRegion="polite"
-            style={bar}
-          >
-            <Text size="xs" style={{ color: barInk }}>
-              {board.active ? (
-                <>
-                  Retreat{" "}
-                  <Text
-                    weight="bold"
-                    size="xs"
-                    style={{ color: barInk }}
-                    text={pokemonName(board.active)}
-                  />
-                  .{" "}
-                </>
-              ) : null}
-              <Text
-                weight="bold"
-                size="xs"
-                style={{ color: barInk }}
-                text={pokemonName(switching)}
-              />{" "}
-              becomes Active.
-            </Text>
-            <View style={themed($barActions)}>
-              <BoardPressable
-                testID={`pokemon-switch-confirm-seat-${seatNumber}`}
-                accessibilityRole="button"
-                accessibilityLabel={`${board.active ? "Switch" : "Make Active"}, ${pokemonName(switching)} becomes Active`}
-                onPress={() => {
-                  table.switchActive(playerId, switching.id)
-                  setSwitchAsk(null)
-                }}
-                style={[themed($barButton), { backgroundColor: barInk }]}
-              >
-                <Text
-                  text={board.active ? "Switch" : "Make Active"}
-                  size="xs"
-                  weight="bold"
-                  style={{ color: onBarInk }}
-                />
-              </BoardPressable>
-              <BoardPressable
-                testID={`pokemon-switch-edit-seat-${seatNumber}`}
-                accessibilityRole="button"
-                accessibilityLabel={`Edit ${pokemonName(switching)}`}
-                onPress={() => {
-                  setSwitchAsk(null)
-                  openSheet({ kind: "edit", pokemonId: switching.id }, `bench:${switching.id}`)
-                }}
-                style={[
-                  themed($barButton),
-                  themed($ghostButton),
-                  { borderColor: overlayTint(barInk, 0.4) },
-                ]}
-              >
-                <Text text="Edit" size="xs" style={{ color: barInk }} />
-              </BoardPressable>
-              <BoardPressable
-                testID={`pokemon-switch-cancel-seat-${seatNumber}`}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel switch"
-                onPress={() => setSwitchAsk(null)}
-                style={[
-                  themed($barButton),
-                  themed($ghostButton),
-                  { borderColor: overlayTint(barInk, 0.4) },
-                ]}
-              >
-                <Text text="Cancel" size="xs" style={{ color: barInk }} />
-              </BoardPressable>
             </View>
-          </View>
-        ) : null}
+          </BoardPressable>
+        </View>
 
         {asking ? (
           <View
@@ -757,7 +750,14 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   )
 }, structurallyEqual)
 
-function ActiveHero({
+type BenchFocus = {
+  restartKey: number
+  switchLabel: string
+  onSwitchIn: () => void
+}
+
+/** why: one hero serves the Active and a focused bench Pokémon, so damage works the same way on both; the bench variant adds the switch action and a bar that drains until the Active returns. */
+function PokemonHero({
   identity,
   seatNumber,
   pokemon,
@@ -767,6 +767,7 @@ function ActiveHero({
   step,
   interactive,
   editRef,
+  bench,
   onDamage,
   onEdit,
 }: {
@@ -779,12 +780,15 @@ function ActiveHero({
   step: number
   interactive: boolean
   editRef: (node: View | null) => void
+  bench?: BenchFocus
   onDamage: (delta: number) => void
   onEdit: () => void
 }) {
   const { themed } = useAppTheme()
   const remaining = remainingHp(pokemon)
   const name = pokemonName(pokemon)
+  const slotLabel = bench ? `Bench, ${name}` : name
+  const onInk = accessibleForeground(ink)
   const recentDelta = useRecentDeltaValue(pokemon.damage)
   const longPressHandled = useRef<number | null>(null)
   const previous = useRef(remaining)
@@ -813,7 +817,7 @@ function ActiveHero({
                 key={delta}
                 testID={`pokemon-damage-seat-${seatNumber}-${delta}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${identity}, ${name}, ${delta > 0 ? `add ${delta} damage` : `heal ${Math.abs(delta)}`}`}
+                accessibilityLabel={`${identity}, ${slotLabel}, ${delta > 0 ? `add ${delta} damage` : `heal ${Math.abs(delta)}`}`}
                 accessibilityHint={`Long press to edit ${name}`}
                 accessibilityActions={[{ name: "longpress", label: `Edit ${name}` }]}
                 delayLongPress={LONG_PRESS_MS}
@@ -856,13 +860,22 @@ function ActiveHero({
           testID={`pokemon-hp-seat-${seatNumber}`}
           text={String(remaining)}
           accessible
-          accessibilityLabel={`${identity}, ${name}, ${remaining} HP left of ${pokemon.hp}, ${pokemon.damage} damage`}
+          accessibilityLabel={`${identity}, ${slotLabel}, ${remaining} HP left of ${pokemon.hp}, ${pokemon.damage} damage`}
           accessibilityLiveRegion="polite"
           maxFontSizeMultiplier={1.3}
           numberOfLines={1}
           style={[themed($hp), { fontSize, lineHeight: getLifeLineHeight(fontSize), color: ink }]}
         />
         <View style={themed($captionRow)} pointerEvents="box-none">
+          {bench ? (
+            <Text
+              testID={`pokemon-hero-bench-tag-seat-${seatNumber}`}
+              text="BENCH"
+              size="xxs"
+              weight="medium"
+              style={[$tag, { color: ink }, $dim75]}
+            />
+          ) : null}
           <Text
             testID={`pokemon-active-name-seat-${seatNumber}`}
             text={name}
@@ -894,8 +907,57 @@ function ActiveHero({
               <Text text="Edit" size="xxs" weight="medium" style={[{ color: ink }, $dim75]} />
             </BoardPressable>
           ) : null}
+          {bench && interactive ? (
+            <BoardPressable
+              testID={`pokemon-switch-in-seat-${seatNumber}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${bench.switchLabel}, ${name} becomes Active`}
+              hitSlop={6}
+              onPress={bench.onSwitchIn}
+              style={({ pressed }) => [
+                themed($switchIn),
+                compact && $inlineActionCramped,
+                { backgroundColor: ink },
+                pressed && $pressed,
+              ]}
+            >
+              <Text text={bench.switchLabel} size="xxs" weight="bold" style={{ color: onInk }} />
+            </BoardPressable>
+          ) : null}
         </View>
+        {bench ? (
+          <DrainBar ink={ink} restartKey={bench.restartKey} seatNumber={seatNumber} />
+        ) : null}
       </View>
+    </View>
+  )
+}
+
+function DrainBar({
+  ink,
+  restartKey,
+  seatNumber,
+}: {
+  ink: string
+  restartKey: number
+  seatNumber: number
+}) {
+  const reducedMotion = useReducedMotion()
+  const left = useSharedValue(1)
+  useEffect(() => {
+    cancelAnimation(left)
+    left.value = 1
+    if (reducedMotion === false)
+      left.value = withTiming(0, { duration: FOCUS_MS, easing: Easing.linear })
+    return () => cancelAnimation(left)
+  }, [left, reducedMotion, restartKey])
+  const fill = useAnimatedStyle(() => ({ transform: [{ scaleX: left.value }] }))
+  return (
+    <View
+      testID={`pokemon-focus-drain-seat-${seatNumber}`}
+      style={[$drainTrack, { backgroundColor: overlayTint(ink, 0.2) }]}
+    >
+      <Animated.View style={[$drainFill, { backgroundColor: ink }, fill]} />
     </View>
   )
 }
@@ -913,6 +975,7 @@ function BenchChip({
   compact,
   interactive,
   promotes,
+  focused,
   triggerRef,
   onPress,
   onLongPress,
@@ -922,22 +985,29 @@ function BenchChip({
   compact?: boolean
   interactive: boolean
   promotes: boolean
+  focused: boolean
   triggerRef: (node: View | null) => void
   onPress: () => void
   onLongPress: () => void
 }) {
   const { themed } = useAppTheme()
   const name = pokemonName(pokemon)
+  const remaining = remainingHp(pokemon)
   const longPressHandled = useRef(false)
   return (
     <BoardPressable
       ref={triggerRef}
       testID={`pokemon-bench-${pokemon.id}`}
       accessibilityRole={interactive ? "button" : undefined}
-      accessibilityLabel={`Bench, ${name}, ${remainingHp(pokemon)} of ${pokemon.hp} HP, ${pokemon.damage} damage`}
+      accessibilityLabel={`Bench, ${name}, ${remaining} of ${pokemon.hp} HP, ${pokemon.damage} damage`}
       accessibilityHint={
-        interactive ? `${promotes ? "Tap to make Active" : "Tap to switch in"} or edit.` : undefined
+        interactive
+          ? promotes
+            ? "Tap to make Active, or edit."
+            : "Tap to count damage on it or switch it in, or edit."
+          : undefined
       }
+      accessibilityState={interactive ? { selected: focused } : undefined}
       accessibilityActions={
         interactive ? [{ name: "longpress", label: `Edit ${name}` }] : undefined
       }
@@ -962,26 +1032,33 @@ function BenchChip({
       }}
       style={({ pressed }) => [
         themed($chip),
-        { borderColor: overlayTint(ink, 0.3) },
+        themed($benchChip),
+        { borderColor: overlayTint(ink, focused ? 1 : 0.3) },
+        focused && $focusedChip,
         pressed && { backgroundColor: overlayTint(ink, 0.14) },
       ]}
     >
-      <Text text={name} size="xxs" numberOfLines={1} style={[{ color: ink }, $dim85]} />
+      <Text text={name} size="xxs" numberOfLines={1} style={[$chipName, { color: ink }, $dim85]} />
       <Text
         testID={`pokemon-bench-hp-${pokemon.id}`}
-        text={String(remainingHp(pokemon))}
+        text={String(remaining)}
         weight="bold"
         numberOfLines={1}
         style={[themed(compact ? $compactChipHp : $chipHp), { color: ink }]}
       />
-      {compact ? null : (
-        <Text
-          text={`/${pokemon.hp}`}
-          size="xxs"
-          numberOfLines={1}
-          style={[{ color: ink }, $dim70]}
-        />
-      )}
+      <View style={$chipPips} pointerEvents="none">
+        {Array.from({ length: pokemon.prizes }, (_, index) => (
+          <View key={index} style={[$chipPip, { backgroundColor: ink }]} />
+        ))}
+      </View>
+      {/* why: the bar under the chip shows how much HP is left at a glance, since the number alone does not say how big the Pokémon is. */}
+      <View
+        pointerEvents="none"
+        style={[
+          $chipBar,
+          { backgroundColor: ink, width: `${Math.round((100 * remaining) / pokemon.hp)}%` },
+        ]}
+      />
     </BoardPressable>
   )
 }
@@ -993,11 +1070,36 @@ const $dim70: TextStyle = { opacity: 0.7 }
 const $dim75: TextStyle = { opacity: 0.75 }
 const $dim80: TextStyle = { opacity: 0.8 }
 const $dim85: TextStyle = { opacity: 0.85 }
-const $pipGone: ViewStyle = { opacity: 0.25 }
 const $pressed: ViewStyle = { opacity: 0.6 }
 const $shrink: ViewStyle = { flexShrink: 1 }
+const $tag: TextStyle = { letterSpacing: 0.6 }
 const $inlineActionCramped: ViewStyle = { minHeight: 18 }
 const $liveRegion: TextStyle = { position: "absolute", width: 1, height: 1, opacity: 0 }
+const $slot: ViewStyle = { borderWidth: 1.5, borderStyle: "dashed" }
+const $focusedChip: ViewStyle = { borderWidth: 2 }
+const $chipName: TextStyle = { alignSelf: "stretch" }
+const $chipPips: ViewStyle = {
+  position: "absolute",
+  right: 5,
+  bottom: 6,
+  flexDirection: "row",
+  gap: 2,
+}
+const $chipPip: ViewStyle = { width: 5, height: 7, borderRadius: 1, opacity: 0.8 }
+const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 3, opacity: 0.85 }
+const $prizeCount: TextStyle = { fontVariant: ["tabular-nums"], letterSpacing: -1 }
+const $prizePip: ViewStyle = { borderRadius: 2 }
+const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
+const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
+const $prizeMeta: ViewStyle = { flexShrink: 1, minWidth: 0, justifyContent: "flex-end" }
+const $drainTrack: ViewStyle = {
+  alignSelf: "stretch",
+  height: 2,
+  marginTop: 4,
+  marginHorizontal: 48,
+  overflow: "hidden",
+}
+const $drainFill: ViewStyle = { width: "100%", height: "100%", transformOrigin: "left" }
 
 const $card: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
@@ -1025,8 +1127,14 @@ const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xxs,
   alignItems: "center",
   justifyContent: "center",
+  overflow: "hidden",
 })
-const $addChip: ThemedStyle<ViewStyle> = () => ({ flex: 0, width: 36 })
+const $benchChip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "flex-start",
+  justifyContent: "flex-start",
+  paddingTop: spacing.xxxs,
+  paddingHorizontal: spacing.xxs + 2,
+})
 const $chipHp: ThemedStyle<TextStyle> = () => ({
   fontSize: 22,
   lineHeight: 24,
@@ -1041,6 +1149,16 @@ const $hero: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   alignItems: "center",
   justifyContent: "center",
+  overflow: "hidden",
+})
+const $placeActive: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  borderWidth: 2,
+  borderStyle: "dashed",
+  borderRadius: 16,
+  alignItems: "center",
+  justifyContent: "center",
+  gap: spacing.xxxs,
   overflow: "hidden",
 })
 const $heroReadout: ThemedStyle<ViewStyle> = () => ({ alignItems: "center", maxWidth: "100%" })
@@ -1062,6 +1180,12 @@ const $inlineAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   minHeight: 24,
   justifyContent: "center",
 })
+const $switchIn: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  paddingHorizontal: spacing.xs,
+  minHeight: 24,
+  borderRadius: 7,
+  justifyContent: "center",
+})
 const $hp: ThemedStyle<TextStyle> = () => ({
   textAlign: "center",
   fontVariant: ["tabular-nums"],
@@ -1078,28 +1202,19 @@ const $compactGlyph: ThemedStyle<TextStyle> = () => ({ fontSize: 30, lineHeight:
 const $bottomRow: ThemedStyle<ViewStyle> = () => ({
   flexDirection: "row",
   alignItems: "flex-end",
-  justifyContent: "space-between",
-})
-const $prizeGroup: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "flex-start",
-  gap: spacing.xxs,
+  justifyContent: "flex-start",
 })
 const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  gap: spacing.xxxs,
-  paddingHorizontal: spacing.xs,
-  paddingVertical: spacing.xxs,
-  borderRadius: 10,
-  marginLeft: -spacing.xs,
-  marginBottom: -spacing.xxs,
-})
-const $pipRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
-  gap: spacing.xxs + 2,
+  gap: spacing.xs,
+  paddingHorizontal: spacing.xs,
+  paddingVertical: spacing.xxs,
+  borderRadius: 12,
+  marginLeft: -spacing.xs,
+  marginBottom: -spacing.xxs,
+  maxWidth: "100%",
 })
-const $pips: ThemedStyle<ViewStyle> = () => ({ flexDirection: "row", gap: 3 })
-const $pip: ThemedStyle<ViewStyle> = () => ({ width: 8, height: 12, borderRadius: 2 })
 const $bar: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
   left: spacing.xs,
