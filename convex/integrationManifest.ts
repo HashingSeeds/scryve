@@ -5,9 +5,10 @@ import {
   CAPABILITY_KEYS,
   capabilityState,
   GAME_SYSTEM_IDS,
-  INTEGRATIONS,
+  integrationFor,
   type CapabilityKey,
 } from "./lib/integrations"
+import { isSystemId } from "./lib/systems"
 
 const capabilityKeyValidator = v.union(
   v.literal("integration"),
@@ -30,7 +31,7 @@ export const list = query({
   handler: async (ctx) =>
     await Promise.all(
       GAME_SYSTEM_IDS.map(async (game) => ({
-        ...INTEGRATIONS[game],
+        ...integrationFor(game),
         capabilities: Object.fromEntries(
           await Promise.all(
             CAPABILITY_KEYS.map(async (key) => [key, await capabilityState(ctx, game, key)]),
@@ -53,7 +54,7 @@ export const setCapabilityOverride = internalMutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (!GAME_SYSTEM_IDS.includes(args.game as (typeof GAME_SYSTEM_IDS)[number]))
+    if (!isSystemId(args.game))
       throw new ConvexError({ code: "unknown_game", message: "Unknown game system" })
     const existing = await ctx.db
       .query("integrationOverrides")

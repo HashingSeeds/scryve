@@ -87,6 +87,53 @@ describe("connected reconciliation", () => {
     expect(display.players[1]).toMatchObject({ currentLife: 20, pendingDelta: 0 })
   })
 
+  it("shows a queued knockout on the board and on the opponent's prizes before it syncs", () => {
+    const pokemonGame: ConnectedProjection = {
+      ...projection,
+      system: "pokemon",
+      format: "standard",
+      startingLife: 6,
+      players: projection.players.map((player) => ({ ...player, currentLife: 6 })),
+      table: {
+        designations: {},
+        players: {
+          "player-1": {
+            pokemon: {
+              active: { id: "pikachu-0001", name: "Pikachu ex", hp: 200, prizes: 2, damage: 0 },
+              bench: [],
+            },
+          },
+        },
+      },
+    }
+    const display = overlayPendingDeltas(pokemonGame, [
+      {
+        schemaVersion: 1,
+        event: {
+          type: "table.action",
+          operationId: asOperationId("operation-knockout"),
+          gameId: asGameId("game-public"),
+          action: {
+            kind: "pokemon.knockedOut",
+            playerId: "player-1",
+            pokemonId: "pikachu-0001",
+            takerPlayerId: "player-2",
+          },
+          actorId: asActorId("user-1"),
+          deviceId: asDeviceId("device-1"),
+          clientCreatedAt: 1,
+        },
+        queuedAt: 1,
+        attempts: 0,
+      },
+    ])
+    expect(display.players[1]).toMatchObject({ currentLife: 4, pendingDelta: -2 })
+    expect(display.table.players["player-1"].pokemon).toMatchObject({
+      bench: [],
+      lastKnockout: { operationId: "operation-knockout", prizesTaken: 2 },
+    })
+  })
+
   it.each(["finished", "abandoned"] as const)(
     "renders authoritative totals without a pending overlay when the game is %s",
     (status) => {

@@ -1,26 +1,11 @@
-import {
-  SpaceGrotesk_300Light as spaceGroteskLight,
-  SpaceGrotesk_400Regular as spaceGroteskRegular,
-  SpaceGrotesk_500Medium as spaceGroteskMedium,
-  SpaceGrotesk_600SemiBold as spaceGroteskSemiBold,
-  SpaceGrotesk_700Bold as spaceGroteskBold,
-} from "@expo-google-fonts/space-grotesk"
-
-export const customFontsToLoad = {
-  spaceGroteskLight,
-  spaceGroteskRegular,
-  spaceGroteskMedium,
-  spaceGroteskSemiBold,
-  spaceGroteskBold,
-}
-
+/** why: the files are named after their PostScript names so one fontFamily resolves on iOS and Android. */
 const fonts = {
-  spaceGrotesk: {
-    light: "spaceGroteskLight",
-    normal: "spaceGroteskRegular",
-    medium: "spaceGroteskMedium",
-    semiBold: "spaceGroteskSemiBold",
-    bold: "spaceGroteskBold",
+  rubik: {
+    light: "Rubik-Light",
+    normal: "Rubik-Regular",
+    medium: "Rubik-Medium",
+    semiBold: "Rubik-SemiBold",
+    bold: "Rubik-Bold",
   },
 }
 
@@ -29,5 +14,5 @@ export const typography = {
    * The fonts are available to use, but prefer using the semantic name.
    */
   fonts,
-  primary: fonts.spaceGrotesk,
+  primary: fonts.rubik,
 }

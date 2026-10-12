@@ -1,5 +1,4 @@
-import { convexTest } from "convex-test"
-
+import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import {
@@ -7,21 +6,11 @@ import {
   UPHELD_RETENTION_MS,
   moderationRetentionExpiresAt,
 } from "./lib/moderationRetention"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./moderation.ts": async () => jest.requireActual("./moderation"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const PUBLIC_ID = "moderation-game-1234"
-type Harness = ReturnType<typeof convexTest<(typeof schema)["tables"]>>
-type Actor = ReturnType<Harness["withIdentity"]>
+type Actor = ReturnType<ConvexTestHarness["withIdentity"]>
 
-async function seatedGame(t: Harness, usernames: [string, string]) {
+async function seatedGame(t: ConvexTestHarness, usernames: [string, string]) {
   const [hostName, guestName] = usernames
   const host = t.withIdentity({ subject: "host-subject" })
   const guest = t.withIdentity({ subject: "guest-subject" })
@@ -56,7 +45,7 @@ async function seatedGame(t: Harness, usernames: [string, string]) {
   return { host, guest }
 }
 
-async function settle(t: Harness) {
+async function settle(t: ConvexTestHarness) {
   await t.finishAllScheduledFunctions(() => jest.runAllTimers())
 }
 
@@ -64,7 +53,7 @@ async function projectionFor(actor: Actor, deviceId: string) {
   return await actor.query(api.games.lobbyProjection, { publicId: PUBLIC_ID, deviceId })
 }
 
-async function addThirdSeat(t: Harness) {
+async function addThirdSeat(t: ConvexTestHarness) {
   const thirdParty = t.withIdentity({ subject: "third-subject" })
   await t.mutation(internal.users.syncFromClerk, {
     clerkUserId: "third-subject",
@@ -108,7 +97,7 @@ describe("moderation", () => {
   })
 
   it("never sends the Clerk display name to other players", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
     const projection = await projectionFor(host, "device-host-0001")
     expect(projection.players.map((player) => player.displayName)).toEqual([
@@ -119,7 +108,7 @@ describe("moderation", () => {
   })
 
   it("blocks and masks immediately on report, without waiting for review", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, guest } = await seatedGame(t, ["host-handle", "guest-handle"])
     const guestSeat = await seatOf(host, "device-host-0001", 2)
 
@@ -151,7 +140,7 @@ describe("moderation", () => {
   })
 
   it("does not expose a blocked username in a finished summary", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
     const guestSeat = await seatOf(host, "device-host-0001", 2)
     await host.mutation(api.moderation.blockPlayer, {
@@ -173,7 +162,7 @@ describe("moderation", () => {
   })
 
   it("holds a name on the first report when it trips the filter", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, guest } = await seatedGame(t, ["host-handle", "sh1t-lord"])
     await settle(t)
     const guestSeat = await seatOf(host, "device-host-0001", 2)
@@ -197,7 +186,7 @@ describe("moderation", () => {
   })
 
   it("holds a name once two distinct players report it", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, guest } = await seatedGame(t, ["host-handle", "guest-handle"])
     const guestSeat = await seatOf(host, "device-host-0001", 2)
     const thirdParty = await addThirdSeat(t)
@@ -224,7 +213,7 @@ describe("moderation", () => {
   })
 
   it("counts one open report per reporter", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
     const guestSeat = await seatOf(host, "device-host-0001", 2)
     for (const reason of ["harassment", "offensive_username"] as const)
@@ -239,7 +228,7 @@ describe("moderation", () => {
   })
 
   it("refuses to seat players who have blocked each other", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
     const guestSeat = await seatOf(host, "device-host-0001", 2)
     await host.mutation(api.moderation.blockPlayer, {
@@ -275,7 +264,7 @@ describe("moderation", () => {
   })
 
   it("restores visibility when a block is lifted", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
     const guestSeat = await seatOf(host, "device-host-0001", 2)
     await host.mutation(api.moderation.blockPlayer, {
@@ -292,7 +281,7 @@ describe("moderation", () => {
   })
 
   it("releases a reports-based hold once the operator dismisses every open report", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, guest } = await seatedGame(t, ["host-handle", "guest-handle"])
     const thirdParty = await addThirdSeat(t)
     const guestSeat = await seatOf(host, "device-host-0001", 2)
@@ -329,7 +318,7 @@ describe("moderation", () => {
   })
 
   it("keeps an operator hold in place when a report is dismissed", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, guest } = await seatedGame(t, ["host-handle", "sh1t-lord"])
     await settle(t)
     const guestSeat = await seatOf(host, "device-host-0001", 2)
@@ -348,7 +337,7 @@ describe("moderation", () => {
   })
 
   it("holds an offensive username that arrives from a Clerk rename", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
     await t.mutation(internal.users.syncFromClerk, {
       clerkUserId: "guest-subject",
@@ -362,7 +351,7 @@ describe("moderation", () => {
   })
 
   it("releases a filter hold when a Clerk rename fixes the username", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "sh1t-lord"])
     await settle(t)
 
@@ -379,7 +368,7 @@ describe("moderation", () => {
   })
 
   it("answers the signup gate without requiring a synced profile", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const newcomer = t.withIdentity({ subject: "newcomer-subject" })
     await expect(
       newcomer.query(api.moderation.usernameIsAcceptable, { username: "sh1t-lord" }),
@@ -390,7 +379,7 @@ describe("moderation", () => {
   })
 
   it("lists open reports for the operator with the matched terms", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "sh1t-lord"])
     await settle(t)
     const guestSeat = await seatOf(host, "device-host-0001", 2)
@@ -421,7 +410,7 @@ describe("moderation", () => {
   })
 
   it("keeps orphaned reports readable and resolvable after account deletion", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await seatedGame(t, ["host-handle", "guest-handle"])
     const createOrphanedReport = async () =>
       await t.run(async (ctx) => {
@@ -471,7 +460,7 @@ describe("moderation", () => {
     )
     expect(statuses.map((report) => report?.status)).toEqual(["upheld", "dismissed"])
 
-    const dangling = convexTest(schema, modules)
+    const dangling = makeConvexTest()
     await seatedGame(dangling, ["host-handle", "guest-handle"])
     const danglingReports = await dangling.run(async (ctx) => {
       const game = await ctx.db
@@ -544,7 +533,7 @@ describe("moderation", () => {
   })
 
   it("rejects reporting yourself or a player from another game", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
     const ownSeat = await seatOf(host, "device-host-0001", 1)
     await expect(
@@ -583,7 +572,7 @@ describe("moderation", () => {
   })
 
   it("purges expired reports but preserves future and legally held reports", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const now = 2_000_000
     jest.setSystemTime(now)
     const ids = await t.run(async (ctx) => {
@@ -630,7 +619,7 @@ describe("moderation", () => {
   })
 
   it("continues past a full page of legally held reports", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const now = 3_000_000
     jest.setSystemTime(now)
     const target = await t.run(async (ctx) => {

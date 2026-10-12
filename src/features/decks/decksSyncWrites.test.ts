@@ -1,4 +1,5 @@
 import type { ConvexReactClient } from "convex/react"
+import type { FunctionArgs } from "convex/server"
 import { ConvexError } from "convex/values"
 import { convexTest } from "convex-test"
 
@@ -7,6 +8,7 @@ import { storage } from "@/utils/storage"
 import { DeckSyncRepository, type SyncedDeck } from "./decksSync"
 import {
   DECK_CONFLICT_REASON,
+  DECK_REJECTED_REASON,
   DeckMetadataWriteController,
   DeckSyncWriteRepository,
   getDeckMetadataWriteController,
@@ -15,7 +17,7 @@ import {
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import schema from "../../../convex/schema"
-import type { DurableStringStorage } from "../sync/durableOutbox"
+import { setOutboxWriter, type DurableStringStorage } from "../sync/durableOutbox"
 
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("../../../convex/_generated/api"),
@@ -120,6 +122,22 @@ describe("deck metadata writes", () => {
     expect(reopened.loadFailed()).toHaveLength(1)
     expect(reopened.loadPending()).toMatchObject([{ note: "Still pending" }])
     stop()
+  })
+
+  it("keeps a dismissed failure dismissed when a stale tab rejects it again", () => {
+    const local = new MemoryStorage()
+    const staleTab = new DeckSyncWriteRepository("owner", local)
+    const otherTab = new DeckSyncWriteRepository("owner", local)
+    const action = pendingWrite()
+    otherTab.enqueue(action)
+    const stalePending = staleTab.loadPending()
+    otherTab.failAction(action, "Rejected", 2, [], otherTab.loadPending())
+    otherTab.dismissFailed(action.operationId)
+
+    staleTab.failAction(action, "Rejected", 3, [], stalePending)
+
+    expect(staleTab.loadFailed()).toEqual([])
+    expect(staleTab.loadPending()).toEqual([])
   })
 
   it("leaves legacy unscoped writes untouched", () => {
@@ -412,6 +430,30 @@ describe("deck metadata writes", () => {
     stop()
   })
 
+  it("fails an edit the server's argument validator rejects instead of retrying it", async () => {
+    const local = new MemoryStorage()
+    new DeckSyncRepository("owner", local).mergeMetadata([metadata()])
+    const controller = new DeckMetadataWriteController(
+      {
+        mutation: jest.fn(async () => {
+          throw new Error(
+            "[CONVEX M(decks:syncWrite)] Server Error\nArgumentValidationError: Object contains extra field `foil` that is not in the validator.",
+          )
+        }),
+      } as unknown as ConvexReactClient,
+      new DeckSyncWriteRepository("owner", local),
+    )
+    controller.update(deckId, { name: "Offline rename" })
+    const stop = controller.start()
+    await flush()
+
+    expect(controller.getSnapshot()).toMatchObject({
+      pending: [],
+      failures: [{ reason: DECK_REJECTED_REASON }],
+    })
+    stop()
+  })
+
   it("hydrates the current deck before parking a returned conflict", async () => {
     const local = new MemoryStorage()
     new DeckSyncRepository("owner", local).mergeMetadata([metadata()])
@@ -526,5 +568,47 @@ describe("deck metadata writes", () => {
     expect(stored).toMatchObject({ name: "Renamed once", syncRevision: 1 })
     expect(restarted.getSnapshot().pending).toEqual([])
     stopRestarted()
+  })
+
+  it("keeps the stored writer provenance out of the real backend's strict args", async () => {
+    const t = convexTest(schema, modules)
+    const actor = t.withIdentity({ subject: "owner" })
+    await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
+    const id = await actor.mutation(api.decks.create, { name: "Original", format: "commander" })
+    const page = await actor.query(api.decks.syncPage, {
+      paginationOpts: { numItems: 100, cursor: null },
+    })
+    const local = new MemoryStorage()
+    new DeckSyncRepository("owner", local).mergeMetadata(page.page)
+    const writer = { app: "1.4.0", update: "update-a", runtime: "runtime-1" }
+    const sent: Array<FunctionArgs<typeof api.decks.syncWrite>> = []
+    const client = {
+      mutation: async (
+        reference: typeof api.decks.syncWrite,
+        args: FunctionArgs<typeof api.decks.syncWrite>,
+      ) => {
+        sent.push(args)
+        return actor.mutation(reference, args)
+      },
+    } as unknown as ConvexReactClient
+    setOutboxWriter(writer)
+    const controller = new DeckMetadataWriteController(
+      client,
+      new DeckSyncWriteRepository("owner", local),
+    )
+    controller.update(id, { name: "Renamed" })
+    setOutboxWriter(undefined)
+    expect([...local.values.values()].some((value) => value.includes('"writtenBy"'))).toBe(true)
+
+    const stop = controller.start()
+    await flush()
+    stop()
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).not.toHaveProperty("writtenBy")
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+    // why: proves this harness would catch a leak: the same args with provenance attached are rejected by the validator.
+    const withProvenance = { ...sent[0], writtenBy: writer }
+    await expect(actor.mutation(api.decks.syncWrite, withProvenance)).rejects.toThrow(/writtenBy/)
   })
 })

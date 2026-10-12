@@ -86,6 +86,14 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     }
   }
   plugins.push([
+    "expo-font",
+    {
+      fonts: ["Light", "Regular", "Medium", "SemiBold", "Bold"].map(
+        (weight) => `./assets/fonts/Rubik-${weight}.ttf`,
+      ),
+    },
+  ])
+  plugins.push([
     "expo-image-picker",
     {
       photosPermission: "Allow Scryve to attach a screenshot you choose to a support request.",

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useLayoutEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { type PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
+import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { CommanderBoardPlayer, GamePlayer, LifeDelta, PlayerId } from "@/features/game/types"
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
@@ -13,6 +14,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
+import { losingCounter, seatTableState } from "./CounterChips"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
@@ -35,6 +37,7 @@ import {
   getPlayerGridRowFlex,
   getPlayerGridRows,
 } from "./playerGridGeometry"
+import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
 
 export interface CommanderDamageGridBinding {
   incomingFor: (player: GamePlayer) => Record<PlayerId, number>
@@ -71,8 +74,11 @@ export interface PlayerGridProps {
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
   getStaleSince?: (player: GamePlayer) => number | undefined
+  /** why: commander damage elimination; a losing table counter like 10 poison is read from `table`. */
   isPlayerEliminated?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
+  /** why: Magic seats show counter chips from it; Pokémon rules swap the life card for a Pokémon board. */
+  table?: TableRuntime
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -89,6 +95,7 @@ export function PlayerGrid({
   getStaleSince,
   isPlayerEliminated,
   commanderDamage,
+  table,
   onChange,
   style,
 }: PlayerGridProps) {
@@ -152,13 +159,22 @@ export function PlayerGrid({
     layout,
     gap: spacing.xxs,
   })
-  const lifeFontSizeInput = {
-    ...cellSize,
-    fontScale,
-    targetSize: layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE,
-    sidewaysGlyphReserve:
-      2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs),
-  }
+  const lifeTargetSize = layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
+  const sidewaysGlyphReserve =
+    2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)
+  /** why: cards size the total they show, which can be a press-in preview with more digits. */
+  const lifeFontSizeFor = useCallback(
+    (digits: number) =>
+      getLifeFontSize({
+        cellWidth: cellSize.cellWidth,
+        cellHeight: cellSize.cellHeight,
+        digits,
+        fontScale,
+        targetSize: lifeTargetSize,
+        sidewaysGlyphReserve,
+      }),
+    [cellSize.cellWidth, cellSize.cellHeight, fontScale, lifeTargetSize, sidewaysGlyphReserve],
+  )
 
   function measureBoard(event: LayoutChangeEvent) {
     const { width: boardWidth, height: boardHeight } = event.nativeEvent.layout
@@ -267,6 +283,49 @@ export function PlayerGrid({
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
+              const seatTable = seatTableState(table, player.id)
+              const eliminated = isPlayerEliminated?.(player)
+                ? "commander damage"
+                : seatTable && losingCounter(seatTable)?.label.toLowerCase()
+              if (table?.tableRules.pokemon) {
+                return (
+                  <View
+                    key={player.id}
+                    testID={`player-cell-seat-${seatNumber}`}
+                    style={themed($cell)}
+                  >
+                    <PokemonSeatCard
+                      playerId={player.id}
+                      playerName={player.name}
+                      seatNumber={seatNumber}
+                      shape={player.shape}
+                      prizes={player.life}
+                      color={player.color}
+                      compact={layout.compact}
+                      contentRotation={contentRotation}
+                      contentInsets={contentInsets}
+                      menuCorner={menuCorner}
+                      menuEdgeCenter={fallbackMenu?.edgeCenter}
+                      disabled={disabled || playerDisabled}
+                      ownership={ownership}
+                      staleSince={getStaleSince?.(player)}
+                      opponents={players
+                        .filter(({ id }) => id !== player.id)
+                        .map(({ id, name }) => ({ id, name }))}
+                      table={table}
+                      onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
+                        onChange(player.id, delta),
+                      )}
+                      style={getScreenCornerSquaringStyle({
+                        rows,
+                        rowIndex,
+                        columnIndex,
+                        insets: Platform.OS === "web" ? insets : undefined,
+                      })}
+                    />
+                  </View>
+                )
+              }
               return (
                 <View
                   key={player.id}
@@ -286,16 +345,13 @@ export function PlayerGrid({
                     screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
                     menuCorner={menuCorner}
                     menuEdgeCenter={fallbackMenu?.edgeCenter}
-                    lifeFontSize={getLifeFontSize({
-                      ...lifeFontSizeInput,
-                      digits: String(player.life).length,
-                    })}
+                    lifeFontSizeFor={lifeFontSizeFor}
                     system={system}
                     lifeStep={lifeStep}
                     disabled={disabled || playerDisabled}
                     ownership={ownership}
                     staleSince={getStaleSince?.(player)}
-                    eliminated={isPlayerEliminated?.(player)}
+                    eliminated={eliminated}
                     commanderDamage={
                       commanderDamage && boardSeats
                         ? {
@@ -342,6 +398,27 @@ export function PlayerGrid({
                                   },
                                 }
                               : {}),
+                          }
+                        : undefined
+                    }
+                    seatTable={
+                      table && seatTable
+                        ? {
+                            ...seatTable,
+                            editable: !(disabled || playerDisabled),
+                            adjustCounter: stable(
+                              `counter:${player.id}`,
+                              (counterId: string, delta: number) =>
+                                table.adjustCounter(player.id, counterId, delta),
+                            ),
+                            takeDesignation: stable(`take:${player.id}`, (designationId: string) =>
+                              table.takeDesignation(player.id, designationId),
+                            ),
+                            releaseDesignation: stable(
+                              `release:${player.id}`,
+                              (designationId: string) =>
+                                table.releaseDesignation(player.id, designationId),
+                            ),
                           }
                         : undefined
                     }

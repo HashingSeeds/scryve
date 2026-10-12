@@ -9,7 +9,6 @@ const ko: Translations = {
     generic: {
       heading: "아직 아무것도 없습니다",
       content: "데이터를 찾지 못했습니다. 새로 고치거나 앱을 다시 불러오세요.",
-      button: "다시 시도",
     },
   },
 }

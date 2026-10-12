@@ -7,7 +7,17 @@ export enum ErrorType {
   HANDLED = "Handled",
 }
 
-export const reportCrash = (error: Error, type: ErrorType = ErrorType.FATAL) => {
+interface CrashContext {
+  tags?: Record<string, string>
+  extra?: Record<string, unknown>
+  fingerprint?: string[]
+}
+
+export const reportCrash = (
+  error: Error,
+  type: ErrorType = ErrorType.FATAL,
+  context: CrashContext = {},
+) => {
   emitTelemetry("error.handled", {
     outcome: "rejected",
     errorCode: type === ErrorType.FATAL ? "FATAL" : "HANDLED",
@@ -16,6 +26,6 @@ export const reportCrash = (error: Error, type: ErrorType = ErrorType.FATAL) => 
     // Never print raw error text: it may contain auth, invite, or identity values.
     console.error(`[Scryve ${type}] Error details omitted by privacy policy`)
   } else {
-    Sentry.captureException(error, { tags: { errorType: type } })
+    Sentry.captureException(error, { ...context, tags: { ...context.tags, errorType: type } })
   }
 }

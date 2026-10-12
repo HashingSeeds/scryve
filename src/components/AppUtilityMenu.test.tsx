@@ -1,11 +1,35 @@
 import { StyleSheet } from "react-native"
-import { fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { ThemeProvider } from "@/theme/context"
 
 import { AppUtilityMenu } from "./AppUtilityMenu"
+import { GameMenuBackdrop } from "./GameRadialMenu"
+import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 describe("AppUtilityMenu", () => {
+  it("closes on Android Back before the game menu it opened from", () => {
+    const pressBack = mockHardwareBack()
+    const closeGameMenu = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <GameMenuBackdrop open onClose={closeGameMenu} />
+        <AppUtilityMenu onSettings={jest.fn()} onAccount={jest.fn()} />
+      </ThemeProvider>,
+    )
+    fireEvent.press(view.getByTestId("utility-menu-button"))
+
+    act(() => void pressBack())
+
+    expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+    expect(closeGameMenu).not.toHaveBeenCalled()
+
+    act(() => void pressBack())
+
+    expect(closeGameMenu).toHaveBeenCalledTimes(1)
+    jest.restoreAllMocks()
+  })
+
   it("turns the utility button into its actions, hiding the trigger from screen readers", () => {
     const onSettings = jest.fn()
     const view = render(

@@ -33,6 +33,7 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import { CommanderStrip } from "./CommanderStrip"
+import { CounterChips, type SeatTable } from "./CounterChips"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
@@ -101,14 +102,16 @@ export interface LifeCardProps {
   screenEdges?: LifeCardScreenEdges
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
-  lifeFontSize?: number
+  lifeFontSizeFor?: (digits: number) => number | undefined
   system?: PlaySystemId
   lifeStep?: number
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
   staleSince?: number
   commanderDamage?: LifeCardCommanderDamage
-  eliminated?: boolean
+  /** why: what knocked the seat out, such as "commander damage" or "poison"; the card dims and its label says why. */
+  eliminated?: string
+  seatTable?: SeatTable
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -142,7 +145,7 @@ export const LifeCard = memo(function LifeCard({
   screenEdges,
   menuCorner,
   menuEdgeCenter,
-  lifeFontSize,
+  lifeFontSizeFor,
   system,
   lifeStep,
   disabled,
@@ -150,6 +153,7 @@ export const LifeCard = memo(function LifeCard({
   staleSince,
   commanderDamage,
   eliminated,
+  seatTable,
   onChange,
   style,
 }: LifeCardProps) {
@@ -161,7 +165,7 @@ export const LifeCard = memo(function LifeCard({
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
-  const frozen = disabled || eliminated
+  const frozen = disabled || !!eliminated
   const inspectDisabled = disabled && ownership !== "unowned"
   const contentRotationStyle: TextStyle | undefined = contentRotation
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
@@ -170,14 +174,18 @@ export const LifeCard = memo(function LifeCard({
   const identity = `Seat ${seatNumber}, ${displayName}`
   const markSize = compact ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
+  // why: a press shows its change right away; the change itself is recorded on release.
+  const [preview, setPreview] = useState(0)
+  const shownLife = life + preview
+  const shownDigits = String(shownLife).length
   const resolvedLifeFontSize =
-    lifeFontSize ??
+    lifeFontSizeFor?.(shownDigits) ??
     Math.min(
       compact ? COMPACT_LIFE_FONT_SIZE : LIFE_FONT_SIZE,
       getLifeFontSizeThatFits({
         availableWidth: getLifeTargetTextSpace(lifeTargetSize),
         availableHeight: getLifeTargetTextSpace(lifeTargetSize),
-        digits: String(life).length,
+        digits: shownDigits,
         fontScale: 1,
       }),
     )
@@ -299,6 +307,8 @@ export const LifeCard = memo(function LifeCard({
     reducedMotion === false ? FadeOut.duration(commanderOverviewDuration) : undefined
 
   const [editorOpen, setEditorOpen] = useState(false)
+  // why: while a counter sheet covers the card, the card's own controls leave touch, keyboard focus, and the accessibility tree; accessibilityViewIsModal only isolates on iOS.
+  const [tableSheetOpen, setTableSheetOpen] = useState(false)
   const recentDelta = useRecentDelta(life)
   const previousLife = useRef(life)
   useEffect(() => {
@@ -370,10 +380,24 @@ export const LifeCard = memo(function LifeCard({
     21 -
     (staleSince !== undefined ? spacing.xxxs + 18 : 0)
   const nameInCorner = !!commanderDamage?.inspection
-  const showStatus =
-    !nameInCorner && (statusEdgeLength === 0 || statusEdgeInset === 0 || availableStatusOffset >= 0)
+  // why: a sideways status layer swaps its sides before turning, so it never pokes past the card. On web an overflowing layer makes the hidden-overflow card scrollable, and focusing a chip by keyboard would shift the whole card.
+  const contentWidth = cardSize.width - cardPadding * 2
+  const contentHeight = cardSize.height - cardPadding * 2
+  const statusLayerBounds: ViewStyle | undefined =
+    Math.abs(contentRotation) === 90 && contentWidth > 0 && contentHeight > 0
+      ? {
+          width: contentHeight,
+          height: contentWidth,
+          left: (contentWidth - contentHeight) / 2,
+          top: (contentHeight - contentWidth) / 2,
+          right: undefined,
+          bottom: undefined,
+        }
+      : undefined
+  // why: once measured, the name moves up to fit a short card, and hides only when even that leaves no room.
+  const showStatus = !nameInCorner && (statusEdgeLength === 0 || availableStatusOffset >= 0)
   const statusTopOffset =
-    statusEdgeInset > 0 && statusEdgeLength > 0
+    statusEdgeLength > 0
       ? Math.min(defaultStatusOffset, availableStatusOffset)
       : defaultStatusOffset
 
@@ -417,7 +441,7 @@ export const LifeCard = memo(function LifeCard({
     <View
       testID={`life-card-seat-${seatNumber}`}
       accessibilityLabel={`${identity}${ownershipLabel ? `, ${ownershipLabel}` : ""}${
-        eliminated ? ", eliminated by commander damage" : ""
+        eliminated ? `, out: ${eliminated}` : ""
       }`}
       onLayout={measureCard}
       style={[
@@ -463,10 +487,10 @@ export const LifeCard = memo(function LifeCard({
       <View
         pointerEvents={commanderOverviewOpen || commanderCardMode ? "none" : "box-none"}
         accessibilityElementsHidden={
-          (!localCommander && commanderOverviewOpen) || !!commanderCardMode
+          (!localCommander && commanderOverviewOpen) || !!commanderCardMode || tableSheetOpen
         }
         importantForAccessibility={
-          (!localCommander && commanderOverviewOpen) || commanderCardMode
+          (!localCommander && commanderOverviewOpen) || commanderCardMode || tableSheetOpen
             ? "no-hide-descendants"
             : "auto"
         }
@@ -484,7 +508,8 @@ export const LifeCard = memo(function LifeCard({
         >
           <Text
             testID={`life-total-seat-${seatNumber}`}
-            text={String(life)}
+            text={String(shownLife)}
+            weight="bold"
             accessible
             accessibilityLabel={`${identity}, ${counterValueLabel(system, life)}`}
             accessibilityLiveRegion="polite"
@@ -503,7 +528,11 @@ export const LifeCard = memo(function LifeCard({
           <View
             testID={`life-status-layer-seat-${seatNumber}`}
             pointerEvents="none"
-            style={[themed($statusLayer), { transform: [{ rotate: `${contentRotation}deg` }] }]}
+            style={[
+              themed($statusLayer),
+              statusLayerBounds,
+              { transform: [{ rotate: `${contentRotation}deg` }] },
+            ]}
           >
             {showStatus ? (
               <View
@@ -626,7 +655,10 @@ export const LifeCard = memo(function LifeCard({
           mode={commanderCardMode}
           life={localCommander ? life : undefined}
         />
-      ) : !commanderOverviewOpen && !localOverviewVisible && ownership !== "unowned" ? (
+      ) : !commanderOverviewOpen &&
+        !localOverviewVisible &&
+        !tableSheetOpen &&
+        ownership !== "unowned" ? (
         <LifeControls
           playerName={displayName}
           seatNumber={seatNumber}
@@ -637,11 +669,17 @@ export const LifeCard = memo(function LifeCard({
           system={system}
           lifeStep={lifeStep}
           recentDelta={recentDelta}
+          pendingDelta={preview}
           onChange={onChange}
+          onPreview={setPreview}
           onLongChange={() => setEditorOpen(true)}
         />
       ) : null}
-      {commanderDamage && !localCommander && !commanderCardMode && !commanderOverviewOpen ? (
+      {commanderDamage &&
+      !localCommander &&
+      !commanderCardMode &&
+      !commanderOverviewOpen &&
+      !tableSheetOpen ? (
         <BoardPressable
           testID={`commander-mark-seat-${seatNumber}`}
           accessibilityRole="button"
@@ -657,7 +695,7 @@ export const LifeCard = memo(function LifeCard({
           ]}
         />
       ) : null}
-      {commanderDamage?.inspection && !commanderCardMode ? (
+      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -677,7 +715,7 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {cornerStatus && !commanderCardMode ? (
+      {cornerStatus && !commanderCardMode && !tableSheetOpen ? (
         <View
           testID={`life-corner-layer-seat-${seatNumber}`}
           pointerEvents="box-none"
@@ -727,6 +765,25 @@ export const LifeCard = memo(function LifeCard({
             </View>
           </BoardPressable>
         </View>
+      ) : null}
+      {seatTable &&
+      !commanderCardMode &&
+      !commanderOverviewOpen &&
+      !localOverviewVisible &&
+      !editorOpen ? (
+        <CounterChips
+          seat={seatTable}
+          seatNumber={seatNumber}
+          identity={identity}
+          color={color}
+          foreground={foreground}
+          compact={compact}
+          contentRotation={contentRotation}
+          contentInsets={contentInsets}
+          menuEdgeCenter={menuEdgeCenter}
+          cardSize={cardSize}
+          onSheetOpenChange={setTableSheetOpen}
+        />
       ) : null}
       {editorOpen ? (
         <LifeEditor

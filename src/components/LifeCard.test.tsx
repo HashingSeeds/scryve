@@ -12,6 +12,7 @@ import { commanderBoardSeats } from "./commanderDamageLayout"
 import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
+import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 const commanderIds = [asPlayerId("player-1"), asPlayerId("player-2")]
 const commanderSeats = commanderBoardSeats([[0], [1]], commanderIds)
@@ -439,6 +440,32 @@ describe("LifeCard", () => {
     },
   )
 
+  it("keeps a sideways name inside a short card that has no insets", () => {
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          contentRotation={90}
+          onChange={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+      nativeEvent: { layout: { width: 158, height: 187, x: 0, y: 0 } },
+    })
+
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-status-layer-seat-1").props.style),
+    ).toMatchObject({ width: 171, height: 142, left: -14.5, top: 14.5 })
+    // why: 71 to the layer's middle, 50 down, and the 21 tall name ends at the layer's 142 edge.
+    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
+      marginTop: 50,
+    })
+  })
+
   it("puts the name and assign sword in the corner opposite the commander grid", () => {
     const onPressSword = jest.fn()
     const view = render(
@@ -713,6 +740,19 @@ describe("LifeCard", () => {
     expect(caption.color).toBe("#FFFFFF")
   })
 
+  it("closes the life editor on Android Back", () => {
+    const pressBack = mockHardwareBack()
+    const view = render(interactiveCard(20, jest.fn()))
+    fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+
+    act(() => void pressBack())
+
+    expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
+    expect(pressBack()).toBe(false)
+    jest.restoreAllMocks()
+  })
+
   it("closes the life editor when the card freezes", () => {
     const view = render(interactiveCard(20, jest.fn()))
     fireEvent(view.getByTestId("life-seat-1-1"), "longPress")
@@ -724,7 +764,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={20}
           color="#41476E"
-          eliminated
+          eliminated="commander damage"
           onChange={jest.fn()}
         />
       </ThemeProvider>,
@@ -778,6 +818,56 @@ describe("LifeCard", () => {
     expect(view.getByText("+")).toBeTruthy()
     act(() => jest.advanceTimersByTime(2000))
     expect(view.getByText("−")).toBeTruthy()
+  })
+
+  it("shows a held change right away and records it once on release", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    const plus = view.getByTestId("life-seat-1-1")
+
+    fireEvent(plus, "pressIn")
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("21")
+    expect(view.getByText("+1")).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+
+    fireEvent.press(plus)
+    view.rerender(interactiveCard(21, onChange))
+    fireEvent(plus, "pressOut")
+    expect(onChange.mock.calls).toEqual([[1]])
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("21")
+    expect(view.getByText("+1")).toBeTruthy()
+  })
+
+  it("drops a held change that slides off or becomes a long press", () => {
+    const onChange = jest.fn()
+    const view = render(interactiveCard(20, onChange))
+    const minus = view.getByTestId("life-seat-1--1")
+
+    fireEvent(minus, "pressIn")
+    act(() => jest.advanceTimersByTime(2000))
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("19")
+    expect(view.getByText("-1")).toBeTruthy()
+    fireEvent(minus, "pressOut")
+    expect(view.getByTestId("life-total-seat-1").props.children).toBe("20")
+    expect(view.getByText("−")).toBeTruthy()
+    expect(view.getByText("+")).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+
+    fireEvent(minus, "pressIn")
+    fireEvent(minus, "longPress")
+    expect(view.getByTestId("life-editor-seat-1")).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("sizes a held change for the digits it shows", () => {
+    const fontSize = (view: ReturnType<typeof renderCard>) =>
+      StyleSheet.flatten(view.getByTestId("life-total-seat-1").props.style).fontSize
+    const threeDigits = fontSize(renderCard(100))
+    const view = renderCard(99)
+    expect(fontSize(view)).toBeGreaterThan(threeDigits)
+
+    fireEvent(view.getByTestId("life-seat-1-1"), "pressIn")
+    expect(fontSize(view)).toBe(threeDigits)
   })
 
   it("lets the control zones handle touches at the life total", () => {
@@ -1143,7 +1233,7 @@ describe("LifeCard", () => {
           seatNumber={1}
           life={13}
           color="#41476E"
-          eliminated
+          eliminated="commander damage"
           onChange={onChange}
         />
       </ThemeProvider>,

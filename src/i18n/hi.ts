@@ -9,7 +9,6 @@ const hi: Translations = {
     generic: {
       heading: "अभी यहाँ कुछ नहीं है",
       content: "कोई डेटा नहीं मिला। ऐप को रीफ़्रेश या पुनः लोड करें।",
-      button: "फिर कोशिश करें",
     },
   },
 }

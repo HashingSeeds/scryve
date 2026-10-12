@@ -1,32 +1,17 @@
 import { ConvexError } from "convex/values"
 
-export type DeckSection = { id: string; label: string }
+import {
+  SYSTEM_IDS,
+  SYSTEMS,
+  isSystemId,
+  systemDefinition,
+  type DeckSection,
+  type FormatDefinition,
+  type SystemId,
+} from "./systems"
 
-export type DeckFormat = {
-  id: string
-  label: string
-  blurb?: string
-  sections: readonly DeckSection[]
-}
-
-const MTG_COMMANDER_SECTIONS = [
-  { id: "commander", label: "Commander" },
-  { id: "main", label: "Main deck" },
-  { id: "sideboard", label: "Sideboard" },
-] as const
-
-const MTG_CONSTRUCTED_SECTIONS = [
-  { id: "main", label: "Main deck" },
-  { id: "sideboard", label: "Sideboard" },
-] as const
-
-const YUGIOH_SECTIONS = [
-  { id: "main", label: "Main Deck" },
-  { id: "extra", label: "Extra Deck" },
-  { id: "side", label: "Side Deck" },
-] as const
-
-const POKEMON_SECTIONS = [{ id: "main", label: "Deck" }] as const
+export type { DeckSection }
+export type DeckFormat = FormatDefinition
 
 export type DeckGame = {
   id: string
@@ -37,116 +22,23 @@ export type DeckGame = {
   formats: readonly DeckFormat[]
 }
 
-const MTG_FORMATS = [
-  {
-    id: "commander",
-    label: "Commander",
-    blurb: "100 cards, singleton",
-    sections: MTG_COMMANDER_SECTIONS,
-  },
-  {
-    id: "standard",
-    label: "Standard",
-    blurb: "Recent sets",
-    sections: MTG_CONSTRUCTED_SECTIONS,
-  },
-  {
-    id: "pioneer",
-    label: "Pioneer",
-    blurb: "Return to Ravnica forward",
-    sections: MTG_CONSTRUCTED_SECTIONS,
-  },
-  {
-    id: "modern",
-    label: "Modern",
-    blurb: "8th Edition forward",
-    sections: MTG_CONSTRUCTED_SECTIONS,
-  },
-  {
-    id: "legacy",
-    label: "Legacy",
-    blurb: "Nearly every set",
-    sections: MTG_CONSTRUCTED_SECTIONS,
-  },
-  {
-    id: "vintage",
-    label: "Vintage",
-    blurb: "Restricted list",
-    sections: MTG_CONSTRUCTED_SECTIONS,
-  },
-  {
-    id: "pauper",
-    label: "Pauper",
-    blurb: "Commons only",
-    sections: MTG_CONSTRUCTED_SECTIONS,
-  },
-  {
-    id: "brawl",
-    label: "Brawl",
-    blurb: "60 cards, singleton",
-    sections: MTG_COMMANDER_SECTIONS,
-  },
-  {
-    id: "limited",
-    label: "Limited",
-    blurb: "Draft and sealed",
-    sections: MTG_CONSTRUCTED_SECTIONS,
-  },
-  {
-    id: "constructed",
-    label: "Constructed",
-    blurb: "Anything else",
-    sections: MTG_CONSTRUCTED_SECTIONS,
-  },
-] as const
-
-const YUGIOH_FORMATS = [
-  { id: "advanced", label: "Advanced", sections: YUGIOH_SECTIONS },
-  { id: "traditional", label: "Traditional", sections: YUGIOH_SECTIONS },
-  { id: "rush", label: "Rush Duel", sections: YUGIOH_SECTIONS },
-] as const
-
-const POKEMON_FORMATS = [
-  { id: "standard", label: "Standard", sections: POKEMON_SECTIONS },
-  { id: "expanded", label: "Expanded", sections: POKEMON_SECTIONS },
-  { id: "unlimited", label: "Unlimited", sections: POKEMON_SECTIONS },
-] as const
-
-export const DECK_GAMES: Record<string, DeckGame> = {
-  mtg: {
-    id: "mtg",
-    label: "Magic: The Gathering",
-    shortLabel: "Magic",
-    available: true,
-    defaultFormat: "commander",
-    formats: MTG_FORMATS,
-  },
-  ygo: {
-    id: "ygo",
-    label: "Yu-Gi-Oh!",
-    shortLabel: "Yu-Gi-Oh!",
-    available: true,
-    defaultFormat: "advanced",
-    formats: YUGIOH_FORMATS,
-  },
-  pokemon: {
-    id: "pokemon",
-    label: "Pokémon TCG",
-    shortLabel: "Pokémon",
-    available: true,
-    defaultFormat: "standard",
-    formats: POKEMON_FORMATS,
-  },
+function deckGameFor(id: SystemId): DeckGame {
+  const { label, shortLabel, available, defaultFormat, formats } = SYSTEMS[id]
+  return { id, label, shortLabel, available, defaultFormat: defaultFormat.deck, formats }
 }
+
+export const DECK_GAMES: Record<string, DeckGame> = Object.fromEntries(
+  SYSTEM_IDS.map((id) => [id, deckGameFor(id)]),
+)
 
 export const DECK_GAME_LIST: readonly DeckGame[] = Object.values(DECK_GAMES)
 
 export type DeckGameId = string
 
-export const DEFAULT_DECK_GAME = "mtg"
+export const DEFAULT_DECK_GAME = "mtg" satisfies SystemId
 
 export function deckGame(game: string): DeckGame | undefined {
-  return Object.prototype.hasOwnProperty.call(DECK_GAMES, game) ? DECK_GAMES[game] : undefined
+  return isSystemId(game) ? DECK_GAMES[game] : undefined
 }
 
 export function assertDeckGame(game: string): DeckGameId {
@@ -179,7 +71,7 @@ export function deckFormats(game: string): readonly DeckFormat[] {
 }
 
 export function defaultDeckFormat(game: string) {
-  return deckGame(game)?.defaultFormat ?? MTG_FORMATS[0].id
+  return deckGame(game)?.defaultFormat ?? SYSTEMS[DEFAULT_DECK_GAME].defaultFormat.deck
 }
 
 export function deckFormatLabel(game: string, format: string) {
@@ -217,7 +109,8 @@ export function magicCatalogCardFields(card: {
   printingId?: string
   section: string
 }) {
-  if (card.game !== "mtg") return {}
+  if (systemDefinition(card.game)?.integration.capabilities.cardCatalog.provider !== "scryfall")
+    return {}
   const board = card.section === "commander" || card.section === "sideboard" ? card.section : "main"
   return { oracleId: card.cardId, scryfallId: card.printingId, board } as const
 }

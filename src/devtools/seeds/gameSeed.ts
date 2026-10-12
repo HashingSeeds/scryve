@@ -92,7 +92,7 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       startingLife:
         params.start !== undefined
           ? integer("start", params.start)
-          : defaultStartingLife(system, format),
+          : defaultStartingLife(system, format, playerCount),
       system,
       format,
       layout,

@@ -1,7 +1,13 @@
 import { randomUUID as secureRandomUUID } from "expo-crypto"
 
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
-import { isPlaySystemId, playSystemFormat, playSystemRules, type PlaySystemId } from "./playSystems"
+import {
+  isPlaySystemId,
+  playSystemFormat,
+  playSystemRules,
+  playTableRules,
+  type PlaySystemId,
+} from "./playSystems"
 import type {
   ActorId,
   CommanderDamageAssignedEvent,
@@ -28,6 +34,13 @@ import {
   shapeForSeat,
 } from "../../../convex/lib/appearance"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
+import {
+  applyTableAction,
+  EMPTY_TABLE,
+  isOutByTableCounters,
+  tableHasState,
+  type TableAction,
+} from "../../../convex/lib/table"
 
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
 export const MAX_LIFE_DELTA = 999_999
@@ -320,7 +333,43 @@ export function isPlayerOut(game: LocalGame, playerId: PlayerId): boolean {
   if (playSystemRules(game.system).counter.direction === "down")
     return game.players.some((player) => player.id !== playerId && player.life <= 0)
   const player = game.players.find(({ id }) => id === playerId)
-  return (player?.life ?? 0) <= 0 || isEliminatedByCommanderDamage(game, playerId)
+  return (
+    (player?.life ?? 0) <= 0 ||
+    isEliminatedByCommanderDamage(game, playerId) ||
+    isOutByTableCounters(game.table ?? EMPTY_TABLE, playerId, localTableRules(game))
+  )
+}
+
+export function localTableRules(game: Pick<LocalGame, "system" | "format">) {
+  return playTableRules(game.system, game.format)
+}
+
+/** why: table actions change current state without joining the event log; a knockout also moves the taker's prize counter. */
+export function applyLocalTableAction(
+  game: LocalGame,
+  action: TableAction,
+  context: { operationId: string; now: number },
+): LocalGame {
+  if (game.status !== "active") return game
+  const table = game.table ?? EMPTY_TABLE
+  const change = applyTableAction(table, action, {
+    rules: localTableRules(game),
+    operationId: context.operationId,
+    lifeOf: (playerId) => game.players.find(({ id }) => id === playerId)?.life,
+  })
+  if (!change || change.table === table) return game
+  const players = game.players.map((player) => {
+    const delta = change.life
+      .filter((life) => life.playerId === player.id)
+      .reduce((total, life) => total + life.delta, 0)
+    return delta === 0 ? player : { ...player, life: player.life + delta }
+  })
+  return {
+    ...game,
+    table: change.table,
+    players,
+    updatedAt: Math.max(game.updatedAt, context.now),
+  }
 }
 
 export function lastPlayerStanding(game: LocalGame): PlayerId | undefined {
@@ -530,7 +579,8 @@ export function hasLocalGameStarted(game: LocalGame): boolean {
   return (
     game.events.length > 0 ||
     game.players.some((player) => player.life !== game.startingLife) ||
-    Object.values(game.commanderDamage ?? {}).some((damage) => damage !== 0)
+    Object.values(game.commanderDamage ?? {}).some((damage) => damage !== 0) ||
+    tableHasState(game.table)
   )
 }
 

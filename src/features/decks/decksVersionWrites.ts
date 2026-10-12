@@ -13,12 +13,14 @@ import {
   type DurableOutboxKeys,
   type DurablePendingRecord,
   type DurableStringStorage,
+  type FieldName,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
-import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
+import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
 import { scopedOwnerId } from "./decksSync"
+import { DECK_VERSION_CONFLICT_REASON, DECK_VERSION_QUEUE_CONFLICT_REASON } from "./deckSyncReasons"
 import { DeckVersionCacheRepository, type CachedVersion } from "./deckVersionsCache"
 import { api } from "../../../convex/_generated/api"
 import { MAX_DECK_NOTE_LENGTH, assertVersionName } from "../../../convex/lib/policy"
@@ -58,13 +60,12 @@ const SCOPE = "versionCards"
 const RETRY_DELAY_MS = 2_000
 // why: each card write is a full list; a 300-entry deck is ~190 KB, past the default budget.
 const VERSION_OUTBOX_LIMITS = { maxPendingBytes: 512 * 1024, maxFailedBytes: 512 * 1024 }
-export const DECK_VERSION_CONFLICT_REASON =
-  "Deck cards changed on another device. Choose which card list to keep."
-export const DECK_VERSION_QUEUE_CONFLICT_REASON =
-  "An earlier card edit conflicted. Choose which card list to keep."
+export { DECK_VERSION_CONFLICT_REASON, DECK_VERSION_QUEUE_CONFLICT_REASON }
 export const DECK_VERSION_DRAFT_UNSYNCED_REASON =
   "This offline draft was never synced. Discard it and create the version again."
 export const DECK_VERSION_LAST_REASON = "A deck must keep at least one version."
+export const DECK_VERSION_REJECTED_REASON =
+  "The server can't accept these changes. Discard them and edit again."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -107,6 +108,39 @@ function isCount(value: unknown): value is number {
 
 function isCard(value: unknown): value is VersionCardPayload {
   return isRecord(value) && typeof value.name === "string" && isCount(value.quantity)
+}
+
+/* why: queued cards can carry fields the server validator rejects (another build wrote them, or a
+   contract release dropped one). `satisfies` breaks the build when the validator's fields change. */
+const serverCardFields = new Set(
+  Object.keys({
+    game: true,
+    identityNamespace: true,
+    cardId: true,
+    providerCardId: true,
+    printingId: true,
+    section: true,
+    entryKind: true,
+    originalReference: true,
+    category: true,
+    oracleId: true,
+    scryfallId: true,
+    name: true,
+    imageUrl: true,
+    smallImageUrl: true,
+    quantity: true,
+    board: true,
+    commanderColor: true,
+  } satisfies Record<keyof VersionCardPayload, true>),
+)
+
+function serverCards(cards: readonly VersionCardPayload[]): VersionCardPayload[] {
+  return cards.map(
+    (card) =>
+      Object.fromEntries(
+        Object.entries(card).filter(([field]) => serverCardFields.has(field)),
+      ) as VersionCardPayload,
+  )
 }
 
 const lifecycleOps = new Set<VersionLifecycleOp>(["cards", "create", "rename", "delete"])
@@ -158,6 +192,38 @@ function parseFailed(value: unknown): FailedVersionWrite | null {
   return action ? { schemaVersion: 1, action, reason, failedAt: value.failedAt } : null
 }
 
+const fieldNames: Record<FieldName<PendingVersionWrite | VersionCardPayload>, true> = {
+  schemaVersion: true,
+  queuedAt: true,
+  attempts: true,
+  lastAttemptAt: true,
+  ownerId: true,
+  deckId: true,
+  versionId: true,
+  operationId: true,
+  expectedRevision: true,
+  cards: true,
+  op: true,
+  name: true,
+  note: true,
+  game: true,
+  identityNamespace: true,
+  cardId: true,
+  providerCardId: true,
+  printingId: true,
+  section: true,
+  entryKind: true,
+  originalReference: true,
+  category: true,
+  oracleId: true,
+  scryfallId: true,
+  imageUrl: true,
+  smallImageUrl: true,
+  quantity: true,
+  board: true,
+  commanderColor: true,
+}
+
 const codec: DurableOutboxCodec<PendingVersionWrite, FailedVersionWrite> = {
   parsePending,
   parseFailed,
@@ -165,6 +231,8 @@ const codec: DurableOutboxCodec<PendingVersionWrite, FailedVersionWrite> = {
   operationId: (action) => action.operationId,
   belongsToScope: (action, ownerId, scope) => action.ownerId === ownerId && scope === SCOPE,
   compare: (left, right) => compareActions(left, right),
+  operationTypes: [...lifecycleOps],
+  knownKeys: Object.keys(fieldNames),
 }
 
 function compareActions(left: PendingVersionWrite, right: PendingVersionWrite) {
@@ -189,7 +257,6 @@ function replayChain(actions: readonly PendingVersionWrite[]): PendingVersionWri
 
 export class DeckVersionWriteRepository {
   private readonly outbox: DurableOutbox<PendingVersionWrite, FailedVersionWrite>
-  private readonly keys: DurableOutboxKeys
   private readonly local: DurableStringStorage
   private readonly deploymentUrl?: string
 
@@ -200,8 +267,13 @@ export class DeckVersionWriteRepository {
   ) {
     this.local = local
     this.deploymentUrl = deploymentUrl
-    this.keys = outboxKeys(deploymentUrl)
-    this.outbox = new DurableOutbox(local, ownerId, this.keys, codec, VERSION_OUTBOX_LIMITS)
+    this.outbox = new DurableOutbox(
+      local,
+      ownerId,
+      outboxKeys(deploymentUrl),
+      codec,
+      VERSION_OUTBOX_LIMITS,
+    )
   }
 
   get cache() {
@@ -251,10 +323,7 @@ export class DeckVersionWriteRepository {
       .filter((action) => action.versionId === versionId && action.attempts === 0)
       .entries())
       if (tail.expectedRevision !== ackRevision + offset)
-        this.local.set(
-          this.keys.pendingRecord(SCOPE, tail.operationId, this.ownerId),
-          JSON.stringify({ ...tail, expectedRevision: ackRevision + offset }),
-        )
+        this.outbox.replacePending(SCOPE, { ...tail, expectedRevision: ackRevision + offset })
   }
 }
 
@@ -509,7 +578,7 @@ export class DeckVersionWriteController {
         operationId: action.operationId,
         name: action.name ?? "",
         ...(action.note ? { note: action.note } : {}),
-        cards: action.cards,
+        cards: serverCards(action.cards),
       })
     const draftRow = this.repository.cache
       .loadVersions(action.deckId)
@@ -541,7 +610,7 @@ export class DeckVersionWriteController {
       versionId: serverVersionId as VersionWriteArgs["versionId"],
       operationId: action.operationId,
       expectedRevision: action.expectedRevision,
-      cards: action.cards,
+      cards: serverCards(action.cards),
       returnConflict: true,
     })
   }
@@ -564,6 +633,8 @@ export class DeckVersionWriteController {
               ? DECK_VERSION_QUEUE_CONFLICT_REASON
               : DECK_VERSION_CONFLICT_REASON,
           }
+        if (isArgumentValidationError(cause))
+          return { kind: "reject" as const, reason: DECK_VERSION_REJECTED_REASON }
         return code && permanentErrors.has(code)
           ? {
               kind: "reject" as const,

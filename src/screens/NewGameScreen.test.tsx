@@ -190,6 +190,11 @@ describe("NewGameScreen", () => {
     ).toBeNull()
   })
 
+  it("drops the empty status row from a fresh local setup", () => {
+    expect(setup().queryByTestId("setup-status")).toBeNull()
+    expect(setup({ localGame: runningLocalGame() }).getByTestId("setup-status")).toBeTruthy()
+  })
+
   it("surfaces a hosted live game in local setup only", () => {
     const onResumeConnected = jest.fn()
     const hosted = {
@@ -534,6 +539,22 @@ describe("NewGameScreen", () => {
       expect.any(Array),
       21,
       expect.objectContaining({ format: "commander", lifeStep: 1 }),
+    )
+  })
+
+  it("follows Brawl life from two players to multiplayer", () => {
+    const onStartLocal = jest.fn()
+    const view = setup({ onStartLocal })
+    fireEvent.press(view.getByTestId("play-system-mtg"))
+    fireEvent.press(view.getByTestId("play-format"))
+    fireEvent.press(view.getByTestId("play-format-option-brawl"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("player-count-increment"))
+    fireEvent.press(view.getByTestId("start-game-button"))
+    expect(onStartLocal).toHaveBeenCalledWith(
+      expect.any(Array),
+      30,
+      expect.objectContaining({ format: "brawl" }),
     )
   })
 

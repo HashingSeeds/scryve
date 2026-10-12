@@ -63,6 +63,7 @@ import {
   playSystemRules,
   supportsCommanderDamage,
 } from "@/features/game/playSystems"
+import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
@@ -278,6 +279,8 @@ type BoardSeat = Omit<GamePlayer, "life">
 const ConnectedLivesContext = createContext<Readonly<Record<string, number>>>({})
 /** why: the unsent count moves on every tap; only the status sheet shows it. */
 const ConnectedUnsentContext = createContext(0)
+// why: like lives, table changes reach only the grid through context, so the memoized board around it skips them.
+const ConnectedTableContext = createContext<TableRuntime | undefined>(undefined)
 
 function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
   return {
@@ -361,6 +364,50 @@ function ConnectedBoardRuntime({
   const lives = useStructurallyStable(
     runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
   )
+  const tableState = useStructurallyStable(runtime.table)
+  const {
+    tableRules,
+    adjustCounter,
+    takeDesignation,
+    releaseDesignation,
+    placePokemon,
+    updatePokemon,
+    adjustPokemonDamage,
+    switchActive,
+    removePokemon,
+    knockOut,
+    undoKnockout,
+  } = runtime
+  const table = useMemo(
+    (): TableRuntime => ({
+      table: tableState,
+      tableRules,
+      adjustCounter,
+      takeDesignation,
+      releaseDesignation,
+      placePokemon,
+      updatePokemon,
+      adjustPokemonDamage,
+      switchActive,
+      removePokemon,
+      knockOut,
+      undoKnockout,
+    }),
+    [
+      tableState,
+      tableRules,
+      adjustCounter,
+      takeDesignation,
+      releaseDesignation,
+      placePokemon,
+      updatePokemon,
+      adjustPokemonDamage,
+      switchActive,
+      removePokemon,
+      knockOut,
+      undoKnockout,
+    ],
+  )
   const latest = useRef(runtime)
   useLayoutEffect(() => {
     latest.current = runtime
@@ -409,24 +456,26 @@ function ConnectedBoardRuntime({
   if (!view) return null
   return (
     <ConnectedLivesContext.Provider value={lives}>
-      <ConnectedUnsentContext.Provider value={runtime.pending.length}>
-        <ConnectedBoardReady
-          publicId={publicId}
-          initialInviteOpen={initialInviteOpen}
-          onBack={onBack}
-          onSetup={onSetup}
-          onHistory={onHistory}
-          onDecks={onDecks}
-          onSettings={onSettings}
-          onAccount={onAccount}
-          accountLabel={accountLabel}
-          onGameEnded={onGameEnded}
-          onRematch={onRematch}
-          onGameAbandoned={onGameAbandoned}
-          view={view}
-          controls={controls}
-        />
-      </ConnectedUnsentContext.Provider>
+      <ConnectedTableContext.Provider value={table}>
+        <ConnectedUnsentContext.Provider value={runtime.pending.length}>
+          <ConnectedBoardReady
+            publicId={publicId}
+            initialInviteOpen={initialInviteOpen}
+            onBack={onBack}
+            onSetup={onSetup}
+            onHistory={onHistory}
+            onDecks={onDecks}
+            onSettings={onSettings}
+            onAccount={onAccount}
+            accountLabel={accountLabel}
+            onGameEnded={onGameEnded}
+            onRematch={onRematch}
+            onGameAbandoned={onGameAbandoned}
+            view={view}
+            controls={controls}
+          />
+        </ConnectedUnsentContext.Provider>
+      </ConnectedTableContext.Provider>
     </ConnectedLivesContext.Provider>
   )
 }
@@ -558,6 +607,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       return `A ${event.delta > 0 ? "+" : ""}${event.delta} ${counter.label} change could not sync`
     if (event.type === "commanderDamage.submitted")
       return `A ${event.delta > 0 ? "+" : ""}${event.delta} commander damage assignment could not sync`
+    if (event.type === "table.action") return "A table change could not sync"
     return `${event.accepted ? "Confirming" : "Declining"} commander damage could not sync`
   }
   const displayNameOf = (playerId: string) =>
@@ -1197,7 +1247,8 @@ function ConnectedLifeGrid({
     () => seats.map((seat): GamePlayer => ({ ...seat, life: lives[seat.id] ?? 0 })),
     [lives, seats],
   )
-  return <PlayerGrid {...grid} players={players} />
+  const table = useContext(ConnectedTableContext)
+  return <PlayerGrid {...grid} players={players} table={table} />
 }
 
 function WinnerChoice({

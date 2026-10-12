@@ -22,6 +22,7 @@ import {
 import { applyClaimDecisions, type ClaimDecision } from "./localGameClaims"
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
 import {
+  defaultStartingLife,
   isPlaySystemId,
   playSystemFormats,
   playSystemId,
@@ -42,6 +43,7 @@ import type {
 } from "./types"
 import { isPlayerMarkShape } from "../../../convex/lib/appearance"
 import { isMatchBestOf, MAX_GAMES_PER_MATCH } from "../../../convex/lib/matchResults"
+import { parseTableState } from "../../../convex/lib/table"
 
 export const MAX_HISTORY_GAMES = 30
 export const MAX_ACTIVE_EVENTS = 500
@@ -318,6 +320,8 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   if (!players || events.some((event) => event.gameId !== value.id)) return null
   const result = parseResult(value.result)
   const commanderDamage = parseCommanderDamage(value.commanderDamage)
+  // why: a table that fails to parse is dropped rather than losing the whole game.
+  const table = parseTableState(value.table)
   const account = parseAccount(value.account)
   const match = parseMatch(value.match, players.length)
   return {
@@ -335,6 +339,7 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     players,
     events,
     ...(commanderDamage ? { commanderDamage } : {}),
+    ...(table ? { table } : {}),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     ...(typeof value.finishedAt === "number" ? { finishedAt: value.finishedAt } : {}),
@@ -363,6 +368,7 @@ function parseSettings(value: unknown): LocalSettings | null {
   ) {
     return null
   }
+  const systemPreference = parseSystemPreference(migrated.defaultSystem, migrated.defaultFormat)
   return {
     schemaVersion: 1,
     defaultPlayerCount: migrated.defaultPlayerCount,
@@ -373,8 +379,23 @@ function parseSettings(value: unknown): LocalSettings | null {
       ? migrated.menuButtonStyle
       : DEFAULT_MENU_BUTTON_STYLE,
     launchDestination: migrated.launchDestination === "decks" ? "decks" : "play",
-    ...parseSystemPreference(migrated.defaultSystem, migrated.defaultFormat),
+    ...systemPreference,
   }
+}
+
+// why: Brawl preferences saved before Brawl had its own default stored Magic's 20, which would otherwise read as a custom value and stop following format changes.
+function migrateBrawlStartingLife(settings: LocalSettings): LocalSettings {
+  const { defaultSystem, defaultFormat, defaultStartingLife: startingLife } = settings
+  return defaultSystem === "mtg" && defaultFormat === "brawl" && startingLife === 20
+    ? {
+        ...settings,
+        defaultStartingLife: defaultStartingLife(
+          defaultSystem,
+          defaultFormat,
+          settings.defaultPlayerCount,
+        ),
+      }
+    : settings
 }
 
 function parseSystemPreference(
@@ -507,18 +528,23 @@ export class LocalGameRepository {
   }
 
   loadSettings(): LocalSettings {
-    const current = parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.settings)))
-    if (current) return current
-    const legacy = parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.legacySettings)))
-    const settings = legacy ?? DEFAULT_LOCAL_SETTINGS
+    const stored = parseJson(this.storage.getString(LOCAL_KEYS.settings))
+    const current = parseSettings(stored)
+    if (current && isRecord(stored) && stored.brawlLifeMigrated === true) return current
+    const legacy = current
+      ? null
+      : parseSettings(parseJson(this.storage.getString(LOCAL_KEYS.legacySettings)))
+    const found = current ?? legacy
+    const settings = found ? migrateBrawlStartingLife(found) : DEFAULT_LOCAL_SETTINGS
     this.saveSettings(settings)
     if (legacy) this.storage.delete(LOCAL_KEYS.legacySettings)
     return settings
   }
 
   saveSettings(settings: LocalSettings): void {
-    const valid = parseSettings(settings)
-    this.storage.set(LOCAL_KEYS.settings, JSON.stringify(valid ?? DEFAULT_LOCAL_SETTINGS))
+    const valid = parseSettings(settings) ?? DEFAULT_LOCAL_SETTINGS
+    // why: anything this build saves is past the one-time Brawl fix, so a 20 chosen afterward is never migrated again.
+    this.storage.set(LOCAL_KEYS.settings, JSON.stringify({ ...valid, brawlLifeMigrated: true }))
   }
 
   loadLayoutPreference(playerCount: number): PlayerGridLayoutVariant {

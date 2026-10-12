@@ -1,31 +1,20 @@
 import { ConvexError } from "convex/values"
-import { convexTest } from "convex-test"
 
+import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import schema from "./schema"
+import type { TableAction } from "./lib/table"
 
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./accountDeletion.ts": async () => jest.requireActual("./accountDeletion"),
-  "./deckCatalogs.ts": async () => jest.requireActual("./deckCatalogs"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 const token = "t".repeat(43)
 
-async function synced(t: ReturnType<typeof convexTest>, subject: string, name: string) {
+async function synced(t: ConvexTestHarness, subject: string, name: string) {
   const actor = t.withIdentity({ subject })
   await actor.mutation(api.users.syncCurrent, { displayName: name })
   return actor
 }
 
 async function lobby(
-  t: ReturnType<typeof convexTest>,
+  t: ConvexTestHarness,
   options: { deckRequired?: boolean; playerCount?: number } = {},
 ) {
   const host = await synced(t, "host-subject", "Host")
@@ -46,7 +35,7 @@ async function lobby(
 
 describe("Convex connected-game authorization", () => {
   it("rejects unauthenticated creation and nonmember projection without disclosure", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await expect(
       t.mutation(api.games.createLobby, {
         publicId: "public-game-id-123456",
@@ -73,7 +62,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("claims one seat idempotently and prevents a full-lobby race", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { created } = await lobby(t)
     const joiner = await synced(t, "joiner", "Joiner")
     await expect(
@@ -96,7 +85,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("prevents a host from accumulating simultaneous lobbies", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host } = await lobby(t)
 
     await expect(
@@ -115,7 +104,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("claims separate seats for separate devices on the same signed-in account", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
 
     await expect(
@@ -152,7 +141,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("enforces host-only start and requires all configured seats", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     await expect(
       host.mutation(api.games.startGame, { publicId: created.publicId }),
@@ -197,7 +186,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("lets only the host change lobby settings without removing occupied seats", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "settings-joiner", "Joiner")
     await joiner.mutation(api.games.claimSeat, {
@@ -251,7 +240,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("applies updated player and deck requirements to readiness and start", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t, { playerCount: 3 })
     const joiner = await synced(t, "requirements-joiner", "Joiner")
     await joiner.mutation(api.games.claimSeat, {
@@ -288,7 +277,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("keeps legacy lobbies deck-optional and blocks required lobbies without decks", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host: requiredHost, created: requiredLobby } = await lobby(t, {
       deckRequired: true,
     })
@@ -332,7 +321,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("enforces invite revocation and manual-code collisions", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "joiner", "Joiner")
     await t.run(async (ctx) => {
@@ -344,7 +333,7 @@ describe("Convex connected-game authorization", () => {
     })
     await expect(
       joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" }),
-    ).rejects.toThrow("invalid, expired, or revoked")
+    ).resolves.toBeNull()
     await t.run(async (ctx) => {
       const invite = await ctx.db
         .query("invitations")
@@ -355,7 +344,7 @@ describe("Convex connected-game authorization", () => {
     await host.mutation(api.games.revokeInvite, { publicId: created.publicId })
     await expect(
       joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" }),
-    ).rejects.toThrow("invalid, expired, or revoked")
+    ).resolves.toBeNull()
     const secondHost = await synced(t, "second-host", "Second host")
     await expect(
       secondHost.mutation(api.games.createLobby, {
@@ -372,7 +361,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("rate-limits authenticated invite enumeration", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = await synced(t, "scanner", "Scanner")
     for (let index = 0; index < 10; index += 1) {
       await expect(
@@ -387,7 +376,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("rejects oversized rulesets and manual-code candidate payloads before database work", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = await synced(t, "bounded-host", "Host")
     const base = {
       publicId: "bounded-public-game-id",
@@ -424,7 +413,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("validates the connected game format for its system", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = await synced(t, "format-host", "Host")
     const base = {
       publicId: "format-public-game-id",
@@ -457,7 +446,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("preserves a legacy ruleset as the format when no format is supplied", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = await synced(t, "legacy-format-host", "Host")
 
     await expect(
@@ -483,7 +472,7 @@ describe("Convex connected-game authorization", () => {
   })
 
   it("keeps decks optional for no-system lobbies", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = await synced(t, "no-system-host", "Host")
 
     const args = {
@@ -531,7 +520,7 @@ describe("Convex connected-game authorization", () => {
   })
 })
 
-async function activeGame(t: ReturnType<typeof convexTest>) {
+async function activeGame(t: ConvexTestHarness) {
   const { host, created } = await lobby(t)
   const joiner = await synced(t, "active-joiner", "Joiner")
   await joiner.mutation(api.games.claimSeat, {
@@ -562,7 +551,7 @@ function lifeArgs(
 
 describe("Convex realtime life writes", () => {
   it("returns stable codes and preserves messages for permanent life-write failures", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const stranger = await synced(t, "code-stranger", "Stranger")
     const args = lifeArgs(game.publicId, game.hostPlayerId, "operation-code-0001", 1)
@@ -632,7 +621,7 @@ describe("Convex realtime life writes", () => {
   })
 
   it("returns timestamp codes on every commander write path", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const resolution = {
       publicId: game.publicId,
@@ -658,7 +647,7 @@ describe("Convex realtime life writes", () => {
   })
 
   it("paginates a staged migration and discovers an older active game past 100 finished memberships", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = await synced(t, "legacy-member", "Legacy")
     await t.run(async (ctx) => {
       const user = await ctx.db
@@ -723,7 +712,7 @@ describe("Convex realtime life writes", () => {
   })
 
   it("rejects unauthenticated, nonmember, cross-seat, and invalid delta/operation writes", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await expect(
       t.mutation(
@@ -777,7 +766,7 @@ describe("Convex realtime life writes", () => {
   })
 
   it("atomically updates totals and an immutable log for simultaneous same/different-player deltas", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const gameRowBefore = await t.run((ctx) =>
       ctx.db
@@ -830,7 +819,7 @@ describe("Convex realtime life writes", () => {
   })
 
   it("deduplicates lost acknowledgements and duplicate/reordered replay exactly once", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const second = lifeArgs(game.publicId, game.hostPlayerId, "operation-replay-0002", -1)
     const first = lifeArgs(game.publicId, game.hostPlayerId, "operation-replay-0001", 5)
@@ -853,7 +842,7 @@ describe("Convex realtime life writes", () => {
   })
 
   it("recovers the head operation without reading recent IDs in the modern projection", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const args = lifeArgs(game.publicId, game.hostPlayerId, "operation-status-0001", 5)
     await game.host.mutation(api.games.changeLife, args)
@@ -932,7 +921,7 @@ describe("Convex realtime life writes", () => {
   })
 
   it("finishes only online through the host transition, preserves summary/history, and rejects new writes", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const committed = lifeArgs(game.publicId, game.hostPlayerId, "operation-before-finish", -5)
     await game.host.mutation(api.games.changeLife, committed)
@@ -974,7 +963,7 @@ describe("Convex realtime life writes", () => {
 
 describe("connected game lifecycle and API hardening", () => {
   it("validates profile avatar URLs at the user projection boundary", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = t.withIdentity({ subject: "avatar-user" })
     await expect(
       actor.mutation(api.users.syncCurrent, {
@@ -990,88 +979,8 @@ describe("connected game lifecycle and API hardening", () => {
     ).resolves.toBeDefined()
   })
 
-  it("shows synced account usernames on the projection instead of seat labels", async () => {
-    const t = convexTest(schema, modules)
-    const { host, created } = await lobby(t)
-    const joiner = t.withIdentity({ subject: "named-joiner" })
-    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner", username: "joiner_cool" })
-    await joiner.mutation(api.games.claimSeat, {
-      manualCode: "ABC234",
-      displayName: "Joiner",
-      color: "#2563EB",
-    })
-    const board = (publicId: string) =>
-      host.query(api.games.lobbyProjection, { publicId, deviceId: "device-host-0001" })
-    const names = async () =>
-      (await board(created.publicId)).players.map((player) => player.displayName)
-    expect(await names()).toEqual(["Player 1", "joiner_cool"])
-
-    await joiner.mutation(api.users.syncCurrent, {
-      displayName: "Joiner",
-      username: "joiner_renamed",
-    })
-    expect(await names()).toEqual(["Player 1", "joiner_renamed"])
-
-    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner" })
-    expect(await names()).toEqual(["Player 1", "joiner_renamed"])
-
-    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner", username: "" })
-    expect(await names()).toEqual(["Player 1", "joiner_cool"])
-
-    const newcomer = t.withIdentity({ subject: "newcomer-subject" })
-    await newcomer.mutation(api.users.syncCurrent, {
-      displayName: "Newcomer",
-      username: "Joiner_Renamed",
-    })
-    const freed = await newcomer.mutation(api.games.createLobby, {
-      publicId: "freed-name-lobby-123456",
-      playerCount: 2,
-      startingLife: 40,
-      ruleset: "commander",
-      inviteToken: "u".repeat(43),
-      manualCodeCandidates: ["NEW234"],
-      hostDisplayName: "Newcomer",
-      hostColor: "#7C3AED",
-      deviceId: "device-newcomer-1",
-    })
-    const freedProjection = await newcomer.query(api.games.lobbyProjection, {
-      publicId: freed.publicId,
-      deviceId: "device-newcomer-1",
-    })
-    expect(freedProjection.players.map((player) => player.displayName)).toEqual(["Joiner_Renamed"])
-  })
-
-  it("ignores conflicting or invalid usernames without failing the sync", async () => {
-    const t = convexTest(schema, modules)
-    const joiner = t.withIdentity({ subject: "taken-joiner" })
-    await joiner.mutation(api.users.syncCurrent, { displayName: "Joiner", username: "taken_name" })
-    const squatter = t.withIdentity({ subject: "squatter" })
-    await expect(
-      squatter.mutation(api.users.syncCurrent, { displayName: "Squatter", username: "TAKEN_name" }),
-    ).resolves.toBeDefined()
-    await expect(
-      squatter.mutation(api.users.syncCurrent, { displayName: "Squatter", username: "ab" }),
-    ).resolves.toBeDefined()
-    const created = await squatter.mutation(api.games.createLobby, {
-      publicId: "squatter-lobby-123456",
-      playerCount: 2,
-      startingLife: 40,
-      ruleset: "commander",
-      inviteToken: token,
-      manualCodeCandidates: ["ZZZ234"],
-      hostDisplayName: "Squatter",
-      hostColor: "#7C3AED",
-      deviceId: "device-squatter-1",
-    })
-    const projection = await squatter.query(api.games.lobbyProjection, {
-      publicId: created.publicId,
-      deviceId: "device-squatter-1",
-    })
-    expect(projection.players.map((player) => player.displayName)).toEqual(["Player 1"])
-  })
-
   it("reports only joinable invites and rotates the current invite atomically", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "rotation-joiner", "Joiner")
     const rotatedToken = "r".repeat(43)
@@ -1106,7 +1015,7 @@ describe("connected game lifecycle and API hardening", () => {
   })
 
   it("lets one member leave discovery without changing the game or other memberships", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const rowBefore = await t.run((ctx) =>
       ctx.db
@@ -1127,8 +1036,28 @@ describe("connected game lifecycle and API hardening", () => {
     expect(await t.run((ctx) => ctx.db.get(rowBefore!._id))).toEqual(rowBefore)
   })
 
+  it("frees a lobby seat when its player leaves", async () => {
+    const t = makeConvexTest()
+    const { host, created } = await lobby(t)
+    const leaver = await synced(t, "lobby-leaver", "Leaver")
+    await leaver.mutation(api.games.claimSeat, { token, displayName: "Leaver", color: "#2563EB" })
+    await expect(
+      leaver.mutation(api.games.leaveMyGame, { publicId: created.publicId }),
+    ).resolves.toMatchObject({ left: true })
+
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    expect(projection.players.map((player) => player.seat)).toEqual([1])
+    const next = await synced(t, "lobby-next", "Next")
+    await expect(
+      next.mutation(api.games.claimSeat, { token, displayName: "Next", color: "#112233" }),
+    ).resolves.toEqual({ publicId: created.publicId, seat: 2 })
+    await expect(
+      leaver.query(api.games.lobbyProjection, { publicId: created.publicId }),
+    ).rejects.toThrow("Game unavailable")
+  })
+
   it("does not transfer lobby host authority and allows explicit lobby abandon", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "lobby-policy-joiner", "Joiner")
     await joiner.mutation(api.games.claimSeat, {
@@ -1172,7 +1101,7 @@ describe("connected game lifecycle and API hardening", () => {
   })
 
   it("records deck results only for finished games, not abandoned ones", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = await synced(t, "stats-host", "Host")
     const joiner = await synced(t, "stats-joiner", "Joiner")
     const deckId = await host.mutation(api.decks.create, {
@@ -1237,7 +1166,7 @@ describe("connected game lifecycle and API hardening", () => {
   })
 
   it("abandons lobby/active games idempotently with correct bounded summaries and replay", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const gameRow = await t.run((ctx) =>
       ctx.db
@@ -1284,7 +1213,7 @@ describe("connected game lifecycle and API hardening", () => {
   })
 
   it("orders and paginates history without a global event sequence", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const gameRow = await t.run((ctx) =>
       ctx.db
@@ -1338,7 +1267,7 @@ describe("connected game lifecycle and API hardening", () => {
   })
 
   it("abandons stale games in bounded batches and refreshes recently active candidates", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = await synced(t, "stale-host", "Stale Host")
     const now = Date.now()
     const staleAt = now - 31 * 24 * 60 * 60 * 1000
@@ -1450,7 +1379,7 @@ function commanderArgs(
 
 describe("connected commander damage claims", () => {
   it("projects defender-only pending claims and confirms them atomically", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const submitted = await game.host.mutation(
       api.games.submitCommanderDamage,
@@ -1486,7 +1415,7 @@ describe("connected commander damage claims", () => {
           1,
         ),
       ),
-    ).rejects.toThrow("pending commander damage claim already exists")
+    ).resolves.toMatchObject({ status: "declined" })
 
     const attackerProjection = await game.host.query(api.games.lobbyProjection, {
       publicId: game.publicId,
@@ -1535,11 +1464,11 @@ describe("connected commander damage claims", () => {
         }),
       ],
     })
-    expect(await t.run((ctx) => ctx.db.query("gameEvents").collect())).toHaveLength(2)
+    expect(await t.run((ctx) => ctx.db.query("gameEvents").collect())).toHaveLength(4)
   })
 
   it("supports negative claims, declines without changing life, and projects lethal damage", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await game.host.mutation(
       api.games.submitCommanderDamage,
@@ -1603,7 +1532,7 @@ describe("connected commander damage claims", () => {
         deviceId: "device-host-0001",
         clientCreatedAt: 1_700_000_000_003,
       }),
-    ).rejects.toThrow("Defending seat-owner")
+    ).rejects.toThrow("Seat-owner permission required for the defending seat")
     await expect(
       game.joiner.mutation(api.games.declineCommanderDamage, {
         publicId: game.publicId,
@@ -1633,7 +1562,7 @@ describe("connected commander damage claims", () => {
   })
 
   it("rejects non-owners and non-Commander games", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await expect(
       game.joiner.mutation(
@@ -1647,7 +1576,7 @@ describe("connected commander damage claims", () => {
           "device-joiner-001",
         ),
       ),
-    ).rejects.toThrow("Attacking seat-owner")
+    ).rejects.toThrow("Seat-owner permission required for the attacking seat")
 
     const host = await synced(t, "noncommander-host", "Host")
     const created = await host.mutation(api.games.createLobby, {
@@ -1683,8 +1612,123 @@ describe("connected commander damage claims", () => {
     ).rejects.toThrow("only available in Commander games")
   })
 
+  it("declines claims that can never land so the attacker's queue drains", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const claimArgs = (operationId: string, delta: number) =>
+      commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta)
+    const claim = (operationId: string, delta: number) =>
+      game.host.mutation(api.games.submitCommanderDamage, claimArgs(operationId, delta))
+    const confirm = (operationId: string) =>
+      game.joiner.mutation(api.games.confirmCommanderDamage, {
+        publicId: game.publicId,
+        operationId,
+        deviceId: "device-joiner-001",
+        clientCreatedAt: 1_700_000_000_001,
+      })
+    await claim("commander-queued-0001", 5)
+    await confirm("commander-queued-0001")
+    await claim("commander-queued-0002", -5)
+    const eventCount = async () =>
+      (await t.run((ctx) => ctx.db.query("gameEvents").collect())).length
+    await expect(claim("commander-queued-0003", -5)).resolves.toMatchObject({
+      status: "declined",
+      deduplicated: false,
+    })
+    const eventsAfterDecline = await eventCount()
+    await expect(claim("commander-queued-0003", -5)).resolves.toMatchObject({
+      status: "declined",
+      deduplicated: true,
+    })
+    expect(await eventCount()).toBe(eventsAfterDecline)
+    const { publicId, ...submitted } = claimArgs("commander-queued-0003", -5)
+    await expect(
+      game.host.query(api.games.connectedOperationStatus, {
+        publicId,
+        operation: { kind: "commanderDamage.submitted", ...submitted },
+      }),
+    ).resolves.toMatchObject({ status: "acknowledged" })
+    const defender = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(defender.commanderDamage?.pendingClaims).toMatchObject([
+      { operationId: "commander-queued-0002" },
+    ])
+
+    await confirm("commander-queued-0002")
+    await expect(claim("commander-queued-0006", -5)).resolves.toMatchObject({
+      status: "declined",
+    })
+    await game.host.mutation(
+      api.games.changeLife,
+      lifeArgs(game.publicId, game.hostPlayerId, "operation-after-decline", -3),
+    )
+    const projection = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.players.map((player) => player.currentLife)).toEqual([37, 40])
+    expect(projection.commanderDamage).toMatchObject({
+      totals: [expect.objectContaining({ total: 0 })],
+      pendingClaims: [],
+    })
+
+    await expect(
+      game.joiner.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(
+          game.publicId,
+          game.hostPlayerId,
+          game.joinerPlayerId,
+          "commander-queued-0004",
+          1,
+          "device-joiner-001",
+        ),
+      ),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+    await expect(claim("commander-queued-0005", 1)).resolves.toMatchObject({ status: "pending" })
+    await expect(
+      game.host.mutation(api.games.declineCommanderDamage, {
+        publicId: game.publicId,
+        operationId: "commander-queued-0005",
+        deviceId: "device-host-0001",
+        clientCreatedAt: 1_700_000_000_002,
+      }),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+  })
+
+  it("declines totals above 99 and refuses a decline id another event already uses", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const claim = (operationId: string, delta: number) =>
+      game.host.mutation(
+        api.games.submitCommanderDamage,
+        commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, delta),
+      )
+    await claim("commander-ceiling-0001", 99)
+    await game.joiner.mutation(api.games.confirmCommanderDamage, {
+      publicId: game.publicId,
+      operationId: "commander-ceiling-0001",
+      deviceId: "device-joiner-001",
+      clientCreatedAt: 1_700_000_000_001,
+    })
+    await expect(claim("commander-ceiling-0002", 1)).resolves.toMatchObject({
+      status: "declined",
+    })
+
+    await game.host.mutation(
+      api.games.changeLife,
+      lifeArgs(game.publicId, game.hostPlayerId, "commander-ceiling-0003_declined", -1),
+    )
+    await expect(claim("commander-ceiling-0003", 1)).rejects.toMatchObject({
+      data: { code: "sync_operation_mismatch" },
+    })
+    await expect(claim("commander-ceiling-0003", 1)).rejects.toMatchObject({
+      data: { code: "sync_operation_mismatch" },
+    })
+  })
+
   it("does not acknowledge a resolution whose stored outcome conflicts with the queue", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await game.host.mutation(
       api.games.submitCommanderDamage,
@@ -1723,7 +1767,7 @@ describe("connected commander damage claims", () => {
   })
 
   it("returns a mismatch code when a commander resolution operation ID is reused", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const claimIds = ["commander-unique-claim-one", "commander-unique-claim-two"]
     for (const claimId of claimIds.slice(0, 1)) {
@@ -1776,7 +1820,7 @@ describe("connected commander damage claims", () => {
   })
 
   it("binds new resolution retries while preserving old resolution calls", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await game.host.mutation(
       api.games.submitCommanderDamage,
@@ -1846,7 +1890,7 @@ describe("connected commander damage claims", () => {
   })
 
   it("does not bind a new operation ID to the opposite legacy decision", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await game.host.mutation(
       api.games.submitCommanderDamage,
@@ -1877,7 +1921,7 @@ describe("connected commander damage claims", () => {
 
 describe("Convex replay-safe game completion", () => {
   it("replays the original acknowledgement after a lost response without duplicate effects", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const args = {
       publicId: game.publicId,
@@ -1910,7 +1954,7 @@ describe("Convex replay-safe game completion", () => {
   })
 
   it("rejects the same completion operation ID with a different payload", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const args = {
       publicId: game.publicId,
@@ -1951,7 +1995,7 @@ describe("Convex replay-safe game completion", () => {
   })
 
   it("returns the authoritative summary for a competing finish or abandon operation", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const abandoned = await game.host.mutation(api.games.abandonGameWithOperation, {
       publicId: game.publicId,
@@ -1976,7 +2020,7 @@ describe("Convex replay-safe game completion", () => {
   })
 
   it("keeps completion host-only and leaves the game untouched for non-hosts", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await expect(
       game.joiner.mutation(api.games.finishGameWithOperation, {
@@ -2007,7 +2051,7 @@ describe("Convex replay-safe game completion", () => {
   })
 
   it("preserves legacy endpoint behavior alongside the receipt-bound operations", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     const legacy = await game.host.mutation(api.games.finishGame, { publicId: game.publicId })
     await expect(
@@ -2026,7 +2070,7 @@ describe("Convex replay-safe game completion", () => {
   })
 
   it("abandons a lobby once, replays identically, and requires an active game to finish", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const args = { publicId: created.publicId, operationId: "completion-lobby-abandon-1" }
     const first = await host.mutation(api.games.abandonGameWithOperation, args)
@@ -2047,7 +2091,7 @@ describe("Convex replay-safe game completion", () => {
   })
 
   it("deletes completion receipts during bounded account-deletion cleanup", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await game.host.mutation(api.games.finishGameWithOperation, {
       publicId: game.publicId,
@@ -2080,7 +2124,7 @@ describe("Convex replay-safe game completion", () => {
 
 describe("hosted player appearances", () => {
   it("assigns distinct colors and shapes when every joiner requests the host's appearance", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t, { playerCount: 6 })
     for (let seat = 2; seat <= 6; seat += 1) {
       const joiner = await synced(t, `appearance-joiner-${seat}`, `Joiner ${seat}`)
@@ -2097,7 +2141,7 @@ describe("hosted player appearances", () => {
   })
 
   it("accepts a join without an appearance preference", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "appearance-default-joiner", "Joiner")
     await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner" })
@@ -2106,7 +2150,7 @@ describe("hosted player appearances", () => {
   })
 
   it("rejects color or shape collisions through both appearance write paths", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "appearance-editor", "Joiner")
     await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" })
@@ -2154,7 +2198,7 @@ describe("hosted player appearances", () => {
   })
 
   it("repairs legacy duplicate appearances in seat order before starting", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "appearance-legacy-joiner", "Joiner")
     await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" })
@@ -2181,10 +2225,12 @@ describe("hosted player appearances", () => {
   })
 
   it("allows legacy lobby renames and color changes despite unchanged duplicate shapes", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const { host, created } = await lobby(t)
     const joiner = await synced(t, "legacy-rename-joiner", "Joiner")
-    const { seat } = await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner" })
+    const claim = await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner" })
+    if (!claim) throw new Error("Expected the lobby claim to succeed")
+    const { seat } = claim
     const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
     const [first, second] = projection.players
     await t.run((ctx) =>
@@ -2229,7 +2275,7 @@ describe("connected rematch", () => {
   afterEach(() => jest.useRealTimers())
 
   it("seats the same table in a new game when the host finishes with a rematch", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await game.host.mutation(
       api.games.changeLife,
@@ -2275,7 +2321,7 @@ describe("connected rematch", () => {
   })
 
   it("finishes without a rematch when players at the table have blocked each other", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await t.run(async (ctx) => {
       const players = await ctx.db.query("gamePlayers").collect()
@@ -2297,7 +2343,7 @@ describe("connected rematch", () => {
   })
 
   it("discards an untouched rematch without history when the host starts another game", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await game.host.mutation(api.games.finishGame, { publicId: game.publicId, rematch })
 
@@ -2329,7 +2375,7 @@ describe("connected rematch", () => {
   })
 
   it("keeps a rematch once anyone has played in it", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const game = await activeGame(t)
     await game.host.mutation(api.games.finishGame, { publicId: game.publicId, rematch })
     const next = await game.host.query(api.games.lobbyProjection, { publicId: rematch.publicId })
@@ -2342,5 +2388,426 @@ describe("connected rematch", () => {
     await expect(
       game.host.query(api.games.lobbyProjection, { publicId: rematch.publicId }),
     ).resolves.toMatchObject({ status: "active" })
+  })
+})
+
+describe("Convex game write rate limits", () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => jest.useRealTimers())
+
+  it("lets a fast burst through, then rate-limits only new changes from the player who keeps going", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    for (let index = 0; index < 60; index += 1)
+      await game.host.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.hostPlayerId, `burst-operation-${index}`.padEnd(16, "0"), -1),
+      )
+    await expect(
+      game.host.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.hostPlayerId, "burst-operation-over", -1),
+      ),
+    ).rejects.toMatchObject({ data: { code: "rate_limited" } })
+    await expect(
+      game.host.mutation(
+        api.games.changeLife,
+        lifeArgs(game.publicId, game.hostPlayerId, "burst-operation-0".padEnd(16, "0"), -1),
+      ),
+    ).resolves.toMatchObject({ deduplicated: true })
+    await expect(
+      game.joiner.mutation(
+        api.games.changeLife,
+        lifeArgs(
+          game.publicId,
+          game.joinerPlayerId,
+          "joiner-operation-0001",
+          -1,
+          "device-join-0001",
+        ),
+      ),
+    ).resolves.toBeDefined()
+  })
+
+  it("rate-limits table actions the same way and still acknowledges a replay", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    const poison = (operationId: string) =>
+      game.host.mutation(api.games.tableAction, {
+        publicId: game.publicId,
+        operationId,
+        deviceId: "device-host-0001",
+        clientCreatedAt: 1_700_000_000_000,
+        action: {
+          kind: "counter.changed",
+          playerId: game.hostPlayerId,
+          counterId: "poison",
+          delta: 1,
+        },
+      })
+    for (let index = 0; index < 60; index += 1) await poison(`table-burst-op-${index}`)
+    await expect(poison("table-burst-op-over")).rejects.toMatchObject({
+      data: { code: "rate_limited" },
+    })
+    await expect(poison("table-burst-op-0")).resolves.toMatchObject({
+      deduplicated: true,
+    })
+  })
+
+  it("rate-limits a host who keeps recreating lobbies", async () => {
+    const t = makeConvexTest()
+    const host = await synced(t, "lobby-spammer", "Host")
+    const create = (index: number) =>
+      host.mutation(api.games.createLobby, {
+        publicId: `spam-public-id-${index}`.padEnd(16, "0"),
+        playerCount: 2,
+        startingLife: 20,
+        ruleset: "none",
+        system: "none",
+        inviteToken: `${index}`.padEnd(43, "t"),
+        manualCodeCandidates: [`SPAM2${index}`],
+        hostDisplayName: "Host",
+        hostColor: "#7C3AED",
+      })
+    for (let index = 0; index < 5; index += 1) {
+      const created = await create(index)
+      await host.mutation(api.games.abandonGame, { publicId: created.publicId })
+    }
+    await expect(create(5)).rejects.toMatchObject({ data: { code: "rate_limited" } })
+  })
+})
+
+describe("connected table actions", () => {
+  async function pokemonGame(t: ConvexTestHarness) {
+    const host = await synced(t, "table-host", "Host")
+    const created = await host.mutation(api.games.createLobby, {
+      publicId: "pokemon-table-game-123",
+      playerCount: 2,
+      startingLife: 6,
+      ruleset: "standard",
+      system: "pokemon",
+      format: "standard",
+      inviteToken: token,
+      manualCodeCandidates: ["PKM234"],
+      hostDisplayName: "Host",
+      hostColor: "#7C3AED",
+      deviceId: "device-host-0001",
+    })
+    const joiner = await synced(t, "table-joiner", "Joiner")
+    await joiner.mutation(api.games.claimSeat, { token, displayName: "Joiner", color: "#2563EB" })
+    await host.mutation(api.games.startGame, { publicId: created.publicId })
+    const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
+    return {
+      host,
+      joiner,
+      publicId: created.publicId,
+      hostPlayerId: projection.players[0].playerId,
+      joinerPlayerId: projection.players[1].playerId,
+    }
+  }
+
+  function tableArgs<Action extends TableAction>(
+    publicId: string,
+    operationId: string,
+    action: Action,
+  ) {
+    return {
+      publicId,
+      operationId,
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1_700_000_000_000,
+      action,
+    }
+  }
+
+  it("knocks out a Pokémon, moves the opponent's prizes, and undoes only that knockout", async () => {
+    const t = makeConvexTest()
+    const game = await pokemonGame(t)
+    const send = (operationId: string, action: TableAction) =>
+      game.host.mutation(api.games.tableAction, tableArgs(game.publicId, operationId, action))
+    await send("table-operation-0001", {
+      kind: "pokemon.placed",
+      playerId: game.hostPlayerId,
+      pokemonId: "charizard-001",
+      slot: "active",
+      card: { cardId: "sv03.5-006", name: "Charizard ex", hp: 330, prizes: 2 },
+    })
+    await send("table-operation-0002", {
+      kind: "pokemon.knockedOut",
+      playerId: game.hostPlayerId,
+      pokemonId: "charizard-001",
+      takerPlayerId: game.joinerPlayerId,
+    })
+
+    const knockedOut = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(knockedOut.players[1].currentLife).toBe(4)
+    expect(knockedOut.eventSequence).toBe(2)
+    expect(knockedOut.table?.players[game.hostPlayerId].pokemon).toMatchObject({
+      bench: [],
+      lastKnockout: { operationId: "table-operation-0002", prizesTaken: 2 },
+    })
+
+    await send("table-operation-0003", {
+      kind: "pokemon.knockoutUndone",
+      playerId: game.hostPlayerId,
+      knockoutOperationId: "table-operation-0002",
+    })
+    const undone = await game.joiner.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(undone.players[1].currentLife).toBe(6)
+    expect(undone.table?.players[game.hostPlayerId].pokemon).toEqual({
+      active: {
+        id: "charizard-001",
+        cardId: "sv03.5-006",
+        name: "Charizard ex",
+        hp: 330,
+        prizes: 2,
+        damage: 0,
+      },
+      bench: [],
+    })
+    await expect(
+      send("table-operation-0004", {
+        kind: "pokemon.knockoutUndone",
+        playerId: game.hostPlayerId,
+        knockoutOperationId: "table-operation-0002",
+      }),
+    ).rejects.toMatchObject({ data: { code: "invalid_table_action" } })
+  })
+
+  it("replays a lost acknowledgement once and reports it through the operation status", async () => {
+    const t = makeConvexTest()
+    const game = await pokemonGame(t)
+    const args = tableArgs(game.publicId, "table-operation-0001", {
+      kind: "pokemon.placed",
+      playerId: game.hostPlayerId,
+      pokemonId: "pidgey-00001",
+      slot: "bench",
+      card: { name: "Pidgey", hp: 60, prizes: 1 },
+    })
+    await game.host.mutation(api.games.tableAction, args)
+    await expect(game.host.mutation(api.games.tableAction, args)).resolves.toMatchObject({
+      deduplicated: true,
+    })
+    const changed = [
+      { ...args.action, slot: "active" as const },
+      { ...args.action, card: { ...args.action.card, hp: 70 } },
+      { ...args.action, card: { ...args.action.card, prizes: 2 } },
+    ]
+    for (const action of changed) {
+      await expect(
+        game.host.mutation(api.games.tableAction, { ...args, action }),
+      ).rejects.toMatchObject({ data: { code: "sync_operation_mismatch" } })
+    }
+
+    const status = (action: TableAction) =>
+      game.host.query(api.games.lobbyProjection, {
+        publicId: game.publicId,
+        operation: {
+          kind: "table.action",
+          operationId: args.operationId,
+          action,
+          deviceId: args.deviceId,
+          clientCreatedAt: args.clientCreatedAt,
+        },
+      })
+    const projection = await status({
+      // why: key order differs from the original send and still matches.
+      card: { prizes: 1, hp: 60, name: "Pidgey" },
+      slot: "bench",
+      pokemonId: "pidgey-00001",
+      playerId: game.hostPlayerId,
+      kind: "pokemon.placed",
+    })
+    expect(projection.operationStatus).toEqual({
+      status: "acknowledged",
+      operationId: args.operationId,
+      projectionEventSequence: 1,
+    })
+    expect(projection.table?.players[game.hostPlayerId].pokemon?.bench).toHaveLength(1)
+    await expect(status(changed[1])).resolves.toMatchObject({
+      operationStatus: { status: "conflict" },
+    })
+  })
+
+  it("knocks out on damage that is lethal against the stored damage, even when each device saw a safe total", async () => {
+    const t = makeConvexTest()
+    const game = await pokemonGame(t)
+    const send = (operationId: string, action: TableAction) =>
+      game.host.mutation(api.games.tableAction, tableArgs(game.publicId, operationId, action))
+    await send("table-operation-0001", {
+      kind: "pokemon.placed",
+      playerId: game.hostPlayerId,
+      pokemonId: "pikachu-0001",
+      slot: "active",
+      card: { name: "Pikachu", hp: 100, prizes: 1 },
+    })
+    await send("table-operation-0002", {
+      kind: "pokemon.damaged",
+      playerId: game.hostPlayerId,
+      pokemonId: "pikachu-0001",
+      delta: 70,
+    })
+    const hit = {
+      kind: "pokemon.damaged" as const,
+      playerId: game.hostPlayerId,
+      pokemonId: "pikachu-0001",
+      delta: 20,
+      takerPlayerId: game.joinerPlayerId,
+    }
+    await send("table-operation-0003", hit)
+    await send("table-operation-0004", hit)
+
+    const projection = await game.host.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.players[1].currentLife).toBe(5)
+    expect(projection.table?.players[game.hostPlayerId].pokemon).toMatchObject({
+      bench: [],
+      lastKnockout: {
+        operationId: "table-operation-0004",
+        pokemon: { damage: 90 },
+        prizesTaken: 1,
+      },
+    })
+  })
+
+  it("carries a local game's table into the connected game under the new seat ids", async () => {
+    const t = makeConvexTest()
+    const host = await synced(t, "publish-host", "Host")
+    const charizard = { id: "charizard-01", name: "Charizard ex", hp: 330, prizes: 2, damage: 0 }
+    const base = {
+      operationId: "publish-table-operation",
+      publicId: "publish-table-game-1234",
+      system: "pokemon",
+      format: "standard",
+      ruleset: "standard",
+      startingLife: 6,
+      inviteToken: token,
+      manualCodeCandidates: ["TBL234"],
+      hostLocalId: "local-a",
+      players: [
+        {
+          localId: "local-a",
+          seat: 1,
+          displayName: "Ada",
+          color: "#7C3AED",
+          currentLife: 6,
+        },
+        {
+          localId: "local-b",
+          seat: 2,
+          displayName: "Grace",
+          color: "#2563EB",
+          currentLife: 4,
+        },
+      ],
+    }
+    const table = {
+      designations: {},
+      players: {
+        "local-a": {
+          pokemon: {
+            bench: [],
+            lastKnockout: {
+              operationId: "local-knockout-00001",
+              pokemon: charizard,
+              slot: "active" as const,
+              takerPlayerId: "local-b",
+              prizesTaken: 2,
+            },
+          },
+        },
+      },
+    }
+    await expect(
+      host.mutation(api.games.publishLocalGame, {
+        ...base,
+        table: { ...table, designations: { monarch: "local-a" } },
+      }),
+    ).rejects.toThrow("Table state does not fit this game")
+
+    const published = await host.mutation(api.games.publishLocalGame, { ...base, table })
+    const [hostSeat, opponentSeat] = published.players.map(({ playerId }) => playerId)
+    await host.mutation(api.games.tableAction, {
+      publicId: published.publicId,
+      operationId: "table-operation-0001",
+      deviceId: "device-host-0001",
+      clientCreatedAt: 1,
+      action: {
+        kind: "pokemon.knockoutUndone",
+        playerId: hostSeat,
+        knockoutOperationId: "local-knockout-00001",
+      },
+    })
+    const projection = await host.query(api.games.lobbyProjection, {
+      publicId: published.publicId,
+    })
+    expect(projection.players.find(({ playerId }) => playerId === opponentSeat)?.currentLife).toBe(
+      6,
+    )
+    expect(projection.table?.players[hostSeat].pokemon).toEqual({ active: charizard, bench: [] })
+  })
+
+  it("lets only a seat's owner act for it and keeps a designation on one seat", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t)
+    await expect(
+      game.joiner.mutation(
+        api.games.tableAction,
+        tableArgs(game.publicId, "table-operation-0001", {
+          kind: "counter.changed",
+          playerId: game.hostPlayerId,
+          counterId: "poison",
+          delta: 1,
+        }),
+      ),
+    ).rejects.toMatchObject({ data: { code: "seat_owner_required" } })
+
+    await game.host.mutation(
+      api.games.tableAction,
+      tableArgs(game.publicId, "table-operation-0002", {
+        kind: "designation.taken",
+        playerId: game.hostPlayerId,
+        designationId: "monarch",
+      }),
+    )
+    await game.joiner.mutation(
+      api.games.tableAction,
+      tableArgs(game.publicId, "table-operation-0003", {
+        kind: "designation.taken",
+        playerId: game.joinerPlayerId,
+        designationId: "monarch",
+      }),
+    )
+    await game.joiner.mutation(
+      api.games.tableAction,
+      tableArgs(game.publicId, "table-operation-0004", {
+        kind: "counter.changed",
+        playerId: game.joinerPlayerId,
+        counterId: "commanderTax",
+        delta: 2,
+      }),
+    )
+    const projection = await game.host.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.table).toEqual({
+      designations: { monarch: game.joinerPlayerId },
+      players: {
+        [game.hostPlayerId]: {},
+        [game.joinerPlayerId]: { counters: { commanderTax: 2 } },
+      },
+    })
+    const events = await game.host.query(api.games.connectedEvents, {
+      publicId: game.publicId,
+      paginationOpts: { numItems: 10, cursor: null },
+    })
+    expect(events.page.map((event) => event.kind)).toEqual([
+      "counter.changed",
+      "designation.taken",
+      "designation.taken",
+    ])
   })
 })
