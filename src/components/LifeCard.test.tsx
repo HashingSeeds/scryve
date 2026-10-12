@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native"
-import { act, fireEvent, render } from "@testing-library/react-native"
+import { act, fireEvent, render, within } from "@testing-library/react-native"
 import * as Reanimated from "react-native-reanimated"
 
 import { asPlayerId, PLAYER_COLORS } from "@/features/game/domain"
@@ -10,9 +10,10 @@ import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/
 import * as reducedMotion from "@/utils/useReducedMotion"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
-import { getPlayerMarkCorner, LifeCard } from "./LifeCard"
+import { LifeCard, seatIdentityPlacement } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
 import { LIFE_TARGET_SIZE } from "./playerCardTypes"
+import { MARK_ART_BOUNDS } from "./PlayerMark"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 const commanderIds = [asPlayerId("player-1"), asPlayerId("player-2")]
@@ -422,35 +423,38 @@ describe("LifeCard", () => {
     expect(view.queryByTestId("life-delta-seat-1")).toBeNull()
   })
 
-  it("uses a visual player mark alongside a visible name pill", () => {
+  it("pairs the player mark with the name in the content's bottom-left corner", () => {
     const view = renderCard(20)
 
-    expect(view.getByTestId("player-name-seat-1")).toHaveTextContent("Ada")
-    const marker = view.getByTestId("player-mark-seat-1", { includeHiddenElements: true })
-    expect(marker).toBeTruthy()
-    expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
-      right: 8,
-      bottom: 8,
+    const corner = view.getByTestId("life-corner-layer-seat-1")
+    expect(within(corner).getByTestId("player-name-seat-1")).toHaveTextContent("Ada")
+    expect(
+      within(corner).getByTestId("player-mark-seat-1", { includeHiddenElements: true }),
+    ).toBeTruthy()
+    expect(StyleSheet.flatten(view.getByTestId("seat-identity-seat-1").props.style)).toMatchObject({
+      flexDirection: "row",
+      gap: 8,
+    })
+    // why: seat 1 draws a circle by default, so the box trims to the circle's drawn edges.
+    const art = MARK_ART_BOUNDS.circle
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("player-mark-seat-1", { includeHiddenElements: true }).props.style,
+      ),
+    ).toMatchObject({
+      width: 64,
+      height: 64,
+      marginLeft: -art.left * (64 / 44),
+      marginBottom: -(44 - art.bottom) * (64 / 44),
+    })
+    expect(StyleSheet.flatten(view.getByTestId("player-name-seat-1").props.style)).toMatchObject({
+      fontSize: 18,
     })
     expect(view.getByTestId("life-card-seat-1").props.accessibilityLabel).toBe("Seat 1, Ada")
   })
 
-  it("pins each rotated player marker to the corner after its life total", () => {
-    expect(getPlayerMarkCorner(0, 8)).toMatchObject({ right: 8, bottom: 8 })
-    expect(getPlayerMarkCorner(180, 8)).toMatchObject({ left: 8, top: 8 })
-    expect(getPlayerMarkCorner(90, 8)).toMatchObject({ left: 8, bottom: 8 })
-    expect(getPlayerMarkCorner(-90, 8)).toMatchObject({ right: 8, top: 8 })
-  })
-
-  it("keeps the player marker inside the insets it is given", () => {
-    expect(getPlayerMarkCorner(180, 8, { top: 47, bottom: 0, left: 0, right: 0 })).toEqual({
-      left: 8,
-      top: 55,
-    })
-  })
-
   it.each([0, 90, -90, 180] as const)(
-    "keeps life status below the total at %s degrees",
+    "turns the identity layer with the content at %s degrees and keeps the pair bottom left",
     (contentRotation) => {
       const view = render(
         <ThemeProvider initialContext="light">
@@ -466,18 +470,24 @@ describe("LifeCard", () => {
         </ThemeProvider>,
       )
 
-      const statusLayer = StyleSheet.flatten(
-        view.getByTestId("life-status-layer-seat-1").props.style,
-      )
-      expect(statusLayer.transform).toEqual([{ rotate: `${contentRotation}deg` }])
-      expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
-        top: "50%",
-        marginTop: 104,
-      })
+      const layer = StyleSheet.flatten(view.getByTestId("life-corner-layer-seat-1").props.style)
+      expect(layer.transform).toEqual([{ rotate: `${contentRotation}deg` }])
+      expect(view.getByTestId("life-status-seat-1")).toHaveTextContent(/Updated 0:42 ago/)
     },
   )
 
-  it("keeps a sideways name inside a short card that has no insets", () => {
+  it("keeps the pair clear of the content's own insets", () => {
+    expect(
+      seatIdentityPlacement({
+        rotation: 180,
+        cardSize: { width: 390, height: 300 },
+        gap: 16,
+        insets: { top: 47, bottom: 0, left: 0, right: 0 },
+      }).position,
+    ).toEqual({ left: 16, bottom: 63, maxWidth: 390 / 2 - 16 - 16 })
+  })
+
+  it("swaps the identity layer's sides before turning a sideways card", () => {
     const view = render(
       <ThemeProvider initialContext="light">
         <LifeCard
@@ -495,11 +505,8 @@ describe("LifeCard", () => {
     })
 
     expect(
-      StyleSheet.flatten(view.getByTestId("life-status-layer-seat-1").props.style),
-    ).toMatchObject({ width: 171, height: 142, left: -14.5, top: 14.5 })
-    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
-      marginTop: 50,
-    })
+      StyleSheet.flatten(view.getByTestId("life-corner-layer-seat-1").props.style),
+    ).toMatchObject({ width: 187, height: 158, left: -14.5, top: 14.5 })
   })
 
   it("puts the name and assign sword in the corner opposite the commander grid", () => {
@@ -542,7 +549,7 @@ describe("LifeCard", () => {
     expect(StyleSheet.flatten(corner.props.style)).toMatchObject({
       left: 16,
       bottom: 16,
-      maxWidth: 138,
+      maxWidth: 340 / 2 - 16 - 16,
     })
     expect(corner).toHaveTextContent("Ada")
     fireEvent.press(corner)
@@ -806,36 +813,6 @@ describe("LifeCard", () => {
       </ThemeProvider>,
     )
     expect(view.queryByTestId("life-editor-seat-1")).toBeNull()
-  })
-
-  it("keeps the marker cornered instead of clamping it into a cramped card", () => {
-    expect(getPlayerMarkCorner(90, 8)).toMatchObject({ left: 8, bottom: 8 })
-    expect(getPlayerMarkCorner(180, 8)).toMatchObject({ left: 8, top: 8 })
-  })
-
-  it("keeps the marker cornered after measuring a cramped sideways card", () => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <LifeCard
-          playerName="Ada"
-          seatNumber={1}
-          life={20}
-          color="#41476E"
-          contentRotation={90}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-
-    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
-      nativeEvent: { layout: { width: 181, height: 400, x: 0, y: 0 } },
-    })
-
-    const marker = view.getByTestId("player-mark-seat-1", { includeHiddenElements: true })
-    expect(StyleSheet.flatten(marker.props.style)).toMatchObject({
-      left: 8,
-      bottom: 8,
-    })
   })
 
   it("temporarily moves positive feedback into the plus control", () => {
@@ -1190,7 +1167,7 @@ describe("LifeCard", () => {
     expect(view.getByTestId("life-total-seat-1")).toBeTruthy()
   })
 
-  it("shows the player name as plain text under the life total", () => {
+  it("shows the player name as plain text beside the mark", () => {
     const view = renderCard(40)
     const name = view.getByTestId("player-name-seat-1")
     expect(name).toHaveTextContent("Ada")
@@ -1198,31 +1175,7 @@ describe("LifeCard", () => {
     expect(StyleSheet.flatten(name.props.style).backgroundColor).toBeUndefined()
   })
 
-  it("centers the life on the whole card and keeps the top opponent name below the notch", () => {
-    const view = render(
-      <ThemeProvider initialContext="dark">
-        <LifeCard
-          playerName="Player 1"
-          seatNumber={1}
-          life={20}
-          color="#B85636"
-          compact
-          contentRotation={180}
-          contentInsets={{ top: 59, bottom: 0, left: 0, right: 0 }}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
-    fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
-      nativeEvent: { layout: { width: 390, height: 187 } },
-    })
-    const readout = StyleSheet.flatten(view.getByTestId("life-readout-seat-1").props.style)
-    const status = StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)
-    expect(readout.paddingTop).toBeUndefined()
-    expect(status.marginTop).toBeLessThan(187 / 2 - 59 - 21)
-  })
-
-  it("hides the status when a short card cannot fit it below the notch", () => {
+  it("sizes the pair down with a compact card", () => {
     const view = render(
       <ThemeProvider initialContext="dark">
         <LifeCard
@@ -1240,18 +1193,14 @@ describe("LifeCard", () => {
     fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
       nativeEvent: { layout: { width: 390, height: 150 } },
     })
-    expect(view.queryByTestId("life-status-seat-1")).toBeNull()
-    expect(view.getByTestId("life-total-seat-1").props.accessible).toBe(true)
-  })
-
-  it("spans the under-total column full width so names truncate late", () => {
-    const view = renderCard(20)
-    expect(StyleSheet.flatten(view.getByTestId("life-status-seat-1").props.style)).toMatchObject({
-      left: 0,
-      right: 0,
-      top: "50%",
+    expect(
+      StyleSheet.flatten(
+        view.getByTestId("player-mark-seat-1", { includeHiddenElements: true }).props.style,
+      ),
+    ).toMatchObject({ width: 48, height: 48 })
+    expect(StyleSheet.flatten(view.getByTestId("player-name-seat-1").props.style)).toMatchObject({
+      fontSize: 16,
     })
-    expect(view.getByTestId("player-name-seat-1")).toHaveTextContent("Ada")
   })
 
   it("mounts no commander board unless the game asks for one", () => {

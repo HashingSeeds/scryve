@@ -55,10 +55,6 @@ export function cornerOffset(
   return screenCorner ? Math.min(gap + inset, Math.max(gap, SCREEN_CORNER_CLEARANCE)) : gap + inset
 }
 
-export const PLAYER_MARK_SIZE = 80
-export const COMPACT_PLAYER_MARK_SIZE = 60
-export const PLAYER_MARK_MUTED_OPACITY = 0.72
-
 export const LIFE_GLYPH_LINE_HEIGHT = 50
 export const COMPACT_LIFE_GLYPH_LINE_HEIGHT = 34
 

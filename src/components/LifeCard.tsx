@@ -22,7 +22,6 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
-import { useElapsedSince } from "@/utils/useElapsedSince"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
@@ -41,7 +40,6 @@ import { LifeEditor } from "./LifeEditor"
 import {
   COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
-  COMPACT_PLAYER_MARK_SIZE,
   getLifeFontSizeThatFits,
   getLifeLineHeight,
   getLifeTargetTextSpace,
@@ -49,20 +47,17 @@ import {
   LIFE_FONT_SIZE,
   LIFE_MAX_FONT_SCALE,
   LIFE_TARGET_SIZE,
-  PLAYER_MARK_MUTED_OPACITY,
-  PLAYER_MARK_SIZE,
-  TUCKS_INTO_SCREEN_CORNERS,
   cornerOffset,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
-  type LifeCardEdge,
   type LifeCardScreenEdges,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
+import { SeatIdentity, seatIdentityMetrics, seatMarkArt } from "./SeatIdentity"
 import { Text } from "./Text"
-import type { PlayerMarkShape } from "../../convex/lib/appearance"
+import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const COMMANDER_OVERVIEW_MS = 220
 
@@ -118,21 +113,6 @@ export interface LifeCardProps {
   style?: StyleProp<ViewStyle>
 }
 
-function UpdatedAgo({ since, color }: { since: number; color: string }) {
-  const { themed } = useAppTheme()
-  const elapsed = useElapsedSince(since)
-  return (
-    <Text
-      text={`Updated ${elapsed} ago`}
-      weight="bold"
-      size="xxs"
-      maxFontSizeMultiplier={1.3}
-      numberOfLines={1}
-      style={[themed($status), { color }]}
-    />
-  )
-}
-
 /** why: the board re-renders on every sync step and server update; a seat only needs to when its own props change. PlayerGrid rebuilds plain props (insets, styles, commander data) each render, so they compare by content, and it keeps every callback's identity stable. */
 export const LifeCard = memo(function LifeCard({
   playerName,
@@ -177,7 +157,6 @@ export const LifeCard = memo(function LifeCard({
     : undefined
   const displayName = playerName.trim() || "unnamed player"
   const identity = `Seat ${seatNumber}, ${displayName}`
-  const markSize = compact ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const [preview, setPreview] = useState(0)
   const shownLife = life + preview
@@ -300,11 +279,6 @@ export const LifeCard = memo(function LifeCard({
       },
     ],
   }))
-  const markStyle = getPlayerMarkCorner(
-    contentRotation,
-    cardPadding,
-    TUCKS_INTO_SCREEN_CORNERS ? undefined : contentInsets,
-  )
   const commanderOverviewEntering =
     reducedMotion === false ? FadeIn.duration(commanderOverviewDuration) : undefined
   const commanderOverviewExiting =
@@ -366,53 +340,26 @@ export const LifeCard = memo(function LifeCard({
             onChange: (step) => commanderDamage.onStage?.(step),
           }
         : undefined
-  const statusEdge =
-    contentRotation === 180
-      ? "top"
-      : contentRotation === 90
-        ? "left"
-        : contentRotation === -90
-          ? "right"
-          : "bottom"
-  const statusEdgeInset = contentInsets?.[statusEdge] ?? 0
-  const statusEdgeLength = Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height
-  const defaultStatusOffset = lifeTargetSize / 2 + (compact ? spacing.xxxs : spacing.xxs)
-  const availableStatusOffset =
-    statusEdgeLength / 2 -
-    statusEdgeInset -
-    cardPadding -
-    21 -
-    (staleSince !== undefined ? spacing.xxxs + 18 : 0)
-  const nameInCorner = !!commanderDamage?.inspection
-  // why: a sideways status layer swaps its sides before turning, so it never pokes past the card. On web an overflowing layer makes the hidden-overflow card scrollable, and focusing a chip by keyboard would shift the whole card.
-  const contentWidth = cardSize.width - cardPadding * 2
-  const contentHeight = cardSize.height - cardPadding * 2
-  const statusLayerBounds: ViewStyle | undefined =
-    Math.abs(contentRotation) === 90 && contentWidth > 0 && contentHeight > 0
-      ? {
-          width: contentHeight,
-          height: contentWidth,
-          left: (contentWidth - contentHeight) / 2,
-          top: (contentHeight - contentWidth) / 2,
-          right: undefined,
-          bottom: undefined,
-        }
-      : undefined
-  const showStatus = !nameInCorner && (statusEdgeLength === 0 || availableStatusOffset >= 0)
-  const statusTopOffset =
-    statusEdgeLength > 0
-      ? Math.min(defaultStatusOffset, availableStatusOffset)
-      : defaultStatusOffset
-
-  const cornerStatus = nameInCorner
-    ? cornerStatusPlacement({
-        rotation: contentRotation,
-        cardSize,
-        gap: compact ? spacing.sm : spacing.md,
-        insets: contentInsets,
-        screenEdges,
-      })
-    : undefined
+  const identityMetrics = seatIdentityMetrics(compact)
+  const identityCorner = seatIdentityPlacement({
+    rotation: contentRotation,
+    cardSize,
+    gap: identityMetrics.edge,
+    insets: contentInsets,
+    screenEdges,
+  })
+  const seatIdentity = (
+    <SeatIdentity
+      seatNumber={seatNumber}
+      playerName={displayName}
+      shape={shape}
+      color={foreground}
+      compact={compact}
+      spinning={ownership === "owned"}
+      insetSwordColor={commanderDamage ? color : undefined}
+      staleSince={staleSince}
+    />
+  )
 
   useEffect(() => {
     if (frozen) {
@@ -456,37 +403,6 @@ export const LifeCard = memo(function LifeCard({
         style,
       ]}
     >
-      {localCommander ? null : commanderDamage && !commanderCardMode ? (
-        <View
-          pointerEvents="none"
-          style={[
-            themed($mark),
-            markStyle,
-            { width: markSize, height: markSize },
-            commanderOverviewOpen && themed($mutedContent),
-          ]}
-        >
-          <PlayerMark
-            seatNumber={seatNumber}
-            shape={shape}
-            color={foreground}
-            rotation={contentRotation}
-            spinning={ownership === "owned"}
-            insetSwordColor={color}
-            size={markSize}
-          />
-        </View>
-      ) : (
-        <PlayerMark
-          seatNumber={seatNumber}
-          shape={shape}
-          color={foreground}
-          rotation={contentRotation}
-          spinning={ownership === "owned"}
-          size={markSize}
-          style={[themed($mark), markStyle, commanderCardMode && themed($mutedContent)]}
-        />
-      )}
       <View
         pointerEvents={
           commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
@@ -536,39 +452,6 @@ export const LifeCard = memo(function LifeCard({
               { color: foreground },
             ]}
           />
-          <View
-            testID={`life-status-layer-seat-${seatNumber}`}
-            pointerEvents="none"
-            style={[
-              themed($statusLayer),
-              statusLayerBounds,
-              { transform: [{ rotate: `${contentRotation}deg` }] },
-            ]}
-          >
-            {showStatus ? (
-              <View
-                testID={`life-status-seat-${seatNumber}`}
-                style={[
-                  themed(compact ? $compactStatusPosition : $statusPosition),
-                  { marginTop: statusTopOffset },
-                ]}
-              >
-                <Text
-                  testID={`player-name-seat-${seatNumber}`}
-                  text={displayName}
-                  accessible={false}
-                  size="xs"
-                  weight="medium"
-                  maxFontSizeMultiplier={1.3}
-                  numberOfLines={1}
-                  style={[themed($name), { color: foreground }]}
-                />
-                {staleSince !== undefined ? (
-                  <UpdatedAgo since={staleSince} color={foreground} />
-                ) : null}
-              </View>
-            ) : null}
-          </View>
         </Animated.View>
       </View>
       {eliminated ? (
@@ -633,23 +516,30 @@ export const LifeCard = memo(function LifeCard({
             </Animated.View>
           </View>
           {!localCommander ? (
-            <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+            <View
+              pointerEvents="box-none"
+              style={[
+                themed($cornerLayer),
+                identityCorner.layer,
+                { transform: [{ rotate: `${contentRotation}deg` }] },
+              ]}
+            >
               <BoardPressable
                 testID={`commander-overview-close-seat-${seatNumber}`}
                 accessibilityRole="button"
                 accessibilityLabel={`Close commander damage for ${identity}`}
                 onPress={closeCommanderOverview}
                 hitSlop={12}
-                style={[themed($overviewClose), markStyle, { width: markSize, height: markSize }]}
+                style={[themed($overviewClose), identityCorner.position]}
               >
                 <PlayerMark
                   seatNumber={seatNumber}
                   shape={shape}
                   color={foreground}
-                  rotation={contentRotation}
                   insetSwordColor={color}
                   closeIcon
-                  size={markSize}
+                  size={identityMetrics.mark}
+                  style={seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).trim}
                 />
               </BoardPressable>
             </View>
@@ -698,27 +588,6 @@ export const LifeCard = memo(function LifeCard({
           dice={dice}
         />
       ) : null}
-      {commanderDamage &&
-      !localCommander &&
-      !commanderCardMode &&
-      !commanderOverviewOpen &&
-      !tableSheetOpen &&
-      !diceCovers ? (
-        <BoardPressable
-          testID={`commander-mark-seat-${seatNumber}`}
-          accessibilityRole="button"
-          accessibilityLabel={`Show commander damage for ${identity}`}
-          accessibilityHint="Expands the commander damage grid"
-          accessibilityState={{ expanded: false }}
-          hitSlop={12}
-          onPress={openCommanderOverview}
-          style={({ pressed }) => [
-            themed($markHitTarget),
-            markStyle,
-            { width: markSize, height: markSize, opacity: pressed ? 0.72 : 1 },
-          ]}
-        />
-      ) : null}
       {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
         <CommanderStrip
           seatNumber={seatNumber}
@@ -739,55 +608,61 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {cornerStatus && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
+      {/* why: the seat's mark and name sit together in the content's bottom-left corner on every board; in commander games the pair is also the assign sword, or the way into the damage grid. */}
+      {!commanderCardMode &&
+      !tableSheetOpen &&
+      !diceCovers &&
+      !(commanderDamage && !localCommander && commanderOverviewOpen) ? (
         <View
           testID={`life-corner-layer-seat-${seatNumber}`}
           pointerEvents="box-none"
           style={[
             themed($cornerLayer),
-            cornerStatus.layer,
+            identityCorner.layer,
             { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
-          <BoardPressable
-            testID={`commander-mark-seat-${seatNumber}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Assign commander damage from ${identity}${
-              staleSince !== undefined ? ", out of date" : ""
-            }`}
-            accessibilityState={{ disabled: !!disabled }}
-            disabled={disabled}
-            hitSlop={8}
-            onPress={beginCommanderAssignment}
-            style={({ pressed }) => [
-              themed($cornerIdentity),
-              cornerStatus.position,
-              pressed && { opacity: 0.72 },
-            ]}
-          >
-            <PlayerMark
-              seatNumber={seatNumber}
-              shape={shape}
-              color={foreground}
-              insetSwordColor={color}
-              size={compact ? 22 : 26}
-            />
-            <View testID={`life-status-seat-${seatNumber}`} style={themed($cornerText)}>
-              <Text
-                testID={`player-name-seat-${seatNumber}`}
-                text={displayName}
-                accessible={false}
-                size="xs"
-                weight="medium"
-                maxFontSizeMultiplier={1.3}
-                numberOfLines={1}
-                style={{ color: foreground }}
-              />
-              {staleSince !== undefined ? (
-                <UpdatedAgo since={staleSince} color={foreground} />
-              ) : null}
+          {commanderDamage?.inspection ? (
+            <BoardPressable
+              testID={`commander-mark-seat-${seatNumber}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Assign commander damage from ${identity}${
+                staleSince !== undefined ? ", out of date" : ""
+              }`}
+              accessibilityState={{ disabled: !!disabled }}
+              disabled={disabled}
+              hitSlop={8}
+              onPress={beginCommanderAssignment}
+              style={({ pressed }) => [
+                $cornerIdentity,
+                identityCorner.position,
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              {seatIdentity}
+            </BoardPressable>
+          ) : commanderDamage ? (
+            <BoardPressable
+              testID={`commander-mark-seat-${seatNumber}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Show commander damage for ${identity}`}
+              accessibilityHint="Expands the commander damage grid"
+              accessibilityState={{ expanded: false }}
+              hitSlop={12}
+              onPress={openCommanderOverview}
+              style={({ pressed }) => [
+                $cornerIdentity,
+                identityCorner.position,
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              {seatIdentity}
+            </BoardPressable>
+          ) : (
+            <View pointerEvents="none" style={[$cornerIdentity, identityCorner.position]}>
+              {seatIdentity}
             </View>
-          </BoardPressable>
+          )}
         </View>
       ) : null}
       {seatTable &&
@@ -876,50 +751,10 @@ const $compactCard: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   borderRadius: spacing.md,
 })
 
-const $mark: ThemedStyle<ViewStyle> = () => ({
-  position: "absolute",
-  zIndex: 9,
-  opacity: PLAYER_MARK_MUTED_OPACITY,
-})
-const $markHitTarget: ThemedStyle<ViewStyle> = () => ({ position: "absolute", zIndex: 10 })
-
-const $name: ThemedStyle<TextStyle> = () => ({
-  maxWidth: "80%",
-  textAlign: "center",
-})
-
-export function getPlayerMarkCorner(
-  rotation: LifeCardContentRotation,
-  padding: number,
-  insets?: LifeCardContentInsets,
-): ViewStyle {
-  const offset = (edge: LifeCardEdge) => padding + (insets?.[edge] ?? 0)
-  if (rotation === 90) return { left: offset("left"), bottom: offset("bottom") }
-  if (rotation === -90) return { right: offset("right"), top: offset("top") }
-  if (rotation === 180) return { left: offset("left"), top: offset("top") }
-  return { right: offset("right"), bottom: offset("bottom") }
-}
-
 const $life: ThemedStyle<TextStyle> = () => ({
   width: "100%",
   textAlign: "center",
   fontVariant: ["tabular-nums"],
-})
-
-const $statusLayer: ThemedStyle<ViewStyle> = () => ({
-  ...StyleSheet.absoluteFill,
-  alignItems: "center",
-})
-
-const $statusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  top: "50%",
-  left: 0,
-  right: 0,
-  marginTop: LIFE_TARGET_SIZE / 2 + spacing.xxs,
-  flexDirection: "column",
-  alignItems: "center",
-  gap: spacing.xxxs,
 })
 
 const $cornerLayer: ThemedStyle<ViewStyle> = () => ({
@@ -927,16 +762,7 @@ const $cornerLayer: ThemedStyle<ViewStyle> = () => ({
   zIndex: 10,
 })
 
-const $cornerIdentity: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  position: "absolute",
-  flexDirection: "row",
-  alignItems: "center",
-  gap: spacing.xs,
-})
-
-const $cornerText: ThemedStyle<ViewStyle> = () => ({ flexShrink: 1, alignItems: "flex-start" })
-
-const CENTER_CUTOUT_HALF_WIDTH = 64
+const $cornerIdentity: ViewStyle = { position: "absolute" }
 
 const CONTENT_LEFT_EDGE = {
   0: "left",
@@ -959,7 +785,8 @@ const CONTENT_BOTTOM_EDGE = {
   [-90]: "right",
 } as const
 
-function cornerStatusPlacement({
+/** why: the identity's layer swaps its sides before turning sideways, so it never pokes past the card. The pair sits at the content's bottom-left and gets at most half the card's run, since the commander strip takes the other corner. */
+export function seatIdentityPlacement({
   rotation,
   cardSize,
   gap,
@@ -976,10 +803,13 @@ function cornerStatusPlacement({
   const sideways = Math.abs(rotation) === 90
   const bottomEdge = CONTENT_BOTTOM_EDGE[rotation]
   const leftEdge = CONTENT_LEFT_EDGE[rotation]
-  const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
-  const bottom = cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
   const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
   const cutoutAtMiddle = spansScreenEdge && (insets?.[bottomEdge] ?? 0) > 0
+  const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
+  // why: a notch or home indicator sits mid-edge, and the name beside the mark would run into it, so the pair rises past that inset instead of tucking into the screen corner.
+  const bottom = cutoutAtMiddle
+    ? gap + (insets?.[bottomEdge] ?? 0)
+    : cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
   const run = sideways ? height : width
   const layer: ViewStyle | undefined = sideways
     ? {
@@ -994,23 +824,10 @@ function cornerStatusPlacement({
   const position: ViewStyle = {
     left,
     bottom,
-    maxWidth: run
-      ? Math.max(run / 2 - left - (cutoutAtMiddle ? CENTER_CUTOUT_HALF_WIDTH : gap), 0)
-      : undefined,
+    maxWidth: run ? Math.max(run / 2 - left - gap, 0) : undefined,
   }
   return { layer, position }
 }
-
-const $compactStatusPosition: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  top: "50%",
-  left: 0,
-  right: 0,
-  marginTop: COMPACT_LIFE_TARGET_SIZE / 2 + spacing.xxxs,
-  position: "absolute",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: spacing.xxxs,
-})
 
 const $commanderOverview: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   ...StyleSheet.absoluteFill,
@@ -1052,6 +869,5 @@ const $eliminated: ThemedStyle<ViewStyle> = ({ colors }) => ({
 
 const $disabledCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.72 })
 const $staleCard: ThemedStyle<ViewStyle> = () => ({ opacity: 0.5 })
-const $status: ThemedStyle<TextStyle> = () => ({ textAlign: "center", opacity: 0.9 })
 
 const $overviewReadout: ViewStyle = { zIndex: 8 }
