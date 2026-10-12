@@ -11,7 +11,7 @@ import { Text } from "../Text"
 
 const LETTERS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"] as const
 const DIGITS = ["123", "456", "789"] as const
-const SYMBOLS = ["-", "'", ".", "é", "&", "♀", "♂"] as const
+const SYMBOLS = ["-", "'", ".", ":", "é", "&", "♀", "♂"] as const
 
 type Key = {
   label: string
