@@ -818,6 +818,11 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               )
             }
             getStaleSince={(player) => (controlled.has(player.id) ? undefined : offlineSince)}
+            getDeckVersionId={(player) =>
+              controlled.has(player.id)
+                ? game.players.find((candidate) => candidate.playerId === player.id)?.deckVersionId
+                : undefined
+            }
             commanderDamage={
               commanderDamageEnabled
                 ? {

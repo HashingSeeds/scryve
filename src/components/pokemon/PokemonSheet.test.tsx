@@ -5,8 +5,10 @@ import { ThemeProvider } from "@/theme/context"
 import { PokemonSheet, type PokemonSheetProps } from "./PokemonSheet"
 
 const mockAction = jest.fn()
+const mockQuery = jest.fn()
 const mockConvex = {
   action: mockAction,
+  query: mockQuery,
   connectionState: () => ({ isWebSocketConnected: true }),
   subscribeToConnectionState: () => () => {},
 }
@@ -58,6 +60,7 @@ describe("PokemonSheet", () => {
   beforeEach(() => {
     jest.useFakeTimers()
     mockAction.mockReset()
+    mockQuery.mockReset()
   })
   afterEach(() => jest.useRealTimers())
 
@@ -193,5 +196,29 @@ describe("PokemonSheet", () => {
     expect(search.props.showSoftInputOnFocus).toBe(true)
     fireEvent(search, "focus")
     expect(screen.queryByTestId("pokemon-keypad-seat-1")).toBeNull()
+  })
+
+  it("lists the seat's own deck Pokémon before typing, and places one with a tap", async () => {
+    mockQuery.mockResolvedValue([
+      { name: "Charizard ex", cardId: "sv03-125", category: "Pokemon", quantity: 2 },
+      { name: "Rare Candy", cardId: "sv01-191", category: "Trainer", quantity: 4 },
+      { name: "Charizard ex", cardId: "sv03-125", category: "Pokemon", quantity: 1 },
+    ])
+    mockAction.mockResolvedValue(card)
+    const onPlace = jest.fn(() => true)
+    render(sheet({ deckVersionId: "version-1", onPlace }))
+    await flush()
+
+    expect(screen.getByLabelText("Charizard ex, SV3 125 ×3")).toBeTruthy()
+    expect(screen.queryByText("Rare Candy")).toBeNull()
+    fireEvent.press(screen.getByTestId("pokemon-result-sv03-125"))
+    await flush()
+    await flush()
+    expect(onPlace).toHaveBeenCalledWith({
+      cardId: "sv03-125",
+      name: "Charizard ex",
+      hp: 330,
+      prizes: 2,
+    })
   })
 })

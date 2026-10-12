@@ -21,9 +21,10 @@ import {
   rotatedLayerStyle,
   type BenchClearance,
 } from "./pokemonCardLayout"
-import { catalogRows, hitDetail } from "./pokemonCatalogHits"
+import { catalogRows, hitDetail, pokemonPrintingLabel } from "./pokemonCatalogHits"
 import { PokemonKeypad } from "./PokemonKeypad"
 import { usePokemonCatalog, type PokemonSearchHit } from "./usePokemonCatalog"
+import { usePokemonDeck } from "./usePokemonDeck"
 import {
   pokemonPrizeValue,
   remainingHp,
@@ -46,6 +47,7 @@ export interface PokemonSheetProps {
   seatNumber: number
   /** why: only a seat on the screen's bottom edge sits under the keyboard, so only its sheet lifts the board. */
   liftsBoard?: boolean
+  deckVersionId?: string
   color: string
   rotation: LifeCardContentRotation
   cardWidth: number
@@ -74,6 +76,7 @@ const DAMAGE_STEPS = [-3, -1, 1, 3, 5, 10] as const
 export function PokemonSheet({
   seatNumber,
   liftsBoard = false,
+  deckVersionId,
   color,
   rotation,
   cardWidth,
@@ -192,7 +195,7 @@ export function PokemonSheet({
     else setHp(edit)
   }
 
-  async function pickHit(hit: PokemonSearchHit) {
+  async function pickHit(hit: Pick<PokemonSearchHit, "cardId" | "name">) {
     setPicking(hit.cardId)
     setPickError(undefined)
     try {
@@ -247,7 +250,21 @@ export function PokemonSheet({
   }
 
   const hits = catalog.hits && catalogRows(catalog.hits)
+  const deck = usePokemonDeck(deckVersionId)
   const showSearch = lookupOpen && catalog.available
+  const wanted = query.trim().toLowerCase()
+  const deckHits = showSearch ? deck.filter(({ name }) => name.toLowerCase().includes(wanted)) : []
+  const inDeck = new Set(deckHits.map(({ cardId }) => cardId))
+  const results = [
+    ...deckHits.map(({ cardId, name, copies }) => ({
+      cardId,
+      name,
+      detail: [pokemonPrintingLabel(cardId), `×${copies}`].filter(Boolean).join(" "),
+    })),
+    ...(hits ?? [])
+      .filter(({ cardId }) => !inDeck.has(cardId))
+      .map((hit) => ({ cardId: hit.cardId, name: hit.name, detail: hitDetail(hit) })),
+  ]
   // why: a catalog pick closes the search field without a blur, so the keypad follows the field instead.
   const keypadField = typingInto === "query" && !showSearch ? undefined : typingInto
   // why: under the results, the keypad pushes them off a short sideways seat.
@@ -322,15 +339,14 @@ export function PokemonSheet({
             style={$body}
             contentContainerStyle={themed(compact ? $compactBodyContent : $bodyContent)}
           >
-            {showSearch && catalog.searching ? (
+            {deckHits.length > 0 || (showSearch && catalog.searching) ? (
               <View testID={`pokemon-results-seat-${seatNumber}`} style={themed($resultsContent)}>
                 {catalog.busy ? <ActivityIndicator color={ink} /> : null}
                 {catalog.error ? <Text text={catalog.error} size="xxs" style={inkStyle} /> : null}
-                {hits && hits.length === 0 ? (
+                {hits && results.length === 0 ? (
                   <Text text="No cards found" size="xxs" style={[inkStyle, $dim]} />
                 ) : null}
-                {hits?.slice(0, MAX_RESULTS).map((hit) => {
-                  const detail = hitDetail(hit)
+                {results.slice(0, MAX_RESULTS).map(({ detail, ...hit }) => {
                   return (
                     <BoardPressable
                       key={hit.cardId}

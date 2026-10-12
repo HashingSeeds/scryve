@@ -379,6 +379,11 @@ export function CurrentGameScreen({
                   }
                 : undefined
             }
+            getDeckVersionId={(player) =>
+              player.id === runtime.game.account?.mePlayerId
+                ? runtime.game.account.deckVersionId
+                : undefined
+            }
             table={runtime.tableRuntime}
             dice={dice.grid}
             onChange={runtime.changeLife}

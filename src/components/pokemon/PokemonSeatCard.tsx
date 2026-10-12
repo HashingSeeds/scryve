@@ -66,6 +66,7 @@ export interface PokemonSeatCardProps {
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
   staleSince?: number
+  deckVersionId?: string
   opponents: readonly { id: string; name: string }[]
   table: TableRuntime
   dice?: LifeCardDice
@@ -110,6 +111,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   disabled,
   ownership,
   staleSince,
+  deckVersionId,
   opponents,
   table,
   onChangePrizes,
@@ -694,6 +696,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         <PokemonSheet
           seatNumber={seatNumber}
           liftsBoard={touchesBottomEdge}
+          deckVersionId={deckVersionId}
           color={color}
           rotation={contentRotation}
           cardWidth={cardSize.width}

@@ -493,6 +493,18 @@ describe("deck version sync", () => {
     expect("smallImageUrl" in (read.cards[0] ?? {})).toBe(false)
   })
 
+  it("reads a version's cards by version id for its owner only", async () => {
+    const t = convexTest(schema, modules)
+    const { actor, deckId, versionId } = await seedVersion(t, "version-cards-owner")
+    const read = await actor.query(api.decks.readVersion, { deckId, versionId })
+    await expect(actor.query(api.decks.versionCards, { versionId })).resolves.toEqual(read.cards)
+
+    const stranger = await synced(t, "version-cards-stranger")
+    await expect(stranger.query(api.decks.versionCards, { versionId })).rejects.toThrow(
+      "Deck not found",
+    )
+  })
+
   it("bootstraps revisions, tombstones, and archived reads for a fresh client", async () => {
     const t = convexTest(schema, modules)
     const actor = await synced(t, "version-pull-owner")
