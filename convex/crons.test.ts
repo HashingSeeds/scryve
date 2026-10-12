@@ -1,19 +1,6 @@
-import { convexTest } from "convex-test"
-
+import { makeConvexTest } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import { RECEIPT_PRUNE_BATCH_SIZE, RECEIPT_RETENTION_MS } from "./crons"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./crons.ts": async () => jest.requireActual("./crons"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./integrationManifest.ts": async () => jest.requireActual("./integrationManifest"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const startedAt = Date.UTC(2026, 0, 1)
@@ -37,7 +24,7 @@ describe("receipt pruning", () => {
   afterEach(() => jest.useRealTimers())
 
   it("deletes expired receipts in bounded batches and keeps recent ones and webhook events", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const insertReceipts = (count: number, prefix: string) =>
       t.run(async (ctx) => {
         const now = Date.now()
@@ -106,7 +93,7 @@ describe("receipt pruning", () => {
   })
 
   it("still deduplicates a retried operation inside the retention window", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const owner = t.withIdentity({ subject: "retry-owner" })
     await owner.mutation(api.users.syncCurrent, { displayName: "retry-owner" })
     const createOperation = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -133,7 +120,7 @@ describe("receipt pruning", () => {
   })
 
   it("keeps deck version receipts so an old version create still replays once", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const owner = t.withIdentity({ subject: "version-owner" })
     await owner.mutation(api.users.syncCurrent, { displayName: "version-owner" })
     const deckId = await owner.mutation(api.decks.create, { name: "Deck", format: "commander" })
@@ -177,7 +164,7 @@ describe("receipt pruning", () => {
   })
 
   it("turns a game publish or completion retried after pruning into no new writes", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const host = t.withIdentity({ subject: "publish-host" })
     await host.mutation(api.users.syncCurrent, { displayName: "Host" })
     const publish = {
