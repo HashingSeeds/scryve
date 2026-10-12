@@ -102,7 +102,6 @@ function PinnedGameBoardStage({
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
             <BoardKeyboardLift
               enabled={holderAngle === 0}
-              boardHeight={height}
               bottomInset={pinned ? metrics.insets.bottom : safeArea.bottom}
             >
               {renderGrid(boardOrientation)}

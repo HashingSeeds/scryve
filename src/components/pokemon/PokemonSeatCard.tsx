@@ -56,6 +56,8 @@ export interface PokemonSeatCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  /** why: a seat on the screen's bottom edge is the one the keyboard covers, so its sheet lifts the board. */
+  touchesBottomEdge?: boolean
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   disabled?: boolean
@@ -104,6 +106,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   dice,
   contentRotation = 0,
   contentInsets,
+  touchesBottomEdge,
   menuCorner,
   menuEdgeCenter,
   disabled,
@@ -153,7 +156,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   // why: native gets a spoken announcement; web reads a live region. One path each, so nothing is heard twice.
   const [announcement, setAnnouncement] = useState("")
   // why: the sheet replaces the control that opened it, so the card remembers which one to hand focus back to.
-  const cardRef = useRef<View>(null)
   const triggers = useRef(new Map<string, View>()).current
   const returnFocusTo = useRef<string | null>(null)
   const trigger = (key: string) => (node: View | null) => {
@@ -338,7 +340,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
 
   return (
     <View
-      ref={cardRef}
       testID={`pokemon-card-seat-${seatNumber}`}
       accessibilityLabel={`${identity}${ownershipLabel ? `, ${ownershipLabel}` : ""}`}
       onLayout={measureCard}
@@ -735,7 +736,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       {sheetMode && canEdit ? (
         <PokemonSheet
           seatNumber={seatNumber}
-          seatRef={cardRef}
+          liftsBoard={touchesBottomEdge}
           color={color}
           rotation={contentRotation}
           cardWidth={cardSize.width}

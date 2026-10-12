@@ -31,7 +31,6 @@ function sheet(props: Partial<PokemonSheetProps> = {}) {
     <ThemeProvider initialContext="dark">
       <PokemonSheet
         seatNumber={1}
-        seatRef={{ current: null }}
         color="#41476E"
         rotation={0}
         cardWidth={390}

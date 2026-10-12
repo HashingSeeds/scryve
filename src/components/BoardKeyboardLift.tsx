@@ -1,77 +1,50 @@
-import { createContext, useContext, useEffect, useRef, type ReactNode, type RefObject } from "react"
-import type { View } from "react-native"
-import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller"
-import Animated, {
-  useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-} from "react-native-reanimated"
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react"
+import { KeyboardAvoidingView } from "react-native-keyboard-controller"
 
-type Lift = {
-  /** why: the owner is whoever focused a field last, so a closing sheet only clears its own lift. */
-  raise: (owner: object, bottom: number) => void
-  clear: (owner: object) => void
-}
+type SetLift = (owner: object, on: boolean) => void
 
-const BoardKeyboardLiftContext = createContext<Lift | null>(null)
+const BoardKeyboardLiftContext = createContext<SetLift>(() => {})
 
 /**
- * why: a seat is about half the screen and the keyboard covers most of a bottom seat, so a sheet typing into the catalog lifts the whole board until that seat's bottom edge clears the keyboard. Only an upright board lifts: while the window is turned, the board measures as if upright and the keyboard rises along another edge.
+ * why: a seat is about half the screen and the keyboard covers most of a bottom seat, so while a bottom seat's sheet has a field focused the whole board rides above the keyboard. Only an upright board lifts: while the window is turned, the keyboard rises along another board edge.
  */
 export function BoardKeyboardLift({
   enabled,
-  boardHeight,
   bottomInset,
   children,
 }: {
   enabled: boolean
-  boardHeight: number
   /** why: a seat on the screen's bottom edge squares its corners into the rounded screen corners; that strip stays tucked under the keyboard instead of showing square corners above it. */
   bottomInset: number
   children: ReactNode
 }) {
-  const { height: keyboard } = useReanimatedKeyboardAnimation()
-  const bottom = useSharedValue(0)
-  const owner = useRef<object>(null)
-  const lifted = useDerivedValue(() => {
-    // why: keyboard height runs from 0 to minus the keyboard height as it opens.
-    const covered =
-      enabled && bottom.value > 0 ? bottom.value - (boardHeight + keyboard.value) - bottomInset : 0
-    return Math.max(0, covered)
-  })
-  const lift = useRef<Lift>({
-    // why: a seat measured while the board is already lifted reads high by the lift.
-    raise: (next, measuredBottom) => {
-      owner.current = next
-      bottom.value = measuredBottom + lifted.value
-    },
-    clear: (previous) => {
-      if (owner.current !== previous) return
-      owner.current = null
-      bottom.value = 0
-    },
-  }).current
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: -lifted.value }] }))
+  const [owner, setOwner] = useState<object | null>(null)
+  // why: the owner is whichever sheet asked last, so a closing sheet only drops its own lift.
+  const setLift = useRef<SetLift>((next, on) =>
+    setOwner((current) => (on ? next : current === next ? null : current)),
+  ).current
 
   return (
-    <BoardKeyboardLiftContext.Provider value={lift}>
-      <Animated.View collapsable={false} style={[$fill, style]}>
+    <BoardKeyboardLiftContext.Provider value={setLift}>
+      <KeyboardAvoidingView
+        behavior="position"
+        enabled={enabled && owner !== null}
+        keyboardVerticalOffset={-bottomInset}
+        style={$fill}
+        contentContainerStyle={$fill}
+      >
         {children}
-      </Animated.View>
+      </KeyboardAvoidingView>
     </BoardKeyboardLiftContext.Provider>
   )
 }
 
-/** why: returns a focus handler for the seat's fields; it measures the seat and lifts the board while the sheet stays open. */
-export function useBoardKeyboardLift(seat: RefObject<View | null>): () => void {
-  const lift = useContext(BoardKeyboardLiftContext)
+/** why: returns a focus handler for a sheet's fields; a seat on the bottom edge lifts the board until the sheet closes. */
+export function useBoardKeyboardLift(lifts: boolean): () => void {
+  const setLift = useContext(BoardKeyboardLiftContext)
   const owner = useRef({}).current
-  useEffect(() => () => lift?.clear(owner), [lift, owner])
-  return () => {
-    seat.current?.measureInWindow((_x, y, _width, height) => {
-      if (height > 0) lift?.raise(owner, y + height)
-    })
-  }
+  useEffect(() => () => setLift(owner, false), [setLift, owner])
+  return () => setLift(owner, lifts)
 }
 
 const $fill = { flex: 1 } as const

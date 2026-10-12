@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentRef, type RefObject } from "react"
+import { useEffect, useRef, useState, type ComponentRef } from "react"
 import type { TextStyle, View as ViewRef, ViewStyle } from "react-native"
 import {
   AccessibilityInfo,
@@ -41,8 +41,8 @@ export type PokemonSheetMode =
 
 export interface PokemonSheetProps {
   seatNumber: number
-  /** why: the sheet turns with the seat, so the board measures the seat itself to lift it clear of the keyboard. */
-  seatRef: RefObject<ViewRef | null>
+  /** why: only a seat on the screen's bottom edge sits under the keyboard, so only its sheet lifts the board. */
+  liftsBoard?: boolean
   color: string
   rotation: LifeCardContentRotation
   cardWidth: number
@@ -81,7 +81,7 @@ function hitDetail(hit: PokemonSearchHit): string | undefined {
  */
 export function PokemonSheet({
   seatNumber,
-  seatRef,
+  liftsBoard = false,
   color,
   rotation,
   cardWidth,
@@ -100,7 +100,7 @@ export function PokemonSheet({
   onClose,
 }: PokemonSheetProps) {
   const { themed } = useAppTheme()
-  const liftSeat = useBoardKeyboardLift(seatRef)
+  const liftSeat = useBoardKeyboardLift(liftsBoard)
   const sheetColor = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(sheetColor)
   const inkStyle = { color: ink }
