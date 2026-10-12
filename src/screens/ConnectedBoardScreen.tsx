@@ -377,6 +377,8 @@ function ConnectedBoardRuntime({
     removePokemon,
     knockOut,
     undoKnockout,
+    setPokemonCondition,
+    checkupPokemon,
   } = runtime
   const table = useMemo(
     (): TableRuntime => ({
@@ -392,6 +394,8 @@ function ConnectedBoardRuntime({
       removePokemon,
       knockOut,
       undoKnockout,
+      setPokemonCondition,
+      checkupPokemon,
     }),
     [
       tableState,
@@ -406,6 +410,8 @@ function ConnectedBoardRuntime({
       removePokemon,
       knockOut,
       undoKnockout,
+      setPokemonCondition,
+      checkupPokemon,
     ],
   )
   const latest = useRef(runtime)
