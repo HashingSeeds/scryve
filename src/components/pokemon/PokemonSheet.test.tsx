@@ -1,15 +1,18 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
+import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { ThemeProvider } from "@/theme/context"
 
 import { PokemonSheet, type PokemonSheetProps } from "./PokemonSheet"
 
 const mockAction = jest.fn()
 const mockQuery = jest.fn()
+let mockOnline = true
 const mockConvex = {
+  url: "https://test.convex.cloud",
   action: mockAction,
   query: mockQuery,
-  connectionState: () => ({ isWebSocketConnected: true }),
+  connectionState: () => ({ isWebSocketConnected: mockOnline }),
   subscribeToConnectionState: () => () => {},
 }
 jest.mock("convex/react", () => ({ useConvex: () => mockConvex }))
@@ -61,6 +64,7 @@ describe("PokemonSheet", () => {
     jest.useFakeTimers()
     mockAction.mockReset()
     mockQuery.mockReset()
+    mockOnline = true
   })
   afterEach(() => jest.useRealTimers())
 
@@ -206,7 +210,7 @@ describe("PokemonSheet", () => {
     ])
     mockAction.mockResolvedValue(card)
     const onPlace = jest.fn(() => true)
-    render(sheet({ deckVersionId: "version-1", onPlace }))
+    render(sheet({ deck: { ownerId: "owner-1", versionId: "version-1" }, onPlace }))
     await flush()
 
     expect(screen.getByLabelText("Charizard ex, SV3 125 ×3")).toBeTruthy()
@@ -219,6 +223,26 @@ describe("PokemonSheet", () => {
       name: "Charizard ex",
       hp: 330,
       prizes: 2,
+    })
+  })
+
+  it("lists a cached deck offline, and a tap fills the name so only HP is left", async () => {
+    mockOnline = false
+    mockQuery.mockRejectedValue(new Error("offline"))
+    mockAction.mockRejectedValue(new Error("offline"))
+    new DeckVersionCacheRepository("owner-offline", undefined, mockConvex.url).saveCards(
+      "version-offline",
+      1,
+      [{ name: "Pikachu ex", cardId: "sv08-057", category: "Pokemon", quantity: 2 }],
+    )
+    render(sheet({ deck: { ownerId: "owner-offline", versionId: "version-offline" } }))
+
+    fireEvent.press(screen.getByTestId("pokemon-result-sv08-057"))
+    await flush()
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Pikachu ex")
+    expect(screen.getByTestId("pokemon-hp-input-seat-1").props.value).toBe("")
+    expect(screen.getByTestId("pokemon-prizes-2-seat-1").props.accessibilityState).toMatchObject({
+      checked: true,
     })
   })
 })

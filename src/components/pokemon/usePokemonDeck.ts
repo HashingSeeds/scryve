@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useConvex } from "convex/react"
-import type { FunctionReturnType } from "convex/server"
+
+import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 
-type DeckCard = FunctionReturnType<typeof api.decks.versionCards>[number]
+export type SeatDeck = { ownerId: string; versionId: string }
 export type PokemonDeckRow = { cardId: string; name: string; copies: number }
+type DeckCard = { category?: string; cardId?: string; name: string; quantity: number }
 
 export function pokemonDeckRows(cards: readonly DeckCard[]): PokemonDeckRow[] {
   const rows = new Map<string, PokemonDeckRow>()
@@ -19,9 +21,19 @@ export function pokemonDeckRows(cards: readonly DeckCard[]): PokemonDeckRow[] {
   return [...rows.values()]
 }
 
-export function usePokemonDeck(versionId: string | undefined): PokemonDeckRow[] {
+/** why: a game is often played offline, so the deck the device already cached shows first and the server only refreshes it. */
+export function usePokemonDeck(deck: SeatDeck | undefined): PokemonDeckRow[] {
   const convex = useConvex()
-  const [loaded, setLoaded] = useState<{ versionId: string; rows: PokemonDeckRow[] }>()
+  const ownerId = deck?.ownerId
+  const versionId = deck?.versionId
+  const cached = useMemo(() => {
+    if (!convex || !ownerId || !versionId) return []
+    const stored = new DeckVersionCacheRepository(ownerId, undefined, convex.url).loadCards(
+      versionId,
+    )
+    return stored ? pokemonDeckRows(stored.cards) : []
+  }, [convex, ownerId, versionId])
+  const [fetched, setFetched] = useState<{ versionId: string; rows: PokemonDeckRow[] }>()
 
   useEffect(() => {
     if (!convex || !versionId) return
@@ -29,7 +41,7 @@ export function usePokemonDeck(versionId: string | undefined): PokemonDeckRow[] 
     convex
       .query(api.decks.versionCards, { versionId: versionId as Id<"deckVersions"> })
       .then((cards) => {
-        if (active) setLoaded({ versionId, rows: pokemonDeckRows(cards) })
+        if (active) setFetched({ versionId, rows: pokemonDeckRows(cards) })
       })
       .catch(() => {})
     return () => {
@@ -37,5 +49,5 @@ export function usePokemonDeck(versionId: string | undefined): PokemonDeckRow[] 
     }
   }, [convex, versionId])
 
-  return loaded && loaded.versionId === versionId ? loaded.rows : []
+  return fetched && fetched.versionId === versionId ? fetched.rows : cached
 }

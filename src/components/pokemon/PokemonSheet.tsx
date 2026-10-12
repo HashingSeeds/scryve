@@ -24,7 +24,7 @@ import {
 import { catalogRows, hitDetail, pokemonPrintingLabel } from "./pokemonCatalogHits"
 import { PokemonKeypad } from "./PokemonKeypad"
 import { usePokemonCatalog, type PokemonSearchHit } from "./usePokemonCatalog"
-import { usePokemonDeck } from "./usePokemonDeck"
+import { usePokemonDeck, type SeatDeck } from "./usePokemonDeck"
 import {
   pokemonPrizeValue,
   remainingHp,
@@ -47,7 +47,7 @@ export interface PokemonSheetProps {
   seatNumber: number
   /** why: only a seat on the screen's bottom edge sits under the keyboard, so only its sheet lifts the board. */
   liftsBoard?: boolean
-  deckVersionId?: string
+  deck?: SeatDeck
   color: string
   rotation: LifeCardContentRotation
   cardWidth: number
@@ -76,7 +76,7 @@ const DAMAGE_STEPS = [-3, -1, 1, 3, 5, 10] as const
 export function PokemonSheet({
   seatNumber,
   liftsBoard = false,
-  deckVersionId,
+  deck: seatDeck,
   color,
   rotation,
   cardWidth,
@@ -216,7 +216,17 @@ export function PokemonSheet({
       setLookupOpen(false)
       setQuery("")
     } catch {
-      if (mounted.current) setPickError("Could not load that card. Type its HP instead.")
+      if (!mounted.current) return
+      // why: offline the catalog can't answer, but the row already names the card, so only HP is left to type.
+      setDraft((current) => ({
+        ...current,
+        cardId: hit.cardId,
+        name: hit.name,
+        prizes: current.prizesChosen ? current.prizes : pokemonPrizeValue(hit.name),
+      }))
+      setLookupOpen(false)
+      setQuery("")
+      setPickError("Could not load that card. Type its HP instead.")
     } finally {
       if (mounted.current) setPicking(undefined)
     }
@@ -250,10 +260,10 @@ export function PokemonSheet({
   }
 
   const hits = catalog.hits && catalogRows(catalog.hits)
-  const deck = usePokemonDeck(deckVersionId)
+  const deck = usePokemonDeck(seatDeck)
   const showSearch = lookupOpen && catalog.available
   const wanted = query.trim().toLowerCase()
-  const deckHits = showSearch ? deck.filter(({ name }) => name.toLowerCase().includes(wanted)) : []
+  const deckHits = lookupOpen ? deck.filter(({ name }) => name.toLowerCase().includes(wanted)) : []
   const inDeck = new Set(deckHits.map(({ cardId }) => cardId))
   const results = [
     ...deckHits.map(({ cardId, name, copies }) => ({

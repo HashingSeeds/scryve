@@ -243,6 +243,7 @@ type ConnectedBoardReadyProps = {
   onGameAbandoned?: () => void
   view: ConnectedBoardReadyView
   controls: ConnectedBoardControls
+  ownerId: string
 }
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
@@ -473,6 +474,7 @@ function ConnectedBoardRuntime({
             onGameAbandoned={onGameAbandoned}
             view={view}
             controls={controls}
+            ownerId={ownerId}
           />
         </ConnectedUnsentContext.Provider>
       </ConnectedTableContext.Provider>
@@ -495,6 +497,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   onGameAbandoned,
   view,
   controls,
+  ownerId,
 }: ConnectedBoardReadyProps) {
   const menuButtonStyle = useMenuButtonStyle()
   const {
@@ -818,11 +821,12 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
               )
             }
             getStaleSince={(player) => (controlled.has(player.id) ? undefined : offlineSince)}
-            getDeckVersionId={(player) =>
-              controlled.has(player.id)
+            getSeatDeck={(player) => {
+              const versionId = controlled.has(player.id)
                 ? game.players.find((candidate) => candidate.playerId === player.id)?.deckVersionId
                 : undefined
-            }
+              return versionId ? { ownerId, versionId } : undefined
+            }}
             commanderDamage={
               commanderDamageEnabled
                 ? {
