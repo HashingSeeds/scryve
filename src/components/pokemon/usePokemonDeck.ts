@@ -41,11 +41,10 @@ export function usePokemonDeck(deck: SeatDeck | undefined): PokemonDeckRow[] {
     convex
       .query(api.decks.versionCards, { versionId: versionId as Id<"deckVersions"> })
       .then(({ revision, cards }) => {
-        new DeckVersionCacheRepository(ownerId, undefined, convex.url).saveCards(
-          versionId,
-          revision,
-          cards,
-        )
+        const cache = new DeckVersionCacheRepository(ownerId, undefined, convex.url)
+        // why: the deck editor caches the same revision with card images, which this text-only read must not overwrite.
+        if ((cache.loadCards(versionId)?.revision ?? -1) < revision)
+          cache.saveCards(versionId, revision, cards)
         if (active) setFetched({ versionId, rows: pokemonDeckRows(cards) })
       })
       .catch(() => {})

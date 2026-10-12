@@ -222,6 +222,7 @@ export function PokemonSheet({
         ...current,
         cardId: hit.cardId,
         name: hit.name,
+        hp: "",
         prizes: pokemonPrizeValue(hit.name),
         prizesChosen: false,
       }))
