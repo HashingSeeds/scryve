@@ -20,5 +20,5 @@ patchedDependencies:
   # react-native 0.86.3 spreads BridgelessUIManager into UIManager, which builds constants for
   # every native view manager at launch (~30ms on a Pixel 6a). JS-only patches live in js-patches/
   # because the native fingerprint hashes patches/, which would block OTA updates.
-  # scripts/js-patches.test.cjs keeps native packages and files out of js-patches/.
+  # scripts/js-patches.test.cjs keeps native files and build scripts out of js-patches/.
   react-native@0.86.3: js-patches/react-native@0.86.3.patch
