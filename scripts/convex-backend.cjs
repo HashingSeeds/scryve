@@ -19,7 +19,6 @@ function packageJsonMatches(baseSource, headSource) {
   }
 }
 
-/** why: true only when git proves the backends are identical; any git failure counts as a change. */
 function backendMatches(baseRef, headRef, cwd = root) {
   const diff = spawnSync("git", ["diff", "--quiet", baseRef, headRef, "--", ...BACKEND_PATHS], {
     cwd,

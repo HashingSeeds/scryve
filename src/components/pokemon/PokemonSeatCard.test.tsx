@@ -10,7 +10,6 @@ import { DICE_CHIP_HEIGHT } from "../DiceChips"
 import { PokemonSeatCard, type PokemonSeatCardProps } from "./PokemonSeatCard"
 import { EMPTY_TABLE, pokemonBoardOf } from "../../../convex/lib/table"
 
-/** why: the card is driven through the same runtime the local board uses, so what the tests press lands in a real table. */
 function pokemonTable(playerNames: string[]) {
   let current = createLocalGame({
     now: 1,

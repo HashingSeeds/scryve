@@ -64,7 +64,6 @@ export interface CurrentGameScreenProps {
   onViewSummary: (gameId: string) => void
   onGameAbandoned?: () => void
   repository?: LocalGameRepository
-  /** why: the signed-in account that a finished game uploads to. */
   ownerId?: string
 }
 
@@ -94,10 +93,8 @@ export function CurrentGameScreen({
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const system = runtime.game.system
   const [menuOpen, setMenuOpen] = useState(false)
-  // why: a board opened on a game already in play keeps End for it; every later game here starts fresh.
   const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
-  // why: the game that just ended decides whether the match goes on, and it is already in history.
   const [matchPrompt, setMatchPrompt] = useState<LocalGame | undefined>(() =>
     runtime.pendingMatchEnd(),
   )
@@ -113,7 +110,6 @@ export function CurrentGameScreen({
   const playBegun = hasPlayBegun(runtime.game)
   const diceGameStarted = dice.gameStarted
   const markFirstPlayerUsed = runtime.markFirstPlayerUsed
-  // why: once play has begun the badge is gone for good on its own, so nothing is written here; the marker is written only when the badge is used.
   useEffect(() => {
     if (playBegun) diceGameStarted()
   }, [playBegun, diceGameStarted])
@@ -159,7 +155,6 @@ export function CurrentGameScreen({
     playBegun,
     system,
   ])
-  // why: a dice tool tapped from the open menu acts at once, and the menu folds away around the row.
   const diceTools = useMemo(
     () =>
       dice.tools.map((tool) => ({
@@ -201,7 +196,6 @@ export function CurrentGameScreen({
       setEndSource(undefined)
       return
     }
-    // why: a failed rematch save throws here, and the open dialog shows the error.
     if (ended.match && !ended.match.result) {
       // why: at the game cap the board waits for the match result, so Cancel or a restart cannot orphan the match.
       if (canContinueMatch(ended)) runtime.nextMatchGame()
@@ -237,7 +231,6 @@ export function CurrentGameScreen({
 
   const dismissSavedToast = useCallback(() => setSaved(undefined), [])
 
-  // why: a judge-ordered restart mid-match replays the same game number; the match and its score stay.
   function abandonGame() {
     setEndSource(undefined)
     if (match) {
@@ -451,7 +444,6 @@ export function CurrentGameScreen({
       ) : null}
 
       {match && !menuOpen ? (
-        // why: the standing is glanceable only; it never sits between a thumb and the life controls.
         <View pointerEvents="none" style={[themed($matchLayer), { top: insets.top + 4 }]}>
           <Text
             testID="match-context"

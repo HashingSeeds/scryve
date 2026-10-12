@@ -80,12 +80,10 @@ export const DURABLE_QUARANTINE_PREFIX = "quarantine:"
 
 export type QuarantineReason = "empty" | "invalid_json" | "rejected"
 
-/** why: the last writer, not the first, because its serializer produced the bytes on disk. */
 export interface WrittenBy {
   app: string
   update: string
   runtime: string
-  /** why: web builds have no update id or runtime, so the release commit is what tells two deploys apart. */
   commit?: string
 }
 
@@ -96,7 +94,6 @@ export interface QuarantinedRecord {
   /** why: key paths and `typeof` labels only; values can hold player data. */
   shape: Record<string, string>
   operationType: string
-  /** why: `update`, `runtime` and `commit` are 8-hex digests here; `scripts/outbox-provenance-lookup.cjs` maps them back. */
   writtenBy: WrittenBy | "unknown"
 }
 
@@ -120,7 +117,6 @@ export function setQuarantineReporter(reporter: (report: QuarantineReport) => vo
   reportQuarantine = reporter
 }
 
-/** why: the app stamps its build onto every record it writes, so a quarantined record says which codec produced it. */
 export function setOutboxWriter(writer: WrittenBy | undefined): void {
   currentWriter = writer
 }
@@ -218,7 +214,6 @@ const shapeChildren = (node: unknown, known: ReadonlySet<string>): Array<[string
   ])
 }
 
-/** why: deep enough for a failed record's `action.cards.0.quantity`; breadth-first so the entry cap drops the deepest paths, and arrays are sampled because their elements share a shape. */
 const shapeOf = (value: unknown, knownKeys: readonly string[]): Record<string, string> => {
   if (!isRecord(value)) return value === null ? {} : { $: typeLabel(value) }
   const known = new Set([...ENVELOPE_KEYS, ...knownKeys])

@@ -291,7 +291,6 @@ describe("GameRadialMenu", () => {
     fireEvent.press(view.getByTestId("dice-d20"))
     expect(tools[1].onPress).toHaveBeenCalledTimes(1)
 
-    // why: the first tool takes the half nearer the pentagon whichever way the pill points.
     for (const anchor of [
       { x: 0.5, y: 0.5 },
       { x: 0.2, y: 0.5 },
@@ -303,7 +302,6 @@ describe("GameRadialMenu", () => {
       const distance = (offset: number) =>
         Math.hypot(pose.x + offset * Math.cos(angle), pose.y + offset * Math.sin(angle))
       expect(distance(inner)).toBeLessThan(distance(outer))
-      // why: 4pt inside each end cap, the pill's own padding, so each pea is concentric with its cap.
       expect([Math.abs(inner), Math.abs(outer)]).toEqual([32, 32])
     }
   })

@@ -351,7 +351,6 @@ export class OutboxSyncController {
     this.publish()
   }
 
-  /** why: table actions check against what this device shows, queued changes included, and only for seats it controls. */
   private tableSource(): TableSource | null {
     const projection = this.displayProjection()
     if (projection?.status !== "active") return null

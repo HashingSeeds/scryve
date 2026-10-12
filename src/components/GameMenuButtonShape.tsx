@@ -61,7 +61,6 @@ interface Point {
   y: number
 }
 
-// why: a corner is a quadratic curve that starts `enter` along the previous edge, bends through the sharp `tip`, and leaves at `exit` along the next edge.
 interface SoftCorner {
   enter: Point
   tip: Point
@@ -91,7 +90,6 @@ export function buildSoftCorners(input: {
     }
   })
   const sideLength = 2 * input.radius * Math.sin(Math.PI / input.sides)
-  // why: two corners share each side, so neither may take more than just under half of it.
   const share = Math.min(input.cornerRadius / sideLength, 0.45)
   return tips.map((tip, corner) => ({
     enter: towards(tip, tips[(corner + input.sides - 1) % input.sides], share),
@@ -113,7 +111,6 @@ export function buildSoftPolygonPath(corners: readonly SoftCorner[]): string {
   return `${pathThrough(corners)} Z`
 }
 
-// why: the dashed trace must fit the outline exactly, so measure the curves instead of assuming straight sides.
 export function softPolygonLength(corners: readonly SoftCorner[]): number {
   const curveSteps = 24
   const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
@@ -136,9 +133,7 @@ export function softPolygonLength(corners: readonly SoftCorner[]): number {
   }, 0)
 }
 
-// why: about 7pt on the 80pt button, enough to match the app's rounded surfaces without losing the pentagon read.
 const PENTAGON_CORNER_RADIUS = 9
-// why: the face sits inside the border, so its corners tighten a little to keep the border an even thickness.
 const FACE_CORNER_RADIUS = PENTAGON_CORNER_RADIUS * 0.9
 
 const PENTAGON_CORNERS = buildSoftCorners({
@@ -159,7 +154,6 @@ const FACE_CORNERS = buildSoftCorners({
 })
 const FACE_PATH = buildSoftPolygonPath(FACE_CORNERS)
 
-// why: corners are numbered clockwise from the apex. The open path ends halfway round its first and last curves, so a bevel starts and stops where the sharp version did instead of bulging into a neighboring edge.
 function faceEdgePath(corners: readonly number[]): string {
   const [first, ...rest] = corners.map((corner) => FACE_CORNERS[corner])
   const last = rest.pop()!
@@ -311,13 +305,10 @@ const TRACE_LAP_MS = 1400
 const RING_FADE_MS = 250
 // why: Reanimated reads the system setting only at startup, so animations we already gate on the live preference must not consult it again.
 const GATED_MOTION = ReduceMotion.Never
-// why: eight dashes per side divide the outline evenly, so no corner gets a doubled dash.
 const STILL_TRACE_DASH = TRACE_LENGTH / 8
-// why: narrower than the border it covers, so a board-colored edge keeps the ring color apart from the seat colors around the button.
 const RING_STROKE_WIDTH = PENTAGON_STROKE_WIDTH - 3
 
 const [{ tip: apex }, { tip: upperRight }] = PENTAGON_CORNERS
-// why: 30% of the way from the upper-right corner toward the apex keeps that corner visible, and the point stays on the border when the open menu turns the pentagon. It is past both rounded corners (each takes about 17% of the side), so it sits on the straight edge. The anchor is in fractions of the button size.
 const BADGE_SHARE_OF_EDGE = 0.3
 export const PENTAGON_BADGE_ANCHOR = {
   x: towards(upperRight, apex, BADGE_SHARE_OF_EDGE).x / PENTAGON_VIEWBOX,
@@ -355,7 +346,6 @@ function SignalBorder({
   )
 }
 
-// why: the ring keeps its last color while fading out, so the fade never snaps to the board color.
 function SignalRing({ color, animate }: { color?: string; animate: boolean }) {
   const [shownColor, setShownColor] = useState(color)
   if (color && color !== shownColor) setShownColor(color)
@@ -382,7 +372,6 @@ function SignalRing({ color, animate }: { color?: string; animate: boolean }) {
   )
 }
 
-// why: animated props run on the UI thread, so the trace keeps gliding while taps re-render the board.
 function SignalTrace({ color }: { color: string }) {
   const offset = useSharedValue(0)
   useEffect(() => {
@@ -421,7 +410,6 @@ export interface GameMenuButtonShapeProps {
   boardBackgroundColor: string
   seatColors?: readonly string[]
   signal?: BorderSignal
-  // why: off while reduced motion is on or unknown, so rings appear at once and traces hold still as dashes.
   animateSignal?: boolean
 }
 

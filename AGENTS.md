@@ -82,8 +82,15 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 
 ## Comments
 
-Make code self-explanatory first through names, extraction, and types. When code cannot express a constraint or rationale, write a `// why:` comment, or `/** why: ... */` above a function for non-obvious usage. This never blocks your work.
-After merge, each new why comment is posted to Matt as an entry on the pinned `Comment review` issue. Kept entries hide themselves. Apply entries checked `drop` with `pnpm comments:apply` in a small PR; they hide once it merges.
+`why:` comments only for breakage no test catches.
+
+Keep:
+- `/** why: sets rather than toggles, so two devices tapping at once agree. */`
+- `` // why: clients that predate `invalid` see no seats and fall through to claimSeat, which throws. ``
+
+Drop:
+- `/** why: Poisoned and Burned only ever sit on the Active. Absent means neither, so boards stored before conditions existed need no backfill. */` (the optional field already says it)
+- `// why: undefined means the deck list is still loading, which keeps the picker closed.` (put that state in the type)
 
 ## Additional tips
 

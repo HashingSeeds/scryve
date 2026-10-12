@@ -17,7 +17,6 @@ const RECEIPT_TABLES = [
   "deckSyncReceipts",
 ] as const
 
-/** why: deletes at most one batch per transaction, then reschedules itself until nothing old is left. */
 export const pruneOldReceipts = internalMutation({
   args: {},
   handler: async (ctx) => {

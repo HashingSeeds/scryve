@@ -83,7 +83,6 @@ export function DeckView({
   onIncrement: (card: DeckCard) => void
   onDecrement: (card: DeckCard) => void
   undo?: { name: string; restore: () => void }
-  // why: stats arrive only for Pro users with a live deck read, so the block is optional.
   stats?: {
     record: DeckStatsRecord
     source: StatsSource

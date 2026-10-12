@@ -34,7 +34,6 @@ export interface LifeCardDice {
   onClearChip?: (chip: DiceSeatChip) => void
 }
 
-/** why: a bloom or an armed ring takes the seat; chips alone leave it playable. */
 export function diceCoversSeat(dice: LifeCardDice | undefined): boolean {
   return !!dice && (dice.view !== undefined || dice.armed !== undefined)
 }
@@ -57,14 +56,12 @@ const BLOOM_EXIT_MS = 300
 const GATED_MOTION = ReduceMotion.Never
 // why: web runs only predefined layout animations, so the shrink is one of those and everything else is driven by shared values.
 const BLOOM_EXITING = ZoomOut.duration(BLOOM_EXIT_MS).reduceMotion(GATED_MOTION)
-// why: a die tumbles through a few faces and slows as it lands; the result it lands on was decided before the tumble began.
 const TUMBLE_TICKS = 9
 const tumbleStepMs = (step: number) => 30 + step * step * 1.2
 const D20_SIDES = 20
 const COIN_FLIP_MS = 640
 const COIN_HALF_TURNS = 6
 
-/** why: a result belongs to the seat that rolled it, so it sits over that card, turned the way its player reads. Each new result is its own bloom. */
 export function DiceSeatOverlay(props: DiceSeatOverlayProps) {
   return <Bloom key={viewKey(props.dice.view)} {...props} />
 }
@@ -131,7 +128,6 @@ function Bloom({
       style={[$layer, animate && arriveStyle]}
     >
       {view?.kind === "choice" ? (
-        // why: the two choices must reach a screen reader one at a time, so nothing accessible wraps them.
         <View testID={`dice-seat-${seatNumber}`} accessible={false} style={overlayStyle}>
           {content}
         </View>
@@ -154,7 +150,6 @@ function Bloom({
 
 type Tumble = { face?: number; flipping: boolean; flip: SharedValue<number> }
 
-/** why: the tumble is presentation only: a d20 shows a few passing faces from its own small sequence (never the game's random source) and a coin spins on its axis, then both land on the decided result. */
 function useTumble(view: DiceSeatView | undefined): Tumble {
   const rolling = view ? rollingTool(view) : undefined
   const [state, setState] = useState<{ face?: number; flipping: boolean }>(() =>
@@ -164,7 +159,6 @@ function useTumble(view: DiceSeatView | undefined): Tumble {
   )
   const flip = useSharedValue(0)
   useEffect(() => {
-    // why: motion turned off mid-tumble lands the die at once on the decided result.
     if (!rolling) {
       flip.value = 1
       setState((current) =>
@@ -201,7 +195,6 @@ function rollingTool(view: DiceSeatView): DiceTool | undefined {
   return undefined
 }
 
-// why: keyed on the roll attempt, not the value, so rolling the same result again still blooms and tumbles.
 function viewKey(view: DiceSeatView | undefined) {
   if (!view) return "armed"
   if (view.kind === "roll") return `roll:${view.roll.tool}:${view.attempt}`
@@ -315,7 +308,6 @@ function Result({
   )
 }
 
-/** why: a coin in the air shows its edge and faces by turns, so the disc squeezes on its axis until it lands. */
 function FlippingCoin({
   flip,
   foreground,

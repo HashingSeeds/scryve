@@ -63,9 +63,6 @@ function playerNote(subject) {
   return summary[0].toUpperCase() + summary.slice(1)
 }
 
-// why: the newest notes on main, newest first. `newSince` maps every commit they span to how many
-// notes came after it, so an install running one of those commits shows only what it lacks.
-// Installs older than the window, or without a commit, show every note.
 function releaseNotes(commits) {
   const notes = []
   const newSince = {}
@@ -78,8 +75,6 @@ function releaseNotes(commits) {
   return { notes, newSince }
 }
 
-// why: a merge commit's subject is "Merge pull request #N from ..."; GitHub puts the PR title on
-// the first line of its body.
 function recentCommits(head) {
   return git("log", "--first-parent", "--max-count=200", "--format=%H%x1f%s%x1f%b%x1e", head)
     .split("\x1e")
@@ -142,7 +137,6 @@ function* betaGroups() {
   for (const groupId of groupIds) yield summarizeGroup(eas("update:view", groupId))
 }
 
-// why: CI passes SENTRY_READ_TOKEN; on our machines the telemetry skill already stores a read token.
 function sentryToken() {
   if (process.env.SENTRY_READ_TOKEN) return process.env.SENTRY_READ_TOKEN
   const telemetryEnv = path.join(os.homedir(), ".config", "telemetry", "env")

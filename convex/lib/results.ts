@@ -21,7 +21,6 @@ type StatsPatch = Partial<Record<keyof typeof EMPTY_GAMES, number>> &
 
 const ENVELOPE_LINES = ["manualMatches", "manualGames", "connectedMatches"] as const
 const EMPTY_GAMES = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
-// why: a match has one result row per deck, so this only bounds a corrupt duplicate.
 const MAX_ROWS_PER_MATCH = 10
 
 function outcomeTally(outcome: MatchOutcome): ResultTally {
@@ -66,7 +65,6 @@ function statsPatch(current: StatsDoc | null, deltas: TallyDeltas, sign: 1 | -1,
   return patch
 }
 
-// why: a decrement never creates a stats row, so removing a result cannot invent an empty tally.
 async function applyStats(
   ctx: MutationCtx,
   deckId: Id<"decks">,
@@ -97,12 +95,10 @@ async function applyStats(
     })
 }
 
-/** why: an abandoned game has no result, so counting it as a played game would drag down deck win rates. */
 export function isAbandonedSummary(summary: Pick<Doc<"gameSummaries">, "terminalStatus">) {
   return summary.terminalStatus === "abandoned"
 }
 
-/** why: connected and published local games share this, so both count seats the same way. */
 export async function recordGameResults(
   ctx: MutationCtx,
   summary: Doc<"gameSummaries">,
@@ -158,7 +154,6 @@ function matchDeltas(match: Doc<"matches">, owner: Doc<"matches">["seats"][numbe
   const matchTally = outcomeTally(owner.outcome ?? "unknown")
   if (match.source === "connected") return { connectedMatches: matchTally }
   const others = match.seats.filter((seat) => seat.seat !== owner.seat)
-  // why: game counters need every seat's wins; an unset gamesDrawn means no drawn games.
   if (owner.gamesWon === undefined || others.some((seat) => seat.gamesWon === undefined))
     return { manualMatches: matchTally }
   const wins = owner.gamesWon
@@ -181,7 +176,6 @@ function deckedOwnerSeat(match: Doc<"matches">) {
   }
 }
 
-/** why: only the owner can attach a deck, so a match records at most one deck result. */
 export async function recordMatchResult(ctx: MutationCtx, match: Doc<"matches">, now: number) {
   const owner = deckedOwnerSeat(match)
   if (!owner || match.finishedAt === undefined) return

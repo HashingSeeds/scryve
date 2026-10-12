@@ -1,14 +1,11 @@
 import type { LocalGameMatch, LocalGameSummary } from "./types"
 
 export interface ClaimDecision {
-  /** why: a match's games are claimed or skipped together, so the id is the match id when the game has one. */
   id: string
   claim: boolean
-  /** why: a seat index, because every game of a match seats the same players but with new player ids. */
   meSeat?: number
 }
 
-/** why: what the picker offers as one row: a single game, or every game of one match. */
 export interface ClaimUnit {
   id: string
   games: LocalGameSummary[]
@@ -19,7 +16,6 @@ export function claimUnitId(game: LocalGameSummary) {
   return game.match?.id ?? game.id
 }
 
-// why: only a finished game can upload, and an account that already declined it is not asked again; another account on the device still can be.
 export function claimableLocalGames(
   games: readonly LocalGameSummary[],
   ownerId: string,
@@ -32,7 +28,6 @@ export function claimableLocalGames(
   )
 }
 
-/** why: one decision covers a whole match, with one me seat for all of its games. Units keep History's newest-first order; games inside a unit run oldest first. */
 export function claimableLocalUnits(
   games: readonly LocalGameSummary[],
   ownerId: string,
@@ -49,7 +44,6 @@ export function claimableLocalUnits(
   })
 }
 
-// why: a claimed game belongs to one account; an unclaimed game is everyone's except the accounts that skipped it.
 export function localGameVisibleTo(game: LocalGameSummary, viewerId?: string): boolean {
   if (game.account) return game.account.ownerId === viewerId
   return viewerId === undefined || !game.skippedBy?.includes(viewerId)
@@ -74,7 +68,6 @@ export function applyClaimDecisions(
       ...game,
       account: { ownerId, ...(me ? { mePlayerId: me.id } : {}) },
       publish: "pending",
-      // why: the game that ended a match carries its result upload, which the account now owns too.
       ...(game.match?.result ? { matchPublish: "pending" } : {}),
     }
   })

@@ -35,7 +35,6 @@ export interface GameBoardStageProps {
   testID?: string
 }
 
-/** why: where the native module exists the board is pinned to the screen hardware so seats never move when the phone turns; web and older binaries keep the JS counter-rotation. */
 export const GameBoardStage = SCREEN_PINNING_AVAILABLE ? PinnedGameBoardStage : LegacyGameBoardStage
 
 function PinnedGameBoardStage({

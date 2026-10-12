@@ -27,7 +27,6 @@ export default function GameSummaryRoute() {
       (auth.isSignedIn && stored.game.account.ownerId === auth.userId))
       ? stored
       : null
-  // why: a local game published from another device only exists on the server.
   const connectedId =
     typeof gameId === "string" && (source === "connected" || (!detail && auth.isSignedIn))
       ? gameId

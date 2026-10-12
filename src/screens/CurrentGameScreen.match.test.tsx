@@ -150,7 +150,6 @@ describe("CurrentGameScreen match mode", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.saveActiveGame(matchGame(1, 4))
     const { view, initial } = mount(repository)
-    // why: seat 4 drops to zero, so a called round leaves it with a loss.
     fireEvent.press(view.getByTestId("life-seat-4--1"))
     fireEvent.press(view.getByTestId("life-seat-4--1"))
     endGame(view, "draw")
@@ -182,7 +181,6 @@ describe("CurrentGameScreen match mode", () => {
     endGame(view, 1)
     fireEvent.press(view.getByTestId("next-game-button"))
 
-    // why: the board label never takes touches; the score opens from the menu's status line.
     expect(view.getByTestId("match-context").props.onPress).toBeUndefined()
     fireEvent.press(view.getByTestId("game-menu-button"))
     fireEvent.press(view.getByLabelText("Game 2 · 0-1 · Best of 3"))
@@ -237,11 +235,9 @@ describe("CurrentGameScreen match mode", () => {
     expect(view.getByText("A match holds at most ten games, so this one ends here.")).toBeTruthy()
     fireEvent.press(view.getByTestId("match-prompt-end-button"))
     fireEvent.press(view.getByTestId("end-match-backdrop"))
-    // why: Cancel returns to the prompt, so the match is never left behind without a result.
     expect(view.getByTestId("match-prompt-dialog")).toBeTruthy()
     expect(repository.loadActiveGame()).toBeNull()
 
-    // why: a restart reopens the owed result from storage on a fresh board.
     view.unmount()
     const reopened = render(
       <ThemeProvider initialContext="light">

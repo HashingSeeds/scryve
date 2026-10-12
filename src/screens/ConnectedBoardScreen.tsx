@@ -247,12 +247,10 @@ type ConnectedBoardReadyProps = {
 
 type FinishBlocker = (typeof FINISH_BLOCKERS)[keyof typeof FINISH_BLOCKERS]
 
-/** why: kept structurally stable across life changes and sync bookkeeping, so the memoized board only renders when what it lays out changes. */
 type ConnectedBoardReadyView = {
   game: ConnectedBoardView
   syncSignal: BoardSyncSignal
   offlineSince?: number
-  /** why: a send in progress lasts a moment on every tap, so it is left out here and ending re-checks the exact queue. */
   finishBlocker?: FinishBlocker
   failed: ConnectedGameRuntime["failed"]
   changeError?: string
@@ -269,17 +267,13 @@ type ConnectedBoardControls = Pick<
   | "abandon"
   | "dismissFailed"
 > & {
-  /** why: press-time checks read the latest runtime so the board does not re-render for state it only checks on press. */
   current: () => ConnectedGameRuntime
 }
 
 type BoardSeat = Omit<GamePlayer, "life">
 
-/** why: life totals change on every tap; only the life grid and the winner picker read them, so the rest of the board skips those renders. */
 const ConnectedLivesContext = createContext<Readonly<Record<string, number>>>({})
-/** why: the unsent count moves on every tap; only the status sheet shows it. */
 const ConnectedUnsentContext = createContext(0)
-// why: like lives, table changes reach only the grid through context, so the memoized board around it skips them.
 const ConnectedTableContext = createContext<TableRuntime | undefined>(undefined)
 
 function toBoardSeat(player: ConnectedBoardSeat): BoardSeat {
@@ -486,7 +480,6 @@ function ConnectedBoardRuntime({
   )
 }
 
-/** why: memoized so life changes, sync bookkeeping and query resubscribes in `ConnectedBoardRuntime` skip the whole board; only context consumers re-render. */
 const ConnectedBoardReady = memo(function ConnectedBoardReady({
   publicId,
   initialInviteOpen,
@@ -1145,7 +1138,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                     : await controls.abandon()
                   if (!ended) return
                   setConfirmingFinish(false)
-                  // why: the finished projection carries any rematch, so the host follows it like every other board.
                   if (withResult && onRematch) return
                   navigatedTerminal.current = true
                   if (withResult) {
@@ -1243,7 +1235,6 @@ const FINISH_BLOCKERS = {
   rejected: { petal: "review first", detail: "Review the changes below first" },
 } as const
 
-/** why: reads life from context so a life change re-renders only this grid and the changed card, not the board around it. */
 function ConnectedLifeGrid({
   seats,
   ...grid

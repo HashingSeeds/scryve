@@ -500,7 +500,6 @@ describe("unified history screen", () => {
 
 describe("HistoryScreen Scryve matches", () => {
   const match = { id: "match_1", bestOf: 3, gameNumber: 1, wins: [0, 0], draws: 0 } as const
-  // why: Ada takes the Bo3 2-1; the third game carries the match result like the device stores it.
   const deviceGames = [
     localGame({
       id: "m-g1",
@@ -590,7 +589,6 @@ describe("HistoryScreen Scryve matches", () => {
     expect(rowIds()).toEqual(["history-row-match-match_1"])
     fireEvent.press(screen.getByTestId("history-row-match-match_1"))
     expect(rowIds()).toEqual(["history-row-match-match_1", "history-row-local-m-g3"])
-    // why: the only loaded game is still game 3 of the match, not game 1 of what is loaded.
     expect(screen.getByLabelText(/Game 3 · /)).toBeTruthy()
 
     view.rerender(

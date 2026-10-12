@@ -1,7 +1,5 @@
 name: beta
 
-# why: every merge ships to the beta channel right away; `pnpm release:promote` (or the promote
-# workflow) later moves a beta update that soaked cleanly to production. See RELEASING.md.
 on:
   push:
     branches: [main]
@@ -12,8 +10,6 @@ permissions:
   contents: read
   actions: read
 
-# why: publishes run in merge order. GitHub keeps one pending run, so a burst of merges skips
-# straight to the newest commit, which already contains the ones in between.
 concurrency:
   group: beta
   cancel-in-progress: false

@@ -21,7 +21,6 @@ describe("pokemonCardLayout", () => {
     expect(benchMenuClearance(0, undefined, "top")).toEqual({ ...none, top: MENU_CLEARANCE })
     expect(benchMenuClearance(180, undefined, "bottom")).toEqual({ ...none, top: MENU_CLEARANCE })
     expect(benchMenuClearance(180, undefined, "top")).toEqual(none)
-    // why: a corner at the inner edge sits on the bench's left or right in content space.
     expect(benchMenuClearance(0, "topLeft", undefined)).toEqual({ ...none, left: MENU_CLEARANCE })
     expect(benchMenuClearance(0, "topRight", undefined)).toEqual({ ...none, right: MENU_CLEARANCE })
     expect(benchMenuClearance(0, "bottomLeft", undefined)).toEqual(none)

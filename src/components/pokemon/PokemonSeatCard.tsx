@@ -50,7 +50,6 @@ export interface PokemonSeatCardProps {
   playerName: string
   seatNumber: number
   shape?: PlayerMarkShape
-  /** why: Prize cards are the seat's main counter, so this is the player's life total. */
   prizes: number
   color: string
   compact?: boolean
@@ -61,7 +60,6 @@ export interface PokemonSeatCardProps {
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
   staleSince?: number
-  /** why: the sole opponent takes prizes on a knockout; with more seats the card asks who did. */
   opponents: readonly { id: string; name: string }[]
   table: TableRuntime
   dice?: LifeCardDice
@@ -77,10 +75,8 @@ const BOTTOM_ROW_HEIGHT = 44
 const COMPACT_BOTTOM_ROW_HEIGHT = 36
 const HERO_CAPTION_HEIGHT = 40
 const COMPACT_HERO_CAPTION_HEIGHT = 20
-// why: a sideways seat on a four-player phone board has under 200px of content height, which the compact flag (five seats and up) does not cover.
 const CRAMPED_CONTENT_HEIGHT = 260
 const LONG_PRESS_MS = 450
-// why: ask bars and the knockout toast sit on the seat color, so they darken a light-inked seat and lighten a dark-inked one.
 const BAR_ON_DARK = "rgba(0,0,0,0.62)"
 const BAR_ON_LIGHT = "rgba(255,255,255,0.78)"
 
@@ -90,9 +86,6 @@ const PLACE_ACTIVE_TRIGGER = "place-active"
 const ADD_TRIGGER = "add"
 type TakerAsk = { pokemonId: string; delta?: number }
 
-/**
- * why: Pokémon seats put the Active Pokémon's remaining HP where life goes, since that is the number both players watch. Prizes shrink to pips, the bench sits on the inner edge, and the whole seat turns as one layer so every rotation lays out the same way.
- */
 export const PokemonSeatCard = memo(function PokemonSeatCard({
   playerId,
   playerName,
@@ -138,7 +131,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const cramped = Boolean(compact) || (layer.height > 0 && layer.height < CRAMPED_CONTENT_HEIGHT)
   const padding = cramped ? spacing.xxs : spacing.xs
   const benchHeight = cramped ? COMPACT_BENCH_HEIGHT : BENCH_HEIGHT
-  // why: a settled dice chip takes its own row above the bench, so it never sits on a bench Pokémon.
   const chipClearance = diceChips?.length
     ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
     : 0
@@ -148,11 +140,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const [switchAsk, setSwitchAsk] = useState<string | null>(null)
   const [takerAsk, setTakerAsk] = useState<TakerAsk | null>(null)
   const [knockout, setKnockout] = useState<TableKnockout | null>(null)
-  // why: an undo is announced once the board shows it landed, since the runtime does not report whether the restore was accepted.
   const [pendingUndo, setPendingUndo] = useState<TableKnockout | null>(null)
-  // why: native gets a spoken announcement; web reads a live region. One path each, so nothing is heard twice.
   const [announcement, setAnnouncement] = useState("")
-  // why: the sheet replaces the control that opened it, so the card remembers which one to hand focus back to.
   const triggers = useRef(new Map<string, View>()).current
   const returnFocusTo = useRef<string | null>(null)
   const trigger = (key: string) => (node: View | null) => {
@@ -174,7 +163,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         : null
   const switching = switchAsk ? board.bench.find(({ id }) => id === switchAsk) : undefined
   const asking = takerAsk ? findPokemon(board, takerAsk.pokemonId)?.pokemon : undefined
-  // why: the sheet covers the seat, so the controls under it stop rendering as targets rather than staying reachable by keyboard or screen reader.
   const controlsLive = canEdit && !sheetMode
 
   useEffect(() => {
@@ -200,9 +188,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     )
   }, [sheetOpen, triggers])
 
-  // why: the toast lasts a moment and only while this knockout is still the one the board can undo.
   const undoable = knockout && board.lastKnockout?.operationId === knockout.operationId
-  // why: undoing puts the Pokémon back where it was, or on the bench if a new Active took its spot; neither lands when that spot is full.
   const undoLands =
     !!knockout &&
     ((knockout.slot === "active" && !board.active) || board.bench.length < rules.benchSize)
@@ -291,7 +277,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     else damage(takerAsk.pokemonId, takerAsk.delta, takerPlayerId)
   }
 
-  // why: one bar for every bench tap, so keyboard and screen reader users reach Edit without a long press, even after a knockout.
   function pressBench(pokemon: PokemonInPlay) {
     if (!canEdit) return
     setSwitchAsk(pokemon.id)
@@ -323,7 +308,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   })
   const prizePips = Math.max(STANDARD_PRIZES, prizes)
   const tint = (alpha: number) => overlayTint(ink, alpha)
-  // why: bars sit above the prize row so the pips stay visible while a knockout toast or a question is up.
   const bar = [
     themed($bar),
     {
@@ -912,7 +896,6 @@ function ActiveHero({
   )
 }
 
-/** why: the life zones' bubble store is reused so taps add up into one "+30" the same way life does. */
 function useRecentDeltaValue(damage: number) {
   const store = useRecentDelta(damage)
   const [value, setValue] = useState(store.get)
@@ -1029,7 +1012,6 @@ const $bench: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xxs,
   alignItems: "stretch",
 })
-// why: chips are text on the seat color with a hairline edge; a fill only shows while pressed.
 const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flex: 1,
   minWidth: 0,

@@ -16,7 +16,6 @@ const OPERATION_ID = /^[A-Za-z0-9_-]{16,128}$/
 
 export const pokemonSlotValidator = v.union(v.literal("active"), v.literal("bench"))
 
-/** why: what a player chose to put in play; HP comes from the catalog or is typed in by hand. */
 export const pokemonCardValidator = v.object({
   cardId: v.optional(v.string()),
   name: v.optional(v.string()),
@@ -28,7 +27,6 @@ export const pokemonConditionValidator = v.union(v.literal("poisoned"), v.litera
 
 export const coinValidator = v.union(v.literal("heads"), v.literal("tails"))
 
-/** why: Poisoned and Burned only ever sit on the Active. Absent means neither, so boards stored before conditions existed need no backfill. */
 export const pokemonValidator = pokemonCardValidator.extend({
   id: v.string(),
   damage: v.number(),
@@ -36,7 +34,6 @@ export const pokemonValidator = pokemonCardValidator.extend({
   burned: v.optional(v.boolean()),
 })
 
-/** why: only the latest knockout on a board can be undone, so the board keeps just enough to put it back. */
 export const pokemonKnockoutValidator = v.object({
   operationId: v.string(),
   pokemon: pokemonValidator,
@@ -56,7 +53,6 @@ export const playerTableValidator = v.object({
   pokemon: v.optional(pokemonBoardValidator),
 })
 
-/** why: designations map a designation id to its holder; players map a player id to their counters and Pokémon. */
 export const tableStateValidator = v.object({
   designations: v.record(v.string(), v.string()),
   players: v.record(v.string(), playerTableValidator),
@@ -97,7 +93,6 @@ export const tableActionValidator = v.union(
     playerId: v.string(),
     pokemonId: v.string(),
     delta: v.number(),
-    /** why: damage that turns out lethal on the current table knocks out, and this seat takes the prizes. */
     takerPlayerId: v.optional(v.string()),
   }),
   v.object({ kind: v.literal("pokemon.switched"), playerId: v.string(), pokemonId: v.string() }),
@@ -194,7 +189,6 @@ function matches(validator: GenericValidator, value: unknown): boolean {
   }
 }
 
-/** why: stored records and server payloads are checked against the same validators the backend enforces, so the client never trusts a shape the server would reject. */
 export function matchesValidator<V extends GenericValidator>(
   validator: V,
   value: unknown,
@@ -231,7 +225,6 @@ export function findPokemon(
   return benched ? { pokemon: benched, slot: "bench" } : undefined
 }
 
-/** why: a counter like poison at its losing count knocks the player out of the game. */
 export function isOutByTableCounters(
   table: TableState,
   playerId: string,
@@ -272,7 +265,6 @@ export function pokemonPrizeValue(name: string): 1 | 2 | 3 {
   return 1
 }
 
-/** why: the board places a catalog card with its printed HP; HP stays undefined when the catalog lacks it so the player can type it in. */
 export function pokemonCardFromCatalog(card: {
   cardId: string
   name: string
@@ -305,14 +297,12 @@ function isNonZeroStep(delta: number, max: number) {
   return Number.isInteger(delta) && delta !== 0 && Math.abs(delta) <= max
 }
 
-/** why: the operation id becomes the undo handle of a knockout; `lifeOf` reads a seat's main counter, and returns undefined for ids that are not seats in this game. */
 export type TableContext = {
   rules: TableDefinition
   operationId: string
   lifeOf: (playerId: string) => number | undefined
 }
 
-/** why: a knockout also moves the taker's prize counter, which lives with life outside the table state. */
 export type TableChange = {
   table: TableState
   life: { playerId: string; delta: number }[]
@@ -410,7 +400,6 @@ export function applyTableAction(
     if (knockout?.operationId !== action.knockoutOperationId) return null
     if (findPokemon(board, knockout.pokemon.id)) return null
     const { lastKnockout: _undone, ...rest } = board
-    // why: the Pokémon goes back where it was; if a new Active was promoted meanwhile, it returns to the bench instead.
     const restored: PokemonBoard | null =
       knockout.slot === "active" && !rest.active
         ? { ...rest, active: knockout.pokemon }
@@ -448,9 +437,7 @@ export function applyTableAction(
 
   if (action.kind === "pokemon.updated") {
     if (!isValidCard(action.card)) return null
-    // why: an edit has no prize taker, so it can't knock out; HP at or below the damage is refused instead.
     if (action.card.hp <= pokemon.damage) return null
-    // why: a different card means it evolved, which clears its conditions; an HP fix keeps them.
     const evolved = action.card.cardId !== pokemon.cardId || action.card.name !== pokemon.name
     const next = withConditions(
       { ...action.card, id: pokemon.id, damage: pokemon.damage },
@@ -575,7 +562,6 @@ function isValidBoard(
   )
 }
 
-/** why: a local game handed to a connected one brings its table along, and the server accepts only what its own reducer could have produced. */
 export function isValidTableSnapshot(
   table: TableState,
   rules: TableDefinition,
@@ -600,7 +586,6 @@ export function isValidTableSnapshot(
   )
 }
 
-/** why: local seats and connected seats have different ids; every place a table names a seat moves to the new id. */
 export function remapTableState(table: TableState, idOf: (playerId: string) => string): TableState {
   return {
     designations: Object.fromEntries(
@@ -629,7 +614,6 @@ export function remapTableState(table: TableState, idOf: (playerId: string) => s
   }
 }
 
-/** why: the table in the shape a client of `tableVersion` parses; before version 2 that means without Pokémon conditions. */
 export function tableForVersion(table: TableState, tableVersion = 1): TableState {
   if (tableVersion >= TABLE_VERSION) return table
   return {
@@ -657,7 +641,6 @@ export function tableForVersion(table: TableState, tableVersion = 1): TableState
   }
 }
 
-/** why: JSON whose key order and absent optional fields do not matter, for comparing replayed payloads. */
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`
   if (isPlainRecord(value))

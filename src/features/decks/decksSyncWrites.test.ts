@@ -607,7 +607,6 @@ describe("deck metadata writes", () => {
     expect(sent).toHaveLength(1)
     expect(sent[0]).not.toHaveProperty("writtenBy")
     expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
-    // why: proves this harness would catch a leak: the same args with provenance attached are rejected by the validator.
     const withProvenance = { ...sent[0], writtenBy: writer }
     await expect(actor.mutation(api.decks.syncWrite, withProvenance)).rejects.toThrow(/writtenBy/)
   })

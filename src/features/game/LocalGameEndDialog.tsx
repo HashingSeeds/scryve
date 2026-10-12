@@ -24,7 +24,6 @@ export function LocalGameEndDialog({
 }: {
   game: LocalGame
   origin?: DialogOrigin
-  /** why: a match counts one win per game, so its games cannot share a winner. */
   singleWinner?: boolean
   onClose: () => void
   onEnd: (result: LocalGameResult) => void

@@ -251,7 +251,6 @@ function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0
 }
 
-// why: a match that does not line up with the seats is dropped rather than scored wrong.
 function parseMatch(value: unknown, seatCount: number): LocalGameMatch | undefined {
   if (
     !isRecord(value) ||
@@ -320,7 +319,6 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
   if (!players || events.some((event) => event.gameId !== value.id)) return null
   const result = parseResult(value.result)
   const commanderDamage = parseCommanderDamage(value.commanderDamage)
-  // why: a table that fails to parse is dropped rather than losing the whole game.
   const table = parseTableState(value.table)
   const account = parseAccount(value.account)
   const match = parseMatch(value.match, players.length)
@@ -464,7 +462,6 @@ function parseSummary(value: unknown): LocalGameSummary | null {
     : null
 }
 
-/** why: games still owed to the server stay past the cap, so a long offline streak never drops them before they upload. */
 function withinHistoryCap(games: readonly LocalGameSummary[]): LocalGameSummary[] {
   return games.filter(
     (game, index) =>
@@ -480,7 +477,6 @@ export class LocalGameRepository {
 
   constructor(private readonly storage: StringStorage = mmkvStorage) {}
 
-  /** why: the publisher waits for finishes and sign-in claims instead of polling storage. */
   onGameFinished(listener: () => void): () => void {
     this.finishListeners.add(listener)
     return () => {
@@ -488,7 +484,6 @@ export class LocalGameRepository {
     }
   }
 
-  /** why: a mounted History re-reads after archives, publish results, and sign-in claims or skips. */
   onHistoryChanged(listener: () => void): () => void {
     this.historyListeners.add(listener)
     return () => {
@@ -500,7 +495,6 @@ export class LocalGameRepository {
     this.historyListeners.forEach((listener) => listener())
   }
 
-  // why: "none" means the player chose no seat last time, which is different from never having chosen.
   loadMeSeat(): number | "none" | undefined {
     const stored = this.storage.getString(LOCAL_KEYS.meSeat)
     if (stored === "none") return "none"
@@ -746,7 +740,6 @@ export class LocalGameRepository {
     }
   }
 
-  /** why: brings every detail record owned by this account in line with the index; safe to run on any launch. */
   repairClaimedDetails(ownerId: string): void {
     for (const game of this.loadHistory()) {
       if (game.account?.ownerId !== ownerId) continue
@@ -765,7 +758,6 @@ export class LocalGameRepository {
     this.settlePublish(gameId, "published")
   }
 
-  // why: a game the server rejected stays on the device but stops blocking the uploads behind it.
   markPublishFailed(gameId: string): void {
     this.settlePublish(gameId, "failed")
   }
@@ -776,7 +768,6 @@ export class LocalGameRepository {
     )
   }
 
-  /** why: a match result only uploads once every game it counts has been acked. */
   pendingMatchFinishes(ownerId: string): LocalGameSummary[] {
     const history = this.loadHistory()
     return history.filter(
@@ -787,7 +778,6 @@ export class LocalGameRepository {
     )
   }
 
-  /** why: the server scores a match from its published games, so a result with a rejected game can never land. */
   matchFinishesWithFailedGames(ownerId: string): LocalGameSummary[] {
     const history = this.loadHistory()
     return history.filter(
@@ -812,12 +802,10 @@ export class LocalGameRepository {
     )
   }
 
-  /** why: the latest game of a match is the one that carries its result when the player ends it. */
   latestMatchGame(matchId: string): LocalGameSummary | undefined {
     return this.loadHistory().find((game) => game.match?.id === matchId)
   }
 
-  /** why: a match that hit the game cap has no board left; the result it still owes survives a restart here. */
   loadPendingMatchEnd(): string | undefined {
     const matchId = this.storage.getString(LOCAL_KEYS.pendingMatchEnd)
     return matchId && this.latestMatchGame(matchId)?.match?.result === undefined
@@ -830,7 +818,6 @@ export class LocalGameRepository {
     else this.storage.set(LOCAL_KEYS.pendingMatchEnd, matchId)
   }
 
-  // why: ending a match happens after its last game was archived, so the result is written onto that game.
   finishMatch(matchId: string, outcomes: MatchSeatOutcome[]): LocalGameSummary | null {
     const latest = this.latestMatchGame(matchId)
     if (!latest?.match || latest.match.result || outcomes.length !== latest.players.length)
@@ -871,7 +858,6 @@ export class LocalGameRepository {
     this.notifyHistoryChanged()
   }
 
-  // why: a game that just finished uploading may be past the cap, so every write trims and drops the details it evicts.
   private saveHistory(
     games: readonly LocalGameSummary[],
     previous: readonly LocalGameSummary[],

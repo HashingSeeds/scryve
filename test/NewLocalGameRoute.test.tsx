@@ -448,7 +448,6 @@ describe("new local game route while signed in", () => {
       format: "commander",
       account: { ownerId: "owner-a", meSeat: 1, deckVersionId: "v-atraxa", deckName: "Atraxa" },
     })
-    // why: Play builds the game from this payload exactly as the index route does.
     const game = createLocalGame(prepared)
     expect(game.account).toEqual({
       ownerId: "owner-a",

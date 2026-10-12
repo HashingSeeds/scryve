@@ -5,7 +5,6 @@ const MARKER = "<!-- bundle-size -->"
 const BUNDLES = { ios: "iOS", android: "Android", web: "Web" }
 const budgetFile = require.resolve("./bundle-size-budget.json")
 
-/** why: web splits into async chunks, so each platform's size is every JS file Metro emitted for it. */
 function measure(exportDir) {
   return Object.fromEntries(
     Object.keys(BUNDLES).map((platform) => {

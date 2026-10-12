@@ -22,7 +22,6 @@ export const setImperativeTheming = (theme: Theme) => {
   setSystemUIBackgroundColor(backgroundOverride?.color ?? themeBackgroundColor)
 }
 
-/** why: theme changes would otherwise repaint over a screen that needs its own background. Call the returned function to restore the theme background. */
 export const overrideSystemUIBackgroundColor = (color: string) => {
   const override = { color }
   backgroundOverride = override

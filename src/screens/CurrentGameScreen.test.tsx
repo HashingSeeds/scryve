@@ -51,7 +51,6 @@ function renderGame(initialGame = game()) {
   )
 }
 
-// why: chips lay out in the card's measured frame, which never arrives in a test unless the layout event is fired by hand.
 function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat") {
   for (const card of view.queryAllByTestId(new RegExp(`^${prefix}-\\d+$`)))
     fireEvent(card, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 400 } } })
@@ -59,7 +58,6 @@ function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat")
 
 describe("CurrentGameScreen", () => {
   beforeEach(() => jest.mocked(Haptics.impactAsync).mockClear())
-  // why: Math.random spies must not leak into later tests when an assertion fails first.
   afterEach(() => jest.restoreAllMocks())
 
   it("renders changes immediately and allows negative life", () => {
@@ -189,7 +187,6 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
     expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(true)
 
-    // why: putting the tool down frees the seat; the chip stays beside the live controls.
     fireEvent.press(view.getByTestId("dice-d20"))
     expect(view.queryByTestId("dice-seat-1")).toBeNull()
     expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
@@ -238,7 +235,6 @@ describe("CurrentGameScreen", () => {
       context,
     )
     expect(withPoison).not.toBe(mtg)
-    // why: poison is damage dealt, so a counter counts as play even with life untouched.
     expect(renderGame(withPoison).queryByTestId("first-player-badge")).toBeNull()
 
     const pokemon = game(2, "pokemon")
@@ -258,7 +254,6 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("first-player-badge")).toBeTruthy()
     fireEvent.press(view.getByTestId("pokemon-damage-seat-1-10"))
     expect(view.queryByTestId("first-player-badge")).toBeNull()
-    // why: healing back to zero leaves no trace of play, so the offer is closed by the write that opened play, not derived from the board.
     fireEvent.press(view.getByTestId("pokemon-damage-seat-1--10"))
     expect(view.queryByTestId("first-player-badge")).toBeNull()
   })

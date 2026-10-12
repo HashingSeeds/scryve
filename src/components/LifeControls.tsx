@@ -50,11 +50,6 @@ export interface RecentDelta {
 
 const NO_RECENT_DELTA: RecentDelta = { get: () => 0, subscribe: () => () => {} }
 
-/**
- * why: the card owns the bubble so it keeps adding up while the controls are hidden (commander
- * overview, damage assignment), but only the controls subscribe, so showing and clearing it
- * re-renders just the two zones instead of the whole card.
- */
 export function useRecentDelta(life: number): RecentDelta {
   const [store] = useState(createRecentDeltaStore)
   const previousLife = useRef(life)
@@ -187,7 +182,6 @@ export function LifeControls({
                 longPressHandled.current = null
                 onPreview?.(delta)
               }}
-              // why: a press that slides off or is cancelled ends here without onPress.
               onPressOut={() => onPreview?.(0)}
               onLongPress={() => {
                 longPressHandled.current = direction

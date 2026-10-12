@@ -3,7 +3,6 @@ export interface BoardPoint {
   y: number
 }
 
-/** why: the pinned board is centered on the window and sits at -holderAngle there, because content turned by holderAngle reads upright. Points are normalized to the board and to the window. */
 export function boardPointToWindowPoint(
   point: BoardPoint,
   board: { width: number; height: number },

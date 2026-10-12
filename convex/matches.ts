@@ -115,7 +115,6 @@ export const recordManualMatch = mutation({
     } else if (args.format !== undefined) {
       throw new Error("Format requires a game system")
     } else if (attached) {
-      // why: an attached deck already knows its system and format, so the form need not repeat them.
       system = attached.deck.game ?? DEFAULT_DECK_GAME
       format = attached.deck.format
     }
@@ -231,7 +230,6 @@ async function ownedScryveMatch(ctx: MutationCtx, user: Doc<"users">, publicId: 
   return match
 }
 
-/** why: a match's games are capped, so reading each one is a bounded way to know their order. */
 async function matchGames(ctx: MutationCtx, match: ScryveMatch) {
   const games = await Promise.all(match.gameIds.map((gameId) => ctx.db.get(gameId)))
   return games.flatMap((game) => (game ? [game] : []))
@@ -241,7 +239,6 @@ function meSeatOf(seats: readonly PublishedMatchSeat[]) {
   return seats.find((seat) => seat.userId !== undefined)
 }
 
-/** why: the first published game creates its match in the same mutation, so neither record exists without the other. */
 export async function linkPublishedGameToMatch(
   ctx: MutationCtx,
   user: Doc<"users">,
@@ -273,7 +270,6 @@ export async function linkPublishedGameToMatch(
     throw new ConvexError({ code: "match_finished", message: "This match already ended" })
   if (existing.seats.length !== game.seats.length)
     throw new Error("A match keeps the same seats for every game")
-  // why: a match is one deck's record, so the account's seat and deck cannot move between its games.
   const lockedSeat = meSeatOf(existing.seats)
   const mySeat = meSeatOf(game.seats)
   if (lockedSeat?.seat !== mySeat?.seat || lockedSeat?.deckVersionId !== mySeat?.deckVersionId)
@@ -321,7 +317,6 @@ export const finishScryveMatch = mutation({
   args: {
     publicId: v.string(),
     finishedAt: v.number(),
-    // why: how many games the device played, so a finish cannot land before the last one is linked.
     gameCount: v.number(),
     seats: v.array(
       v.object({

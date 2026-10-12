@@ -46,7 +46,6 @@ export interface CommanderStripProps {
   onToggle: () => void
 }
 
-/** why: the strip's SVG marks are costly, and a life change re-renders the card around them with equal strip props. */
 export const CommanderStrip = memo(function CommanderStrip({
   seatNumber,
   identity,

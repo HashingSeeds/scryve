@@ -76,7 +76,6 @@ export default function Index() {
   const [oldGameChoice, setOldGameChoice] = useState<"continue" | "end">()
   const [loadedGame, setLoadedGame] = useState(() => localGameRepository.loadActiveGame())
   const [freshGame, setFreshGame] = useState(() => createFreshGame(prepared, settings))
-  // why: with nothing stored, the board's last game ended or was never saved; a new id on every focus keeps an ended game from coming back.
   useFocusEffect(
     useCallback(() => {
       const nextSettings = localGameRepository.loadSettings()

@@ -1,11 +1,3 @@
-/**
- * why: a version belongs to one commit. `v<version>` tags the commit that built it, so the
- * other platform or a retried build reuses it, and a newer commit of main bumps the patch.
- * An untagged version is used as is, which is how hand-set minor and major bumps ship.
- *
- *   node scripts/release-native.cjs version   settle this commit's version (prod build scripts run this)
- *   node scripts/release-native.cjs cloud     settle the version, then build both platforms on EAS and submit
- */
 const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
@@ -29,7 +21,6 @@ function bumpPatch(version) {
   return `${major}.${minor}.${Number(patch) + 1}`
 }
 
-/** why: `taggedCommit` is the commit `v<version>` points at, or null before that tag exists. */
 function planVersion({ version, taggedCommit, head }) {
   if (taggedCommit === head) return { action: "reuse", version }
   if (taggedCommit === null) return { action: "tag", version }
@@ -75,7 +66,6 @@ function settleVersion() {
   const tag = `v${plan.version}`
 
   if (plan.action === "reuse") {
-    // why: a run interrupted before its push leaves the bump commit and tag only on this machine.
     const onMain = isAncestor(head, MAIN)
     try {
       if (onMain) git("push", "--quiet", "origin", `refs/tags/${tag}`)

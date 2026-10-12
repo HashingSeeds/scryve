@@ -43,7 +43,6 @@ const chips = (table: SeatTable, props?: Partial<CounterChipsProps>) =>
   render(chipsElement(table, props))
 
 describe("CounterChips", () => {
-  // why: spies, the web platform swap, and fake timers are undone even when a test fails midway.
   afterEach(() => {
     jest.restoreAllMocks()
     jest.useRealTimers()
@@ -117,7 +116,6 @@ describe("CounterChips", () => {
   })
 
   it("wraps a full row inside a narrow sideways six-player card instead of overflowing it", () => {
-    // why: 6 players on a 320x568 board leaves sideways cards about 154px along their reading edge.
     const view = chips(
       seat({ counters: { poison: 5, commanderTax: 4 }, held: ["monarch", "initiative"] }),
       { compact: true, contentRotation: 90, cardSize: { width: 158, height: 154 } },

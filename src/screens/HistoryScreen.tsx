@@ -94,7 +94,6 @@ function titleFor(entry: HistoryEntry) {
   return `${entry.players.length} player${entry.players.length === 1 ? "" : "s"}`
 }
 
-// why: a manual match only knows its date, so its row shows the score and event instead of a time.
 function matchSubtitleFor(entry: HistoryEntry, match: HistoryMatchDetails) {
   const games = match.games?.length
   const decks = [...new Set(entryDeckNames(entry))]
@@ -117,7 +116,6 @@ function subtitleFor(entry: HistoryEntry) {
   const decks = [...new Set(entryDeckNames(entry))]
   const gameNumber = entry.scryveMatch?.gameNumber
   return [
-    // why: inside a match the game's place in it says more than its source, which the match row shows.
     gameNumber === undefined ? SOURCE_LABELS[entry.source] : `Game ${gameNumber}`,
     timeLabel(entry.finishedAt),
     entry.winnerNames?.length ? `Won by ${entry.winnerNames.join(" & ")}` : undefined,
@@ -281,7 +279,6 @@ export function HistoryScreen({
   }, [games, connectedPage])
   const now = Date.now()
   const visible = filterHistory(entries, filters, now)
-  // why: an expanded match lists its games right under it, in the match's own day.
   const sections = daySections(visible, now).map((section) => ({
     ...section,
     data: section.data.flatMap((entry) =>

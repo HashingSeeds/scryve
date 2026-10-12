@@ -22,7 +22,6 @@ export function getPlayerGridRows(
   return chunkSeats(seats, layout.columnCount)
 }
 
-/** why: pass topInset (a fraction of board height) when PlayerGrid pads the board top, so the anchor still lands on the card seam. */
 export function getPlayerGridMenuAnchor(
   playerCount: number,
   layout: ReturnType<typeof getPlayerGridLayout>,

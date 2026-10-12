@@ -215,7 +215,6 @@ describe("LocalGamePublishSession rejections", () => {
     render(<LocalGamePublishSession ownerId="owner-a" repository={repository} />)
     await waitFor(() => expect(repository.pendingPublishes("owner-a")).toHaveLength(0))
     expect(mockPublish).toHaveBeenCalledTimes(2)
-    // why: uploads go oldest first, so the rejected game is the older one, listed last in History.
     expect(repository.loadHistory().map((game) => game.publish)).toEqual(["published", "failed"])
   })
 

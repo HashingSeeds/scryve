@@ -23,19 +23,15 @@ export interface HistoryPlayerSummary {
 
 export interface HistoryMatchDetails {
   bestOf: number
-  /** why: manual rows read "vs ..."; a Scryve match lists its players like a game row. */
   opponents?: string[]
   deckName?: string
-  // why: "2-1" or "2-1-1" when the owner entered a game score, otherwise nothing to show.
   score?: string
   eventName?: string
   roundNumber?: number
-  /** why: a Scryve match folds its games under one row, newest first. */
   games?: HistoryEntry[]
   inProgress?: boolean
 }
 
-/** why: what one game row knows about its whole match; the group takes the most complete standing. */
 export interface HistoryMatchStanding {
   finished: boolean
   outcome: HistoryOutcome
@@ -46,7 +42,6 @@ export interface HistoryMatchRef {
   publicId: string
   bestOf: number
   standing: HistoryMatchStanding
-  /** why: the ordinal the device or server stored; the group falls back to time order only when none did. */
   gameNumber?: number
 }
 
@@ -63,7 +58,6 @@ export interface HistoryEntry {
   system?: PlaySystemId
   format: string
   match?: HistoryMatchDetails
-  /** why: set on a game played inside a Scryve match; `groupMatchGames` folds these rows away. */
   scryveMatch?: HistoryMatchRef
 }
 
@@ -132,7 +126,6 @@ export function manualHistoryEntry(match: {
       name: seat.displayName,
       deckName: seat.deckName,
     })),
-    // why: a deckless manual match has no system, so it files under a plain "Match" format.
     format: system && match.format ? playFormatLabel(system, match.format) : "Match",
     match: {
       bestOf: match.bestOf,
@@ -156,14 +149,12 @@ function localOutcome(game: LocalGameSummary, winnerNames: string[]): HistoryOut
   return result.winnerPlayerIds.includes(me) ? "win" : "loss"
 }
 
-// why: "2-1-1" from the account's seat like manual entry; a signed-out table shows every seat's wins like the board does.
 function scryveMatchScore(wins: number[], draws: number, mine: number) {
   if (mine === -1) return matchScoreLabel({ wins, draws })
   const losses = wins.reduce((sum, count, seat) => (seat === mine ? sum : sum + count), 0)
   return draws > 0 ? `${wins[mine]}-${losses}-${draws}` : `${wins[mine]}-${losses}`
 }
 
-// why: the device knows the standing after each of its games, so even an unfinished match shows a score.
 function localMatchRef(game: LocalGameSummary, match: LocalGameMatch): HistoryMatchRef {
   const { wins, draws } = matchScoreAfter(game)
   const me = game.account?.mePlayerId
@@ -239,12 +230,10 @@ export type ScryveMatchSummary = {
   }[]
 }
 
-// why: the server only scores a match once it is finished; until then the loaded games tell the standing.
 function serverMatchRef(match: ScryveMatchSummary, gameNumber?: number): HistoryMatchRef {
   const finished = match.status === "finished"
   const mine = match.seats.findIndex((seat) => seat.mine)
   const wins = match.seats.map((seat) => seat.gamesWon)
-  // why: a drawn game is drawn for every seat, so the server stores the same count on each; read one.
   const draws = (match.seats[mine] ?? match.seats[0])?.gamesDrawn ?? 0
   const score =
     finished && wins.every((count) => count !== undefined)
@@ -264,7 +253,6 @@ function serverMatchRef(match: ScryveMatchSummary, gameNumber?: number): History
 
 export function connectedHistoryEntry(game: {
   publicId: string
-  /** why: a published local game keys as `local:<id>` so the device's own copy folds into it. */
   source?: "local" | "connected"
   outcome?: "win" | "loss" | "draw" | "unknown"
   eventCount: number
@@ -310,7 +298,6 @@ export function connectedHistoryEntry(game: {
   }
 }
 
-// why: a server match that is still active has no score, so the viewer's loaded game outcomes stand in.
 function runningScore(games: HistoryEntry[]) {
   const counts = { win: 0, loss: 0, draw: 0, unrecorded: 0 }
   for (const game of games) counts[game.outcome] += 1
@@ -321,7 +308,6 @@ function runningScore(games: HistoryEntry[]) {
 }
 
 function matchGroupEntry(publicId: string, games: HistoryEntry[]): HistoryEntry {
-  // why: stored ordinals keep "Game 3" right when only game 3 is loaded; time order is the fallback for rows without one.
   const ordered = [...games]
     .sort(
       (a, b) =>
@@ -334,7 +320,6 @@ function matchGroupEntry(publicId: string, games: HistoryEntry[]): HistoryEntry 
     }))
   const latest = ordered[ordered.length - 1]
   const ref = latest.scryveMatch
-  // why: the device copy of the ending game and every server row know the result; an unfinished match reads the latest game.
   const standing =
     ordered.map((game) => game.scryveMatch.standing).find((known) => known.finished) ?? ref.standing
   const score = standing.score ?? runningScore(ordered)
@@ -357,7 +342,6 @@ function matchGroupEntry(publicId: string, games: HistoryEntry[]): HistoryEntry 
   }
 }
 
-/** why: games that share a Scryve match fold into one entry placed at the latest game, however many pages they span. */
 export function groupMatchGames(entries: HistoryEntry[]): HistoryEntry[] {
   const games = new Map<string, HistoryEntry[]>()
   const grouped: HistoryEntry[] = []

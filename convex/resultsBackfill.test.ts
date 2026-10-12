@@ -52,7 +52,6 @@ async function publish(
   })
 }
 
-// why: before #350 an abandoned game recorded an unknown result, which is a no-winner publish plus an abandoned summary.
 async function markAbandoned(t: Tester, publicId: string) {
   await t.run(async (ctx) => {
     const summary = await ctx.db
@@ -117,7 +116,6 @@ async function runBackfill(t: Tester, args: { numItems: number; dryRun?: boolean
 
 const EMPTY = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
 
-// why: what the seeded mix must look like once every abandoned result is gone.
 async function expectCleaned(t: Tester, deckA: Id<"decks">, deckB: Id<"decks">) {
   const after = await state(t)
   expect(after.results).toEqual(["game_nowinner_000000001", "game_won_0000000000001"])
@@ -166,7 +164,6 @@ describe("removeAbandonedGameResults", () => {
   it("stays exact when a run stops after deleting and restarts from the beginning", async () => {
     const t = convexTest(schema, modules)
     const { deckA, deckB } = await seed(t)
-    // why: rows page in creation order, so the first three hold one abandoned result.
     const first = await t.mutation(internal.resultsBackfill.removeAbandonedGameResults, {
       paginationOpts: { numItems: 3, cursor: null },
     })

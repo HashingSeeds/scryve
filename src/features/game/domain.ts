@@ -185,7 +185,6 @@ function newMatch(bestOf: MatchBestOf, seatCount: number, now: number): LocalGam
   }
 }
 
-/** why: the score once this game's result is counted, by seat index. */
 export function matchScoreAfter(game: Pick<LocalGame, "players" | "match" | "result">) {
   const match = game.match
   if (!match) throw new Error("This game is not part of a match.")
@@ -200,7 +199,6 @@ export function matchScoreAfter(game: Pick<LocalGame, "players" | "match" | "res
   }
 }
 
-/** why: a seat that reaches the needed wins ends the match without asking. */
 export function completedMatchResult(
   game: Pick<LocalGame, "players" | "match" | "result">,
 ): LocalMatchResult | undefined {
@@ -221,7 +219,6 @@ export function matchScoreLabel(score: { wins: number[]; draws: number }) {
     : `${score.wins.join("-")} · ${drawsLabel(score.draws)}`
 }
 
-/** why: the board shows where the match stands before this game counts. */
 export function matchContextLabel(game: Pick<LocalGame, "match">) {
   const match = game.match
   if (!match) return undefined
@@ -237,7 +234,6 @@ export function canContinueMatch(game: Pick<LocalGame, "status" | "match">) {
   )
 }
 
-/** why: the next game keeps the seats and the score; only the board and the game id are new. */
 export function createNextMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match || !canContinueMatch(game))
     throw new Error("This match cannot continue to another game.")
@@ -252,12 +248,10 @@ export function createNextMatchGame(game: LocalGame, now?: number): LocalGame {
   }
 }
 
-/** why: a match counts as under way once a game of it started or finished; a fresh game 1 can still be replaced. */
 export function isMatchInProgress(game: LocalGame) {
   return game.match !== undefined && (game.match.gameNumber > 1 || hasLocalGameStarted(game))
 }
 
-/** why: abandoning a game mid-match restarts that game; the match, its score, and the loser's first choice stay, and the offer is open again. */
 export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match) throw new Error("This game is not part of a match.")
   return withFirstChooser(
@@ -266,7 +260,6 @@ export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   )
 }
 
-/** why: setup forms know seats by index while a running game knows them by player id. */
 export function localGameAccount(
   players: readonly GamePlayer[],
   account: { ownerId: string; meSeat?: number; deckVersionId?: string; deckName?: string },
@@ -285,7 +278,6 @@ export function meSeatOf(game: Pick<LocalGame, "players" | "account">): number |
   return index === -1 ? undefined : index
 }
 
-/** why: a rematch hands the choice of who goes first to the one player who lost; a draw or several losers has no one to ask. */
 export function soleLoserSeat(game: Pick<LocalGame, "players" | "result">): number | undefined {
   if (game.result?.kind !== "win") return undefined
   const losers = game.players.flatMap((player, seat) =>
@@ -294,7 +286,6 @@ export function soleLoserSeat(game: Pick<LocalGame, "players" | "result">): numb
   return losers.length === 1 ? losers[0] : undefined
 }
 
-/** why: the game that follows a finished one hands its sole loser the choice of who goes first. */
 export function createRematch(game: LocalGame, now?: number): LocalGame {
   return withFirstChooser(createRematchBoard(game, now), soleLoserSeat(game))
 }
@@ -313,7 +304,6 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
     lifeStep: game.lifeStep,
     now,
     ...(game.account ? { account: { ...game.account, meSeat: meSeatOf(game) } } : {}),
-    // why: match mode is a table setting, so a finished match hands the table a fresh match.
     ...(game.match ? { match: { bestOf: game.match.bestOf } } : {}),
   })
 }
@@ -349,7 +339,6 @@ export function isEliminatedByCommanderDamage(game: LocalGame, playerId: PlayerI
   )
 }
 
-/** why: Pokémon counts Prize cards down, so reaching zero wins and knocks out everyone else. */
 export function isPlayerOut(game: LocalGame, playerId: PlayerId): boolean {
   if (playSystemRules(game.system).counter.direction === "down")
     return game.players.some((player) => player.id !== playerId && player.life <= 0)
@@ -365,7 +354,6 @@ export function localTableRules(game: Pick<LocalGame, "system" | "format">) {
   return playTableRules(game.system, game.format)
 }
 
-/** why: table actions change current state without joining the event log; a knockout also moves the taker's prize counter. */
 export function applyLocalTableAction(
   game: LocalGame,
   action: TableAction,
@@ -596,7 +584,6 @@ export function applyGameCommand(
   return event ? reduceGameEvent(game, event) : game
 }
 
-/** why: who goes first is settled by the first point of play: life, prizes, commander damage, counters, designations, or Pokémon damage. Placing Pokémon and picking a layout set the table and do not count. */
 export function hasPlayBegun(game: LocalGame): boolean {
   if (
     game.events.some(({ type }) => type === "life.changed" || type === "commanderDamage.assigned")

@@ -24,14 +24,12 @@ export interface DiceChipsProps {
   compact?: boolean
   contentRotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
-  /** why: distance from the reading frame's top edge, so the chips clear safe areas and the menu the way counter chips do. */
   top: number
   left: number
   chips: readonly DiceSeatChip[]
   onClear: (chip: DiceSeatChip) => void
 }
 
-/** why: a settled result sits on the card's inner edge, facing the table, until the seat rolls again, play begins, or someone taps it away. */
 export function DiceChips({
   seatNumber,
   playerName,

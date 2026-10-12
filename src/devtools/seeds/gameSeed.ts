@@ -45,18 +45,6 @@ function parseSystem(value = "mtg") {
   throw new SeedError(`system must be one of ${[...PLAY_SYSTEM_IDS, NO_PLAY_SYSTEM].join(", ")}.`)
 }
 
-/**
- * why: replaying real game commands keeps life, commander damage, and undo history
- * identical to a game played by hand on this device. Params:
- *
- *   system  mtg | ygo | pokemon | none (default mtg)
- *   format  a format id for the system, e.g. commander
- *   players 2-6 (default: length of life, else the app's default count)
- *   start   starting life (default: the system and format default)
- *   life    final life per seat, e.g. 40,31,12,40
- *   cmd     commander damage by seat, e.g. 2>3:9,4>3:21
- *   layout  player grid layout variant for the player count
- */
 export function buildSeededGame(params: SeedParams, repository: LocalGameRepository): LocalGame {
   const system = parseSystem(params.system)
   if (params.format !== undefined) {
@@ -126,12 +114,10 @@ export function buildSeededGame(params: SeedParams, repository: LocalGameReposit
       { type: "commanderDamage.assign", fromPlayerId, toPlayerId, delta },
       context,
     )
-    // why: the domain silently drops self damage and clamps totals at the cap.
     if (commanderDamageBetween(game, fromPlayerId, toPlayerId) !== before + delta)
       throw new SeedError(`cmd "${entry}" was rejected by the game rules.`)
   }
 
-  // why: life is the final value per seat, so commander damage above is already counted.
   life.forEach((target, index) => {
     const player = game.players[index]
     const delta = target - player.life

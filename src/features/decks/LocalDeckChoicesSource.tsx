@@ -12,7 +12,6 @@ import { api } from "../../../convex/_generated/api"
 
 export type DeckChoices = DeckChoice[] | "unavailable" | undefined
 
-// why: the "This is me" seat offers the account's decks, read once the user row is synced.
 function DeckChoicesQuery({ onChange }: { onChange: (decks: DeckChoices) => void }) {
   const profile = useConnectedProfile()
   const mine = useQuery(api.decks.listMine, profile.status === "ready" ? {} : "skip")

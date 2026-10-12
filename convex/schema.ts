@@ -31,24 +31,19 @@ const resultOutcome = v.union(
   v.literal("unknown"),
 )
 
-// why: opponents are often not Scryve users, so only the name is required.
 const matchSeat = v.object({
   seat: v.number(),
   displayName: v.string(),
   userId: v.optional(v.id("users")),
-  // why: only a seat's own user may attach a deck, so opponents describe theirs in deckName.
   deckId: v.optional(v.id("decks")),
   deckVersionId: v.optional(v.id("deckVersions")),
   deckName: v.optional(v.string()),
   gamesWon: v.optional(v.number()),
-  // why: official apps report drawn games (2-1-1). Unset means unknown, not zero.
   gamesDrawn: v.optional(v.number()),
-  // why: unset until the match ends. A called pod round draws every seat still in the game.
   outcome: v.optional(resultOutcome),
   deletedAt: v.optional(v.number()),
 })
 
-// why: manual results stay separate from Scryve games so stats can filter by source.
 const manualRecordValidator = v.object({
   total: v.number(),
   wins: v.number(),
@@ -60,21 +55,17 @@ const manualRecordValidator = v.object({
 const manualStatsFields = {
   manualMatches: v.optional(manualRecordValidator),
   manualGames: v.optional(manualRecordValidator),
-  // why: Scryve games already live in the top-level counters; matches played in Scryve get their own tally.
   connectedMatches: v.optional(manualRecordValidator),
 }
 
 const matchFields = {
-  // why: client-generated so a match can start offline. Also the idempotent create key.
   publicId: v.string(),
-  // why: cleared when the owner deletes their account, so other seats keep their history.
   ownerUserId: v.optional(v.id("users")),
   bestOf: v.union(v.literal(1), v.literal(3), v.literal(5)),
   system: v.optional(v.string()),
   format: v.optional(v.string()),
   // why: an embedded array is safe because writers cap seats at MAX_PLAYERS.
   seats: v.array(matchSeat),
-  // why: free text until a store events layer exists.
   eventName: v.optional(v.string()),
   roundNumber: v.optional(v.number()),
   createdAt: v.number(),
@@ -133,12 +124,10 @@ export default defineSchema({
     rematchPublicId: v.optional(v.string()),
     rematchOfGameId: v.optional(v.id("games")),
     matchId: v.optional(v.id("matches")),
-    // why: the game's order inside its match, so out-of-order uploads still sort.
     matchGameNumber: v.optional(v.number()),
     // Reserved for a future event stream without enabling connected mutations in Phase 2.
     // Legacy event-count base. New life writes never patch this shared row.
     eventSequence: v.optional(v.number()),
-    // why: Monarch and Initiative belong to at most one seat; keyed by designation id. Rare writes, so they live on the game row.
     designations: v.optional(v.record(v.string(), v.id("gamePlayers"))),
   })
     .index("by_public_id", ["publicId"])
@@ -164,7 +153,6 @@ export default defineSchema({
     // Optional during the Phase 2→3 staged migration; migrateMyGameMemberships backfills it.
     resumable: v.optional(v.boolean()),
     joinedAt: v.number(),
-    // why: per-seat table state beside life. Bounded by the system registry: a few counters, one Active, and a five-Pokémon bench.
     counters: v.optional(v.record(v.string(), v.number())),
     pokemon: v.optional(pokemonBoardValidator),
   })
@@ -302,7 +290,6 @@ export default defineSchema({
     ),
     resultKind: v.optional(v.union(v.literal("win"), v.literal("draw"), v.literal("unknown"))),
     winnerPlayerIds: v.optional(v.array(v.id("gamePlayers"))),
-    // why: lets History fold a match's games under one entry.
     matchId: v.optional(v.id("matches")),
   })
     .index("by_game", ["gameId"])
@@ -320,7 +307,6 @@ export default defineSchema({
     }),
   }).index("by_host_and_operation_id", ["hostUserId", "operationId"]),
 
-  // why: one table keeps History a single paginated stream, so manual matches get rows here too.
   gameHistoryEntries: defineTable(
     v.union(
       v.object({
@@ -519,7 +505,6 @@ export default defineSchema({
     .index("by_deck_and_finished_at", ["deckId", "finishedAt"])
     .index("by_user", ["userId"]),
 
-  // why: a match records only what happened at the table. Points belong to a future events layer.
   matches: defineTable(
     v.union(
       v.object({
@@ -533,7 +518,6 @@ export default defineSchema({
       v.object({
         ...matchFields,
         source: v.literal("manual"),
-        // why: manual matches use the date the player picked, not the entry time.
         finishedAt: v.number(),
       }),
     ),
@@ -546,7 +530,6 @@ export default defineSchema({
     deckVersionId: v.id("deckVersions"),
     matchId: v.id("matches"),
     userId: v.id("users"),
-    // why: drives the Scryve / manual / all filter on deck stats.
     source: v.union(v.literal("connected"), v.literal("manual")),
     outcome: resultOutcome,
     finishedAt: v.number(),

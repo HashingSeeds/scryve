@@ -11,7 +11,6 @@ import {
   type LifeCardMenuEdge,
 } from "../playerCardTypes"
 
-/** why: the whole seat lays out in content space (bench along the top, prizes bottom-left) and turns as one layer, so screen-space insets are mapped onto content edges here. */
 const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
   0: { top: "top", right: "right", bottom: "bottom", left: "left" },
   90: { top: "right", right: "bottom", bottom: "left", left: "top" },
@@ -37,7 +36,6 @@ export const MENU_CLEARANCE = 44
 export type BenchClearance = { top: number; left: number; right: number }
 const NO_CLEARANCE: BenchClearance = { top: 0, left: 0, right: 0 }
 
-/** why: the bench sits on the inner edge, where the game menu button also lives. A menu centered on that edge pushes the bench down; a menu at a corner only shortens the bench on that side, which keeps the height a cramped seat needs. */
 export function benchMenuClearance(
   rotation: LifeCardContentRotation,
   menuCorner: LifeCardMenuCorner | undefined,
@@ -45,7 +43,6 @@ export function benchMenuClearance(
 ): BenchClearance {
   const edges = CONTENT_EDGES[rotation]
   if (menuEdgeCenter === edges.top) return { ...NO_CLEARANCE, top: MENU_CLEARANCE }
-  // why: corner names carry both axes ("topRight"), and a sideways seat's inner edge is left or right.
   const corner = menuCorner?.toLowerCase()
   if (!corner || !corner.includes(edges.top)) return NO_CLEARANCE
   return corner.includes(edges.left)
@@ -53,14 +50,12 @@ export function benchMenuClearance(
     : { ...NO_CLEARANCE, right: MENU_CLEARANCE }
 }
 
-/** why: a sheet replaces the controls that opened it, so focus moves by hand: into the sheet when it opens and back to its trigger when it closes. Web moves keyboard focus; native moves the screen reader. */
 export function moveFocus(target: HostInstance | null | undefined) {
   if (!target) return
   if (Platform.OS === "web") target.focus()
   else AccessibilityInfo.sendAccessibilityEvent(target, "focus")
 }
 
-/** why: a sideways seat lays out in a frame with its sides swapped, then turns into place, like the life editor. */
 export function rotatedLayerStyle(
   rotation: LifeCardContentRotation,
   cardWidth: number,
@@ -84,7 +79,6 @@ export function rotatedLayerStyle(
 export const HERO_FONT_MAX = 96
 const HERO_FONT_FALLBACK = 80
 const HERO_FONT_MIN = 30
-// why: the tap halves show "+30" style feedback beside the number, so the number leaves room for it on each side.
 const HERO_GUTTER = 56
 
 export function heroFontSize(input: {
@@ -94,7 +88,6 @@ export function heroFontSize(input: {
   fontScale: number
 }): number {
   if (!(input.width > 0)) return HERO_FONT_FALLBACK
-  // why: a cramped seat still gets a legible number; the caption gives way before the HP does.
   return Math.max(
     HERO_FONT_MIN,
     Math.min(

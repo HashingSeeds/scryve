@@ -22,7 +22,6 @@ interface AuthAccess {
   isSignedIn: boolean
   userId?: string
   sessionHint?: SessionHint
-  /** why: the sign-in sheet is a modal, so prompts that follow sign-in wait for it to close. */
   authVisible: boolean
   openAuth: () => void
   closeAuth: () => void

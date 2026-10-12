@@ -29,7 +29,6 @@ import { initObservability, navigationTracing } from "@/utils/observability"
 initObservability()
 
 SplashScreen.preventAutoHideAsync()
-// why: Android's default 400ms exit fade was ~80% of a warm launch on a Pixel 6a; this matches iOS's instant hide.
 setSplashScreenOptions({ duration: 0 })
 
 if (__DEV__) {

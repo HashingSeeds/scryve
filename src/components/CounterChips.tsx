@@ -26,9 +26,7 @@ import { playerTableOf } from "../../convex/lib/table"
 export interface SeatTable {
   rules: TableRules
   counters: Readonly<Record<string, number>>
-  /** why: designation ids this seat holds, in rules order. */
   held: readonly string[]
-  /** why: connected seats owned by another device still show their chips, but only the owner changes them. */
   editable: boolean
   adjustCounter: (counterId: string, delta: number) => void
   takeDesignation: (designationId: string) => void
@@ -37,7 +35,6 @@ export interface SeatTable {
 
 const NO_COUNTERS: Readonly<Record<string, number>> = {}
 
-/** why: the per-seat slice of the table, or nothing when the game's rules have no counters or designations to show. */
 export function seatTableState(
   runtime: TableRuntime | undefined,
   playerId: string,
@@ -52,14 +49,12 @@ export function seatTableState(
   }
 }
 
-/** why: a counter at its losing count (10 poison) knocks the seat out, just as lethal commander damage does. */
 export function losingCounter({ rules, counters }: Pick<SeatTable, "rules" | "counters">) {
   return rules.counters.find(
     ({ id, losesAt }) => losesAt !== undefined && (counters[id] ?? 0) >= losesAt,
   )
 }
 
-// why: glyphs are keyed by counter or designation id, so any system that reuses an id gets its glyph and new ids fall back to a plain dot.
 const GLYPHS: Record<string, string> = {
   poison: "M12 2v20",
   commanderTax: "M6 3h12v18l-6-4-6 4zM12 7v6M9 10h6",
@@ -96,7 +91,6 @@ const CONTENT_EDGES = {
   180: { top: "bottom", right: "left", bottom: "top", left: "right" },
 } as const satisfies Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>>
 
-/** why: chips and sheets lay out upright in the seat's reading frame, then turn with the card's content. */
 export function contentFrame(
   rotation: LifeCardContentRotation,
   size: { width: number; height: number },
@@ -120,7 +114,6 @@ function contentInset(
   return insets?.[CONTENT_EDGES[rotation][edge]] ?? 0
 }
 
-// why: the game menu button is centered on the seam between cards, so a seat whose inner edge holds it starts its chips below the button.
 const MENU_CLEARANCE = 42
 const COMPACT_MENU_CLEARANCE = 37
 
@@ -129,7 +122,6 @@ type Sheet = { kind: "edit"; counterId: string } | { kind: "add" }
 const ADD_TRIGGER = "add"
 const LIVE_REGION_REISSUE_MS = 100
 
-/** why: the sheet replaces the controls that opened it, so focus has to move by hand: into the sheet when it opens and back to its trigger when it closes. Web moves keyboard focus; native moves the screen reader. */
 function moveFocus(target: View | null | undefined) {
   if (!target) return
   if (Platform.OS === "web") target.focus()
@@ -147,9 +139,7 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
-  /** why: a dice chip row above pushes the counters down so the two never overlap. */
   clearanceAbove?: number
-  /** why: the open sheet covers the card, so the card drops its own controls from touch, focus, and screen readers meanwhile. */
   onSheetOpenChange?: (open: boolean) => void
 }
 
@@ -175,7 +165,6 @@ export function chipRowOrigin(input: {
   }
 }
 
-/** why: counters and designations sit on the card's inner edge, facing the table. Tap a chip to bump it, hold it to edit or remove, and the faint + adds a counter or takes a designation. */
 export const CounterChips = memo(function CounterChips({
   seat,
   seatNumber,
@@ -278,7 +267,6 @@ export const CounterChips = memo(function CounterChips({
                 counter.losesAt !== undefined ? `${value} of ${counter.losesAt}` : String(value)
               const chipStyle = [
                 themed(compact ? $compactChip : $chip),
-                // why: reaching a losing count (10 poison) outlines the chip, like the lethal commander disc.
                 lethal && { borderColor: foreground },
               ]
               if (!editable)
@@ -566,7 +554,6 @@ function CounterSheet({
           <View style={[$sheetCenter, themed($options)]}>
             {seat.rules.counters.map((option, index) => {
               const current = seat.counters[option.id] ?? 0
-              // why: a counter in play opens its editor from here too, so keyboard users can correct it without a long press.
               return (
                 <SheetOption
                   key={option.id}
@@ -675,7 +662,6 @@ function SheetOption({
 
 const $layer: ViewStyle = { zIndex: 10 }
 
-// why: the row stays inside the seat's reading frame and wraps toward the life total when a narrow sideways card cannot fit every chip on one line.
 const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
   left: spacing.xs,

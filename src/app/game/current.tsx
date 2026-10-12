@@ -11,7 +11,6 @@ import { CurrentGameScreen } from "@/screens/CurrentGameScreen"
 export default function CurrentLocalGameRoute() {
   const auth = useAuthAccess()
   const [game, setGame] = useState(() => localGameRepository.loadActiveGame())
-  // why: setup can rename or end this game while the board waits underneath; the board adopts what this reads.
   useFocusEffect(useCallback(() => setGame(localGameRepository.loadActiveGame()), []))
   if (!game) {
     return (

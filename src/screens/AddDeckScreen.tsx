@@ -481,7 +481,6 @@ export function AddDeckScreen({
   const [searchError, setSearchError] = useState<string>()
   const online = useConvexOnline()
   const browseOffline = !online && (searching || Boolean(searchError))
-  // why: Retry and reconnect repeat the last request, so a failed "Load more" keeps its page.
   const searchCursor = useRef<string | undefined>(undefined)
   const [previewError, setPreviewError] = useState<string>()
   const [previewRetryAfterMs, setPreviewRetryAfterMs] = useState<number>()

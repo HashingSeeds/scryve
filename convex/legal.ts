@@ -27,7 +27,6 @@ export const recordAcceptance = mutation({
     document: consentDocument,
     version: v.string(),
     platform: v.string(),
-    // why: optional so installed apps keep working; it can only reject a write, never authorize one.
     intendedAccount: v.optional(v.string()),
   },
   handler: async (ctx, args) => {

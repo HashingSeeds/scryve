@@ -6,7 +6,6 @@ export const TurnedBoardContext = createContext(false)
 
 const WHOLE_SCREEN: Insets = { top: 10000, left: 10000, bottom: 10000, right: 10000 }
 
-// why: the props include `ref`, so callers can move focus to a board control.
 export function BoardPressable(props: ComponentProps<typeof Pressable>) {
   const turned = useContext(TurnedBoardContext)
   return (

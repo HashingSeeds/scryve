@@ -31,7 +31,6 @@ const TRACK_BORDER_WIDTH = 1
 const SEGMENT_PADDING = 4
 const SLIDE_SPRING = { damping: 18, stiffness: 240, mass: 0.6 } as const
 
-/** why: at large font scales a single row ellipsizes labels, so it falls back to two columns, then one. */
 function fittingColumns(count: number, trackWidth: number, widestLabel: number) {
   if (trackWidth <= 0) return count
   const fits = (columns: number) => trackWidth / columns >= widestLabel + SEGMENT_PADDING * 2
@@ -148,7 +147,6 @@ const $thumbShape: ThemedStyle<ViewStyle> = () => ({
   borderRadius: CHOICE_RADIUS - TRACK_INSET,
 })
 const $wrappedTrack: ViewStyle = { flexWrap: "wrap" }
-// why: an odd last cell keeps its column width instead of stretching across the row.
 const $wrappedSegment: ViewStyle = { flexGrow: 0 }
 const $segment: ViewStyle = {
   flex: 1,
@@ -158,7 +156,6 @@ const $segment: ViewStyle = {
   paddingHorizontal: SEGMENT_PADDING,
 }
 const $segmentLabel: TextStyle = { textAlign: "center" }
-// why: an unconstrained, invisible copy of the labels measures the widest one at the current font scale.
 const $labelRuler: ViewStyle = { position: "absolute", top: 0, left: 0, opacity: 0 }
 const $dimmed: ViewStyle = { opacity: 0.5 }
 

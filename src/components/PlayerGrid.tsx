@@ -75,7 +75,6 @@ export interface PlayerGridProps {
   players: GamePlayer[]
   boardOrientation?: Omit<ReturnType<typeof useGameBoardOrientation>, "frameRef" | "nativeFrame"> &
     Partial<Pick<ReturnType<typeof useGameBoardOrientation>, "nativeFrame">> & {
-      // why: a hardware-pinned board lays out at rotation 0 but sits turned in window space, so it supplies board-space insets and the angle touches arrive at.
       insets?: LifeCardContentInsets
       touchRotation?: number
     }
@@ -86,10 +85,8 @@ export interface PlayerGridProps {
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
   getStaleSince?: (player: GamePlayer) => number | undefined
-  /** why: commander damage elimination; a losing table counter like 10 poison is read from `table`. */
   isPlayerEliminated?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
-  /** why: Magic seats show counter chips from it; Pokémon rules swap the life card for a Pokémon board. */
   table?: TableRuntime
   dice?: DiceGridBinding
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
@@ -176,7 +173,6 @@ export function PlayerGrid({
   const lifeTargetSize = layout.compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
   const sidewaysGlyphReserve =
     2 * ((layout.compact ? COMPACT_LIFE_GLYPH_LINE_HEIGHT : LIFE_GLYPH_LINE_HEIGHT) + spacing.xs)
-  /** why: cards size the total they show, which can be a press-in preview with more digits. */
   const lifeFontSizeFor = useCallback(
     (digits: number) =>
       getLifeFontSize({

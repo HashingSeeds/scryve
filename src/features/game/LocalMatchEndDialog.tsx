@@ -26,7 +26,6 @@ function drawForRemaining(game: LocalGame): MatchSeatOutcome[] {
   return game.players.map((player) => (isPlayerOut(game, player.id) ? "loss" : "draw"))
 }
 
-/** why: a match usually ends the way its score says; a called round draws whoever is still playing. */
 export function defaultMatchOutcomes(game: LocalGame): MatchSeatOutcome[] {
   const { wins } = matchScoreAfter(game)
   const most = Math.max(...wins)

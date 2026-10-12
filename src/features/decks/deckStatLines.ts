@@ -10,7 +10,6 @@ export const STATS_SOURCES: { value: StatsSource; label: string }[] = [
 
 type Tally = { total: number; wins: number; losses: number; draws: number }
 
-// why: an absent tally means the source has no data for that line, so it hides.
 type SourceCounters = { matches?: Tally; games?: Tally }
 
 // why: envelopes are optional so cached rows and older query shapes still render Scryve games.
@@ -58,7 +57,6 @@ export function deckStatLines(record: DeckStatsRecord, source: StatsSource): Sta
           }
   const matchLine = line("Matches", counters.matches)
   const gameLine = line("Games", counters.games)
-  // why: Bo1 pods make both lines identical, so one line says it all.
   if (matchLine && gameLine && matchLine.text === gameLine.text) return [matchLine]
   return [matchLine, gameLine].filter((entry) => entry !== undefined)
 }

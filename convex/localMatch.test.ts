@@ -37,7 +37,6 @@ async function owner(t: TestConvex<typeof schema>, subject = "owner") {
   return { actor, deckId, versionId }
 }
 
-/** why: every game of the match keeps the same two seats; only the winner and order change. */
 function matchGame(
   gameNumber: number,
   winner: "me" | "them" | "draw",
@@ -246,7 +245,6 @@ describe("finishScryveMatch", () => {
     expect(stats[0]).toMatchObject({ games: 3, wins: 2, losses: 1, connectedMatches: counted })
     expect(versionStats[0]).toMatchObject({ games: 3, wins: 2, connectedMatches: counted })
     expect(stats[0].manualMatches).toBeUndefined()
-    // why: the games are the history; a finished match adds no row of its own.
     expect(history).toHaveLength(3)
 
     await t.mutation(internal.entitlements.setUserFeature, {
@@ -404,7 +402,6 @@ describe("account deletion", () => {
     const ada = await owner(t)
     await owner(t, "bob")
     await ada.actor.mutation(api.games.publishFinishedLocalGame, matchGame(1, "me"))
-    // why: connected match mode will seat other accounts; until then the seat is linked by hand.
     const bobUserId = await t.run(async (ctx) => {
       const user = (await ctx.db
         .query("users")

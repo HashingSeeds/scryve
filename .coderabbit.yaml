@@ -6,7 +6,6 @@ reviews:
   # why: scripts/merge-gate.cjs reads the "CodeRabbit" commit status, so keep that surface.
   review_progress: false
   commit_status: true
-  # why: a review that errors should read as failed, not success.
   fail_commit_status: true
   # why: agents open PRs as Matthew, and `@coderabbitai resolve` approved #331 without a review.
   allow_author_approval: false
@@ -17,3 +16,12 @@ reviews:
     auto_incremental_review: false
     # why: the default pauses reviews after 5 commits, which quietly blocks the merge gate.
     auto_pause_after_reviewed_commits: 0
+  path_instructions:
+    - path: "**/*"
+      instructions: >-
+        Request changes on each added `why:` comment unless it names what breaks that no test
+        catches: an installed client or version, a stored data shape, a coupled file or config,
+        a platform bug, or a race. Ask to delete comments that describe what code does, explain
+        what a field or undefined means (put that in a name or type), narrate a test, recount PR
+        history, or restate expand-and-contract. If a test could enforce the rule, ask for the
+        test instead.
