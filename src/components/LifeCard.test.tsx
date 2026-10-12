@@ -3,6 +3,7 @@ import { act, fireEvent, render } from "@testing-library/react-native"
 import * as Reanimated from "react-native-reanimated"
 
 import { asPlayerId, PLAYER_COLORS } from "@/features/game/domain"
+import { playTableRules } from "@/features/game/playSystems"
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme } from "@/theme/theme"
 import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
@@ -38,6 +39,42 @@ const renderCard = (life: number) => render(card(life))
 describe("LifeCard", () => {
   beforeEach(() => jest.useFakeTimers())
   afterEach(() => jest.useRealTimers())
+
+  it("gives the seat to the dice: chips and life controls leave touch and focus, the overlay takes the tap", () => {
+    const adjustCounter = jest.fn()
+    const onChange = jest.fn()
+    const onPress = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="light">
+        <LifeCard
+          playerName="Ada"
+          seatNumber={1}
+          life={20}
+          color="#41476E"
+          seatTable={{
+            rules: playTableRules("mtg", "commander"),
+            counters: { poison: 2 },
+            held: [],
+            editable: true,
+            adjustCounter,
+            takeDesignation: jest.fn(),
+            releaseDesignation: jest.fn(),
+          }}
+          dice={{ armed: "d20", onPress }}
+          onChange={onChange}
+        />
+      </ThemeProvider>,
+    )
+
+    expect(view.queryByTestId("counter-chip-1-poison", { includeHiddenElements: true })).toBeNull()
+    expect(view.queryByTestId("life-seat-1--1", { includeHiddenElements: true })).toBeNull()
+    expect(view.queryByTestId("life-total-seat-1")).toBeNull()
+    expect(view.getByTestId("life-total-seat-1", { includeHiddenElements: true })).toBeTruthy()
+    fireEvent.press(view.getByTestId("dice-seat-1"))
+    expect(onPress).toHaveBeenCalledTimes(1)
+    expect(adjustCounter).not.toHaveBeenCalled()
+    expect(onChange).not.toHaveBeenCalled()
+  })
 
   it("adds up recent changes on the matching side, even while its controls are hidden", () => {
     const seat = (life: number, ownership?: "unowned") => (

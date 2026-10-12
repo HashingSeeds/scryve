@@ -1,9 +1,10 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { Platform, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedStyle } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import type { DiceSeatChip } from "@/features/game/dice"
 import { type PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
@@ -11,10 +12,12 @@ import type { CommanderBoardPlayer, GamePlayer, LifeDelta, PlayerId } from "@/fe
 import type { useGameBoardOrientation } from "@/features/game/useGameBoardOrientation"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useStableCallbacks } from "@/utils/useStableCallbacks"
 import { useTopEdgeBand } from "@/utils/useTopEdgeBand"
 
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { losingCounter, seatTableState } from "./CounterChips"
+import type { LifeCardDice } from "./DiceSeatOverlay"
 import { LifeCard, type LifeCardCommanderDamage } from "./LifeCard"
 import {
   COMPACT_LIFE_GLYPH_LINE_HEIGHT,
@@ -59,6 +62,15 @@ export interface CommanderDamageGridBinding {
   onStage: (player: GamePlayer, step: number) => void
 }
 
+export interface DiceGridBinding {
+  armed: LifeCardDice["armed"] | null
+  seatFor: (player: GamePlayer) => LifeCardDice["view"]
+  chipsFor: (player: GamePlayer) => readonly DiceSeatChip[]
+  onPressSeat: (player: GamePlayer) => void
+  onChoose: (player: GamePlayer, order: "first" | "second") => void
+  onClearChip: (player: GamePlayer, chip: DiceSeatChip) => void
+}
+
 export interface PlayerGridProps {
   players: GamePlayer[]
   boardOrientation?: Omit<ReturnType<typeof useGameBoardOrientation>, "frameRef" | "nativeFrame"> &
@@ -79,6 +91,7 @@ export interface PlayerGridProps {
   commanderDamage?: CommanderDamageGridBinding
   /** why: Magic seats show counter chips from it; Pokémon rules swap the life card for a Pokémon board. */
   table?: TableRuntime
+  dice?: DiceGridBinding
   onChange: (playerId: PlayerId, delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -96,6 +109,7 @@ export function PlayerGrid({
   isPlayerEliminated,
   commanderDamage,
   table,
+  dice,
   onChange,
   style,
 }: PlayerGridProps) {
@@ -283,6 +297,23 @@ export function PlayerGrid({
                   : fallbackMenuAt(rows, fallbackMenuBoundary, rowIndex, columnIndex)
               const menuCorner =
                 menuCornerAt(menuJunction, rowIndex, columnIndex) ?? fallbackMenu?.corner
+              const diceView = dice?.seatFor(player)
+              const diceChips = dice?.chipsFor(player)
+              const seatDice =
+                dice && (diceView || dice.armed || diceChips?.length)
+                  ? {
+                      view: diceView,
+                      armed: dice.armed ?? undefined,
+                      chips: diceChips,
+                      onPress: stable(`dice:${player.id}`, () => dice.onPressSeat(player)),
+                      onChoose: stable(`dice-choose:${player.id}`, (order: "first" | "second") =>
+                        dice.onChoose(player, order),
+                      ),
+                      onClearChip: stable(`dice-chip:${player.id}`, (chip: DiceSeatChip) =>
+                        dice.onClearChip(player, chip),
+                      ),
+                    }
+                  : undefined
               const seatTable = seatTableState(table, player.id)
               const eliminated = isPlayerEliminated?.(player)
                 ? "commander damage"
@@ -313,6 +344,7 @@ export function PlayerGrid({
                         .filter(({ id }) => id !== player.id)
                         .map(({ id, name }) => ({ id, name }))}
                       table={table}
+                      dice={seatDice}
                       onChangePrizes={stable(`change:${player.id}`, (delta: LifeDelta) =>
                         onChange(player.id, delta),
                       )}
@@ -422,6 +454,7 @@ export function PlayerGrid({
                           }
                         : undefined
                     }
+                    dice={seatDice}
                     onChange={stable(`change:${player.id}`, (delta: LifeDelta) =>
                       onChange(player.id, delta),
                     )}
@@ -440,32 +473,6 @@ export function PlayerGrid({
       </Animated.View>
     </View>
   )
-}
-
-type Callback = (...args: never[]) => unknown
-
-/** why: `LifeCard` is memoized and compares props structurally, so each per-seat callback keeps one identity for the life of the board. Each render's closures become the latest only after commit, so a discarded render never leaks into a handler. */
-function useStableCallbacks() {
-  const entries = useRef(new Map<string, { latest: Callback; stable: Callback }>()).current
-  const rendered = useRef(new Map<string, Callback>()).current
-  rendered.clear()
-  useLayoutEffect(() => {
-    for (const [key, fn] of rendered) {
-      const entry = entries.get(key)
-      if (entry) entry.latest = fn
-    }
-  })
-  return <Fn extends Callback>(key: string, fn: Fn): Fn => {
-    rendered.set(key, fn)
-    const existing = entries.get(key)
-    if (existing) return existing.stable as Fn
-    const entry: { latest: Callback; stable: Callback } = {
-      latest: fn,
-      stable: (...args) => entry.latest(...args),
-    }
-    entries.set(key, entry)
-    return entry.stable as Fn
-  }
 }
 
 export { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"

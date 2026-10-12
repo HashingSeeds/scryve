@@ -33,7 +33,9 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import { CommanderStrip } from "./CommanderStrip"
-import { CounterChips, type SeatTable } from "./CounterChips"
+import { chipRowOrigin, CounterChips, type SeatTable } from "./CounterChips"
+import { DICE_CHIP_HEIGHT, COMPACT_DICE_CHIP_HEIGHT, DiceChips } from "./DiceChips"
+import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
@@ -112,6 +114,7 @@ export interface LifeCardProps {
   /** why: what knocked the seat out, such as "commander damage" or "poison"; the card dims and its label says why. */
   eliminated?: string
   seatTable?: SeatTable
+  dice?: LifeCardDice
   onChange: (delta: LifeDelta) => void
   style?: StyleProp<ViewStyle>
 }
@@ -152,6 +155,7 @@ export const LifeCard = memo(function LifeCard({
   ownership,
   staleSince,
   commanderDamage,
+  dice,
   eliminated,
   seatTable,
   onChange,
@@ -162,6 +166,8 @@ export const LifeCard = memo(function LifeCard({
     theme: { spacing },
   } = useAppTheme()
   const localCommander = !!commanderDamage?.inspection
+  const diceCovers = diceCoversSeat(dice)
+  const diceChips = dice?.chips
   const foreground = accessibleForeground(color)
   const reducedMotion = useReducedMotion()
   const commanderOverviewDuration = motionDuration(reducedMotion, COMMANDER_OVERVIEW_MS)
@@ -485,12 +491,20 @@ export const LifeCard = memo(function LifeCard({
         />
       )}
       <View
-        pointerEvents={commanderOverviewOpen || commanderCardMode ? "none" : "box-none"}
+        pointerEvents={
+          commanderOverviewOpen || commanderCardMode || diceCovers ? "none" : "box-none"
+        }
         accessibilityElementsHidden={
-          (!localCommander && commanderOverviewOpen) || !!commanderCardMode || tableSheetOpen
+          (!localCommander && commanderOverviewOpen) ||
+          !!commanderCardMode ||
+          tableSheetOpen ||
+          diceCovers
         }
         importantForAccessibility={
-          (!localCommander && commanderOverviewOpen) || commanderCardMode || tableSheetOpen
+          (!localCommander && commanderOverviewOpen) ||
+          commanderCardMode ||
+          tableSheetOpen ||
+          diceCovers
             ? "no-hide-descendants"
             : "auto"
         }
@@ -658,6 +672,7 @@ export const LifeCard = memo(function LifeCard({
       ) : !commanderOverviewOpen &&
         !localOverviewVisible &&
         !tableSheetOpen &&
+        !diceCovers &&
         ownership !== "unowned" ? (
         <LifeControls
           playerName={displayName}
@@ -675,11 +690,23 @@ export const LifeCard = memo(function LifeCard({
           onLongChange={() => setEditorOpen(true)}
         />
       ) : null}
+      {dice && diceCovers ? (
+        <DiceSeatOverlay
+          seatNumber={seatNumber}
+          playerName={displayName}
+          color={color}
+          foreground={foreground}
+          contentRotation={contentRotation}
+          compact={compact}
+          dice={dice}
+        />
+      ) : null}
       {commanderDamage &&
       !localCommander &&
       !commanderCardMode &&
       !commanderOverviewOpen &&
-      !tableSheetOpen ? (
+      !tableSheetOpen &&
+      !diceCovers ? (
         <BoardPressable
           testID={`commander-mark-seat-${seatNumber}`}
           accessibilityRole="button"
@@ -695,7 +722,7 @@ export const LifeCard = memo(function LifeCard({
           ]}
         />
       ) : null}
-      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen ? (
+      {commanderDamage?.inspection && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
         <CommanderStrip
           seatNumber={seatNumber}
           identity={identity}
@@ -715,7 +742,7 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {cornerStatus && !commanderCardMode && !tableSheetOpen ? (
+      {cornerStatus && !commanderCardMode && !tableSheetOpen && !diceCovers ? (
         <View
           testID={`life-corner-layer-seat-${seatNumber}`}
           pointerEvents="box-none"
@@ -767,6 +794,7 @@ export const LifeCard = memo(function LifeCard({
         </View>
       ) : null}
       {seatTable &&
+      !diceCovers &&
       !commanderCardMode &&
       !commanderOverviewOpen &&
       !localOverviewVisible &&
@@ -782,7 +810,25 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
+          clearanceAbove={
+            diceChips?.length
+              ? (compact ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
+              : 0
+          }
           onSheetOpenChange={setTableSheetOpen}
+        />
+      ) : null}
+      {diceChips?.length && dice?.onClearChip && !dice.view && !commanderCardMode && !editorOpen ? (
+        <DiceChips
+          seatNumber={seatNumber}
+          playerName={displayName}
+          foreground={foreground}
+          compact={compact}
+          contentRotation={contentRotation}
+          cardSize={cardSize}
+          {...chipRowOrigin({ compact, contentRotation, contentInsets, menuEdgeCenter, spacing })}
+          chips={diceChips}
+          onClear={dice.onClearChip}
         />
       ) : null}
       {editorOpen ? (

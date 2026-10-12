@@ -58,6 +58,39 @@ describe("GameBoardStage on a pinned screen", () => {
     )
   })
 
+  it("keeps a held action's tools out on the pinned board while the menu is closed", () => {
+    const onFirst = jest.fn()
+    render(
+      <ThemeProvider initialContext="dark">
+        <GameBoardStage
+          playerCount={2}
+          layoutVariant="auto"
+          renderGrid={() => <View testID="grid" />}
+          menu={{
+            open: false,
+            actions: [
+              {
+                kind: "dice",
+                label: "Dice",
+                tools: [
+                  { key: "first", label: "First", accessibilityLabel: "First", onPress: onFirst },
+                ],
+              },
+            ],
+            heldAction: "dice",
+            exitAction: { label: "Close dice", onPress: jest.fn() },
+            onToggle: jest.fn(),
+            onClose: jest.fn(),
+          }}
+        />
+      </ThemeProvider>,
+    )
+
+    const cluster = screen.getByTestId("game-menu-cluster")
+    fireEvent.press(within(cluster).getByTestId("dice-first"))
+    expect(onFirst).toHaveBeenCalledTimes(1)
+  })
+
   it("turns the connected sync status with the menu so the holder can read it", () => {
     const onPress = jest.fn()
     render(

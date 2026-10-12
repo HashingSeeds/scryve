@@ -570,3 +570,20 @@ describe("LocalGameRepository sign-in claims", () => {
     expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({ ownerId: "owner-a" })
   })
 })
+
+describe("first-player offer on the game", () => {
+  it("round-trips the chooser seat and the used mark, and ignores values that fit no seat", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = { ...makeGame(), firstChooserSeat: 1, firstPlayerOffered: true as const }
+    repository.saveActiveGame(game)
+    expect(repository.loadActiveGame()).toMatchObject({
+      firstChooserSeat: 1,
+      firstPlayerOffered: true,
+    })
+
+    repository.saveActiveGame({ ...makeGame(), firstChooserSeat: 9 })
+    const loaded = repository.loadActiveGame()
+    expect(loaded?.firstChooserSeat).toBeUndefined()
+    expect(loaded?.firstPlayerOffered).toBeUndefined()
+  })
+})
