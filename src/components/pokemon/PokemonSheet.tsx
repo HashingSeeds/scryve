@@ -380,7 +380,8 @@ export function PokemonSheet({
                 placeholder="HP"
                 value={draft.hp}
                 selection={caretAtEnd(draft.hp)}
-                inputMode="numeric"
+                // why: React Native lets inputMode decide showSoftInputOnFocus, so "numeric" alone would raise the system pad.
+                inputMode={onKeypad ? "none" : "numeric"}
                 keyboardType="number-pad"
                 maxLength={3}
                 showSoftInputOnFocus={!onKeypad}

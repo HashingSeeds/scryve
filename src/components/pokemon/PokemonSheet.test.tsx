@@ -151,7 +151,9 @@ describe("PokemonSheet", () => {
     await flush()
     expect(screen.getByTestId("pokemon-result-sv03-125")).toBeTruthy()
 
-    fireEvent(screen.getByTestId("pokemon-hp-input-seat-1"), "focus")
+    const hp = screen.getByTestId("pokemon-hp-input-seat-1")
+    expect(hp.props.inputMode).toBe("none")
+    fireEvent(hp, "focus")
     expect(screen.queryByTestId("pokemon-key-q-seat-1")).toBeNull()
     for (const key of ["1", "2", "0", "5"])
       fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
