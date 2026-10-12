@@ -29,7 +29,7 @@ import { useConvexOnline } from "./useConvexOnline"
 import { useRemoteReady } from "./useRemoteReady"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
-import { EMPTY_TABLE } from "../../../convex/lib/table"
+import { EMPTY_TABLE, TABLE_VERSION } from "../../../convex/lib/table"
 
 export { mergeDrainSnapshot } from "./OutboxSyncController"
 
@@ -250,6 +250,7 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
         publicId,
         deviceId,
         includeRecentOperationIds: false,
+        tableVersion: TABLE_VERSION,
         ...(head ? { operation: operationCheckFor(head) } : {}),
       }
     : "skip"

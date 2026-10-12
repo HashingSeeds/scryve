@@ -2,11 +2,13 @@ import { tableRules } from "./systems"
 import {
   applyTableAction,
   EMPTY_TABLE,
+  isValidTableSnapshot,
   matchesValidator,
   pokemonBoardOf,
   pokemonCardFromCatalog,
   pokemonPrizeValue,
   tableActionValidator,
+  tableStateValidator,
   type TableAction,
   type TableState,
 } from "./table"
@@ -232,6 +234,163 @@ describe("Pokémon board", () => {
         { rules: commander },
       ),
     ).toBeNull()
+  })
+})
+
+describe("Pokémon conditions", () => {
+  const placed: TableAction[] = [
+    {
+      kind: "pokemon.placed",
+      playerId: "me",
+      pokemonId: "active-001",
+      slot: "active",
+      card: pidgey,
+    },
+    {
+      kind: "pokemon.placed",
+      playerId: "me",
+      pokemonId: "bench-0001",
+      slot: "bench",
+      card: pidgey,
+    },
+  ]
+  const condition = (pokemonId: string, which: "poisoned" | "burned", on = true): TableAction => ({
+    kind: "pokemon.conditionChanged",
+    playerId: "me",
+    pokemonId,
+    condition: which,
+    on,
+  })
+  const checkup = (coin?: "heads" | "tails", pokemonId = "active-001"): TableAction => ({
+    kind: "pokemon.checkedUp",
+    playerId: "me",
+    pokemonId,
+    takerPlayerId: "them",
+    ...(coin ? { coin } : {}),
+  })
+  const sick = boardWith(
+    ...placed,
+    condition("active-001", "poisoned"),
+    condition("active-001", "burned"),
+  )
+
+  it("sets conditions on the Active only, and setting one again changes nothing", () => {
+    expect(pokemonBoardOf(sick, "me").active).toMatchObject({ poisoned: true, burned: true })
+    expect(run(sick, condition("active-001", "poisoned"))!.table).toBe(sick)
+    expect(run(sick, condition("bench-0001", "poisoned"))).toBeNull()
+    const cured = run(sick, condition("active-001", "poisoned", false))!.table
+    expect(pokemonBoardOf(cured, "me").active).toEqual({
+      ...pidgey,
+      id: "active-001",
+      damage: 0,
+      burned: true,
+    })
+  })
+
+  it("clears conditions when the Pokémon retreats, evolves, or goes back to the bench on undo", () => {
+    const switched = run(sick, {
+      kind: "pokemon.switched",
+      playerId: "me",
+      pokemonId: "bench-0001",
+    })!
+    expect(pokemonBoardOf(switched.table, "me").bench).toEqual([
+      { ...pidgey, id: "active-001", damage: 0 },
+    ])
+
+    const update = (card: typeof pidgey) =>
+      pokemonBoardOf(
+        run(sick, { kind: "pokemon.updated", playerId: "me", pokemonId: "active-001", card })!
+          .table,
+        "me",
+      ).active
+    expect(update({ ...pidgey, hp: 70 })).toMatchObject({ poisoned: true, burned: true })
+    expect(update({ name: "Pidgeotto", hp: 80, prizes: 1 })).toEqual({
+      name: "Pidgeotto",
+      hp: 80,
+      prizes: 1,
+      id: "active-001",
+      damage: 0,
+    })
+
+    const knockedOut = boardWith(
+      ...placed,
+      condition("active-001", "burned"),
+      { kind: "pokemon.knockedOut", playerId: "me", pokemonId: "active-001" },
+      { kind: "pokemon.switched", playerId: "me", pokemonId: "bench-0001" },
+    )
+    const undo: TableAction = {
+      kind: "pokemon.knockoutUndone",
+      playerId: "me",
+      knockoutOperationId: "operation-0000000001",
+    }
+    expect(pokemonBoardOf(run(knockedOut, undo)!.table, "me").bench).toEqual([
+      { ...pidgey, id: "active-001", damage: 0 },
+    ])
+
+    const removed = run(sick, { kind: "pokemon.removed", playerId: "me", pokemonId: "active-001" })!
+    expect(pokemonBoardOf(removed.table, "me").active).toBeUndefined()
+  })
+
+  it("puts 10 on Poisoned and 20 on Burned at Checkup, and only heads cures the Burn", () => {
+    const tails = run(sick, checkup("tails"))!.table
+    expect(pokemonBoardOf(tails, "me").active).toMatchObject({
+      damage: 30,
+      poisoned: true,
+      burned: true,
+    })
+    expect(pokemonBoardOf(run(sick, checkup())!.table, "me").active).toMatchObject({
+      burned: true,
+    })
+    const heads = pokemonBoardOf(run(sick, checkup("heads"))!.table, "me").active
+    expect(heads).toMatchObject({ damage: 30, poisoned: true })
+    expect(heads).not.toHaveProperty("burned")
+
+    const healthy = boardWith(...placed)
+    expect(run(healthy, checkup("heads"))!.table).toBe(healthy)
+    expect(run(sick, checkup(undefined, "bench-0001"))).toBeNull()
+  })
+
+  it("knocks out on lethal Checkup damage, gives prizes, and undo restores the Pokémon as it stood", () => {
+    const hurt = run(sick, {
+      kind: "pokemon.damaged",
+      playerId: "me",
+      pokemonId: "active-001",
+      delta: 40,
+    })!.table
+    const knockout = run(hurt, checkup("heads"), { operationId: "checkup-000000000001" })!
+    expect(knockout.life).toEqual([{ playerId: "them", delta: -1 }])
+    expect(pokemonBoardOf(knockout.table, "me").active).toBeUndefined()
+
+    const undone = run(
+      knockout.table,
+      {
+        kind: "pokemon.knockoutUndone",
+        playerId: "me",
+        knockoutOperationId: "checkup-000000000001",
+      },
+      { life: { me: 6, them: 5 } },
+    )!
+    expect(undone.life).toEqual([{ playerId: "them", delta: 1 }])
+    expect(pokemonBoardOf(undone.table, "me").active).toEqual(pokemonBoardOf(hurt, "me").active)
+  })
+
+  it("accepts tables stored before conditions existed and refuses a Burned bench Pokémon", () => {
+    const stored = {
+      designations: {},
+      players: {
+        me: { pokemon: { active: { ...pidgey, id: "active-001", damage: 10 }, bench: [] } },
+      },
+    }
+    expect(matchesValidator(tableStateValidator, stored)).toBe(true)
+    const players = new Set(["me", "them"])
+    expect(isValidTableSnapshot(sick, pokemon, players)).toBe(true)
+    const benchBurned = {
+      ...stored,
+      players: {
+        me: { pokemon: { bench: [{ ...pidgey, id: "bench-0001", damage: 0, burned: true }] } },
+      },
+    }
+    expect(isValidTableSnapshot(benchBurned, pokemon, players)).toBe(false)
   })
 })
 

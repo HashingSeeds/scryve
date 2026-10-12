@@ -76,6 +76,27 @@ describe("table runtime", () => {
     expect(pokemonBoardOf(game().table!, me).active).toMatchObject({ damage: 320 })
   })
 
+  it("keeps conditions across a restart and reports a lethal Checkup as an undoable knockout", () => {
+    const { actions, game } = localTable(newGame("pokemon", 6))
+    const [me, opponent] = game().players.map(({ id }) => id)
+    const pokemonId = actions.placePokemon(me, "active", { name: "Pidgey", hp: 60, prizes: 1 })!
+    actions.adjustPokemonDamage(me, pokemonId, 40)
+    actions.setPokemonCondition(me, pokemonId, "burned", true)
+
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(game())
+    expect(repository.loadActiveGame()!.table).toEqual(game().table)
+
+    const knockout = actions.checkupPokemon(me, pokemonId, "heads")
+    expect(knockout).toMatchObject({
+      playerId: me,
+      takerPlayerId: opponent,
+      prizesTaken: 1,
+      pokemon: { damage: 40, burned: true },
+    })
+    expect(game().players.map(({ life }) => life)).toEqual([6, 5])
+  })
+
   it("survives a restart and counts ten poison as a loss", () => {
     const { actions, game } = localTable(newGame("mtg", 40))
     const [me] = game().players.map(({ id }) => id)

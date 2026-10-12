@@ -3,7 +3,9 @@ import type { TableRules } from "./playSystems"
 import {
   applyTableAction,
   pokemonBoardOf,
+  type Coin,
   type PokemonCard,
+  type PokemonCondition,
   type PokemonKnockout,
   type PokemonSlot,
   type TableAction,
@@ -34,6 +36,20 @@ export interface TableActions {
   removePokemon: (playerId: string, pokemonId: string) => void
   knockOut: (playerId: string, pokemonId: string, takerPlayerId?: string) => TableKnockout | null
   undoKnockout: (playerId: string, knockoutOperationId: string) => void
+  /** why: only the Active can be Poisoned or Burned; leaving the Active Spot or evolving clears both. */
+  setPokemonCondition: (
+    playerId: string,
+    pokemonId: string,
+    condition: PokemonCondition,
+    on: boolean,
+  ) => void
+  /** why: Checkup on the Active: Poisoned +10, Burned +20, then heads cures the Burn. Pass the owner's coin when Burned. Lethal Checkup damage knocks out and returns the knockout for the Undo toast. */
+  checkupPokemon: (
+    playerId: string,
+    pokemonId: string,
+    coin?: Coin,
+    takerPlayerId?: string,
+  ) => TableKnockout | null
 }
 
 /** why: both board modes expose this, so table UI takes one runtime and never asks whether the game is local or connected. */
@@ -83,7 +99,7 @@ export function createTableActions(
   const runKnockout = ({
     takerPlayerId,
     ...action
-  }: TableAction & { kind: "pokemon.damaged" | "pokemon.knockedOut" }) => {
+  }: TableAction & { kind: "pokemon.damaged" | "pokemon.knockedOut" | "pokemon.checkedUp" }) => {
     const taker = takerFor(action.playerId, takerPlayerId)
     const result = run({ ...action, ...(taker === undefined ? {} : { takerPlayerId: taker }) })
     if (!result) return null
@@ -122,5 +138,16 @@ export function createTableActions(
     undoKnockout: (playerId, knockoutOperationId) => {
       run({ kind: "pokemon.knockoutUndone", playerId, knockoutOperationId })
     },
+    setPokemonCondition: (playerId, pokemonId, condition, on) => {
+      run({ kind: "pokemon.conditionChanged", playerId, pokemonId, condition, on })
+    },
+    checkupPokemon: (playerId, pokemonId, coin, takerPlayerId) =>
+      runKnockout({
+        kind: "pokemon.checkedUp",
+        playerId,
+        pokemonId,
+        ...(coin === undefined ? {} : { coin }),
+        takerPlayerId,
+      }),
   }
 }
