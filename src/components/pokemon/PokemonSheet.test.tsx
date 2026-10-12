@@ -146,7 +146,7 @@ describe("PokemonSheet", () => {
     for (const key of ["c", "h", "a"])
       fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
     fireEvent.press(screen.getByTestId("pokemon-key-delete-seat-1"))
-    expect(search.props.value).toBe("CH")
+    expect(search.props.value).toBe("Ch")
     act(() => jest.advanceTimersByTime(350))
     await flush()
     expect(screen.getByTestId("pokemon-result-sv03-125")).toBeTruthy()
@@ -156,6 +156,17 @@ describe("PokemonSheet", () => {
     for (const key of ["1", "2", "0", "5"])
       fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
     expect(screen.getByTestId("pokemon-hp-input-seat-1").props.value).toBe("120")
+  })
+
+  it("capitalizes only the first keypad letter, so a typed Mega ex is worth three prizes", () => {
+    render(sheet({ rotation: 180 }))
+    fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
+    for (const key of [..."mega", "space", ..."ab", "space", ..."ex"])
+      fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Mega ab ex")
+    expect(screen.getByTestId("pokemon-prizes-3-seat-1").props.accessibilityState).toMatchObject({
+      checked: true,
+    })
   })
 
   it("keeps the system keyboard for a seat facing the bottom edge", () => {

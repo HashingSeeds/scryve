@@ -12,12 +12,19 @@ import { Text } from "../Text"
 const LETTERS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"] as const
 const DIGITS = ["123", "456", "789"] as const
 
-type Key = { label: string; accessibilityLabel: string; wide?: boolean; onPress: () => void }
+type Key = {
+  label: string
+  accessibilityLabel: string
+  wide?: boolean
+  active?: boolean
+  onPress: () => void
+}
 
 export function PokemonKeypad({
   seatNumber,
   ink,
   digitsOnly,
+  capitalize,
   compact,
   onType,
   onDelete,
@@ -26,6 +33,8 @@ export function PokemonKeypad({
   seatNumber: number
   ink: string
   digitsOnly: boolean
+  /** why: prize values read the name's case ("ex" vs "EX"), so letters can't all come out uppercase. */
+  capitalize: boolean
   compact?: boolean
   onType: (text: string) => void
   onDelete: () => void
@@ -34,6 +43,8 @@ export function PokemonKeypad({
   const { themed } = useAppTheme()
   const [digitsChosen, setDigitsChosen] = useState(false)
   const digits = digitsOnly || digitsChosen
+  const [shift, setShift] = useState<boolean>()
+  const upper = shift ?? capitalize
   const keyStyle = [
     themed(compact ? $compactKey : $key),
     { backgroundColor: overlayTint(ink, 0.18) },
@@ -41,11 +52,24 @@ export function PokemonKeypad({
   const pressed = { backgroundColor: overlayTint(ink, 0.36) }
   const inkStyle = { color: ink }
 
-  const typed = (char: string): Key => ({
-    label: char,
-    accessibilityLabel: char,
-    onPress: () => onType(char),
-  })
+  const typed = (char: string): Key => {
+    const text = upper ? char : char.toLowerCase()
+    return {
+      label: text,
+      accessibilityLabel: char,
+      onPress: () => {
+        onType(text)
+        setShift(undefined)
+      },
+    }
+  }
+  const shiftKey: Key = {
+    label: "⇧",
+    accessibilityLabel: "Shift",
+    wide: true,
+    active: upper,
+    onPress: () => setShift(!upper),
+  }
   const del: Key = { label: "⌫", accessibilityLabel: "Delete", wide: true, onPress: onDelete }
   const done: Key = {
     label: "Done",
@@ -70,10 +94,11 @@ export function PokemonKeypad({
         ],
       ]
     : [
-        ...LETTERS.map((row, index) => [
-          ...[...row].map(typed),
-          ...(index === LETTERS.length - 1 ? [del] : []),
-        ]),
+        ...LETTERS.map((row, index) =>
+          index === LETTERS.length - 1
+            ? [shiftKey, ...[...row].map(typed), del]
+            : [...row].map(typed),
+        ),
         [
           {
             label: "123",
@@ -96,11 +121,12 @@ export function PokemonKeypad({
               testID={`pokemon-key-${key.accessibilityLabel.toLowerCase().replace(" ", "-")}-seat-${seatNumber}`}
               accessibilityRole="button"
               accessibilityLabel={key.accessibilityLabel}
+              accessibilityState={key.active === undefined ? undefined : { selected: key.active }}
               onPress={key.onPress}
               style={({ pressed: down }) => [
                 keyStyle,
                 key.wide && !digits && $wide,
-                down && pressed,
+                (down || key.active) && pressed,
               ]}
             >
               <Text

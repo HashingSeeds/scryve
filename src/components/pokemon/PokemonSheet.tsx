@@ -174,6 +174,15 @@ export function PokemonSheet({
     else liftSeat()
   }
 
+  function fieldValue(field: Field) {
+    return { query, name: draft.name, hp: draft.hp }[field]
+  }
+
+  // why: keypad edits land at the end, so the caret stays there instead of suggesting a spot mid-text.
+  function caretAtEnd(value: string) {
+    return onKeypad ? { start: value.length, end: value.length } : undefined
+  }
+
   function editField(change: (value: string) => string) {
     const field = keypadField
     if (!field) return
@@ -294,6 +303,7 @@ export function PokemonSheet({
               accessibilityLabel="Search the card catalog"
               placeholder="Search cards"
               value={query}
+              selection={caretAtEnd(query)}
               autoFocus={mode.kind === "place"}
               autoCorrect={false}
               maxLength={120}
@@ -354,6 +364,7 @@ export function PokemonSheet({
                 accessibilityLabel="Pokémon name"
                 placeholder="Name"
                 value={draft.name}
+                selection={caretAtEnd(draft.name)}
                 autoCorrect={false}
                 maxLength={100}
                 showSoftInputOnFocus={!onKeypad}
@@ -368,6 +379,7 @@ export function PokemonSheet({
                 accessibilityLabel="HP"
                 placeholder="HP"
                 value={draft.hp}
+                selection={caretAtEnd(draft.hp)}
                 inputMode="numeric"
                 keyboardType="number-pad"
                 maxLength={3}
@@ -531,6 +543,7 @@ export function PokemonSheet({
               seatNumber={seatNumber}
               ink={ink}
               digitsOnly={keypadField === "hp"}
+              capitalize={fieldValue(keypadField) === ""}
               compact={compact}
               onType={(text) => editField((value) => value + text)}
               onDelete={() => editField((value) => value.slice(0, -1))}
