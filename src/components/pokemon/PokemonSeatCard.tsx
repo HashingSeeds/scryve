@@ -411,7 +411,11 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           size={markSize}
           style={[
             themed($mark),
-            { right: padding + insets.right, bottom: padding + insets.bottom },
+            {
+              right: padding + insets.right,
+              // why: the mark centers on the prize row, so the seat's identity reads as one line with the name beside it.
+              bottom: padding + insets.bottom + (prizeRowHeight - markSize) / 2,
+            },
           ]}
         />
         <View
@@ -585,25 +589,25 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
                 />
               ))}
             </View>
-            <View style={$prizeMeta}>
-              <Text
-                testID={`player-name-seat-${seatNumber}`}
-                text={displayName}
-                size="xxs"
-                numberOfLines={1}
-                style={[{ color: ink }, $dim75]}
-              />
-              {elapsed ? (
-                <Text
-                  text={`Updated ${elapsed} ago`}
-                  size="xxs"
-                  weight="bold"
-                  numberOfLines={1}
-                  style={{ color: ink }}
-                />
-              ) : null}
-            </View>
           </BoardPressable>
+          <View style={[$identity, { marginRight: markSize + spacing.xs }]}>
+            <Text
+              testID={`player-name-seat-${seatNumber}`}
+              text={displayName}
+              size="xxs"
+              numberOfLines={1}
+              style={[{ color: ink }, $dim75]}
+            />
+            {elapsed ? (
+              <Text
+                text={`Updated ${elapsed} ago`}
+                size="xxs"
+                weight="bold"
+                numberOfLines={1}
+                style={{ color: ink }}
+              />
+            ) : null}
+          </View>
         </View>
 
         {asking ? (
@@ -1092,7 +1096,8 @@ const $prizeCount: TextStyle = { fontVariant: ["tabular-nums"], letterSpacing: -
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
-const $prizeMeta: ViewStyle = { flexShrink: 1, minWidth: 0, justifyContent: "flex-end" }
+// why: the name sits with the seat mark, as it does on the commander board, and the prizes keep the other corner.
+const $identity: ViewStyle = { flex: 1, minWidth: 0, alignItems: "flex-end" }
 const $drainTrack: ViewStyle = {
   alignSelf: "stretch",
   height: 2,
@@ -1202,7 +1207,7 @@ const $glyph: ThemedStyle<TextStyle> = () => ({ fontSize: 44, lineHeight: 50, op
 const $compactGlyph: ThemedStyle<TextStyle> = () => ({ fontSize: 30, lineHeight: 34, opacity: 0.6 })
 const $bottomRow: ThemedStyle<ViewStyle> = () => ({
   flexDirection: "row",
-  alignItems: "flex-end",
+  alignItems: "center",
   justifyContent: "flex-start",
 })
 const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
