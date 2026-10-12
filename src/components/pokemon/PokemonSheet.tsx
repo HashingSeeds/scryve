@@ -263,7 +263,9 @@ export function PokemonSheet({
 
   const hits = catalog.hits && catalogRows(catalog.hits)
   const deck = usePokemonDeck(seatDeck)
-  const showSearch = lookupOpen && catalog.available
+  // why: a cached deck is searchable offline; only the catalog part waits for a connection.
+  const searchable = catalog.available || deck.length > 0
+  const showSearch = lookupOpen && searchable
   const wanted = query.trim().toLowerCase()
   const deckHits = lookupOpen ? deck.filter(({ name }) => name.toLowerCase().includes(wanted)) : []
   const inDeck = new Set(deckHits.map(({ cardId }) => cardId))
@@ -420,7 +422,7 @@ export function PokemonSheet({
                 inputWrapperStyle={themed($fieldWrapper)}
                 style={$hpInput}
               />
-              {!showSearch && catalog.available ? (
+              {!showSearch && searchable ? (
                 <BoardPressable
                   testID={`pokemon-lookup-seat-${seatNumber}`}
                   accessibilityRole="button"

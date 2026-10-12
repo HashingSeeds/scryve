@@ -240,9 +240,10 @@ describe("PokemonSheet", () => {
     new DeckVersionCacheRepository("owner-offline", undefined, mockConvex.url).saveCards(
       "version-offline",
       1,
-      [{ name: "Pikachu ex", cardId: "sv08-057", category: "Pokemon", quantity: 2 }],
+      [{ name: "Pikachu ex", cardId: "sv08-057", category: "pokemon", quantity: 2 }],
     )
     render(sheet({ deck: { ownerId: "owner-offline", versionId: "version-offline" } }))
+    expect(screen.getByTestId("pokemon-search-seat-1")).toBeTruthy()
 
     fireEvent.press(screen.getByTestId("pokemon-result-sv08-057"))
     await flush()

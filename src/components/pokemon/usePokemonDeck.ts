@@ -13,7 +13,7 @@ type DeckCard = { category?: string; cardId?: string; name: string; quantity: nu
 export function pokemonDeckRows(cards: readonly DeckCard[]): PokemonDeckRow[] {
   const rows = new Map<string, PokemonDeckRow>()
   for (const card of cards) {
-    if (card.category !== "Pokemon" || !card.cardId) continue
+    if (card.category?.toLowerCase() !== "pokemon" || !card.cardId) continue
     const row = rows.get(card.cardId)
     if (row) row.copies += card.quantity
     else rows.set(card.cardId, { cardId: card.cardId, name: card.name, copies: card.quantity })
