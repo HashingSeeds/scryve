@@ -224,7 +224,6 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId(`pokemon-bench-hp-${benched}`)).toHaveTextContent("240")
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("240")
 
-    // why: the tap restarted the timer, so the Active is still away at the old deadline.
     act(() => void jest.advanceTimersByTime(2_500))
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("240")
     act(() => void jest.advanceTimersByTime(600))
@@ -388,6 +387,37 @@ describe("PokemonSeatCard", () => {
     view.rerender(<Seat harness={table} seat={0} prizes={6} onChangePrizes={onChangePrizes} />)
     fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "longPress")
     expect(onChangePrizes).not.toHaveBeenCalled()
+  })
+
+  it("keeps a bench Pokémon focused while a press on the hero crosses the deadline", () => {
+    jest.useFakeTimers()
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
+    const benched = table.actions.placePokemon(me, "bench", { name: "Pikachu", hp: 60, prizes: 1 })!
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
+    act(() => void jest.advanceTimersByTime(2_800))
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "pressIn")
+    act(() => void jest.advanceTimersByTime(1_000))
+    expect(screen.getByTestId("pokemon-hero-bench-tag-seat-1")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "pressOut")
+    expect(board(table).bench[0].damage).toBe(10)
+    expect(board(table).active?.damage).toBe(0)
+    jest.useRealTimers()
+  })
+
+  it("puts a prize back from a screen reader action or the keyboard", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const onChangePrizes = jest.fn()
+    render(<Seat harness={table} seat={0} prizes={4} onChangePrizes={onChangePrizes} />)
+    const prizes = screen.getByTestId("pokemon-prizes-seat-1")
+
+    fireEvent(prizes, "accessibilityAction", { nativeEvent: { actionName: "longpress" } })
+    fireEvent(prizes, "keyDown", { key: "ArrowUp" })
+    expect(onChangePrizes.mock.calls).toEqual([[1], [1]])
   })
 
   it("keeps a bench Pokémon focused when its chip is tapped again", () => {

@@ -152,6 +152,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const prizeRowHeight = (markArt.bottom - markArt.top) * markScale
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
+  const [focusHeld, setFocusHeld] = useState(false)
   const focusTick = useRef(0)
   const [takerAsk, setTakerAsk] = useState<TakerAsk | null>(null)
   const [knockout, setKnockout] = useState<TableKnockout | null>(null)
@@ -192,10 +193,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   }, [canEdit])
 
   useEffect(() => {
-    if (!focus) return
+    if (!focus || focusHeld) return
     const timer = setTimeout(() => setFocus(null), FOCUS_MS)
     return () => clearTimeout(timer)
-  }, [focus])
+  }, [focus, focusHeld])
 
   const sheetOpen = sheetMode !== null
   useEffect(() => {
@@ -299,6 +300,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     else damage(takerAsk.pokemonId, takerAsk.delta, takerPlayerId)
   }
 
+  function putPrizeBack() {
+    if (prizes < STANDARD_PRIZES) onChangePrizes(1)
+  }
+
   function touchFocus(pokemonId: string) {
     setFocus({ pokemonId, tick: ++focusTick.current })
   }
@@ -309,7 +314,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       table.switchActive(playerId, pokemon.id)
       return
     }
-    // why: a second tap on the focused chip restarts the timer; ending focus there sent the next damage tap to the Active.
     touchFocus(pokemon.id)
   }
 
@@ -494,6 +498,11 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               damage(shown.id, delta)
               if (focused) touchFocus(focused.id)
             }}
+            // why: expiring mid-press remounts the hero and drops the press, so a held tap or long press would never land.
+            onHoldChange={(held) => {
+              setFocusHeld(held)
+              if (!held && focused) touchFocus(focused.id)
+            }}
             onEdit={() =>
               openSheet(
                 { kind: "edit", pokemonId: shown.id },
@@ -566,8 +575,16 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             }
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
+            accessibilityActions={[{ name: "longpress", label: "Put a prize back" }]}
+            onAccessibilityAction={({ nativeEvent }) => {
+              if (nativeEvent.actionName === "longpress") putPrizeBack()
+            }}
+            // why: React Native Web never fires long press from the keyboard, so keyboard players put a prize back with + or the up arrow.
+            onKeyDown={(event) => {
+              if (event.key === "+" || event.key === "=" || event.key === "ArrowUp") putPrizeBack()
+            }}
             onPress={() => prizes > 0 && onChangePrizes(-1)}
-            onLongPress={() => prizes < STANDARD_PRIZES && onChangePrizes(1)}
+            onLongPress={putPrizeBack}
             style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
           >
             <View
@@ -756,6 +773,7 @@ function PokemonHero({
   bench,
   onDamage,
   onEdit,
+  onHoldChange,
 }: {
   identity: string
   seatNumber: number
@@ -769,6 +787,7 @@ function PokemonHero({
   bench?: BenchFocus
   onDamage: (delta: number) => void
   onEdit: () => void
+  onHoldChange: (held: boolean) => void
 }) {
   const { themed } = useAppTheme()
   const remaining = remainingHp(pokemon)
@@ -809,7 +828,9 @@ function PokemonHero({
                 delayLongPress={LONG_PRESS_MS}
                 onPressIn={() => {
                   longPressHandled.current = null
+                  onHoldChange(true)
                 }}
+                onPressOut={() => onHoldChange(false)}
                 onLongPress={() => {
                   longPressHandled.current = direction
                   onEdit()

@@ -19,18 +19,12 @@ export function hitDetail(hit: PokemonSearchHit): string | undefined {
   )
 }
 
-function standardLegal(hit: PokemonSearchHit) {
-  return hit.facets.some(({ key, value }) => key === "standardLegal" && value === "true")
-}
-
 export function catalogRows(hits: readonly PokemonSearchHit[]): PokemonSearchHit[] {
   const seen = new Set<string>()
-  return [...hits]
-    .sort((a, b) => Number(standardLegal(b)) - Number(standardLegal(a)))
-    .filter((hit) => {
-      const row = `${hit.name}\n${hitDetail(hit) ?? ""}`
-      if (seen.has(row)) return false
-      seen.add(row)
-      return true
-    })
+  return hits.filter((hit) => {
+    const row = `${hit.name}\n${hitDetail(hit) ?? ""}`
+    if (seen.has(row)) return false
+    seen.add(row)
+    return true
+  })
 }

@@ -22,21 +22,6 @@ describe("pokemonPrintingLabel", () => {
 })
 
 describe("catalogRows", () => {
-  it("lists Standard-legal printings first and keeps the rest in order", () => {
-    const rows = catalogRows([
-      hit("basep-1"),
-      hit("sv08.5-028", "Pikachu", [{ key: "standardLegal", value: "true" }]),
-      hit("tk-hs-r-2"),
-      hit("sv03-125", "Charizard ex", [{ key: "standardLegal", value: "true" }]),
-    ])
-    expect(rows.map(({ cardId }) => cardId)).toEqual([
-      "sv08.5-028",
-      "sv03-125",
-      "basep-1",
-      "tk-hs-r-2",
-    ])
-  })
-
   it("drops a row that would read the same as one already shown", () => {
     const rows = catalogRows([hit("sv03-125"), hit("sv03-125"), hit("sv03-125", "Charizard ex")])
     expect(rows.map((row) => `${row.name} ${hitDetail(row)}`)).toEqual([
