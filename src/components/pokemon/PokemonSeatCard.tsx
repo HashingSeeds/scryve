@@ -83,12 +83,8 @@ const FOCUS_MS = 3_000
 const STANDARD_PRIZES = 6
 const BENCH_HEIGHT = 56
 const COMPACT_BENCH_HEIGHT = 44
-const PRIZE_ROW_HEIGHT = 60
-const COMPACT_PRIZE_ROW_HEIGHT = 40
-const PRIZE_COUNT_SIZE = 46
-const COMPACT_PRIZE_COUNT_SIZE = 28
-const PRIZE_PIP = { width: 13, height: 17, gap: 3 }
-const COMPACT_PRIZE_PIP = { width: 9, height: 12, gap: 2 }
+// why: a prize pip keeps a card's 13:17 shape.
+const PRIZE_PIP_ASPECT = 13 / 17
 const HERO_CAPTION_HEIGHT = 44
 const COMPACT_HERO_CAPTION_HEIGHT = 24
 const CRAMPED_CONTENT_HEIGHT = 260
@@ -153,8 +149,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const chipClearance = diceChips?.length
     ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
     : 0
-  const prizeRowHeight = cramped ? COMPACT_PRIZE_ROW_HEIGHT : PRIZE_ROW_HEIGHT
   const markSize = cramped ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
+  // why: the prize grid stands as tall as the seat mark across from it, so the bottom row reads as one band.
+  const prizeRowHeight = markSize
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const focusTick = useRef(0)
@@ -348,8 +345,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     fontScale: 1,
   })
   const prizePips = Math.max(STANDARD_PRIZES, prizes)
-  const pip = cramped ? COMPACT_PRIZE_PIP : PRIZE_PIP
-  const prizeCountSize = cramped ? COMPACT_PRIZE_COUNT_SIZE : PRIZE_COUNT_SIZE
+  const pipGap = cramped ? 2 : 3
+  const pipHeight = (prizeRowHeight - pipGap * 2) / 3
+  const pip = { width: pipHeight * PRIZE_PIP_ASPECT, height: pipHeight, gap: pipGap }
   const tint = (alpha: number) => overlayTint(ink, alpha)
   const bar = [
     themed($bar),
@@ -544,7 +542,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           </BoardPressable>
         )}
 
-        {/* why: prizes are the score, so the count is big enough to read across the table and the pips sit two by three like the cards do. */}
+        {/* why: prizes are the score; the pips sit two by three like the cards do, so the count reads at a glance without a number. */}
         <View style={[themed($bottomRow), { height: prizeRowHeight }]}>
           <View style={[$identity, { marginLeft: markSize + spacing.xs }]}>
             <Text
@@ -578,16 +576,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             onLongPress={() => prizes < STANDARD_PRIZES && onChangePrizes(1)}
             style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
           >
-            <Text
-              testID={`pokemon-prize-count-seat-${seatNumber}`}
-              text={String(prizes)}
-              weight="bold"
-              maxFontSizeMultiplier={1.2}
-              style={[
-                $prizeCount,
-                { fontSize: prizeCountSize, lineHeight: prizeCountSize, color: ink },
-              ]}
-            />
             <View
               style={[$prizeGrid, { width: pip.width * 2 + pip.gap, gap: pip.gap }]}
               accessibilityElementsHidden
@@ -1092,7 +1080,6 @@ const $chipPips: ViewStyle = {
 }
 const $chipPip: ViewStyle = { width: 5, height: 7, borderRadius: 1, opacity: 0.8 }
 const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 3, opacity: 0.85 }
-const $prizeCount: TextStyle = { fontVariant: ["tabular-nums"], letterSpacing: -1 }
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
@@ -1217,8 +1204,6 @@ const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xs,
   paddingVertical: spacing.xxs,
   borderRadius: 12,
-  marginRight: -spacing.xs,
-  marginBottom: -spacing.xxs,
   maxWidth: "100%",
 })
 const $bar: ThemedStyle<ViewStyle> = ({ spacing }) => ({

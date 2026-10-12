@@ -367,7 +367,7 @@ describe("PokemonSeatCard", () => {
     const onChangePrizes = jest.fn()
     render(<Seat harness={table} seat={0} prizes={4} onChangePrizes={onChangePrizes} />)
 
-    expect(screen.getByTestId("pokemon-prize-count-seat-1")).toHaveTextContent("4")
+    expect(screen.getByLabelText("Seat 1, Ada, 4 Prize cards")).toBeTruthy()
     expect(
       screen.getAllByTestId(/^pokemon-prize-pip-\d-seat-1$/, { includeHiddenElements: true }),
     ).toHaveLength(6)
