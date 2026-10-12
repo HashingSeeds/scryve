@@ -22,10 +22,13 @@ const NATIVE_DIRS = new Set([
 ])
 const NATIVE_FILES = new Set(["app.plugin.js", "react-native.config.js"])
 const JS_SOURCE = /\.(?:[cm]?[jt]s|[jt]sx)$/
+// why: codegen turns spec files into native code; this is the name filter @react-native/codegen applies.
+const CODEGEN_SPEC = /^(Native.+|.+NativeComponent)/
 
 const touchesNative = (file) =>
   !JS_SOURCE.test(file) ||
   NATIVE_FILES.has(path.posix.basename(file)) ||
+  CODEGEN_SPEC.test(path.posix.basename(file)) ||
   file.split("/").some((segment) => NATIVE_DIRS.has(segment))
 
 for (const file of fs.readdirSync(patchDir).filter((name) => name.endsWith(".patch"))) {
