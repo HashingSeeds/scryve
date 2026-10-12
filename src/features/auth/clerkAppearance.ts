@@ -1,4 +1,5 @@
 import type { Theme } from "@/theme/types"
+import { typography } from "@/theme/typography"
 
 export function getClerkAppearance({ colors }: Theme) {
   return {
@@ -16,8 +17,8 @@ export function getClerkAppearance({ colors }: Theme) {
       colorRing: colors.tint,
       colorShadow: colors.shadow,
       colorModalBackdrop: colors.overlay,
-      fontFamily: "spaceGroteskRegular, system-ui, sans-serif",
-      fontFamilyButtons: "spaceGroteskSemiBold, system-ui, sans-serif",
+      fontFamily: `${typography.primary.normal}, system-ui, sans-serif`,
+      fontFamilyButtons: `${typography.primary.semiBold}, system-ui, sans-serif`,
       borderRadius: "8px",
       fontSize: "0.95rem",
     },

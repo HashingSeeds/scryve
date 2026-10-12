@@ -5,6 +5,7 @@ import { objectRecord, stringValue } from "./games/cards"
 import { pokemonImageCandidates } from "./games/pokemon"
 import { cardsByYgoIds } from "./games/yugioh"
 import { SCRYFALL_RATE_LIMIT_BLOCK_MS, fetchScryfall, normalizeScryfallCard } from "./scryfall"
+import { SYSTEMS, type CatalogProvider, type SystemId } from "./systems"
 
 function scryfallLookupError(status: number, cardId: string, lookup: "Card" | "Printing"): never {
   if (status === 429)
@@ -19,17 +20,30 @@ function scryfallLookupError(status: number, cardId: string, lookup: "Card" | "P
   })
 }
 
-export async function cardImageCandidates(ctx: ActionCtx, game: string, cardId: string) {
-  if (game === "pokemon") return await pokemonImageCandidates(ctx, cardId)
-  if (game === "ygo") {
-    if (cardId.startsWith("rush:")) return []
-    const result = await cardsByYgoIds(ctx, [cardId])
-    return result.cards
-      .flatMap((card) =>
-        card.printings.flatMap((printing) => printing.faces.flatMap((face) => face.imageUrl ?? [])),
-      )
-      .slice(0, 8)
-  }
+export async function cardImageCandidates(ctx: ActionCtx, game: SystemId, cardId: string) {
+  return await catalogImageCandidates[SYSTEMS[game].integration.capabilities.cardCatalog.provider](
+    ctx,
+    cardId,
+  )
+}
+
+const catalogImageCandidates = {
+  tcgdex: pokemonImageCandidates,
+  ygoprodeck: ygoprodeckImageCandidates,
+  scryfall: scryfallImageCandidates,
+} satisfies Record<CatalogProvider, (ctx: ActionCtx, cardId: string) => Promise<string[]>>
+
+async function ygoprodeckImageCandidates(ctx: ActionCtx, cardId: string) {
+  if (cardId.startsWith("rush:")) return []
+  const result = await cardsByYgoIds(ctx, [cardId])
+  return result.cards
+    .flatMap((card) =>
+      card.printings.flatMap((printing) => printing.faces.flatMap((face) => face.imageUrl ?? [])),
+    )
+    .slice(0, 8)
+}
+
+async function scryfallImageCandidates(ctx: ActionCtx, cardId: string) {
   const original = await fetchScryfall(ctx, `/cards/${encodeURIComponent(cardId)}`)
   if (!original.ok) scryfallLookupError(original.status, cardId, "Card")
   const card = objectRecord(await original.json())

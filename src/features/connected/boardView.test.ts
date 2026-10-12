@@ -18,6 +18,7 @@ function projection(
     eventSequence: lives[0] + lives[1],
     serverUpdatedAt: lives[0] * 1000,
     recentOperationIds: [`operation-${lives[0]}`],
+    table: { designations: {}, players: {} },
     players: lives.map((life, index) => ({
       playerId: `player-${index + 1}`,
       seat: index + 1,

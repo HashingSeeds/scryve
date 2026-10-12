@@ -42,7 +42,13 @@ const subscribe = (listener: () => void) => {
 }
 function publish(key: string, value: Fallback) {
   fallbacks.set(key, value)
-  if (fallbacks.size > 200) fallbacks.delete(fallbacks.keys().next().value!)
+  // why: a mounted card recreates an evicted live entry, which would evict another card's, looping forever.
+  if (fallbacks.size > 200) {
+    const now = Date.now()
+    fallbacks.forEach((entry, cached) => {
+      if (entry.expiresAt <= now) fallbacks.delete(cached)
+    })
+  }
   listeners.forEach((listener) => listener())
 }
 

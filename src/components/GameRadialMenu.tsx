@@ -23,6 +23,7 @@ import { useAppTheme } from "@/theme/context"
 import type { GameMenuActionKind } from "@/theme/gameMenu"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
+import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import {
   motionDuration,
   useReducedMotion,
@@ -30,22 +31,38 @@ import {
 } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { DiceGlyph } from "./DiceGlyph"
 import {
   DEFAULT_MENU_BUTTON_STYLE,
   GameMenuButtonShape,
   type MenuButtonStyle,
+  mixColorsInLinearLight,
   PENTAGON_BADGE_ANCHOR,
 } from "./GameMenuButtonShape"
+import { PlayerMark } from "./PlayerMark"
 import { Text } from "./Text"
+import type { PlayerMarkShape } from "../../convex/lib/appearance"
 
-export interface RadialMenuAction {
+export interface RadialMenuTool {
+  key: string
+  label: string
+  accessibilityLabel: string
+  selected?: boolean
+  dimmed?: boolean
+  onPress: () => void
+}
+
+/** why: an action is a plain pill, or a pill holding two round tools: `tools[0]` sits in the end nearer the pentagon and the other rolls out from under it as the pill lands. */
+export type RadialMenuAction = {
   kind: GameMenuActionKind
   label: string
   detail?: string
   disabled?: boolean
   blocked?: boolean
-  onPress: (event?: GestureResponderEvent) => void
-}
+} & (
+  | { onPress: (event?: GestureResponderEvent) => void; tools?: undefined }
+  | { tools: readonly RadialMenuTool[]; onPress?: undefined }
+)
 
 export type GameMenuSignalTone = "slow" | "offline" | "catchingUp" | "caughtUp" | "attention"
 
@@ -58,6 +75,14 @@ export interface GameMenuSignal {
 export interface GameMenuStatusLine {
   text: string
   tone: GameMenuSignalTone
+  onPress: () => void
+}
+
+/** why: a one-tap offer that sits on the pentagon's upper corner while it applies, such as rolling for who goes first. */
+export interface GameMenuBadge {
+  color: string
+  glyph: { tool: "d20" | "coin" } | { seatNumber: number; shape?: PlayerMarkShape }
+  accessibilityLabel: string
   onPress: () => void
 }
 
@@ -75,6 +100,9 @@ export interface GameRadialMenuProps {
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
+  // why: this action stays out after the menu closes, so its tools keep working once the backdrop lifts and the seats are live.
+  heldAction?: GameMenuActionKind
+  badge?: GameMenuBadge
 }
 
 export interface RadialActionPose {
@@ -93,6 +121,31 @@ export const PENTAGON_OPEN_ROTATION_DEG = 360 / PENTAGON_SIDES / 2
 
 const ACTION_WIDTH = 116
 const ACTION_HEIGHT = 52
+
+const TOOL_SIZE = 44
+const TOOL_RADIUS = TOOL_SIZE / 2
+// why: the same inset on every side keeps each tool concentric with the pill's end cap.
+const TOOL_INSET = (ACTION_HEIGHT - TOOL_SIZE) / 2
+const TOOL_OFFSET = ACTION_WIDTH / 2 - TOOL_INSET - TOOL_RADIUS
+const TOOL_TINT = 0.45
+const BADGE_SIZE = 28
+const BADGE_POP_DELAY_MS = 260
+// why: the offer badge is larger than the sync badge, so it sits further up its edge to read as equally high; measured on the pentagon's own geometry here so the sync anchor can change on its own.
+const START_BADGE_SHARE_OF_EDGE = 0.4
+const PENTAGON_CIRCUMRADIUS = 0.46
+function pentagonCorner(angleDeg: number) {
+  const angle = (angleDeg * Math.PI) / 180
+  return {
+    x: 0.5 + PENTAGON_CIRCUMRADIUS * Math.cos(angle),
+    y: 0.5 + PENTAGON_CIRCUMRADIUS * Math.sin(angle),
+  }
+}
+const PENTAGON_APEX = pentagonCorner(-90)
+const PENTAGON_UPPER_LEFT = pentagonCorner(-90 - 360 / PENTAGON_SIDES)
+const START_BADGE_ANCHOR = {
+  x: PENTAGON_UPPER_LEFT.x + START_BADGE_SHARE_OF_EDGE * (PENTAGON_APEX.x - PENTAGON_UPPER_LEFT.x),
+  y: PENTAGON_UPPER_LEFT.y + START_BADGE_SHARE_OF_EDGE * (PENTAGON_APEX.y - PENTAGON_UPPER_LEFT.y),
+}
 
 const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
 const STATUS_LINE_DISTANCE = 128
@@ -118,6 +171,10 @@ const POP_EASING = Easing.inOut(Easing.quad)
 const GATED_MOTION = ReduceMotion.Never
 const BADGE_ENTERING = ZoomIn.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
 const BADGE_EXITING = ZoomOut.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
+// why: the offer pops in after the board has dealt in, so it reads as an invitation rather than part of the button.
+const START_BADGE_ENTERING = ZoomIn.delay(BADGE_POP_DELAY_MS)
+  .duration(SIGNAL_BADGE_SCALE_MS)
+  .reduceMotion(GATED_MOTION)
 const PENTAGON_SPIN_SPRING = {
   damping: 18,
   stiffness: 220,
@@ -183,6 +240,19 @@ export function getRadialActionStart(pose: { x: number; y: number }): { x: numbe
   }
 }
 
+export function getRadialToolOffsets(
+  pose: Pick<RadialActionPose, "x" | "y" | "rotationDeg">,
+): readonly [number, number] {
+  const angle = (pose.rotationDeg * Math.PI) / 180
+  const plusEnd = {
+    x: pose.x + TOOL_OFFSET * Math.cos(angle),
+    y: pose.y + TOOL_OFFSET * Math.sin(angle),
+  }
+  const plusEndIsNearerThePentagon = Math.hypot(plusEnd.x, plusEnd.y) < Math.hypot(pose.x, pose.y)
+  const inner = plusEndIsNearerThePentagon ? TOOL_OFFSET : -TOOL_OFFSET
+  return [inner, -inner]
+}
+
 export const GameRadialMenu = memo(function GameRadialMenu({
   open,
   anchor,
@@ -197,6 +267,8 @@ export const GameRadialMenu = memo(function GameRadialMenu({
   exitAction,
   signal,
   statusLine,
+  heldAction,
+  badge,
 }: GameRadialMenuProps) {
   const { themed } = useAppTheme()
   const menuOpen = open && !exitAction
@@ -215,6 +287,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
       <GameMenuBackdrop open={menuOpen} onClose={onClose} />
       <GameRadialFan
         open={menuOpen}
+        heldAction={heldAction}
         anchor={anchor}
         anchorStyle={[anchorStyle, nativeAnchorStyle]}
         actions={actions}
@@ -228,6 +301,7 @@ export const GameRadialMenu = memo(function GameRadialMenu({
         seatColors={seatColors}
         exitAction={exitAction}
         signal={signal}
+        badge={badge}
         onToggle={onToggle}
       />
 
@@ -292,6 +366,7 @@ function percentAnchorStyle(anchor: { x: number; y: number }): ViewStyle {
 
 export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { themed } = useAppTheme()
+  useCloseOnBack(open, onClose)
   if (!open) return null
   return (
     <BoardPressable
@@ -306,12 +381,14 @@ export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: ()
 
 function GameRadialFan({
   open,
+  heldAction,
   anchor,
   anchorStyle = percentAnchorStyle(anchor),
   actions,
   poseTurnMs = 0,
 }: {
   open: boolean
+  heldAction?: GameMenuActionKind
   anchor: { x: number; y: number }
   anchorStyle?: AnchorStyle
   actions: readonly RadialMenuAction[]
@@ -328,7 +405,7 @@ function GameRadialFan({
           anchorStyle={anchorStyle}
           pose={poses[index]}
           reducedMotion={reducedMotion}
-          open={open}
+          open={open || action.kind === heldAction}
           poseTurnMs={poseTurnMs}
         />
       ))}
@@ -348,6 +425,7 @@ type GameMenuAnchorProps = {
   seatColors?: readonly string[]
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
+  badge?: GameMenuBadge
   onToggle: () => void
 }
 
@@ -358,6 +436,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle,
   actions,
   statusLine,
+  heldAction,
   ...anchorProps
 }: Omit<GameMenuAnchorProps, "anchorStyle"> & {
   holderAnchor: { x: number; y: number }
@@ -365,6 +444,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
   facingAngle: number
   actions: readonly RadialMenuAction[]
   statusLine?: GameMenuStatusLine
+  heldAction?: GameMenuActionKind
 }) {
   const menuOpen = anchorProps.open && !anchorProps.exitAction
   const reducedMotion = useReducedMotion()
@@ -388,6 +468,7 @@ export const GameMenuCluster = memo(function GameMenuCluster({
     >
       <GameRadialFan
         open={menuOpen}
+        heldAction={heldAction}
         anchor={holderAnchor}
         anchorStyle={$clusterCenter}
         actions={actions}
@@ -417,6 +498,7 @@ function GameMenuAnchor({
   seatColors,
   exitAction,
   signal,
+  badge,
   onToggle,
 }: GameMenuAnchorProps) {
   const {
@@ -427,6 +509,7 @@ function GameMenuAnchor({
   const animateFully = reducedMotion === false
   const suppressed = !!exitAction
   const menuOpen = open && !suppressed
+  useCloseOnBack(suppressed, () => exitAction?.onPress())
   const pentagonRotation = useSharedValue(
     menuOpen ? PENTAGON_OPEN_ROTATION_DEG : suppressed ? -PENTAGON_OPEN_ROTATION_DEG : 0,
   )
@@ -541,6 +624,42 @@ function GameMenuAnchor({
                 { color: accessibleForeground(colors.gameMenu.signal[signal.tone]) },
               ]}
             />
+          </Animated.View>
+        </View>
+      ) : null}
+      {badge && !menuOpen && !suppressed ? (
+        <View
+          pointerEvents="box-none"
+          style={compact ? $compactStartBadgeCenter : $largeStartBadgeCenter}
+        >
+          <Animated.View entering={animateFully ? START_BADGE_ENTERING : undefined}>
+            <BoardPressable
+              testID="first-player-badge"
+              accessibilityRole="button"
+              accessibilityLabel={badge.accessibilityLabel}
+              hitSlop={9}
+              onPress={badge.onPress}
+              style={({ pressed }) => [
+                themed($startBadge),
+                { backgroundColor: badge.color },
+                pressed && themed($pressedAction),
+              ]}
+            >
+              {"tool" in badge.glyph ? (
+                <DiceGlyph
+                  tool={badge.glyph.tool}
+                  size={15}
+                  color={accessibleForeground(badge.color)}
+                />
+              ) : (
+                <PlayerMark
+                  seatNumber={badge.glyph.seatNumber}
+                  shape={badge.glyph.shape}
+                  color={accessibleForeground(badge.color)}
+                  size={15}
+                />
+              )}
+            </BoardPressable>
           </Animated.View>
         </View>
       ) : null}
@@ -690,15 +809,41 @@ function RadialAction({
     }
   })
 
+  if (action.tools) {
+    return (
+      <Animated.View
+        style={[themed($actionAnchor), anchorStyle, animatedStyle]}
+        pointerEvents={open ? "box-none" : "none"}
+        aria-hidden={!open}
+        accessibilityElementsHidden={!open}
+        importantForAccessibility={open ? "auto" : "no-hide-descendants"}
+      >
+        <View pointerEvents="box-none" style={[themed($action), { backgroundColor: background }]}>
+          <RadialToolRow
+            kind={action.kind}
+            tools={action.tools}
+            pose={pose}
+            open={open}
+            background={background}
+          />
+        </View>
+      </Animated.View>
+    )
+  }
+
   return (
     <Animated.View
       style={[themed($actionAnchor), anchorStyle, animatedStyle]}
       pointerEvents={open ? "auto" : "none"}
       aria-hidden={!open}
+      accessibilityElementsHidden={!open}
+      importantForAccessibility={open ? "auto" : "no-hide-descendants"}
     >
       <BoardPressable
         testID={open ? `${action.kind}-button` : undefined}
-        disabled={action.disabled}
+        // why: a hidden action stays mounted, so it must leave the tab order or a keyboard could fire it unseen on web.
+        disabled={action.disabled || !open}
+        tabIndex={open ? undefined : -1}
         accessibilityRole="button"
         accessibilityLabel={action.detail ? `${action.label}, ${action.detail}` : action.label}
         accessibilityState={{ disabled: !!action.disabled }}
@@ -728,6 +873,87 @@ function RadialAction({
         ) : null}
       </BoardPressable>
     </Animated.View>
+  )
+}
+
+function RadialToolRow({
+  kind,
+  tools,
+  pose,
+  open,
+  background,
+}: {
+  kind: GameMenuActionKind
+  tools: readonly RadialMenuTool[]
+  pose: RadialActionPose
+  open: boolean
+  background: string
+}) {
+  const offsets = getRadialToolOffsets(pose)
+  return (
+    <>
+      {tools.slice(0, offsets.length).map((tool, index) => (
+        <RadialTool
+          key={tool.key}
+          testID={open ? `${kind}-${tool.key}` : undefined}
+          open={open}
+          tool={tool}
+          left={ACTION_WIDTH / 2 + offsets[index] - TOOL_RADIUS}
+          background={background}
+        />
+      ))}
+    </>
+  )
+}
+
+function RadialTool({
+  testID,
+  open,
+  tool,
+  left,
+  background,
+}: {
+  testID?: string
+  open: boolean
+  tool: RadialMenuTool
+  left: number
+  background: string
+}) {
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
+  const fill = tool.selected
+    ? colors.gameMenu.anchorGlyph
+    : mixColorsInLinearLight(background, "#FFFFFF", TOOL_TINT)
+  const foreground = accessibleForeground(fill)
+
+  return (
+    <View style={[$toolSlot, { left }]}>
+      <BoardPressable
+        testID={testID}
+        disabled={!open}
+        tabIndex={open ? undefined : -1}
+        accessibilityRole="button"
+        accessibilityLabel={tool.accessibilityLabel}
+        accessibilityState={tool.selected === undefined ? undefined : { selected: tool.selected }}
+        style={({ pressed }) => [
+          $tool,
+          { backgroundColor: fill },
+          tool.dimmed && $dimmedTool,
+          pressed && themed($pressedAction),
+        ]}
+        onPress={tool.onPress}
+      >
+        <Text
+          text={tool.label}
+          weight="bold"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.2}
+          style={[$toolText, { color: foreground }]}
+        />
+      </BoardPressable>
+    </View>
   )
 }
 
@@ -814,6 +1040,20 @@ const $actionDetail: ThemedStyle<TextStyle> = () => ({
   lineHeight: 12,
   textAlign: "center",
 })
+const $toolSlot: ViewStyle = {
+  position: "absolute",
+  top: TOOL_INSET,
+  width: TOOL_SIZE,
+  height: TOOL_SIZE,
+}
+const $tool: ViewStyle = {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: TOOL_RADIUS,
+}
+const $toolText: TextStyle = { fontSize: 14, lineHeight: 18, letterSpacing: 0.2 }
+const $dimmedTool: ViewStyle = { opacity: 0.45 }
 const SIGNAL_BADGE_SIZE = 22
 // why: a zero-size box at the anchor centers the badge on its real width, so "100" sits where "1" does.
 const $signalBadgeCenter: ViewStyle = {
@@ -831,6 +1071,33 @@ function signalBadgeAt(buttonSize: number): ViewStyle {
 }
 const $largeSignalBadgeCenter = signalBadgeAt(MENU_BUTTON_SIZE)
 const $compactSignalBadgeCenter = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
+// why: the offer takes the upper-left edge, opposite the sync badge, so the two never share a spot.
+// why: the badge has a fixed size, so it is centered on its anchor by offsetting half its size rather than by flex centering in a zero-size box, which iOS left hanging half a badge low.
+function startBadgeAt(buttonSize: number): ViewStyle {
+  return {
+    position: "absolute",
+    left: START_BADGE_ANCHOR.x * buttonSize - BADGE_SIZE / 2,
+    top: START_BADGE_ANCHOR.y * buttonSize - BADGE_SIZE / 2,
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+  }
+}
+const $largeStartBadgeCenter = startBadgeAt(MENU_BUTTON_SIZE)
+const $compactStartBadgeCenter = startBadgeAt(COMPACT_MENU_BUTTON_SIZE)
+const $startBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  width: BADGE_SIZE,
+  height: BADGE_SIZE,
+  borderRadius: BADGE_SIZE / 2,
+  borderWidth: 2.5,
+  borderColor: colors.gameMenu.anchorBorder,
+  alignItems: "center",
+  justifyContent: "center",
+  shadowColor: colors.gameMenu.shadow,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.45,
+  shadowRadius: 4,
+  elevation: 6,
+})
 const $signalBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
   minWidth: SIGNAL_BADGE_SIZE,
   height: SIGNAL_BADGE_SIZE,

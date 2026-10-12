@@ -20,6 +20,8 @@ import {
   meSeatOf,
   reduceGameEvent,
   validatePlayerNames,
+  restartMatchGame,
+  soleLoserSeat,
 } from "./domain"
 import type { CommandContext, GameEvent, LifeDelta, LocalGame } from "./types"
 
@@ -479,5 +481,62 @@ describe("local game account", () => {
       deckName: "Atraxa",
     })
     expect(rematch.players[1].id).not.toBe(seated.players[1].id)
+  })
+})
+
+describe("soleLoserSeat", () => {
+  const game = createLocalGame({
+    players: [
+      { name: "Ada", color: "#41476E" },
+      { name: "Grace", color: "#39755C" },
+      { name: "Katherine", color: "#7B5A91" },
+    ],
+    startingLife: 20,
+    now: 1,
+  })
+  const [ada, grace] = game.players
+
+  it("names the one seat that lost, and nobody for a draw, several losers, or an unfinished game", () => {
+    expect(
+      soleLoserSeat({ ...game, result: { kind: "win", winnerPlayerIds: [ada.id, grace.id] } }),
+    ).toBe(2)
+    expect(
+      soleLoserSeat({ ...game, result: { kind: "win", winnerPlayerIds: [ada.id] } }),
+    ).toBeUndefined()
+    expect(soleLoserSeat({ ...game, result: { kind: "draw" } })).toBeUndefined()
+    expect(soleLoserSeat(game)).toBeUndefined()
+  })
+})
+
+describe("first chooser on a rematch", () => {
+  const finished = {
+    ...createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 20,
+      now: 1,
+      match: { bestOf: 3 },
+    }),
+    status: "finished" as const,
+  }
+
+  it("hands the loser the first choice, keeps it through a restart, and reopens the offer", () => {
+    const won = {
+      ...finished,
+      result: { kind: "win" as const, winnerPlayerIds: [finished.players[0].id] },
+    }
+    const next = createRematch(won)
+    expect(next.firstChooserSeat).toBe(1)
+    expect(next.firstPlayerOffered).toBeUndefined()
+    expect(
+      createRematch({ ...finished, result: { kind: "draw" } }).firstChooserSeat,
+    ).toBeUndefined()
+
+    const restarted = restartMatchGame({ ...next, firstPlayerOffered: true })
+    expect(restarted.firstChooserSeat).toBe(1)
+    expect(restarted.firstPlayerOffered).toBeUndefined()
+    expect(restarted.match).toEqual(next.match)
   })
 })

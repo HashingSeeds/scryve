@@ -6,15 +6,18 @@ import {
   DeckVersionWriteRepository,
   DECK_VERSION_CONFLICT_REASON,
   DECK_VERSION_QUEUE_CONFLICT_REASON,
+  DECK_VERSION_REJECTED_REASON,
   DeckVersionWriteController,
   getDeckVersionWriteController,
   type PendingVersionWrite,
+  type VersionCardPayload,
 } from "./decksVersionWrites"
 import { api } from "../../../convex/_generated/api"
 import type { Id } from "../../../convex/_generated/dataModel"
 import { MAX_DECK_CARDS } from "../../../convex/lib/policy"
 import schema from "../../../convex/schema"
-import type { DurableStringStorage } from "../sync/durableOutbox"
+import { makeConvexTest, type ConvexTestHarness } from "../../../test/convexTest"
+import { setOutboxWriter, type DurableStringStorage } from "../sync/durableOutbox"
 
 const modules = {
   "./_generated/api.ts": async () => jest.requireActual("../../../convex/_generated/api"),
@@ -82,6 +85,32 @@ const versionSnapshot = (revision: number) => ({
 })
 
 const flush = () => new Promise(setImmediate)
+
+const solRing = {
+  name: "Sol Ring",
+  quantity: 1,
+  oracleId: "11111111-1111-4111-8111-111111111111",
+  scryfallId: "22222222-2222-4222-8222-222222222222",
+}
+
+async function seedVersion(actor: ReturnType<ConvexTestHarness["withIdentity"]>, name: string) {
+  const id = await actor.mutation(api.decks.create, { name, format: "commander" })
+  await actor.mutation(api.decks.saveVersion, { deckId: id, cards: [solRing] })
+  const page = await actor.query(api.decks.versionsPull, {
+    deckId: id,
+    paginationOpts: { numItems: 100, cursor: null },
+  })
+  return page.page[0]
+}
+
+function convexTestClient(actor: ReturnType<ConvexTestHarness["withIdentity"]>) {
+  return {
+    mutation: (
+      reference: typeof api.decks.syncVersionWrite,
+      args: Parameters<typeof actor.mutation>[1],
+    ) => actor.mutation(reference, args),
+  } as unknown as ConvexReactClient
+}
 
 describe("deck version card writes", () => {
   it("keeps pending and failed card writes inside their account and Convex deployment", async () => {
@@ -695,6 +724,49 @@ describe("deck version card writes", () => {
     stopSession()
   })
 
+  it("sends every lifecycle op without the stored writer provenance", async () => {
+    const local = new MemoryStorage()
+    const repository = new DeckVersionWriteRepository("owner", local)
+    setOutboxWriter({ app: "1.4.0", update: "update-a", runtime: "runtime-1" })
+    const ops: Array<Pick<PendingVersionWrite, "op" | "name">> = [
+      { op: "create", name: "Sideboard" },
+      { op: "cards" },
+      { op: "rename", name: "Renamed" },
+      { op: "delete" },
+    ]
+    for (const [index, extra] of ops.entries())
+      repository.enqueue({
+        ...pendingWrite(),
+        ...extra,
+        versionId: `version-${extra.op}` as Id<"deckVersions">,
+        operationId: `aaaaaaaa-aaaa-4aaa-8aaa-00000000000${index}`,
+      })
+    setOutboxWriter(undefined)
+    expect(
+      [...local.values.values()].filter((value) => value.includes('"writtenBy"')),
+    ).toHaveLength(ops.length)
+    const mutation = jest.fn(async (_reference: unknown, args: { versionId?: string }) => ({
+      ...versionSnapshot(1),
+      versionId: args.versionId ?? versionId,
+    }))
+    const controller = new DeckVersionWriteController(
+      { mutation } as unknown as ConvexReactClient,
+      repository,
+    )
+
+    const stop = controller.start()
+    await flush()
+    stop()
+
+    expect(mutation.mock.calls.map(([reference]) => reference)).toEqual([
+      api.decks.syncCreateVersion,
+      api.decks.syncVersionWrite,
+      api.decks.syncUpdateVersion,
+      api.decks.syncDeleteVersion,
+    ])
+    for (const [, args] of mutation.mock.calls) expect(args).not.toHaveProperty("writtenBy")
+  })
+
   it("scopes default write controllers to the client's deployment URL", () => {
     const client = (url: string) =>
       ({
@@ -714,5 +786,68 @@ describe("deck version card writes", () => {
         "factory-write-owner",
       ).getSnapshot().pending,
     ).toEqual([])
+  })
+  it("drops card fields the server doesn't know before syncing a queued write", async () => {
+    const t = makeConvexTest()
+    const actor = t.withIdentity({ subject: "owner" })
+    await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
+    const version = await seedVersion(actor, "Original")
+    const local = new MemoryStorage()
+    const cardFromAnotherBuild = { ...solRing, quantity: 4, foil: true }
+    const controller = new DeckVersionWriteController(
+      convexTestClient(actor),
+      new DeckVersionWriteRepository("owner", local),
+    )
+    const stop = controller.start()
+
+    controller.update(version.deckId, version.versionId, [cardFromAnotherBuild], version.revision)
+    await flush()
+    await flush()
+    stop()
+
+    expect(controller.getSnapshot()).toMatchObject({ pending: [], failures: [] })
+    const cards = await t.run(async (ctx) =>
+      ctx.db
+        .query("deckCards")
+        .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version.versionId))
+        .take(10),
+    )
+    expect(cards).toHaveLength(1)
+    expect(cards[0]).toMatchObject({ name: "Sol Ring", quantity: 4 })
+    expect(cards[0]).not.toHaveProperty("foil")
+  })
+
+  it("fails a write the server validator rejects and keeps draining the writes behind it", async () => {
+    const t = makeConvexTest()
+    const actor = t.withIdentity({ subject: "owner" })
+    await actor.mutation(api.users.syncCurrent, { displayName: "Owner" })
+    const rejected = await seedVersion(actor, "Rejected")
+    const later = await seedVersion(actor, "Later")
+    const local = new MemoryStorage()
+    const boardFromNewerBuild = { ...solRing, board: "maybeboard" } as unknown as VersionCardPayload
+    const controller = new DeckVersionWriteController(
+      convexTestClient(actor),
+      new DeckVersionWriteRepository("owner", local),
+    )
+    const stop = controller.start()
+
+    controller.update(rejected.deckId, rejected.versionId, [boardFromNewerBuild], rejected.revision)
+    controller.update(later.deckId, later.versionId, [{ ...solRing, quantity: 2 }], later.revision)
+    await flush()
+    await flush()
+    await flush()
+    stop()
+
+    expect(controller.getSnapshot()).toMatchObject({
+      pending: [],
+      failures: [
+        {
+          reason: DECK_VERSION_REJECTED_REASON,
+          action: { versionId: rejected.versionId },
+        },
+      ],
+    })
+    const stored = await t.run(async (ctx) => ctx.db.get(later.versionId))
+    expect(stored).toMatchObject({ syncRevision: later.revision + 1 })
   })
 })

@@ -9,7 +9,6 @@ const ja: Translations = {
     generic: {
       heading: "まだ何もありません",
       content: "データが見つかりません。更新または再読み込みしてください。",
-      button: "もう一度試す",
     },
   },
 }

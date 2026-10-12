@@ -1,126 +1,32 @@
 import { ConvexError } from "convex/values"
 
+import {
+  isSystemId,
+  SYSTEMS,
+  type CapabilityKey,
+  type IntegrationDefinition,
+  type SystemId,
+} from "./systems"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
 
-export const GAME_SYSTEM_IDS = ["mtg", "ygo", "pokemon"] as const
-export type GameSystemId = (typeof GAME_SYSTEM_IDS)[number]
+export { CAPABILITY_KEYS, SYSTEM_IDS as GAME_SYSTEM_IDS } from "./systems"
+export type { CapabilityKey, CapabilityRelease, SystemId as GameSystemId } from "./systems"
 
-export const CAPABILITY_KEYS = [
-  "integration",
-  "cardCatalog",
-  "deckImport",
-  "exampleDecks",
-  "images",
-  "playTracking",
-  "aggregateMetagameStats",
-] as const
-export type CapabilityKey = (typeof CAPABILITY_KEYS)[number]
-export type CapabilityRelease = "enabled" | "permission_required" | "disabled"
+export type Integration = IntegrationDefinition & { id: SystemId; displayName: string }
 
-type Capability = {
-  technical: "available" | "unavailable"
-  release: CapabilityRelease
-  provider?: string
-  note?: string
+export function integrationFor<Id extends SystemId>(id: Id) {
+  const { label, integration } = SYSTEMS[id]
+  return { id, displayName: label, ...integration } satisfies Integration
 }
-
-type Integration = {
-  id: GameSystemId
-  displayName: string
-  identityNamespace: string
-  capabilities: Record<CapabilityKey, Capability>
-  rights: {
-    review: "reviewed" | "permission_pending" | "blocked"
-    basis: "fan_policy" | "fair_use" | "explicit_license" | "publisher_api" | "unknown"
-    imageUse: "licensed" | "functional_card_context" | "text_only" | "none"
-    requiredNotices: readonly string[]
-  }
-}
-
-const available = (provider?: string, note?: string): Capability => ({
-  technical: "available",
-  release: "enabled",
-  ...(provider ? { provider } : {}),
-  ...(note ? { note } : {}),
-})
-
-export const INTEGRATIONS = {
-  mtg: {
-    id: "mtg",
-    displayName: "Magic: The Gathering",
-    identityNamespace: "scryfall-oracle",
-    capabilities: {
-      integration: available("scryve"),
-      cardCatalog: available("scryfall"),
-      deckImport: available("scryfall"),
-      exampleDecks: available("mtgjson"),
-      images: available("scryfall", "Functional card context only."),
-      playTracking: available("scryve"),
-      aggregateMetagameStats: available("scryve"),
-    },
-    rights: {
-      review: "reviewed",
-      basis: "fan_policy",
-      imageUse: "functional_card_context",
-      requiredNotices: ["Magic: The Gathering is property of Wizards of the Coast."],
-    },
-  },
-  ygo: {
-    id: "ygo",
-    displayName: "Yu-Gi-Oh!",
-    identityNamespace: "ygoprodeck-card",
-    capabilities: {
-      integration: available("scryve"),
-      cardCatalog: available("ygoprodeck", "Card metadata is cached in Convex."),
-      deckImport: available("ygoprodeck"),
-      exampleDecks: available("ygoprodeck-decks", "Cleaned Top Decks only."),
-      images: available("cloudflare-r2", "Functional card context through Scryve's mirror."),
-      playTracking: available("scryve"),
-      aggregateMetagameStats: available("scryve"),
-    },
-    rights: {
-      review: "reviewed",
-      basis: "fair_use",
-      imageUse: "functional_card_context",
-      requiredNotices: [
-        "Yu-Gi-Oh! and related card content remain property of their respective owners.",
-      ],
-    },
-  },
-  pokemon: {
-    id: "pokemon",
-    displayName: "Pokémon TCG",
-    identityNamespace: "tcgdex-card",
-    capabilities: {
-      integration: available("scryve"),
-      cardCatalog: available("tcgdex"),
-      deckImport: available("tcgdex"),
-      exampleDecks: available("limitless", "Cleaned tournament deck data only."),
-      images: available("tcgdex", "Functional card context only."),
-      playTracking: available("scryve"),
-      aggregateMetagameStats: available("scryve"),
-    },
-    rights: {
-      review: "reviewed",
-      basis: "fair_use",
-      imageUse: "functional_card_context",
-      requiredNotices: [
-        "Pokémon, card artwork, and related marks remain property of their respective owners.",
-      ],
-    },
-  },
-} as const satisfies Record<GameSystemId, Integration>
 
 export function integration(game: string): Integration | undefined {
-  return GAME_SYSTEM_IDS.includes(game as GameSystemId)
-    ? (INTEGRATIONS[game as GameSystemId] as Integration)
-    : undefined
+  return isSystemId(game) ? integrationFor(game) : undefined
 }
 
-export function assertGameSystem(game: string): GameSystemId {
-  if (!integration(game))
+export function assertGameSystem(game: string): SystemId {
+  if (!isSystemId(game))
     throw new ConvexError({ code: "unknown_game", message: "Unknown game system" })
-  return game as GameSystemId
+  return game
 }
 
 type DatabaseCtx = QueryCtx | MutationCtx

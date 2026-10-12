@@ -5,12 +5,7 @@ import { mutation, type MutationCtx } from "./_generated/server"
 import { requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { assertGameSystem } from "./lib/integrations"
-import {
-  assertGameScores,
-  MAX_GAMES_PER_MATCH,
-  type MatchBestOf,
-  type MatchOutcome,
-} from "./lib/matchResults"
+import { assertGameScores, MAX_GAMES_PER_MATCH, type MatchBestOf } from "./lib/matchResults"
 import {
   assertDeckName,
   assertDisplayName,
@@ -20,6 +15,7 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
 } from "./lib/policy"
+import { recordMatchResult, removeMatchResult } from "./lib/results"
 
 const outcomeValidator = v.union(
   v.literal("win"),
@@ -38,10 +34,6 @@ const seatResultFields = {
 }
 
 type MatchSeat = Doc<"matches">["seats"][number]
-type MatchRecord = NonNullable<Doc<"deckStats">["manualMatches"]>
-type MatchCounters = Pick<Doc<"deckStats">, "manualMatches" | "manualGames" | "connectedMatches">
-type MatchDeltas = Partial<Record<keyof MatchCounters, MatchRecord>>
-
 // why: same rows a match doc can hold, so a doc never needs rewriting on read.
 const MAX_ROWS_PER_MATCH = 10
 
@@ -76,95 +68,6 @@ async function ownedDeckVersion(
   )
     throw new ConvexError({ code: "deck_not_found", message: "Deck not found" })
   return { deck, version }
-}
-
-function ownerSeatOf(match: Doc<"matches">) {
-  return match.seats.find((seat) => seat.userId !== undefined && seat.userId === match.ownerUserId)
-}
-
-function outcomeRecord(outcome: MatchOutcome): MatchRecord {
-  return {
-    total: 1,
-    wins: outcome === "win" ? 1 : 0,
-    losses: outcome === "loss" ? 1 : 0,
-    draws: outcome === "draw" ? 1 : 0,
-    unknown: outcome === "unknown" ? 1 : 0,
-  }
-}
-
-// why: both record and delete derive counters from the stored seats so they always cancel out.
-function manualDeltas(match: Doc<"matches">, owner: MatchSeat): MatchDeltas {
-  const manualMatches = outcomeRecord(owner.outcome ?? "unknown")
-  const others = match.seats.filter((seat) => seat.seat !== owner.seat)
-  // why: game counters need every seat's wins; an unset gamesDrawn means no drawn games.
-  if (owner.gamesWon === undefined || others.some((seat) => seat.gamesWon === undefined))
-    return { manualMatches }
-  const wins = owner.gamesWon
-  const draws = owner.gamesDrawn ?? 0
-  const losses = others.reduce((sum, seat) => sum + (seat.gamesWon ?? 0), 0)
-  return {
-    manualMatches,
-    manualGames: { total: wins + losses + draws, wins, losses, draws, unknown: 0 },
-  }
-}
-
-function addRecord(current: MatchRecord | undefined, delta: MatchRecord, sign: 1 | -1) {
-  const sum = (key: keyof MatchRecord) => Math.max(0, (current?.[key] ?? 0) + sign * delta[key])
-  return {
-    total: sum("total"),
-    wins: sum("wins"),
-    losses: sum("losses"),
-    draws: sum("draws"),
-    unknown: sum("unknown"),
-  }
-}
-
-const MATCH_COUNTER_KEYS = ["manualMatches", "manualGames", "connectedMatches"] as const
-
-function matchStatsPatch(
-  current: MatchCounters | null,
-  deltas: MatchDeltas,
-  sign: 1 | -1,
-  now: number,
-) {
-  const patch: Partial<MatchCounters> & { updatedAt: number } = { updatedAt: now }
-  for (const key of MATCH_COUNTER_KEYS) {
-    const delta = deltas[key]
-    if (delta) patch[key] = addRecord(current?.[key], delta, sign)
-  }
-  return patch
-}
-
-const EMPTY_SCRYVE_RECORD = { games: 0, wins: 0, losses: 0, draws: 0, unknown: 0 }
-
-async function applyMatchStats(
-  ctx: MutationCtx,
-  deckId: Id<"decks">,
-  deckVersionId: Id<"deckVersions">,
-  deltas: MatchDeltas,
-  sign: 1 | -1,
-  now: number,
-) {
-  const stats = await ctx.db
-    .query("deckStats")
-    .withIndex("by_deck", (q) => q.eq("deckId", deckId))
-    .unique()
-  const patch = matchStatsPatch(stats, deltas, sign, now)
-  if (stats) await ctx.db.patch(stats._id, patch)
-  else await ctx.db.insert("deckStats", { deckId, ...EMPTY_SCRYVE_RECORD, ...patch })
-  const versionStats = await ctx.db
-    .query("deckVersionStats")
-    .withIndex("by_version", (q) => q.eq("deckVersionId", deckVersionId))
-    .unique()
-  const versionPatch = matchStatsPatch(versionStats, deltas, sign, now)
-  if (versionStats) await ctx.db.patch(versionStats._id, versionPatch)
-  else
-    await ctx.db.insert("deckVersionStats", {
-      deckId,
-      deckVersionId,
-      ...EMPTY_SCRYVE_RECORD,
-      ...versionPatch,
-    })
 }
 
 export const recordManualMatch = mutation({
@@ -269,26 +172,7 @@ export const recordManualMatch = mutation({
       finishedAt,
       outcome: args.me.outcome,
     })
-    if (attached) {
-      await ctx.db.insert("deckMatchResults", {
-        deckId: attached.deck._id,
-        deckVersionId: attached.version._id,
-        matchId,
-        userId: user._id,
-        source: "manual",
-        outcome: args.me.outcome,
-        finishedAt,
-      })
-      const match = (await ctx.db.get(matchId))!
-      await applyMatchStats(
-        ctx,
-        attached.deck._id,
-        attached.version._id,
-        manualDeltas(match, ownerSeatOf(match)!),
-        1,
-        now,
-      )
-    }
+    await recordMatchResult(ctx, (await ctx.db.get(matchId))!, now)
     return { matchId }
   },
 })
@@ -308,25 +192,7 @@ export const deleteManualMatch = mutation({
       .filter((q) => q.eq(q.field("matchId"), match._id))
       .take(MAX_ROWS_PER_MATCH)
     for (const entry of history) await ctx.db.delete(entry._id)
-    const owner = ownerSeatOf(match)
-    if (owner?.deckId && owner.deckVersionId) {
-      const results = await ctx.db
-        .query("deckMatchResults")
-        .withIndex("by_deck_and_source_and_finished_at", (q) =>
-          q.eq("deckId", owner.deckId!).eq("source", "manual").eq("finishedAt", match.finishedAt),
-        )
-        .filter((q) => q.eq(q.field("matchId"), match._id))
-        .take(MAX_ROWS_PER_MATCH)
-      for (const result of results) await ctx.db.delete(result._id)
-      await applyMatchStats(
-        ctx,
-        owner.deckId,
-        owner.deckVersionId,
-        manualDeltas(match, owner),
-        -1,
-        Date.now(),
-      )
-    }
+    await removeMatchResult(ctx, match, Date.now())
     await ctx.db.delete(match._id)
     return null
   },
@@ -500,26 +366,7 @@ export const finishScryveMatch = mutation({
       }
     })
     await ctx.db.patch(match._id, { status: "finished", finishedAt, seats, updatedAt: now })
-    const owner = seats.find((seat) => seat.userId === user._id)
-    if (owner?.deckId && owner.deckVersionId) {
-      await ctx.db.insert("deckMatchResults", {
-        deckId: owner.deckId,
-        deckVersionId: owner.deckVersionId,
-        matchId: match._id,
-        userId: user._id,
-        source: "connected",
-        outcome: owner.outcome,
-        finishedAt,
-      })
-      await applyMatchStats(
-        ctx,
-        owner.deckId,
-        owner.deckVersionId,
-        { connectedMatches: outcomeRecord(owner.outcome) },
-        1,
-        now,
-      )
-    }
+    await recordMatchResult(ctx, (await ctx.db.get(match._id))!, now)
     return { matchId: match._id }
   },
 })

@@ -3,7 +3,11 @@ import * as Clipboard from "expo-clipboard"
 import * as Updates from "expo-updates"
 import { fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { DEFAULT_LOCAL_SETTINGS } from "@/features/game/localPersistence"
+import {
+  DEFAULT_LOCAL_SETTINGS,
+  LOCAL_KEYS,
+  LocalGameRepository,
+} from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 import { analyticsId } from "@/utils/analytics"
 
@@ -317,6 +321,27 @@ describe("SettingsScreen", () => {
       tapVersion(view, 5)
       expect(view.queryByTestId("beta-updates-switch")).toBeNull()
     })
+
+    it("offers Back to preview only while a preview build runs a PR channel", async () => {
+      expect(renderSettings().queryByTestId("back-to-preview-button")).toBeNull()
+      mockUpdates.channel = "pr-12"
+      const view = renderSettings()
+      expect(view.getByText("Channel: pr-12")).toBeTruthy()
+      fireEvent.press(view.getByTestId("back-to-preview-button"))
+      expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith(null)
+      await waitFor(() => expect(Updates.reloadAsync).toHaveBeenCalled())
+    })
+
+    it("keeps the PR channel and says so when going back to preview fails", async () => {
+      mockUpdates.channel = "pr-12"
+      jest.mocked(Updates.checkForUpdateAsync).mockRejectedValueOnce(new Error("offline"))
+      const view = renderSettings()
+      fireEvent.press(view.getByTestId("back-to-preview-button"))
+      expect(await view.findByText("Could not go back to preview. Try again.")).toBeTruthy()
+      expect(Updates.setUpdateRequestHeadersOverride).toHaveBeenLastCalledWith({
+        "expo-channel-name": "pr-12",
+      })
+    })
   })
 
   it("exposes the two shipping menu button treatments", () => {
@@ -471,6 +496,46 @@ describe("SettingsScreen", () => {
     fireEvent.press(view.getByTestId("default-format-option-standard"))
     expect(onSettingsChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ defaultFormat: "standard", defaultStartingLife: 39 }),
+    )
+  })
+
+  it("moves a migrated Brawl default to Commander life and multiplayer Brawl life", () => {
+    const stored = new Map<string, string>([
+      [
+        LOCAL_KEYS.settings,
+        JSON.stringify({
+          ...DEFAULT_LOCAL_SETTINGS,
+          defaultStartingLife: 20,
+          defaultSystem: "mtg",
+          defaultFormat: "brawl",
+        }),
+      ],
+    ])
+    const settings = new LocalGameRepository({
+      getString: (key) => stored.get(key),
+      set: (key, value) => stored.set(key, value),
+      delete: (key) => stored.delete(key),
+    }).loadSettings()
+    const onSettingsChange = jest.fn()
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        <SettingsScreen
+          initialSettings={settings}
+          onBack={jest.fn()}
+          onSettingsChange={onSettingsChange}
+        />
+      </ThemeProvider>,
+    )
+
+    fireEvent.press(view.getByTestId("default-player-count-increment"))
+    expect(onSettingsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ defaultPlayerCount: 3, defaultStartingLife: 30 }),
+    )
+
+    fireEvent.press(view.getByTestId("default-format"))
+    fireEvent.press(view.getByTestId("default-format-option-commander"))
+    expect(onSettingsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ defaultFormat: "commander", defaultStartingLife: 40 }),
     )
   })
 

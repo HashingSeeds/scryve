@@ -1,6 +1,6 @@
 export type GameMenuActionKind =
   | "layout"
-  | "undo"
+  | "dice"
   | "players"
   | "status"
   | "home"

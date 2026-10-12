@@ -1,8 +1,6 @@
-import { convexTest } from "convex-test"
-
+import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import schema from "./schema"
 
 /**
  * The report-and-hold path in `moderation.test.ts` covers the decisions moderation makes. This
@@ -12,17 +10,9 @@ import schema from "./schema"
  * like a working system from inside a single mutation.
  */
 
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./games.ts": async () => jest.requireActual("./games"),
-  "./moderation.ts": async () => jest.requireActual("./moderation"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
-
 const PUBLIC_ID = "moderation-pipeline-01"
 const PLACEHOLDER = /^[a-z]+-[a-z]+-\d{2}$/
-type Harness = ReturnType<typeof convexTest<(typeof schema)["tables"]>>
+type Harness = ConvexTestHarness
 type Actor = ReturnType<Harness["withIdentity"]>
 
 async function settle(t: Harness) {
@@ -133,7 +123,7 @@ describe("moderation pipeline", () => {
   describe("alerting an operator", () => {
     it("emails the operator when the filter holds a name at sync, with everything needed to act", async () => {
       configureAlerts()
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const userId = await syncUser(t, "held-subject", "sh1t-lord")
       await settle(t)
 
@@ -152,7 +142,7 @@ describe("moderation pipeline", () => {
 
     it("holds a slur the profanity dataset does not know and names it in the alert", async () => {
       configureAlerts()
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       await syncUser(t, "held-subject", "hitler88")
       await settle(t)
 
@@ -164,7 +154,7 @@ describe("moderation pipeline", () => {
 
     it("alerts once per hold, not on every later sync of the same held name", async () => {
       configureAlerts()
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       await syncUser(t, "held-subject", "sh1t-lord")
       await settle(t)
       await syncUser(t, "held-subject", "sh1t-lord")
@@ -176,7 +166,7 @@ describe("moderation pipeline", () => {
 
     it("emails the operator when a report files, naming the automatic action taken", async () => {
       configureAlerts()
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const { host } = await seatedGame(t, ["host-handle", "sh1t-lord"])
       await settle(t)
       fetchMock.mockClear()
@@ -198,7 +188,7 @@ describe("moderation pipeline", () => {
 
     it("says so explicitly when a report triggered no automatic action", async () => {
       configureAlerts()
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
       const guestSeat = await seatOf(host, "device-host-0001", 2)
       await reportGuest(host, guestSeat.playerId as Id<"gamePlayers">)
@@ -209,7 +199,7 @@ describe("moderation pipeline", () => {
     })
 
     it("keeps the report and the hold when the alert transport is unconfigured", async () => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const { host } = await seatedGame(t, ["host-handle", "sh1t-lord"])
       const guestSeat = await seatOf(host, "device-host-0001", 2)
       await reportGuest(host, guestSeat.playerId as Id<"gamePlayers">)
@@ -226,7 +216,7 @@ describe("moderation pipeline", () => {
     it("keeps the hold when Resend rejects the alert", async () => {
       configureAlerts()
       fetchMock.mockResolvedValue(new Response("rate limited", { status: 429 }))
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       await syncUser(t, "held-subject", "sh1t-lord")
       await settle(t)
 
@@ -238,7 +228,7 @@ describe("moderation pipeline", () => {
 
   describe("propagating a hold into finished-game history", () => {
     it("renames the held player across more history than one batch holds", async () => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const userId = await syncUser(t, "held-subject", "clean-handle")
       const gameCount = 30
       await t.run(async (ctx) => {
@@ -310,7 +300,7 @@ describe("moderation pipeline", () => {
     })
 
     it("hides a held name from the reporter's own history list", async () => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const { host } = await seatedGame(t, ["host-handle", "sh1t-lord"])
       await settle(t)
       await host.mutation(api.games.startGame, { publicId: PUBLIC_ID })
@@ -329,7 +319,7 @@ describe("moderation pipeline", () => {
 
   describe("allocating a placeholder", () => {
     it("never hands out a placeholder another account already uses", async () => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       // Occupy every name the suggester can produce except one, then force a hold.
       const adjectives = [
         "brisk",
@@ -396,7 +386,7 @@ describe("moderation pipeline", () => {
 
   describe("what a report does beyond the report row", () => {
     it("keeps the reporter and the reported player out of the same lobby afterwards", async () => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const { host, guest, token } = await seatedGame(t, ["host-handle", "guest-handle"])
       const guestSeat = await seatOf(host, "device-host-0001", 2)
       await reportGuest(host, guestSeat.playerId as Id<"gamePlayers">)
@@ -417,7 +407,7 @@ describe("moderation pipeline", () => {
     })
 
     it("does not hold a name on one report alone when the filter is clean", async () => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
       const guestSeat = await seatOf(host, "device-host-0001", 2)
       const result = await reportGuest(host, guestSeat.playerId as Id<"gamePlayers">)
@@ -431,7 +421,7 @@ describe("moderation pipeline", () => {
 
   describe("operator resolution", () => {
     it("leaves a filter hold in place when an unrelated report is dismissed", async () => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const { host } = await seatedGame(t, ["host-handle", "sh1t-lord"])
       await settle(t)
       const guestSeat = await seatOf(host, "device-host-0001", 2)
@@ -456,7 +446,7 @@ describe("moderation pipeline", () => {
     })
 
     it("keeps an upheld hold after every report is resolved", async () => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const { host } = await seatedGame(t, ["host-handle", "guest-handle"])
       const guestSeat = await seatOf(host, "device-host-0001", 2)
       await reportGuest(host, guestSeat.playerId as Id<"gamePlayers">)

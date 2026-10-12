@@ -7,6 +7,7 @@ import {
   type DurableOutboxKeys,
   type DurableOutboxLimits,
   type DurableStringStorage,
+  type FieldName,
 } from "@/features/sync/durableOutbox"
 import { storage as mmkvStorage } from "@/utils/storage"
 
@@ -18,8 +19,10 @@ import type {
   ConnectedProjection,
   FailedLifeAction,
   PendingLifeAction,
+  TableActionEvent,
 } from "./model"
 import { toConnectedProjection } from "./model"
+import { matchesValidator, tableActionValidator } from "../../../convex/lib/table"
 import {
   asActorId,
   asDeviceId,
@@ -193,9 +196,35 @@ function parseCommanderResolutionEvent(
   }
 }
 
+function parseTableActionEvent(value: Record<string, unknown>): TableActionEvent | null {
+  if (
+    typeof value.operationId !== "string" ||
+    typeof value.gameId !== "string" ||
+    typeof value.actorId !== "string" ||
+    typeof value.deviceId !== "string" ||
+    !/^[A-Za-z0-9_-]{16,128}$/.test(value.operationId) ||
+    !/^[A-Za-z0-9_-]{8,128}$/.test(value.deviceId) ||
+    typeof value.clientCreatedAt !== "number" ||
+    !Number.isSafeInteger(value.clientCreatedAt) ||
+    value.clientCreatedAt < 0 ||
+    !matchesValidator(tableActionValidator, value.action)
+  )
+    return null
+  return {
+    type: "table.action",
+    operationId: asOperationId(value.operationId),
+    gameId: asGameId(value.gameId),
+    action: value.action,
+    actorId: asActorId(value.actorId),
+    deviceId: asDeviceId(value.deviceId),
+    clientCreatedAt: value.clientCreatedAt,
+  }
+}
+
 function parseEvent(value: unknown): ConnectedActionEvent | null {
   if (!isRecord(value)) return null
   if (value.type === "life.changed") return parseLifeEvent(value)
+  if (value.type === "table.action") return parseTableActionEvent(value)
   if (value.type === "commanderDamage.resolved") return parseCommanderResolutionEvent(value)
   return parseCommanderDamageEvent(value)
 }
@@ -369,6 +398,28 @@ function resumeEntrySignature(entry: ResumableGame): string {
   ].join("|")
 }
 
+const fieldNames: Record<FieldName<PendingLifeAction | ConnectedActionEvent>, true> = {
+  schemaVersion: true,
+  event: true,
+  queuedAt: true,
+  attempts: true,
+  lastAttemptAt: true,
+  type: true,
+  operationId: true,
+  gameId: true,
+  playerId: true,
+  delta: true,
+  actorId: true,
+  deviceId: true,
+  clientCreatedAt: true,
+  compensatesOperationId: true,
+  fromPlayerId: true,
+  toPlayerId: true,
+  claimOperationId: true,
+  accepted: true,
+  action: true,
+}
+
 const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
   parsePending,
   parseFailed,
@@ -380,6 +431,13 @@ const outboxCodec: DurableOutboxCodec<PendingLifeAction, FailedLifeAction> = {
     left.queuedAt - right.queuedAt ||
     left.event.clientCreatedAt - right.event.clientCreatedAt ||
     left.event.operationId.localeCompare(right.event.operationId),
+  operationTypes: [
+    "life.changed",
+    "table.action",
+    "commanderDamage.submitted",
+    "commanderDamage.resolved",
+  ] satisfies ConnectedActionEvent["type"][],
+  knownKeys: Object.keys(fieldNames),
 }
 
 export class ConnectedGameRepository {

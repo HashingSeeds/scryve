@@ -11,6 +11,7 @@ import Animated, {
 import { useAppUpdate } from "@/features/updates/appUpdate"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { Text } from "./Text"
@@ -61,11 +62,13 @@ export function AppUtilityMenu({
     opacity: interpolate(progress.value, [0.5, 1], [0, 1], "clamp"),
   }))
 
-  if (!visible) return null
   const close = () => {
     setOpen(false)
     onOpenChange?.(false)
   }
+  useCloseOnBack(open, close)
+
+  if (!visible) return null
   const choose = (action: () => void) => {
     close()
     action()

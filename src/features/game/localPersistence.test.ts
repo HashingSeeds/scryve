@@ -211,6 +211,39 @@ describe("LocalGameRepository", () => {
     })
   })
 
+  it.each([
+    [2, 20, 25],
+    [4, 20, 30],
+    [2, 22, 22],
+  ])("migrates a %i-player Brawl default stored at %i life to %i", (players, stored, expected) => {
+    const storage = new MemoryStorage()
+    storage.set(
+      LOCAL_KEYS.settings,
+      JSON.stringify({
+        schemaVersion: 1,
+        defaultPlayerCount: players,
+        defaultStartingLife: stored,
+        hapticsEnabled: true,
+        themePreference: "dark",
+        defaultSystem: "mtg",
+        defaultFormat: "brawl",
+      }),
+    )
+    expect(new LocalGameRepository(storage).loadSettings().defaultStartingLife).toBe(expected)
+  })
+
+  it("keeps a Brawl starting life of 20 chosen after the migration", () => {
+    const storage = new MemoryStorage()
+    const repository = new LocalGameRepository(storage)
+    repository.saveSettings({
+      ...repository.loadSettings(),
+      defaultSystem: "mtg",
+      defaultFormat: "brawl",
+      defaultStartingLife: 20,
+    })
+    expect(new LocalGameRepository(storage).loadSettings().defaultStartingLife).toBe(20)
+  })
+
   it("stores a default system and format only when both are known", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)
@@ -535,5 +568,22 @@ describe("LocalGameRepository sign-in claims", () => {
     expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({ ownerId: "owner-a" })
     repository.repairClaimedDetails("owner-a")
     expect(repository.loadHistoryDetail(claimed.id)?.game.account).toEqual({ ownerId: "owner-a" })
+  })
+})
+
+describe("first-player offer on the game", () => {
+  it("round-trips the chooser seat and the used mark, and ignores values that fit no seat", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const game = { ...makeGame(), firstChooserSeat: 1, firstPlayerOffered: true as const }
+    repository.saveActiveGame(game)
+    expect(repository.loadActiveGame()).toMatchObject({
+      firstChooserSeat: 1,
+      firstPlayerOffered: true,
+    })
+
+    repository.saveActiveGame({ ...makeGame(), firstChooserSeat: 9 })
+    const loaded = repository.loadActiveGame()
+    expect(loaded?.firstChooserSeat).toBeUndefined()
+    expect(loaded?.firstPlayerOffered).toBeUndefined()
   })
 })

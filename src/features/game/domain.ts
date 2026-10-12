@@ -1,7 +1,13 @@
 import { randomUUID as secureRandomUUID } from "expo-crypto"
 
 import { playerGridLayoutForCount, type PlayerGridLayoutVariant } from "./playerLayouts"
-import { isPlaySystemId, playSystemFormat, playSystemRules, type PlaySystemId } from "./playSystems"
+import {
+  isPlaySystemId,
+  playSystemFormat,
+  playSystemRules,
+  playTableRules,
+  type PlaySystemId,
+} from "./playSystems"
 import type {
   ActorId,
   CommanderDamageAssignedEvent,
@@ -28,6 +34,13 @@ import {
   shapeForSeat,
 } from "../../../convex/lib/appearance"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
+import {
+  applyTableAction,
+  EMPTY_TABLE,
+  isOutByTableCounters,
+  tableHasState,
+  type TableAction,
+} from "../../../convex/lib/table"
 
 export const PLAYER_COLORS = PLAYER_COLOR_CHOICES
 export const MAX_LIFE_DELTA = 999_999
@@ -244,10 +257,13 @@ export function isMatchInProgress(game: LocalGame) {
   return game.match !== undefined && (game.match.gameNumber > 1 || hasLocalGameStarted(game))
 }
 
-/** why: abandoning a game mid-match restarts that game; the match and its score stay. */
+/** why: abandoning a game mid-match restarts that game; the match, its score, and the loser's first choice stay, and the offer is open again. */
 export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match) throw new Error("This game is not part of a match.")
-  return { ...createRematch(game, now), match: game.match }
+  return withFirstChooser(
+    { ...createRematchBoard(game, now), match: game.match },
+    game.firstChooserSeat,
+  )
 }
 
 /** why: setup forms know seats by index while a running game knows them by player id. */
@@ -269,7 +285,25 @@ export function meSeatOf(game: Pick<LocalGame, "players" | "account">): number |
   return index === -1 ? undefined : index
 }
 
+/** why: a rematch hands the choice of who goes first to the one player who lost; a draw or several losers has no one to ask. */
+export function soleLoserSeat(game: Pick<LocalGame, "players" | "result">): number | undefined {
+  if (game.result?.kind !== "win") return undefined
+  const losers = game.players.flatMap((player, seat) =>
+    game.result?.kind === "win" && game.result.winnerPlayerIds.includes(player.id) ? [] : [seat],
+  )
+  return losers.length === 1 ? losers[0] : undefined
+}
+
+/** why: the game that follows a finished one hands its sole loser the choice of who goes first. */
 export function createRematch(game: LocalGame, now?: number): LocalGame {
+  return withFirstChooser(createRematchBoard(game, now), soleLoserSeat(game))
+}
+
+export function withFirstChooser(game: LocalGame, seat: number | undefined): LocalGame {
+  return seat === undefined ? game : { ...game, firstChooserSeat: seat }
+}
+
+function createRematchBoard(game: LocalGame, now?: number): LocalGame {
   return createLocalGame({
     players: game.players.map(({ name, color, shape }) => ({ name, color, shape })),
     startingLife: game.startingLife,
@@ -320,7 +354,43 @@ export function isPlayerOut(game: LocalGame, playerId: PlayerId): boolean {
   if (playSystemRules(game.system).counter.direction === "down")
     return game.players.some((player) => player.id !== playerId && player.life <= 0)
   const player = game.players.find(({ id }) => id === playerId)
-  return (player?.life ?? 0) <= 0 || isEliminatedByCommanderDamage(game, playerId)
+  return (
+    (player?.life ?? 0) <= 0 ||
+    isEliminatedByCommanderDamage(game, playerId) ||
+    isOutByTableCounters(game.table ?? EMPTY_TABLE, playerId, localTableRules(game))
+  )
+}
+
+export function localTableRules(game: Pick<LocalGame, "system" | "format">) {
+  return playTableRules(game.system, game.format)
+}
+
+/** why: table actions change current state without joining the event log; a knockout also moves the taker's prize counter. */
+export function applyLocalTableAction(
+  game: LocalGame,
+  action: TableAction,
+  context: { operationId: string; now: number },
+): LocalGame {
+  if (game.status !== "active") return game
+  const table = game.table ?? EMPTY_TABLE
+  const change = applyTableAction(table, action, {
+    rules: localTableRules(game),
+    operationId: context.operationId,
+    lifeOf: (playerId) => game.players.find(({ id }) => id === playerId)?.life,
+  })
+  if (!change || change.table === table) return game
+  const players = game.players.map((player) => {
+    const delta = change.life
+      .filter((life) => life.playerId === player.id)
+      .reduce((total, life) => total + life.delta, 0)
+    return delta === 0 ? player : { ...player, life: player.life + delta }
+  })
+  return {
+    ...game,
+    table: change.table,
+    players,
+    updatedAt: Math.max(game.updatedAt, context.now),
+  }
 }
 
 export function lastPlayerStanding(game: LocalGame): PlayerId | undefined {
@@ -526,11 +596,29 @@ export function applyGameCommand(
   return event ? reduceGameEvent(game, event) : game
 }
 
+/** why: who goes first is settled by the first point of play: life, prizes, commander damage, counters, designations, or Pokémon damage. Placing Pokémon and picking a layout set the table and do not count. */
+export function hasPlayBegun(game: LocalGame): boolean {
+  if (
+    game.events.some(({ type }) => type === "life.changed" || type === "commanderDamage.assigned")
+  )
+    return true
+  if (game.players.some((player) => player.life !== game.startingLife)) return true
+  const table = game.table
+  if (!table) return false
+  if (Object.keys(table.designations).length > 0) return true
+  return Object.values(table.players).some(
+    ({ counters, pokemon }) =>
+      Object.values(counters ?? {}).some((value) => value !== 0) ||
+      [pokemon?.active, ...(pokemon?.bench ?? [])].some((card) => (card?.damage ?? 0) > 0),
+  )
+}
+
 export function hasLocalGameStarted(game: LocalGame): boolean {
   return (
     game.events.length > 0 ||
     game.players.some((player) => player.life !== game.startingLife) ||
-    Object.values(game.commanderDamage ?? {}).some((damage) => damage !== 0)
+    Object.values(game.commanderDamage ?? {}).some((damage) => damage !== 0) ||
+    tableHasState(game.table)
   )
 }
 

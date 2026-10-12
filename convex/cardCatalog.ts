@@ -72,14 +72,18 @@ async function upsertCard(ctx: MutationCtx, card: NormalizedCard) {
     )
     .unique()
   const now = Date.now()
+  // why: TCGdex search returns brief cards with no category; caching one must not erase the HP, stage, and types a full lookup stored.
+  const keepsFullCard =
+    card.game === "pokemon" && existing?.category !== undefined && card.category === undefined
+  const category = keepsFullCard ? existing.category : card.category
   const logicalValue = {
     game: assertGameSystem(card.game),
     identityNamespace: card.identityNamespace,
     cardId: card.cardId,
     name: card.name.trim(),
     nameNormalized: normalizeCardName(card.name),
-    ...(card.category ? { category: card.category } : {}),
-    facets: card.facets,
+    ...(category ? { category } : {}),
+    facets: keepsFullCard ? existing.facets : card.facets,
     updatedAt: now,
   }
   const gameCardId = existing?._id ?? (await ctx.db.insert("gameCards", logicalValue))

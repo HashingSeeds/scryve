@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics"
 import { useKeepAwake } from "expo-keep-awake"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
 
-import { commanderDamageKey, createLocalGame } from "@/features/game/domain"
+import { applyLocalTableAction, commanderDamageKey, createLocalGame } from "@/features/game/domain"
 import { LocalGameRepository, type StringStorage } from "@/features/game/localPersistence"
 import { ThemeProvider } from "@/theme/context"
 
@@ -27,21 +27,42 @@ class MemoryStorage implements StringStorage {
   }
 }
 
-function game(playerCount = 2) {
+function game(playerCount = 2, system?: "pokemon") {
   return createLocalGame({
     players: Array.from({ length: playerCount }, (_, index) => ({
       name: ["Ada", "Grace", "Katherine", "Dorothy", "Evelyn", "Mary"][index],
       color: ["#41476E", "#39755C", "#7B5A91", "#A06A2B", "#B03A58", "#C76542"][index],
     })),
-    startingLife: 2,
+    startingLife: system === "pokemon" ? 6 : 2,
+    system,
     now: 1,
   })
 }
 
+function renderGame(initialGame = game()) {
+  return render(
+    <ThemeProvider initialContext="light">
+      <CurrentGameScreen
+        initialGame={initialGame}
+        repository={new LocalGameRepository(new MemoryStorage())}
+        onViewSummary={jest.fn()}
+      />
+    </ThemeProvider>,
+  )
+}
+
+// why: chips lay out in the card's measured frame, which never arrives in a test unless the layout event is fired by hand.
+function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat") {
+  for (const card of view.queryAllByTestId(new RegExp(`^${prefix}-\\d+$`)))
+    fireEvent(card, "layout", { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 400 } } })
+}
+
 describe("CurrentGameScreen", () => {
   beforeEach(() => jest.mocked(Haptics.impactAsync).mockClear())
+  // why: Math.random spies must not leak into later tests when an assertion fails first.
+  afterEach(() => jest.restoreAllMocks())
 
-  it("renders changes immediately, allows negative life, and undoes once", () => {
+  it("renders changes immediately and allows negative life", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const view = render(
       <ThemeProvider initialContext="light">
@@ -52,11 +73,6 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-editor-step-1--5"))
     fireEvent.press(view.getByTestId("life-editor-close-seat-1"))
     expect(view.getByTestId("life-total-seat-1").props.children).toBe("-3")
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("undo-button"))
-    expect(view.getByTestId("life-total-seat-1").props.children).toBe("2")
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    expect(view.getByTestId("undo-button").props.accessibilityState.disabled).toBe(true)
     expect(useKeepAwake).toHaveBeenCalledWith("count-local-game", {
       suppressDeactivateWarnings: true,
     })
@@ -129,7 +145,7 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-button")).toBeTruthy()
     expect(view.getByTestId("player-name-seat-2")).toHaveTextContent("Grace")
     expect(view.getByTestId("player-mark-seat-2", { includeHiddenElements: true })).toBeTruthy()
-    expect(view.queryByTestId("undo-button")).toBeNull()
+    expect(view.queryByTestId("dice-coin")).toBeNull()
     expect(view.queryByTestId("home-button")).toBeNull()
 
     fireEvent.press(view.getByTestId("game-menu-button"))
@@ -137,11 +153,199 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("game-menu-backdrop")).toBeTruthy()
     expect(view.queryByTestId("home-button")).toBeNull()
     expect(view.getByTestId("layout-button").props.accessibilityState.disabled).toBe(true)
+    expect(view.getByTestId("dice-coin")).toBeTruthy()
     expect(view.getByTestId("setup-button")).toBeTruthy()
     expect(view.getByTestId("history-button")).toBeTruthy()
     expect(view.getByTestId("end-game-button")).toBeTruthy()
     expect(view.getByTestId("open-decks-button")).toBeTruthy()
     expect(view.getByTestId("utility-menu-button")).toBeTruthy()
+  })
+
+  it("enters dice mode from a pea in the menu and closes it from the pentagon", () => {
+    const view = renderGame()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("dice-coin"))
+
+    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
+    expect(view.queryByTestId("layout-button")).toBeNull()
+    expect(view.getByTestId("dice-coin").props.accessibilityState.selected).toBe(true)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip a coin for Ada")
+    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Close dice")
+
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    expect(view.queryByTestId("dice-coin")).toBeNull()
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(view.getByTestId("game-menu-button").props.accessibilityLabel).toBe("Game options")
+  })
+
+  it("arms a die from the menu and rolls it for the tapped seat, leaving a chip", () => {
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderGame()
+    layoutSeats(view)
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("dice-d20"))
+
+    fireEvent.press(view.getByTestId("dice-seat-1"))
+    expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
+    expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(true)
+
+    // why: putting the tool down frees the seat; the chip stays beside the live controls.
+    fireEvent.press(view.getByTestId("dice-d20"))
+    expect(view.queryByTestId("dice-seat-1")).toBeNull()
+    expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
+    expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
+  })
+
+  it("offers the first-player roll only while the game is fresh, and its chip leaves on the first life change", () => {
+    const rolls = [0.9, 0.1]
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const view = renderGame()
+    layoutSeats(view)
+    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+      "Roll for who goes first",
+    )
+
+    fireEvent.press(view.getByTestId("first-player-badge"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
+    expect(view.queryByTestId("dice-chip-2-first")).toBeNull()
+
+    fireEvent.press(view.getByTestId("life-seat-2-1"))
+    expect(view.queryByTestId("dice-chip-1-first")).toBeNull()
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+
+    const inProgress = renderGame({
+      ...game(),
+      players: game().players.map((p, i) => ({ ...p, life: i ? 2 : 1 })),
+    })
+    expect(inProgress.queryByTestId("first-player-badge")).toBeNull()
+  })
+
+  it("keeps the first-player offer through Pokémon setup and withdraws it at the first point of play", () => {
+    const context = { operationId: "op-1", now: 2 }
+    const mtg = createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 20,
+      system: "mtg",
+      now: 1,
+    })
+    const withPoison = applyLocalTableAction(
+      mtg,
+      { kind: "counter.changed", playerId: mtg.players[0].id, counterId: "poison", delta: 1 },
+      context,
+    )
+    expect(withPoison).not.toBe(mtg)
+    // why: poison is damage dealt, so a counter counts as play even with life untouched.
+    expect(renderGame(withPoison).queryByTestId("first-player-badge")).toBeNull()
+
+    const pokemon = game(2, "pokemon")
+    const placed = applyLocalTableAction(
+      pokemon,
+      {
+        kind: "pokemon.placed",
+        playerId: pokemon.players[0].id,
+        pokemonId: "pokemon_1",
+        slot: "active",
+        card: { name: "Pikachu", hp: 60, prizes: 1 },
+      },
+      context,
+    )
+    expect(placed).not.toBe(pokemon)
+    const view = renderGame(placed)
+    expect(view.getByTestId("first-player-badge")).toBeTruthy()
+    fireEvent.press(view.getByTestId("pokemon-damage-seat-1-10"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    // why: healing back to zero leaves no trace of play, so the offer is closed by the write that opened play, not derived from the board.
+    fireEvent.press(view.getByTestId("pokemon-damage-seat-1--10"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+  })
+
+  it("remembers a used offer and a rematch's loser across a reopen", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    repository.saveActiveGame(game())
+    const rolls = [0.9, 0.1]
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    const first = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={repository.loadActiveGame()!}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    fireEvent.press(first.getByTestId("first-player-badge"))
+    first.unmount()
+
+    const reopened = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={repository.loadActiveGame()!}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(reopened.queryByTestId("first-player-badge")).toBeNull()
+    fireEvent.press(reopened.getByTestId("life-seat-1-1"))
+    fireEvent.press(reopened.getByTestId("game-menu-button"))
+    fireEvent.press(reopened.getByTestId("end-game-button"))
+    fireEvent.press(reopened.getByTestId("end-game-winner-0"))
+    fireEvent.press(reopened.getByTestId("confirm-end-game-button"))
+    reopened.unmount()
+
+    const rematch = render(
+      <ThemeProvider initialContext="light">
+        <CurrentGameScreen
+          initialGame={repository.loadActiveGame()!}
+          repository={repository}
+          onViewSummary={jest.fn()}
+        />
+      </ThemeProvider>,
+    )
+    expect(rematch.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+      "Grace lost the last game. Choose who goes first",
+    )
+  })
+
+  it("flips a coin for Pokémon and lets the winner choose first or second", () => {
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderGame(game(2, "pokemon"))
+    layoutSeats(view, "pokemon-card-seat")
+    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+      "Flip for who goes first",
+    )
+
+    fireEvent.press(view.getByTestId("first-player-badge"))
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Won the flip/)
+    expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Waiting for the choice")
+
+    fireEvent.press(view.getByTestId("dice-go-second"))
+    expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
+    expect(view.queryByTestId("dice-seat-2")).toBeNull()
+  })
+
+  it("hands a rematch's first choice to the player who lost", () => {
+    const view = renderGame()
+    fireEvent.press(view.getByTestId("life-seat-1-1"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+    fireEvent.press(view.getByTestId("game-menu-button"))
+    fireEvent.press(view.getByTestId("end-game-button"))
+    fireEvent.press(view.getByTestId("end-game-winner-0"))
+    fireEvent.press(view.getByTestId("confirm-end-game-button"))
+    layoutSeats(view)
+
+    const badge = view.getByTestId("first-player-badge")
+    expect(badge.props.accessibilityLabel).toBe("Grace lost the last game. Choose who goes first")
+    expect(StyleSheet.flatten(badge.props.style).backgroundColor).toBe("#39755C")
+
+    fireEvent.press(badge)
+    expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/^Lost the last game/)
+    fireEvent.press(view.getByTestId("dice-go-first"))
+    expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
   })
 
   it("offers Connect instead of End on a fresh board", () => {
@@ -691,19 +895,6 @@ describe("CurrentGameScreen", () => {
       fireEvent.press(view.getByTestId("game-menu-button"))
       expect(view.getByTestId("end-game-button")).toBeTruthy()
       expect(view.queryByTestId("connect-button")).toBeNull()
-    })
-
-    it("undoes one assignment press as a single action", () => {
-      const view = renderGame()
-      armCommander(view, 1)
-      for (let press = 0; press < 5; press += 1)
-        fireEvent.press(view.getByTestId("commander-stage-seat-2-1"))
-      expect(life(view, 2)).toBe("35")
-      fireEvent.press(view.getByTestId("commander-done-seat-1"))
-
-      fireEvent.press(view.getByTestId("game-menu-button"))
-      fireEvent.press(view.getByTestId("undo-button"))
-      expect(life(view, 2)).toBe("36")
     })
   })
 })

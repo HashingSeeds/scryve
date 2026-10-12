@@ -1,8 +1,9 @@
+import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter"
 import { v } from "convex/values"
 
-import { internal } from "./_generated/api"
+import { components, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import { internalMutation, mutation } from "./_generated/server"
+import { env, internalAction, internalMutation, mutation } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
 import { hasAccountDeletion, requireIdentity } from "./lib/auth"
 import { placeUsernameOnHold, releaseUsernameHold } from "./lib/moderation"
@@ -31,7 +32,11 @@ async function enforceUsernameFilter(ctx: MutationCtx, userId: Id<"users">, user
     if (!wasHeld) await ctx.scheduler.runAfter(0, internal.moderation.sendHoldAlert, { userId })
     return
   }
-  if (user.moderationHold?.reason === "filter") {
+  // why: a report can place a filter hold on a name the gate passes, so only a different name lifts it.
+  if (
+    user.moderationHold?.reason === "filter" &&
+    username.toLowerCase() !== user.moderationHold.heldUsername.toLowerCase()
+  ) {
     await releaseUsernameHold(ctx, user)
     return
   }
@@ -92,10 +97,9 @@ type UsernameSync = { action: "store"; username: string } | { action: "clear" } 
 
 async function usernameForSync(
   ctx: MutationCtx,
-  username: string | undefined,
+  username: string,
   clerkUserId: string,
 ): Promise<UsernameSync> {
-  if (username === undefined) return { action: "keep" }
   if (username === "") return { action: "clear" }
   let value: string
   try {
@@ -113,10 +117,15 @@ async function usernameForSync(
   return { action: "store", username: value }
 }
 
+const usernameRefreshLimiter = new RateLimiter(components.rateLimiter, {
+  usernameRefresh: { kind: "token bucket", rate: 2, period: MINUTE, capacity: 2 },
+})
+
 export const syncCurrent = mutation({
   args: {
     displayName: v.string(),
     avatarUrl: v.optional(v.string()),
+    /** why: never stored, since clients can send any name. A mismatch only triggers a Clerk refresh. */
     username: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -125,28 +134,22 @@ export const syncCurrent = mutation({
       throw new Error("Account deletion is in progress")
     const displayName = assertDisplayName(args.displayName)
     const avatarUrl = assertAvatarUrl(args.avatarUrl)
-    const usernameSync = await usernameForSync(ctx, args.username, identity.subject)
-    const usernamePatch =
-      usernameSync.action === "store"
-        ? {
-            username: usernameSync.username,
-            usernameNormalized: normalizeUsername(usernameSync.username),
-          }
-        : usernameSync.action === "clear"
-          ? { username: undefined, usernameNormalized: undefined }
-          : {}
     const now = Date.now()
     const existing = await ctx.db
       .query("users")
       .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
       .unique()
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        displayName,
-        avatarUrl,
-        ...usernamePatch,
-        updatedAt: now,
+    if (args.username !== undefined && args.username !== (existing?.username ?? "")) {
+      const refresh = await usernameRefreshLimiter.limit(ctx, "usernameRefresh", {
+        key: identity.tokenIdentifier,
       })
+      if (refresh.ok)
+        await ctx.scheduler.runAfter(0, internal.users.refreshUsernameFromClerk, {
+          clerkUserId: identity.subject,
+        })
+    }
+    if (existing) {
+      await ctx.db.patch(existing._id, { displayName, avatarUrl, updatedAt: now })
       await applyStoredRevenueCatState(ctx, existing)
       return existing._id
     }
@@ -154,7 +157,6 @@ export const syncCurrent = mutation({
       clerkUserId: identity.subject,
       displayName,
       avatarUrl,
-      ...usernamePatch,
       membershipMigrationVersion: MEMBERSHIP_MIGRATION_VERSION,
       createdAt: now,
       updatedAt: now,
@@ -162,5 +164,67 @@ export const syncCurrent = mutation({
     const user = await ctx.db.get(userId)
     if (user) await applyStoredRevenueCatState(ctx, user)
     return userId
+  },
+})
+
+export const refreshUsernameFromClerk = internalAction({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, { clerkUserId }) => {
+    if (!env.CLERK_SECRET_KEY) return null
+    const fetchStartedAt = Date.now()
+    const response = await fetch(
+      `https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`,
+      { headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` } },
+    )
+    if (!response.ok) {
+      console.error(`Clerk username refresh failed with status ${response.status}`)
+      return null
+    }
+    const clerkUser: unknown = await response.json()
+    const username =
+      clerkUser &&
+      typeof clerkUser === "object" &&
+      "username" in clerkUser &&
+      typeof clerkUser.username === "string"
+        ? clerkUser.username
+        : ""
+    await ctx.runMutation(internal.users.applyClerkUsername, {
+      clerkUserId,
+      username,
+      fetchStartedAt,
+    })
+    return null
+  },
+})
+
+export const applyClerkUsername = internalMutation({
+  // why: optional so refreshes already scheduled by the previous deploy still apply.
+  args: { clerkUserId: v.string(), username: v.string(), fetchStartedAt: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    if (await hasAccountDeletion(ctx, args.clerkUserId)) return null
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .unique()
+    if (!user) return null
+    // why: a webhook or sync that landed during the fetch is newer than this response, so it wins.
+    if (args.fetchStartedAt !== undefined && user.updatedAt > args.fetchStartedAt) return null
+    const sync = await usernameForSync(ctx, args.username, args.clerkUserId)
+    if (sync.action === "keep") return null
+    if (sync.action === "clear") {
+      await ctx.db.patch(user._id, {
+        username: undefined,
+        usernameNormalized: undefined,
+        updatedAt: Date.now(),
+      })
+      return null
+    }
+    await ctx.db.patch(user._id, {
+      username: sync.username,
+      usernameNormalized: normalizeUsername(sync.username),
+      updatedAt: Date.now(),
+    })
+    await enforceUsernameFilter(ctx, user._id, sync.username)
+    return null
   },
 })

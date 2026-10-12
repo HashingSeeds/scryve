@@ -110,6 +110,15 @@ the code is stale, so compare a call's behavior or `npx convex logs` stack
 lines instead. If it is stale, mark connected-play flows skipped and note the
 risk in the report. Do not redeploy it.
 
+For more seats, scripted remote load, failure cases, or a stale dev deployment,
+use `pnpm bots` instead of a second tab. Bots only run against a Convex preview:
+`pnpm preview:up` points this worktree's app at the branch preview (a preview
+passes the development-deployment check). Then host in the app and run
+`pnpm bots join <CODE> --count <n>`, or run `pnpm bots host --players <n>` and
+join the code it prints. `pnpm bots --help` lists play and failure options
+(commander damage, socket drops, bursts, duplicates); `--json` prints one event
+per line.
+
 ## Drive the flow
 
 - Interact like a user: navigate to the changed screen, perform its primary
@@ -178,6 +187,7 @@ actually saw.
   account, production instance, or secret-bearing workaround.
 - **Connected-play screens fail:** confirm both tabs are signed in as
   different test accounts and the dev deployment is current. If it is stale
-  or unreachable, record as skipped, not failed.
+  or unreachable, use a preview with `pnpm bots` (below), else record as
+  skipped, not failed.
 - **Interaction has no effect:** check the console first — RN-web-only
   crashes often appear there before the UI visibly breaks.

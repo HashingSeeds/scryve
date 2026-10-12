@@ -379,14 +379,14 @@ export function NewGameScreen({
     const nextCounter = playSystemRules(next).counter
     setSystem(next)
     setFormat(next ? playSystemFormat(next) : undefined)
-    setStartingLife(defaultStartingLife(next))
+    setStartingLife(defaultStartingLife(next, undefined, playerCount))
     setLifeStep(nextCounter.tapStep)
     setDeck(undefined)
   }
 
   function chooseFormat(value: string | undefined) {
-    if (startingLife === defaultStartingLife(system, format))
-      setStartingLife(defaultStartingLife(system, value))
+    if (startingLife === defaultStartingLife(system, format, playerCount))
+      setStartingLife(defaultStartingLife(system, value, playerCount))
     setFormat(value)
     setDeck(undefined)
   }
@@ -452,6 +452,8 @@ export function NewGameScreen({
           })
         return next
       })
+    if (startingLife === defaultStartingLife(system, format, playerCount))
+      setStartingLife(defaultStartingLife(system, format, value))
     setPlayerCount(value)
     setLayout((current) => playerGridLayoutForCount(value, current))
   }
@@ -834,44 +836,49 @@ export function NewGameScreen({
                   />
                 ) : null}
               </View>
-              <TouchableOpacity
-                testID="setup-status"
-                accessible={Boolean(statusText)}
-                accessibilityRole={hasStatusDetails ? "button" : "text"}
-                accessibilityLabel={statusText || "Game status"}
-                accessibilityHint={
-                  directResume
-                    ? "Returns to your current game"
-                    : hasStatusDetails
-                      ? "Opens game and connection details"
-                      : undefined
-                }
-                disabled={!hasStatusDetails}
-                style={[
-                  themed($statusRow),
-                  (directResume || (connectedMode && hasStatusDetails)) && themed($resumeAction),
-                ]}
-                onPress={
-                  localGameBlocksStart
-                    ? onResumeLocal
-                    : directResume && resumeGame
-                      ? () => onResumeConnected?.(resumeGame)
-                      : singleBlockingConnected && onResumeConnected
-                        ? () => onResumeConnected(singleBlockingConnected)
-                        : () => setShowStatus(true)
-                }
-              >
-                <Text
-                  testID={preparing && showPreparation ? "connected-host-preparation" : undefined}
-                  accessibilityLiveRegion="polite"
-                  size="xs"
-                  numberOfLines={1}
-                  text={statusText}
-                  style={themed(
-                    directResume || (connectedMode && hasStatusDetails) ? $resumeText : $statusText,
-                  )}
-                />
-              </TouchableOpacity>
+              {/* why: connected status arrives late, so its row stays reserved; an empty local row is dead space above the home indicator. */}
+              {connectedMode || statusText ? (
+                <TouchableOpacity
+                  testID="setup-status"
+                  accessible={Boolean(statusText)}
+                  accessibilityRole={hasStatusDetails ? "button" : "text"}
+                  accessibilityLabel={statusText || "Game status"}
+                  accessibilityHint={
+                    directResume
+                      ? "Returns to your current game"
+                      : hasStatusDetails
+                        ? "Opens game and connection details"
+                        : undefined
+                  }
+                  disabled={!hasStatusDetails}
+                  style={[
+                    themed($statusRow),
+                    (directResume || (connectedMode && hasStatusDetails)) && themed($resumeAction),
+                  ]}
+                  onPress={
+                    localGameBlocksStart
+                      ? onResumeLocal
+                      : directResume && resumeGame
+                        ? () => onResumeConnected?.(resumeGame)
+                        : singleBlockingConnected && onResumeConnected
+                          ? () => onResumeConnected(singleBlockingConnected)
+                          : () => setShowStatus(true)
+                  }
+                >
+                  <Text
+                    testID={preparing && showPreparation ? "connected-host-preparation" : undefined}
+                    accessibilityLiveRegion="polite"
+                    size="xs"
+                    numberOfLines={1}
+                    text={statusText}
+                    style={themed(
+                      directResume || (connectedMode && hasStatusDetails)
+                        ? $resumeText
+                        : $statusText,
+                    )}
+                  />
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </>

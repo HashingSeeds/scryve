@@ -2,7 +2,6 @@ import { getPlayerGridLayoutOptions } from "@/features/game/playerLayouts"
 import {
   defaultStartingLife,
   PLAY_SYSTEM_IDS,
-  playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
 
@@ -21,7 +20,7 @@ const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
 const DEMO_TAP_MS = 2600
 const PRESS_MS = 220
 // Commander damage the demo player deals to each successive opponent.
-const SAMPLE_COMMANDER_DAMAGE = [6, 3] as const
+const SAMPLE_COMMANDER_DAMAGE = [3, 3] as const
 
 function startingLife(system: PlaySystemId) {
   return defaultStartingLife(system, system === "mtg" ? "commander" : undefined)
@@ -59,7 +58,8 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
 
   const countPicker = query<HTMLElement>("[data-pick='count']")
   const layoutPicker = query<HTMLElement>("[data-pick='layout']")
-  const systemPicker = query<HTMLElement>("[data-pick='system']")
+  // Every system picker on the page drives the same game.
+  const systemPickers = [...document.querySelectorAll<HTMLElement>("[data-pick='system']")]
   const press = (picker: HTMLElement, value: string) =>
     picker.querySelectorAll<HTMLElement>("button").forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.value === value))
@@ -73,7 +73,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
       .join("")
     press(countPicker, String(count))
     press(layoutPicker, game.setup.layout)
-    press(systemPicker, game.setup.system)
+    systemPickers.forEach((picker) => press(picker, game.setup.system))
   }
   const picked = (event: Event) =>
     (event.target as Element).closest<HTMLElement>("button")?.dataset.value
@@ -94,13 +94,13 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     )
     if (option) game.reset({ layout: option.variant })
   })
-  systemPicker.innerHTML = PLAY_SYSTEM_IDS.map(
-    (id) => `<button type="button" data-value="${id}">${playSystemRules(id).shortLabel}</button>`,
-  ).join("")
-  systemPicker.addEventListener("click", (event) => {
-    const value = picked(event)
-    const id = PLAY_SYSTEM_IDS.find((system) => system === value)
-    if (id) game.reset({ system: id, startingLife: startingLife(id), values: [] })
+  // The system pickers' buttons are in the HTML, so the hero has its height before this runs.
+  systemPickers.forEach((picker) => {
+    picker.addEventListener("click", (event) => {
+      const value = picked(event)
+      const id = PLAY_SYSTEM_IDS.find((system) => system === value)
+      if (id) game.reset({ system: id, startingLife: startingLife(id), values: [] })
+    })
   })
   game.subscribe((event) => event.type === "reset" && syncPickers())
   syncPickers()
@@ -282,8 +282,10 @@ function setUpStage() {
   setUpFullScreen(stage)
 }
 
-// On small screens the deck screen stands up in a strip too short to use, so tapping it opens
-// the same phone full screen.
+// Scenes whose screen is portrait only. On small screens the phone stands up in a strip too
+// short to use, so tapping it opens the same phone full screen.
+const PORTRAIT_SCENES = new Set(["record", "pro"])
+
 function setUpFullScreen(stage: HTMLElement) {
   const toggle = (open: boolean) => {
     if (stage.classList.contains("full") === open) return
@@ -296,7 +298,11 @@ function setUpFullScreen(stage: HTMLElement) {
   query(".rig", stage).addEventListener(
     "click",
     (event) => {
-      if (!narrow.matches || stage.dataset.scene !== "pro" || stage.classList.contains("full"))
+      if (
+        !narrow.matches ||
+        !PORTRAIT_SCENES.has(stage.dataset.scene ?? "") ||
+        stage.classList.contains("full")
+      )
         return
       event.stopPropagation()
       toggle(true)

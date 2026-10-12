@@ -26,6 +26,16 @@ function commanderGame(): LocalGame {
 }
 
 describe("buildLocalGameSnapshot", () => {
+  it("leaves the first-player offer on the device", () => {
+    const game: LocalGame = { ...commanderGame(), firstChooserSeat: 1, firstPlayerOffered: true }
+    const snapshot = buildLocalGameSnapshot({
+      game,
+      hostPlayerId: game.players[0].id,
+      ...identifiers,
+    })
+    expect(JSON.stringify(snapshot)).not.toMatch(/firstChooserSeat|firstPlayerOffered/)
+  })
+
   it("rebases zero-based local seats onto the server's one-based seats", () => {
     const game = createLocalGame({
       players: [
@@ -113,6 +123,22 @@ describe("buildLocalGameSnapshot", () => {
       buildLocalGameSnapshot({ game: played, hostPlayerId: game.players[0].id, ...identifiers })
         .commanderTotals,
     ).toBeUndefined()
+  })
+
+  it("carries the table by local player id and leaves behind one the server would reject", () => {
+    const game = commanderGame()
+    const [ada, grace] = game.players.map(({ id }) => id)
+    const table = {
+      designations: { monarch: ada },
+      players: { [grace]: { counters: { poison: 3, commanderTax: 4 } } },
+    }
+    const build = (candidate: LocalGame) =>
+      buildLocalGameSnapshot({ game: candidate, hostPlayerId: ada, ...identifiers })
+
+    expect(build({ ...game, table }).table).toEqual(table)
+    expect(
+      build({ ...game, table: { ...table, designations: { notADesignation: ada } } }),
+    ).not.toHaveProperty("table")
   })
 
   it("falls back to a system-less ruleset when the game has no format", () => {

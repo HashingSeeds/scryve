@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import { useKeepAwake } from "expo-keep-awake"
@@ -13,15 +13,17 @@ import {
   type DialogOrigin,
 } from "@/components/DialogCard"
 import { FloatingAppNavigation } from "@/components/FloatingAppNavigation"
-import { type RadialMenuAction } from "@/components/GameRadialMenu"
+import { type GameMenuBadge, type RadialMenuAction } from "@/components/GameRadialMenu"
 import { getPlayerGridLayoutOptions, PlayerGrid } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
+import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { Screen } from "@/components/Screen"
 import { Text } from "@/components/Text"
 import {
   canContinueMatch,
   drawsLabel,
   hasLocalGameStarted,
+  hasPlayBegun,
   incomingCommanderDamage,
   isEliminatedByCommanderDamage,
   matchContextLabel,
@@ -40,6 +42,7 @@ import type {
   MatchSeatOutcome,
   PlayerId,
 } from "@/features/game/types"
+import { useDice } from "@/features/game/useDice"
 import { useLocalGame } from "@/features/game/useLocalGame"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
@@ -83,12 +86,16 @@ export function CurrentGameScreen({
 }: CurrentGameScreenProps) {
   useKeepAwake("count-local-game", { suppressDeactivateWarnings: true })
   const menuButtonStyle = useMenuButtonStyle()
-  const { themed } = useAppTheme()
+  const {
+    themed,
+    theme: { colors },
+  } = useAppTheme()
   const insets = useSafeAreaInsets()
   const runtime = useLocalGame(initialGame, repository, ownerId)
   const system = runtime.game.system
   const [menuOpen, setMenuOpen] = useState(false)
-  const [freshBoard, setFreshBoard] = useState(fresh)
+  // why: a board opened on a game already in play keeps End for it; every later game here starts fresh.
+  const [resumedGameId] = useState(fresh ? undefined : initialGame.id)
   const [saved, setSaved] = useState<{ gameId: string; message: string }>()
   // why: the game that just ended decides whether the match goes on, and it is already in history.
   const [matchPrompt, setMatchPrompt] = useState<LocalGame | undefined>(() =>
@@ -96,19 +103,78 @@ export function CurrentGameScreen({
   )
   const [matchEnding, setMatchEnding] = useState<LocalGame>()
   const [matchOpen, setMatchOpen] = useState(false)
-  const isFresh = freshBoard && !hasLocalGameStarted(runtime.game)
+  const isFresh = runtime.game.id !== resumedGameId && !hasLocalGameStarted(runtime.game)
   const match = runtime.game.match
   const [endSource, setEndSource] = useState<GameEndSource | undefined>(
     initialEndOpen ? "stale_game_prompt" : undefined,
   )
   const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
+  const dice = useDice(runtime.game.players, runtime.game.id)
+  const playBegun = hasPlayBegun(runtime.game)
+  const diceGameStarted = dice.gameStarted
+  const markFirstPlayerUsed = runtime.markFirstPlayerUsed
+  // why: once play has begun the badge is gone for good on its own, so nothing is written here; the marker is written only when the badge is used.
+  useEffect(() => {
+    if (playBegun) diceGameStarted()
+  }, [playBegun, diceGameStarted])
+  const firstPlayerUsed = runtime.game.firstPlayerOffered === true
+  const loserSeat = runtime.game.firstChooserSeat
+  const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
+  const { ask: diceAsk, flip: diceFlip, rollOff: diceRollOff } = dice
+  const badge = useMemo<GameMenuBadge | undefined>(() => {
+    if (playBegun || firstPlayerUsed) return undefined
+    const offer = (run: () => void) => () => {
+      markFirstPlayerUsed()
+      run()
+    }
+    if (loser && loserSeat !== undefined)
+      return {
+        color: loser.color,
+        glyph: { seatNumber: loserSeat + 1, shape: loser.shape },
+        accessibilityLabel: `${loser.name} lost the last game. Choose who goes first`,
+        onPress: offer(() => diceAsk(loser.id, "loss")),
+      }
+    if (system === "pokemon")
+      return {
+        color: colors.gameMenu.actions.dice,
+        glyph: { tool: "coin" },
+        accessibilityLabel: "Flip for who goes first",
+        onPress: offer(diceFlip),
+      }
+    return {
+      color: colors.gameMenu.actions.dice,
+      glyph: { tool: "d20" },
+      accessibilityLabel: "Roll for who goes first",
+      onPress: offer(diceRollOff),
+    }
+  }, [
+    colors.gameMenu.actions.dice,
+    diceAsk,
+    diceFlip,
+    diceRollOff,
+    firstPlayerUsed,
+    loser,
+    loserSeat,
+    markFirstPlayerUsed,
+    playBegun,
+    system,
+  ])
+  // why: a dice tool tapped from the open menu acts at once, and the menu folds away around the row.
+  const diceTools = useMemo(
+    () =>
+      dice.tools.map((tool) => ({
+        ...tool,
+        onPress: () => {
+          setMenuOpen(false)
+          tool.onPress()
+        },
+      })),
+    [dice.tools],
+  )
   const [menuDialogOrigin, setMenuDialogOrigin] = useState<DialogOrigin>()
   const [armedPlayerId, setArmedPlayerId] = useState<PlayerId | null>(null)
   const [inspectedPlayerId, setInspectedPlayerId] = useState<PlayerId | null>(null)
   const commanderDamageEnabled = supportsCommanderDamage(system, runtime.game.format)
-
-  const runtimeRef = useRef(runtime)
-  runtimeRef.current = runtime
 
   function toggleSword(player: GamePlayer) {
     setInspectedPlayerId(null)
@@ -141,13 +207,11 @@ export function CurrentGameScreen({
       if (canContinueMatch(ended)) runtime.nextMatchGame()
       else runtime.holdMatchEnd(ended.match.id)
       setEndSource(undefined)
-      setFreshBoard(true)
       setMatchPrompt(ended)
       return
     }
     runtime.rematch()
     setEndSource(undefined)
-    setFreshBoard(true)
     setSaved({ gameId: ended.id, message: ended.match ? "Match saved" : "Game saved" })
   }
 
@@ -155,7 +219,6 @@ export function CurrentGameScreen({
     if (!matchEnding?.match) return
     const ended = runtime.endMatch(matchEnding.match.id, outcomes)
     setMatchEnding(undefined)
-    setFreshBoard(true)
     setSaved({ gameId: ended.id, message: "Match saved" })
   }
 
@@ -179,7 +242,6 @@ export function CurrentGameScreen({
     setEndSource(undefined)
     if (match) {
       runtime.restartMatchGame()
-      setFreshBoard(true)
       return
     }
     if (!onGameAbandoned) return
@@ -205,11 +267,6 @@ export function CurrentGameScreen({
     setMenuOpen((current) => !current)
   }, [])
 
-  const undoAndCloseMenu = useCallback(() => {
-    runtimeRef.current.undo()
-    setMenuOpen(false)
-  }, [])
-
   const exitCommanderMode = useCallback(() => {
     setArmedPlayerId(null)
     setInspectedPlayerId(null)
@@ -231,12 +288,7 @@ export function CurrentGameScreen({
           setLayoutPickerOpen(true)
         },
       },
-      {
-        kind: "undo",
-        label: "Undo",
-        disabled: !runtime.canUndo,
-        onPress: undoAndCloseMenu,
-      },
+      { kind: "dice", label: "Dice", tools: diceTools },
       {
         kind: "setup",
         label: "Game",
@@ -277,24 +329,27 @@ export function CurrentGameScreen({
     [
       captureMenuDialogOrigin,
       closeMenu,
+      diceTools,
       isFresh,
       layoutOptions.length,
       onConnect,
       onHistory,
       onSetup,
-      runtime.canUndo,
       showEndConfirmation,
-      undoAndCloseMenu,
     ],
   )
 
   const seatColors = useSeatColors(runtime.game.players)
+  const diceOpen = dice.open
+  const closeDice = dice.close
   const exitAction = useMemo(
     () =>
-      armedPlayerId || inspectedPlayerId
-        ? { label: "Exit commander damage", onPress: exitCommanderMode }
-        : undefined,
-    [armedPlayerId, inspectedPlayerId, exitCommanderMode],
+      diceOpen
+        ? { label: "Close dice", onPress: closeDice }
+        : armedPlayerId || inspectedPlayerId
+          ? { label: "Exit commander damage", onPress: exitCommanderMode }
+          : undefined,
+    [armedPlayerId, closeDice, diceOpen, inspectedPlayerId, exitCommanderMode],
   )
 
   return (
@@ -331,6 +386,8 @@ export function CurrentGameScreen({
                   }
                 : undefined
             }
+            table={runtime.tableRuntime}
+            dice={dice.grid}
             onChange={runtime.changeLife}
           />
         )}
@@ -349,6 +406,8 @@ export function CurrentGameScreen({
                 },
               }
             : {}),
+          heldAction: diceOpen ? "dice" : undefined,
+          badge,
           onToggle: toggleMenu,
           onClose: closeMenu,
         }}
@@ -364,6 +423,7 @@ export function CurrentGameScreen({
           ) : null
         }
       />
+      <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
 
       {layoutPickerOpen ? (
         <DialogCard
