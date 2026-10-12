@@ -118,7 +118,8 @@ export function CurrentGameScreen({
     diceGameStarted()
     markFirstPlayerUsed()
   }, [playBegun, diceGameStarted, markFirstPlayerUsed])
-  const { used: firstPlayerUsed, loserSeat } = runtime.firstPlayer
+  const firstPlayerUsed = runtime.game.firstPlayerOffered === true
+  const loserSeat = runtime.game.firstChooserSeat
   const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
   const { ask: diceAsk, flip: diceFlip, rollOff: diceRollOff } = dice
   const badge = useMemo<GameMenuBadge | undefined>(() => {

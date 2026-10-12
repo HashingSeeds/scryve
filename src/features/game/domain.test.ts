@@ -20,6 +20,7 @@ import {
   meSeatOf,
   reduceGameEvent,
   validatePlayerNames,
+  restartMatchGame,
   soleLoserSeat,
 } from "./domain"
 import type { CommandContext, GameEvent, LifeDelta, LocalGame } from "./types"
@@ -504,5 +505,38 @@ describe("soleLoserSeat", () => {
     ).toBeUndefined()
     expect(soleLoserSeat({ ...game, result: { kind: "draw" } })).toBeUndefined()
     expect(soleLoserSeat(game)).toBeUndefined()
+  })
+})
+
+describe("first chooser on a rematch", () => {
+  const finished = {
+    ...createLocalGame({
+      players: [
+        { name: "Ada", color: "#41476E" },
+        { name: "Grace", color: "#39755C" },
+      ],
+      startingLife: 20,
+      now: 1,
+      match: { bestOf: 3 },
+    }),
+    status: "finished" as const,
+  }
+
+  it("hands the loser the first choice, keeps it through a restart, and reopens the offer", () => {
+    const won = {
+      ...finished,
+      result: { kind: "win" as const, winnerPlayerIds: [finished.players[0].id] },
+    }
+    const next = createRematch(won)
+    expect(next.firstChooserSeat).toBe(1)
+    expect(next.firstPlayerOffered).toBeUndefined()
+    expect(
+      createRematch({ ...finished, result: { kind: "draw" } }).firstChooserSeat,
+    ).toBeUndefined()
+
+    const restarted = restartMatchGame({ ...next, firstPlayerOffered: true })
+    expect(restarted.firstChooserSeat).toBe(1)
+    expect(restarted.firstPlayerOffered).toBeUndefined()
+    expect(restarted.match).toEqual(next.match)
   })
 })

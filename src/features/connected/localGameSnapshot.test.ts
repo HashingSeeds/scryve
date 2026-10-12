@@ -26,6 +26,16 @@ function commanderGame(): LocalGame {
 }
 
 describe("buildLocalGameSnapshot", () => {
+  it("leaves the first-player offer on the device", () => {
+    const game: LocalGame = { ...commanderGame(), firstChooserSeat: 1, firstPlayerOffered: true }
+    const snapshot = buildLocalGameSnapshot({
+      game,
+      hostPlayerId: game.players[0].id,
+      ...identifiers,
+    })
+    expect(JSON.stringify(snapshot)).not.toMatch(/firstChooserSeat|firstPlayerOffered/)
+  })
+
   it("rebases zero-based local seats onto the server's one-based seats", () => {
     const game = createLocalGame({
       players: [

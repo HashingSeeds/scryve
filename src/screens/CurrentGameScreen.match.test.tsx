@@ -6,10 +6,6 @@ import { ThemeProvider } from "@/theme/context"
 
 import { CurrentGameScreen } from "./CurrentGameScreen"
 
-jest.mock("@/utils/crashReporting", () => ({
-  ...jest.requireActual<typeof import("@/utils/crashReporting")>("@/utils/crashReporting"),
-  reportCrash: jest.fn(),
-}))
 jest.mock("react-native-safe-area-context", () => ({
   ...jest.requireActual("react-native-safe-area-context"),
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),
@@ -86,29 +82,6 @@ describe("CurrentGameScreen match mode", () => {
     fireEvent.press(view.getByTestId("abandon-game-button"))
 
     expect(view.getByTestId("match-context")).toHaveTextContent(/^Game 2/)
-    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(offer)
-  })
-
-  it("keeps the loser's first choice through a restart even when the record cannot be stored", () => {
-    class RefusingStorage extends MemoryStorage {
-      set(key: string, value: string) {
-        if (key.includes("firstPlayer")) throw new Error("quota")
-        super.set(key, value)
-      }
-    }
-    const repository = new LocalGameRepository(new RefusingStorage())
-    repository.saveActiveGame(matchGame(3))
-    const { view } = mount(repository, jest.fn())
-    endGame(view, 0)
-    fireEvent.press(view.getByTestId("next-game-button"))
-    const offer = "Grace lost the last game. Choose who goes first"
-    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(offer)
-
-    fireEvent.press(view.getByTestId("life-seat-1-1"))
-    fireEvent.press(view.getByTestId("game-menu-button"))
-    fireEvent.press(view.getByTestId("end-game-button"))
-    fireEvent.press(view.getByTestId("abandon-game-button"))
-
     expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(offer)
   })
 
