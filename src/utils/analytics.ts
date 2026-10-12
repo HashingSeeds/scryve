@@ -6,6 +6,7 @@ import type PostHog from "posthog-react-native"
 import { createClientId } from "@/features/game/domain"
 import { isPlaySystemId, playSystemFormats } from "@/features/game/playSystems"
 import { loadString, saveString, storage } from "@/utils/storage"
+import type { TelemetryAdapter } from "@/utils/telemetry"
 
 const CONSENT_KEY = "scryve.analytics.consent.v1"
 const SOURCE_KEY = "scryve.analytics.source.v1"
@@ -21,9 +22,11 @@ const values = {
   feature: ["library", "saved", "assigned"],
   surface: ["history", "deck"],
   end_source: ["game_menu", "new_game_prompt", "stale_game_prompt", "unknown"],
+  timing: ["join.completed", "join.failed", "mutation.ack"],
 } as const
 
 export type GameEndSource = (typeof values.end_source)[number]
+type SyncTiming = (typeof values.timing)[number]
 
 type GameProperties = {
   system?: string
@@ -42,6 +45,7 @@ type Events = {
   }
   deck_used: { feature: "library" | "saved" | "assigned" }
   stats_viewed: { surface: "history" | "deck" }
+  sync_timing: { timing: SyncTiming; duration_ms: number; attempt_count?: number }
 }
 
 const eventKeys: Record<keyof Events, readonly string[]> = {
@@ -51,6 +55,7 @@ const eventKeys: Record<keyof Events, readonly string[]> = {
   connection_attempt: ["action", "stage", "reason"],
   deck_used: ["feature"],
   stats_viewed: ["surface"],
+  sync_timing: ["timing", "duration_ms", "attempt_count"],
 }
 
 let enabled = loadString(CONSENT_KEY) === "yes"
@@ -92,6 +97,9 @@ export function analyticsProperties(event: string, properties: Record<string, un
     } else if (key === "player_count") {
       if (typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= 6)
         result[key] = value
+    } else if (key === "duration_ms" || key === "attempt_count") {
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0)
+        result[key] = Math.round(value)
     } else if (
       Object.hasOwn(values, key) &&
       typeof value === "string" &&
@@ -247,6 +255,24 @@ export function captureAnalytics<E extends keyof Events>(event: E, properties: E
       })
       .catch(() => undefined)
   }, 0)
+}
+
+const isSyncTiming = (name: string): name is SyncTiming =>
+  (values.timing as readonly string[]).includes(name)
+
+const MUTATION_ACK_KEEP_PROBABILITY = 0.05
+
+/** why: consent is checked when the event happens, never later, so nothing recorded while sharing is off can upload after opting in; PostHog's own queue is already cleared on withdrawal. */
+export const syncTimingAdapter: TelemetryAdapter = {
+  emit({ name, metadata }) {
+    if (!enabled || !isSyncTiming(name) || metadata.durationMs === undefined) return
+    if (name === "mutation.ack" && Math.random() >= MUTATION_ACK_KEEP_PROBABILITY) return
+    captureAnalytics("sync_timing", {
+      timing: name,
+      duration_ms: metadata.durationMs,
+      ...(metadata.attemptCount !== undefined && { attempt_count: metadata.attemptCount }),
+    })
+  },
 }
 
 export function initAnalytics() {

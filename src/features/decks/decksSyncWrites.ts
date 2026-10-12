@@ -13,9 +13,10 @@ import {
   type DurableOutboxKeys,
   type DurablePendingRecord,
   type DurableStringStorage,
+  type FieldName,
 } from "@/features/sync/durableOutbox"
 import { createOutboxController, type OutboxController } from "@/features/sync/outboxController"
-import { convexErrorCode, convexErrorMessage } from "@/utils/convexError"
+import { convexErrorCode, convexErrorMessage, isArgumentValidationError } from "@/utils/convexError"
 import { storage } from "@/utils/storage"
 
 import {
@@ -25,6 +26,7 @@ import {
   type DeckSyncController,
   type SyncedDeck,
 } from "./decksSync"
+import { DECK_CONFLICT_REASON } from "./deckSyncReasons"
 import { api } from "../../../convex/_generated/api"
 import { assertDeckName, assertDeckFormat, assertDeckNote } from "../../../convex/lib/policy"
 
@@ -54,9 +56,11 @@ export interface DeckSyncWriteSnapshot {
   capacityBlocked: boolean
 }
 
+export { DECK_CONFLICT_REASON }
+
 const SCOPE = "metadata"
 const RETRY_DELAY_MS = 2_000
-export const DECK_CONFLICT_REASON = "Deck changed on another device. Choose which version to keep."
+export const DECK_REJECTED_REASON = "The server can't accept this edit. Discard it and edit again."
 const permanentErrors = new Set([
   "sync_conflict",
   "sync_operation_mismatch",
@@ -131,7 +135,28 @@ function parseFailed(value: unknown): FailedDeckWrite | null {
   return action ? { schemaVersion: 1, action, reason, failedAt: value.failedAt } : null
 }
 
+const fieldNames: Record<FieldName<PendingDeckWrite>, true> = {
+  schemaVersion: true,
+  queuedAt: true,
+  attempts: true,
+  lastAttemptAt: true,
+  ownerId: true,
+  deckId: true,
+  supersedes: true,
+  id: true,
+  operationId: true,
+  expectedOwnerId: true,
+  returnConflict: true,
+  expectedRevision: true,
+  name: true,
+  format: true,
+  game: true,
+  note: true,
+  deleted: true,
+}
+
 const codec: DurableOutboxCodec<PendingDeckWrite, FailedDeckWrite> = {
+  knownKeys: Object.keys(fieldNames),
   parsePending,
   parseFailed,
   createFailure: (action, reason, failedAt) => ({ schemaVersion: 1, action, reason, failedAt }),
@@ -344,6 +369,8 @@ export class DeckMetadataWriteController {
         const code = convexErrorCode(cause)
         if (code === "sync_conflict")
           return { kind: "reject" as const, reason: DECK_CONFLICT_REASON }
+        if (isArgumentValidationError(cause))
+          return { kind: "reject" as const, reason: DECK_REJECTED_REASON }
         return code && permanentErrors.has(code)
           ? {
               kind: "reject" as const,

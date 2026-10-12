@@ -67,6 +67,7 @@ On Linux, an iOS `agent-device` failure does not mean mobile verification is una
 - UI changes need before/after images. Motion or timing needs a short video.
 - Upload PR evidence to GitHub. Never commit PR-only screenshots or assets such as `.github/pr-assets/`.
 - One concern per PR. If the description says "also", split it.
+- CodeRabbit reviews a PR once when it opens, not on later pushes. Its limit is shared by every agent, since all PRs open as Matt. Batch review fixes into one push, then comment `@coderabbitai full review` once. Never retry the command in a loop; `@coderabbitai rate limit` shows what's left without spending a review.
 - When babysitting: poll checks and comments newer than the last push, verify each bot finding against the source, fix real ones, dismiss false positives with a written reason. Stay quiet when nothing is new. Stop when the bots are green on the latest commit.
 
 ## Plans and work artifacts

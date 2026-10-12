@@ -18,6 +18,7 @@ import {
 import { requireHost, requireMembership, requireSeatOwner, requireUser } from "./lib/auth"
 import { assertDeckGameFormat, DEFAULT_DECK_GAME } from "./lib/deckGames"
 import { hasFeature, PREMIUM_FEATURES } from "./lib/entitlements"
+import { limitGameRate } from "./lib/gameRateLimits"
 import { gameWriteError } from "./lib/gameWriteErrors"
 import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
 import { blockedUserIdsFor, isBlockedBetween, publicUsernameFor } from "./lib/moderation"
@@ -45,6 +46,22 @@ import {
   STALE_GAME_INACTIVITY_MS,
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
+import { recordGameResults } from "./lib/results"
+import { tableRules } from "./lib/systems"
+import {
+  applyTableAction as reduceTableAction,
+  canonicalJson,
+  isValidTableSnapshot,
+  remapTableState,
+  tableActionDelta,
+  tableActionIdentity,
+  tableStateValidator,
+  tableActionValidator,
+  type PlayerTable,
+  type PokemonCard,
+  type TableAction,
+  type TableState,
+} from "./lib/table"
 import { linkPublishedGameToMatch, publishedMatchValidator } from "./matches"
 
 const MAX_PLAYERS_PER_GAME_READ = 7
@@ -162,13 +179,27 @@ function assertSnapshotLife(life: number) {
     throw new Error("Snapshot life must be a whole number between -1000000 and 1000000")
 }
 
-async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: "seatLookup") {
-  const now = Date.now()
-  const record = await ctx.db
+const JOIN_ATTEMPT_WINDOW_MS = 60_000
+const MAX_JOIN_ATTEMPTS = 10
+const INVALID_INVITE_MESSAGE = "Invite is invalid, expired, or revoked"
+const TOO_MANY_JOINS_MESSAGE = "Too many join attempts; wait a minute and try again"
+
+// why: production redacts plain Error messages to "Server Error"; ConvexError data reaches the client.
+function tooManyJoinAttempts() {
+  return new ConvexError({ code: "too_many_join_attempts", message: TOO_MANY_JOINS_MESSAGE })
+}
+
+async function joinAttemptsFor(ctx: QueryCtx, clerkUserId: string, kind?: "seatLookup") {
+  return await ctx.db
     .query("joinAttempts")
     .withIndex("by_clerk_user_kind", (q) => q.eq("clerkUserId", clerkUserId).eq("kind", kind))
     .unique()
-  if (!record || now - record.windowStartedAt >= 60_000) {
+}
+
+async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: "seatLookup") {
+  const now = Date.now()
+  const record = await joinAttemptsFor(ctx, clerkUserId, kind)
+  if (!record || now - record.windowStartedAt >= JOIN_ATTEMPT_WINDOW_MS) {
     if (record) await ctx.db.patch(record._id, { windowStartedAt: now, attempts: 1 })
     else
       await ctx.db.insert("joinAttempts", {
@@ -179,11 +210,53 @@ async function consumeJoinAttempt(ctx: MutationCtx, clerkUserId: string, kind?: 
       })
     return
   }
-  if (record.attempts >= 10) {
+  if (record.attempts >= MAX_JOIN_ATTEMPTS) {
     if (kind === "seatLookup") return ctx.db.patch(record._id, { attempts: record.attempts + 1 })
-    throw new Error("Too many join attempts; wait a minute and try again")
+    throw tooManyJoinAttempts()
   }
   await ctx.db.patch(record._id, { attempts: record.attempts + 1 })
+}
+
+// why: a malformed code can never match an invite, so it counts as a wrong one instead of throwing and rolling back the attempt.
+function manualCodeOrUndefined(code: string) {
+  try {
+    return normalizeManualCode(code)
+  } catch {
+    return undefined
+  }
+}
+
+function inviteKey(args: { token?: string; manualCode?: string }) {
+  if (args.token) return args.token
+  return args.manualCode ? (manualCodeOrUndefined(args.manualCode) ?? args.manualCode) : ""
+}
+
+/**
+ * why: callers must return rather than throw after this, because a thrown error rolls the
+ * counter back. The remembered invite lets claimSeat keep throwing for clients that predate this.
+ */
+async function recordFailedInvite(
+  ctx: MutationCtx,
+  clerkUserId: string,
+  args: { token?: string; manualCode?: string },
+) {
+  await consumeJoinAttempt(ctx, clerkUserId)
+  const record = await joinAttemptsFor(ctx, clerkUserId)
+  if (record)
+    await ctx.db.patch(record._id, { failedInvite: inviteKey(args), failedInviteAt: Date.now() })
+}
+
+async function joinableInviteGame(ctx: QueryCtx, args: { token?: string; manualCode?: string }) {
+  const invite = await findInvite(ctx, args)
+  if (!invite) return null
+  const game = await ctx.db.get(invite.gameId)
+  if (
+    !game ||
+    (game.status !== "lobby" && game.status !== "active") ||
+    !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+  )
+    return null
+  return game
 }
 
 function seatLabelFor(player: { seat: number }) {
@@ -388,10 +461,11 @@ async function findInvite(
       .query("invitations")
       .withIndex("by_token", (q) => q.eq("token", args.token!))
       .unique()
-  if (args.manualCode)
+  const manualCode = args.manualCode ? manualCodeOrUndefined(args.manualCode) : undefined
+  if (manualCode)
     return await ctx.db
       .query("invitations")
-      .withIndex("by_manual_code", (q) => q.eq("manualCode", normalizeManualCode(args.manualCode!)))
+      .withIndex("by_manual_code", (q) => q.eq("manualCode", manualCode))
       .unique()
   return null
 }
@@ -442,23 +516,6 @@ async function inviteIsCurrent(
   if (game.currentInvitationId) return game.currentInvitationId === invite._id
   const current = await currentUsableInvite(ctx, game, now)
   return current?._id === invite._id
-}
-
-type DeckRecord = { games: number; wins: number; losses: number; draws: number; unknown: number }
-
-function incrementedRecord(
-  current: DeckRecord | null,
-  outcome: "win" | "loss" | "draw" | "unknown",
-  now: number,
-) {
-  return {
-    games: (current?.games ?? 0) + 1,
-    wins: (current?.wins ?? 0) + (outcome === "win" ? 1 : 0),
-    losses: (current?.losses ?? 0) + (outcome === "loss" ? 1 : 0),
-    draws: (current?.draws ?? 0) + (outcome === "draw" ? 1 : 0),
-    unknown: (current?.unknown ?? 0) + (outcome === "unknown" ? 1 : 0),
-    updatedAt: now,
-  }
 }
 
 async function terminalizeGame(
@@ -577,39 +634,7 @@ async function terminalizeGame(
       outcome,
     })
   }
-  // why: an abandoned game has no result, so counting it as a played game would drag down deck win rates.
-  const recordsDeckResults = recordsHistory && status === "finished"
-  for (const player of recordsDeckResults ? summaryPlayers : []) {
-    if (!player.userId || !player.deckId || !player.deckVersionId) continue
-    await ctx.db.insert("deckGameResults", {
-      deckId: player.deckId,
-      deckVersionId: player.deckVersionId,
-      gameId: game._id,
-      playerId: player.playerId,
-      userId: player.userId,
-      outcome: player.outcome,
-      finishedAt,
-    })
-    const stats = await ctx.db
-      .query("deckStats")
-      .withIndex("by_deck", (q) => q.eq("deckId", player.deckId!))
-      .unique()
-    const increment = incrementedRecord(stats, player.outcome, now)
-    if (stats) await ctx.db.patch(stats._id, increment)
-    else await ctx.db.insert("deckStats", { deckId: player.deckId, ...increment })
-    const versionStats = await ctx.db
-      .query("deckVersionStats")
-      .withIndex("by_version", (q) => q.eq("deckVersionId", player.deckVersionId!))
-      .unique()
-    const versionIncrement = incrementedRecord(versionStats, player.outcome, now)
-    if (versionStats) await ctx.db.patch(versionStats._id, versionIncrement)
-    else
-      await ctx.db.insert("deckVersionStats", {
-        deckId: player.deckId,
-        deckVersionId: player.deckVersionId,
-        ...versionIncrement,
-      })
-  }
+  await recordGameResults(ctx, summary, now)
   await ctx.db.patch(game._id, { status, updatedAt: now })
   for (const player of players) await ctx.db.patch(player._id, { resumable: false })
   return summary
@@ -640,6 +665,7 @@ export const createLobby = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
+    await limitGameRate(ctx, "lobbyCreate", user._id)
     if (args.game !== undefined && args.system !== undefined && args.game !== args.system)
       throw new Error("Game system fields must match")
     const noSystem = (args.system ?? args.game) === NO_GAME_SYSTEM
@@ -819,19 +845,27 @@ export const claimSeat = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
-    await consumeJoinAttempt(ctx, String(user.clerkUserId))
+    const clerkUserId = String(user.clerkUserId)
+    await consumeJoinAttempt(ctx, clerkUserId)
     if (args.color !== undefined) assertAllowedColor(args.color)
     if (args.shape !== undefined) assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
     if (args.deviceId) assertDeviceId(args.deviceId)
-    const invite = await findInvite(ctx, args)
-    if (!invite) throw new Error("Invite is invalid, expired, or revoked")
-    const game = await ctx.db.get(invite.gameId)
-    if (
-      !game ||
-      (game.status !== "lobby" && game.status !== "active") ||
-      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
-    )
-      throw new Error("Invite is invalid, expired, or revoked")
+    const game = await joinableInviteGame(ctx, args)
+    if (!game) {
+      /* why: installed clients claim right after claimableSeats rejected the same invite and
+         expect this throw; that lookup already counted the failure. The grace is timed from the
+         lookup, not the window, so a rollover between the two calls still throws, yet retries
+         stop being free a minute later. Any other wrong invite returns null so the attempt
+         counted above commits. */
+      const joins = await joinAttemptsFor(ctx, clerkUserId)
+      if (
+        joins?.failedInvite === inviteKey(args) &&
+        joins.failedInviteAt !== undefined &&
+        Date.now() - joins.failedInviteAt < JOIN_ATTEMPT_WINDOW_MS
+      )
+        throw new Error(INVALID_INVITE_MESSAGE)
+      return null
+    }
     const existingPlayers = await playersForGame(ctx, game._id)
     for (const seated of existingPlayers) {
       if (!seated.userId || seated.userId === user._id) continue
@@ -976,6 +1010,8 @@ export const publishLocalGame = mutation({
     commanderTotals: v.optional(
       v.array(v.object({ fromSeat: v.number(), toSeat: v.number(), total: v.number() })),
     ),
+    // why: counters, designations, and Pokémon keyed by local player id; remapped to the new seats on insert.
+    table: v.optional(tableStateValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
@@ -1005,6 +1041,8 @@ export const publishLocalGame = mutation({
     }
     if (totalPairs.size > MAX_PLAYERS_PER_GAME_READ * (MAX_PLAYERS_PER_GAME_READ - 1))
       throw new Error("Too many commander damage totals")
+    if (args.table && !isValidTableSnapshot(args.table, tableRules(gameSystem, format), localIds))
+      throw new Error("Table state does not fit this game")
     const requestKey = JSON.stringify([
       args.publicId,
       args.system ?? null,
@@ -1025,6 +1063,8 @@ export const publishLocalGame = mutation({
         player.currentLife,
       ]),
       args.commanderTotals ?? null,
+      // why: appended only when sent, so receipts written before tables existed keep their key.
+      ...(args.table ? [canonicalJson(args.table)] : []),
     ])
     const receipt = await ctx.db
       .query("gamePublishReceipts")
@@ -1042,6 +1082,7 @@ export const publishLocalGame = mutation({
         players: receipt.players,
       }
     }
+    await limitGameRate(ctx, "lobbyCreate", user._id)
     await clearWayToHost(ctx, user._id)
     if (
       await ctx.db
@@ -1090,6 +1131,20 @@ export const publishLocalGame = mutation({
       })
       mapping.push({ localId: player.localId, playerId, seat: player.seat })
       playerIdsBySeat.set(player.seat, playerId)
+    }
+    if (args.table) {
+      const playerIdsByLocalId = new Map(
+        mapping.map(({ localId, playerId }) => [localId, playerId]),
+      )
+      const table = remapTableState(gatedTableState(args.table), (localId) =>
+        playerIdsByLocalId.get(localId)!,
+      )
+      for (const [playerId, player] of Object.entries(table.players)) {
+        const id = ctx.db.normalizeId("gamePlayers", playerId)
+        if (id) await ctx.db.patch(id, playerTableFromRow(player))
+      }
+      if (Object.keys(table.designations).length > 0)
+        await ctx.db.patch(gameId, { designations: storedDesignations(ctx, table.designations) })
     }
     for (const total of totals) {
       await ctx.db.insert("gameCommanderDamage", {
@@ -1309,16 +1364,23 @@ export const claimableSeats = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx)
-    await consumeJoinAttempt(ctx, String(user.clerkUserId), "seatLookup")
-    const invite = await findInvite(ctx, args)
-    if (!invite) throw new Error("Invite is invalid, expired, or revoked")
-    const game = await ctx.db.get(invite.gameId)
+    const clerkUserId = String(user.clerkUserId)
+    /* why: a lookup reveals whether a code is live, so it stops once wrong codes or claims have
+       spent the join budget, even though repeat lookups of a good code never spend it. */
+    const joins = await joinAttemptsFor(ctx, clerkUserId)
     if (
-      !game ||
-      (game.status !== "active" && game.status !== "lobby") ||
-      !(await inviteIsCurrent(ctx, game, invite, Date.now()))
+      joins &&
+      Date.now() - joins.windowStartedAt < JOIN_ATTEMPT_WINDOW_MS &&
+      joins.attempts >= MAX_JOIN_ATTEMPTS
     )
-      throw new Error("Invite is invalid, expired, or revoked")
+      throw tooManyJoinAttempts()
+    await consumeJoinAttempt(ctx, clerkUserId, "seatLookup")
+    const game = await joinableInviteGame(ctx, args)
+    if (!game) {
+      await recordFailedInvite(ctx, clerkUserId, args)
+      // why: clients that predate `invalid` see no seats and fall through to claimSeat, which throws.
+      return { invalid: true as const, seats: [] }
+    }
     const players = await playersForGame(ctx, game._id)
     for (const seated of players) {
       if (!seated.userId || seated.userId === user._id) continue
@@ -1360,6 +1422,13 @@ const connectedOperation = v.union(
     claimOperationId: v.string(),
     toPlayerId: v.id("gamePlayers"),
     accepted: v.boolean(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+  }),
+  v.object({
+    kind: v.literal("table.action"),
+    operationId: v.string(),
+    action: tableActionValidator,
     deviceId: v.string(),
     clientCreatedAt: v.number(),
   }),
@@ -1454,9 +1523,21 @@ export const lobbyProjection = query({
           })),
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
+      ...(tableRulesApply(gameTableRules(game)) ? { table: tableProjection(game, players) } : {}),
     }
   },
 })
+
+function tableRulesApply(rules: ReturnType<typeof gameTableRules>) {
+  return rules.counters.length > 0 || rules.designations.length > 0 || rules.pokemon !== undefined
+}
+
+function tableProjection(game: Doc<"games">, players: Doc<"gamePlayers">[]): TableState {
+  return {
+    designations: game.designations ?? {},
+    players: Object.fromEntries(players.map((player) => [player._id, playerTableFromRow(player)])),
+  }
+}
 
 export const connectedOperationStatus = query({
   args: { publicId: v.string(), operation: connectedOperation },
@@ -1553,10 +1634,14 @@ async function statusForOperation(
       ? event.kind === "life.changed" &&
         event.playerId === operation.playerId &&
         event.delta === operation.delta
-      : event.kind === "commanderDamage.claimed" &&
-        event.fromPlayerId === operation.fromPlayerId &&
-        event.toPlayerId === operation.toPlayerId &&
-        event.delta === operation.delta)
+      : operation.kind === "table.action"
+        ? event.kind === operation.action.kind &&
+          event.playerId === operation.action.playerId &&
+          event.actionIdentity === tableActionIdentity(operation.action)
+        : event.kind === "commanderDamage.claimed" &&
+          event.fromPlayerId === operation.fromPlayerId &&
+          event.toPlayerId === operation.toPlayerId &&
+          event.delta === operation.delta)
   return matches ? acknowledged() : conflict("Operation identifier was reused with different data")
 }
 
@@ -1572,7 +1657,8 @@ export const setMyAppearance = mutation({
     assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
     const game = await gameByPublicId(ctx, args.publicId)
     if (game.status !== "lobby") throw new Error("Appearance can only change in a lobby")
-    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
+    const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
+    await limitGameRate(ctx, "gameWrite", user._id)
     const players = await playersForGame(ctx, game._id)
     const requested = { color: args.color.toUpperCase(), shape: args.shape as PlayerMarkShape }
     if (appearanceIsTaken(takenAppearances(players, player._id), requested))
@@ -1591,7 +1677,8 @@ export const updateLobbySettings = mutation({
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    await requireHost(ctx, game)
+    const host = await requireHost(ctx, game)
+    await limitGameRate(ctx, "gameWrite", host._id)
     if (game.status !== "lobby")
       throw new ConvexError({
         code: "lobby_settings_not_allowed",
@@ -1671,7 +1758,8 @@ export const updateMySeat = mutation({
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
     if (game.status !== "lobby") throw new Error("Seat metadata can only change in the lobby")
-    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
+    const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
+    await limitGameRate(ctx, "gameWrite", user._id)
     const displayName = assertDisplayName(args.displayName)
     assertAllowedColor(args.color)
     const color = args.color.toUpperCase()
@@ -1703,7 +1791,8 @@ export const rotateInvite = mutation({
   },
   handler: async (ctx, args) => {
     const game = await gameByPublicId(ctx, args.publicId)
-    await requireHost(ctx, game)
+    const host = await requireHost(ctx, game)
+    await limitGameRate(ctx, "gameWrite", host._id)
     if (game.status !== "lobby" && game.status !== "active")
       throw new Error("Only a lobby or active game invite can be rotated")
     assertInviteToken(args.inviteToken)
@@ -1779,6 +1868,7 @@ export const changeLife = mutation({
         deduplicated: true,
       }
     }
+    await limitGameRate(ctx, "gameWrite", user._id)
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const now = Date.now()
@@ -1809,6 +1899,185 @@ export const changeLife = mutation({
   },
 })
 
+function gameTableRules(game: Doc<"games">) {
+  return tableRules(game.system ?? game.game ?? DEFAULT_DECK_GAME, game.format ?? game.ruleset)
+}
+
+function storedDesignations(ctx: QueryCtx, designations: TableState["designations"]) {
+  const stored: Record<string, Id<"gamePlayers">> = {}
+  for (const [designationId, holder] of Object.entries(designations)) {
+    const holderId = ctx.db.normalizeId("gamePlayers", holder)
+    if (holderId) stored[designationId] = holderId
+  }
+  return stored
+}
+
+function playerTableFromRow(player: PlayerTable): PlayerTable {
+  return {
+    ...(player.counters ? { counters: player.counters } : {}),
+    ...(player.pokemon ? { pokemon: player.pokemon } : {}),
+  }
+}
+
+// why: a knockout and its undo also move the other seat's prize counter, so that row is read too.
+function relatedPlayerId(action: TableAction, actor: Doc<"gamePlayers">) {
+  if (action.kind === "pokemon.knockedOut" || action.kind === "pokemon.damaged")
+    return action.takerPlayerId
+  if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
+  return undefined
+}
+
+// why: a hand-typed Pokémon name is shown to every seat, so one that fails the name gate is stored without it, like a hidden deck name.
+function gatedCard<Card extends PokemonCard>(card: Card): Card {
+  return card.name !== undefined && nameFailsGate(card.name) ? { ...card, name: undefined } : card
+}
+
+function gatedTableAction(action: TableAction): TableAction {
+  if (action.kind !== "pokemon.placed" && action.kind !== "pokemon.updated") return action
+  return { ...action, card: gatedCard(action.card) }
+}
+
+function gatedTableState(table: TableState): TableState {
+  return {
+    ...table,
+    players: Object.fromEntries(
+      Object.entries(table.players).map(([playerId, player]) => {
+        const board = player.pokemon
+        if (!board) return [playerId, player]
+        const knockout = board.lastKnockout
+        return [
+          playerId,
+          {
+            ...player,
+            pokemon: {
+              ...(board.active ? { active: gatedCard(board.active) } : {}),
+              bench: board.bench.map(gatedCard),
+              ...(knockout
+                ? { lastKnockout: { ...knockout, pokemon: gatedCard(knockout.pokemon) } }
+                : {}),
+            },
+          },
+        ]
+      }),
+    ),
+  }
+}
+
+// why: counters, designations, and Pokémon all go through one replay-safe write that runs the shared table reducer. Only the acting seat's owner may write, like life.
+export const tableAction = mutation({
+  args: {
+    publicId: v.string(),
+    operationId: v.string(),
+    deviceId: v.string(),
+    clientCreatedAt: v.number(),
+    action: tableActionValidator,
+  },
+  handler: async (ctx, args) => {
+    assertGameWriteOperationId(args.operationId)
+    assertGameWriteDeviceId(args.deviceId)
+    if (!Number.isSafeInteger(args.clientCreatedAt) || args.clientCreatedAt < 0)
+      throw gameWriteError("invalid_client_timestamp", "Invalid client timestamp")
+    const action = gatedTableAction(args.action)
+
+    const game = await gameByPublicIdForWrite(ctx, args.publicId)
+    const user = await requireUser(ctx)
+    const actorId = ctx.db.normalizeId("gamePlayers", action.playerId)
+    const actor = actorId ? await ctx.db.get(actorId) : null
+    if (
+      !actor ||
+      actor.gameId !== game._id ||
+      (actor.userId === undefined ? game.hostUserId !== user._id : actor.userId !== user._id) ||
+      (actor.deviceId !== undefined && actor.deviceId !== args.deviceId)
+    )
+      throw gameWriteError("seat_owner_required", "Seat-owner permission required")
+
+    // why: identity comes from the action as sent, so a retry matches even when the name gate trimmed what was stored.
+    const actionIdentity = tableActionIdentity(args.action)
+    const actionDelta = tableActionDelta(action)
+    const duplicate = await ctx.db
+      .query("gameEvents")
+      .withIndex("by_game_operation", (q) =>
+        q.eq("gameId", game._id).eq("operationId", args.operationId),
+      )
+      .unique()
+    if (duplicate) {
+      if (
+        duplicate.kind !== action.kind ||
+        duplicate.playerId !== actor._id ||
+        duplicate.actionIdentity !== actionIdentity ||
+        duplicate.actorUserId !== user._id ||
+        duplicate.deviceId !== args.deviceId ||
+        duplicate.clientCreatedAt !== args.clientCreatedAt
+      )
+        throw syncOperationMismatch()
+      return { operationId: duplicate.operationId, eventId: duplicate._id, deduplicated: true }
+    }
+    await limitGameRate(ctx, "gameWrite", user._id)
+    if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
+
+    const rows = new Map<string, Doc<"gamePlayers">>([[actor._id, actor]])
+    const relatedId = ctx.db.normalizeId("gamePlayers", relatedPlayerId(action, actor) ?? "")
+    const related = relatedId ? await ctx.db.get(relatedId) : null
+    if (related?.gameId === game._id) rows.set(related._id, related)
+    const table: TableState = {
+      designations: game.designations ?? {},
+      players: Object.fromEntries(
+        [...rows.values()].map((row) => [row._id, playerTableFromRow(row)]),
+      ),
+    }
+    const result = reduceTableAction(table, action, {
+      rules: gameTableRules(game),
+      operationId: args.operationId,
+      lifeOf: (playerId) => rows.get(playerId)?.currentLife,
+    })
+    if (!result) throw gameWriteError("invalid_table_action", "This table change no longer applies")
+
+    const now = Date.now()
+    for (const row of rows.values()) {
+      const before = table.players[row._id]
+      const after = result.table.players[row._id]
+      const lifeDelta = result.life
+        .filter((change) => change.playerId === row._id)
+        .reduce((total, change) => total + change.delta, 0)
+      const isActor = row._id === actor._id
+      if (!isActor && after === before && lifeDelta === 0) continue
+      await ctx.db.patch(row._id, {
+        ...(after === before ? {} : { counters: after?.counters, pokemon: after?.pokemon }),
+        ...(lifeDelta === 0 ? {} : { currentLife: row.currentLife + lifeDelta }),
+        ...(isActor ? { eventCount: (row.eventCount ?? 0) + 1 } : {}),
+        lastEventAt: now,
+      })
+    }
+    if (result.table.designations !== table.designations)
+      await ctx.db.patch(game._id, {
+        designations: storedDesignations(ctx, result.table.designations),
+      })
+
+    const lifeChange = result.life[0]
+    const lifeChangeTarget = lifeChange && ctx.db.normalizeId("gamePlayers", lifeChange.playerId)
+    const eventId = await ctx.db.insert("gameEvents", {
+      gameId: game._id,
+      playerId: actor._id,
+      operationId: args.operationId,
+      kind: action.kind,
+      actionIdentity,
+      ...(lifeChange && lifeChangeTarget
+        ? { toPlayerId: lifeChangeTarget, delta: lifeChange.delta }
+        : actionDelta === undefined
+          ? {}
+          : { delta: actionDelta }),
+      ...(action.kind === "pokemon.knockoutUndone"
+        ? { undoOfOperationId: action.knockoutOperationId }
+        : {}),
+      actorUserId: user._id,
+      deviceId: args.deviceId,
+      clientCreatedAt: args.clientCreatedAt,
+      serverCreatedAt: now,
+    })
+    return { operationId: args.operationId, eventId, deduplicated: false }
+  },
+})
+
 async function commanderPlayerForWrite(
   ctx: MutationCtx,
   game: Doc<"games">,
@@ -1824,8 +2093,9 @@ async function commanderPlayerForWrite(
     (player.userId === undefined ? game.hostUserId !== user._id : player.userId !== user._id) ||
     (player.deviceId !== undefined && player.deviceId !== deviceId)
   )
-    throw new Error(
-      `${label === "source" ? "Attacking" : "Defending"} seat-owner permission required`,
+    throw gameWriteError(
+      "seat_owner_required",
+      `Seat-owner permission required for the ${label === "source" ? "attacking" : "defending"} seat`,
     )
   return player
 }
@@ -1909,6 +2179,7 @@ export const submitCommanderDamage = mutation({
       )
       .unique()
     if (eventWithOperation) throw syncOperationMismatch()
+    await limitGameRate(ctx, "gameWrite", user._id)
 
     const pair = await ctx.db
       .query("gameCommanderDamage")
@@ -1917,31 +2188,42 @@ export const submitCommanderDamage = mutation({
       )
       .unique()
     const nextTotal = (pair?.total ?? 0) + args.delta
-    if (nextTotal < 0 || nextTotal > MAX_COMMANDER_DAMAGE)
-      throw new Error("Commander damage total must remain between 0 and 99")
     const pending = await ctx.db
       .query("gameCommanderClaims")
       .withIndex("by_game_and_status", (q) => q.eq("gameId", game._id).eq("status", "pending"))
       .take(MAX_PENDING_COMMANDER_CLAIMS + 1)
-    if (
+    // why: a claim that can never land is stored as declined instead of thrown, so every installed outbox sees a success and stops retrying it.
+    const declined =
+      nextTotal < 0 ||
+      nextTotal > MAX_COMMANDER_DAMAGE ||
+      pending.length >= MAX_PENDING_COMMANDER_CLAIMS ||
       pending.some((claim) => claim.fromPlayerId === source._id && claim.toPlayerId === target._id)
+    const declineOperationId = `${args.operationId}_declined`
+    if (
+      declined &&
+      (await ctx.db
+        .query("gameEvents")
+        .withIndex("by_game_operation", (q) =>
+          q.eq("gameId", game._id).eq("operationId", declineOperationId),
+        )
+        .first())
     )
-      throw new Error("A pending commander damage claim already exists for this pair")
-    if (pending.length >= MAX_PENDING_COMMANDER_CLAIMS)
-      throw new Error("Too many pending commander damage claims")
+      throw syncOperationMismatch()
 
     const now = Date.now()
+    const status = declined ? ("declined" as const) : ("pending" as const)
     const claimId = await ctx.db.insert("gameCommanderClaims", {
       gameId: game._id,
       operationId: args.operationId,
       fromPlayerId: source._id,
       toPlayerId: target._id,
       delta: args.delta,
-      status: "pending",
+      status,
       actorUserId: user._id,
       deviceId: args.deviceId,
       clientCreatedAt: args.clientCreatedAt,
       createdAt: now,
+      ...(declined ? { resolvedAt: now } : {}),
     })
     await ctx.db.insert("gameEvents", {
       gameId: game._id,
@@ -1957,16 +2239,24 @@ export const submitCommanderDamage = mutation({
       clientCreatedAt: args.clientCreatedAt,
       serverCreatedAt: now,
     })
+    if (declined)
+      await ctx.db.insert("gameEvents", {
+        gameId: game._id,
+        playerId: target._id,
+        operationId: declineOperationId,
+        kind: "commanderDamage.declined",
+        delta: args.delta,
+        fromPlayerId: source._id,
+        toPlayerId: target._id,
+        claimOperationId: args.operationId,
+        clientCreatedAt: args.clientCreatedAt,
+        serverCreatedAt: now,
+      })
     await ctx.db.patch(target._id, {
-      eventCount: (target.eventCount ?? 0) + 1,
+      eventCount: (target.eventCount ?? 0) + (declined ? 2 : 1),
       lastEventAt: now,
     })
-    return {
-      operationId: args.operationId,
-      claimId,
-      status: "pending" as const,
-      deduplicated: false,
-    }
+    return { operationId: args.operationId, claimId, status, deduplicated: false }
   },
 })
 
@@ -2089,6 +2379,7 @@ async function resolveCommanderClaim(
         : {}),
     }
   }
+  await limitGameRate(ctx, "gameWrite", user._id)
   if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
   const now = Date.now()

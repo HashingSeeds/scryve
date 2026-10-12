@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
   ZoomIn,
 } from "react-native-reanimated"
-import Svg, { Circle, G, Path, Polygon, Rect } from "react-native-svg"
+import Svg, { Circle, G, Path, Rect } from "react-native-svg"
 
 import { structurallyEqual } from "@/utils/structurallyEqual"
 import { useReducedMotion } from "@/utils/useReducedMotion"
@@ -118,10 +118,10 @@ const SWORD_INSET_THAT_FITS_SHAPE: Record<
   square: { centerX: 22, centerY: 22, size: 15 },
   diamond: { centerX: 22, centerY: 22, size: 14 },
   hexagon: { centerX: 22, centerY: 22, size: 16 },
-  triangle: { centerX: 22, centerY: 25, size: 13 },
-  star: { centerX: 22, centerY: 22, size: 12 },
+  triangle: { centerX: 22, centerY: 25, size: 14 },
+  star: { centerX: 22, centerY: 23, size: 12 },
   plus: { centerX: 22, centerY: 22, size: 12 },
-  shield: { centerX: 22, centerY: 21, size: 15 },
+  shield: { centerX: 22, centerY: 21.5, size: 15 },
   heart: { centerX: 22, centerY: 22.5, size: 13 },
 }
 
@@ -180,26 +180,51 @@ function MarkShape({ shape, color }: { shape: PlayerMarkShape; color: string }) 
   const common = { fill: color, testID: `player-mark-shape-${shape}` }
   switch (shape) {
     case "circle":
-      return <Circle {...common} cx="22" cy="22" r="10" />
+      return <Circle {...common} cx="22" cy="22" r="12" />
     case "triangle":
-      return <Polygon {...common} points="22,9 35,33 9,33" />
+      return (
+        <Path
+          {...common}
+          d="M19.83 9.82a2.5 2.5 0 0 1 4.34 0l11.91 20.94a2.5 2.5 0 0 1-2.18 3.74H10.1a2.5 2.5 0 0 1-2.18-3.74Z"
+        />
+      )
     case "square":
-      return <Rect {...common} x="12" y="12" width="20" height="20" rx="2" />
+      return <Rect {...common} x="11" y="11" width="22" height="22" rx="3" />
     case "diamond":
-      return <Polygon {...common} points="22,9 35,22 22,35 9,22" />
+      return (
+        <Path
+          {...common}
+          d="M20.23 9.77a2.5 2.5 0 0 1 3.54 0l10.46 10.46a2.5 2.5 0 0 1 0 3.54L23.77 34.23a2.5 2.5 0 0 1-3.54 0L9.77 23.77a2.5 2.5 0 0 1 0-3.54Z"
+        />
+      )
     case "star":
       return (
         <Path
           {...common}
-          d="M22 8l4.2 8.5 9.4 1.4-6.8 6.6 1.6 9.3-8.4-4.4-8.4 4.4 1.6-9.3-6.8-6.6 9.4-1.4z"
+          d="M20.61 9.37a1.5 1.5 0 0 1 2.78 0l2.84 6.91a1 1 0 0 0 .85.62l7.45.57a1.5 1.5 0 0 1 .86 2.64l-5.69 4.84a1 1 0 0 0-.33 1l1.76 7.26a1.5 1.5 0 0 1-2.24 1.63l-6.37-3.92a1 1 0 0 0-1.04 0l-6.37 3.92a1.5 1.5 0 0 1-2.24-1.63l1.76-7.26a1 1 0 0 0-.33-1l-5.69-4.84a1.5 1.5 0 0 1 .86-2.64l7.45-.57a1 1 0 0 0 .85-.62Z"
         />
       )
     case "hexagon":
-      return <Polygon {...common} points="22,8 34,15 34,29 22,36 10,29 10,15" />
+      return (
+        <Path
+          {...common}
+          d="M20.75 8.72a2.5 2.5 0 0 1 2.5 0l9.62 5.56a2.5 2.5 0 0 1 1.25 2.16v11.12a2.5 2.5 0 0 1-1.25 2.16l-9.62 5.56a2.5 2.5 0 0 1-2.5 0l-9.62-5.56a2.5 2.5 0 0 1-1.25-2.16V16.44a2.5 2.5 0 0 1 1.25-2.16Z"
+        />
+      )
     case "plus":
-      return <Path {...common} d="M17 8h10v9h9v10h-9v9H17v-9H8V17h9z" />
+      return (
+        <Path
+          {...common}
+          d="M17 10.5A2.5 2.5 0 0 1 19.5 8h5a2.5 2.5 0 0 1 2.5 2.5V16a1 1 0 0 0 1 1h5.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5H28a1 1 0 0 0-1 1v5.5a2.5 2.5 0 0 1-2.5 2.5h-5a2.5 2.5 0 0 1-2.5-2.5V28a1 1 0 0 0-1-1h-5.5A2.5 2.5 0 0 1 8 24.5v-5a2.5 2.5 0 0 1 2.5-2.5H16a1 1 0 0 0 1-1Z"
+        />
+      )
     case "shield":
-      return <Path {...common} d="M22 8l12 5v10c0 6-5 10-12 14-7-4-12-8-12-14V13z" />
+      return (
+        <Path
+          {...common}
+          d="M21.04 8.4a2.5 2.5 0 0 1 1.92 0l9.5 3.96A2.5 2.5 0 0 1 34 14.67V23c0 6-5 10-12 14-7-4-12-8-12-14v-8.33a2.5 2.5 0 0 1 1.54-2.31Z"
+        />
+      )
     case "heart":
       return (
         <Path

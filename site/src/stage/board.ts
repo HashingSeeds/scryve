@@ -16,19 +16,6 @@ import {
 } from "../../../convex/lib/appearance"
 import { HINT_PRESS_MS, showTapHint } from "./hint"
 
-const SHAPE_PATHS: Record<PlayerMarkShape, string> = {
-  circle: '<circle cx="12" cy="12" r="10"/>',
-  triangle: '<path d="M12 2 22.5 21h-21z"/>',
-  square: '<rect x="2.5" y="2.5" width="19" height="19" rx="2"/>',
-  diamond: '<path d="M12 .8 23.2 12 12 23.2.8 12z"/>',
-  star: '<path d="m12 1.5 3.1 6.9 7.4.7-5.6 5 1.7 7.4L12 17.6l-6.6 3.9 1.7-7.4-5.6-5 7.4-.7z"/>',
-  hexagon: '<path d="M6.5 2h11l5.5 10-5.5 10h-11L1 12z"/>',
-  plus: '<path d="M8.4 2h7.2v6.4H22v7.2h-6.4V22H8.4v-6.4H2V8.4h6.4z"/>',
-  shield: '<path d="M12 2l8.6 3.6v7.1c0 4.3-3.6 7.1-8.6 10-5-2.9-8.6-5.7-8.6-10V5.6z"/>',
-  heart:
-    '<path transform="translate(-3.7 -3.7) scale(.714)" d="M22 34.84 19.97 32.99C12.76 26.45 8 22.14 8 16.85 8 12.54 11.39 9.15 15.7 9.15c2.44 0 4.77 1.13 6.3 2.93 1.53-1.8 3.86-2.93 6.3-2.93 4.31 0 7.7 3.39 7.7 7.7 0 5.29-4.76 9.6-11.97 16.14Z"/>',
-}
-
 // The game menu button, ported from the app's dark keystoneIIFlat shape
 // (src/components/GameMenuButtonShape.tsx) and three-bar glyph (GameRadialMenu.tsx),
 // which the app draws at 80px. Keep the geometry in sync with those files.
@@ -80,7 +67,8 @@ export function seatShape(seat: number): PlayerMarkShape {
 }
 
 export function markSvg(shape: PlayerMarkShape, fill = "currentColor"): string {
-  return `<svg viewBox="0 0 24 24" fill="${fill}" aria-hidden="true">${SHAPE_PATHS[shape]}</svg>`
+  // The app marks, cropped so their 8-36 box fills 2-22 of a 24 unit icon.
+  return `<svg viewBox="5.2 5.2 33.6 33.6" fill="${fill}" aria-hidden="true">${APP_MARK_SHAPES[shape]}</svg>`
 }
 
 type GameEvent = { type: "change"; seat: number; delta: number } | { type: "reset" }
@@ -188,14 +176,18 @@ function phoneRows(game: DemoGame) {
 
 // The app's mark shapes (src/components/PlayerMark.tsx), drawn on a 44 unit box.
 const APP_MARK_SHAPES: Record<PlayerMarkShape, string> = {
-  circle: '<circle cx="22" cy="22" r="10"/>',
-  triangle: '<polygon points="22,9 35,33 9,33"/>',
-  square: '<rect x="12" y="12" width="20" height="20" rx="2"/>',
-  diamond: '<polygon points="22,9 35,22 22,35 9,22"/>',
-  star: '<path d="M22 8l4.2 8.5 9.4 1.4-6.8 6.6 1.6 9.3-8.4-4.4-8.4 4.4 1.6-9.3-6.8-6.6 9.4-1.4z"/>',
-  hexagon: '<polygon points="22,8 34,15 34,29 22,36 10,29 10,15"/>',
-  plus: '<path d="M17 8h10v9h9v10h-9v9H17v-9H8V17h9z"/>',
-  shield: '<path d="M22 8l12 5v10c0 6-5 10-12 14-7-4-12-8-12-14V13z"/>',
+  circle: '<circle cx="22" cy="22" r="12"/>',
+  triangle:
+    '<path d="M19.83 9.82a2.5 2.5 0 0 1 4.34 0l11.91 20.94a2.5 2.5 0 0 1-2.18 3.74H10.1a2.5 2.5 0 0 1-2.18-3.74Z"/>',
+  square: '<rect x="11" y="11" width="22" height="22" rx="3"/>',
+  diamond:
+    '<path d="M20.23 9.77a2.5 2.5 0 0 1 3.54 0l10.46 10.46a2.5 2.5 0 0 1 0 3.54L23.77 34.23a2.5 2.5 0 0 1-3.54 0L9.77 23.77a2.5 2.5 0 0 1 0-3.54Z"/>',
+  star: '<path d="M20.61 9.37a1.5 1.5 0 0 1 2.78 0l2.84 6.91a1 1 0 0 0 .85.62l7.45.57a1.5 1.5 0 0 1 .86 2.64l-5.69 4.84a1 1 0 0 0-.33 1l1.76 7.26a1.5 1.5 0 0 1-2.24 1.63l-6.37-3.92a1 1 0 0 0-1.04 0l-6.37 3.92a1.5 1.5 0 0 1-2.24-1.63l1.76-7.26a1 1 0 0 0-.33-1l-5.69-4.84a1.5 1.5 0 0 1 .86-2.64l7.45-.57a1 1 0 0 0 .85-.62Z"/>',
+  hexagon:
+    '<path d="M20.75 8.72a2.5 2.5 0 0 1 2.5 0l9.62 5.56a2.5 2.5 0 0 1 1.25 2.16v11.12a2.5 2.5 0 0 1-1.25 2.16l-9.62 5.56a2.5 2.5 0 0 1-2.5 0l-9.62-5.56a2.5 2.5 0 0 1-1.25-2.16V16.44a2.5 2.5 0 0 1 1.25-2.16Z"/>',
+  plus: '<path d="M17 10.5A2.5 2.5 0 0 1 19.5 8h5a2.5 2.5 0 0 1 2.5 2.5V16a1 1 0 0 0 1 1h5.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5H28a1 1 0 0 0-1 1v5.5a2.5 2.5 0 0 1-2.5 2.5h-5a2.5 2.5 0 0 1-2.5-2.5V28a1 1 0 0 0-1-1h-5.5A2.5 2.5 0 0 1 8 24.5v-5a2.5 2.5 0 0 1 2.5-2.5H16a1 1 0 0 0 1-1Z"/>',
+  shield:
+    '<path d="M21.04 8.4a2.5 2.5 0 0 1 1.92 0l9.5 3.96A2.5 2.5 0 0 1 34 14.67V23c0 6-5 10-12 14-7-4-12-8-12-14v-8.33a2.5 2.5 0 0 1 1.54-2.31Z"/>',
   heart:
     '<path d="M22 34.84 19.97 32.99C12.76 26.45 8 22.14 8 16.85 8 12.54 11.39 9.15 15.7 9.15c2.44 0 4.77 1.13 6.3 2.93 1.53-1.8 3.86-2.93 6.3-2.93 4.31 0 7.7 3.39 7.7 7.7 0 5.29-4.76 9.6-11.97 16.14Z"/>',
 }
@@ -206,10 +198,10 @@ const SWORD_INSETS: Record<PlayerMarkShape, { centerY: number; size: number }> =
   square: { centerY: 22, size: 15 },
   diamond: { centerY: 22, size: 14 },
   hexagon: { centerY: 22, size: 16 },
-  triangle: { centerY: 25, size: 13 },
-  star: { centerY: 22, size: 12 },
+  triangle: { centerY: 25, size: 14 },
+  star: { centerY: 23, size: 12 },
   plus: { centerY: 22, size: 12 },
-  shield: { centerY: 21, size: 15 },
+  shield: { centerY: 21.5, size: 15 },
   heart: { centerY: 22.5, size: 13 },
 }
 

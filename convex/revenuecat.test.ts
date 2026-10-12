@@ -1,23 +1,9 @@
-import { convexTest, type TestConvexForDataModelAndIdentity } from "convex-test"
-
+import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api } from "./_generated/api"
-import type { DataModel } from "./_generated/dataModel"
 import { deletedIdentityHash } from "./lib/auth"
-import schema from "./schema"
-
-const modules = {
-  "./_generated/api.ts": async () => jest.requireActual("./_generated/api"),
-  "./_generated/server.ts": async () => jest.requireActual("./_generated/server"),
-  "./entitlements.ts": async () => jest.requireActual("./entitlements"),
-  "./decks.ts": async () => jest.requireActual("./decks"),
-  "./http.ts": async () => jest.requireActual("./http"),
-  "./revenuecat.ts": async () => jest.requireActual("./revenuecat"),
-  "./users.ts": async () => jest.requireActual("./users"),
-}
 
 const webhookAuth = "Bearer webhook-test"
 const apiKey = "sk_test_revenuecat"
-type Harness = TestConvexForDataModelAndIdentity<DataModel>
 
 function subscriberResponse({
   enabled,
@@ -62,17 +48,17 @@ function webhook(event: Record<string, unknown>) {
   }
 }
 
-function sendWebhook(t: Harness, event: Record<string, unknown>) {
+function sendWebhook(t: ConvexTestHarness, event: Record<string, unknown>) {
   return t.fetch("/revenuecat/webhooks", webhook(event))
 }
 
-async function createUser(t: Harness, subject: string) {
+async function createUser(t: ConvexTestHarness, subject: string) {
   const actor = t.withIdentity({ subject })
   await actor.mutation(api.users.syncCurrent, { displayName: subject })
   return actor
 }
 
-async function entitlements(t: Harness, clerkUserId: string) {
+async function entitlements(t: ConvexTestHarness, clerkUserId: string) {
   return await t.run(async (ctx) => {
     const user = await ctx.db
       .query("users")
@@ -101,7 +87,7 @@ describe("RevenueCat entitlement sync", () => {
   })
 
   it("authenticates webhooks and syncs every premium feature for an alias once", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await createUser(t, "clerk_alias")
     const fetchSpy = jest
       .spyOn(globalThis, "fetch")
@@ -140,7 +126,7 @@ describe("RevenueCat entitlement sync", () => {
   })
 
   it("keeps the newest fetched state when webhook delivery is out of order", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await createUser(t, "clerk_ordered")
     const fetchSpy = jest.spyOn(globalThis, "fetch")
     fetchSpy.mockResolvedValueOnce(subscriberResponse({ enabled: true, observedAt: 200 }))
@@ -167,7 +153,7 @@ describe("RevenueCat entitlement sync", () => {
   })
 
   it("returns a retryable failure without deduping a failed subscriber fetch", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await createUser(t, "clerk_retry")
     const fetchSpy = jest.spyOn(globalThis, "fetch")
     fetchSpy.mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
@@ -191,7 +177,7 @@ describe("RevenueCat entitlement sync", () => {
   })
 
   it("stores missing-user state and applies it when Clerk creates the user", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     jest
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(subscriberResponse({ enabled: true, observedAt: 400 }))
@@ -216,7 +202,7 @@ describe("RevenueCat entitlement sync", () => {
   })
 
   it("does not recreate billing state for a deleted identity", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const clerkUserId = "clerk_deleted"
     await t.run(async (ctx) => {
       await ctx.db.insert("accountDeletionReceipts", {
@@ -248,7 +234,7 @@ describe("RevenueCat entitlement sync", () => {
   })
 
   it("revokes transfer source with shared subscriber data and ignores sandbox events", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     await createUser(t, "clerk_source")
     await createUser(t, "clerk_destination")
     const fetchSpy = jest
@@ -302,7 +288,7 @@ describe("RevenueCat entitlement sync", () => {
   it.each(["scryve_pro_monthly", "foil_yearly"])(
     "maps %s subscription state to the same Pro access",
     async (productIdentifier) => {
-      const t = convexTest(schema, modules)
+      const t = makeConvexTest()
       const actor = await createUser(t, "clerk_status")
       const fetchSpy = jest.spyOn(globalThis, "fetch")
       fetchSpy.mockResolvedValueOnce(
@@ -355,7 +341,7 @@ describe("RevenueCat entitlement sync", () => {
   )
 
   it("requires a matching subscription before granting Pro access", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = await createUser(t, "clerk_without_subscription")
     jest.spyOn(globalThis, "fetch").mockResolvedValue(
       Response.json({
@@ -380,7 +366,7 @@ describe("RevenueCat entitlement sync", () => {
   })
 
   it("lets only the authenticated caller refresh their current state", async () => {
-    const t = convexTest(schema, modules)
+    const t = makeConvexTest()
     const actor = await createUser(t, "clerk_action")
     const fetchSpy = jest
       .spyOn(globalThis, "fetch")

@@ -28,6 +28,7 @@ import {
   requireDeckCapacity,
   requireVersionCapacity,
 } from "./lib/entitlements"
+import { limitGameRate } from "./lib/gameRateLimits"
 import { ygoImageUrl } from "./lib/games/yugioh"
 import { capabilityReleased, requireReleasedCapability } from "./lib/integrations"
 import {
@@ -1391,7 +1392,8 @@ export const selectForSeat = mutation({
         code: "deck_selection_not_allowed",
         message: "Decks can only be selected in a lobby",
       })
-    const { player } = await requireSeatOwner(ctx, game._id, args.seat)
+    const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
+    await limitGameRate(ctx, "gameWrite", user._id)
     if (args.deckVersionId === undefined) {
       if (game.deckRequired === true)
         throw new ConvexError({

@@ -1,6 +1,7 @@
 import { Platform } from "react-native"
 import * as Sentry from "@sentry/react-native"
 
+import * as durableOutbox from "@/features/sync/durableOutbox"
 import { initObservability } from "@/utils/observability"
 import { emitTelemetry, setTelemetryAdapter } from "@/utils/telemetry"
 
@@ -11,6 +12,15 @@ jest.mock("@sentry/react-native", () => ({
   mobileReplayIntegration: jest.fn(() => ({ type: "mobileReplay" })),
   browserReplayIntegration: jest.fn(() => ({ type: "browserReplay" })),
   feedbackIntegration: jest.fn(() => ({ type: "feedback" })),
+  reactNativeTracingIntegration: jest.fn(() => ({ type: "tracing" })),
+  reactNavigationIntegration: jest.fn(() => ({ type: "navigation" })),
+}))
+
+const mockAnalytics = { enabled: false, emit: jest.fn() }
+
+jest.mock("@/utils/analytics", () => ({
+  analyticsEnabled: () => mockAnalytics.enabled,
+  syncTimingAdapter: { emit: (event: unknown) => mockAnalytics.emit(event) },
 }))
 
 const mockUpdatesState = {
@@ -36,7 +46,8 @@ jest.mock("expo-updates", () => ({
   },
 }))
 
-const mockExpoConfig: { extra: { appVariant?: string } } = { extra: {} }
+const mockExpoConfig: { version?: string; extra: { appVariant?: string; releaseCommit?: string } } =
+  { extra: {} }
 
 jest.mock("expo-constants", () => ({
   __esModule: true,
@@ -50,7 +61,9 @@ jest.mock("expo-constants", () => ({
 describe("observability initialization", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockAnalytics.enabled = false
     mockExpoConfig.extra = {}
+    delete mockExpoConfig.version
     mockUpdatesState.updateId = "test-update-id"
     mockUpdatesState.channel = "test-channel"
     mockUpdatesState.runtimeVersion = "1.0.0"
@@ -66,7 +79,7 @@ describe("observability initialization", () => {
     ["ios", 0],
     ["android", 1],
     ["web", 1],
-  ] as const)("configures error replay for %s", (platform, errorReplaySampleRate) => {
+  ] as const)("configures replay for %s", (platform, errorReplaySampleRate) => {
     jest.replaceProperty(Platform, "OS", platform)
     initObservability()
 
@@ -78,6 +91,8 @@ describe("observability initialization", () => {
         replaysOnErrorSampleRate: errorReplaySampleRate,
         integrations: [
           { type: platform === "web" ? "browserReplay" : "mobileReplay" },
+          { type: "tracing" },
+          { type: "navigation" },
           { type: "feedback" },
         ],
       }),
@@ -141,13 +156,68 @@ describe("observability initialization", () => {
     })
   })
 
-  it("includes both mobileReplayIntegration and feedbackIntegration", () => {
+  it("traces launch and navigation without request spans", () => {
     initObservability()
 
-    const callArgs = (Sentry.init as jest.Mock).mock.calls[0][0]
-    expect(callArgs.integrations).toHaveLength(2)
-    expect(callArgs.integrations[0].type).toBe("mobileReplay")
-    expect(callArgs.integrations[1].type).toBe("feedback")
+    expect(Sentry.reactNativeTracingIntegration).toHaveBeenCalledWith({
+      traceFetch: false,
+      traceXHR: false,
+    })
+  })
+
+  it.each(["ios", "android"] as const)("traces %s only while usage sharing is on", (platform) => {
+    jest.replaceProperty(Platform, "OS", platform)
+    initObservability()
+    const { tracesSampler } = (Sentry.init as jest.Mock).mock.calls[0][0]
+
+    expect(tracesSampler()).toBe(0)
+    mockAnalytics.enabled = true
+    expect(tracesSampler()).toBe(0.2)
+  })
+
+  it("does not trace web", () => {
+    jest.replaceProperty(Platform, "OS", "web")
+    initObservability()
+
+    expect((Sentry.init as jest.Mock).mock.calls[0][0].tracesSampler).toBeUndefined()
+  })
+
+  it("uploads transactions without breadcrumbs, so request URLs stay out", () => {
+    mockAnalytics.enabled = true
+    initObservability()
+    const { beforeSendTransaction } = (Sentry.init as jest.Mock).mock.calls[0][0]
+
+    const event = beforeSendTransaction({
+      type: "transaction",
+      transaction: "settings",
+      breadcrumbs: [{ category: "xhr", data: { url: "https://api.example.test/private?code=1" } }],
+    })
+
+    expect(event).toEqual({ type: "transaction", transaction: "settings", breadcrumbs: [] })
+  })
+
+  it("drops a transaction that finishes after sharing was turned off", () => {
+    mockAnalytics.enabled = true
+    initObservability()
+    const { tracesSampler, beforeSendTransaction } = (Sentry.init as jest.Mock).mock.calls[0][0]
+    expect(tracesSampler()).toBe(0.2)
+
+    mockAnalytics.enabled = false
+
+    expect(beforeSendTransaction({ type: "transaction", transaction: "settings" })).toBeNull()
+  })
+
+  it("forwards telemetry to the sync timing adapter", () => {
+    initObservability()
+
+    emitTelemetry("join.completed", { durationMs: 840, outcome: "success" })
+
+    expect(mockAnalytics.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "join.completed",
+        metadata: { durationMs: 840, outcome: "success" },
+      }),
+    )
   })
 
   it("sets release correlation tags from expo-updates", () => {
@@ -159,6 +229,19 @@ describe("observability initialization", () => {
       runtimeVersion: "1.0.0",
       embeddedLaunch: "false",
     })
+  })
+
+  it("stamps outbox records with the same build identity as the Sentry tags", () => {
+    const setOutboxWriter = jest.spyOn(durableOutbox, "setOutboxWriter")
+    mockExpoConfig.version = "1.4.0"
+    initObservability()
+    mockExpoConfig.extra = { releaseCommit: "0123456789abcdef0123456789abcdef01234567" }
+    initObservability()
+
+    expect(setOutboxWriter.mock.calls).toEqual([
+      [{ app: "1.4.0", update: "test-update-id", runtime: "1.0.0" }],
+      [{ app: "1.4.0", update: "test-update-id", runtime: "1.0.0", commit: "0123456789ab" }],
+    ])
   })
 
   it("wires telemetry adapter to emit breadcrumbs with only allowed metadata", () => {

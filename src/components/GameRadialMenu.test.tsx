@@ -1,12 +1,13 @@
 import { AccessibilityInfo, StyleSheet } from "react-native"
-import { fireEvent, render, waitFor } from "@testing-library/react-native"
-import { Polygon, Polyline } from "react-native-svg"
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
+import { Path } from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme, lightTheme } from "@/theme/theme"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./GameRadialMenu"
+import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
@@ -53,13 +54,11 @@ describe("GameRadialMenu", () => {
     const view = render(menu(false))
 
     expect(view.getByTestId("game-menu-pentagon")).toBeTruthy()
-    const pentagon = view
-      .UNSAFE_getAllByType(Polygon)
-      .find((polygon) => polygon.props.strokeWidth === 7)
+    const pentagon = view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 7)
     expect(pentagon).toBeTruthy()
     expect(lightTheme.colors.gameMenu.anchorBorder).toBe("#FFFFFF")
     expect(pentagon!.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
-    expect(pentagon!.props.points.split(" ")).toHaveLength(5)
+    expect(pentagon!.props.d.match(/Q/g)).toHaveLength(5)
   })
 
   it("uses the flat Keystone II treatment by default in dark mode", () => {
@@ -75,18 +74,15 @@ describe("GameRadialMenu", () => {
       </ThemeProvider>,
     )
 
-    const pentagon = view
-      .UNSAFE_getAllByType(Polygon)
-      .find((polygon) => polygon.props.strokeWidth === 7)
+    const pentagon = view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 7)
     expect(pentagon).toBeTruthy()
     expect(pentagon!.props.fill).toBe("url(#keystoneTwoFill)")
     expect(darkTheme.colors.gameMenu.anchorBorder).toBe("#000000")
     expect(pentagon!.props.stroke).toBe(darkTheme.colors.gameMenu.anchorBorder)
     expect(
-      view.UNSAFE_getAllByType(Polygon).find((polygon) => polygon.props.strokeWidth === 1.4)!.props
-        .stroke,
+      view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 1.4)!.props.stroke,
     ).toBe(darkTheme.colors.gameMenu.anchorBorder)
-    expect(view.UNSAFE_queryAllByType(Polyline)).toHaveLength(0)
+    expect(view.queryByTestId("game-menu-bevel")).toBeNull()
   })
 
   it("keeps the menu glyph in centered square bounds", () => {
@@ -156,7 +152,7 @@ describe("GameRadialMenu", () => {
 
   // why: queried by component type because the host element only carries processed SVG props.
   const signalLayer = (view: ReturnType<typeof render>, testID: string) =>
-    view.UNSAFE_queryAllByType(Polygon).find((polygon) => polygon.props.testID === testID)
+    view.UNSAFE_queryAllByType(Path).find((path) => path.props.testID === testID)
 
   it("rings and badges the pentagon while a sync signal is set, fading the ring out in its last color", () => {
     const signal = {
@@ -240,6 +236,30 @@ describe("GameRadialMenu", () => {
 
     expect(callbacks[1]).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it("lets Android Back close the menu or exit commander damage, and passes it through otherwise", () => {
+    const pressBack = mockHardwareBack()
+    const onClose = jest.fn()
+    const onExit = jest.fn()
+    const view = render(menu(false, onClose))
+
+    expect(pressBack()).toBe(false)
+
+    view.rerender(menu(true, onClose))
+    act(() => void pressBack())
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    view.rerender(
+      menu(false, onClose, { exitAction: { label: "Exit commander damage", onPress: onExit } }),
+    )
+    act(() => void pressBack())
+    expect(onExit).toHaveBeenCalledTimes(1)
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    view.rerender(menu(false, onClose))
+    expect(pressBack()).toBe(false)
+    jest.restoreAllMocks()
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

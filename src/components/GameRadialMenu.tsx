@@ -23,6 +23,7 @@ import { useAppTheme } from "@/theme/context"
 import type { GameMenuActionKind } from "@/theme/gameMenu"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
+import { useCloseOnBack } from "@/utils/useCloseOnBack"
 import {
   motionDuration,
   useReducedMotion,
@@ -292,6 +293,7 @@ function percentAnchorStyle(anchor: { x: number; y: number }): ViewStyle {
 
 export function GameMenuBackdrop({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { themed } = useAppTheme()
+  useCloseOnBack(open, onClose)
   if (!open) return null
   return (
     <BoardPressable
@@ -427,6 +429,7 @@ function GameMenuAnchor({
   const animateFully = reducedMotion === false
   const suppressed = !!exitAction
   const menuOpen = open && !suppressed
+  useCloseOnBack(suppressed, () => exitAction?.onPress())
   const pentagonRotation = useSharedValue(
     menuOpen ? PENTAGON_OPEN_ROTATION_DEG : suppressed ? -PENTAGON_OPEN_ROTATION_DEG : 0,
   )

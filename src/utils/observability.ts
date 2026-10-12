@@ -1,25 +1,21 @@
-import { AppState, Platform } from "react-native"
+import { Platform } from "react-native"
 import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import * as Sentry from "@sentry/react-native"
 
+import { setOutboxWriter, setQuarantineReporter } from "@/features/sync/durableOutbox"
+import { analyticsEnabled, syncTimingAdapter } from "@/utils/analytics"
+import { ErrorType, reportCrash } from "@/utils/crashReporting"
 import { setTelemetryAdapter } from "@/utils/telemetry"
-import {
-  combineTelemetryAdapters,
-  createBatchingTelemetryAdapter,
-  type BatchingTelemetryAdapter,
-  type TelemetrySink,
-} from "@/utils/telemetryBatch"
+import { combineTelemetryAdapters } from "@/utils/telemetryBatch"
 
 const FALLBACK_SENTRY_DSN =
   "https://fb85fd67adf134394a15190b8a488404@o4507118738669568.ingest.us.sentry.io/4511870328635392"
 
-const TAP_FREQUENCY_EVENT_KEEP_PROBABILITY = 0.05
+// why: ~1,600 sessions a month at about 10 spans each is at most ~3,200 spans at this rate, and only opted-in sessions are traced; the plan includes 5M spans a month.
+const NATIVE_TRACES_SAMPLE_RATE = 0.2
 
-export interface ObservabilityOptions {
-  sink?: TelemetrySink
-  getAnalyticsId?: () => string | undefined
-}
+export const navigationTracing = Sentry.reactNavigationIntegration()
 
 // why: only EAS builds carry a channel, so channel-less local and perf builds stop posing as production, and store installs keep their channel even if an update ships without APP_VARIANT.
 function buildEnvironment() {
@@ -31,9 +27,7 @@ function buildEnvironment() {
   return Updates.channel || "local"
 }
 
-export function initObservability(
-  options: ObservabilityOptions = {},
-): BatchingTelemetryAdapter | undefined {
+export function initObservability() {
   const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN ?? FALLBACK_SENTRY_DSN
 
   Sentry.init({
@@ -43,6 +37,13 @@ export function initObservability(
     enableLogs: false,
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: Platform.OS === "ios" ? 0 : 1,
+    // why: traces exist for native app start and slow or frozen frames, which web does not report; they follow the usage-sharing choice.
+    tracesSampler:
+      Platform.OS === "web"
+        ? undefined
+        : () => (analyticsEnabled() ? NATIVE_TRACES_SAMPLE_RATE : 0),
+    // why: a transaction can outlive the opt-out that happens during it; breadcrumbs carry request URLs and transactions upload without an error, so they carry none.
+    beforeSendTransaction: (event) => (analyticsEnabled() ? { ...event, breadcrumbs: [] } : null),
     integrations: [
       ...(Platform.OS === "web"
         ? [
@@ -59,15 +60,44 @@ export function initObservability(
               maskAllVectors: true,
             }),
           ]),
+      // why: request spans would upload request URLs and add trace headers to third-party calls.
+      Sentry.reactNativeTracingIntegration({ traceFetch: false, traceXHR: false }),
+      navigationTracing,
       Sentry.feedbackIntegration(),
     ],
   })
 
+  const updateId = Updates.updateId ?? "embedded"
+  const runtimeVersion = Updates.runtimeVersion ?? "unknown"
   Sentry.setTags({
-    updateId: Updates.updateId ?? "embedded",
+    updateId,
     updateChannel: Updates.channel ?? "none",
-    runtimeVersion: Updates.runtimeVersion ?? "unknown",
+    runtimeVersion,
     embeddedLaunch: String(Updates.isEmbeddedLaunch),
+  })
+
+  const releaseCommit: unknown = Constants.expoConfig?.extra?.releaseCommit
+  setOutboxWriter({
+    app: Constants.expoConfig?.version ?? "unknown",
+    update: updateId,
+    runtime: runtimeVersion,
+    ...(typeof releaseCommit === "string" && releaseCommit
+      ? { commit: releaseCommit.slice(0, 12) }
+      : {}),
+  })
+  setQuarantineReporter(({ outbox, count, reasons, records }) => {
+    const error = new Error("Unreadable outbox records were quarantined")
+    error.name = "OutboxQuarantine"
+    reportCrash(error, ErrorType.HANDLED, {
+      tags: { outbox },
+      // why: Sentry flattens extra past three levels, so each record gets its own key to keep its shape readable.
+      extra: {
+        count,
+        reasons,
+        ...Object.fromEntries(records.map((record, index) => [`record${index}`, record])),
+      },
+      fingerprint: ["outbox-quarantine", outbox],
+    })
   })
 
   const unbatchedBreadcrumbAdapter = {
@@ -80,21 +110,5 @@ export function initObservability(
       }),
   }
 
-  if (!options.sink) {
-    setTelemetryAdapter(unbatchedBreadcrumbAdapter)
-    return undefined
-  }
-
-  const batching = createBatchingTelemetryAdapter({
-    sink: options.sink,
-    getAnalyticsId: options.getAnalyticsId,
-    keepProbabilityByEvent: { "mutation.ack": TAP_FREQUENCY_EVENT_KEEP_PROBABILITY },
-  })
-
-  AppState.addEventListener("change", (state) => {
-    if (state !== "active") void batching.flush()
-  })
-
-  setTelemetryAdapter(combineTelemetryAdapters(unbatchedBreadcrumbAdapter, batching))
-  return batching
+  setTelemetryAdapter(combineTelemetryAdapters(unbatchedBreadcrumbAdapter, syncTimingAdapter))
 }

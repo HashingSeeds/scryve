@@ -9,7 +9,9 @@ import {
   removeResumeEntryEverywhere,
   subscribeResumeIndex,
 } from "./persistence"
+import { sendQueuedAction } from "./useConnectedGame"
 import { asActorId, asDeviceId, asGameId, asOperationId, asPlayerId } from "../game/domain"
+import { setOutboxWriter } from "../sync/durableOutbox"
 
 class MemoryStorage {
   values = new Map<string, string>()
@@ -104,6 +106,22 @@ describe("connected MMKV repository", () => {
     expect(result).toMatchObject({ accepted: false, reason: "byte_limit", pending: [] })
   })
 
+  it("keeps a dismissed failure dismissed when a stale tab rejects it again", () => {
+    const storage = new MemoryStorage()
+    const staleTab = new ConnectedGameRepository(storage, "user-1")
+    const otherTab = new ConnectedGameRepository(storage, "user-1")
+    const rejected = action("operation-stale-tab-01", 1)
+    otherTab.enqueue(rejected, [])
+    const stalePending = staleTab.loadOutbox("game-public")
+    otherTab.fail("game-public", rejected.event.operationId, "Game is not active", 2)
+    otherTab.dismissFailed("game-public", rejected.event.operationId)
+
+    staleTab.failAction(rejected, "Game is not active", 3, [], stalePending)
+
+    expect(staleTab.loadFailed("game-public")).toEqual([])
+    expect(staleTab.loadOutbox("game-public")).toEqual([])
+  })
+
   it("recovers durable outbox records after process death and acknowledges exactly one", () => {
     const storage = new MemoryStorage()
     new ConnectedGameRepository(storage).enqueue(action("operation-first-1", 1))
@@ -117,6 +135,26 @@ describe("connected MMKV repository", () => {
     expect(restarted.loadOutbox("game-public").map((item) => item.event.operationId)).toEqual([
       "operation-second",
     ])
+  })
+
+  it("recovers a queued table action after process death", () => {
+    const storage = new MemoryStorage()
+    const tableAction: PendingLifeAction = {
+      schemaVersion: 1,
+      event: {
+        type: "table.action",
+        operationId: asOperationId("operation-table-01"),
+        gameId: asGameId("game-public"),
+        action: { kind: "designation.taken", playerId: "player-1", designationId: "monarch" },
+        actorId: asActorId("user-1"),
+        deviceId: asDeviceId("device-1"),
+        clientCreatedAt: 1,
+      },
+      queuedAt: 1,
+      attempts: 0,
+    }
+    new ConnectedGameRepository(storage).enqueue(tableAction)
+    expect(new ConnectedGameRepository(storage).loadOutbox("game-public")).toEqual([tableAction])
   })
 
   it("keeps client-created time as the tie-breaker for equal queue times", () => {
@@ -525,6 +563,65 @@ describe("connected MMKV repository", () => {
     expect(repository.loadProjection("game-public")).toBeNull()
     expect(repository.loadOutbox("game-public")).toEqual([])
     expect(repository.loadFailed("game-public")).toEqual([])
+  })
+
+  it("sends every queued action kind without the stored writer provenance", async () => {
+    const storage = new MemoryStorage()
+    const repository = new ConnectedGameRepository(storage, "user-1")
+    const life = action("operation-life-0001", 1)
+    const { actorId, deviceId, gameId } = life.event
+    const claim: PendingLifeAction = {
+      ...action("operation-claim-0001", 2),
+      event: {
+        type: "commanderDamage.submitted",
+        operationId: asOperationId("operation-claim-0001"),
+        gameId,
+        fromPlayerId: asPlayerId("player-1"),
+        toPlayerId: asPlayerId("player-2"),
+        delta: 3,
+        actorId,
+        deviceId,
+        clientCreatedAt: 2,
+      },
+    }
+    const resolution: PendingLifeAction = {
+      ...action("operation-resolve-0001", 3),
+      event: {
+        type: "commanderDamage.resolved",
+        operationId: asOperationId("operation-resolve-0001"),
+        claimOperationId: asOperationId("operation-claim-0001"),
+        gameId,
+        toPlayerId: asPlayerId("player-2"),
+        accepted: true,
+        actorId,
+        deviceId,
+        clientCreatedAt: 3,
+      },
+    }
+    setOutboxWriter({ app: "1.4.0", update: "update-a", runtime: "runtime-1" })
+    for (const queued of [life, claim, resolution])
+      repository.enqueue(queued, repository.loadOutbox("game-public"))
+    setOutboxWriter(undefined)
+    expect(
+      [...storage.values.values()].filter((value) => value.includes('"writtenBy"')),
+    ).toHaveLength(3)
+
+    const acknowledge = async (args: { operationId: string }) => ({
+      operationId: args.operationId,
+    })
+    const mutations = {
+      changeLife: jest.fn(acknowledge),
+      tableAction: jest.fn(acknowledge),
+      submitCommanderDamage: jest.fn(acknowledge),
+      confirmCommanderDamage: jest.fn(acknowledge),
+      declineCommanderDamage: jest.fn(acknowledge),
+    }
+    for (const queued of repository.loadOutbox("game-public"))
+      await sendQueuedAction(mutations, "game-public", queued)
+
+    const sent = Object.values(mutations).flatMap((mutation) => mutation.mock.calls)
+    expect(sent).toHaveLength(3)
+    for (const [args] of sent) expect(args).not.toHaveProperty("writtenBy")
   })
 })
 

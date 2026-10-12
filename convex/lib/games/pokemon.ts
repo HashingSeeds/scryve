@@ -8,6 +8,7 @@ import {
 } from "./cards"
 import { internal } from "../../_generated/api"
 import type { ActionCtx } from "../../_generated/server"
+import { POKEMON_HP_FACET } from "../table"
 
 const BASE_URL = "https://api.tcgdex.net/v2/en"
 const REQUEST_INTERVAL_MS = 100
@@ -66,6 +67,7 @@ function normalizePokemonCard(value: unknown, includeImages: boolean): Normalize
     nameNormalized: normalizeCardName(name),
     ...(stringValue(card.category) ? { category: stringValue(card.category) } : {}),
     facets: compact([
+      facet(POKEMON_HP_FACET, card.hp),
       facet("stage", card.stage),
       facet("types", types.join(", ")),
       facet(

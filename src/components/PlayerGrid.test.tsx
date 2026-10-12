@@ -2,6 +2,8 @@ import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render } from "@testing-library/react-native"
 
 import { asPlayerId } from "@/features/game/domain"
+import { playTableRules } from "@/features/game/playSystems"
+import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 import { spacing } from "@/theme/spacing"
 
@@ -24,6 +26,7 @@ import {
   PlayerGrid,
 } from "./PlayerGrid"
 import { PlayerMark } from "./PlayerMark"
+import type { TableState } from "../../convex/lib/table"
 
 function players(count: number) {
   return Array.from({ length: count }, (_, seat) => ({
@@ -33,6 +36,36 @@ function players(count: number) {
     life: 20,
     seat,
   }))
+}
+
+function tableGrid(table: TableState) {
+  const seats = players(2)
+  const rules = playTableRules("mtg", "commander")
+  const submit = jest.fn(() => true)
+  const runtime: TableRuntime = {
+    table,
+    tableRules: rules,
+    ...createTableActions(
+      () => ({
+        table,
+        rules,
+        playerIds: seats.map(({ id }) => id),
+        lifeOf: () => 40,
+        canAct: () => true,
+      }),
+      submit,
+    ),
+  }
+  const view = render(
+    <ThemeProvider>
+      <PlayerGrid players={seats} table={runtime} onChange={jest.fn()} />
+    </ThemeProvider>,
+  )
+  for (const seat of seats.keys())
+    fireEvent(view.getByTestId(`life-card-seat-${seat + 1}`), "layout", {
+      nativeEvent: { layout: { width: 300, height: 400, x: 0, y: 0 } },
+    })
+  return { view, submit }
 }
 
 describe("PlayerGrid", () => {
@@ -81,6 +114,42 @@ describe("PlayerGrid", () => {
     expect(measuredFontSize).toBeGreaterThan(initialFontSize)
     expect(initialOpacity).toBe(0)
     expect(measuredOpacity).toBe(1)
+  })
+
+  it("shows each seat its own counters and designations and sends chip taps for that seat", () => {
+    const { view, submit } = tableGrid({
+      designations: { monarch: "player-1" },
+      players: { "player-0": { counters: { poison: 2 } } },
+    })
+
+    expect(view.queryByTestId("designation-chip-1-monarch")).toBeNull()
+    expect(view.getByTestId("designation-chip-2-monarch")).toBeTruthy()
+    expect(view.queryByTestId("counter-chip-2-poison")).toBeNull()
+    fireEvent.press(view.getByTestId("counter-chip-1-poison"))
+    expect(submit).toHaveBeenCalledWith(
+      { kind: "counter.changed", playerId: "player-0", counterId: "poison", delta: 1 },
+      expect.any(String),
+    )
+  })
+
+  it("reads a seat at its losing poison count as out, and keeps its counters editable", () => {
+    const { view, submit } = tableGrid({
+      designations: {},
+      players: { "player-0": { counters: { poison: 10 } } },
+    })
+
+    expect(view.getByTestId("life-eliminated-seat-1")).toBeTruthy()
+    expect(view.getByTestId("life-card-seat-1")).toHaveProp(
+      "accessibilityLabel",
+      "Seat 1, Player 1, out: poison",
+    )
+    expect(view.queryByTestId("life-eliminated-seat-2")).toBeNull()
+    fireEvent(view.getByTestId("counter-chip-1-poison"), "longPress")
+    fireEvent.press(view.getByTestId("counter-edit-1-poison-minus"))
+    expect(submit).toHaveBeenCalledWith(
+      { kind: "counter.changed", playerId: "player-0", counterId: "poison", delta: -1 },
+      expect.any(String),
+    )
   })
 
   it("keeps commander callbacks stable across renders while calling the latest handler", () => {
@@ -193,7 +262,7 @@ describe("PlayerGrid", () => {
     },
   )
 
-  it("keeps one card's life font size when another total gains a digit", () => {
+  it("sizes a held preview by its digits without resizing other cards", () => {
     const initialPlayers = players(2)
     initialPlayers[1].life = 999
     const onChange = jest.fn()
@@ -211,10 +280,17 @@ describe("PlayerGrid", () => {
     const firstBefore = fontSize(1)
     const secondBefore = fontSize(2)
 
+    fireEvent(view.getByTestId("life-seat-2-1"), "pressIn")
+    const secondPreview = fontSize(2)
+    expect(fontSize(1)).toBe(firstBefore)
+    fireEvent(view.getByTestId("life-seat-2-1"), "pressOut")
+    expect(fontSize(2)).toBe(secondBefore)
+
     view.rerender(renderGrid([initialPlayers[0], { ...initialPlayers[1], life: 1000 }]))
 
     expect(fontSize(1)).toBe(firstBefore)
     expect(fontSize(2)).toBeLessThan(secondBefore)
+    expect(fontSize(2)).toBe(secondPreview)
     view.unmount()
     jest.clearAllMocks()
   })

@@ -81,4 +81,24 @@ describe("connected invite native intent", () => {
       Reflect.set(globalThis, "__DEV__", development)
     }
   })
+
+  it.each([
+    "scryve-preview://preview/pr-123",
+    "count-preview://preview/pr-123",
+    "scryve-preview://expo-development-client/?url=https://u.expo.dev/1e4ab9fb-230c-421d-a659-a4aaa4355d82?channel-name=pr-123",
+    "/preview/pr-123",
+  ])("routes PR preview link %s", (path) => {
+    expect(redirectSystemPath({ path, initial: true })).toBe("/preview/pr-123")
+  })
+
+  it.each([
+    "scryve-preview://preview/production",
+    "scryve-preview://preview/pr-123?x=1",
+    "scryve-preview://preview/pr-",
+    "scryve://preview/pr-123",
+    "scryve-preview://expo-development-client/?url=https://evil.example/x?channel-name=pr-123",
+    "scryve-preview://expo-development-client/?url=https://u.expo.dev/1e4ab9fb-230c-421d-a659-a4aaa4355d82?channel-name=beta",
+  ])("drops other preview link %s", (path) =>
+    expect(redirectSystemPath({ path, initial: true })).toBe("/"),
+  )
 })

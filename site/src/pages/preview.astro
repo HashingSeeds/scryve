@@ -1,0 +1,33 @@
+---
+// why: chat apps and GitHub only link http(s), so the pr-preview comment links here, and this page
+// opens the preview app. web/_redirects serves it for /preview/*.
+import Base from "../layouts/Base.astro"
+---
+
+<Base title="PR preview · Scryve" description="Open a pull request preview in Scryve (Preview).">
+  <main class="missing">
+    <a class="brand" href="/">Scryve</a>
+    <h1 id="preview-heading">Not a preview link.</h1>
+    <p id="preview-hint">Preview links look like /preview/pr-123.</p>
+    <div id="preview-open-row" hidden>
+      <a id="preview-open" class="button">Open in Scryve (Preview)</a>
+    </div>
+  </main>
+</Base>
+
+<script>
+  // why: only pr-<number> is ever put in the deep link, so this page cannot redirect anywhere else.
+  const channel = /^\/preview\/(pr-[0-9]+)\/?$/.exec(location.pathname)?.[1]
+  const heading = document.getElementById("preview-heading")
+  const hint = document.getElementById("preview-hint")
+  const row = document.getElementById("preview-open-row")
+  const open = document.getElementById("preview-open")
+  if (channel && heading && hint && row && open) {
+    const deepLink = `scryve-preview://preview/${channel}`
+    heading.textContent = `Opening ${channel}`
+    hint.textContent = "Needs Scryve (Preview) on this phone. If nothing happens, tap below."
+    open.setAttribute("href", deepLink)
+    row.hidden = false
+    location.replace(deepLink)
+  }
+</script>

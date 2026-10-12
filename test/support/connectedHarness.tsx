@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import type { ConnectedGameStatus } from "@/features/connected/model"
+import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 
 type ActiveConnectedGame = {
@@ -71,7 +72,7 @@ type RuntimeActionEvent = {
   accepted?: boolean
 }
 
-export type MockConnectedRuntime = {
+export type MockConnectedRuntime = TableRuntime & {
   status: "loading" | "ready" | "unavailable"
   source: "cache" | "remote"
   message?: string
@@ -106,11 +107,11 @@ export type MockConnectedRuntime = {
 }
 
 export const mockClaimSeat = jest.fn(async () => ({ publicId: "game-public", seat: 2 }))
-export const mockClaimableSeats = jest.fn(async () => ({
-  publicId: "game-public",
-  mode: "connected",
-  seats: [] as number[],
-}))
+export const mockClaimableSeats = jest.fn(
+  async (): Promise<
+    { publicId: string; mode: string; seats: number[] } | { invalid: true; seats: number[] }
+  > => ({ publicId: "game-public", mode: "connected", seats: [] }),
+)
 export const mockSyncUser = jest.fn(async () => "user")
 export const mockStart = jest.fn(async () => ({ publicId: "game-public" }))
 export const mockLeave = jest.fn(async () => ({ publicId: "game-public", left: true }))
@@ -191,6 +192,13 @@ function defaultRuntime(): MockConnectedRuntime {
     abandon: mockRuntimeAbandon,
     dismissFailed: mockDismissFailed,
     finishing: false,
+    // why: the board reads the table from the runtime; these tests cover life and commander damage, so the table stays empty.
+    table: { designations: {}, players: {} },
+    tableRules: { counters: [], designations: [] },
+    ...createTableActions(
+      () => null,
+      () => false,
+    ),
   }
 }
 

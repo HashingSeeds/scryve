@@ -6,15 +6,18 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
   applyGameCommand,
+  applyLocalTableAction,
   canUndo,
   createNextMatchGame,
   createRematch,
   defaultCommandContext,
   hasLocalGameStarted,
+  localTableRules,
   restartMatchGame,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
+import { createTableActions, type TableRuntime } from "./tableRuntime"
 import type {
   GameCommand,
   LifeDelta,
@@ -23,14 +26,27 @@ import type {
   MatchSeatOutcome,
   PlayerId,
 } from "./types"
+import { EMPTY_TABLE } from "../../../convex/lib/table"
 
-/** why: `ownerId` is the signed-in account, so a finished game is filed under it for upload. */
+/**
+ * why: `storedGame` is the game as the route last read it from storage. The route rereads on
+ * focus, so a board left open under setup adopts renames and ended games instead of saving
+ * its older copy over them. A new read always wins: the board saves before it updates, so
+ * storage is never behind it. Each read is a new object, so callers must keep it stable
+ * between reads. `ownerId` is the signed-in account, so a finished game is filed under it
+ * for upload.
+ */
 export function useLocalGame(
-  initialGame: LocalGame,
+  storedGame: LocalGame,
   repository: LocalGameRepository = localGameRepository,
   ownerId?: string,
 ) {
-  const [game, setGame] = useState(initialGame)
+  const [game, setGame] = useState(storedGame)
+  const [readGame, setReadGame] = useState(storedGame)
+  if (storedGame !== readGame) {
+    setReadGame(storedGame)
+    setGame(storedGame)
+  }
   const reduceMotion = useReducedMotion()
   const deviceId = useMemo(() => repository.getDeviceId(), [repository])
   const context = useMemo(() => defaultCommandContext(deviceId), [deviceId])
@@ -88,6 +104,35 @@ export function useLocalGame(
     [dispatch, reduceMotion, settings.hapticsEnabled],
   )
 
+  const tableActions = useMemo(
+    () =>
+      createTableActions(
+        () => {
+          const current = gameRef.current
+          if (current.status !== "active") return null
+          return {
+            table: current.table ?? EMPTY_TABLE,
+            rules: localTableRules(current),
+            playerIds: current.players.map(({ id }) => id),
+            lifeOf: (playerId) => current.players.find(({ id }) => id === playerId)?.life,
+            canAct: () => true,
+          }
+        },
+        (action, operationId) => {
+          const previous = gameRef.current
+          const next = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
+          if (next === previous) return false
+          repository.saveActiveGame(next)
+          if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
+            captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
+          gameRef.current = next
+          setGame(next)
+          return true
+        },
+      ),
+    [repository],
+  )
+
   const replaceBoard = useCallback(
     (next: LocalGame) => {
       repository.saveActiveGame(next)
@@ -129,8 +174,18 @@ export function useLocalGame(
     [repository],
   )
 
+  // why: the Pokémon seats memoize on this object, so it only changes when the table itself does, not on every life tap.
+  const tableState = game.table ?? EMPTY_TABLE
+  const tableRules = localTableRules(game)
+  const tableRuntime = useMemo(
+    (): TableRuntime => ({ ...tableActions, table: tableState, tableRules }),
+    [tableActions, tableState, tableRules],
+  )
+
   return {
     game,
+    ...tableRuntime,
+    tableRuntime,
     canUndo: canUndo(game, context.actorId),
     changeLife,
     assignCommanderDamage,

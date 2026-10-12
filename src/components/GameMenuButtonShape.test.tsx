@@ -1,25 +1,28 @@
 import { render } from "@testing-library/react-native"
-import { ClipPath, Path, Polygon, Polyline } from "react-native-svg"
+import { ClipPath, Path } from "react-native-svg"
 
 import {
+  buildSoftCorners,
+  buildSoftPolygonPath,
   buildSweepWedges,
   DEFAULT_MENU_BUTTON_STYLE,
   GameMenuButtonShape,
   isMenuButtonStyle,
   MENU_BUTTON_STYLES,
   mixColorsInLinearLight,
+  PENTAGON_BADGE_ANCHOR,
+  softPolygonLength,
 } from "./GameMenuButtonShape"
 
 const RED = "#FF0000"
 const BLUE = "#0000FF"
 const PENTAGON_CENTER = 50
 
-function radiusOf(points: string): number {
+function farthestTipRadius(path: string): number {
   return Math.max(
-    ...points.split(" ").map((corner) => {
-      const [x, y] = corner.split(",").map(Number)
-      return Math.hypot(x - PENTAGON_CENTER, y - PENTAGON_CENTER)
-    }),
+    ...Array.from(path.matchAll(/Q([\d.]+),([\d.]+)/g), ([, x, y]) =>
+      Math.hypot(Number(x) - PENTAGON_CENTER, Number(y) - PENTAGON_CENTER),
+    ),
   )
 }
 
@@ -94,16 +97,16 @@ describe("GameMenuButtonShape", () => {
     const view = render(
       <GameMenuButtonShape variant={variant} isDark boardBackgroundColor="#000000" />,
     )
-    expect(view.UNSAFE_queryAllByType(Polyline)).toHaveLength(0)
+    expect(view.queryByTestId("game-menu-bevel")).toBeNull()
   })
 
   it.each(MENU_BUTTON_STYLES)("preserves the current %s treatment in light mode", (variant) => {
-    expect(shape(variant).UNSAFE_getAllByType(Polyline)).toHaveLength(2)
+    expect(shape(variant).getByTestId("game-menu-bevel").findAllByType(Path)).toHaveLength(2)
   })
 
   it.each(MENU_BUTTON_STYLES)("renders %s without an exterior shadow", (variant) => {
-    const polygons = shape(variant).UNSAFE_getAllByType(Polygon)
-    expect(polygons.every((polygon) => polygon.props.translateY === undefined)).toBe(true)
+    const paths = shape(variant).UNSAFE_getAllByType(Path)
+    expect(paths.every((path) => path.props.translateY === undefined)).toBe(true)
   })
 
   it.each(MENU_BUTTON_STYLES)(
@@ -111,20 +114,57 @@ describe("GameMenuButtonShape", () => {
     (variant) => {
       const view = shape(variant)
       const halo = view
-        .UNSAFE_getAllByType(Polygon)
-        .find((polygon) => polygon.props.stroke === "#FFFFFF" && polygon.props.strokeWidth === 7)
+        .UNSAFE_getAllByType(Path)
+        .find((path) => path.props.stroke === "#FFFFFF" && path.props.strokeWidth === 7)
       const clip = view.UNSAFE_getByType(ClipPath).props.children
       expect(halo).toBeTruthy()
-      expect(radiusOf(clip.props.points)).toBeCloseTo(
-        radiusOf(halo!.props.points) - halo!.props.strokeWidth / 2,
+      expect(farthestTipRadius(clip.props.d)).toBeCloseTo(
+        farthestTipRadius(halo!.props.d) - halo!.props.strokeWidth / 2,
         5,
       )
       const bevelReach = Math.max(
-        ...view.UNSAFE_getAllByType(Polyline).map((line) => radiusOf(line.props.points)),
+        ...view
+          .UNSAFE_getByProps({ testID: "game-menu-bevel" })
+          .findAllByType(Path)
+          .map((line) => farthestTipRadius(line.props.d)),
       )
-      expect(bevelReach).toBeLessThanOrEqual(radiusOf(clip.props.points) + 1e-6)
+      expect(bevelReach).toBeLessThanOrEqual(farthestTipRadius(clip.props.d) + 1e-6)
     },
   )
+
+  describe("soft corners", () => {
+    const corners = buildSoftCorners({ sides: 5, center: 50, radius: 46, cornerRadius: 9 })
+
+    it("starts and ends each curve the corner radius away from its sharp tip", () => {
+      corners.forEach(({ enter, tip, exit }) => {
+        expect(Math.hypot(enter.x - tip.x, enter.y - tip.y)).toBeCloseTo(9, 5)
+        expect(Math.hypot(exit.x - tip.x, exit.y - tip.y)).toBeCloseTo(9, 5)
+      })
+    })
+
+    it("draws one closed curve per corner", () => {
+      const path = buildSoftPolygonPath(corners)
+      expect(path.match(/Q/g)).toHaveLength(5)
+      expect(path.endsWith("Z")).toBe(true)
+    })
+
+    // why: the trace's dash is sized from this length, so a wrong length makes the trace repeat or fall short around the rim.
+    it("measures the rounded outline's full length", () => {
+      expect(softPolygonLength(corners)).toBeCloseTo(259.17, 1)
+    })
+
+    it("keeps the badge anchor on a straight stretch of the border", () => {
+      const [apex, upperRight] = corners
+      const anchor = {
+        x: PENTAGON_BADGE_ANCHOR.x * 100,
+        y: PENTAGON_BADGE_ANCHOR.y * 100,
+      }
+      const fromUpperRight = Math.hypot(anchor.x - upperRight.tip.x, anchor.y - upperRight.tip.y)
+      const fromApex = Math.hypot(anchor.x - apex.tip.x, anchor.y - apex.tip.y)
+      expect(fromUpperRight).toBeGreaterThan(9)
+      expect(fromApex).toBeGreaterThan(9)
+    })
+  })
 
   it("falls back to the default palette when a board reports no seats", () => {
     expect(shape("prismFlat", []).UNSAFE_getAllByType(Path).length).toBeGreaterThan(0)

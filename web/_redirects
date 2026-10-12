@@ -34,6 +34,9 @@
 /delete-account /play/delete-account  301
 /delete-account/* /play/delete-account  301
 
+# PR preview links open the preview app; site/src/pages/preview.astro reads the PR from the path.
+/preview/* /preview  200
+
 # Trailing slashes on app routes (store listings and legal text link these pages)
 /play/:page/ /play/:page  301
 
