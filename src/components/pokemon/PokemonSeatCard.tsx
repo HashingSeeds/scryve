@@ -314,8 +314,8 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       table.switchActive(playerId, pokemon.id)
       return
     }
-    if (focused?.id === pokemon.id) setFocus(null)
-    else touchFocus(pokemon.id)
+    // why: a second tap on the focused chip restarts the timer; ending focus there sent the next damage tap to the Active.
+    touchFocus(pokemon.id)
   }
 
   function switchIn(pokemonId: string) {
@@ -551,8 +551,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             }
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
-            onPress={() => onChangePrizes(-1)}
-            onLongPress={() => onChangePrizes(1)}
+            // why: prizes run out at 0, and a put back never passes the six that were laid out.
+            onPress={() => prizes > 0 && onChangePrizes(-1)}
+            onLongPress={() => prizes < STANDARD_PRIZES && onChangePrizes(1)}
             style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
           >
             <Text
