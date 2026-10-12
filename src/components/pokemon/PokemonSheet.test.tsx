@@ -179,6 +179,14 @@ describe("PokemonSheet", () => {
     expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Ho-Oh")
   })
 
+  it("moves focus to the search field when Look up opens it", () => {
+    const pokemon = { id: "active-001", name: "Pikachu", hp: 60, prizes: 1, damage: 0 }
+    render(sheet({ rotation: 180, mode: { kind: "edit", pokemon, slot: "active" } }))
+    fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
+    fireEvent.press(screen.getByTestId("pokemon-lookup-seat-1"))
+    expect(screen.getByTestId("pokemon-search-seat-1").props.autoFocus).toBe(true)
+  })
+
   it("keeps the system keyboard for a seat facing the bottom edge", () => {
     render(sheet({ rotation: 0 }))
     const search = screen.getByTestId("pokemon-search-seat-1")

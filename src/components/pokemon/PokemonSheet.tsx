@@ -304,7 +304,7 @@ export function PokemonSheet({
               placeholder="Search cards"
               value={query}
               selection={caretAtEnd(query)}
-              autoFocus={mode.kind === "place"}
+              autoFocus
               autoCorrect={false}
               maxLength={120}
               returnKeyType="search"
