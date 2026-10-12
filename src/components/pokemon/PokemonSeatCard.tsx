@@ -402,7 +402,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           !readyToLayout && $hidden,
         ]}
       >
-        {/* why: the seat mark is drawn first and sits behind the content in the content-space corner, as on the life card, so it costs the cramped seats no room and never covers a tap target. */}
+        {/* why: the seat mark is drawn first and sits behind the content in the bottom-left content corner, so it costs the cramped seats no room and never covers a tap target. */}
         <PlayerMark
           seatNumber={seatNumber}
           shape={shape}
@@ -412,7 +412,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           style={[
             themed($mark),
             {
-              right: padding + insets.right,
+              left: padding + insets.left,
               // why: the mark centers on the prize row, so the seat's identity reads as one line with the name beside it.
               bottom: padding + insets.bottom + (prizeRowHeight - markSize) / 2,
             },
@@ -546,6 +546,24 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
 
         {/* why: prizes are the score, so the count is big enough to read across the table and the pips sit two by three like the cards do. */}
         <View style={[themed($bottomRow), { height: prizeRowHeight }]}>
+          <View style={[$identity, { marginLeft: markSize + spacing.xs }]}>
+            <Text
+              testID={`player-name-seat-${seatNumber}`}
+              text={displayName}
+              size="xxs"
+              numberOfLines={1}
+              style={[{ color: ink }, $dim75]}
+            />
+            {elapsed ? (
+              <Text
+                text={`Updated ${elapsed} ago`}
+                size="xxs"
+                weight="bold"
+                numberOfLines={1}
+                style={{ color: ink }}
+              />
+            ) : null}
+          </View>
           <BoardPressable
             testID={`pokemon-prizes-seat-${seatNumber}`}
             accessibilityRole={controlsLive ? "button" : undefined}
@@ -590,24 +608,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               ))}
             </View>
           </BoardPressable>
-          <View style={[$identity, { marginRight: markSize + spacing.xs }]}>
-            <Text
-              testID={`player-name-seat-${seatNumber}`}
-              text={displayName}
-              size="xxs"
-              numberOfLines={1}
-              style={[{ color: ink }, $dim75]}
-            />
-            {elapsed ? (
-              <Text
-                text={`Updated ${elapsed} ago`}
-                size="xxs"
-                weight="bold"
-                numberOfLines={1}
-                style={{ color: ink }}
-              />
-            ) : null}
-          </View>
         </View>
 
         {asking ? (
@@ -1096,8 +1096,8 @@ const $prizeCount: TextStyle = { fontVariant: ["tabular-nums"], letterSpacing: -
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
-// why: the name sits with the seat mark, as it does on the commander board, and the prizes keep the other corner.
-const $identity: ViewStyle = { flex: 1, minWidth: 0, alignItems: "flex-end" }
+// why: the name sits with the seat mark in the bottom-left corner on every board, and the prizes take the other corner.
+const $identity: ViewStyle = { flex: 1, minWidth: 0, alignItems: "flex-start" }
 const $drainTrack: ViewStyle = {
   alignSelf: "stretch",
   height: 2,
@@ -1217,7 +1217,7 @@ const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xs,
   paddingVertical: spacing.xxs,
   borderRadius: 12,
-  marginLeft: -spacing.xs,
+  marginRight: -spacing.xs,
   marginBottom: -spacing.xxs,
   maxWidth: "100%",
 })
