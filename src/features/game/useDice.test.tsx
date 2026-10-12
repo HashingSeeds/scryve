@@ -127,15 +127,19 @@ describe("useDice", () => {
 
     fireEvent.press(view.getByTestId("dice-coin"))
     fireEvent.press(view.getByTestId("dice-seat-1"))
+    expect(view.getByTestId("dice-coin-flipping")).toBeTruthy()
+    expect(view.getByTestId("dice-seat-1")).not.toHaveTextContent("Tails")
+    act(() => jest.advanceTimersByTime(700))
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("CoinTails")
     expect(view.queryByTestId("dice-chip-1-coin")).toBeNull()
 
-    act(() => jest.advanceTimersByTime(2000))
+    act(() => jest.advanceTimersByTime(1300))
     expect(view.getByTestId("dice-chip-1-coin")).toHaveTextContent("Tails")
     expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip a coin for Ada")
 
     fireEvent.press(view.getByTestId("dice-seat-1"))
     expect(view.queryByTestId("dice-chip-1-coin")).toBeNull()
+    act(() => jest.advanceTimersByTime(700))
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("CoinTails")
 
     fireEvent.press(view.getByTestId("dice-close"))
@@ -167,18 +171,23 @@ describe("useDice", () => {
     const view = renderTable()
 
     fireEvent.press(view.getByTestId("dice-rolloff"))
+    // why: the die tumbles first, so the tie reads only once it lands; the announcement is the final result straight away.
+    expect(view.getByTestId("dice-seat-1")).not.toHaveTextContent("Tie")
+    expect(announce).toHaveBeenLastCalledWith("Tie at 19, Ada and Grace. Roll again")
+    expect(announce).toHaveBeenCalledTimes(1)
+    act(() => jest.advanceTimersByTime(700))
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/19Tie/)
     expect(view.getByTestId("dice-seat-3")).toHaveTextContent(/3Out$/)
-    expect(announce).toHaveBeenLastCalledWith("Tie at 19, Ada and Grace. Roll again")
     act(() => jest.advanceTimersByTime(5000))
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent(/19Tie/)
 
     fireEvent.press(view.getByTestId("dice-seat-2"))
+    act(() => jest.advanceTimersByTime(700))
     expect(view.getByTestId("dice-seat-2")).toHaveTextContent(/20Goes first$/)
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("d205")
     expect(announce).toHaveBeenLastCalledWith("Grace rolled 20, goes first")
 
-    act(() => jest.advanceTimersByTime(2000))
+    act(() => jest.advanceTimersByTime(1300))
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
     expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
     expect(view.queryByTestId("dice-chip-1-first")).toBeNull()

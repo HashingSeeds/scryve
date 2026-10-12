@@ -1,6 +1,6 @@
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
-import Animated, { ZoomIn } from "react-native-reanimated"
+import Animated, { ReduceMotion, ZoomIn } from "react-native-reanimated"
 
 import type { DiceSeatChip } from "@/features/game/dice"
 import { useAppTheme } from "@/theme/context"
@@ -47,7 +47,11 @@ export function DiceChips({
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
   if (cardSize.width === 0 || cardSize.height === 0 || chips.length === 0) return null
-  const entering = reducedMotion === false ? ZoomIn.duration(CHIP_POP_MS) : undefined
+  // why: Reanimated reads the system setting only at startup, so an animation already gated on the live preference must not consult it again.
+  const entering =
+    reducedMotion === false
+      ? ZoomIn.duration(CHIP_POP_MS).reduceMotion(ReduceMotion.Never)
+      : undefined
   return (
     <View pointerEvents="box-none" style={[contentFrame(contentRotation, cardSize), $layer]}>
       <View

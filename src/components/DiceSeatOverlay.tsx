@@ -1,9 +1,14 @@
+import { useEffect, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { StyleSheet, View } from "react-native"
 import Animated, {
-  type EntryExitAnimationFunction,
+  ReduceMotion,
+  type SharedValue,
+  useAnimatedStyle,
+  useSharedValue,
   withSpring,
   withTiming,
+  ZoomOut,
 } from "react-native-reanimated"
 
 import {
@@ -45,46 +50,26 @@ export interface DiceSeatOverlayProps {
 }
 
 const BLOOM_SPRING = { damping: 14, stiffness: 180, mass: 0.8 } as const
+const BLOOM_START_SCALE = 0.4
+const BLOOM_START_TURN_DEG = -40
 const BLOOM_EXIT_MS = 300
-const BLOOM_EXIT_SCALE = 0.16
-const BLOOM_EXIT_RISE = 56
-const COMPACT_BLOOM_EXIT_RISE = 36
+// why: Reanimated reads the system setting only at startup, so animations we already gate on the live preference must not consult it again.
+const GATED_MOTION = ReduceMotion.Never
+// why: web runs only predefined layout animations, so the shrink is one of those and everything else is driven by shared values.
+const BLOOM_EXITING = ZoomOut.duration(BLOOM_EXIT_MS).reduceMotion(GATED_MOTION)
+// why: a die tumbles through a few faces and slows as it lands; the result it lands on was decided before the tumble began.
+const TUMBLE_TICKS = 9
+const tumbleStepMs = (step: number) => 30 + step * step * 1.2
+const D20_SIDES = 20
+const COIN_FLIP_MS = 640
+const COIN_HALF_TURNS = 6
 
-const bloomEnter: EntryExitAnimationFunction = () => {
-  "worklet"
-  return {
-    initialValues: { opacity: 0, transform: [{ scale: 0.4 }, { rotate: "-40deg" }] },
-    animations: {
-      opacity: withTiming(1, { duration: 120 }),
-      transform: [
-        { scale: withSpring(1, BLOOM_SPRING) },
-        { rotate: withSpring("0deg", BLOOM_SPRING) },
-      ],
-    },
-  }
+/** why: a result belongs to the seat that rolled it, so it sits over that card, turned the way its player reads. Each new result is its own bloom. */
+export function DiceSeatOverlay(props: DiceSeatOverlayProps) {
+  return <Bloom key={viewKey(props.dice.view)} {...props} />
 }
 
-/** why: the result shrinks toward the card's inner edge, where its chip lands; the rotation keeps "up" in the seat's reading frame. */
-function bloomExit(rotationDeg: number, rise: number): EntryExitAnimationFunction {
-  return () => {
-    "worklet"
-    const rotate = `${rotationDeg}deg`
-    return {
-      initialValues: { opacity: 1, transform: [{ rotate }, { translateY: 0 }, { scale: 1 }] },
-      animations: {
-        opacity: withTiming(0, { duration: BLOOM_EXIT_MS }),
-        transform: [
-          { rotate },
-          { translateY: withTiming(-rise, { duration: BLOOM_EXIT_MS }) },
-          { scale: withTiming(BLOOM_EXIT_SCALE, { duration: BLOOM_EXIT_MS }) },
-        ],
-      },
-    }
-  }
-}
-
-/** why: a result belongs to the seat that rolled it, so it sits over that card, turned the way its player reads. */
-export function DiceSeatOverlay({
+function Bloom({
   seatNumber,
   playerName,
   color,
@@ -103,11 +88,21 @@ export function DiceSeatOverlay({
     ? { transform: [{ rotate: `${contentRotation}deg` }] }
     : undefined
   const animate = reducedMotion === false && !!view && !scrim
-  const entering = animate ? bloomEnter : undefined
-  const exiting = animate
-    ? bloomExit(contentRotation, compact ? COMPACT_BLOOM_EXIT_RISE : BLOOM_EXIT_RISE)
-    : undefined
   const interactive = view?.kind !== "waiting" && view?.kind !== "choice"
+  const tumble = useTumble(animate ? view : undefined)
+
+  const arrive = useSharedValue(animate ? 0 : 1)
+  useEffect(() => {
+    arrive.value = animate ? withSpring(1, BLOOM_SPRING) : 1
+  }, [animate, arrive])
+  const arriveStyle = useAnimatedStyle(() => ({
+    opacity: arrive.value,
+    transform: [
+      { scale: BLOOM_START_SCALE + (1 - BLOOM_START_SCALE) * arrive.value },
+      { rotate: `${BLOOM_START_TURN_DEG * (1 - arrive.value)}deg` },
+    ],
+  }))
+
   const overlayStyle = [
     themed($overlay),
     compact && themed($compactOverlay),
@@ -123,6 +118,7 @@ export function DiceSeatOverlay({
           playerName={playerName}
           foreground={foreground}
           compact={compact}
+          tumble={tumble}
           onChoose={dice.onChoose}
         />
       </View>
@@ -130,12 +126,9 @@ export function DiceSeatOverlay({
 
   return (
     <Animated.View
-      // why: a new result on the same seat must animate in again, so each bloom is its own element.
-      key={viewKey(view)}
-      entering={entering}
-      exiting={exiting}
+      exiting={animate ? BLOOM_EXITING : undefined}
       pointerEvents="box-none"
-      style={$layer}
+      style={[$layer, animate && arriveStyle]}
     >
       {view?.kind === "choice" ? (
         // why: the two choices must reach a screen reader one at a time, so nothing accessible wraps them.
@@ -159,6 +152,48 @@ export function DiceSeatOverlay({
   )
 }
 
+type Tumble = { face?: number; flipping: boolean; flip: SharedValue<number> }
+
+/** why: the tumble is presentation only: a d20 shows a few passing faces from its own small sequence (never the game's random source) and a coin spins on its axis, then both land on the decided result. */
+function useTumble(view: DiceSeatView | undefined): Tumble {
+  const rolling = view ? rollingTool(view) : undefined
+  const [state, setState] = useState<{ face?: number; flipping: boolean }>(() =>
+    rolling === "d20"
+      ? { face: passingFace(0), flipping: false }
+      : { flipping: rolling === "coin" },
+  )
+  const flip = useSharedValue(0)
+  useEffect(() => {
+    if (rolling === "coin") {
+      flip.value = withTiming(1, { duration: COIN_FLIP_MS })
+      const landing = setTimeout(() => setState({ flipping: false }), COIN_FLIP_MS)
+      return () => clearTimeout(landing)
+    }
+    if (rolling !== "d20") return
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let delay = 0
+    for (let step = 1; step < TUMBLE_TICKS; step += 1) {
+      delay += tumbleStepMs(step)
+      timers.push(setTimeout(() => setState({ face: passingFace(step), flipping: false }), delay))
+    }
+    timers.push(setTimeout(() => setState({ flipping: false }), delay + tumbleStepMs(TUMBLE_TICKS)))
+    return () => timers.forEach(clearTimeout)
+  }, [flip, rolling])
+  return { ...state, flip }
+}
+
+function passingFace(step: number) {
+  let seed = 7
+  for (let i = 0; i <= step; i += 1) seed = (seed * 1103515245 + 12345) % 2147483648
+  return (seed % D20_SIDES) + 1
+}
+
+function rollingTool(view: DiceSeatView): DiceTool | undefined {
+  if (view.kind === "roll") return view.roll.tool
+  if (view.kind === "rolloff") return "d20"
+  return undefined
+}
+
 function viewKey(view: DiceSeatView | undefined) {
   if (!view) return "armed"
   if (view.kind === "roll") return `roll:${view.roll.tool}:${view.roll.value}`
@@ -171,16 +206,19 @@ function Result({
   playerName,
   foreground,
   compact,
+  tumble,
   onChoose,
 }: {
   view: DiceSeatView
   playerName: string
   foreground: string
   compact?: boolean
+  tumble: Tumble
   onChoose?: (order: "first" | "second") => void
 }) {
   const { themed } = useAppTheme()
   const text = { color: foreground }
+  const tumbling = tumble.face !== undefined
   const label = (value: string) => (
     <Text text={value} weight="bold" size="xs" maxFontSizeMultiplier={1.2} style={text} />
   )
@@ -235,31 +273,63 @@ function Result({
       <>
         {label("d20")}
         <Text
-          text={String(view.value)}
+          text={String(tumble.face ?? view.value)}
           weight="medium"
           maxFontSizeMultiplier={1.2}
           style={[themed(compact ? $compactValue : $value), text]}
         />
-        {view.status === "won"
-          ? label("Goes first")
-          : view.status === "tied"
-            ? label("Tie. Tap to roll again")
-            : view.status === "out"
-              ? label("Out")
-              : null}
+        {tumbling
+          ? null
+          : view.status === "won"
+            ? label("Goes first")
+            : view.status === "tied"
+              ? label("Tie. Tap to roll again")
+              : view.status === "out"
+                ? label("Out")
+                : null}
       </>
     )
   if (view.kind === "waiting") return null
   return (
     <>
       {label(toolLabel(view.roll.tool))}
-      <Text
-        text={String(view.roll.value)}
-        weight="medium"
-        maxFontSizeMultiplier={1.2}
-        style={[themed(compact ? $compactValue : $value), text]}
-      />
+      {tumble.flipping ? (
+        <FlippingCoin flip={tumble.flip} foreground={foreground} compact={compact} />
+      ) : (
+        <Text
+          text={String(tumble.face ?? view.roll.value)}
+          weight="medium"
+          maxFontSizeMultiplier={1.2}
+          style={[themed(compact ? $compactValue : $value), text]}
+        />
+      )}
     </>
+  )
+}
+
+/** why: a coin in the air shows its edge and faces by turns, so the disc squeezes on its axis until it lands. */
+function FlippingCoin({
+  flip,
+  foreground,
+  compact,
+}: {
+  flip: SharedValue<number>
+  foreground: string
+  compact?: boolean
+}) {
+  const size = compact ? 46 : 64
+  const spin = useAnimatedStyle(() => ({
+    transform: [{ scaleX: Math.abs(Math.cos(flip.value * Math.PI * COIN_HALF_TURNS)) }],
+  }))
+  return (
+    <Animated.View
+      testID="dice-coin-flipping"
+      style={[
+        $coin,
+        { width: size, height: size, borderRadius: size / 2, borderColor: foreground },
+        spin,
+      ]}
+    />
   )
 }
 
@@ -329,3 +399,4 @@ const $compactOption: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   justifyContent: "center",
 })
 const $pressed: ViewStyle = { opacity: 0.72 }
+const $coin: ViewStyle = { borderWidth: 3 }
