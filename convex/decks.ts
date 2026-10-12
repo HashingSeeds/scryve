@@ -308,7 +308,6 @@ type StatsCounters = Pick<
 >
 
 // why: top-level fields stay Scryve games for installed clients; each source gets its own envelope.
-// why: an absent tally means no data for that line.
 function statsRecord(stats: StatsCounters | null) {
   const games = {
     total: stats?.games ?? 0,

@@ -208,7 +208,6 @@ jobs:
     # newer push. The head, state, and label rechecks before `eas update` and the comment make a
     # stale run skip instead. If two first publishes ever race to create the pr-<n> channel, re-run
     # the newer one that failed.
-    # why: holds EXPO_PREVIEW_TOKEN and requires Matthew's approval.
     environment: pr-preview
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -336,7 +335,6 @@ jobs:
               echo "::error::eas fingerprint:generate did not load the preview EAS environment"
               exit 1
             fi
-            # why: the update is published from the base, so its runtime is the base's.
             if [ "$hash" != "$pr_hash" ]; then
               echo "$platform=native change or stale base: rebase (\`${pr_hash:0:8}\` vs base \`${hash:0:8}\`)" >> "$GITHUB_OUTPUT"
               continue

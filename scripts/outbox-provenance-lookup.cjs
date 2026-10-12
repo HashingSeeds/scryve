@@ -23,12 +23,6 @@ function gitCandidates() {
   }
 }
 
-/**
- * why: OutboxQuarantine events carry digests of update IDs, runtime fingerprints and release commits, never the
- * values, so a build is found by hashing known candidates. Usage: `node scripts/outbox-provenance-lookup.cjs <digest>...`.
- * Commits come from git; pipe update IDs and fingerprints in one per line, e.g.
- * `eas update:list --all --json --non-interactive | jq -r '.. | objects | (.id?, .runtimeVersion?) | strings' | node scripts/outbox-provenance-lookup.cjs 1a2b3c4d`
- */
 function lookup(digests, candidates) {
   const wanted = new Set(digests)
   return [...new Set(candidates)].filter((candidate) => wanted.has(provenanceDigest(candidate)))

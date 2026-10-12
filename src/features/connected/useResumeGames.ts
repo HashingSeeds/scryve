@@ -31,7 +31,6 @@ function useRestoreGaveUp(restoring: boolean) {
   return gaveUp
 }
 
-// why: `undefined` means Clerk is still restoring a device with saved games and no session hint, so wait rather than flash local play.
 export function useNewestResumeGame(): ReturnType<typeof loadNewestResumeGame> | undefined {
   const revision = useResumeRevision()
   const { isLoaded, isSignedIn, userId, sessionHint } = useAuthAccess()

@@ -13,11 +13,9 @@ type DeckRules = { game: string; format: string }
 export type DeckDraft = {
   editing: boolean
   cards: DeckCard[]
-  // why: dirty compares against the list the edit started from, not whatever the server sends mid-edit.
   base: DeckCard[]
   note: string
   metadataRevision?: number
-  // why: an edit opened before any version cards loaded is re-seeded once they arrive and is never dirty until then.
   fromCache: boolean
   undo?: { name: string; cards: DeckCard[] }
   commanderSelected: boolean
@@ -41,7 +39,6 @@ export function openDeckDraft(start: {
   return { ...closedDeckDraft, ...start, editing: true, base: start.cards }
 }
 
-/** why: a saved draft keeps its cards and commander choice so warnings stay visible after save. */
 export function closeDeckDraft(draft: DeckDraft): DeckDraft {
   return { ...draft, editing: false, undo: undefined }
 }
@@ -104,7 +101,6 @@ export function addDraftCard(draft: DeckDraft, card: DeckCard): DeckDraft {
   return { ...draft, cards: incrementCard(draft.cards, card), undo: undefined }
 }
 
-/** why: removing the last copy offers undo, so a mis-tap never loses a card silently. */
 export function removeDraftCard(draft: DeckDraft, card: DeckCard): DeckDraft {
   return {
     ...draft,
@@ -134,7 +130,6 @@ export function isCommanderPick(deck: DeckRules, card: DeckCard) {
   return isCommanderDeck(deck) && cardSection(card) === "commander"
 }
 
-/** why: commander changes support exactly one commander; partner pairs stay read-only for now. */
 export function canChooseCommander(deck: DeckRules, cards: readonly DeckCard[]) {
   return (
     isCommanderDeck(deck) &&
@@ -180,7 +175,6 @@ export function chooseDraftCommander(
 
 type SaveTarget = "queue" | "mutation" | "none"
 
-/** why: queued writes never wait on the network, so an `immediate` save skips the busy state and access prompt. */
 export function planDeckSave(input: {
   changes: { cards: boolean; note: boolean }
   canQueueCards: boolean

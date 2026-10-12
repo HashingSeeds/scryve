@@ -325,7 +325,6 @@ export function loadNewestResumeGame(
   )
 }
 
-// why: launch must decide whether to wait for Clerk before it knows which account is active.
 export function hasAnyResumeGame(
   storage: ConnectedStringStorage = mmkvStorage,
   deployment = connectedDeploymentScope(),

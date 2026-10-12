@@ -1,7 +1,5 @@
 name: promote
 
-# why: promotes without local secrets, from the Actions tab, the GitHub app, or an agent:
-# `gh workflow run promote -f promote=true`. Without `promote`, it only reports.
 on:
   workflow_dispatch:
     inputs:

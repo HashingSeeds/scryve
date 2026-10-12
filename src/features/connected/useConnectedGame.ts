@@ -309,7 +309,6 @@ export function useConnectedGame(publicId: string, ownerId = "anonymous"): Conne
 
   useEffect(() => () => controller.dispose(), [controller])
 
-  // why: the projection query re-renders this hook on every resubscribe, so the board only sees a new runtime when the snapshot or readiness changed.
   return useMemo((): ConnectedGameRuntime => {
     const projection = snapshot.projection
     const runtime = {

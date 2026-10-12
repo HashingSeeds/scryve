@@ -28,7 +28,6 @@ export const NO_TABLE: TableDefinition = { counters: [], designations: [] }
 
 const tableRulesCache = new Map<string, TableDefinition>()
 
-/** why: the counters, designations, and Pokémon board one game offers. Cached so render paths get one stable object per system and format. */
 export function tableRules(system: unknown, format: string | undefined): TableDefinition {
   const definition = systemDefinition(system)
   if (!definition) return NO_TABLE

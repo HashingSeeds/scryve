@@ -148,7 +148,6 @@ describe("GameMenuButtonShape", () => {
       expect(path.endsWith("Z")).toBe(true)
     })
 
-    // why: the trace's dash is sized from this length, so a wrong length makes the trace repeat or fall short around the rim.
     it("measures the rounded outline's full length", () => {
       expect(softPolygonLength(corners)).toBeCloseTo(259.17, 1)
     })

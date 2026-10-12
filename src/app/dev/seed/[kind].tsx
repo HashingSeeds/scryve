@@ -5,10 +5,6 @@ import { EmptyState } from "@/components/EmptyState"
 import { Screen } from "@/components/Screen"
 import { runSeed } from "@/devtools/seeds"
 
-/**
- * why: agents and maintainers reach a known state from one link instead of tapping
- * through setup. Release builds redirect home without writing anything.
- */
 export default function DevSeedRoute() {
   const { kind, ...params } = useLocalSearchParams<{ kind: string }>()
   const [error, setError] = useState<string>()

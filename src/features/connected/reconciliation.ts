@@ -41,7 +41,6 @@ export function overlayPendingDeltas(
     if (event.gameId !== confirmed.publicId) continue
     if (confirmedOperations.has(event.operationId)) continue
     if (event.type === "life.changed") addDelta(event.playerId, event.delta)
-    // why: table actions replay through the shared reducer, so a queued knockout also shows the prizes it takes.
     if (event.type === "table.action") {
       const change = applyTableAction(table, event.action, {
         rules,

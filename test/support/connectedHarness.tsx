@@ -192,7 +192,6 @@ function defaultRuntime(): MockConnectedRuntime {
     abandon: mockRuntimeAbandon,
     dismissFailed: mockDismissFailed,
     finishing: false,
-    // why: the board reads the table from the runtime; these tests cover life and commander damage, so the table stays empty.
     table: { designations: {}, players: {} },
     tableRules: { counters: [], designations: [] },
     ...createTableActions(

@@ -29,7 +29,6 @@ export type DeckViewInput = {
   versionWrites: DeckVersionWriteSnapshot & { mappedVersion: (versionId: string) => string }
   versionCache: DeckVersionCacheSnapshot
   selectedVersionId: string | undefined
-  // why: card details live in device storage, so they are read only when commander warnings need them.
   loadCardDetails: () => Record<string, CommanderSelectionDetails>
 }
 
@@ -60,7 +59,6 @@ export function isDeckKnownDeleted(
   return lists.some((list) => list.some((deck) => deck.deckId === deckId && deck.deleted))
 }
 
-/** why: a provisional offline version has no server row yet, so the query reads the default until it is acknowledged. */
 export function deckQueryVersionId(
   selectedVersionId: string | undefined,
   mappedSelection: string | undefined,
@@ -99,7 +97,6 @@ function newestPendingCardWrite(
     )
 }
 
-/** why: cards resolve as the open draft, then the newest pending write, then the live server list, then the device cache. */
 export function resolveDeckView(input: DeckViewInput) {
   const { deckId, detail, draft, sync, metadataWrites, versionWrites, versionCache } = input
   const { selectedVersionId } = input
@@ -133,7 +130,6 @@ export function resolveDeckView(input: DeckViewInput) {
   const canQueueMetadata = Boolean(
     sync.enabled && sync.ownerId && metadataWrites.metadata.some((item) => item.deckId === deckId),
   )
-  // why: card and version lifecycle writes queue for any signed-in device with sync on.
   const canQueueVersions = sync.enabled && Boolean(sync.ownerId)
 
   const cachedVersion = versionCache.version
@@ -238,7 +234,6 @@ export function resolveDeckView(input: DeckViewInput) {
     cards,
     cardsUnavailable,
     cardsCached,
-    // why: a new version copies what this device shows, so it is absent until some card list is known.
     versionCapture:
       pendingCardWrite || storedCards.length > 0 || cachedCards !== undefined
         ? displayCards

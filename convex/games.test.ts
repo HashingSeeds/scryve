@@ -2613,7 +2613,6 @@ describe("connected table actions", () => {
         },
       })
     const projection = await status({
-      // why: key order differs from the original send and still matches.
       card: { prizes: 1, hp: 60, name: "Pidgey" },
       slot: "bench",
       pokemonId: "pidgey-00001",

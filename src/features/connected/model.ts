@@ -82,7 +82,6 @@ export interface CommanderDamageResolvedEvent {
   clientCreatedAt: number
 }
 
-/** why: counters, designations, and Pokémon changes share one outbox event that carries the shared table action. */
 export interface TableActionEvent {
   type: "table.action"
   operationId: OperationId
@@ -111,7 +110,6 @@ export interface ConnectedProjection {
   recentOperationIds: string[]
   /** Optional so projections from before commander damage remain readable. */
   commanderDamage?: ConnectedCommanderDamageProjection
-  /** why: only sent for systems with table features; optional so projections from older servers stay readable. */
   table?: TableState
   /** Only the host sees this, and only while the invite is still usable. */
   invitation?: { token: string; manualCode: string; expiresAt: number }
@@ -150,7 +148,6 @@ export type FailedLifeAction = FailedConnectedAction
 
 export interface ConnectedDisplayProjection extends ConnectedProjection {
   players: Array<ConnectedPlayerProjection & { pendingDelta: number }>
-  /** why: the confirmed table with queued table actions applied, empty when the system has none. */
   table: TableState
 }
 

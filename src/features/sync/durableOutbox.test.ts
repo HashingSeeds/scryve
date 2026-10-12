@@ -274,7 +274,6 @@ describe("durable outbox provenance", () => {
 
     expect(stored(storage, pendingKey)).toEqual({ ...note, writtenBy: writer })
     expect(storage.getString(pendingKey)).toMatch(/^\{"writtenBy":/)
-    // why: the test codec passes the stored object through, like the deck codec does.
     expect(outbox.loadPending("deck")).toEqual([note])
 
     setOutboxWriter(otherWriter)
@@ -294,7 +293,6 @@ describe("durable outbox provenance", () => {
     const legacy = operation("note-legacy", 1)
     const rewrapped = operation("note-rewrapped", 2)
     storage.set(keys.pendingRecord("deck", "note-legacy", "owner"), JSON.stringify(legacy))
-    // why: an older pass-through codec copies the pending record, provenance included, into `action`.
     storage.set(
       keys.failedRecord("deck", "note-rewrapped", "owner"),
       JSON.stringify(
@@ -328,7 +326,6 @@ describe("durable outbox provenance", () => {
     })
 
     expect(outbox.enqueue(second, "deck")).toMatchObject({ accepted: false, reason: "byte_limit" })
-    // why: failAction only fails an operation that is still pending.
     new DurableOutbox(storage, "owner", keys, codec).enqueue(second, "deck")
     expect(
       outbox.failAction(

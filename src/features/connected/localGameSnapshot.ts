@@ -45,7 +45,6 @@ export function buildFinishedLocalGameSnapshot(game: LocalGameSummary) {
   }
 }
 
-/** why: the `finishScryveMatch` payload: the final score by seat and each seat's outcome. */
 export function buildMatchFinishSnapshot(game: LocalGameSummary) {
   const match = game.match
   if (!match?.result) throw new Error("This game did not end a match")
@@ -94,7 +93,6 @@ export interface LocalGameSnapshot {
     currentLife: number
   }[]
   commanderTotals?: { fromSeat: number; toSeat: number; total: number }[]
-  /** why: counters, designations, and Pokémon keyed by local player id; the server remaps them to the new seats. */
   table?: TableState
 }
 

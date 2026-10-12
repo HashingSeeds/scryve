@@ -101,7 +101,6 @@ export function supportsCommanderDamage(value: unknown, format?: string): boolea
   return playFormatDefinition(playSystemId(value), format)?.hasCommanderDamage ?? false
 }
 
-/** why: which counters, designations, and Pokémon board a game shows comes from the system registry, never from system checks in the UI. */
 export function playTableRules(value: unknown, format?: string): TableRules {
   return isPlaySystemId(value) ? tableRules(value, playSystemFormat(value, format)) : NO_TABLE
 }

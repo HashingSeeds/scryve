@@ -7,10 +7,6 @@ function isSafeInternalPath(path: string): boolean {
   return /^\/(?:[A-Za-z0-9_-]+\/?)+$/.test(path)
 }
 
-/**
- * why: seed links carry their state in the query, which the warm route grammar rejects.
- * Matching the raw link, not a normalized URL, keeps `//`, `..`, and other schemes out.
- */
 const DEV_SEED_LINK =
   /^(?:(?:scryve|count)(?:-dev|-preview)?:\/\/\/?|\/)dev\/seed\/([a-z]+)(\?[^#\s\u0000-\u001F\u007F]*)?$/
 

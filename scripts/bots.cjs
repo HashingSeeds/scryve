@@ -156,10 +156,6 @@ function assertPreviewTarget({ deploymentName, url }) {
     throw new Error("Convex did not return a preview deployment URL")
 }
 
-/**
- * why: trades the project-wide preview key for one preview's admin key, as
- * `convex run --preview-name` does. The admin key stays in memory and is never printed.
- */
 async function previewCredentials(deployKey, preview) {
   const [, teamSlug, projectSlug] = deployKey.split("|")[0].split(":")
   const response = await fetch("https://api.convex.dev/api/deployment/authorize_preview", {
@@ -195,7 +191,6 @@ function createReporter(json) {
   }
 }
 
-// why: each bot owns its socket, identity and device, so several can share one lobby.
 class Bot {
   constructor(slot, credentials, options, report) {
     Object.assign(this, botIdentity(slot))
@@ -341,10 +336,6 @@ class Bot {
     })
   }
 
-  /**
-   * why: offline writes keep their operation id and timestamp, like the app's outbox, so
-   * replays are retries the server must dedupe rather than new changes.
-   */
   send(fn, args, replay = false) {
     const op = { fn, args, settled: false }
     if (this.offline) return void this.queue.push(op)

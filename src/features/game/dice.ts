@@ -4,16 +4,12 @@ export type DiceTool = "d20" | "coin"
 export type CoinFace = "Heads" | "Tails"
 export type DiceRoll = { tool: "d20"; value: number } | { tool: "coin"; value: CoinFace }
 
-/** why: a result blooms over the card, then shrinks into a chip on the card's edge facing the table. */
 export type DicePhase = "bloom" | "chip"
 
-/** why: `attempt` counts this seat's rolls, so a repeat of the same value still reads as a new roll on the card. */
 export type SeatResult = { roll: DiceRoll; phase: DicePhase; attempt: number }
 
-/** why: the chooser is the seat that won the flip or lost the last game; which one decides what the card says. */
 export type ChoiceReason = "flip" | "loss"
 
-// why: a roll-off keeps every seat's die on the table; `pool` is who is still rolling, so one seat left is the winner and more is a tie.
 export type FirstPlayer =
   | {
       kind: "rolloff"
@@ -66,7 +62,6 @@ export function armTool(state: DiceState, tool: DiceTool): DiceState {
   return { ...state, armed: state.armed === tool ? null : tool }
 }
 
-/** why: the tool stays armed so the next tap rolls again; tapping the tool itself puts it down. */
 export function rollForSeat(
   state: DiceState,
   seatId: PlayerId,
@@ -156,7 +151,6 @@ export function pickFirst(state: DiceState, seatId: PlayerId, note?: string): Di
   return { ...state, first: { kind: "picked", seatId, phase: "bloom", ...(note ? { note } : {}) } }
 }
 
-/** why: a decided roll-off and a pick both end as one "1st" chip on the winner; a tie stays on the table until it is re-rolled. */
 export function settleFirst(state: DiceState): DiceState {
   const { first } = state
   if (!first || first.kind === "choice" || first.phase === "chip") return state

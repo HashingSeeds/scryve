@@ -52,7 +52,6 @@ export interface RadialMenuTool {
   onPress: () => void
 }
 
-/** why: an action is a plain pill, or a pill holding two round tools: `tools[0]` sits in the end nearer the pentagon and the other rolls out from under it as the pill lands. */
 export type RadialMenuAction = {
   kind: GameMenuActionKind
   label: string
@@ -78,7 +77,6 @@ export interface GameMenuStatusLine {
   onPress: () => void
 }
 
-/** why: a one-tap offer that sits on the pentagon's upper corner while it applies, such as rolling for who goes first. */
 export interface GameMenuBadge {
   color: string
   glyph: { tool: "d20" | "coin" } | { seatNumber: number; shape?: PlayerMarkShape }
@@ -100,7 +98,6 @@ export interface GameRadialMenuProps {
   exitAction?: { label: string; onPress: () => void }
   signal?: GameMenuSignal
   statusLine?: GameMenuStatusLine
-  // why: this action stays out after the menu closes, so its tools keep working once the backdrop lifts and the seats are live.
   heldAction?: GameMenuActionKind
   badge?: GameMenuBadge
 }
@@ -124,13 +121,11 @@ const ACTION_HEIGHT = 52
 
 const TOOL_SIZE = 44
 const TOOL_RADIUS = TOOL_SIZE / 2
-// why: the same inset on every side keeps each tool concentric with the pill's end cap.
 const TOOL_INSET = (ACTION_HEIGHT - TOOL_SIZE) / 2
 const TOOL_OFFSET = ACTION_WIDTH / 2 - TOOL_INSET - TOOL_RADIUS
 const TOOL_TINT = 0.45
 const BADGE_SIZE = 28
 const BADGE_POP_DELAY_MS = 260
-// why: the offer badge is larger than the sync badge, so it sits further up its edge to read as equally high; measured on the pentagon's own geometry here so the sync anchor can change on its own.
 const START_BADGE_SHARE_OF_EDGE = 0.4
 const PENTAGON_CIRCUMRADIUS = 0.46
 function pentagonCorner(angleDeg: number) {
@@ -151,7 +146,6 @@ const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"
 const STATUS_LINE_DISTANCE = 128
 const STATUS_LINE_HEIGHT = 40
 const STATUS_LINE_REACH = STATUS_LINE_DISTANCE + STATUS_LINE_HEIGHT
-// why: the app navigation shown with the menu sits along the bottom of the window, so the status line must not land there.
 const APP_NAVIGATION_CLEARANCE = 96
 const ANCHOR_LOW_ON_SCREEN = 0.6
 
@@ -161,7 +155,6 @@ const ACTION_START_SCALE = 0.5
 const ACTION_START_ROTATION_LAG_DEG = 25
 const ACTION_POSE_SPRING = { damping: 13, stiffness: 210, mass: 0.8 } as const
 const SIGNAL_BADGE_SCALE_MS = 180
-// why: "needs you" is the one state worth interrupting for, so the button pops once when it arrives.
 const ATTENTION_POP_SCALE = 1.1
 const ATTENTION_POP_RISE_MS = 130
 const ATTENTION_POP_SETTLE_MS = 190
@@ -171,7 +164,6 @@ const POP_EASING = Easing.inOut(Easing.quad)
 const GATED_MOTION = ReduceMotion.Never
 const BADGE_ENTERING = ZoomIn.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
 const BADGE_EXITING = ZoomOut.duration(SIGNAL_BADGE_SCALE_MS).reduceMotion(GATED_MOTION)
-// why: the offer pops in after the board has dealt in, so it reads as an invitation rather than part of the button.
 const START_BADGE_ENTERING = ZoomIn.delay(BADGE_POP_DELAY_MS)
   .duration(SIGNAL_BADGE_SCALE_MS)
   .reduceMotion(GATED_MOTION)
@@ -1071,8 +1063,6 @@ function signalBadgeAt(buttonSize: number): ViewStyle {
 }
 const $largeSignalBadgeCenter = signalBadgeAt(MENU_BUTTON_SIZE)
 const $compactSignalBadgeCenter = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
-// why: the offer takes the upper-left edge, opposite the sync badge, so the two never share a spot.
-// why: the badge has a fixed size, so it is centered on its anchor by offsetting half its size rather than by flex centering in a zero-size box, which iOS left hanging half a badge low.
 function startBadgeAt(buttonSize: number): ViewStyle {
   return {
     position: "absolute",

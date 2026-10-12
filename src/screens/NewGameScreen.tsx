@@ -105,11 +105,9 @@ export interface DeckChoice {
   format: string
 }
 
-/** why: present only while signed in, so local games can carry the account's seat and deck. */
 export interface LocalAccountSetup {
   ownerId: string
   defaultMeSeat?: number
-  // why: undefined means the deck list is still loading, which keeps the picker closed.
   decks?: readonly DeckChoice[] | "unavailable"
 }
 
@@ -142,7 +140,6 @@ export interface NewGameScreenProps {
   onResumeConnected?: (game: ResumableGame) => void
   /** Publishes the running local game as a connected game. Absent when the flow is unavailable. */
   localConnect?: LocalConnectFeed
-  /** why: between games of a match, setup can end the match from its last finished game; the board owns everything else. */
   localMatchEnd?: { game: LocalGame; onEnd: (outcomes: MatchSeatOutcome[]) => void }
 }
 
@@ -216,7 +213,6 @@ export function NewGameScreen({
     initialGame?.lifeStep ?? playSystemRules(initialSystem).counter.tapStep,
   )
   const counter = playSystemRules(system).counter
-  // why: a claimed or running game keeps whatever seat it has, even none; a fresh setup pre-marks one.
   const [meSeat, setMeSeat] = useState<number | undefined>(() =>
     initialGame && (initialGame.account || hasLocalGameStarted(initialGame))
       ? meSeatOf(initialGame)
@@ -237,7 +233,6 @@ export function NewGameScreen({
     setDeck(undefined)
   }, [account?.defaultMeSeat, account?.ownerId])
   const [matchOn, setMatchOn] = useState(Boolean(initialGame?.match))
-  // why: the best of follows the table until the player picks one; a pod round is one game, a 1v1 match is three.
   const [chosenBestOf, setChosenBestOf] = useState<MatchBestOf | undefined>(
     initialGame?.match?.bestOf,
   )
@@ -278,7 +273,6 @@ export function NewGameScreen({
   const matchBestOf = matchOn
     ? (chosenBestOf ?? (format === "commander" || playerCount > 2 ? 1 : 3))
     : undefined
-  // why: a match is one deck's record, so once it is under way the seat and deck stay put.
   const matchLocked = Boolean(
     initialGame?.match && (initialGame.match.gameNumber > 1 || hasLocalGameStarted(initialGame)),
   )
@@ -302,7 +296,6 @@ export function NewGameScreen({
   const busy = connectedMode && Boolean(connected?.busy)
   const connectedGames = connected?.activeGames ?? []
   const localGameBlocksStart = Boolean(localGame)
-  // why: a match in progress is continued from setup, never ended game by game or replaced.
   const matchBlocks = Boolean(localGame?.match)
   const [endingMatch, setEndingMatch] = useState(false)
   const connectedBlocksLocal =

@@ -100,7 +100,6 @@ export function localSummaryModel(game: LocalGame): GameSummaryModel {
   }
 }
 
-/** why: commander damage also costs the target life, so the summary counts it as a life change. */
 export function localChanges(game: LocalGame): SummaryChange[] {
   return game.events
     .filter(

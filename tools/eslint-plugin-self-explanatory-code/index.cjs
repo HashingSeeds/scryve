@@ -18,7 +18,7 @@ const DEFAULT_ALLOWED_PATTERNS = [
 ]
 
 const FEEDBACK =
-  "Prefer self-explanatory code over this comment. Rewrite the code so its intent is expressed through the API, variables, function names, and parameters. Simplify or extract the logic first; keep a comment only when the code cannot express a necessary constraint or rationale."
+  "Prefer self-explanatory code over this comment. Rewrite the code so its intent is expressed through the API, variables, function names, and parameters. Simplify or extract the logic first; otherwise delete it, or prefix it with `why:` only if it names what breaks that no test catches."
 const BASELINE_PREFIX = "self-explanatory-code-baseline:"
 const baselineCache = new Map()
 

@@ -33,7 +33,6 @@ function withoutDeck(snapshot: ReturnType<typeof buildFinishedLocalGameSnapshot>
   }
 }
 
-// why: a pass runs on account readiness, reconnect, and every finish; a transient failure ends it for the next trigger, a rejected game is marked failed so it never pins the games behind it, and the server treats a repeated game id as the same publish.
 function ActivePublish({
   ownerId,
   repository,
@@ -66,7 +65,6 @@ function ActivePublish({
           continue
         } catch (cause) {
           if (!isPermanentRejection(cause)) return
-          // why: a deck removed since setup should not cost the game itself; it uploads once more without the deck.
           if (
             !isDeckRejection(cause) ||
             snapshot.players.every((player) => !player.deckVersionId)
@@ -83,7 +81,6 @@ function ActivePublish({
           repository.markPublishFailed(game.id)
         }
       }
-      // why: a match result is only sent once its games are acked, so the server can count them; one with a rejected game is dropped.
       for (const game of repository.matchFinishesWithFailedGames(ownerId))
         repository.markMatchPublishFailed(game.id)
       for (const game of repository.pendingMatchFinishes(ownerId)) {

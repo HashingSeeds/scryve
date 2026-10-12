@@ -12,7 +12,6 @@ export type CounterDefinition = {
   readonly quickAdjustments: readonly [number, number]
   readonly scrubStep: number
   readonly scrubSteps: number
-  /** why: "down" counters (Pokémon prizes) count toward zero, so reaching zero wins instead of loses. */
   readonly direction: "open" | "down"
   readonly maxStartingValue: number
 }
@@ -58,19 +57,15 @@ export type IntegrationDefinition = {
   }
 }
 
-/** why: an in-game counter beside the main one, like poison or commander tax, that each player tracks. */
 export type TableCounterDefinition = {
   readonly id: string
   readonly label: string
   readonly step: number
   readonly max: number
-  /** why: reaching this count loses the game (10 poison, Comprehensive Rules 104.3d). */
   readonly losesAt?: number
-  /** why: commander tax only exists where a command zone does. */
   readonly commandZoneOnly?: boolean
 }
 
-/** why: a designation is held by at most one player; taking it moves it from whoever had it. */
 export type DesignationDefinition = { readonly id: string; readonly label: string }
 
 export type PokemonBoardDefinition = { readonly benchSize: number; readonly damageStep: number }
@@ -78,7 +73,6 @@ export type PokemonBoardDefinition = { readonly benchSize: number; readonly dama
 export type TableDefinition = {
   readonly counters: readonly TableCounterDefinition[]
   readonly designations: readonly DesignationDefinition[]
-  /** why: Pokémon tracks HP and damage per Pokémon in play, and a knockout moves the opponent's prize counter. */
   readonly pokemon?: PokemonBoardDefinition
 }
 
@@ -86,7 +80,6 @@ export type SystemDefinition = {
   readonly label: string
   readonly shortLabel: string
   readonly available: boolean
-  /** why: deck creation starts Magic in Commander while a new game starts in Standard. */
   readonly defaultFormat: { readonly deck: string; readonly play: string }
   readonly counter: CounterDefinition
   readonly formats: readonly FormatDefinition[]
@@ -191,7 +184,6 @@ export const SYSTEMS = {
         label: "Brawl",
         blurb: "60 cards, singleton",
         sections: MTG_COMMAND_ZONE_SECTIONS,
-        // why: Comprehensive Rules 903.12: Brawl starts at 25 (30 multiplayer) and skips the 21 commander damage loss.
         startingValue: 25,
         multiplayerStartingValue: 30,
         hasCommanderDamage: false,

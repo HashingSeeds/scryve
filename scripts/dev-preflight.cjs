@@ -23,7 +23,6 @@ const stateDir = path.join(
   "scryve-dev",
 )
 
-// why: pnpm keeps a copy of the lockfile it last installed, so a byte comparison tells whether this worktree's install is stale without any state of our own.
 function needsInstall(lockfile, installedLockfile) {
   if (!lockfile) return false
   return !installedLockfile || !lockfile.equals(installedLockfile)
@@ -34,7 +33,6 @@ const DEV_COMMANDS = [
   { kind: "convex", script: /(?:\.bin\/convex|convex\/bin\/main\.js)$/, command: "dev" },
 ]
 
-// why: match the node process itself by argv, not shells or editors that merely mention the command.
 function devKind(argv) {
   if (!/(?:^|\/)node$/.test(argv[0] ?? "")) return null
   const [script, command] = argv.slice(1).filter((arg) => !arg.startsWith("-"))
@@ -141,7 +139,6 @@ function processTable() {
       return pid ? [{ pid: Number(pid), argv: command.split(/\s+/) }] : []
     })
   }
-  // why: spawning ps costs 50 ms or more on a busy Linux box, while reading /proc directly takes about 10 ms.
   return fs
     .readdirSync("/proc")
     .filter((name) => /^\d+$/.test(name))
@@ -151,7 +148,6 @@ function processTable() {
     }))
 }
 
-/** why: start time plus cwd plus cmdline tells a reused pid apart from the process that was found earlier. */
 function processInfo(pid) {
   if (process.platform === "linux") {
     const stat = readFile(`/proc/${pid}/stat`)?.toString()
@@ -267,7 +263,6 @@ async function lockHolder(port) {
 
 const isDevStarter = (argv) => argv.some((arg) => /(?:^|\/)scripts\/dev\.cjs$/.test(arg))
 
-// why: a refused connection means the holder just released the port, so the walk restarts.
 function probe(port) {
   return new Promise((resolve) => {
     const socket = net.connect(port, "127.0.0.1")
@@ -311,7 +306,6 @@ function listenerPid(port) {
 }
 
 const TCP_LISTEN = "0A"
-// why: these are 127.0.0.1, 0.0.0.0, ::, and ::ffff:127.0.0.1 as /proc/net/tcp{,6} print them, the only listeners that conflict with the lock's bind.
 const LOCK_CONFLICT_ADDRESSES = new Set([
   "0100007F",
   "00000000",
@@ -398,7 +392,6 @@ function parseRecord(content) {
   }
 }
 
-// why: readers outside the lock must never see a half-written record, so write a temp file and rename it into place.
 function writeRecord(record) {
   fs.mkdirSync(stateDir, { recursive: true })
   const { identity } = processInfo(process.pid) ?? {}

@@ -34,7 +34,6 @@ const touchesNative = (file) =>
 for (const file of fs.readdirSync(patchDir).filter((name) => name.endsWith(".patch"))) {
   test(`${file} patches only JS that ships in the bundle`, () => {
     const patch = fs.readFileSync(path.join(patchDir, file), "utf8")
-    // why: a rename has two paths, and either one can be native.
     const changedFiles = [...patch.matchAll(/^diff --git a\/(\S+) b\/(\S+)$/gm)].flatMap(
       ([, from, to]) => [from, to],
     )

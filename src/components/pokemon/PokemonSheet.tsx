@@ -44,16 +44,12 @@ export interface PokemonSheetProps {
   rotation: LifeCardContentRotation
   cardWidth: number
   cardHeight: number
-  /** why: already mapped into content space by the seat card. */
   insets: LifeCardContentInsets
-  /** why: the game menu button overlaps the inner edge; the header keeps clear of it the same way the bench does. */
   clearance: BenchClearance
   compact?: boolean
   damageStep: number
   mode: PokemonSheetMode
-  /** why: returns false when the board refused the placement, so the sheet stays open with the draft. */
   onPlace: (card: PokemonCard) => boolean
-  /** why: returns false when the board refused the edit, so the sheet stays open with the draft. */
   onUpdate: (pokemonId: string, card: PokemonCard) => boolean
   onDamage: (pokemonId: string, delta: number) => void
   onMakeActive: (pokemonId: string) => void
@@ -66,16 +62,12 @@ const PRIZE_CHOICES = [1, 2, 3] as const
 const MAX_RESULTS = 12
 const DAMAGE_STEPS = [-3, -1, 1, 3, 5, 10] as const
 
-/** why: the same Pokémon has many printings with different HP, so the set and number tell them apart. */
 function hitDetail(hit: PokemonSearchHit): string | undefined {
   if (hit.setCode) return `${hit.setCode.toUpperCase()} ${hit.collectorNumber ?? ""}`.trim()
   if (hit.collectorNumber) return `#${hit.collectorNumber}`
   return hit.typeLabel
 }
 
-/**
- * why: one overlay places a new Pokémon or edits one in play. Both start from the card catalog so HP and prize value come from the printed card, and both accept typed values when the catalog is out of reach.
- */
 export function PokemonSheet({
   seatNumber,
   color,
@@ -123,7 +115,6 @@ export function PokemonSheet({
     }
   }, [])
   const firstControl = useRef<ViewRef>(null)
-  // why: a placement opens on the search field, which autofocuses, so focus stays there instead of jumping to Done.
   const searchField = useRef<ComponentRef<typeof TextField>>(null)
   useEffect(() => moveFocus(searchField.current ?? firstControl.current), [])
   const catalog = usePokemonCatalog(lookupOpen ? query : "")
@@ -152,7 +143,6 @@ export function PokemonSheet({
         : "Bench"
 
   function setName(name: string) {
-    // why: a typed name drops the catalog link and guesses the prize value until the player sets it.
     setDraft((current) => ({
       ...current,
       name,

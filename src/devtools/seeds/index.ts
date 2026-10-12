@@ -3,10 +3,6 @@ import type { Href } from "expo-router"
 import { seedGame } from "./gameSeed"
 import { SeedError, type SeedParams } from "./seedTypes"
 
-/**
- * why: `/dev/seed/<kind>` resolves kinds here, so a new kind (decks next) needs only
- * a seed function that writes its state and returns where to open it.
- */
 const SEEDS = {
   game: seedGame,
 } satisfies Record<string, (params: SeedParams) => Href | Promise<Href>>

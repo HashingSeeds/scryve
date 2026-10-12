@@ -30,20 +30,17 @@ import {
 } from "./dice"
 import type { GamePlayer, PlayerId } from "./types"
 
-// why: a result stays large long enough to read across the table, then shrinks into its chip. Tapping it settles it sooner.
 const BLOOM_MS = { d20: 5000, coin: 4500, first: 5000 } as const
 const FIRST_HOLD = "first"
 
 type State = {
   gameId: string
-  /** why: dice mode is the Dice petal held out with the seats live; a first-player pick from the badge never enters it. */
   mode: boolean
   dice: DiceState
 }
 
 const CLOSED: Omit<State, "gameId"> = { mode: false, dice: EMPTY_DICE }
 
-/** why: dice results are table talk, so they live on this device only and are gone when the game changes. Rolls belong to dice mode; who goes first belongs to the game's start and clears on its first life change. */
 export function useDice(players: readonly GamePlayer[], gameId: string) {
   const [stored, setStored] = useState<State>()
   const state = stored?.gameId === gameId ? stored : { gameId, ...CLOSED }
@@ -81,7 +78,6 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
   function set(next: DiceState, patch: Partial<Omit<State, "gameId" | "dice">> = {}) {
     update({ ...patch, dice: next })
   }
-  /** why: reduced motion skips the bloom; otherwise it holds, then settles through the latest state so a newer roll on the seat is never cut short. */
   function hold(key: string, ms: number, settle: (dice: DiceState) => DiceState) {
     dropHold(key)
     if (reducedMotion !== false) return settle
@@ -135,7 +131,6 @@ export function useDice(players: readonly GamePlayer[], gameId: string) {
     set(offerChoice(dice, seatId, reason))
   })
 
-  // why: once play has begun, a pick still on its way out settles without leaving a chip.
   const gameStarted = stable("gameStarted", () => {
     dropHold(FIRST_HOLD)
     set(clearFirst(dice))

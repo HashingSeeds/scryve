@@ -300,7 +300,6 @@ async function displayNamesForViewer(
   return names
 }
 
-// why: a local game's names were typed by its only viewer, so they survive where a connected guest becomes a seat label.
 function summaryIdentitySnapshotFor(
   player: Doc<"gamePlayers">,
   user: Doc<"users"> | null,
@@ -321,7 +320,6 @@ export function maskSummaryPlayersForViewer(
   options: { localGame?: boolean } = {},
 ) {
   return players.map((rawPlayer) => {
-    // why: deck names are free text, so only the owner sees one that fails the filter.
     const player =
       rawPlayer.deckNameAtFinish !== undefined &&
       rawPlayer.userId !== viewerUserId &&
@@ -531,7 +529,6 @@ async function terminalizeGame(
     | { kind: "unknown" } = {
     kind: "unknown",
   },
-  // why: a published local game finished on the device, so its records keep that moment, source, and match.
   options: { finishedAt?: number; historySource?: "local"; matchId?: Id<"matches"> } = {},
 ): Promise<Doc<"gameSummaries">> {
   const existing = await ctx.db
@@ -547,7 +544,6 @@ async function terminalizeGame(
   const playerIds = new Set(players.map((player) => player._id))
   if (status !== "finished") result = { kind: "unknown" }
   const recordsHistory = !(status === "abandoned" && isUntouchedRematch(game, players))
-  // why: boards that wake on the finished game should open its summary, not a discarded rematch.
   if (!recordsHistory && game.rematchOfGameId)
     await ctx.db.patch(game.rematchOfGameId, { rematchPublicId: undefined })
   if (result.kind === "win") {
@@ -1011,7 +1007,6 @@ export const publishLocalGame = mutation({
     commanderTotals: v.optional(
       v.array(v.object({ fromSeat: v.number(), toSeat: v.number(), total: v.number() })),
     ),
-    // why: counters, designations, and Pokémon keyed by local player id; remapped to the new seats on insert.
     table: v.optional(tableStateValidator),
   },
   handler: async (ctx, args) => {
@@ -1203,7 +1198,6 @@ export const publishFinishedLocalGame = mutation({
       v.object({ kind: v.literal("draw") }),
       v.object({ kind: v.literal("unknown") }),
     ),
-    // why: a game inside a match carries the match's client id so the first publish creates the match.
     match: v.optional(publishedMatchValidator),
   },
   handler: async (ctx, args) => {
@@ -1923,7 +1917,6 @@ function playerTableFromRow(player: PlayerTable): PlayerTable {
   }
 }
 
-// why: a knockout and its undo also move the other seat's prize counter, so that row is read too.
 function relatedPlayerId(action: TableAction, actor: Doc<"gamePlayers">) {
   if (
     action.kind === "pokemon.knockedOut" ||
@@ -1935,7 +1928,6 @@ function relatedPlayerId(action: TableAction, actor: Doc<"gamePlayers">) {
   return undefined
 }
 
-// why: a hand-typed Pokémon name is shown to every seat, so one that fails the name gate is stored without it, like a hidden deck name.
 function gatedCard<Card extends PokemonCard>(card: Card): Card {
   return card.name !== undefined && nameFailsGate(card.name) ? { ...card, name: undefined } : card
 }
@@ -1971,7 +1963,6 @@ function gatedTableState(table: TableState): TableState {
   }
 }
 
-// why: counters, designations, and Pokémon all go through one replay-safe write that runs the shared table reducer. Only the acting seat's owner may write, like life.
 export const tableAction = mutation({
   args: {
     publicId: v.string(),
@@ -2774,7 +2765,6 @@ export const leaveMyGame = mutation({
         )
       : userPlayers[0]
     if (!player) throw new Error("Game membership required")
-    // why: lobby seats are claimed by inserting a row, so leaving deletes it for the next joiner; an active seat keeps its life history.
     if (game.status === "lobby") {
       await ctx.db.delete(player._id)
       await ctx.db.patch(game._id, { updatedAt: Date.now() })

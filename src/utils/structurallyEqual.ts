@@ -1,4 +1,3 @@
-/** why: memoized components get freshly built plain props each render; comparing arrays and plain objects by content (functions and instances by identity) lets equal props skip the render. */
 export function structurallyEqual(previous: unknown, next: unknown): boolean {
   if (Object.is(previous, next)) return true
   if (Array.isArray(previous) && Array.isArray(next))

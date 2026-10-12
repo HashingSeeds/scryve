@@ -31,7 +31,6 @@ export function createSnapshotStore<Snapshot extends object>(
   }
 }
 
-/** why: domains rebuild a snapshot on every lifecycle step, and an unchanged one would re-render every subscriber. */
 function sameFields<Snapshot extends object>(previous: Snapshot, next: Snapshot): boolean {
   const keys = Object.keys(next) as (keyof Snapshot)[]
   return (

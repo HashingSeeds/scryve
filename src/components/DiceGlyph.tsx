@@ -2,7 +2,6 @@ import Svg, { Circle, Polygon } from "react-native-svg"
 
 import type { DiceTool } from "@/features/game/dice"
 
-/** why: one small mark for each tool, drawn the same on the badge and on a seat's chip. */
 export function DiceGlyph({ tool, size, color }: { tool: DiceTool; size: number; color: string }) {
   if (tool === "coin")
     return (

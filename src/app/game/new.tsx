@@ -69,7 +69,6 @@ export default function NewLocalGameRoute() {
   const [decks, setDecks] = useState<DeckChoices>()
   const [activeGame, setActiveGame] = useState(() => localGameRepository.loadActiveGame())
   const [defaults] = useState(() => localGameRepository.loadSettings())
-  // why: seat 1 is the usual pick on a fresh device; a remembered "none" stays none.
   const [defaultMeSeat] = useState(() => {
     const remembered = localGameRepository.loadMeSeat()
     return remembered === "none" ? undefined : (remembered ?? 0)

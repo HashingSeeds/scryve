@@ -79,7 +79,6 @@ describe("connectedHistoryEntry", () => {
 
 type LocalMatch = NonNullable<LocalGameSummary["match"]>
 
-/** why: a Bo3 Ada wins 2-1, with the match result on the game that ended it, as the device stores it. */
 function deviceMatch(account?: LocalGameSummary["account"]): LocalGameSummary[] {
   const match: LocalMatch = { id: "match_1", bestOf: 3, gameNumber: 1, wins: [0, 0], draws: 0 }
   return [

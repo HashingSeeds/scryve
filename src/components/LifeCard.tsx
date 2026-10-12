@@ -111,7 +111,6 @@ export interface LifeCardProps {
   ownership?: "owned" | "unowned" | "disabled"
   staleSince?: number
   commanderDamage?: LifeCardCommanderDamage
-  /** why: what knocked the seat out, such as "commander damage" or "poison"; the card dims and its label says why. */
   eliminated?: string
   seatTable?: SeatTable
   dice?: LifeCardDice
@@ -180,7 +179,6 @@ export const LifeCard = memo(function LifeCard({
   const identity = `Seat ${seatNumber}, ${displayName}`
   const markSize = compact ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
   const lifeTargetSize = compact ? COMPACT_LIFE_TARGET_SIZE : LIFE_TARGET_SIZE
-  // why: a press shows its change right away; the change itself is recorded on release.
   const [preview, setPreview] = useState(0)
   const shownLife = life + preview
   const shownDigits = String(shownLife).length
@@ -400,7 +398,6 @@ export const LifeCard = memo(function LifeCard({
           bottom: undefined,
         }
       : undefined
-  // why: once measured, the name moves up to fit a short card, and hides only when even that leaves no room.
   const showStatus = !nameInCorner && (statusEdgeLength === 0 || availableStatusOffset >= 0)
   const statusTopOffset =
     statusEdgeLength > 0

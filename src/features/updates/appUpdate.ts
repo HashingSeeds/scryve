@@ -16,10 +16,6 @@ export type AppUpdate =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
 
-/**
- * why: an update lists main's newest notes; `releaseNotesNewSince` says how many are newer than the
- * commit this install runs (app.config.ts), so the player sees only what the update adds.
- */
 export function newReleaseNotes(update: unknown, runningCommit: unknown): string[] {
   if (!isRecord(update)) return []
   const notes = Array.isArray(update.releaseNotes)
@@ -91,7 +87,6 @@ export function updateChannelLabel() {
   return switchedChannel ? `${running} (${switchedChannel} after restart)` : running
 }
 
-// why: overriding works on existing store builds because EAS Build embeds this header key.
 export function setBetaUpdates(enabled: boolean) {
   try {
     Updates.setUpdateRequestHeadersOverride(enabled ? { "expo-channel-name": BETA_CHANNEL } : null)
@@ -129,10 +124,6 @@ function overrideChannel(channel: string | null) {
 // why: a second link while a switch is in flight could reset the override the first one set.
 let switching = false
 
-/**
- * why: the pr-preview workflow publishes each labeled PR to its own `pr-<number>` channel. Without
- * a compatible update there, the build keeps the channel it is running.
- */
 export async function openPrPreview(
   channel: string,
 ): Promise<"busy" | "current" | "missing" | "reloading"> {

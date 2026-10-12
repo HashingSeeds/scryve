@@ -1,4 +1,3 @@
-// why: Android builds every view manager at launch unless MainApplication wraps its packages (README.md).
 const { withMainApplication } = require("expo/config-plugins")
 
 const IMPORT = "import expo.modules.lazyviewmanagers.withLazyViewManagers"
@@ -13,7 +12,6 @@ module.exports = function withLazyViewManagersPlugin(config) {
 
     let contents = modResults.contents
     if (!contents.includes(LAZY_PACKAGE_LIST)) {
-      // why: fail the build if Expo's template changes, instead of silently losing the startup win.
       if (contents.split(PACKAGE_LIST).length !== 2)
         throw new Error(`lazy-view-managers: expected one "${PACKAGE_LIST}" in MainApplication.kt`)
       contents = contents.replace(PACKAGE_LIST, LAZY_PACKAGE_LIST)

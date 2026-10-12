@@ -1,8 +1,3 @@
-/**
- * why: previews count against the team's deployment cap until Convex expires them 5 days after
- * creation, so this deletes them once their branch is done. Run by the convex preview cleanup
- * workflow; pass --dry-run to only list stale previews.
- */
 const CONVEX_API = "https://api.convex.dev/v1"
 const GITHUB_API = "https://api.github.com"
 

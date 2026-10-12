@@ -5,7 +5,6 @@ import { components } from "../_generated/api"
 import type { Id } from "../_generated/dataModel"
 import type { MutationCtx } from "../_generated/server"
 
-// why: the outbox sends one tap per round trip, so a fast player peaks near 5-10/s for a few seconds; 60 absorbs that and 5/s sustained still fits a host running several seats.
 export const gameRateLimiter = new RateLimiter(components.rateLimiter, {
   gameWrite: { kind: "token bucket", rate: 5 * 60, period: MINUTE, capacity: 60 },
   lobbyCreate: { kind: "token bucket", rate: 20, period: HOUR, capacity: 5 },

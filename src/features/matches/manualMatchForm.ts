@@ -18,7 +18,6 @@ export type ManualMatchDraft = {
   bestOf: BestOf
   outcome: SeatOutcome
   opponents: OpponentDraft[]
-  // why: free text so the score stays optional; blank means unknown, not zero.
   score: { wins: string; losses: string; draws: string }
   eventName: string
   round: string
@@ -67,7 +66,6 @@ export function defaultManualMatchDraft(today = new Date()): ManualMatchDraft {
   }
 }
 
-// why: a match has one winner, so picking a new one demotes the previous winner to a loss.
 export function withSeatOutcome(
   draft: ManualMatchDraft,
   seat: "me" | number,
@@ -88,7 +86,6 @@ export function withSeatOutcome(
 
 const OPPOSITE: Record<SeatOutcome, SeatOutcome> = { win: "loss", loss: "win", draw: "draw" }
 
-// why: a two-player form never shows the opponent's result, so a pod starts from the derived one.
 export function withOpponentAdded(draft: ManualMatchDraft): ManualMatchDraft {
   const opponents =
     draft.opponents.length === 1
@@ -156,7 +153,6 @@ export function buildManualMatchArgs(
   }
   const scoreGiven = twoPlayer && Object.values(draft.score).some((value) => value.trim() !== "")
   if (scoreGiven) {
-    // why: a score is all or nothing; only draws may be left blank to mean none.
     if (draft.score.wins.trim() === "" || draft.score.losses.trim() === "")
       return { ok: false, error: "Enter both wins and losses, or leave the score blank" }
     const maxWins = Math.ceil(draft.bestOf / 2)

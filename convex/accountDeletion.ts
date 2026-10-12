@@ -510,7 +510,6 @@ export const processUserLinkedData = internalMutation({
       if (ownedMatches.length) {
         const now = Date.now()
         for (const match of ownedMatches) {
-          // why: a manual match has no other participant to keep it for.
           if (match.source === "manual") await ctx.db.delete(match._id)
           else
             await ctx.db.patch(match._id, {
@@ -522,7 +521,6 @@ export const processUserLinkedData = internalMutation({
         await ctx.scheduler.runAfter(0, internal.accountDeletion.processUserLinkedData, args)
         return null
       }
-      // why: a published local game with no seat of the user's has no membership to anonymize.
       const hosted = await ctx.db
         .query("games")
         .withIndex("by_host_status", (q) => q.eq("hostUserId", request.userId!))

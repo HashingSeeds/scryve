@@ -15,9 +15,6 @@ const SEARCH_DEBOUNCE_MS = 350
 const MIN_QUERY = 2
 const noSubscription = () => {}
 
-/**
- * why: placing a Pokémon starts from the shared card catalog so HP and prize value come from the printed card. Search results carry no HP, so a pick does one lookup; the board falls back to typed values when there is no catalog to reach.
- */
 export function usePokemonCatalog(query: string) {
   const convex = useConvex()
   // why: a local game may run with no Convex client at all, which the stock connection hook treats as a bug.

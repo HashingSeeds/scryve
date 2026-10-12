@@ -60,7 +60,6 @@ function scryveMatchView(match: ScryveMatch, viewerId: Id<"users">) {
 
 export type ScryveMatchView = ReturnType<typeof scryveMatchView>
 
-// why: every game of a match on the page shares one lookup, so reads stay bounded by the page size.
 function scryveMatchLookup(ctx: QueryCtx, viewerId: Id<"users">) {
   const views = new Map<Id<"matches">, ScryveMatchView | null>()
   return async (matchId: Id<"matches">) => {
@@ -96,7 +95,6 @@ export const entries = query({
       const summary = await ctx.db.get(entry.summaryId)
       if (!summary) continue
       const match = entry.matchId ? await scryveMatch(entry.matchId) : null
-      // why: the game's ordinal in its match lives on the game doc, so only match rows read it.
       const game = match ? await ctx.db.get(entry.gameId) : null
       page.push({
         kind: "game" as const,

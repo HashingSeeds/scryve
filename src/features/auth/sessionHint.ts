@@ -6,7 +6,6 @@ import { readPublicCloudConfig } from "./config"
 
 const SESSION_HINT_KEY = "count.auth.session-hint.v1"
 
-// why: Clerk loads network-first, so launch reads the last confirmed session synchronously instead. `userId: null` means it was signed out.
 export type SessionHint = { userId: string | null }
 
 // why: a hint from another Clerk instance or Convex deployment (dev vs production builds) must never stand in for this one.

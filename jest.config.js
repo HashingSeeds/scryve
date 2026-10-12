@@ -1,6 +1,5 @@
 const modulePathIgnorePatterns = ["<rootDir>/\\.delta/", "<rootDir>/\\.agents-work/"]
 
-// why: Convex functions and pure logic never touch React Native, so they skip its preset and run in plain Node.
 const nodeTestDirectories = ["<rootDir>/convex/", "<rootDir>/src/features/sync/"]
 
 /**
@@ -33,7 +32,6 @@ module.exports = {
       transform: {
         "^.+\\.[jt]sx?$": "babel-jest",
       },
-      // why: only convex-test and Convex components ship ESM; pnpm nests them under node_modules/.pnpm.
       transformIgnorePatterns: [
         "/node_modules/(?!(\\.pnpm/(convex-test|@convex-dev)[^/]*/node_modules/)?(convex-test|@convex-dev)/)",
       ],

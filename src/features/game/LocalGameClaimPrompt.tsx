@@ -49,7 +49,6 @@ function whenLabel(timestamp: number) {
   return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
 }
 
-// why: the result leads so a narrow row truncates the format, not the fact that decides the "This is me" seat.
 function detailLine(unit: ClaimUnit) {
   const game = latestGame(unit)
   return [resultLabel(unit), whenLabel(game.finishedAt), localHistoryEntry(game).format].join(" · ")
@@ -71,7 +70,6 @@ function seatMark(seat: number, player?: Pick<GamePlayer, "name" | "color" | "sh
   }
 }
 
-// why: one seat for every game; a game without that seat keeps no seat rather than a wrong one.
 function seatsFor(units: readonly ClaimUnit[], seat: number | undefined) {
   return Object.fromEntries(
     units.map((unit) => [
@@ -89,11 +87,9 @@ function ClaimPicker({
   repository: LocalGameRepository
 }) {
   const { themed } = useAppTheme()
-  // why: read once per account; games finished while signed in are tagged at the finish and never qualify.
   const [candidates] = useState(() => claimableLocalUnits(repository.loadHistory(), ownerId))
   const [open, setOpen] = useState(true)
   const [excluded, setExcluded] = useState<readonly string[]>([])
-  // why: no starting seat; the me seat is final once claimed, and an empty seat is unrecorded rather than wrong.
   const [allSeat, setAllSeat] = useState<number>()
   const [meSeats, setMeSeats] = useState<Readonly<Record<string, number | undefined>>>({})
   const [error, setError] = useState<string>()
@@ -112,7 +108,6 @@ function ClaimPicker({
     )
   }
 
-  // why: a failed write keeps the picker open; the index is authoritative, so retrying repairs whatever was left behind.
   function confirm() {
     try {
       repository.resolveClaims(
@@ -225,7 +220,6 @@ function ClaimPicker({
   )
 }
 
-// why: tapping the chosen mark again clears it, so "no seat" needs no control of its own.
 function SeatMarks({
   testID,
   label,
@@ -280,7 +274,6 @@ function SeatMarks({
   )
 }
 
-// why: a game in progress is never interrupted; the check reruns when the route changes or a game ends, and otherwise on the next launch.
 function useLocalGameRunning(repository: LocalGameRepository) {
   const pathname = usePathname()
   const [finishCount, setFinishCount] = useState(0)
@@ -300,7 +293,6 @@ function isLocalGameRunning(repository: LocalGameRepository) {
   return game !== null && hasLocalGameStarted(game)
 }
 
-/** why: shows whenever a signed-in account with settled consent has signed-out games it has not decided on; closing it only defers to the next launch. */
 export function LocalGameClaimPrompt({
   repository = localGameRepository,
 }: {
@@ -310,14 +302,11 @@ export function LocalGameClaimPrompt({
   const consentSettled = useLegalConsentSettled()
   const running = useLocalGameRunning(repository)
   const ownerId = auth.configured && auth.isLoaded && auth.isSignedIn ? auth.userId : undefined
-  // why: a claim whose detail write failed last time is finished here before the account's games are read again.
   useEffect(() => {
     if (!ownerId) return
     try {
       repository.repairClaimedDetails(ownerId)
-    } catch {
-      // why: storage is still failing; the next launch tries again and the index already holds the claim.
-    }
+    } catch {}
   }, [ownerId, repository])
   if (!ownerId || auth.authVisible || !consentSettled || running) return null
   return <ClaimPicker key={ownerId} ownerId={ownerId} repository={repository} />
@@ -331,12 +320,10 @@ const $game: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
 const CHECK_SIZE = 22
 const MARK_SIZE = 28
 const MARK_TARGET = 44
-// why: lines each game's marks up under its names, past the checkbox.
 const $gameMarks: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   marginLeft: CHECK_SIZE + spacing.sm,
 })
 const $seatMarks: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xxs })
-// why: pulls the tap targets' padding into the margin so the first mark lines up with text above it.
 const $markRow: ViewStyle = {
   flexDirection: "row",
   flexWrap: "wrap",

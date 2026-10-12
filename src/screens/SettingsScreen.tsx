@@ -150,7 +150,6 @@ export function SettingsScreen({
     setSettings(next)
     onSettingsChange(next)
   }
-  // why: a starting value still at its default follows the new default; a custom one stays put.
   const followDefaultLife = (
     changes: Partial<Pick<LocalSettings, "defaultFormat" | "defaultPlayerCount">>,
   ) => {

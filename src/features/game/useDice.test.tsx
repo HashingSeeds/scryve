@@ -17,7 +17,6 @@ const players: GamePlayer[] = [
   { id: asPlayerId("p3"), name: "Katherine", color: "#7B5A91", life: 20, seat: 2 },
 ]
 
-// why: every table starts with dice closed, so each tool press here also proves a tool works from closed.
 function Table({ gameId = "game-1" }: { gameId?: string }) {
   const dice = useDice(players, gameId)
   const { grid } = dice
@@ -188,7 +187,6 @@ describe("useDice", () => {
     const view = renderTable()
 
     fireEvent.press(view.getByTestId("dice-rolloff"))
-    // why: the die tumbles first, so the tie reads only once it lands; the announcement is the final result straight away.
     expect(view.getByTestId("dice-seat-1")).not.toHaveTextContent("Tie")
     expect(announce).toHaveBeenLastCalledWith("Tie at 19, Ada and Grace. Roll again")
     expect(announce).toHaveBeenCalledTimes(1)

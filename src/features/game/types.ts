@@ -24,7 +24,6 @@ export interface GamePlayer {
   seat: number
 }
 
-/** why: life stays out so another seat's life change does not re-render commander boards and strips on every card. */
 export type CommanderBoardPlayer = Pick<GamePlayer, "id" | "name" | "color" | "shape">
 
 interface BaseGameEvent {
@@ -66,7 +65,6 @@ export type GameEvent =
 
 export type CommanderDamageTotals = Record<string, number>
 
-/** why: ties a local game to the signed-in account that will publish it, and to that account's seat. */
 export interface LocalGameAccount {
   ownerId: string
   mePlayerId?: PlayerId
@@ -76,20 +74,16 @@ export interface LocalGameAccount {
 
 export type MatchSeatOutcome = "win" | "loss" | "draw"
 
-/** why: outcomes are by seat index because every game of a match seats the same players in the same order. */
 export interface LocalMatchResult {
   outcomes: MatchSeatOutcome[]
 }
 
-/** why: a match lives on each of its games, so the score survives the new game id a rematch creates. */
 export interface LocalGameMatch {
   id: string
   bestOf: MatchBestOf
   gameNumber: number
-  /** why: wins per seat index and drawn games before this game. */
   wins: number[]
   draws: number
-  /** why: set on the game that ended the match, by reaching the needed wins or by the player ending it. */
   result?: LocalMatchResult
 }
 
@@ -113,9 +107,7 @@ export interface LocalGame {
   result?: LocalGameResult
   account?: LocalGameAccount
   match?: LocalGameMatch
-  /** why: the seat that lost the game before this one chooses who goes first; it lives on the game so a reopen keeps the offer. */
   firstChooserSeat?: number
-  /** why: the first-player offer is one per game, so it is marked used on the game itself. Device-only, like the fields above it. */
   firstPlayerOffered?: true
 }
 
@@ -157,11 +149,8 @@ export interface LocalGameSummary {
   finishedAt: number
   result?: LocalGameResult
   account?: LocalGameAccount
-  /** why: a finished game owned by an account uploads once; the flag survives restarts until the server acks or rejects it. */
   publish?: "pending" | "published" | "failed"
-  /** why: accounts that declined to claim a signed-out game, so a later sign-in picker can skip it. */
   skippedBy?: string[]
   match?: LocalGameMatch
-  /** why: the game that ended a match also carries the match result upload, which waits for every game's ack and is dropped when a game was rejected. */
   matchPublish?: "pending" | "published" | "failed"
 }

@@ -40,7 +40,6 @@ export type RecordMatchDeck = {
 
 type RecordMatchScreenProps = {
   access: CloudAccess
-  // why: History adds results without a deck; deck stats only count matches that name one.
   deck?: RecordMatchDeck
   onBack: () => void
   onSaved: () => void

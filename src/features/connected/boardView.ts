@@ -6,13 +6,11 @@ import type {
 
 export type ConnectedBoardSeat = Omit<ConnectedPlayerProjection, "currentLife">
 
-/** why: life totals and per-change bookkeeping are left out, so a life change from any seat leaves the board's view structurally equal and only the life cards re-render. */
 export interface ConnectedBoardView extends Omit<
   ConnectedProjection,
   "players" | "eventSequence" | "serverUpdatedAt" | "recentOperationIds"
 > {
   players: ConnectedBoardSeat[]
-  /** why: only set once finished; while active the sequence moves with every change. */
   finalEventSequence?: number
 }
 

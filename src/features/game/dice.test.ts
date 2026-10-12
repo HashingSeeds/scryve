@@ -58,7 +58,6 @@ describe("dice roll-off", () => {
     expect(settleFirst(tied)).toBe(tied)
     expect(firstPlayerSeat(tied)).toBeUndefined()
 
-    // why: only the tied seats roll again, so only their attempt counts move on.
     const settled = rerollTies(tied, d20s(2, 20))
     expect(diceSeatView(settled, ada)).toMatchObject({ value: 2, attempt: 2, status: "lost" })
     expect(diceSeatView(settled, grace)).toMatchObject({ value: 20, attempt: 2, status: "won" })

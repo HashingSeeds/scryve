@@ -126,7 +126,6 @@ describe("history.entries", () => {
 
 const SCRYVE_MATCH_ID = "match_local_bo3_000001"
 
-/** why: the same two seats every game, published from the device in order. */
 function scryveMatchGame(gameNumber: number, winner: "me" | "them") {
   const finishedAt = GAME_AT + gameNumber * 60_000
   return {

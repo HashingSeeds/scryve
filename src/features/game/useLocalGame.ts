@@ -148,7 +148,6 @@ export function useLocalGame(
     [repository],
   )
 
-  // why: the offer is one per game, so using it is written onto the game like any other board change.
   const markFirstPlayerUsed = useCallback(() => {
     const current = gameRef.current
     if (!current.firstPlayerOffered) replaceBoard({ ...current, firstPlayerOffered: true })
@@ -166,12 +165,10 @@ export function useLocalGame(
     [replaceBoard],
   )
 
-  /** why: the match's last finished game is in history; ending it also hands the table a fresh match. */
   const endMatch = useCallback(
     (matchId: string, outcomes: MatchSeatOutcome[]) => {
       const ended = repository.finishMatch(matchId, outcomes)
       if (!ended) throw new Error("This match has no finished game to end.")
-      // why: the fresh match that follows hands the loser of the match's last game the first choice.
       if (gameRef.current.match?.id === matchId) {
         const last = repository.loadHistoryDetail(ended.id)?.game
         replaceBoard(
@@ -217,7 +214,6 @@ export function useLocalGame(
     endMatch,
     markFirstPlayerUsed,
     latestMatchGame,
-    /** why: a match that hit the game cap still owes its result after a restart; the board reopens the prompt from it. */
     pendingMatchEnd: () => {
       const matchId = repository.loadPendingMatchEnd()
       return matchId ? latestMatchGame(matchId) : undefined
