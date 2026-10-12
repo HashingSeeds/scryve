@@ -41,6 +41,7 @@ import {
   getPlayerGridRows,
 } from "./playerGridGeometry"
 import { PokemonSeatCard } from "./pokemon/PokemonSeatCard"
+import type { SeatDeck } from "./pokemon/usePokemonDeck"
 
 export interface CommanderDamageGridBinding {
   incomingFor: (player: GamePlayer) => Record<PlayerId, number>
@@ -85,6 +86,8 @@ export interface PlayerGridProps {
   isPlayerDisabled?: (player: GamePlayer) => boolean
   isPlayerOwned?: (player: GamePlayer) => boolean
   getStaleSince?: (player: GamePlayer) => number | undefined
+  /** why: only decks the signed-in user owns can be read, so screens return a version only for seats they control. */
+  getSeatDeck?: (player: GamePlayer) => SeatDeck | undefined
   isPlayerEliminated?: (player: GamePlayer) => boolean
   commanderDamage?: CommanderDamageGridBinding
   table?: TableRuntime
@@ -103,6 +106,7 @@ export function PlayerGrid({
   isPlayerDisabled,
   isPlayerOwned,
   getStaleSince,
+  getSeatDeck,
   isPlayerEliminated,
   commanderDamage,
   table,
@@ -337,6 +341,7 @@ export function PlayerGrid({
                       disabled={disabled || playerDisabled}
                       ownership={ownership}
                       staleSince={getStaleSince?.(player)}
+                      deck={getSeatDeck?.(player)}
                       opponents={players
                         .filter(({ id }) => id !== player.id)
                         .map(({ id, name }) => ({ id, name }))}

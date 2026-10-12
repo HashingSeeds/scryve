@@ -21,9 +21,10 @@ import {
   rotatedLayerStyle,
   type BenchClearance,
 } from "./pokemonCardLayout"
-import { catalogRows, hitDetail } from "./pokemonCatalogHits"
+import { catalogRows, hitDetail, pokemonPrintingLabel } from "./pokemonCatalogHits"
 import { PokemonKeypad } from "./PokemonKeypad"
 import { usePokemonCatalog, type PokemonSearchHit } from "./usePokemonCatalog"
+import { usePokemonDeck, type SeatDeck } from "./usePokemonDeck"
 import {
   pokemonPrizeValue,
   remainingHp,
@@ -46,6 +47,7 @@ export interface PokemonSheetProps {
   seatNumber: number
   /** why: only a seat on the screen's bottom edge sits under the keyboard, so only its sheet lifts the board. */
   liftsBoard?: boolean
+  deck?: SeatDeck
   color: string
   rotation: LifeCardContentRotation
   cardWidth: number
@@ -74,6 +76,7 @@ const DAMAGE_STEPS = [-3, -1, 1, 3, 5, 10] as const
 export function PokemonSheet({
   seatNumber,
   liftsBoard = false,
+  deck: seatDeck,
   color,
   rotation,
   cardWidth,
@@ -192,7 +195,7 @@ export function PokemonSheet({
     else setHp(edit)
   }
 
-  async function pickHit(hit: PokemonSearchHit) {
+  async function pickHit(hit: Pick<PokemonSearchHit, "cardId" | "name">) {
     setPicking(hit.cardId)
     setPickError(undefined)
     try {
@@ -213,7 +216,19 @@ export function PokemonSheet({
       setLookupOpen(false)
       setQuery("")
     } catch {
-      if (mounted.current) setPickError("Could not load that card. Type its HP instead.")
+      if (!mounted.current) return
+      // why: offline the catalog can't answer, but the row already names the card, so only HP is left to type.
+      setDraft((current) => ({
+        ...current,
+        cardId: hit.cardId,
+        name: hit.name,
+        hp: "",
+        prizes: pokemonPrizeValue(hit.name),
+        prizesChosen: false,
+      }))
+      setLookupOpen(false)
+      setQuery("")
+      setPickError("Could not load that card. Type its HP instead.")
     } finally {
       if (mounted.current) setPicking(undefined)
     }
@@ -247,7 +262,23 @@ export function PokemonSheet({
   }
 
   const hits = catalog.hits && catalogRows(catalog.hits)
-  const showSearch = lookupOpen && catalog.available
+  const deck = usePokemonDeck(seatDeck)
+  // why: a cached deck is searchable offline; only the catalog part waits for a connection.
+  const searchable = catalog.available || deck.length > 0
+  const showSearch = lookupOpen && searchable
+  const wanted = query.trim().toLowerCase()
+  const deckHits = lookupOpen ? deck.filter(({ name }) => name.toLowerCase().includes(wanted)) : []
+  const inDeck = new Set(deckHits.map(({ cardId }) => cardId))
+  const results = [
+    ...deckHits.map(({ cardId, name, copies }) => ({
+      cardId,
+      name,
+      detail: [pokemonPrintingLabel(cardId), `×${copies}`].filter(Boolean).join(" "),
+    })),
+    ...(hits ?? [])
+      .filter(({ cardId }) => !inDeck.has(cardId))
+      .map((hit) => ({ cardId: hit.cardId, name: hit.name, detail: hitDetail(hit) })),
+  ]
   // why: a catalog pick closes the search field without a blur, so the keypad follows the field instead.
   const keypadField = typingInto === "query" && !showSearch ? undefined : typingInto
   // why: under the results, the keypad pushes them off a short sideways seat.
@@ -322,15 +353,14 @@ export function PokemonSheet({
             style={$body}
             contentContainerStyle={themed(compact ? $compactBodyContent : $bodyContent)}
           >
-            {showSearch && catalog.searching ? (
+            {deckHits.length > 0 || (showSearch && catalog.searching) ? (
               <View testID={`pokemon-results-seat-${seatNumber}`} style={themed($resultsContent)}>
                 {catalog.busy ? <ActivityIndicator color={ink} /> : null}
                 {catalog.error ? <Text text={catalog.error} size="xxs" style={inkStyle} /> : null}
-                {hits && hits.length === 0 ? (
+                {hits && results.length === 0 ? (
                   <Text text="No cards found" size="xxs" style={[inkStyle, $dim]} />
                 ) : null}
-                {hits?.slice(0, MAX_RESULTS).map((hit) => {
-                  const detail = hitDetail(hit)
+                {results.slice(0, MAX_RESULTS).map(({ detail, ...hit }) => {
                   return (
                     <BoardPressable
                       key={hit.cardId}
@@ -392,7 +422,7 @@ export function PokemonSheet({
                 inputWrapperStyle={themed($fieldWrapper)}
                 style={$hpInput}
               />
-              {!showSearch && catalog.available ? (
+              {!showSearch && searchable ? (
                 <BoardPressable
                   testID={`pokemon-lookup-seat-${seatNumber}`}
                   accessibilityRole="button"

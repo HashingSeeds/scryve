@@ -379,6 +379,12 @@ export function CurrentGameScreen({
                   }
                 : undefined
             }
+            getSeatDeck={(player) => {
+              const account = runtime.game.account
+              return player.id === account?.mePlayerId && account.deckVersionId
+                ? { ownerId: account.ownerId, versionId: account.deckVersionId }
+                : undefined
+            }}
             table={runtime.tableRuntime}
             dice={dice.grid}
             onChange={runtime.changeLife}

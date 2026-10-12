@@ -28,6 +28,7 @@ import {
   rotatedLayerStyle,
 } from "./pokemonCardLayout"
 import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
+import type { SeatDeck } from "./usePokemonDeck"
 import { shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
 import {
   findPokemon,
@@ -66,6 +67,7 @@ export interface PokemonSeatCardProps {
   disabled?: boolean
   ownership?: "owned" | "unowned" | "disabled"
   staleSince?: number
+  deck?: SeatDeck
   opponents: readonly { id: string; name: string }[]
   table: TableRuntime
   dice?: LifeCardDice
@@ -110,6 +112,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   disabled,
   ownership,
   staleSince,
+  deck,
   opponents,
   table,
   onChangePrizes,
@@ -694,6 +697,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         <PokemonSheet
           seatNumber={seatNumber}
           liftsBoard={touchesBottomEdge}
+          deck={deck}
           color={color}
           rotation={contentRotation}
           cardWidth={cardSize.width}

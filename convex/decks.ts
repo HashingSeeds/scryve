@@ -1375,6 +1375,25 @@ export const readVersion = query({
   },
 })
 
+/** why: a game stores only the seat's version id, and keeps it after the deck moves on, so this reads archived versions too. */
+export const versionCards = query({
+  args: { versionId: v.id("deckVersions") },
+  handler: async (ctx, args) => {
+    const version = await ctx.db.get(args.versionId)
+    if (!version)
+      throw new ConvexError({ code: "deck_version_not_found", message: "Deck version not found" })
+    const { deck } = await ownedDeck(ctx, version.deckId)
+    const cards = await ctx.db
+      .query("deckCards")
+      .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version._id))
+      .take(MAX_DECK_CARDS)
+    return {
+      revision: syncedVersion(version).revision,
+      cards: cards.map((card) => projectCard(deck, false, card)),
+    }
+  },
+})
+
 export const selectForSeat = mutation({
   args: {
     publicId: v.string(),

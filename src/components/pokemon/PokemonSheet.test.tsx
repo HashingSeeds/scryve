@@ -1,13 +1,18 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
+import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { ThemeProvider } from "@/theme/context"
 
 import { PokemonSheet, type PokemonSheetProps } from "./PokemonSheet"
 
 const mockAction = jest.fn()
+const mockQuery = jest.fn()
+let mockOnline = true
 const mockConvex = {
+  url: "https://test.convex.cloud",
   action: mockAction,
-  connectionState: () => ({ isWebSocketConnected: true }),
+  query: mockQuery,
+  connectionState: () => ({ isWebSocketConnected: mockOnline }),
   subscribeToConnectionState: () => () => {},
 }
 jest.mock("convex/react", () => ({ useConvex: () => mockConvex }))
@@ -58,6 +63,8 @@ describe("PokemonSheet", () => {
   beforeEach(() => {
     jest.useFakeTimers()
     mockAction.mockReset()
+    mockQuery.mockReset()
+    mockOnline = true
   })
   afterEach(() => jest.useRealTimers())
 
@@ -193,5 +200,57 @@ describe("PokemonSheet", () => {
     expect(search.props.showSoftInputOnFocus).toBe(true)
     fireEvent(search, "focus")
     expect(screen.queryByTestId("pokemon-keypad-seat-1")).toBeNull()
+  })
+
+  it("lists the seat's own deck Pokémon before typing, and places one with a tap", async () => {
+    mockQuery.mockResolvedValue({
+      revision: 1,
+      cards: [
+        { name: "Charizard ex", cardId: "sv03-125", category: "Pokemon", quantity: 2 },
+        { name: "Rare Candy", cardId: "sv01-191", category: "Trainer", quantity: 4 },
+        { name: "Charizard ex", cardId: "sv03-125", category: "Pokemon", quantity: 1 },
+      ],
+    })
+    mockAction.mockResolvedValue(card)
+    const onPlace = jest.fn(() => true)
+    render(sheet({ deck: { ownerId: "owner-1", versionId: "version-1" }, onPlace }))
+    await flush()
+
+    expect(screen.getByLabelText("Charizard ex, SV3 125 ×3")).toBeTruthy()
+    expect(screen.queryByText("Rare Candy")).toBeNull()
+    expect(
+      new DeckVersionCacheRepository("owner-1", undefined, mockConvex.url).loadCards("version-1")
+        ?.cards,
+    ).toHaveLength(3)
+    fireEvent.press(screen.getByTestId("pokemon-result-sv03-125"))
+    await flush()
+    await flush()
+    expect(onPlace).toHaveBeenCalledWith({
+      cardId: "sv03-125",
+      name: "Charizard ex",
+      hp: 330,
+      prizes: 2,
+    })
+  })
+
+  it("lists a cached deck offline, and a tap fills the name so only HP is left", async () => {
+    mockOnline = false
+    mockQuery.mockRejectedValue(new Error("offline"))
+    mockAction.mockRejectedValue(new Error("offline"))
+    new DeckVersionCacheRepository("owner-offline", undefined, mockConvex.url).saveCards(
+      "version-offline",
+      1,
+      [{ name: "Pikachu ex", cardId: "sv08-057", category: "pokemon", quantity: 2 }],
+    )
+    render(sheet({ deck: { ownerId: "owner-offline", versionId: "version-offline" } }))
+    expect(screen.getByTestId("pokemon-search-seat-1")).toBeTruthy()
+
+    fireEvent.press(screen.getByTestId("pokemon-result-sv08-057"))
+    await flush()
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Pikachu ex")
+    expect(screen.getByTestId("pokemon-hp-input-seat-1").props.value).toBe("")
+    expect(screen.getByTestId("pokemon-prizes-2-seat-1").props.accessibilityState).toMatchObject({
+      checked: true,
+    })
   })
 })
