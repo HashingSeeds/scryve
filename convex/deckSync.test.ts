@@ -497,7 +497,10 @@ describe("deck version sync", () => {
     const t = convexTest(schema, modules)
     const { actor, deckId, versionId } = await seedVersion(t, "version-cards-owner")
     const read = await actor.query(api.decks.readVersion, { deckId, versionId })
-    await expect(actor.query(api.decks.versionCards, { versionId })).resolves.toEqual(read.cards)
+    await expect(actor.query(api.decks.versionCards, { versionId })).resolves.toEqual({
+      revision: read.version.revision,
+      cards: read.cards,
+    })
 
     const stranger = await synced(t, "version-cards-stranger")
     await expect(stranger.query(api.decks.versionCards, { versionId })).rejects.toThrow(

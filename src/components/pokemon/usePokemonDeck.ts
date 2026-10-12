@@ -21,7 +21,7 @@ export function pokemonDeckRows(cards: readonly DeckCard[]): PokemonDeckRow[] {
   return [...rows.values()]
 }
 
-/** why: a game is often played offline, so the deck the device already cached shows first and the server only refreshes it. */
+/** why: a game is often played offline, so the deck shows from the device cache, and every fetch refills that cache. */
 export function usePokemonDeck(deck: SeatDeck | undefined): PokemonDeckRow[] {
   const convex = useConvex()
   const ownerId = deck?.ownerId
@@ -36,18 +36,23 @@ export function usePokemonDeck(deck: SeatDeck | undefined): PokemonDeckRow[] {
   const [fetched, setFetched] = useState<{ versionId: string; rows: PokemonDeckRow[] }>()
 
   useEffect(() => {
-    if (!convex || !versionId) return
+    if (!convex || !ownerId || !versionId) return
     let active = true
     convex
       .query(api.decks.versionCards, { versionId: versionId as Id<"deckVersions"> })
-      .then((cards) => {
+      .then(({ revision, cards }) => {
+        new DeckVersionCacheRepository(ownerId, undefined, convex.url).saveCards(
+          versionId,
+          revision,
+          cards,
+        )
         if (active) setFetched({ versionId, rows: pokemonDeckRows(cards) })
       })
       .catch(() => {})
     return () => {
       active = false
     }
-  }, [convex, versionId])
+  }, [convex, ownerId, versionId])
 
   return fetched && fetched.versionId === versionId ? fetched.rows : cached
 }

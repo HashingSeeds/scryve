@@ -222,7 +222,8 @@ export function PokemonSheet({
         ...current,
         cardId: hit.cardId,
         name: hit.name,
-        prizes: current.prizesChosen ? current.prizes : pokemonPrizeValue(hit.name),
+        prizes: pokemonPrizeValue(hit.name),
+        prizesChosen: false,
       }))
       setLookupOpen(false)
       setQuery("")

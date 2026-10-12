@@ -1387,7 +1387,10 @@ export const versionCards = query({
       .query("deckCards")
       .withIndex("by_deck_version", (q) => q.eq("deckVersionId", version._id))
       .take(MAX_DECK_CARDS)
-    return cards.map((card) => projectCard(deck, false, card))
+    return {
+      revision: syncedVersion(version).revision,
+      cards: cards.map((card) => projectCard(deck, false, card)),
+    }
   },
 })
 

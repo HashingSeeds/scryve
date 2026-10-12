@@ -203,11 +203,14 @@ describe("PokemonSheet", () => {
   })
 
   it("lists the seat's own deck Pokémon before typing, and places one with a tap", async () => {
-    mockQuery.mockResolvedValue([
-      { name: "Charizard ex", cardId: "sv03-125", category: "Pokemon", quantity: 2 },
-      { name: "Rare Candy", cardId: "sv01-191", category: "Trainer", quantity: 4 },
-      { name: "Charizard ex", cardId: "sv03-125", category: "Pokemon", quantity: 1 },
-    ])
+    mockQuery.mockResolvedValue({
+      revision: 1,
+      cards: [
+        { name: "Charizard ex", cardId: "sv03-125", category: "Pokemon", quantity: 2 },
+        { name: "Rare Candy", cardId: "sv01-191", category: "Trainer", quantity: 4 },
+        { name: "Charizard ex", cardId: "sv03-125", category: "Pokemon", quantity: 1 },
+      ],
+    })
     mockAction.mockResolvedValue(card)
     const onPlace = jest.fn(() => true)
     render(sheet({ deck: { ownerId: "owner-1", versionId: "version-1" }, onPlace }))
@@ -215,6 +218,10 @@ describe("PokemonSheet", () => {
 
     expect(screen.getByLabelText("Charizard ex, SV3 125 ×3")).toBeTruthy()
     expect(screen.queryByText("Rare Candy")).toBeNull()
+    expect(
+      new DeckVersionCacheRepository("owner-1", undefined, mockConvex.url).loadCards("version-1")
+        ?.cards,
+    ).toHaveLength(3)
     fireEvent.press(screen.getByTestId("pokemon-result-sv03-125"))
     await flush()
     await flush()
