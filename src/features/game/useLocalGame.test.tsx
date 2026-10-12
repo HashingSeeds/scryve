@@ -61,6 +61,30 @@ describe("useLocalGame persistence", () => {
     expect(result.current.game.firstPlayerOffered).toBe(true)
   })
 
+  it("closes the offer when a reopened save already in play is cleared back to its start", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const initial = createLocalGame({
+      now: 1,
+      system: "mtg",
+      startingLife: 20,
+      players: [
+        { name: "Ada", color: "#000" },
+        { name: "Grace", color: "#111" },
+      ],
+    })
+    const first = renderHook(() => useLocalGame(initial, repository))
+    act(() => first.result.current.adjustCounter(initial.players[0].id, "poison", 1))
+    const { firstPlayerOffered: _, ...unmarked } = first.result.current.game
+    repository.saveActiveGame(unmarked)
+    first.unmount()
+
+    const reopened = repository.loadActiveGame()!
+    const { result } = renderHook(() => useLocalGame(reopened, repository))
+    expect(result.current.game.firstPlayerOffered).toBeUndefined()
+    act(() => result.current.adjustCounter(initial.players[0].id, "poison", -1))
+    expect(result.current.game.firstPlayerOffered).toBe(true)
+  })
+
   it("reopens a played save without writing it", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     const played = {
