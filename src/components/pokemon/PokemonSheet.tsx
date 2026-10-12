@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentRef } from "react"
+import { useEffect, useRef, useState, type ComponentRef, type RefObject } from "react"
 import type { TextStyle, View as ViewRef, ViewStyle } from "react-native"
 import {
   AccessibilityInfo,
@@ -28,6 +28,7 @@ import {
   type PokemonInPlay,
   type PokemonSlot,
 } from "../../../convex/lib/table"
+import { useBoardKeyboardLift } from "../BoardKeyboardLift"
 import { BoardPressable } from "../BoardPressable"
 import { mixColorsInLinearLight } from "../GameMenuButtonShape"
 import { overlayTint } from "../LifeControls"
@@ -40,6 +41,8 @@ export type PokemonSheetMode =
 
 export interface PokemonSheetProps {
   seatNumber: number
+  /** why: the sheet turns with the seat, so the board measures the seat itself to lift it clear of the keyboard. */
+  seatRef: RefObject<ViewRef | null>
   color: string
   rotation: LifeCardContentRotation
   cardWidth: number
@@ -78,6 +81,7 @@ function hitDetail(hit: PokemonSearchHit): string | undefined {
  */
 export function PokemonSheet({
   seatNumber,
+  seatRef,
   color,
   rotation,
   cardWidth,
@@ -96,6 +100,7 @@ export function PokemonSheet({
   onClose,
 }: PokemonSheetProps) {
   const { themed } = useAppTheme()
+  const liftSeat = useBoardKeyboardLift(seatRef)
   const sheetColor = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(sheetColor)
   const inkStyle = { color: ink }
@@ -269,6 +274,7 @@ export function PokemonSheet({
           maxLength={120}
           returnKeyType="search"
           onChangeText={setQuery}
+          onFocus={liftSeat}
           inputWrapperStyle={themed($fieldWrapper)}
         />
       ) : null}
@@ -324,6 +330,7 @@ export function PokemonSheet({
             autoCorrect={false}
             maxLength={100}
             onChangeText={setName}
+            onFocus={liftSeat}
             containerStyle={$grow}
             inputWrapperStyle={themed($fieldWrapper)}
           />
@@ -335,6 +342,7 @@ export function PokemonSheet({
             inputMode="numeric"
             keyboardType="number-pad"
             maxLength={3}
+            onFocus={liftSeat}
             onChangeText={(hp) => {
               setEditError(undefined)
               setDraft((current) => ({ ...current, hp }))

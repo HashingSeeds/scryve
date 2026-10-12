@@ -3,6 +3,7 @@ import { Dimensions, StyleSheet, useWindowDimensions, View, type ViewStyle } fro
 import Animated from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { BoardKeyboardLift } from "@/components/BoardKeyboardLift"
 import { TurnedBoardContext } from "@/components/BoardPressable"
 import {
   GameMenuBackdrop,
@@ -99,25 +100,27 @@ function PinnedGameBoardStage({
       <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
-            {renderGrid(boardOrientation)}
-            <GameMenuBackdrop open={menuOpen} onClose={menu.onClose} />
-            <GameMenuCluster
-              open={menu.open}
-              anchor={boardAnchor}
-              holderAnchor={holderAnchor}
-              holderHeight={holderAngle % 180 === 0 ? height : width}
-              facingAngle={holderAngle}
-              actions={menu.actions}
-              compact={playerCount > 2}
-              variant={menu.variant}
-              seatColors={menu.seatColors}
-              exitAction={menu.exitAction}
-              signal={menu.signal}
-              statusLine={menu.statusLine}
-              heldAction={menu.heldAction}
-              badge={menu.badge}
-              onToggle={menu.onToggle}
-            />
+            <BoardKeyboardLift enabled={holderAngle === 0} boardHeight={height}>
+              {renderGrid(boardOrientation)}
+              <GameMenuBackdrop open={menuOpen} onClose={menu.onClose} />
+              <GameMenuCluster
+                open={menu.open}
+                anchor={boardAnchor}
+                holderAnchor={holderAnchor}
+                holderHeight={holderAngle % 180 === 0 ? height : width}
+                facingAngle={holderAngle}
+                actions={menu.actions}
+                compact={playerCount > 2}
+                variant={menu.variant}
+                seatColors={menu.seatColors}
+                exitAction={menu.exitAction}
+                signal={menu.signal}
+                statusLine={menu.statusLine}
+                heldAction={menu.heldAction}
+                badge={menu.badge}
+                onToggle={menu.onToggle}
+              />
+            </BoardKeyboardLift>
           </View>
         </TurnedBoardContext.Provider>
       </ScreenPinnedView>
