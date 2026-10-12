@@ -29,7 +29,7 @@ import {
   rotatedLayerStyle,
 } from "./pokemonCardLayout"
 import { PokemonSheet, type PokemonSheetMode } from "./PokemonSheet"
-import type { PlayerMarkShape } from "../../../convex/lib/appearance"
+import { shapeForSeat, type PlayerMarkShape } from "../../../convex/lib/appearance"
 import {
   findPokemon,
   pokemonBoardOf,
@@ -50,7 +50,7 @@ import {
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "../playerCardTypes"
-import { PlayerMark } from "../PlayerMark"
+import { MARK_ART_BOUNDS, MARK_VIEW_BOX, PlayerMark } from "../PlayerMark"
 import { Text } from "../Text"
 
 export interface PokemonSeatCardProps {
@@ -150,8 +150,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
     : 0
   const markSize = cramped ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
-  // why: the prize grid stands as tall as the seat mark across from it, so the bottom row reads as one band.
-  const prizeRowHeight = markSize
+  // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
+  const markArt = MARK_ART_BOUNDS[shape ?? shapeForSeat(seatNumber)]
+  const markScale = markSize / MARK_VIEW_BOX
+  const prizeRowHeight = (markArt.bottom - markArt.top) * markScale
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const focusTick = useRef(0)
@@ -411,8 +413,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             themed($mark),
             {
               left: padding + insets.left,
-              // why: the mark centers on the prize row, so the seat's identity reads as one line with the name beside it.
-              bottom: padding + insets.bottom + (prizeRowHeight - markSize) / 2,
+              bottom: padding + insets.bottom - (MARK_VIEW_BOX - markArt.bottom) * markScale,
             },
           ]}
         />
