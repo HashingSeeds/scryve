@@ -164,12 +164,19 @@ function useTumble(view: DiceSeatView | undefined): Tumble {
   )
   const flip = useSharedValue(0)
   useEffect(() => {
+    // why: motion turned off mid-tumble lands the die at once on the decided result.
+    if (!rolling) {
+      flip.value = 1
+      setState((current) =>
+        current.face === undefined && !current.flipping ? current : { flipping: false },
+      )
+      return
+    }
     if (rolling === "coin") {
       flip.value = withTiming(1, { duration: COIN_FLIP_MS })
       const landing = setTimeout(() => setState({ flipping: false }), COIN_FLIP_MS)
       return () => clearTimeout(landing)
     }
-    if (rolling !== "d20") return
     const timers: ReturnType<typeof setTimeout>[] = []
     let delay = 0
     for (let step = 1; step < TUMBLE_TICKS; step += 1) {
@@ -194,10 +201,11 @@ function rollingTool(view: DiceSeatView): DiceTool | undefined {
   return undefined
 }
 
+// why: keyed on the roll attempt, not the value, so rolling the same result again still blooms and tumbles.
 function viewKey(view: DiceSeatView | undefined) {
   if (!view) return "armed"
-  if (view.kind === "roll") return `roll:${view.roll.tool}:${view.roll.value}`
-  if (view.kind === "rolloff") return `rolloff:${view.value}:${view.status}`
+  if (view.kind === "roll") return `roll:${view.roll.tool}:${view.attempt}`
+  if (view.kind === "rolloff") return `rolloff:${view.attempt}`
   return view.kind
 }
 

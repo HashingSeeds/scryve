@@ -7,7 +7,8 @@ export type DiceRoll = { tool: "d20"; value: number } | { tool: "coin"; value: C
 /** why: a result blooms over the card, then shrinks into a chip on the card's edge facing the table. */
 export type DicePhase = "bloom" | "chip"
 
-export type SeatResult = { roll: DiceRoll; phase: DicePhase }
+/** why: `attempt` counts this seat's rolls, so a repeat of the same value still reads as a new roll on the card. */
+export type SeatResult = { roll: DiceRoll; phase: DicePhase; attempt: number }
 
 /** why: the chooser is the seat that won the flip or lost the last game; which one decides what the card says. */
 export type ChoiceReason = "flip" | "loss"
@@ -17,6 +18,7 @@ export type FirstPlayer =
   | {
       kind: "rolloff"
       rolls: Partial<Record<PlayerId, number>>
+      attempts: Partial<Record<PlayerId, number>>
       pool: PlayerId[]
       phase: DicePhase
     }
@@ -30,8 +32,8 @@ export interface DiceState {
 }
 
 export type DiceSeatView =
-  | { kind: "roll"; roll: DiceRoll }
-  | { kind: "rolloff"; value: number; status: "won" | "tied" | "out" | "lost" }
+  | { kind: "roll"; roll: DiceRoll; attempt: number }
+  | { kind: "rolloff"; value: number; attempt: number; status: "won" | "tied" | "out" | "lost" }
   | { kind: "choice"; reason: ChoiceReason }
   | { kind: "waiting" }
   | { kind: "first"; status: "won" | "lost"; note?: string }
@@ -72,8 +74,12 @@ export function rollForSeat(
 ): { state: DiceState; roll: DiceRoll } | undefined {
   if (!state.armed) return undefined
   const result = roll(state.armed, random)
+  const attempt = (state.results[seatId]?.attempt ?? 0) + 1
   return {
-    state: { ...state, results: { ...state.results, [seatId]: { roll: result, phase: "bloom" } } },
+    state: {
+      ...state,
+      results: { ...state.results, [seatId]: { roll: result, phase: "bloom", attempt } },
+    },
     roll: result,
   }
 }
@@ -94,25 +100,34 @@ export function startRollOff(
   seatIds: readonly PlayerId[],
   random = Math.random,
 ): DiceState {
-  return { ...state, first: resolveRollOff({}, seatIds, random) }
+  return { ...state, first: resolveRollOff({}, {}, seatIds, random) }
 }
 
 export function rerollTies(state: DiceState, random = Math.random): DiceState {
   if (state.first?.kind !== "rolloff" || state.first.pool.length < 2) return state
-  return { ...state, first: resolveRollOff(state.first.rolls, state.first.pool, random) }
+  return {
+    ...state,
+    first: resolveRollOff(state.first.rolls, state.first.attempts, state.first.pool, random),
+  }
 }
 
 function resolveRollOff(
   previous: Partial<Record<PlayerId, number>>,
+  previousAttempts: Partial<Record<PlayerId, number>>,
   pool: readonly PlayerId[],
   random: () => number,
 ): FirstPlayer {
   const rolls = { ...previous }
-  for (const seatId of pool) rolls[seatId] = rollD20(random)
+  const attempts = { ...previousAttempts }
+  for (const seatId of pool) {
+    rolls[seatId] = rollD20(random)
+    attempts[seatId] = (attempts[seatId] ?? 0) + 1
+  }
   const high = Math.max(...pool.map((seatId) => rolls[seatId] ?? 0))
   return {
     kind: "rolloff",
     rolls,
+    attempts,
     pool: pool.filter((seatId) => rolls[seatId] === high),
     phase: "bloom",
   }
@@ -181,12 +196,15 @@ export function diceSeatView(state: DiceState, seatId: PlayerId): DiceSeatView |
       return {
         kind: "rolloff",
         value,
+        attempt: first.attempts[seatId] ?? 1,
         status: decided ? (inPool ? "won" : "lost") : inPool ? "tied" : "out",
       }
     }
   }
   const result = state.results[seatId]
-  return result?.phase === "bloom" ? { kind: "roll", roll: result.roll } : undefined
+  return result?.phase === "bloom"
+    ? { kind: "roll", roll: result.roll, attempt: result.attempt }
+    : undefined
 }
 
 export function diceSeatChips(state: DiceState, seatId: PlayerId): DiceSeatChip[] {

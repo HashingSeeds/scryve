@@ -113,11 +113,10 @@ export function CurrentGameScreen({
   const playBegun = hasPlayBegun(runtime.game)
   const diceGameStarted = dice.gameStarted
   const markFirstPlayerUsed = runtime.markFirstPlayerUsed
+  // why: once play has begun the badge is gone for good on its own, so nothing is written here; the marker is written only when the badge is used.
   useEffect(() => {
-    if (!playBegun) return
-    diceGameStarted()
-    markFirstPlayerUsed()
-  }, [playBegun, diceGameStarted, markFirstPlayerUsed])
+    if (playBegun) diceGameStarted()
+  }, [playBegun, diceGameStarted])
   const firstPlayerUsed = runtime.game.firstPlayerOffered === true
   const loserSeat = runtime.game.firstChooserSeat
   const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]

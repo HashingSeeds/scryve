@@ -33,8 +33,13 @@ function d20s(...values: number[]) {
 describe("dice roll-off", () => {
   it("hands the highest roll the first turn, blooming on every seat and settling into one chip", () => {
     const state = startRollOff(EMPTY_DICE, [ada, grace, kat], d20s(7, 18, 3))
-    expect(diceSeatView(state, grace)).toEqual({ kind: "rolloff", value: 18, status: "won" })
-    expect(diceSeatView(state, ada)).toEqual({ kind: "rolloff", value: 7, status: "lost" })
+    expect(diceSeatView(state, grace)).toEqual({
+      kind: "rolloff",
+      value: 18,
+      attempt: 1,
+      status: "won",
+    })
+    expect(diceSeatView(state, ada)).toMatchObject({ value: 7, status: "lost" })
     expect(rollOffAnnouncement(state.first, players)).toBe("Grace rolled 18, goes first")
     expect(firstPlayerSeat(state)).toBe(grace)
 
@@ -47,16 +52,17 @@ describe("dice roll-off", () => {
 
   it("re-rolls only the tied seats and leaves the rest out", () => {
     const tied = startRollOff(EMPTY_DICE, [ada, grace, kat], d20s(18, 18, 3))
-    expect(diceSeatView(tied, ada)).toEqual({ kind: "rolloff", value: 18, status: "tied" })
-    expect(diceSeatView(tied, kat)).toEqual({ kind: "rolloff", value: 3, status: "out" })
+    expect(diceSeatView(tied, ada)).toMatchObject({ value: 18, attempt: 1, status: "tied" })
+    expect(diceSeatView(tied, kat)).toMatchObject({ value: 3, attempt: 1, status: "out" })
     expect(rollOffAnnouncement(tied.first, players)).toBe("Tie at 18, Ada and Grace. Roll again")
     expect(settleFirst(tied)).toBe(tied)
     expect(firstPlayerSeat(tied)).toBeUndefined()
 
+    // why: only the tied seats roll again, so only their attempt counts move on.
     const settled = rerollTies(tied, d20s(2, 20))
-    expect(diceSeatView(settled, ada)).toEqual({ kind: "rolloff", value: 2, status: "lost" })
-    expect(diceSeatView(settled, grace)).toEqual({ kind: "rolloff", value: 20, status: "won" })
-    expect(diceSeatView(settled, kat)).toEqual({ kind: "rolloff", value: 3, status: "lost" })
+    expect(diceSeatView(settled, ada)).toMatchObject({ value: 2, attempt: 2, status: "lost" })
+    expect(diceSeatView(settled, grace)).toMatchObject({ value: 20, attempt: 2, status: "won" })
+    expect(diceSeatView(settled, kat)).toMatchObject({ value: 3, attempt: 1, status: "lost" })
     expect(rerollTies(settled)).toBe(settled)
   })
 })
@@ -87,7 +93,7 @@ describe("dice per seat", () => {
     const rolled = rollForSeat(armed, ada, d20s(17))!
     expect(rolled.roll).toEqual({ tool: "d20", value: 17 })
     expect(rolled.state.armed).toBe("d20")
-    expect(diceSeatView(rolled.state, ada)).toEqual({ kind: "roll", roll: rolled.roll })
+    expect(diceSeatView(rolled.state, ada)).toEqual({ kind: "roll", roll: rolled.roll, attempt: 1 })
     expect(diceSeatView(rolled.state, grace)).toBeUndefined()
     expect(armTool(rolled.state, "d20").armed).toBeNull()
   })
@@ -105,6 +111,7 @@ describe("dice per seat", () => {
     expect(diceSeatView(again, grace)).toEqual({
       kind: "roll",
       roll: { tool: "coin", value: "Heads" },
+      attempt: 2,
     })
     expect(diceSeatChips(again, grace)).toEqual([])
     expect(diceSeatChips(clearResult(chipped, grace), grace)).toEqual([])

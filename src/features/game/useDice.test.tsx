@@ -148,6 +148,23 @@ describe("useDice", () => {
     expect(view.queryByTestId("dice-chip-1-coin")).toBeNull()
   })
 
+  it("tumbles again when a seat rolls the same result twice", () => {
+    jest.useFakeTimers()
+    jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
+    jest.spyOn(Math, "random").mockReturnValue(0.7)
+    const view = renderTable()
+
+    fireEvent.press(view.getByTestId("dice-coin"))
+    fireEvent.press(view.getByTestId("dice-seat-1"))
+    act(() => jest.advanceTimersByTime(700))
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent("CoinTails")
+
+    fireEvent.press(view.getByTestId("dice-seat-1"))
+    expect(view.getByTestId("dice-coin-flipping")).toBeTruthy()
+    act(() => jest.advanceTimersByTime(700))
+    expect(view.getByTestId("dice-seat-1")).toHaveTextContent("CoinTails")
+  })
+
   it("settles a bloom at once under reduced motion, and a tap clears the chip", () => {
     jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(true)
     jest.spyOn(Math, "random").mockReturnValue(0.5)
