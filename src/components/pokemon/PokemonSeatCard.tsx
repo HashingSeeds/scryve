@@ -145,7 +145,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const identityMetrics = seatIdentityMetrics(cramped)
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
-  // why: the row sits as far from the card's bottom and left edges as the seat identity does on every other board.
   const bottomRowLift = identityMetrics.edge - padding
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)

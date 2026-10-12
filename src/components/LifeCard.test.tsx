@@ -435,7 +435,6 @@ describe("LifeCard", () => {
       flexDirection: "row",
       gap: 8,
     })
-    // why: seat 1 draws a circle by default, so the box trims to the circle's drawn edges.
     const art = MARK_ART_BOUNDS.circle
     expect(
       StyleSheet.flatten(
@@ -483,8 +482,23 @@ describe("LifeCard", () => {
         cardSize: { width: 390, height: 300 },
         gap: 16,
         insets: { top: 47, bottom: 0, left: 0, right: 0 },
+        markHeight: 64,
       }).position,
     ).toEqual({ left: 16, bottom: 63, maxWidth: 390 / 2 - 16 - 16 })
+  })
+
+  it("rises past a notch only when the card has room above it for the mark", () => {
+    const place = (height: number) =>
+      seatIdentityPlacement({
+        rotation: 180,
+        cardSize: { width: 390, height },
+        gap: 12,
+        insets: { top: 59, bottom: 0, left: 0, right: 0 },
+        screenEdges: { top: true, left: true, right: true, bottom: false },
+        markHeight: 48,
+      }).position.bottom
+    expect(place(400)).toBe(12 + 59)
+    expect(place(150)).toBeLessThan(12 + 59)
   })
 
   it("swaps the identity layer's sides before turning a sideways card", () => {

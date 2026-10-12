@@ -46,6 +46,7 @@ import {
   lifeCardContentInsetStyle,
   LIFE_FONT_SIZE,
   LIFE_MAX_FONT_SCALE,
+  LIFE_GLYPH_LINE_HEIGHT,
   LIFE_TARGET_SIZE,
   cornerOffset,
   type LifeCardContentInsets,
@@ -347,6 +348,7 @@ export const LifeCard = memo(function LifeCard({
     gap: identityMetrics.edge,
     insets: contentInsets,
     screenEdges,
+    markHeight: identityMetrics.mark,
   })
   const seatIdentity = (
     <SeatIdentity
@@ -608,7 +610,6 @@ export const LifeCard = memo(function LifeCard({
           onBoundsChange={setStripBounds}
         />
       ) : null}
-      {/* why: the seat's mark and name sit together in the content's bottom-left corner on every board; in commander games the pair is also the assign sword, or the way into the damage grid. */}
       {!commanderCardMode &&
       !tableSheetOpen &&
       !diceCovers &&
@@ -785,17 +786,19 @@ const CONTENT_BOTTOM_EDGE = {
   [-90]: "right",
 } as const
 
-/** why: the identity's layer swaps its sides before turning sideways, so it never pokes past the card. The pair sits at the content's bottom-left and gets at most half the card's run, since the commander strip takes the other corner. */
+/** why: the layer swaps its sides before turning sideways; turned as is, the identity pokes past the card. */
 export function seatIdentityPlacement({
   rotation,
   cardSize,
   gap,
   insets,
   screenEdges,
+  markHeight,
 }: {
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   gap: number
+  markHeight: number
   insets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
 }) {
@@ -804,11 +807,14 @@ export function seatIdentityPlacement({
   const bottomEdge = CONTENT_BOTTOM_EDGE[rotation]
   const leftEdge = CONTENT_LEFT_EDGE[rotation]
   const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
-  const cutoutAtMiddle = spansScreenEdge && (insets?.[bottomEdge] ?? 0) > 0
+  const inset = insets?.[bottomEdge] ?? 0
+  const contentHeight = sideways ? width : height
+  // why: a mid-edge notch or home indicator truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
+  const roomAboveCutout = gap + inset + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
+  const cutoutAtMiddle = spansScreenEdge && inset > 0 && roomAboveCutout
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
-  // why: a notch or home indicator sits mid-edge, and the name beside the mark would run into it, so the pair rises past that inset instead of tucking into the screen corner.
   const bottom = cutoutAtMiddle
-    ? gap + (insets?.[bottomEdge] ?? 0)
+    ? gap + inset
     : cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
   const run = sideways ? height : width
   const layer: ViewStyle | undefined = sideways
