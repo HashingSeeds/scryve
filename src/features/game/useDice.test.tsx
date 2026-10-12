@@ -133,7 +133,7 @@ describe("useDice", () => {
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("CoinTails")
     expect(view.queryByTestId("dice-chip-1-coin")).toBeNull()
 
-    act(() => jest.advanceTimersByTime(1300))
+    act(() => jest.advanceTimersByTime(3800))
     expect(view.getByTestId("dice-chip-1-coin")).toHaveTextContent("Tails")
     expect(view.getByTestId("dice-seat-1").props.accessibilityLabel).toBe("Flip a coin for Ada")
 
@@ -187,7 +187,7 @@ describe("useDice", () => {
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("d205")
     expect(announce).toHaveBeenLastCalledWith("Grace rolled 20, goes first")
 
-    act(() => jest.advanceTimersByTime(1300))
+    act(() => jest.advanceTimersByTime(4300))
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
     expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
     expect(view.queryByTestId("dice-chip-1-first")).toBeNull()

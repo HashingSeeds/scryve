@@ -30,8 +30,8 @@ import {
 } from "./dice"
 import type { GamePlayer, PlayerId } from "./types"
 
-// why: a result stays large long enough to read across the table, then shrinks into its chip.
-const BLOOM_MS = { d20: 2700, coin: 2000, first: 2000 } as const
+// why: a result stays large long enough to read across the table, then shrinks into its chip. Tapping it settles it sooner.
+const BLOOM_MS = { d20: 5000, coin: 4500, first: 5000 } as const
 const FIRST_HOLD = "first"
 
 type State = {
