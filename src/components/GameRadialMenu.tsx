@@ -4,7 +4,6 @@ import { StyleSheet, View } from "react-native"
 import Animated, {
   Easing,
   ReduceMotion,
-  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -125,17 +124,28 @@ const ACTION_HEIGHT = 52
 
 const TOOL_SIZE = 44
 const TOOL_RADIUS = TOOL_SIZE / 2
+// why: the same inset on every side keeps each tool concentric with the pill's end cap.
 const TOOL_INSET = (ACTION_HEIGHT - TOOL_SIZE) / 2
-const TOOL_END_INSET = 8
-// why: two tools sit inside the pill's own width, one in each half, with the pill's padding around them.
-const TOOL_OFFSET = ACTION_WIDTH / 2 - TOOL_END_INSET - TOOL_RADIUS
-// why: the outer tool starts rolling out a beat after the pill starts arriving, so it emerges from under the inner one as the pill lands.
-const TOOL_ROLL_LAG_MS = 120
-const TOOL_ROLL_MS = 400
-const TOOL_ROLL_EASING = Easing.bezier(0.25, 1.15, 0.45, 1)
+const TOOL_OFFSET = ACTION_WIDTH / 2 - TOOL_INSET - TOOL_RADIUS
 const TOOL_TINT = 0.45
 const BADGE_SIZE = 28
 const BADGE_POP_DELAY_MS = 260
+// why: the offer badge is larger than the sync badge, so it sits further up its edge to read as equally high; measured on the pentagon's own geometry here so the sync anchor can change on its own.
+const START_BADGE_SHARE_OF_EDGE = 0.4
+const PENTAGON_CIRCUMRADIUS = 0.46
+function pentagonCorner(angleDeg: number) {
+  const angle = (angleDeg * Math.PI) / 180
+  return {
+    x: 0.5 + PENTAGON_CIRCUMRADIUS * Math.cos(angle),
+    y: 0.5 + PENTAGON_CIRCUMRADIUS * Math.sin(angle),
+  }
+}
+const PENTAGON_APEX = pentagonCorner(-90)
+const PENTAGON_UPPER_LEFT = pentagonCorner(-90 - 360 / PENTAGON_SIDES)
+const START_BADGE_ANCHOR = {
+  x: PENTAGON_UPPER_LEFT.x + START_BADGE_SHARE_OF_EDGE * (PENTAGON_APEX.x - PENTAGON_UPPER_LEFT.x),
+  y: PENTAGON_UPPER_LEFT.y + START_BADGE_SHARE_OF_EDGE * (PENTAGON_APEX.y - PENTAGON_UPPER_LEFT.y),
+}
 
 const MOVING_SIGNAL_TONES: readonly GameMenuSignalTone[] = ["slow", "catchingUp"]
 const STATUS_LINE_DISTANCE = 128
@@ -812,7 +822,6 @@ function RadialAction({
             tools={action.tools}
             pose={pose}
             open={open}
-            animateFully={animateFully}
             background={background}
           />
         </View>
@@ -863,57 +872,32 @@ function RadialAction({
   )
 }
 
-/** why: the outer tool starts under the inner one and rolls out to its half of the pill, turning one radian per radius traveled so it rolls without slipping and lands upright in the pill's frame. */
 function RadialToolRow({
   kind,
   tools,
   pose,
   open,
-  animateFully,
   background,
 }: {
   kind: GameMenuActionKind
   tools: readonly RadialMenuTool[]
   pose: RadialActionPose
   open: boolean
-  animateFully: boolean
   background: string
 }) {
   const offsets = getRadialToolOffsets(pose)
-  const firstLeft = ACTION_WIDTH / 2 + offsets[0] - TOOL_RADIUS
-  const roll = useSharedValue(0)
-
-  useEffect(() => {
-    if (!open) {
-      roll.value = 0
-      return
-    }
-    roll.value = animateFully
-      ? withDelay(
-          pose.delayMs + TOOL_ROLL_LAG_MS,
-          withTiming(1, { duration: TOOL_ROLL_MS, easing: TOOL_ROLL_EASING }),
-        )
-      : 1
-  }, [animateFully, open, pose.delayMs, roll])
-
-  // why: drawn outer first so the inner tool paints on top and the other emerges from beneath it.
   return (
     <>
-      {tools
-        .slice(0, offsets.length)
-        .map((tool, index) => (
-          <RadialTool
-            key={tool.key}
-            testID={open ? `${kind}-${tool.key}` : undefined}
-            open={open}
-            tool={tool}
-            left={firstLeft}
-            travel={offsets[index] - offsets[0]}
-            roll={roll}
-            background={background}
-          />
-        ))
-        .reverse()}
+      {tools.slice(0, offsets.length).map((tool, index) => (
+        <RadialTool
+          key={tool.key}
+          testID={open ? `${kind}-${tool.key}` : undefined}
+          open={open}
+          tool={tool}
+          left={ACTION_WIDTH / 2 + offsets[index] - TOOL_RADIUS}
+          background={background}
+        />
+      ))}
     </>
   )
 }
@@ -923,16 +907,12 @@ function RadialTool({
   open,
   tool,
   left,
-  travel,
-  roll,
   background,
 }: {
   testID?: string
   open: boolean
   tool: RadialMenuTool
   left: number
-  travel: number
-  roll: SharedValue<number>
   background: string
 }) {
   const {
@@ -943,15 +923,9 @@ function RadialTool({
     ? colors.gameMenu.anchorGlyph
     : mixColorsInLinearLight(background, "#FFFFFF", TOOL_TINT)
   const foreground = accessibleForeground(fill)
-  const rollStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: travel * roll.value },
-      { rotate: `${(-travel / TOOL_RADIUS) * (1 - roll.value)}rad` },
-    ],
-  }))
 
   return (
-    <Animated.View style={[$toolSlot, { left }, rollStyle]}>
+    <View style={[$toolSlot, { left }]}>
       <BoardPressable
         testID={testID}
         disabled={!open}
@@ -975,7 +949,7 @@ function RadialTool({
           style={[$toolText, { color: foreground }]}
         />
       </BoardPressable>
-    </Animated.View>
+    </View>
   )
 }
 
@@ -1093,12 +1067,9 @@ function signalBadgeAt(buttonSize: number): ViewStyle {
 }
 const $largeSignalBadgeCenter = signalBadgeAt(MENU_BUTTON_SIZE)
 const $compactSignalBadgeCenter = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
-// why: the offer takes the upper-left corner, the mirror of the sync badge's, so the two never share a spot.
+// why: the offer takes the upper-left edge, opposite the sync badge, so the two never share a spot.
 function startBadgeAt(buttonSize: number): ViewStyle {
-  return {
-    left: (1 - PENTAGON_BADGE_ANCHOR.x) * buttonSize,
-    top: PENTAGON_BADGE_ANCHOR.y * buttonSize,
-  }
+  return { left: START_BADGE_ANCHOR.x * buttonSize, top: START_BADGE_ANCHOR.y * buttonSize }
 }
 const $largeStartBadgeCenter = startBadgeAt(MENU_BUTTON_SIZE)
 const $compactStartBadgeCenter = startBadgeAt(COMPACT_MENU_BUTTON_SIZE)
