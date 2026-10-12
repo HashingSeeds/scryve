@@ -133,4 +133,36 @@ describe("PokemonSheet", () => {
     expect(screen.getByText("Could not save it. Try again.")).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it("types on the in-seat keypad when the seat faces away from the system keyboard", async () => {
+    mockAction.mockImplementation((_reference: unknown, args: { query?: string }) =>
+      Promise.resolve(args.query ? [hit] : card),
+    )
+    render(sheet({ rotation: 180 }))
+    const search = screen.getByTestId("pokemon-search-seat-1")
+    expect(search.props.showSoftInputOnFocus).toBe(false)
+
+    fireEvent(search, "focus")
+    for (const key of ["c", "h", "a"])
+      fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
+    fireEvent.press(screen.getByTestId("pokemon-key-delete-seat-1"))
+    expect(search.props.value).toBe("CH")
+    act(() => jest.advanceTimersByTime(350))
+    await flush()
+    expect(screen.getByTestId("pokemon-result-sv03-125")).toBeTruthy()
+
+    fireEvent(screen.getByTestId("pokemon-hp-input-seat-1"), "focus")
+    expect(screen.queryByTestId("pokemon-key-q-seat-1")).toBeNull()
+    for (const key of ["1", "2", "0", "5"])
+      fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
+    expect(screen.getByTestId("pokemon-hp-input-seat-1").props.value).toBe("120")
+  })
+
+  it("keeps the system keyboard for a seat facing the bottom edge", () => {
+    render(sheet({ rotation: 0 }))
+    const search = screen.getByTestId("pokemon-search-seat-1")
+    expect(search.props.showSoftInputOnFocus).toBe(true)
+    fireEvent(search, "focus")
+    expect(screen.queryByTestId("pokemon-keypad-seat-1")).toBeNull()
+  })
 })
