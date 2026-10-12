@@ -169,6 +169,14 @@ describe("PokemonSheet", () => {
     })
   })
 
+  it("types punctuation from the keypad's number layer", () => {
+    render(sheet({ rotation: 180 }))
+    fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
+    for (const key of ["h", "o", "numbers", "-", "letters", "shift", "o", "h"])
+      fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Ho-Oh")
+  })
+
   it("keeps the system keyboard for a seat facing the bottom edge", () => {
     render(sheet({ rotation: 0 }))
     const search = screen.getByTestId("pokemon-search-seat-1")
