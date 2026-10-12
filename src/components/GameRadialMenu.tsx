@@ -1063,6 +1063,7 @@ function signalBadgeAt(buttonSize: number): ViewStyle {
 }
 const $largeSignalBadgeCenter = signalBadgeAt(MENU_BUTTON_SIZE)
 const $compactSignalBadgeCenter = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
+// why: the badge has a fixed size, so it is centered on its anchor by offsetting half its size rather than by flex centering in a zero-size box, which iOS left hanging half a badge low.
 function startBadgeAt(buttonSize: number): ViewStyle {
   return {
     position: "absolute",
