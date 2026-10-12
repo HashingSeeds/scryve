@@ -496,9 +496,10 @@ describe("LifeCard", () => {
         insets: { top: 59, bottom: 0, left: 0, right: 0 },
         screenEdges: { top: true, left: true, right: true, bottom: false },
         markHeight: 48,
-      }).position.bottom
-    expect(place(400)).toBe(12 + 59)
-    expect(place(150)).toBeLessThan(12 + 59)
+      }).position
+    expect(place(400).bottom).toBe(12 + 59)
+    expect(place(150).bottom).toBeLessThan(12 + 59)
+    expect(place(150).maxWidth).toBeLessThanOrEqual(390 / 2 - 64)
   })
 
   it("swaps the identity layer's sides before turning a sideways card", () => {
