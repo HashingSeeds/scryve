@@ -20,6 +20,7 @@ import {
   rotatedLayerStyle,
   type BenchClearance,
 } from "./pokemonCardLayout"
+import { catalogRows, hitDetail } from "./pokemonCatalogHits"
 import { usePokemonCatalog, type PokemonSearchHit } from "./usePokemonCatalog"
 import {
   pokemonPrizeValue,
@@ -64,12 +65,6 @@ export interface PokemonSheetProps {
 const PRIZE_CHOICES = [1, 2, 3] as const
 const MAX_RESULTS = 12
 const DAMAGE_STEPS = [-3, -1, 1, 3, 5, 10] as const
-
-function hitDetail(hit: PokemonSearchHit): string | undefined {
-  if (hit.setCode) return `${hit.setCode.toUpperCase()} ${hit.collectorNumber ?? ""}`.trim()
-  if (hit.collectorNumber) return `#${hit.collectorNumber}`
-  return hit.typeLabel
-}
 
 export function PokemonSheet({
   seatNumber,
@@ -210,7 +205,7 @@ export function PokemonSheet({
     if (Platform.OS !== "web") AccessibilityInfo.announceForAccessibility(message)
   }
 
-  const hits = catalog.hits
+  const hits = catalog.hits && catalogRows(catalog.hits)
   const showSearch = lookupOpen && catalog.available
   const stepLabel = (step: number) => `${step > 0 ? "+" : "−"}${Math.abs(step * damageStep)}`
 

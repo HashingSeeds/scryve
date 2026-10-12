@@ -20,6 +20,20 @@ import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const SPIN_DURATION_MS = 500
 
+/** why: shapes sit inside their 44 unit box with different margins, so lining up boxes leaves drawn edges misaligned (the triangle floated above the prize grid). */
+export const MARK_ART_BOUNDS: Record<PlayerMarkShape, { top: number; bottom: number }> = {
+  circle: { top: 10, bottom: 34 },
+  triangle: { top: 8.56, bottom: 34.5 },
+  square: { top: 11, bottom: 33 },
+  diamond: { top: 9.04, bottom: 34.96 },
+  star: { top: 8.43, bottom: 35.06 },
+  hexagon: { top: 8.39, bottom: 35.61 },
+  plus: { top: 8, bottom: 36 },
+  shield: { top: 8.21, bottom: 37 },
+  heart: { top: 9.15, bottom: 34.84 },
+}
+export const MARK_VIEW_BOX = 44
+
 export interface PlayerMarkProps {
   seatNumber: number
   color: string

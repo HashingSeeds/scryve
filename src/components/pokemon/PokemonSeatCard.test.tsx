@@ -162,7 +162,7 @@ describe("PokemonSeatCard", () => {
     )
     expect(table.game().players.map(({ life }) => life)).toEqual([6, 4])
     expect(board(table).active).toBeUndefined()
-    expect(screen.getByText("No Active")).toBeTruthy()
+    expect(screen.getByText("Place Active")).toBeTruthy()
 
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith(
       "Charizard ex knocked out. Grace takes 2 prizes.",
@@ -200,7 +200,8 @@ describe("PokemonSeatCard", () => {
     jest.useRealTimers()
   })
 
-  it("asks before retreating into a bench Pokémon, and offers Make Active or Edit when the Active is gone", () => {
+  it("focuses a tapped bench Pokémon on the hero, where its taps count and the Active returns after a pause", () => {
+    jest.useFakeTimers()
     const table = pokemonTable(["Ada", "Grace"])
     const me = table.game().players[0].id
     table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
@@ -214,25 +215,80 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId(`pokemon-bench-hp-${benched}`)).toHaveTextContent("250")
 
     fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
-    expect(board(table).active?.name).toBe("Charizard ex")
-    fireEvent.press(screen.getByTestId("pokemon-switch-edit-seat-1"))
-    expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
-    expect(screen.queryByTestId("pokemon-damage-seat-1-10")).toBeNull()
-    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("250")
+    expect(screen.getByTestId("pokemon-hero-bench-tag-seat-1")).toBeTruthy()
+    expect(screen.getByTestId("pokemon-focus-drain-seat-1")).toBeTruthy()
+    act(() => void jest.advanceTimersByTime(2_500))
+    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    expect(board(table).active?.damage).toBe(0)
+    expect(screen.getByTestId(`pokemon-bench-hp-${benched}`)).toHaveTextContent("240")
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("240")
+
+    act(() => void jest.advanceTimersByTime(2_500))
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("240")
+    act(() => void jest.advanceTimersByTime(600))
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("330")
+    expect(screen.queryByTestId("pokemon-hero-bench-tag-seat-1")).toBeNull()
 
     fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
-    fireEvent.press(screen.getByTestId("pokemon-switch-confirm-seat-1"))
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "longPress")
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Pidgeot ex")
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+
+    fireEvent.press(screen.getByTestId("pokemon-switch-in-seat-1"))
     expect(board(table).active?.name).toBe("Pidgeot ex")
     expect(board(table).bench.map(({ name }) => name)).toEqual(["Charizard ex"])
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("240")
+    expect(screen.queryByTestId("pokemon-hero-bench-tag-seat-1")).toBeNull()
+    jest.useRealTimers()
+  })
 
-    act(() => void table.actions.knockOut(me, benched))
-    const charizard = board(table).bench[0].id
-    fireEvent.press(screen.getByTestId(`pokemon-bench-${charizard}`))
-    expect(screen.getByText("Make Active")).toBeTruthy()
-    expect(screen.getByTestId("pokemon-switch-edit-seat-1")).toBeTruthy()
-    expect(board(table).active).toBeUndefined()
-    fireEvent.press(screen.getByTestId("pokemon-switch-confirm-seat-1"))
+  it("makes a tapped bench Pokémon Active outright when the Active spot is empty", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    const benched = table.actions.placePokemon(me, "bench", { name: "Pikachu", hp: 60, prizes: 1 })!
+    render(<Seat harness={table} seat={0} />)
+
+    expect(screen.getByText("or tap a bench Pokémon")).toBeTruthy()
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
+    expect(board(table).active?.name).toBe("Pikachu")
+    expect(screen.queryByTestId("pokemon-hero-bench-tag-seat-1")).toBeNull()
+  })
+
+  it("knocks out a focused bench Pokémon from the hero and Undo returns it to the bench", () => {
+    jest.useFakeTimers()
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
+    const benched = table.actions.placePokemon(me, "bench", { name: "Pikachu", hp: 60, prizes: 1 })!
+    table.actions.adjustPokemonDamage(me, benched, 50)
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
+    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    expect(screen.getByTestId("pokemon-knockout-message-seat-1")).toHaveTextContent(
+      "Pikachu knocked out. Grace takes 1 prize.",
+    )
+    expect(board(table).bench).toEqual([])
     expect(board(table).active?.name).toBe("Charizard ex")
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("330")
+
+    fireEvent.press(screen.getByTestId("pokemon-knockout-undo-seat-1"))
+    expect(board(table).bench).toMatchObject([{ id: benched, damage: 50 }])
+    expect(table.game().players.map(({ life }) => life)).toEqual([6, 6])
+    jest.useRealTimers()
+  })
+
+  it("draws every bench spot, filled or not, with the next free one as the add target", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    const benched = table.actions.placePokemon(me, "bench", { name: "Pikachu", hp: 60, prizes: 1 })!
+    render(<Seat harness={table} seat={0} />)
+
+    expect(screen.getByTestId(`pokemon-bench-${benched}`)).toBeTruthy()
+    expect(screen.getByTestId("pokemon-bench-add-seat-1")).toBeTruthy()
+    expect(screen.getAllByTestId(/^pokemon-bench-slot-\d+-seat-1$/)).toHaveLength(3)
+    expect(screen.getByTestId("pokemon-place-active-seat-1")).toHaveTextContent(/^Place Active/)
   })
 
   it("asks who takes the prizes when more than one opponent could", () => {
@@ -308,14 +364,110 @@ describe("PokemonSeatCard", () => {
   it("takes a prize on tap and puts one back on a long press", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const onChangePrizes = jest.fn()
-    render(<Seat harness={table} seat={0} onChangePrizes={onChangePrizes} />)
+    render(<Seat harness={table} seat={0} prizes={4} onChangePrizes={onChangePrizes} />)
 
+    expect(screen.getByLabelText("Seat 1, Ada, 4 Prize cards")).toBeTruthy()
+    expect(
+      screen.getAllByTestId(/^pokemon-prize-pip-\d-seat-1$/, { includeHiddenElements: true }),
+    ).toHaveLength(6)
     fireEvent.press(screen.getByTestId("pokemon-prizes-seat-1"))
     expect(onChangePrizes).toHaveBeenLastCalledWith(-1)
     fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "longPress")
     expect(onChangePrizes).toHaveBeenLastCalledWith(1)
-    onChangePrizes.mockClear()
-    fireEvent.press(screen.getByTestId("pokemon-prize-back-seat-1"))
-    expect(onChangePrizes).toHaveBeenCalledWith(1)
+    expect(screen.queryByText("+1")).toBeNull()
+  })
+
+  it("stops taking prizes at 0 and putting them back at 6", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const onChangePrizes = jest.fn()
+    const view = render(
+      <Seat harness={table} seat={0} prizes={0} onChangePrizes={onChangePrizes} />,
+    )
+    fireEvent.press(screen.getByTestId("pokemon-prizes-seat-1"))
+    view.rerender(<Seat harness={table} seat={0} prizes={6} onChangePrizes={onChangePrizes} />)
+    fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "longPress")
+    expect(onChangePrizes).not.toHaveBeenCalled()
+  })
+
+  it("keeps a bench Pokémon focused while a press on the hero crosses the deadline", () => {
+    jest.useFakeTimers()
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
+    const benched = table.actions.placePokemon(me, "bench", { name: "Pikachu", hp: 60, prizes: 1 })!
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
+    act(() => void jest.advanceTimersByTime(2_800))
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "pressIn")
+    act(() => void jest.advanceTimersByTime(1_000))
+    expect(screen.getByTestId("pokemon-hero-bench-tag-seat-1")).toBeTruthy()
+    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "pressOut")
+    expect(board(table).bench[0].damage).toBe(10)
+    expect(board(table).active?.damage).toBe(0)
+    jest.useRealTimers()
+  })
+
+  it("lets the focus run out after a long press opens and closes the editor", () => {
+    jest.useFakeTimers()
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
+    const benched = table.actions.placePokemon(me, "bench", { name: "Pikachu", hp: 60, prizes: 1 })!
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "pressIn")
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "longPress")
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+    act(() => void jest.advanceTimersByTime(3_100))
+    expect(screen.queryByTestId("pokemon-hero-bench-tag-seat-1")).toBeNull()
+    jest.useRealTimers()
+  })
+
+  it("puts a prize back from a screen reader action or the keyboard", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const onChangePrizes = jest.fn()
+    render(<Seat harness={table} seat={0} prizes={4} onChangePrizes={onChangePrizes} />)
+    const prizes = screen.getByTestId("pokemon-prizes-seat-1")
+
+    fireEvent(prizes, "accessibilityAction", { nativeEvent: { actionName: "longpress" } })
+    fireEvent(prizes, "keyDown", { key: "ArrowUp" })
+    expect(onChangePrizes.mock.calls).toEqual([[1], [1]])
+  })
+
+  it("ignores prize shortcuts on a seat this device does not control", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const onChangePrizes = jest.fn()
+    render(
+      <Seat
+        harness={table}
+        seat={0}
+        prizes={4}
+        ownership="unowned"
+        onChangePrizes={onChangePrizes}
+      />,
+    )
+    fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "keyDown", { key: "ArrowUp" })
+    expect(onChangePrizes).not.toHaveBeenCalled()
+  })
+
+  it("keeps a bench Pokémon focused when its chip is tapped again", () => {
+    jest.useFakeTimers()
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
+    const benched = table.actions.placePokemon(me, "bench", { name: "Pikachu", hp: 60, prizes: 1 })!
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
+    act(() => void jest.advanceTimersByTime(2_000))
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
+    act(() => void jest.advanceTimersByTime(2_000))
+    fireEvent.press(screen.getByTestId("pokemon-damage-seat-1-10"))
+    expect(board(table).bench[0].damage).toBe(10)
+    expect(board(table).active?.damage).toBe(0)
+    jest.useRealTimers()
   })
 })
