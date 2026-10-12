@@ -21,10 +21,13 @@ const BoardKeyboardLiftContext = createContext<Lift | null>(null)
 export function BoardKeyboardLift({
   enabled,
   boardHeight,
+  bottomInset,
   children,
 }: {
   enabled: boolean
   boardHeight: number
+  /** why: a seat on the screen's bottom edge squares its corners into the rounded screen corners; that strip stays tucked under the keyboard instead of showing square corners above it. */
+  bottomInset: number
   children: ReactNode
 }) {
   const { height: keyboard } = useReanimatedKeyboardAnimation()
@@ -32,7 +35,8 @@ export function BoardKeyboardLift({
   const owner = useRef<object>(null)
   const lifted = useDerivedValue(() => {
     // why: keyboard height runs from 0 to minus the keyboard height as it opens.
-    const covered = enabled && bottom.value > 0 ? bottom.value - (boardHeight + keyboard.value) : 0
+    const covered =
+      enabled && bottom.value > 0 ? bottom.value - (boardHeight + keyboard.value) - bottomInset : 0
     return Math.max(0, covered)
   })
   const lift = useRef<Lift>({

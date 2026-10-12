@@ -100,7 +100,11 @@ function PinnedGameBoardStage({
       <ScreenPinnedView style={StyleSheet.absoluteFill} onOrientationChange={setMetrics}>
         <TurnedBoardContext.Provider value={holderAngle !== 0}>
           <View collapsable={false} style={pinned ? [$pinnedBoard, { width, height }] : $fill}>
-            <BoardKeyboardLift enabled={holderAngle === 0} boardHeight={height}>
+            <BoardKeyboardLift
+              enabled={holderAngle === 0}
+              boardHeight={height}
+              bottomInset={pinned ? metrics.insets.bottom : safeArea.bottom}
+            >
               {renderGrid(boardOrientation)}
               <GameMenuBackdrop open={menuOpen} onClose={menu.onClose} />
               <GameMenuCluster
