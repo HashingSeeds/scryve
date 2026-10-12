@@ -7,8 +7,7 @@
     "autolinking": {
       "android": {
         "exclude": [
-          "@expo/ui",
-          "@solana-mobile/mobile-wallet-adapter-protocol"
+          "@expo/ui"
         ]
       }
     }
@@ -70,22 +69,22 @@
     "release:native": "node scripts/release-native.cjs cloud"
   },
   "dependencies": {
-    "@clerk/expo": "4.6.1",
+    "@clerk/expo": "4.10.1",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@expo/dom-webview": "~57.0.1",
     "@expo/metro-runtime": "~57.0.16",
     "@legendapp/state": "3.0.0-beta.48",
     "@sentry/react-native": "^7.11.0",
     "convex": "1.42.3",
-    "expo": "57.0.27",
+    "expo": "57.0.28",
     "expo-application": "~57.0.3",
-    "expo-auth-session": "57.0.14",
+    "expo-auth-session": "57.0.15",
     "expo-build-properties": "~57.0.22",
     "expo-camera": "~57.0.6",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "57.0.21",
-    "expo-crypto": "57.0.3",
-    "expo-dev-client": "~57.0.19",
+    "expo-crypto": "57.0.4",
+    "expo-dev-client": "~57.0.20",
     "expo-font": "~57.0.4",
     "expo-haptics": "~57.0.3",
     "expo-image": "~57.0.5",
@@ -94,13 +93,13 @@
     "expo-linking": "~57.0.12",
     "expo-localization": "~57.0.2",
     "expo-observe": "~57.0.25",
-    "expo-router": "~57.0.25",
-    "expo-screen-orientation": "~57.0.2",
+    "expo-router": "~57.0.26",
+    "expo-screen-orientation": "~57.0.3",
     "expo-secure-store": "57.0.4",
-    "expo-splash-screen": "~57.0.9",
+    "expo-splash-screen": "~57.0.10",
     "expo-store-review": "~57.0.3",
     "expo-system-ui": "~57.0.4",
-    "expo-updates": "~57.0.25",
+    "expo-updates": "~57.0.26",
     "expo-web-browser": "57.0.3",
     "i18next": "^23.14.0",
     "intl-pluralrules": "^2.0.1",
@@ -148,7 +147,7 @@
     "eslint-plugin-reactotron": "^0.1.2",
     "eslint-plugin-self-explanatory-code": "file:tools/eslint-plugin-self-explanatory-code",
     "jest": "~29.7.0",
-    "jest-expo": "~57.0.5",
+    "jest-expo": "~57.0.6",
     "prettier": "^3.3.3",
     "react-test-renderer": "19.2.3",
     "reactotron-core-client": "^2.9.4",
