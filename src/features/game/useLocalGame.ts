@@ -12,8 +12,11 @@ import {
   createRematch,
   defaultCommandContext,
   hasLocalGameStarted,
+  hasPlayBegun,
   localTableRules,
   restartMatchGame,
+  soleLoserSeat,
+  withFirstChooser,
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
@@ -56,8 +59,9 @@ export function useLocalGame(
 
   const dispatch = useCallback(
     (command: GameCommand, endSource?: GameEndSource): LocalGame => {
-      const next = applyGameCommand(gameRef.current, command, context)
-      if (next === gameRef.current) return next
+      const applied = applyGameCommand(gameRef.current, command, context)
+      if (applied === gameRef.current) return applied
+      const next = withFirstPlayerSettled(gameRef.current, applied)
       if (next.status === "active") {
         repository.saveActiveGame(next)
         if (!hasLocalGameStarted(gameRef.current) && hasLocalGameStarted(next))
@@ -120,8 +124,9 @@ export function useLocalGame(
         },
         (action, operationId) => {
           const previous = gameRef.current
-          const next = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
-          if (next === previous) return false
+          const applied = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
+          if (applied === previous) return false
+          const next = withFirstPlayerSettled(previous, applied)
           repository.saveActiveGame(next)
           if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
             captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
@@ -143,6 +148,12 @@ export function useLocalGame(
     [repository],
   )
 
+  // why: the offer is one per game, so using it is written onto the game like any other board change.
+  const markFirstPlayerUsed = useCallback(() => {
+    const current = gameRef.current
+    if (!current.firstPlayerOffered) replaceBoard({ ...current, firstPlayerOffered: true })
+  }, [replaceBoard])
+
   const rematch = useCallback(() => replaceBoard(createRematch(gameRef.current)), [replaceBoard])
 
   const nextMatchGame = useCallback(
@@ -160,10 +171,16 @@ export function useLocalGame(
     (matchId: string, outcomes: MatchSeatOutcome[]) => {
       const ended = repository.finishMatch(matchId, outcomes)
       if (!ended) throw new Error("This match has no finished game to end.")
-      if (gameRef.current.match?.id === matchId) rematch()
+      // why: the fresh match that follows hands the loser of the match's last game the first choice.
+      if (gameRef.current.match?.id === matchId) {
+        const last = repository.loadHistoryDetail(ended.id)?.game
+        replaceBoard(
+          withFirstChooser(createRematch(gameRef.current), last ? soleLoserSeat(last) : undefined),
+        )
+      }
       return ended
     },
-    [rematch, repository],
+    [replaceBoard, repository],
   )
 
   const latestMatchGame = useCallback(
@@ -198,6 +215,7 @@ export function useLocalGame(
     nextMatchGame,
     restartMatchGame: restartMatchGameBoard,
     endMatch,
+    markFirstPlayerUsed,
     latestMatchGame,
     /** why: a match that hit the game cap still owes its result after a restart; the board reopens the prompt from it. */
     pendingMatchEnd: () => {
@@ -210,4 +228,11 @@ export function useLocalGame(
       return gameRef.current
     },
   }
+}
+
+/** why: the first point of play closes the first-player offer for good, in the same write as the change itself, so damage healed or a counter cleared never brings the offer back. The board before the change counts too, since a reopened save may already be in play without the marker. */
+function withFirstPlayerSettled(previous: LocalGame, game: LocalGame): LocalGame {
+  return !game.firstPlayerOffered && (hasPlayBegun(previous) || hasPlayBegun(game))
+    ? { ...game, firstPlayerOffered: true }
+    : game
 }

@@ -1,23 +1,38 @@
 import { AccessibilityInfo, StyleSheet } from "react-native"
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native"
-import { Polygon, Polyline } from "react-native-svg"
+import { Path } from "react-native-svg"
 
 import { ThemeProvider } from "@/theme/context"
 import { darkTheme, lightTheme } from "@/theme/theme"
 import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
-import { GameRadialMenu, getRadialActionPoses, type RadialMenuAction } from "./GameRadialMenu"
+import {
+  GameRadialMenu,
+  getRadialActionPoses,
+  getRadialToolOffsets,
+  type RadialMenuAction,
+  type RadialMenuTool,
+} from "./GameRadialMenu"
 import { mockHardwareBack } from "../../test/support/hardwareBack"
 
 describe("GameRadialMenu", () => {
   const callbacks = Array.from({ length: 5 }, () => jest.fn())
   const actions: RadialMenuAction[] = [
     { kind: "layout", label: "Layout", onPress: callbacks[0] },
-    { kind: "undo", label: "Undo", onPress: callbacks[1] },
+    { kind: "dice", label: "Dice", onPress: callbacks[1] },
     { kind: "status", label: "Status", onPress: callbacks[2] },
     { kind: "home", label: "Home", onPress: callbacks[3] },
     { kind: "end-game", label: "End game", onPress: callbacks[4] },
   ]
+  const tools: RadialMenuTool[] = ["coin", "d20"].map((key) => ({
+    key,
+    label: key,
+    accessibilityLabel: key,
+    onPress: jest.fn(),
+  }))
+  const actionsWithDiceTools: RadialMenuAction[] = actions.map((action) =>
+    action.kind === "dice" ? { kind: "dice", label: "Dice", tools } : action,
+  )
 
   function menu(
     open: boolean,
@@ -54,13 +69,11 @@ describe("GameRadialMenu", () => {
     const view = render(menu(false))
 
     expect(view.getByTestId("game-menu-pentagon")).toBeTruthy()
-    const pentagon = view
-      .UNSAFE_getAllByType(Polygon)
-      .find((polygon) => polygon.props.strokeWidth === 7)
+    const pentagon = view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 7)
     expect(pentagon).toBeTruthy()
     expect(lightTheme.colors.gameMenu.anchorBorder).toBe("#FFFFFF")
     expect(pentagon!.props.stroke).toBe(lightTheme.colors.gameMenu.anchorBorder)
-    expect(pentagon!.props.points.split(" ")).toHaveLength(5)
+    expect(pentagon!.props.d.match(/Q/g)).toHaveLength(5)
   })
 
   it("uses the flat Keystone II treatment by default in dark mode", () => {
@@ -76,18 +89,15 @@ describe("GameRadialMenu", () => {
       </ThemeProvider>,
     )
 
-    const pentagon = view
-      .UNSAFE_getAllByType(Polygon)
-      .find((polygon) => polygon.props.strokeWidth === 7)
+    const pentagon = view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 7)
     expect(pentagon).toBeTruthy()
     expect(pentagon!.props.fill).toBe("url(#keystoneTwoFill)")
     expect(darkTheme.colors.gameMenu.anchorBorder).toBe("#000000")
     expect(pentagon!.props.stroke).toBe(darkTheme.colors.gameMenu.anchorBorder)
     expect(
-      view.UNSAFE_getAllByType(Polygon).find((polygon) => polygon.props.strokeWidth === 1.4)!.props
-        .stroke,
+      view.UNSAFE_getAllByType(Path).find((path) => path.props.strokeWidth === 1.4)!.props.stroke,
     ).toBe(darkTheme.colors.gameMenu.anchorBorder)
-    expect(view.UNSAFE_queryAllByType(Polyline)).toHaveLength(0)
+    expect(view.queryByTestId("game-menu-bevel")).toBeNull()
   })
 
   it("keeps the menu glyph in centered square bounds", () => {
@@ -157,7 +167,7 @@ describe("GameRadialMenu", () => {
 
   // why: queried by component type because the host element only carries processed SVG props.
   const signalLayer = (view: ReturnType<typeof render>, testID: string) =>
-    view.UNSAFE_queryAllByType(Polygon).find((polygon) => polygon.props.testID === testID)
+    view.UNSAFE_queryAllByType(Path).find((path) => path.props.testID === testID)
 
   it("rings and badges the pentagon while a sync signal is set, fading the ring out in its last color", () => {
     const signal = {
@@ -211,7 +221,13 @@ describe("GameRadialMenu", () => {
     const onEnd = jest.fn()
     const blockedActions: RadialMenuAction[] = actions.map((action) =>
       action.kind === "end-game"
-        ? { ...action, detail: "needs connection", blocked: true, onPress: onEnd }
+        ? {
+            kind: "end-game",
+            label: "End game",
+            detail: "needs connection",
+            blocked: true,
+            onPress: onEnd,
+          }
         : action,
     )
     const statusLine = {
@@ -236,7 +252,7 @@ describe("GameRadialMenu", () => {
     const onClose = jest.fn()
     const view = render(menu(true, onClose))
 
-    fireEvent.press(view.getByTestId("undo-button"))
+    fireEvent.press(view.getByTestId("dice-button"))
     fireEvent.press(view.getByTestId("game-menu-backdrop"))
 
     expect(callbacks[1]).toHaveBeenCalledTimes(1)
@@ -265,6 +281,89 @@ describe("GameRadialMenu", () => {
     view.rerender(menu(false, onClose))
     expect(pressBack()).toBe(false)
     jest.restoreAllMocks()
+  })
+
+  it("lays an action's two tools out inside the pill, the first nearer the pentagon", () => {
+    const view = render(menu(true, jest.fn(), { actions: actionsWithDiceTools }))
+
+    expect(view.queryByTestId("dice-button")).toBeNull()
+    for (const tool of tools) expect(view.getByTestId(`dice-${tool.key}`)).toBeTruthy()
+    fireEvent.press(view.getByTestId("dice-d20"))
+    expect(tools[1].onPress).toHaveBeenCalledTimes(1)
+
+    // why: the first tool takes the half nearer the pentagon whichever way the pill points.
+    for (const anchor of [
+      { x: 0.5, y: 0.5 },
+      { x: 0.2, y: 0.5 },
+      { x: 0.8, y: 0.5 },
+    ]) {
+      const pose = getRadialActionPoses(anchor)[1]
+      const [inner, outer] = getRadialToolOffsets(pose)
+      const angle = (pose.rotationDeg * Math.PI) / 180
+      const distance = (offset: number) =>
+        Math.hypot(pose.x + offset * Math.cos(angle), pose.y + offset * Math.sin(angle))
+      expect(distance(inner)).toBeLessThan(distance(outer))
+      // why: 4pt inside each end cap, the pill's own padding, so each pea is concentric with its cap.
+      expect([Math.abs(inner), Math.abs(outer)]).toEqual([32, 32])
+    }
+  })
+
+  it("offers the first-player badge on the pentagon only while the menu is closed and free", () => {
+    const onPress = jest.fn()
+    const badge = {
+      color: "#55C894",
+      glyph: { tool: "d20" },
+      accessibilityLabel: "Roll for who goes first",
+      onPress,
+    } as const
+    const view = render(menu(false, jest.fn(), { badge }))
+
+    fireEvent.press(view.getByTestId("first-player-badge"))
+    expect(onPress).toHaveBeenCalledTimes(1)
+
+    view.rerender(menu(true, jest.fn(), { badge }))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+
+    view.rerender(
+      menu(false, jest.fn(), { badge, exitAction: { label: "Close dice", onPress: jest.fn() } }),
+    )
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
+  })
+
+  it("disables hidden tools and pills and takes them out of the tab order", () => {
+    const view = render(menu(false, jest.fn(), { actions: actionsWithDiceTools }))
+    const hidden = { includeHiddenElements: true }
+
+    for (const label of ["d20", "Layout"]) {
+      const button = view.getByLabelText(label, hidden)
+      expect(button.props.tabIndex).toBe(-1)
+      expect(button.props.accessibilityState.disabled).toBe(true)
+    }
+
+    view.rerender(menu(true, jest.fn(), { actions: actionsWithDiceTools }))
+    for (const label of ["d20", "Layout"]) {
+      const button = view.getByLabelText(label, hidden)
+      expect(button.props.tabIndex).toBeUndefined()
+      expect(button.props.accessibilityState.disabled).toBe(false)
+    }
+  })
+
+  it("keeps a held action's tools out and pressable while the menu is closed", () => {
+    const view = render(
+      menu(false, jest.fn(), {
+        actions: actionsWithDiceTools,
+        heldAction: "dice",
+        exitAction: { label: "Close dice", onPress: jest.fn() },
+      }),
+    )
+
+    expect(view.queryByTestId("game-menu-backdrop")).toBeNull()
+    expect(view.queryByTestId("layout-button")).toBeNull()
+    fireEvent.press(view.getByTestId("dice-coin"))
+    expect(tools[0].onPress).toHaveBeenCalledTimes(1)
+
+    view.rerender(menu(false, jest.fn(), { actions: actionsWithDiceTools }))
+    expect(view.queryByTestId("dice-coin")).toBeNull()
   })
 
   it("poses every action toward open space when the anchor nears a screen edge", () => {

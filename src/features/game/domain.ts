@@ -257,10 +257,13 @@ export function isMatchInProgress(game: LocalGame) {
   return game.match !== undefined && (game.match.gameNumber > 1 || hasLocalGameStarted(game))
 }
 
-/** why: abandoning a game mid-match restarts that game; the match and its score stay. */
+/** why: abandoning a game mid-match restarts that game; the match, its score, and the loser's first choice stay, and the offer is open again. */
 export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match) throw new Error("This game is not part of a match.")
-  return { ...createRematch(game, now), match: game.match }
+  return withFirstChooser(
+    { ...createRematchBoard(game, now), match: game.match },
+    game.firstChooserSeat,
+  )
 }
 
 /** why: setup forms know seats by index while a running game knows them by player id. */
@@ -282,7 +285,25 @@ export function meSeatOf(game: Pick<LocalGame, "players" | "account">): number |
   return index === -1 ? undefined : index
 }
 
+/** why: a rematch hands the choice of who goes first to the one player who lost; a draw or several losers has no one to ask. */
+export function soleLoserSeat(game: Pick<LocalGame, "players" | "result">): number | undefined {
+  if (game.result?.kind !== "win") return undefined
+  const losers = game.players.flatMap((player, seat) =>
+    game.result?.kind === "win" && game.result.winnerPlayerIds.includes(player.id) ? [] : [seat],
+  )
+  return losers.length === 1 ? losers[0] : undefined
+}
+
+/** why: the game that follows a finished one hands its sole loser the choice of who goes first. */
 export function createRematch(game: LocalGame, now?: number): LocalGame {
+  return withFirstChooser(createRematchBoard(game, now), soleLoserSeat(game))
+}
+
+export function withFirstChooser(game: LocalGame, seat: number | undefined): LocalGame {
+  return seat === undefined ? game : { ...game, firstChooserSeat: seat }
+}
+
+function createRematchBoard(game: LocalGame, now?: number): LocalGame {
   return createLocalGame({
     players: game.players.map(({ name, color, shape }) => ({ name, color, shape })),
     startingLife: game.startingLife,
@@ -573,6 +594,23 @@ export function applyGameCommand(
 ): LocalGame {
   const event = commandToEvent(game, command, context)
   return event ? reduceGameEvent(game, event) : game
+}
+
+/** why: who goes first is settled by the first point of play: life, prizes, commander damage, counters, designations, or Pokémon damage. Placing Pokémon and picking a layout set the table and do not count. */
+export function hasPlayBegun(game: LocalGame): boolean {
+  if (
+    game.events.some(({ type }) => type === "life.changed" || type === "commanderDamage.assigned")
+  )
+    return true
+  if (game.players.some((player) => player.life !== game.startingLife)) return true
+  const table = game.table
+  if (!table) return false
+  if (Object.keys(table.designations).length > 0) return true
+  return Object.values(table.players).some(
+    ({ counters, pokemon }) =>
+      Object.values(counters ?? {}).some((value) => value !== 0) ||
+      [pokemon?.active, ...(pokemon?.bench ?? [])].some((card) => (card?.damage ?? 0) > 0),
+  )
 }
 
 export function hasLocalGameStarted(game: LocalGame): boolean {

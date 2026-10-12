@@ -346,6 +346,13 @@ function parseGame(value: unknown, events: GameEvent[]): LocalGame | null {
     ...(result ? { result } : {}),
     ...(account ? { account } : {}),
     ...(match ? { match } : {}),
+    ...(Number.isInteger(value.firstChooserSeat) &&
+    typeof value.firstChooserSeat === "number" &&
+    value.firstChooserSeat >= 0 &&
+    value.firstChooserSeat < players.length
+      ? { firstChooserSeat: value.firstChooserSeat }
+      : {}),
+    ...(value.firstPlayerOffered === true ? { firstPlayerOffered: true } : {}),
   }
 }
 

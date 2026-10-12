@@ -11,7 +11,6 @@ Android launch-time work. Pixel 6a release build, cold launch, board interactive
   cost ~20ms per launch to register.
   - `@expo/ui`: pulled in by expo-router for `Stack.Toolbar`. Remove the exclusion before using
     native toolbars, or Android will crash with a missing native module.
-  - `@solana-mobile/mobile-wallet-adapter-protocol`: pulled in by Clerk for Solana wallet sign-in.
-    Remove the exclusion before enabling web3 wallets.
 
-Recheck both exclusions when upgrading Expo or Clerk.
+Recheck the exclusion when upgrading Expo. Clerk stopped pulling in the Solana wallet adapter in
+`@clerk/expo` 4.10, so it no longer needs one.

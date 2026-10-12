@@ -113,6 +113,10 @@ export interface LocalGame {
   result?: LocalGameResult
   account?: LocalGameAccount
   match?: LocalGameMatch
+  /** why: the seat that lost the game before this one chooses who goes first; it lives on the game so a reopen keeps the offer. */
+  firstChooserSeat?: number
+  /** why: the first-player offer is one per game, so it is marked used on the game itself. Device-only, like the fields above it. */
+  firstPlayerOffered?: true
 }
 
 export interface NewPlayerInput {

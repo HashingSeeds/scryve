@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values"
 import { makeConvexTest, type ConvexTestHarness } from "../test/convexTest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
-import type { TableAction } from "./lib/table"
+import { TABLE_VERSION, type TableAction } from "./lib/table"
 
 const token = "t".repeat(43)
 
@@ -2671,6 +2671,73 @@ describe("connected table actions", () => {
         prizesTaken: 1,
       },
     })
+  })
+
+  it("hides conditions from clients that predate them, and a lethal Checkup takes prizes", async () => {
+    const t = makeConvexTest()
+    const game = await pokemonGame(t)
+    const send = (operationId: string, action: TableAction) =>
+      game.host.mutation(api.games.tableAction, tableArgs(game.publicId, operationId, action))
+    const pokemonId = "pikachu-0001"
+    await send("table-operation-0001", {
+      kind: "pokemon.placed",
+      playerId: game.hostPlayerId,
+      pokemonId,
+      slot: "active",
+      card: { name: "Pikachu", hp: 60, prizes: 1 },
+    })
+    for (const [index, condition] of (["poisoned", "burned"] as const).entries())
+      await send(`table-operation-000${index + 2}`, {
+        kind: "pokemon.conditionChanged",
+        playerId: game.hostPlayerId,
+        pokemonId,
+        condition,
+        on: true,
+      })
+    await send("table-operation-0004", {
+      kind: "pokemon.checkedUp",
+      playerId: game.hostPlayerId,
+      pokemonId,
+      coin: "tails",
+    })
+
+    const board = async (tableVersion?: number) =>
+      (
+        await game.joiner.query(api.games.lobbyProjection, {
+          publicId: game.publicId,
+          ...(tableVersion === undefined ? {} : { tableVersion }),
+        })
+      ).table?.players[game.hostPlayerId].pokemon
+    expect(await board(TABLE_VERSION)).toMatchObject({
+      active: { damage: 30, poisoned: true, burned: true },
+    })
+    // why: installed clients reject a table with fields they do not know, so they get it without conditions.
+    expect((await board())?.active).toEqual({
+      id: pokemonId,
+      name: "Pikachu",
+      hp: 60,
+      prizes: 1,
+      damage: 30,
+    })
+
+    await send("table-operation-0005", {
+      kind: "pokemon.checkedUp",
+      playerId: game.hostPlayerId,
+      pokemonId,
+      takerPlayerId: game.joinerPlayerId,
+    })
+    const projection = await game.joiner.query(api.games.lobbyProjection, {
+      publicId: game.publicId,
+    })
+    expect(projection.players[1].currentLife).toBe(5)
+    expect(projection.table?.players[game.hostPlayerId].pokemon?.lastKnockout).toMatchObject({
+      operationId: "table-operation-0005",
+      pokemon: { damage: 30 },
+      prizesTaken: 1,
+    })
+    expect(
+      projection.table?.players[game.hostPlayerId].pokemon?.lastKnockout?.pokemon,
+    ).not.toHaveProperty("burned")
   })
 
   it("carries a local game's table into the connected game under the new seat ids", async () => {

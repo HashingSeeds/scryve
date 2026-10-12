@@ -55,6 +55,7 @@ import {
   remapTableState,
   tableActionDelta,
   tableActionIdentity,
+  tableForVersion,
   tableStateValidator,
   tableActionValidator,
   type PlayerTable,
@@ -1440,6 +1441,7 @@ export const lobbyProjection = query({
     deviceId: v.optional(v.string()),
     includeRecentOperationIds: v.optional(v.boolean()),
     operation: v.optional(connectedOperation),
+    tableVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     assertPublicId(args.publicId)
@@ -1523,7 +1525,9 @@ export const lobbyProjection = query({
           })),
       ),
       ...(commanderDamage ? { commanderDamage } : {}),
-      ...(tableRulesApply(gameTableRules(game)) ? { table: tableProjection(game, players) } : {}),
+      ...(tableRulesApply(gameTableRules(game))
+        ? { table: tableForVersion(tableProjection(game, players), args.tableVersion) }
+        : {}),
     }
   },
 })
@@ -1921,7 +1925,11 @@ function playerTableFromRow(player: PlayerTable): PlayerTable {
 
 // why: a knockout and its undo also move the other seat's prize counter, so that row is read too.
 function relatedPlayerId(action: TableAction, actor: Doc<"gamePlayers">) {
-  if (action.kind === "pokemon.knockedOut" || action.kind === "pokemon.damaged")
+  if (
+    action.kind === "pokemon.knockedOut" ||
+    action.kind === "pokemon.damaged" ||
+    action.kind === "pokemon.checkedUp"
+  )
     return action.takerPlayerId
   if (action.kind === "pokemon.knockoutUndone") return actor.pokemon?.lastKnockout?.takerPlayerId
   return undefined

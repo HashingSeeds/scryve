@@ -114,6 +114,8 @@ function PinnedGameBoardStage({
               exitAction={menu.exitAction}
               signal={menu.signal}
               statusLine={menu.statusLine}
+              heldAction={menu.heldAction}
+              badge={menu.badge}
               onToggle={menu.onToggle}
             />
           </View>

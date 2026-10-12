@@ -5,6 +5,10 @@ import type { PokemonBoardDefinition, TableDefinition } from "./systems"
 export const MAX_POKEMON_HP = 999
 export const MAX_POKEMON_DAMAGE = 999
 export const POKEMON_HP_FACET = "hp"
+export const POISON_CHECKUP_DAMAGE = 10
+export const BURN_CHECKUP_DAMAGE = 20
+/** why: clients that send this to lobbyProjection get Pokémon conditions; older installs get the table without them, since their strict parser drops a table with fields it does not know. */
+export const TABLE_VERSION = 2
 const MAX_POKEMON_CARD_ID_LENGTH = 200
 const MAX_POKEMON_NAME_LENGTH = 100
 const POKEMON_ID = /^[A-Za-z0-9_-]{8,64}$/
@@ -20,7 +24,17 @@ export const pokemonCardValidator = v.object({
   prizes: v.number(),
 })
 
-export const pokemonValidator = pokemonCardValidator.extend({ id: v.string(), damage: v.number() })
+export const pokemonConditionValidator = v.union(v.literal("poisoned"), v.literal("burned"))
+
+export const coinValidator = v.union(v.literal("heads"), v.literal("tails"))
+
+/** why: Poisoned and Burned only ever sit on the Active. Absent means neither, so boards stored before conditions existed need no backfill. */
+export const pokemonValidator = pokemonCardValidator.extend({
+  id: v.string(),
+  damage: v.number(),
+  poisoned: v.optional(v.boolean()),
+  burned: v.optional(v.boolean()),
+})
 
 /** why: only the latest knockout on a board can be undone, so the board keeps just enough to put it back. */
 export const pokemonKnockoutValidator = v.object({
@@ -99,10 +113,30 @@ export const tableActionValidator = v.union(
     playerId: v.string(),
     knockoutOperationId: v.string(),
   }),
+  /** why: sets rather than toggles, so two devices tapping at once agree. */
+  v.object({
+    kind: v.literal("pokemon.conditionChanged"),
+    playerId: v.string(),
+    pokemonId: v.string(),
+    condition: pokemonConditionValidator,
+    on: v.boolean(),
+  }),
+  /**
+   * why: Pokémon Checkup on one Active as a single operation, so its damage, Burn cure, and any knockout land together. The owner's coin is an input so every reducer agrees; without heads the Burn stays.
+   */
+  v.object({
+    kind: v.literal("pokemon.checkedUp"),
+    playerId: v.string(),
+    pokemonId: v.string(),
+    coin: v.optional(coinValidator),
+    takerPlayerId: v.optional(v.string()),
+  }),
 )
 
 export type PokemonSlot = Infer<typeof pokemonSlotValidator>
 export type PokemonCard = Infer<typeof pokemonCardValidator>
+export type PokemonCondition = Infer<typeof pokemonConditionValidator>
+export type Coin = Infer<typeof coinValidator>
 export type PokemonInPlay = Infer<typeof pokemonValidator>
 export type PokemonKnockout = Infer<typeof pokemonKnockoutValidator>
 export type PokemonBoard = Infer<typeof pokemonBoardValidator>
@@ -299,6 +333,22 @@ function withoutPokemon(board: PokemonBoard, pokemonId: string): PokemonBoard {
   return rest
 }
 
+function withConditions(
+  pokemon: PokemonInPlay,
+  conditions: Partial<Record<PokemonCondition, boolean>>,
+): PokemonInPlay {
+  const { poisoned: _poisoned, burned: _burned, ...rest } = pokemon
+  return {
+    ...rest,
+    ...(conditions.poisoned ? { poisoned: true } : {}),
+    ...(conditions.burned ? { burned: true } : {}),
+  }
+}
+
+function isConditioned(pokemon: PokemonInPlay) {
+  return pokemon.poisoned === true || pokemon.burned === true
+}
+
 function replacePokemon(board: PokemonBoard, next: PokemonInPlay): PokemonBoard {
   return board.active?.id === next.id
     ? { ...board, active: next }
@@ -365,7 +415,7 @@ export function applyTableAction(
       knockout.slot === "active" && !rest.active
         ? { ...rest, active: knockout.pokemon }
         : rest.bench.length < pokemonRules.benchSize
-          ? { ...rest, bench: [...rest.bench, knockout.pokemon] }
+          ? { ...rest, bench: [...rest.bench, withConditions(knockout.pokemon, {})] }
           : null
     if (!restored) return null
     return {
@@ -400,7 +450,12 @@ export function applyTableAction(
     if (!isValidCard(action.card)) return null
     // why: an edit has no prize taker, so it can't knock out; HP at or below the damage is refused instead.
     if (action.card.hp <= pokemon.damage) return null
-    const next: PokemonInPlay = { ...action.card, id: pokemon.id, damage: pokemon.damage }
+    // why: a different card means it evolved, which clears its conditions; an HP fix keeps them.
+    const evolved = action.card.cardId !== pokemon.cardId || action.card.name !== pokemon.name
+    const next = withConditions(
+      { ...action.card, id: pokemon.id, damage: pokemon.damage },
+      evolved ? {} : pokemon,
+    )
     return { table: withBoard(table, action.playerId, replacePokemon(board, next)), life: [] }
   }
 
@@ -419,8 +474,9 @@ export function applyTableAction(
 
   if (action.kind === "pokemon.switched") {
     if (slot !== "bench") return null
-    const bench = board.active
-      ? board.bench.map((benched) => (benched.id === pokemon.id ? board.active! : benched))
+    const retreated = board.active && withConditions(board.active, {})
+    const bench = retreated
+      ? board.bench.map((benched) => (benched.id === pokemon.id ? retreated : benched))
       : board.bench.filter((benched) => benched.id !== pokemon.id)
     return {
       table: withBoard(table, action.playerId, { ...board, active: pokemon, bench }),
@@ -430,6 +486,28 @@ export function applyTableAction(
 
   if (action.kind === "pokemon.removed")
     return { table: withBoard(table, action.playerId, withoutPokemon(board, pokemon.id)), life: [] }
+
+  if (action.kind === "pokemon.conditionChanged") {
+    if (slot !== "active") return null
+    if ((pokemon[action.condition] === true) === action.on) return unchanged
+    const active = withConditions(pokemon, { ...pokemon, [action.condition]: action.on })
+    return { table: withBoard(table, action.playerId, { ...board, active }), life: [] }
+  }
+
+  if (action.kind === "pokemon.checkedUp") {
+    if (slot !== "active") return null
+    const checkupDamage =
+      (pokemon.poisoned ? POISON_CHECKUP_DAMAGE : 0) + (pokemon.burned ? BURN_CHECKUP_DAMAGE : 0)
+    if (checkupDamage === 0) return unchanged
+    const damage = Math.min(MAX_POKEMON_DAMAGE, pokemon.damage + checkupDamage)
+    if (damage >= pokemon.hp)
+      return knockOut(table, action.playerId, board, found, action.takerPlayerId, context)
+    const active = withConditions(
+      { ...pokemon, damage },
+      { poisoned: pokemon.poisoned, burned: pokemon.burned && action.coin !== "heads" },
+    )
+    return { table: withBoard(table, action.playerId, { ...board, active }), life: [] }
+  }
 
   return knockOut(table, action.playerId, board, found, action.takerPlayerId, context)
 }
@@ -484,9 +562,11 @@ function isValidBoard(
     board.bench.length <= rules.benchSize &&
     ids.size === inPlay.length &&
     inPlay.every(isValidPokemon) &&
+    !board.bench.some(isConditioned) &&
     (knockout === undefined ||
       (OPERATION_ID.test(knockout.operationId) &&
         isValidPokemon(knockout.pokemon) &&
+        (knockout.slot === "active" || !isConditioned(knockout.pokemon)) &&
         !ids.has(knockout.pokemon.id) &&
         isWholeNumber(knockout.prizesTaken, 0, knockout.pokemon.prizes) &&
         (knockout.takerPlayerId === undefined
@@ -544,6 +624,34 @@ export function remapTableState(table: TableState, idOf: (playerId: string) => s
               }
             : player,
         ]
+      }),
+    ),
+  }
+}
+
+/** why: the table in the shape a client of `tableVersion` parses; before version 2 that means without Pokémon conditions. */
+export function tableForVersion(table: TableState, tableVersion = 1): TableState {
+  if (tableVersion >= TABLE_VERSION) return table
+  return {
+    ...table,
+    players: Object.fromEntries(
+      Object.entries(table.players).map(([playerId, player]) => {
+        const board = player.pokemon
+        if (!board) return [playerId, player]
+        const { active, lastKnockout, ...rest } = board
+        const pokemon: PokemonBoard = {
+          ...rest,
+          ...(active ? { active: withConditions(active, {}) } : {}),
+          ...(lastKnockout
+            ? {
+                lastKnockout: {
+                  ...lastKnockout,
+                  pokemon: withConditions(lastKnockout.pokemon, {}),
+                },
+              }
+            : {}),
+        }
+        return [playerId, { ...player, pokemon }]
       }),
     ),
   }

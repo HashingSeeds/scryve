@@ -97,7 +97,7 @@ const CONTENT_EDGES = {
 } as const satisfies Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>>
 
 /** why: chips and sheets lay out upright in the seat's reading frame, then turn with the card's content. */
-function contentFrame(
+export function contentFrame(
   rotation: LifeCardContentRotation,
   size: { width: number; height: number },
 ): ViewStyle {
@@ -147,8 +147,32 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
+  /** why: a dice chip row above pushes the counters down so the two never overlap. */
+  clearanceAbove?: number
   /** why: the open sheet covers the card, so the card drops its own controls from touch, focus, and screen readers meanwhile. */
   onSheetOpenChange?: (open: boolean) => void
+}
+
+export function chipRowOrigin(input: {
+  compact?: boolean
+  contentRotation: LifeCardContentRotation
+  contentInsets?: LifeCardContentInsets
+  menuEdgeCenter?: LifeCardMenuEdge
+  spacing: { xxs: number; xs: number }
+}) {
+  const { compact, contentRotation, contentInsets, menuEdgeCenter, spacing } = input
+  const gap = compact ? spacing.xxs : spacing.xs
+  const menuClearance =
+    menuEdgeCenter === CONTENT_EDGES[contentRotation].top
+      ? compact
+        ? COMPACT_MENU_CLEARANCE
+        : MENU_CLEARANCE
+      : 0
+  return {
+    top: gap + contentInset(contentRotation, contentInsets, "top") + menuClearance,
+    left: gap + contentInset(contentRotation, contentInsets, "left"),
+    menuClearance,
+  }
 }
 
 /** why: counters and designations sit on the card's inner edge, facing the table. Tap a chip to bump it, hold it to edit or remove, and the faint + adds a counter or takes a designation. */
@@ -163,6 +187,7 @@ export const CounterChips = memo(function CounterChips({
   contentInsets,
   menuEdgeCenter,
   cardSize,
+  clearanceAbove = 0,
   onSheetOpenChange,
 }: CounterChipsProps) {
   const {
@@ -209,16 +234,9 @@ export const CounterChips = memo(function CounterChips({
   if (cardSize.width === 0 || cardSize.height === 0) return null
   const frame = contentFrame(contentRotation, cardSize)
   const glyphSize = compact ? 13 : 15
-  const menuClearance =
-    menuEdgeCenter === CONTENT_EDGES[contentRotation].top
-      ? compact
-        ? COMPACT_MENU_CLEARANCE
-        : MENU_CLEARANCE
-      : 0
-  const top =
-    (compact ? spacing.xxs : spacing.xs) +
-    contentInset(contentRotation, contentInsets, "top") +
-    menuClearance
+  const origin = chipRowOrigin({ compact, contentRotation, contentInsets, menuEdgeCenter, spacing })
+  const { menuClearance } = origin
+  const top = origin.top + clearanceAbove
 
   return (
     <>
