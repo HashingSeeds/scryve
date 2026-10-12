@@ -23,7 +23,6 @@ function standardLegal(hit: PokemonSearchHit) {
   return hit.facets.some(({ key, value }) => key === "standardLegal" && value === "true")
 }
 
-/** why: the catalog returns every printing of a name; the rows people pick from are the ones legal now, and two rows that read the same are one choice. */
 export function catalogRows(hits: readonly PokemonSearchHit[]): PokemonSearchHit[] {
   const seen = new Set<string>()
   return [...hits]

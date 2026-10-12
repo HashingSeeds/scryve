@@ -20,7 +20,7 @@ import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
 const SPIN_DURATION_MS = 500
 
-/** why: each shape leaves a different margin inside its 44 unit view box, so layouts that line a mark up with other content use the drawn top and bottom (measured with getBBox) instead of the box. */
+/** why: shapes sit inside their 44 unit box with different margins, so lining up boxes leaves drawn edges misaligned (the triangle floated above the prize grid). */
 export const MARK_ART_BOUNDS: Record<PlayerMarkShape, { top: number; bottom: number }> = {
   circle: { top: 10, bottom: 34 },
   triangle: { top: 8.56, bottom: 34.5 },

@@ -205,7 +205,6 @@ export function PokemonSheet({
     if (Platform.OS !== "web") AccessibilityInfo.announceForAccessibility(message)
   }
 
-  // why: the same Pokémon has many printings with different HP, so the set and number tell them apart.
   const hits = catalog.hits && catalogRows(catalog.hits)
   const showSearch = lookupOpen && catalog.available
   const stepLabel = (step: number) => `${step > 0 ? "+" : "−"}${Math.abs(step * damageStep)}`

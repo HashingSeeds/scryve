@@ -78,12 +78,10 @@ export interface PokemonSeatCardProps {
 }
 
 const KNOCKOUT_TOAST_MS = 6_000
-// why: a focused bench Pokémon holds the hero long enough for a few taps, then the Active comes back on its own so the seat never stays on the wrong Pokémon.
 const FOCUS_MS = 3_000
 const STANDARD_PRIZES = 6
 const BENCH_HEIGHT = 56
 const COMPACT_BENCH_HEIGHT = 44
-// why: a prize pip keeps a card's 13:17 shape.
 const PRIZE_PIP_ASPECT = 13 / 17
 const HERO_CAPTION_HEIGHT = 44
 const COMPACT_HERO_CAPTION_HEIGHT = 24
@@ -97,7 +95,6 @@ const EDIT_ACTIVE_TRIGGER = "edit-active"
 const PLACE_ACTIVE_TRIGGER = "place-active"
 const ADD_TRIGGER = "add"
 type TakerAsk = { pokemonId: string; delta?: number }
-// why: a new tick per tap restarts the focus timer and the drain bar, even when the same Pokémon is tapped again.
 type Focus = { pokemonId: string; tick: number }
 
 export const PokemonSeatCard = memo(function PokemonSeatCard({
@@ -150,7 +147,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
     : 0
   const markSize = cramped ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
-  // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const markArt = MARK_ART_BOUNDS[shape ?? shapeForSeat(seatNumber)]
   const markScale = markSize / MARK_VIEW_BOX
   const prizeRowHeight = (markArt.bottom - markArt.top) * markScale
@@ -402,7 +398,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           !readyToLayout && $hidden,
         ]}
       >
-        {/* why: the seat mark is drawn first and sits behind the content in the bottom-left content corner, so it costs the cramped seats no room and never covers a tap target. */}
+        {/* why: drawn first so it sits behind the controls; drawn later it covers bench and prize tap targets. */}
         <PlayerMark
           seatNumber={seatNumber}
           shape={shape}
@@ -425,7 +421,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             { height: benchHeight, marginLeft: clearance.left, marginRight: clearance.right },
           ]}
         >
-          {/* why: every bench spot is drawn, filled or not, so the row reads as a bench and the next free spot is the add target. */}
           {Array.from({ length: Math.max(rules.benchSize, board.bench.length) }, (_, index) => {
             const pokemon = board.bench[index]
             if (pokemon)
@@ -543,7 +538,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           </BoardPressable>
         )}
 
-        {/* why: prizes are the score; the pips sit two by three like the cards do, so the count reads at a glance without a number. */}
         <View style={[themed($bottomRow), { height: prizeRowHeight }]}>
           <View style={[$identity, { marginLeft: markSize + spacing.xs }]}>
             <Text
@@ -572,7 +566,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             }
             disabled={!controlsLive}
             delayLongPress={LONG_PRESS_MS}
-            // why: prizes run out at 0, and a put back never passes the six that were laid out.
             onPress={() => prizes > 0 && onChangePrizes(-1)}
             onLongPress={() => prizes < STANDARD_PRIZES && onChangePrizes(1)}
             style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
@@ -750,7 +743,6 @@ type BenchFocus = {
   onSwitchIn: () => void
 }
 
-/** why: one hero serves the Active and a focused bench Pokémon, so damage works the same way on both; the bench variant adds the switch action and a bar that drains until the Active returns. */
 function PokemonHero({
   identity,
   seatNumber,
@@ -1045,7 +1037,6 @@ function BenchChip({
           <View key={index} style={[$chipPip, { backgroundColor: ink }]} />
         ))}
       </View>
-      {/* why: the bar under the chip shows how much HP is left at a glance, since the number alone does not say how big the Pokémon is. */}
       <View
         pointerEvents="none"
         style={[
@@ -1084,7 +1075,6 @@ const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
-// why: the name sits with the seat mark in the bottom-left corner on every board, and the prizes take the other corner.
 const $identity: ViewStyle = { flex: 1, minWidth: 0, alignItems: "flex-start" }
 const $drainTrack: ViewStyle = {
   alignSelf: "stretch",
