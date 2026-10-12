@@ -94,7 +94,10 @@ it("refreshes old metadata and reveals eligible deck cards without listing unkno
   const view = chooser([deck[2]])
   expect(view.queryByLabelText("Preview Unknown as commander")).toBeNull()
   await waitFor(() => expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy())
-  expect(mockAction).toHaveBeenCalledWith(expect.anything(), { scryfallId: "unknown" })
+  expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    scryfallId: "unknown",
+    deviceId: expect.any(String),
+  })
 })
 
 it("searches Scryfall for legal commanders beyond the cache and removes deck duplicates", async () => {
@@ -111,6 +114,7 @@ it("searches Scryfall for legal commanders beyond the cache and removes deck dup
     jest.advanceTimersByTime(400)
   })
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
     game: "mtg",
     query: "(ar) is:commander f:commander",
   })
@@ -133,6 +137,7 @@ it("defaults to the exact selected color for deck and provider results", async (
     jest.advanceTimersByTime(400)
   })
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
     game: "mtg",
     query: '(ar) is:commander f:commander (id=b or o:"choose a color")',
   })
@@ -225,6 +230,7 @@ it("requires the exact selected identity by default and optionally allows additi
   expect(view.queryByLabelText("Preview Unknown as commander")).toBeNull()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
     game: "mtg",
     query: 'is:commander f:commander (id=ub or o:"choose a color")',
   })
@@ -236,6 +242,7 @@ it("requires the exact selected identity by default and optionally allows additi
   expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
     game: "mtg",
     query: 'is:commander f:commander (id>=ub or o:"choose a color")',
   })
@@ -257,7 +264,7 @@ it("fetches searchable keyword choices, combines selected keywords, and reuses t
   const view = chooser(deck.slice(0, 2))
   fireEvent.press(view.getByTestId("commander-filters-button"))
   await act(async () => {})
-  expect(mockAction).toHaveBeenCalledWith(expect.anything(), {})
+  expect(mockAction).toHaveBeenCalledWith(expect.anything(), { deviceId: expect.any(String) })
   expect(JSON.parse(loadString("scryve.cards.keyword-abilities.v1") ?? "null")).toEqual([
     "Flying",
     "Ward",
@@ -274,6 +281,7 @@ it("fetches searchable keyword choices, combines selected keywords, and reuses t
   expect(view.queryByLabelText("Preview Sol Ring as commander")).toBeNull()
   await act(async () => jest.advanceTimersByTime(400))
   expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+    deviceId: expect.any(String),
     game: "mtg",
     query: 'is:commander f:commander kw:"Flying" kw:"Ward"',
   })
@@ -327,6 +335,7 @@ it.each(["commander", "main"])(
     await act(async () => jest.advanceTimersByTime(400))
     expect(mockAction).toHaveBeenCalledTimes(2)
     expect(mockAction).toHaveBeenLastCalledWith(expect.anything(), {
+      deviceId: expect.any(String),
       game: "mtg",
       query:
         section === "commander"
@@ -394,7 +403,10 @@ it.each([
       game: "mtg",
       items: [{ key: "unknown", scryfallId: "unknown" }],
     })
-    expect(mockAction).toHaveBeenCalledWith(expect.anything(), { scryfallId: "unknown" })
+    expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+      scryfallId: "unknown",
+      deviceId: expect.any(String),
+    })
     expect(view.getByLabelText("Preview Unknown as commander")).toBeTruthy()
   },
 )

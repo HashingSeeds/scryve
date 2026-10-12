@@ -5,6 +5,7 @@ import { Image, type ImageStyle } from "expo-image"
 import { useConvex } from "convex/react"
 
 import { Text } from "@/components/Text"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import { convexErrorCode, convexErrorRetryAfterMs } from "@/utils/convexError"
 
@@ -124,7 +125,11 @@ export function CardImage({
             publishPaused(key, failed)
             return
           }
-          const urls = await client.action(api.cards.imageFallbacks, { game, cardId })
+          const urls = await client.action(api.cards.imageFallbacks, {
+            game,
+            cardId,
+            deviceId: new LocalGameRepository().getDeviceId(),
+          })
           publish(key, {
             urls: urls.filter((url) => !failed.has(url)),
             failed,

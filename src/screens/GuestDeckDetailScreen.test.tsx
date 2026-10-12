@@ -295,7 +295,10 @@ test("loads rules text when opening a saved Magic card", async () => {
   const view = renderScreen()
   fireEvent.press(view.getByLabelText("1× Molecule Man"))
   await waitFor(() => expect(view.getByText("Molecule Man rules text")).toBeTruthy())
-  expect(mockSearchCards).toHaveBeenCalledWith({ scryfallId: "molecule-man" })
+  expect(mockSearchCards).toHaveBeenCalledWith({
+    scryfallId: "molecule-man",
+    deviceId: expect.any(String),
+  })
 })
 
 test("shows lookup errors and retries when the saved card is reopened", async () => {

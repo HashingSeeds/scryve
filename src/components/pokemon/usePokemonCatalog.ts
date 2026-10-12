@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react"
 import { useConvex } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { convexErrorMessage } from "@/utils/convexError"
 
 import { api } from "../../../convex/_generated/api"
@@ -17,6 +18,7 @@ const noSubscription = () => {}
 
 export function usePokemonCatalog(query: string) {
   const convex = useConvex()
+  const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   // why: a local game may run with no Convex client at all, which the stock connection hook treats as a bug.
   const online = useSyncExternalStore(
     (listener) => convex?.subscribeToConnectionState(listener) ?? noSubscription,
@@ -37,7 +39,11 @@ export function usePokemonCatalog(query: string) {
     let active = true
     const timer = setTimeout(async () => {
       try {
-        const found = await convex.action(api.cards.search, { game: "pokemon", query: wanted })
+        const found = await convex.action(api.cards.search, {
+          game: "pokemon",
+          query: wanted,
+          deviceId,
+        })
         if (!active) return
         setState({
           query: wanted,
@@ -52,7 +58,7 @@ export function usePokemonCatalog(query: string) {
       active = false
       clearTimeout(timer)
     }
-  }, [convex, searching, wanted])
+  }, [convex, searching, wanted, deviceId])
 
   const current = state.query === wanted ? state : undefined
 
@@ -61,6 +67,7 @@ export function usePokemonCatalog(query: string) {
     const card = await convex.action(api.cards.byCatalogId, {
       game: "pokemon",
       cardId: hit.cardId,
+      deviceId,
     })
     return pokemonCardFromCatalog(card)
   }

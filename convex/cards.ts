@@ -6,7 +6,7 @@ import type { ActionCtx, MutationCtx } from "./_generated/server"
 import { action, internalMutation, internalQuery, query } from "./_generated/server"
 import { actionCapabilityEnabled, requireActionCapability } from "./lib/actionCapabilities"
 import { cardImageCandidates } from "./lib/cardImageFallback"
-import { deckRateLimiter } from "./lib/deckRateLimits"
+import { limitCardLookup } from "./lib/deckRateLimits"
 import type { CatalogCard, NormalizedCard } from "./lib/games/cards"
 import { normalizeScryfallCatalogCard } from "./lib/games/magic"
 import { pokemonCardById, pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
@@ -106,7 +106,7 @@ async function recordHealth(
 }
 
 export const search = action({
-  args: { query: v.string(), game: v.optional(v.string()) },
+  args: { query: v.string(), game: v.optional(v.string()), deviceId: v.optional(v.string()) },
   handler: async (ctx, args): Promise<CardReference[] | CatalogCard[]> => {
     const query = args.query.trim()
     const game = assertGameSystem(args.game ?? "mtg")
@@ -116,15 +116,6 @@ export const search = action({
         message: "Choose fewer filters or shorten your search.",
       })
     if (query.length < 2 || (game !== "mtg" && query.length > 120)) return []
-    if (!(await ctx.auth.getUserIdentity())) {
-      const limit = await deckRateLimiter.limit(ctx, "guestDeckImport")
-      if (!limit.ok)
-        throw new ConvexError({
-          code: "rate_limited",
-          message: `Try searching again in ${Math.ceil(limit.retryAfter / 1000)} seconds.`,
-          retryAfterMs: limit.retryAfter,
-        })
-    }
     await requireActionCapability(ctx, game, "cardCatalog")
     const includeImages = await actionCapabilityEnabled(ctx, game, "images")
     if (game !== "mtg") {
@@ -135,6 +126,7 @@ export const search = action({
       })
       if (cached.length > 0 && (!includeImages || cached.every(hasCatalogImage)))
         return includeImages ? cached : cached.map((card) => catalogWithoutImages(card))
+      await limitCardLookup(ctx, args.deviceId)
       const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
       const startedAt = Date.now()
       try {
@@ -170,6 +162,7 @@ export const search = action({
         })
       }
     }
+    await limitCardLookup(ctx, args.deviceId)
     const path = `/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=name`
     const response = await fetchScryfall(ctx, path)
     if (response.status === 404) return []
@@ -196,10 +189,11 @@ export const search = action({
 })
 
 export const keywordAbilities = action({
-  args: {},
+  args: { deviceId: v.optional(v.string()) },
   returns: v.array(v.string()),
-  handler: async (ctx): Promise<string[]> => {
+  handler: async (ctx, args): Promise<string[]> => {
     await requireActionCapability(ctx, "mtg", "cardCatalog")
+    await limitCardLookup(ctx, args.deviceId)
     const response = await fetchScryfall(ctx, "/catalog/keyword-abilities")
     if (!response.ok)
       throw new ConvexError({
@@ -230,7 +224,7 @@ export const keywordAbilities = action({
 })
 
 export const byCatalogId = action({
-  args: { game: v.string(), cardId: v.string() },
+  args: { game: v.string(), cardId: v.string(), deviceId: v.optional(v.string()) },
   handler: async (ctx, args): Promise<CatalogCard> => {
     const game = assertGameSystem(args.game)
     await requireActionCapability(ctx, game, "cardCatalog")
@@ -248,6 +242,7 @@ export const byCatalogId = action({
       (!includeImages || game === "mtg" || cardId.startsWith("rush:") || hasCatalogImage(cached))
     )
       return includeImages ? cached : catalogWithoutImages(cached)
+    await limitCardLookup(ctx, args.deviceId)
     if (game === "mtg") {
       const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(cardId)}`)
       if (response.status === 404)
@@ -308,7 +303,7 @@ export const byCatalogId = action({
 })
 
 export const byPokemonReference = action({
-  args: { name: v.string(), originalReference: v.string() },
+  args: { name: v.string(), originalReference: v.string(), deviceId: v.optional(v.string()) },
   handler: async (ctx, args): Promise<CatalogCard> => {
     await requireActionCapability(ctx, "pokemon", "cardCatalog")
     const includeImages = await actionCapabilityEnabled(ctx, "pokemon", "images")
@@ -316,7 +311,7 @@ export const byPokemonReference = action({
     const originalReference = args.originalReference.trim()
     if (!name || name.length > 200 || !originalReference || originalReference.length > 80)
       throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card reference" })
-
+    await limitCardLookup(ctx, args.deviceId)
     const startedAt = Date.now()
     const result = await (async () => {
       try {
@@ -368,11 +363,13 @@ function toCardReference(cached: Doc<"cardReferences">): CardReference {
 }
 
 export const byId = action({
-  args: { scryfallId: v.string() },
+  args: { scryfallId: v.string(), deviceId: v.optional(v.string()) },
   handler: async (ctx, args): Promise<CardReference> => {
     if (!/^[0-9a-f-]{36}$/i.test(args.scryfallId))
       throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
-    const cached: Doc<"cardReferences"> | null = await ctx.runQuery(internal.cards.cachedById, args)
+    const cached: Doc<"cardReferences"> | null = await ctx.runQuery(internal.cards.cachedById, {
+      scryfallId: args.scryfallId,
+    })
     if (
       cached &&
       isCompleteReference(cached) &&
@@ -385,6 +382,7 @@ export const byId = action({
     )
       return toCardReference(cached)
     try {
+      await limitCardLookup(ctx, args.deviceId)
       const response = await fetchScryfall(ctx, `/cards/${encodeURIComponent(args.scryfallId)}`)
       if (response.status === 404)
         throw new ConvexError({ code: "card_not_found", message: "Card not found" })
@@ -581,13 +579,14 @@ export const cacheMany = internalMutation({
 })
 
 export const imageFallbacks = action({
-  args: { game: v.string(), cardId: v.string() },
-  handler: async (ctx, { game: gameId, cardId }) => {
+  args: { game: v.string(), cardId: v.string(), deviceId: v.optional(v.string()) },
+  handler: async (ctx, { game: gameId, cardId, deviceId }) => {
     const game = assertGameSystem(gameId)
     await requireActionCapability(ctx, game, "images")
     await requireActionCapability(ctx, game, "cardCatalog")
     if (!cardId.trim() || cardId.length > 200)
       throw new ConvexError({ code: "invalid_card_identifier", message: "Invalid card identifier" })
+    await limitCardLookup(ctx, deviceId)
     return [...new Set(await cardImageCandidates(ctx, game, cardId.trim()))]
   },
 })

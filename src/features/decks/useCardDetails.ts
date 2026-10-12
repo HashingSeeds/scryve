@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useAction, useConvexConnectionState } from "convex/react"
 
 import type { FocusedCardDetails } from "@/components/CardFocusDialog"
+import { LocalGameRepository } from "@/features/game/localPersistence"
 import { convexErrorMessage, convexRetryAfterMs } from "@/utils/convexError"
 
 import { loadCardDetails, readCardDetail, saveCardDetails } from "./cardDetailsCache"
@@ -24,6 +25,7 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
   const byId = useAction(api.cards.byId)
   const byCatalogId = useAction(api.cards.byCatalogId)
   const byPokemonReference = useAction(api.cards.byPokemonReference)
+  const [deviceId] = useState(() => new LocalGameRepository().getDeviceId())
   const connection = useConvexConnectionState()
   const offline = connection?.isWebSocketConnected === false
   const [detailsByKey, setDetailsByKey] = useState<Record<string, FocusedCardDetails>>(() =>
@@ -91,11 +93,11 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
       }
       try {
         const details = magicId
-          ? await byId({ scryfallId: magicId })
+          ? await byId({ scryfallId: magicId, deviceId })
           : catalogCardId
-            ? catalogCardDetails(await byCatalogId({ game, cardId: catalogCardId }))
+            ? catalogCardDetails(await byCatalogId({ game, cardId: catalogCardId, deviceId }))
             : game === "pokemon" && originalReference
-              ? catalogCardDetails(await byPokemonReference({ name, originalReference }))
+              ? catalogCardDetails(await byPokemonReference({ name, originalReference, deviceId }))
               : undefined
         if (!active) return
         if (requireCommanderRules || needsFaces) enrichmentAttempts.current.add(enrichmentKey)
@@ -142,6 +144,7 @@ export function useCardDetails(card?: CardLookup, requireCommanderRules = false)
     byId,
     byCatalogId,
     byPokemonReference,
+    deviceId,
     detailsByKey,
     attempt,
     requireCommanderRules,

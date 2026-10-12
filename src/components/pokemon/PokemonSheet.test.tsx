@@ -105,6 +105,8 @@ describe("PokemonSheet", () => {
       hp: 330,
       prizes: 2,
     })
+    for (const [, args] of mockAction.mock.calls)
+      expect(args).toMatchObject({ deviceId: expect.any(String) })
     expect(screen.getByText("Could not place it. Try again.")).toBeTruthy()
     expect(screen.getByTestId("pokemon-hp-input-seat-1").props.value).toBe("330")
     expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Charizard ex")
