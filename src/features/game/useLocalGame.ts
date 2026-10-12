@@ -12,6 +12,7 @@ import {
   createRematch,
   defaultCommandContext,
   hasLocalGameStarted,
+  hasPlayBegun,
   localTableRules,
   restartMatchGame,
   soleLoserSeat,
@@ -58,8 +59,9 @@ export function useLocalGame(
 
   const dispatch = useCallback(
     (command: GameCommand, endSource?: GameEndSource): LocalGame => {
-      const next = applyGameCommand(gameRef.current, command, context)
-      if (next === gameRef.current) return next
+      const applied = applyGameCommand(gameRef.current, command, context)
+      if (applied === gameRef.current) return applied
+      const next = withFirstPlayerSettled(applied)
       if (next.status === "active") {
         repository.saveActiveGame(next)
         if (!hasLocalGameStarted(gameRef.current) && hasLocalGameStarted(next))
@@ -122,8 +124,9 @@ export function useLocalGame(
         },
         (action, operationId) => {
           const previous = gameRef.current
-          const next = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
-          if (next === previous) return false
+          const applied = applyLocalTableAction(previous, action, { operationId, now: Date.now() })
+          if (applied === previous) return false
+          const next = withFirstPlayerSettled(applied)
           repository.saveActiveGame(next)
           if (!hasLocalGameStarted(previous) && hasLocalGameStarted(next))
             captureGame("game_started", { ...next, playerCount: next.players.length }, "local")
@@ -225,4 +228,11 @@ export function useLocalGame(
       return gameRef.current
     },
   }
+}
+
+/** why: the first point of play closes the first-player offer for good, in the same write as the change itself, so damage healed or a counter cleared never brings the offer back. */
+function withFirstPlayerSettled(game: LocalGame): LocalGame {
+  return !game.firstPlayerOffered && hasPlayBegun(game)
+    ? { ...game, firstPlayerOffered: true }
+    : game
 }

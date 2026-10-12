@@ -258,6 +258,9 @@ describe("CurrentGameScreen", () => {
     expect(view.getByTestId("first-player-badge")).toBeTruthy()
     fireEvent.press(view.getByTestId("pokemon-damage-seat-1-10"))
     expect(view.queryByTestId("first-player-badge")).toBeNull()
+    // why: healing back to zero leaves no trace of play, so the offer is closed by the write that opened play, not derived from the board.
+    fireEvent.press(view.getByTestId("pokemon-damage-seat-1--10"))
+    expect(view.queryByTestId("first-player-badge")).toBeNull()
   })
 
   it("remembers a used offer and a rematch's loser across a reopen", () => {
