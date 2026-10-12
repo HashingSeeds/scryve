@@ -7,7 +7,7 @@ settings:
 patchedDependencies:
   convex-test@0.0.54:
     hash: ad66aa7d478d3750462375942993487a7cd9d38819c0ccb5c9074c721c6d5bd3
-    path: patches/convex-test@0.0.54.patch
+    path: js-patches/convex-test@0.0.54.patch
   react-native-screens@4.26.2:
     hash: e416589d8837665cf8bac9988610f5d20a8c8859ca3f51ff2830c008ff57cbdd
     path: patches/react-native-screens@4.26.2.patch
