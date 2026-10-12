@@ -630,7 +630,7 @@ function GameMenuAnchor({
       {badge && !menuOpen && !suppressed ? (
         <View
           pointerEvents="box-none"
-          style={[$signalBadgeCenter, compact ? $compactStartBadgeCenter : $largeStartBadgeCenter]}
+          style={compact ? $compactStartBadgeCenter : $largeStartBadgeCenter}
         >
           <Animated.View entering={animateFully ? START_BADGE_ENTERING : undefined}>
             <BoardPressable
@@ -1068,8 +1068,15 @@ function signalBadgeAt(buttonSize: number): ViewStyle {
 const $largeSignalBadgeCenter = signalBadgeAt(MENU_BUTTON_SIZE)
 const $compactSignalBadgeCenter = signalBadgeAt(COMPACT_MENU_BUTTON_SIZE)
 // why: the offer takes the upper-left edge, opposite the sync badge, so the two never share a spot.
+// why: the badge has a fixed size, so it is centered on its anchor by offsetting half its size rather than by flex centering in a zero-size box, which iOS left hanging half a badge low.
 function startBadgeAt(buttonSize: number): ViewStyle {
-  return { left: START_BADGE_ANCHOR.x * buttonSize, top: START_BADGE_ANCHOR.y * buttonSize }
+  return {
+    position: "absolute",
+    left: START_BADGE_ANCHOR.x * buttonSize - BADGE_SIZE / 2,
+    top: START_BADGE_ANCHOR.y * buttonSize - BADGE_SIZE / 2,
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+  }
 }
 const $largeStartBadgeCenter = startBadgeAt(MENU_BUTTON_SIZE)
 const $compactStartBadgeCenter = startBadgeAt(COMPACT_MENU_BUTTON_SIZE)
