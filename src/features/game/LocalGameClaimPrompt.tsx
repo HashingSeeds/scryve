@@ -199,7 +199,7 @@ function ClaimPicker({
       <Text
         size="xxs"
         style={themed($dim)}
-        text="Your seat sets your win record and can't be changed later."
+        text="Your seat sets your win record and can't be changed later. No seat records no win or loss."
       />
       {error ? <AlertNote text={error} /> : null}
       <View style={themed($dialogActions)}>
@@ -258,7 +258,7 @@ function SeatMarks({
               testID={`${testID}-seat-${seat}`}
               accessibilityRole="radio"
               accessibilityLabel={mark.label}
-              accessibilityState={{ selected: chosen }}
+              aria-checked={chosen}
               style={[
                 themed($mark),
                 chosen && themed($markChosen),

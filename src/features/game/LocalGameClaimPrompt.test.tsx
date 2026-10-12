@@ -127,12 +127,11 @@ describe("LocalGameClaimPrompt", () => {
     repository.archiveGame(quad)
     setup(repository)
 
-    const chosen = (id: string, seat: number) =>
-      screen.getByTestId(`claim-me-${id}-seat-${seat}`).props.accessibilityState.selected
-    expect(chosen(trio.id, 1)).toBe(false)
+    const mark = (id: string, seat: number) => screen.getByTestId(`claim-me-${id}-seat-${seat}`)
+    expect(mark(trio.id, 1)).not.toBeChecked()
     fireEvent.press(screen.getByTestId("claim-me-all-seat-2"))
-    expect(chosen(trio.id, 2)).toBe(true)
-    expect(chosen(quad.id, 2)).toBe(true)
+    expect(mark(trio.id, 2)).toBeChecked()
+    expect(mark(quad.id, 2)).toBeChecked()
     fireEvent.press(screen.getByTestId(`claim-me-${quad.id}-seat-0`))
     fireEvent.press(screen.getByTestId(`claim-me-${trio.id}-seat-2`))
     fireEvent.press(screen.getByTestId("claim-games-confirm"))
