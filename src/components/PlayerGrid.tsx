@@ -331,6 +331,7 @@ export function PlayerGrid({
                       compact={layout.compact}
                       contentRotation={contentRotation}
                       contentInsets={contentInsets}
+                      touchesBottomEdge={screenEdges.bottom}
                       menuCorner={menuCorner}
                       menuEdgeCenter={fallbackMenu?.edgeCenter}
                       disabled={disabled || playerDisabled}

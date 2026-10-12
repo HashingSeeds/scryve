@@ -55,6 +55,8 @@ export interface PokemonSeatCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  /** why: a seat on the screen's bottom edge is the one the keyboard covers, so its sheet lifts the board. */
+  touchesBottomEdge?: boolean
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   disabled?: boolean
@@ -97,6 +99,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   dice,
   contentRotation = 0,
   contentInsets,
+  touchesBottomEdge,
   menuCorner,
   menuEdgeCenter,
   disabled,
@@ -717,6 +720,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       {sheetMode && canEdit ? (
         <PokemonSheet
           seatNumber={seatNumber}
+          liftsBoard={touchesBottomEdge}
           color={color}
           rotation={contentRotation}
           cardWidth={cardSize.width}

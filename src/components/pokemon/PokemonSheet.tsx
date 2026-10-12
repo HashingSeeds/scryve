@@ -28,6 +28,7 @@ import {
   type PokemonInPlay,
   type PokemonSlot,
 } from "../../../convex/lib/table"
+import { useBoardKeyboardLift } from "../BoardKeyboardLift"
 import { BoardPressable } from "../BoardPressable"
 import { mixColorsInLinearLight } from "../GameMenuButtonShape"
 import { overlayTint } from "../LifeControls"
@@ -40,6 +41,8 @@ export type PokemonSheetMode =
 
 export interface PokemonSheetProps {
   seatNumber: number
+  /** why: only a seat on the screen's bottom edge sits under the keyboard, so only its sheet lifts the board. */
+  liftsBoard?: boolean
   color: string
   rotation: LifeCardContentRotation
   cardWidth: number
@@ -70,6 +73,7 @@ function hitDetail(hit: PokemonSearchHit): string | undefined {
 
 export function PokemonSheet({
   seatNumber,
+  liftsBoard = false,
   color,
   rotation,
   cardWidth,
@@ -88,6 +92,7 @@ export function PokemonSheet({
   onClose,
 }: PokemonSheetProps) {
   const { themed } = useAppTheme()
+  const liftSeat = useBoardKeyboardLift(liftsBoard)
   const sheetColor = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(sheetColor)
   const inkStyle = { color: ink }
@@ -259,6 +264,7 @@ export function PokemonSheet({
           maxLength={120}
           returnKeyType="search"
           onChangeText={setQuery}
+          onFocus={liftSeat}
           inputWrapperStyle={themed($fieldWrapper)}
         />
       ) : null}
@@ -314,6 +320,7 @@ export function PokemonSheet({
             autoCorrect={false}
             maxLength={100}
             onChangeText={setName}
+            onFocus={liftSeat}
             containerStyle={$grow}
             inputWrapperStyle={themed($fieldWrapper)}
           />
@@ -325,6 +332,7 @@ export function PokemonSheet({
             inputMode="numeric"
             keyboardType="number-pad"
             maxLength={3}
+            onFocus={liftSeat}
             onChangeText={(hp) => {
               setEditError(undefined)
               setDraft((current) => ({ ...current, hp }))
