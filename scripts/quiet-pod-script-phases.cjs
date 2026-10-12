@@ -19,11 +19,20 @@ const KNOWN_SCRIPT_PHASES = {
 const ANSI = /\x1b\[[0-9;]*m/g
 const SCRIPT_PHASE_WARNING = /\[!\] (\S+) has added (\d+) script phases?\. Please inspect/
 
-const COCOAPODS_WARNING_MARKER = "[!]"
+const KNOWN_WARNING_BODIES = Object.entries(KNOWN_SCRIPT_PHASES).map(
+  ([pod, count]) =>
+    `${pod} has added ${count} script phase${count === 1 ? "" : "s"}. Please inspect`,
+)
 
 function isKnownScriptPhaseWarning(line) {
   const match = line.replace(ANSI, "").match(SCRIPT_PHASE_WARNING)
   return match !== null && KNOWN_SCRIPT_PHASES[match[1]] === Number(match[2])
+}
+
+function couldBecomeKnownScriptPhaseWarning(partialLine) {
+  if (isKnownScriptPhaseWarning(partialLine)) return true
+  const [, body] = partialLine.replace(ANSI, "").split("[!] ")
+  return body !== undefined && KNOWN_WARNING_BODIES.some((known) => known.startsWith(body))
 }
 
 // why: prompts end without a newline, so a partial line flushes after a pause or when the other stream writes, keeping order.
@@ -33,7 +42,7 @@ function createLineFilter(input, output, filters) {
   const filter = {
     flushPartialLine() {
       clearTimeout(flushTimer)
-      if (pending.replace(ANSI, "").includes(COCOAPODS_WARNING_MARKER)) return
+      if (couldBecomeKnownScriptPhaseWarning(pending)) return
       output.write(pending)
       pending = ""
     },
@@ -83,4 +92,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { isKnownScriptPhaseWarning }
+module.exports = { couldBecomeKnownScriptPhaseWarning, isKnownScriptPhaseWarning }
