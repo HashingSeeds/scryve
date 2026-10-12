@@ -409,6 +409,23 @@ describe("PokemonSeatCard", () => {
     jest.useRealTimers()
   })
 
+  it("lets the focus run out after a long press opens and closes the editor", () => {
+    jest.useFakeTimers()
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    table.actions.placePokemon(me, "active", { name: "Charizard ex", hp: 330, prizes: 2 })
+    const benched = table.actions.placePokemon(me, "bench", { name: "Pikachu", hp: 60, prizes: 1 })!
+    render(<Seat harness={table} seat={0} />)
+
+    fireEvent.press(screen.getByTestId(`pokemon-bench-${benched}`))
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "pressIn")
+    fireEvent(screen.getByTestId("pokemon-damage-seat-1-10"), "longPress")
+    fireEvent.press(screen.getByTestId("pokemon-sheet-done-seat-1"))
+    act(() => void jest.advanceTimersByTime(3_100))
+    expect(screen.queryByTestId("pokemon-hero-bench-tag-seat-1")).toBeNull()
+    jest.useRealTimers()
+  })
+
   it("puts a prize back from a screen reader action or the keyboard", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const onChangePrizes = jest.fn()
@@ -418,6 +435,22 @@ describe("PokemonSeatCard", () => {
     fireEvent(prizes, "accessibilityAction", { nativeEvent: { actionName: "longpress" } })
     fireEvent(prizes, "keyDown", { key: "ArrowUp" })
     expect(onChangePrizes.mock.calls).toEqual([[1], [1]])
+  })
+
+  it("ignores prize shortcuts on a seat this device does not control", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const onChangePrizes = jest.fn()
+    render(
+      <Seat
+        harness={table}
+        seat={0}
+        prizes={4}
+        ownership="unowned"
+        onChangePrizes={onChangePrizes}
+      />,
+    )
+    fireEvent(screen.getByTestId("pokemon-prizes-seat-1"), "keyDown", { key: "ArrowUp" })
+    expect(onChangePrizes).not.toHaveBeenCalled()
   })
 
   it("keeps a bench Pokémon focused when its chip is tapped again", () => {

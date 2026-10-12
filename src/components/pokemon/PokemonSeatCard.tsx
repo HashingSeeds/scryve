@@ -192,6 +192,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     }
   }, [canEdit])
 
+  // why: a long press opens the editor and unmounts the pressed zone before onPressOut, which would leave the focus held for good.
+  useEffect(() => setFocusHeld(false), [controlsLive, focus?.pokemonId])
+
   useEffect(() => {
     if (!focus || focusHeld) return
     const timer = setTimeout(() => setFocus(null), FOCUS_MS)
@@ -301,7 +304,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   }
 
   function putPrizeBack() {
-    if (prizes < STANDARD_PRIZES) onChangePrizes(1)
+    if (controlsLive && prizes < STANDARD_PRIZES) onChangePrizes(1)
   }
 
   function touchFocus(pokemonId: string) {
@@ -904,6 +907,8 @@ function PokemonHero({
               accessibilityRole="button"
               accessibilityLabel={`Edit ${name}`}
               hitSlop={8}
+              onPressIn={() => onHoldChange(true)}
+              onPressOut={() => onHoldChange(false)}
               onPress={onEdit}
               style={({ pressed }) => [
                 themed($inlineAction),
@@ -920,6 +925,8 @@ function PokemonHero({
               accessibilityRole="button"
               accessibilityLabel={`${bench.switchLabel}, ${name} becomes Active`}
               hitSlop={6}
+              onPressIn={() => onHoldChange(true)}
+              onPressOut={() => onHoldChange(false)}
               onPress={bench.onSwitchIn}
               style={({ pressed }) => [
                 themed($switchIn),
