@@ -15,7 +15,6 @@ import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 import { accessibleForeground } from "@/utils/colorContrast"
 import { structurallyEqual } from "@/utils/structurallyEqual"
-import { useElapsedSince } from "@/utils/useElapsedSince"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
@@ -41,16 +40,13 @@ import { COMPACT_DICE_CHIP_HEIGHT, DICE_CHIP_HEIGHT, DiceChips } from "../DiceCh
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
-  COMPACT_PLAYER_MARK_SIZE,
   getLifeLineHeight,
-  PLAYER_MARK_MUTED_OPACITY,
-  PLAYER_MARK_SIZE,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "../playerCardTypes"
-import { MARK_ART_BOUNDS, MARK_VIEW_BOX, PlayerMark } from "../PlayerMark"
+import { SeatIdentity, seatIdentityMetrics, seatMarkArt } from "../SeatIdentity"
 import { Text } from "../Text"
 
 export interface PokemonSeatCardProps {
@@ -146,10 +142,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const chipClearance = diceChips?.length
     ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
     : 0
-  const markSize = cramped ? COMPACT_PLAYER_MARK_SIZE : PLAYER_MARK_SIZE
-  const markArt = MARK_ART_BOUNDS[shape ?? shapeForSeat(seatNumber)]
-  const markScale = markSize / MARK_VIEW_BOX
-  const prizeRowHeight = (markArt.bottom - markArt.top) * markScale
+  const identityMetrics = seatIdentityMetrics(cramped)
+  // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
+  const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
+  const bottomRowLift = identityMetrics.edge - padding
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)
@@ -168,8 +164,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     returnFocusTo.current = from
     setSheet(next)
   }
-  const elapsed = useElapsedSince(staleSince)
-
   const editing = sheet?.kind === "edit" ? findPokemon(board, sheet.pokemonId) : undefined
   const sheetMode: PokemonSheetMode | null =
     sheet?.kind === "place"
@@ -345,6 +339,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       chipClearance -
       benchHeight -
       prizeRowHeight -
+      bottomRowLift -
       (cramped ? COMPACT_HERO_CAPTION_HEIGHT : HERO_CAPTION_HEIGHT),
     digits: heroDigits,
     fontScale: 1,
@@ -358,7 +353,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     themed($bar),
     {
       backgroundColor: ink === "#FFFFFF" ? BAR_ON_DARK : BAR_ON_LIGHT,
-      bottom: padding + insets.bottom + prizeRowHeight,
+      bottom: padding + insets.bottom + bottomRowLift + prizeRowHeight,
     },
   ]
   const barInk = ink
@@ -405,21 +400,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           !readyToLayout && $hidden,
         ]}
       >
-        {/* why: drawn first so it sits behind the controls; drawn later it covers bench and prize tap targets. */}
-        <PlayerMark
-          seatNumber={seatNumber}
-          shape={shape}
-          color={ink}
-          spinning={ownership === "owned"}
-          size={markSize}
-          style={[
-            themed($mark),
-            {
-              left: padding + insets.left,
-              bottom: padding + insets.bottom - (MARK_VIEW_BOX - markArt.bottom) * markScale,
-            },
-          ]}
-        />
         <View
           testID={`pokemon-bench-seat-${seatNumber}`}
           accessibilityLabel={`${identity}, bench, ${board.bench.length} of ${rules.benchSize}`}
@@ -550,25 +530,18 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           </BoardPressable>
         )}
 
-        <View style={[themed($bottomRow), { height: prizeRowHeight }]}>
-          <View style={[$identity, { marginLeft: markSize + spacing.xs }]}>
-            <Text
-              testID={`player-name-seat-${seatNumber}`}
-              text={displayName}
-              size="xxs"
-              numberOfLines={1}
-              style={[{ color: ink }, $dim75]}
-            />
-            {elapsed ? (
-              <Text
-                text={`Updated ${elapsed} ago`}
-                size="xxs"
-                weight="bold"
-                numberOfLines={1}
-                style={{ color: ink }}
-              />
-            ) : null}
-          </View>
+        {/* why: prizes are the score; the pips sit two by three like the cards do, so the count reads at a glance without a number. */}
+        <View style={[themed($bottomRow), { height: prizeRowHeight, marginBottom: bottomRowLift }]}>
+          <SeatIdentity
+            seatNumber={seatNumber}
+            playerName={displayName}
+            shape={shape}
+            color={ink}
+            compact={cramped}
+            spinning={ownership === "owned"}
+            staleSince={staleSince}
+            style={[$identity, { marginLeft: bottomRowLift }]}
+          />
           <BoardPressable
             testID={`pokemon-prizes-seat-${seatNumber}`}
             accessibilityRole={controlsLive ? "button" : undefined}
@@ -1103,7 +1076,7 @@ const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
-const $identity: ViewStyle = { flex: 1, minWidth: 0, alignItems: "flex-start" }
+const $identity: ViewStyle = { flex: 1, minWidth: 0 }
 const $drainTrack: ViewStyle = {
   alignSelf: "stretch",
   height: 2,
@@ -1181,11 +1154,6 @@ const $captionRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexWrap: "wrap",
   columnGap: spacing.xs,
   maxWidth: "100%",
-})
-const $mark: ThemedStyle<ViewStyle> = () => ({
-  position: "absolute",
-  zIndex: 0,
-  opacity: PLAYER_MARK_MUTED_OPACITY,
 })
 const $inlineAction: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingHorizontal: spacing.xxs,
