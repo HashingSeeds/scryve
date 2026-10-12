@@ -392,6 +392,7 @@ function parseRecord(content) {
   }
 }
 
+// why: readers outside the lock must never see a half-written record, so write a temp file and rename it into place.
 function writeRecord(record) {
   fs.mkdirSync(stateDir, { recursive: true })
   const { identity } = processInfo(process.pid) ?? {}

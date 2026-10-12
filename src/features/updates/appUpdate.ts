@@ -87,6 +87,7 @@ export function updateChannelLabel() {
   return switchedChannel ? `${running} (${switchedChannel} after restart)` : running
 }
 
+// why: overriding works on existing store builds because EAS Build embeds this header key.
 export function setBetaUpdates(enabled: boolean) {
   try {
     Updates.setUpdateRequestHeadersOverride(enabled ? { "expo-channel-name": BETA_CHANNEL } : null)
