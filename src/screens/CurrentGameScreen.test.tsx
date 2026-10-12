@@ -59,6 +59,8 @@ function layoutSeats(view: ReturnType<typeof render>, prefix = "life-card-seat")
 
 describe("CurrentGameScreen", () => {
   beforeEach(() => jest.mocked(Haptics.impactAsync).mockClear())
+  // why: Math.random spies must not leak into later tests when an assertion fails first.
+  afterEach(() => jest.restoreAllMocks())
 
   it("renders changes immediately and allows negative life", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
@@ -177,7 +179,7 @@ describe("CurrentGameScreen", () => {
   })
 
   it("arms a die from the menu and rolls it for the tapped seat, leaving a chip", () => {
-    const random = jest.spyOn(Math, "random").mockReturnValue(0.5)
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderGame()
     layoutSeats(view)
     fireEvent.press(view.getByTestId("game-menu-button"))
@@ -192,12 +194,11 @@ describe("CurrentGameScreen", () => {
     expect(view.queryByTestId("dice-seat-1")).toBeNull()
     expect(view.getByTestId("life-seat-1-1")).toBeTruthy()
     expect(view.getByTestId("dice-chip-1-d20")).toHaveTextContent("11")
-    random.mockRestore()
   })
 
   it("offers the first-player roll only while the game is fresh, and its chip leaves on the first life change", () => {
     const rolls = [0.9, 0.1]
-    const random = jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
     const view = renderGame()
     layoutSeats(view)
     expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
@@ -212,7 +213,6 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("life-seat-2-1"))
     expect(view.queryByTestId("dice-chip-1-first")).toBeNull()
     expect(view.queryByTestId("first-player-badge")).toBeNull()
-    random.mockRestore()
 
     const inProgress = renderGame({
       ...game(),
@@ -267,7 +267,7 @@ describe("CurrentGameScreen", () => {
     const repository = new LocalGameRepository(new MemoryStorage())
     repository.saveActiveGame(game())
     const rolls = [0.9, 0.1]
-    const random = jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
+    jest.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? 0)
     const first = render(
       <ThemeProvider initialContext="light">
         <CurrentGameScreen
@@ -279,7 +279,6 @@ describe("CurrentGameScreen", () => {
     )
     fireEvent.press(first.getByTestId("first-player-badge"))
     first.unmount()
-    random.mockRestore()
 
     const reopened = render(
       <ThemeProvider initialContext="light">
@@ -313,7 +312,7 @@ describe("CurrentGameScreen", () => {
   })
 
   it("flips a coin for Pokémon and lets the winner choose first or second", () => {
-    const random = jest.spyOn(Math, "random").mockReturnValue(0.5)
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
     const view = renderGame(game(2, "pokemon"))
     layoutSeats(view, "pokemon-card-seat")
     expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
@@ -327,7 +326,6 @@ describe("CurrentGameScreen", () => {
     fireEvent.press(view.getByTestId("dice-go-second"))
     expect(view.getByTestId("dice-chip-1-first")).toHaveTextContent("1st")
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
-    random.mockRestore()
   })
 
   it("hands a rematch's first choice to the player who lost", () => {

@@ -815,6 +815,8 @@ function RadialAction({
         style={[themed($actionAnchor), anchorStyle, animatedStyle]}
         pointerEvents={open ? "box-none" : "none"}
         aria-hidden={!open}
+        accessibilityElementsHidden={!open}
+        importantForAccessibility={open ? "auto" : "no-hide-descendants"}
       >
         <View pointerEvents="box-none" style={[themed($action), { backgroundColor: background }]}>
           <RadialToolRow
@@ -834,6 +836,8 @@ function RadialAction({
       style={[themed($actionAnchor), anchorStyle, animatedStyle]}
       pointerEvents={open ? "auto" : "none"}
       aria-hidden={!open}
+      accessibilityElementsHidden={!open}
+      importantForAccessibility={open ? "auto" : "no-hide-descendants"}
     >
       <BoardPressable
         testID={open ? `${action.kind}-button` : undefined}
