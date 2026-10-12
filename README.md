@@ -99,6 +99,12 @@ pnpm run build:ios:prod     # iOS, production profile
 
 Each has an Android equivalent (`build:android:sim`, `build:android:dev`, `build:android:preview`, `build:android:prod`).
 
+Builds land in `build/` (for example `build/ios-dev.ipa`). Each one has a matching `upload:` script that sends that file to EAS with project metadata through `eas-local`, a fork of eas-cli that must be on your PATH:
+
+```bash
+pnpm run build:ios:dev && pnpm run upload:ios:dev
+```
+
 ## Running Maestro end-to-end tests
 
 Maestro drives the installed iOS or Android development build through native accessibility, so no
