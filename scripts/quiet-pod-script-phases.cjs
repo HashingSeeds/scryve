@@ -53,6 +53,7 @@ function createLineFilter(input, output, filters) {
   input.on("end", () => {
     clearTimeout(flushTimer)
     if (!isKnownScriptPhaseWarning(pending)) output.write(pending)
+    pending = ""
   })
 }
 
