@@ -52,7 +52,7 @@ function renderGate(onResolved?: () => void) {
 }
 
 function clearAccountAcceptanceCache() {
-  storage.delete(LEGAL_ACCOUNT_ACCEPTANCE_KEY)
+  storage.remove(LEGAL_ACCOUNT_ACCEPTANCE_KEY)
 }
 
 function deferred<T>() {
@@ -73,7 +73,7 @@ describe("LegalConsentGate", () => {
     mockRecordAcceptance.mockResolvedValue({ acceptedAt: 0 })
     accountAcceptanceCache.write("user-a", {})
     accountAcceptanceCache.write("user-b", {})
-    storage.delete(LEGAL_ACCOUNT_PENDING_CONSENT_KEY)
+    storage.remove(LEGAL_ACCOUNT_PENDING_CONSENT_KEY)
     mockPush.mockClear()
     deviceAcceptanceStore.write({})
   })

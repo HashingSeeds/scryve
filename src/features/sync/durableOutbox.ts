@@ -42,7 +42,7 @@ export interface DurableStringStorage {
   getString(key: string): string | undefined
   getAllKeys(): string[]
   set(key: string, value: string): void
-  delete(key: string): void
+  remove(key: string): void
 }
 
 export interface DurableOutboxLimits {
@@ -380,7 +380,7 @@ export class DurableOutbox<
           this.codec.operationId(failed.action) === operationId &&
           this.codec.belongsToScope(failed.action, this.ownerId, scopeId)
         ) {
-          if (action) this.storage.delete(pendingKey)
+          if (action) this.storage.remove(pendingKey)
           else this.quarantine(pendingKey, "pending", quarantined)
           continue
         }
@@ -417,7 +417,7 @@ export class DurableOutbox<
   }
 
   acknowledge(scopeId: string, operationId: string): void {
-    this.storage.delete(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
+    this.storage.remove(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
     const index = stringIndex(
       parsedJson(this.storage.getString(this.keys.pendingIndex(scopeId, this.ownerId))),
     ).filter((candidate) => candidate !== operationId)
@@ -486,7 +486,7 @@ export class DurableOutbox<
     const nextPending = pending.filter(
       (candidate) => this.codec.operationId(candidate) !== operationId,
     )
-    this.storage.delete(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
+    this.storage.remove(this.keys.pendingRecord(scopeId, operationId, this.ownerId))
     this.storage.set(
       this.keys.pendingIndex(scopeId, this.ownerId),
       JSON.stringify(nextPending.map((candidate) => this.codec.operationId(candidate))),
@@ -555,7 +555,7 @@ export class DurableOutbox<
         ),
       })
     }
-    this.storage.delete(key)
+    this.storage.remove(key)
   }
 
   /** why: quarantine is otherwise silent; one report per load pass carries enough structure to write a recovering codec, never record values. */
@@ -570,7 +570,7 @@ export class DurableOutbox<
   }
 
   dismissFailed(scopeId: string, operationId: string): void {
-    this.storage.delete(this.keys.failedRecord(scopeId, operationId, this.ownerId))
+    this.storage.remove(this.keys.failedRecord(scopeId, operationId, this.ownerId))
     const index = stringIndex(
       parsedJson(this.storage.getString(this.keys.failedIndex(scopeId, this.ownerId))),
     ).filter((candidate) => candidate !== operationId)

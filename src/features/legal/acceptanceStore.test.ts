@@ -15,7 +15,7 @@ function memoryStorage(seed: Record<string, string> = {}): StringStorage {
   return {
     getString: (key) => values.get(key),
     set: (key, value) => void values.set(key, value),
-    delete: (key) => void values.delete(key),
+    remove: (key) => void values.delete(key),
   }
 }
 

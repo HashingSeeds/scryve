@@ -514,7 +514,7 @@ describe("SettingsScreen", () => {
     const settings = new LocalGameRepository({
       getString: (key) => stored.get(key),
       set: (key, value) => stored.set(key, value),
-      delete: (key) => stored.delete(key),
+      remove: (key) => stored.delete(key),
     }).loadSettings()
     const onSettingsChange = jest.fn()
     const view = render(

@@ -11,7 +11,7 @@ import { api } from "../../../convex/_generated/api"
 export interface CardDetailStore {
   getString(key: string): string | undefined
   set(key: string, value: string): void
-  delete(key: string): void
+  remove(key: string): void
 }
 
 const DETAILS_KEY = "scryve.cards.details.v1"
@@ -64,7 +64,7 @@ export function readCardDetail(
 
 export function clearCardDetails(store: CardDetailStore = storage): void {
   try {
-    store.delete(DETAILS_KEY)
+    store.remove(DETAILS_KEY)
   } catch (error) {
     console.error("[card-details-cache] failed to clear", error)
   }

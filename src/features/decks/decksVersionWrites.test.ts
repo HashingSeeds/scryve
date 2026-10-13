@@ -43,7 +43,7 @@ class MemoryStorage implements DurableStringStorage {
     this.values.set(key, value)
   }
 
-  delete(key: string) {
+  remove(key: string) {
     this.values.delete(key)
   }
 }

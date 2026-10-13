@@ -92,7 +92,7 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
 export interface StringStorage {
   getString(key: string): string | undefined
   set(key: string, value: string): void
-  delete(key: string): void
+  remove(key: string): void
 }
 
 interface ActiveMetadata {
@@ -538,7 +538,7 @@ export class LocalGameRepository {
     const found = current ?? legacy
     const settings = found ? migrateBrawlStartingLife(found) : DEFAULT_LOCAL_SETTINGS
     this.saveSettings(settings)
-    if (legacy) this.storage.delete(LOCAL_KEYS.legacySettings)
+    if (legacy) this.storage.remove(LOCAL_KEYS.legacySettings)
     return settings
   }
 
@@ -586,7 +586,7 @@ export class LocalGameRepository {
       )
     }
     for (let index = chunkCount; index < previousChunkCount; index += 1) {
-      this.storage.delete(LOCAL_KEYS.activeEvents(index))
+      this.storage.remove(LOCAL_KEYS.activeEvents(index))
     }
   }
 
@@ -643,9 +643,9 @@ export class LocalGameRepository {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.active))
     const chunkCount =
       isRecord(raw) && typeof raw.eventChunkCount === "number" ? raw.eventChunkCount : 0
-    this.storage.delete(LOCAL_KEYS.active)
+    this.storage.remove(LOCAL_KEYS.active)
     for (let index = 0; index < chunkCount; index += 1) {
-      this.storage.delete(LOCAL_KEYS.activeEvents(index))
+      this.storage.remove(LOCAL_KEYS.activeEvents(index))
     }
   }
 
@@ -814,7 +814,7 @@ export class LocalGameRepository {
   }
 
   savePendingMatchEnd(matchId: string | undefined): void {
-    if (matchId === undefined) this.storage.delete(LOCAL_KEYS.pendingMatchEnd)
+    if (matchId === undefined) this.storage.remove(LOCAL_KEYS.pendingMatchEnd)
     else this.storage.set(LOCAL_KEYS.pendingMatchEnd, matchId)
   }
 
@@ -866,7 +866,7 @@ export class LocalGameRepository {
     this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(next))
     previous
       .filter(({ id }) => !next.some((game) => game.id === id))
-      .forEach(({ id }) => this.storage.delete(LOCAL_KEYS.historyDetail(id)))
+      .forEach(({ id }) => this.storage.remove(LOCAL_KEYS.historyDetail(id)))
   }
 
   loadHistory(): LocalGameSummary[] {

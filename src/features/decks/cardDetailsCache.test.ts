@@ -18,7 +18,7 @@ function memoryStore(): CardDetailStore {
     set: (key, value) => {
       values.set(key, value)
     },
-    delete: (key) => {
+    remove: (key) => {
       values.delete(key)
     },
   }

@@ -464,7 +464,7 @@ export class ConnectedGameRepository {
     if (!isRecord(stored) || stored.schemaVersion !== 1) return null
     const projection = toConnectedProjection(stored)
     if (projection && projection.publicId !== gameId) {
-      this.storage.delete(key)
+      this.storage.remove(key)
       return null
     }
     return projection
@@ -616,11 +616,11 @@ export class ConnectedGameRepository {
       CONNECTED_KEYS.failedRecord(gameId, "", this.ownerId),
     ]
     for (const key of this.storage.getAllKeys()) {
-      if (recordPrefixes.some((prefix) => key.startsWith(prefix))) this.storage.delete(key)
+      if (recordPrefixes.some((prefix) => key.startsWith(prefix))) this.storage.remove(key)
     }
-    this.storage.delete(CONNECTED_KEYS.projection(gameId, this.ownerId))
-    this.storage.delete(CONNECTED_KEYS.outboxIndex(gameId, this.ownerId))
-    this.storage.delete(CONNECTED_KEYS.failedIndex(gameId, this.ownerId))
+    this.storage.remove(CONNECTED_KEYS.projection(gameId, this.ownerId))
+    this.storage.remove(CONNECTED_KEYS.outboxIndex(gameId, this.ownerId))
+    this.storage.remove(CONNECTED_KEYS.failedIndex(gameId, this.ownerId))
     return true
   }
 
@@ -640,6 +640,6 @@ export class ConnectedGameRepository {
       } else remaining.push(candidate)
     }
     if (remaining.length) this.storage.set(legacyKey, JSON.stringify(remaining))
-    else this.storage.delete(legacyKey)
+    else this.storage.remove(legacyKey)
   }
 }

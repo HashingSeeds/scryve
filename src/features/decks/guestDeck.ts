@@ -143,7 +143,7 @@ function readStore() {
 function migrateLegacyDeck(decks: GuestDeck[]) {
   if (!saveString(GUEST_DECKS_KEY, JSON.stringify(decks))) return false
   try {
-    storage.delete(LEGACY_GUEST_DECK_KEY)
+    storage.remove(LEGACY_GUEST_DECK_KEY)
     return true
   } catch {
     return false
@@ -234,8 +234,8 @@ export function deleteGuestDeck(localId: string) {
 
 export function clearGuestDecks() {
   try {
-    storage.delete(GUEST_DECKS_KEY)
-    storage.delete(LEGACY_GUEST_DECK_KEY)
+    storage.remove(GUEST_DECKS_KEY)
+    storage.remove(LEGACY_GUEST_DECK_KEY)
   } catch {
     throw new GuestDeckStorageError("Unable to delete guest decks.")
   }

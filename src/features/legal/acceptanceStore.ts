@@ -79,7 +79,7 @@ export class AccountConsentSyncStore {
     const accounts = this.all()
     delete accounts[userId]
     if (Object.keys(accounts).length === 0) {
-      this.storage.delete(LEGAL_ACCOUNT_PENDING_CONSENT_KEY)
+      this.storage.remove(LEGAL_ACCOUNT_PENDING_CONSENT_KEY)
       return
     }
     this.storage.set(LEGAL_ACCOUNT_PENDING_CONSENT_KEY, JSON.stringify(accounts))
