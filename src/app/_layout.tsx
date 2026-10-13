@@ -62,6 +62,8 @@ function Root() {
   useEffect(() => {
     if (ready && isConsentResolved) {
       AppMetrics.markInteractive()
+      // why: scripts/measure-native.cjs times cold starts to this logcat line.
+      console.info("scryve:interactive")
       initAnalytics()
     }
   }, [isConsentResolved, ready])
