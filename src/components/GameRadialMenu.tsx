@@ -629,7 +629,7 @@ function GameMenuAnchor({
               testID="first-player-badge"
               accessibilityRole="button"
               accessibilityLabel={badge.accessibilityLabel}
-              hitSlop={9}
+              hitSlop={START_BADGE_HIT_SLOP}
               onPress={badge.onPress}
               style={({ pressed }) => [
                 themed($startBadge),
@@ -1073,6 +1073,8 @@ function startBadgeAt(buttonSize: number): ViewStyle {
     height: BADGE_SIZE,
   }
 }
+// why: the badge sits up and left of the menu button's center, so slop toward the bottom or right would catch center taps meant to open the menu.
+const START_BADGE_HIT_SLOP = { top: 9, left: 9, bottom: 0, right: 0 }
 const $largeStartBadgeCenter = startBadgeAt(MENU_BUTTON_SIZE)
 const $compactStartBadgeCenter = startBadgeAt(COMPACT_MENU_BUTTON_SIZE)
 const $startBadge: ThemedStyle<ViewStyle> = ({ colors }) => ({
