@@ -21,7 +21,7 @@ describe("PlayerMark", () => {
     },
   )
   it.each([
-    [1, "circle"],
+    [1, "heart"],
     [2, "triangle"],
     [3, "square"],
     [4, "diamond"],
@@ -72,7 +72,7 @@ describe("PlayerMark", () => {
   })
 
   it.each([
-    [1, "circle"],
+    [1, "heart"],
     [2, "triangle"],
     [3, "square"],
     [4, "diamond"],

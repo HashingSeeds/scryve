@@ -1,4 +1,5 @@
 import {
+  ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
   appearanceIsTaken,
   CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
@@ -14,13 +15,15 @@ const RED = PLAYER_COLOR_CHOICES[0]
 const BLUE = PLAYER_COLOR_CHOICES[1]
 
 describe("player appearance", () => {
-  it("keeps legacy seat defaults readable while offering heart for new local games", () => {
-    expect(shapeForSeat(1)).toBe("circle")
+  it("defaults seat one to heart while keeping legacy circle readable", () => {
+    expect(shapeForSeat(1)).toBe("heart")
     expect(shapeForSeat(2)).toBe("triangle")
     expect(shapeForSeat(7)).toBe(shapeForSeat(1))
     expect(shapeForSeat(1, PLAYER_MARK_SHAPES)).toBe("heart")
     expect(PLAYER_MARK_SHAPES).toHaveLength(8)
     expect(PLAYER_MARK_SHAPES).not.toContain("circle")
+    expect(CONNECTED_PLAYER_MARK_SHAPES).not.toContain("circle")
+    expect(ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES).toContain("circle")
     expect(isPlayerMarkShape("circle")).toBe(true)
     expect(isPlayerMarkShape("heart")).toBe(true)
     expect(isPlayerMarkShape("plus")).toBe(true)
@@ -40,13 +43,13 @@ describe("player appearance", () => {
   })
 
   it("preserves each available preference when the other one conflicts", () => {
-    const taken = [{ color: RED, shape: "circle" as const }]
+    const taken = [{ color: RED, shape: "heart" as const }]
     expect(resolveAppearance({ preferred: { color: RED, shape: "star" }, taken, seat: 2 })).toEqual(
       { color: BLUE, shape: "star" },
     )
     expect(
       resolveAppearance({
-        preferred: { color: BLUE, shape: "circle" },
+        preferred: { color: BLUE, shape: "heart" },
         taken,
         seat: 2,
         shapes: CONNECTED_PLAYER_MARK_SHAPES,
@@ -74,19 +77,27 @@ describe("player appearance", () => {
     expect(resolveAppearance({ taken: [], seat: 2 })).toEqual({ color: BLUE, shape: "triangle" })
   })
 
-  it.each(["heart", "plus", "shield"] as const)(
-    "maps local %s to a compatible hosted mark",
-    (shape) => {
-      expect(
-        resolveAppearance({
-          preferred: { color: BLUE, shape },
-          taken: [],
-          seat: 2,
-          shapes: CONNECTED_PLAYER_MARK_SHAPES,
-        }),
-      ).toEqual({ color: BLUE, shape: "circle" })
-    },
-  )
+  it.each(["plus", "shield"] as const)("maps local %s to a compatible hosted mark", (shape) => {
+    expect(
+      resolveAppearance({
+        preferred: { color: BLUE, shape },
+        taken: [],
+        seat: 2,
+        shapes: CONNECTED_PLAYER_MARK_SHAPES,
+      }),
+    ).toEqual({ color: BLUE, shape: "heart" })
+  })
+
+  it("keeps a legacy circle the server still accepts", () => {
+    expect(
+      resolveAppearance({
+        preferred: { color: BLUE, shape: "circle" },
+        taken: [],
+        seat: 1,
+        shapes: ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+      }),
+    ).toEqual({ color: BLUE, shape: "circle" })
+  })
 
   it("fails instead of reusing an appearance when either catalog is exhausted", () => {
     const taken = PLAYER_MARK_SHAPES.map((shape, index) => ({

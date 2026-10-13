@@ -775,7 +775,7 @@ describe("published player appearances", () => {
     await expect(host.mutation(api.games.publishLocalGame, args)).resolves.toEqual(created)
   })
 
-  it("maps new local marks to distinct marks supported by installed clients", async () => {
+  it("maps local-only marks to distinct hosted marks", async () => {
     const t = makeConvexTest()
     const { host, created } = await published(t, {
       players: baseSnapshot.players.map((player, index) => ({
@@ -784,6 +784,6 @@ describe("published player appearances", () => {
       })),
     })
     const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
-    expect(projection.players.map(({ shape }) => shape)).toEqual(["circle", "triangle"])
+    expect(projection.players.map(({ shape }) => shape)).toEqual(["heart", "triangle"])
   })
 })

@@ -610,7 +610,7 @@ describe("ConnectedLobbyScreen", () => {
     expect(screen.getByTestId("appearance-shape-square")).toBeDisabled()
     expect(screen.getByTestId("appearance-color-39755c")).toBeDisabled()
     expect(screen.queryByTestId("appearance-shape-plus")).toBeNull()
-    expect(screen.queryByTestId("appearance-shape-heart")).toBeNull()
+    expect(screen.queryByTestId("appearance-shape-circle")).toBeNull()
     expect(screen.getByTestId("appearance-shape-star")).toBeEnabled()
 
     fireEvent.press(screen.getByTestId("appearance-shape-star"))
