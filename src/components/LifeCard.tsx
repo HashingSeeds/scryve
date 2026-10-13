@@ -56,7 +56,12 @@ import {
   type LifeCardMenuEdge,
 } from "./playerCardTypes"
 import { PlayerMark } from "./PlayerMark"
-import { SeatIdentity, seatIdentityMetrics, seatMarkArt } from "./SeatIdentity"
+import {
+  SeatIdentity,
+  seatIdentityBottomGap,
+  seatIdentityMetrics,
+  seatMarkArt,
+} from "./SeatIdentity"
 import { Text } from "./Text"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
 
@@ -812,13 +817,14 @@ export function seatIdentityPlacement({
   const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
   const inset = insets?.[bottomEdge] ?? 0
   const contentHeight = sideways ? width : height
+  const raised = seatIdentityBottomGap(gap, inset) + inset
   // why: a mid-edge notch or home indicator truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
-  const roomAboveCutout = gap + inset + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
+  const roomAboveCutout = raised + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
   const underCutout = spansScreenEdge && inset > 0
   const cutoutAtMiddle = underCutout && roomAboveCutout
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
   const bottom = cutoutAtMiddle
-    ? gap + inset
+    ? raised
     : cornerOffset(gap, bottomEdge, leftEdge, insets, screenEdges)
   const run = sideways ? height : width
   const layer: ViewStyle | undefined = sideways

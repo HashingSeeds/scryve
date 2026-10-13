@@ -19,6 +19,10 @@ export function seatIdentityMetrics(compact?: boolean) {
   return compact ? SEAT_IDENTITY.compact : SEAT_IDENTITY.regular
 }
 
+export function seatIdentityBottomGap(edge: number, inset: number) {
+  return inset > 0 ? edge / 2 : edge
+}
+
 export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {
   const scale = seatIdentityMetrics(compact).mark / MARK_VIEW_BOX
   const art = MARK_ART_BOUNDS[shape]

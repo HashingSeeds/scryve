@@ -116,6 +116,25 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
   })
 
+  it.each([
+    { rotation: 0, insets: { top: 0, bottom: 0, left: 0, right: 0 }, offset: 16 },
+    { rotation: 0, insets: { top: 0, bottom: 34, left: 0, right: 0 }, offset: 34 + 8 },
+    { rotation: 180, insets: { top: 59, bottom: 0, left: 0, right: 0 }, offset: 59 + 8 },
+  ] as const)(
+    "sits the bottom row $offset from a $rotation degree seat's bottom",
+    ({ rotation, insets, offset }) => {
+      const table = pokemonTable(["Ada", "Grace"])
+      render(<Seat harness={table} seat={0} contentRotation={rotation} contentInsets={insets} />)
+      fireEvent(screen.getByTestId("pokemon-card-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 422 } },
+      })
+
+      const layer = StyleSheet.flatten(screen.getByTestId("pokemon-layer-seat-1").props.style)
+      const row = StyleSheet.flatten(screen.getByTestId("pokemon-bottom-row-seat-1").props.style)
+      expect((layer.paddingBottom as number) + (row.marginBottom as number)).toBe(offset)
+    },
+  )
+
   it("drops its controls from touch and screen readers while dice sit on the seat", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const onPress = jest.fn()
