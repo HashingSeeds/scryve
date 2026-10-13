@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { GestureResponderEvent, TextStyle, ViewStyle } from "react-native"
-import { ScrollView, TouchableOpacity, View } from "react-native"
+import { ScrollView, TouchableOpacity, useWindowDimensions, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AlertNote } from "@/components/AlertNote"
@@ -180,6 +180,7 @@ export function NewGameScreen({
     theme: { colors, spacing },
   } = useAppTheme()
   const { bottom } = useSafeAreaInsets()
+  const { fontScale } = useWindowDimensions()
   const [playerCount, setPlayerCount] = useState(
     initialGame?.players.length ?? defaults.defaultPlayerCount,
   )
@@ -309,6 +310,8 @@ export function NewGameScreen({
     connectedMode || !onResumeConnected ? undefined : connectedGames.find((game) => game.isHost)
   /** Only a running local game can be handed to the server; a connected one is already there. */
   const canConnectLocal = Boolean(localConnect) && !connectedMode && localGameBlocksStart
+  const footerRow =
+    (canConnectLocal || Boolean(localMatchEnd)) && fontScale <= FOOTER_ROW_MAX_FONT_SCALE
   const directResume =
     localGameBlocksStart || Boolean(resumeGame && connected?.ready && !connected.error)
 
@@ -751,7 +754,7 @@ export function NewGameScreen({
           </Screen>
           <View style={[themed($footer), { paddingBottom: Math.max(bottom, spacing.sm) }]}>
             <View style={themed($footerContent)}>
-              <View style={canConnectLocal || localMatchEnd ? themed($footerActions) : undefined}>
+              <View style={themed(footerRow ? $footerActions : $footerStack)}>
                 <Button
                   testID={connectedMode ? "host-connected-button" : "start-game-button"}
                   text={
@@ -765,8 +768,9 @@ export function NewGameScreen({
                   }
                   tx={connectedMode || gameBlocksStart ? undefined : "game:startGame"}
                   preset="reversed"
+                  TextProps={$footerButtonText}
                   style={[
-                    (canConnectLocal || localMatchEnd) && themed($footerAction),
+                    footerRow && themed($footerAction),
                     gameBlocksStart && themed($endCurrentButton),
                   ]}
                   textStyle={gameBlocksStart ? themed($endCurrentButtonText) : undefined}
@@ -808,7 +812,8 @@ export function NewGameScreen({
                   <Button
                     testID="end-match-setup-button"
                     text="End match…"
-                    style={themed($footerAction)}
+                    TextProps={$footerButtonText}
+                    style={footerRow ? themed($footerAction) : undefined}
                     accessibilityHint="Records the match result from its last finished game"
                     onPress={() => setEndingMatch(true)}
                   />
@@ -817,8 +822,9 @@ export function NewGameScreen({
                   <Button
                     testID="connect-local-button"
                     text={localConnect?.access?.label ?? "Connect"}
+                    TextProps={$footerButtonText}
                     preset="reversed"
-                    style={themed($footerAction)}
+                    style={footerRow ? themed($footerAction) : undefined}
                     disabled={localConnect?.busy || localConnect?.ready === false}
                     accessibilityHint="Moves this game to the cloud so others can join it"
                     onPress={() =>
@@ -863,6 +869,7 @@ export function NewGameScreen({
                     accessibilityLiveRegion="polite"
                     size="xs"
                     numberOfLines={1}
+                    maxFontSizeMultiplier={FOOTER_MAX_FONT_SCALE}
                     text={statusText}
                     style={themed(
                       directResume || (connectedMode && hasStatusDetails)
@@ -1118,6 +1125,9 @@ const $appearanceButton: ThemedStyle<ViewStyle> = () => ({
   alignItems: "center",
   justifyContent: "center",
 })
+const FOOTER_ROW_MAX_FONT_SCALE = 1.4
+const FOOTER_MAX_FONT_SCALE = 2
+const $footerButtonText = { maxFontSizeMultiplier: FOOTER_MAX_FONT_SCALE }
 const $footer: ThemedStyle<ViewStyle> = ({ colors, spacing }) => ({
   borderTopWidth: 1,
   borderTopColor: colors.separator,
@@ -1136,6 +1146,7 @@ const $footerActions: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   gap: spacing.xs,
 })
 const $footerAction: ThemedStyle<ViewStyle> = () => ({ flex: 1 })
+const $footerStack: ThemedStyle<ViewStyle> = ({ spacing }) => ({ gap: spacing.xs })
 const $footerNote: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.error })
 const $footerStatus: ThemedStyle<TextStyle> = ({ colors }) => ({ color: colors.textDim })
 

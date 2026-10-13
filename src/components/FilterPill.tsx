@@ -35,6 +35,7 @@ export function FilterPill({
     >
       <Text
         size="xxs"
+        maxFontSizeMultiplier={PILL_MAX_FONT_SCALE}
         weight={selected ? "medium" : "normal"}
         style={selected ? themed($chipSelectedText) : themed($dimmedText)}
         text={removable ? `${label}  ✕` : label}
@@ -79,7 +80,12 @@ export function FilterButton({
           <Circle cx={11} cy={7} r={2} />
           <Circle cx={17} cy={17} r={2} />
         </Svg>
-        <Text size="xxs" style={themed($filterText)} text={label} />
+        <Text
+          size="xxs"
+          maxFontSizeMultiplier={PILL_MAX_FONT_SCALE}
+          style={themed($filterText)}
+          text={label}
+        />
       </TouchableOpacity>
     </View>
   )
@@ -94,6 +100,8 @@ export function FilterGroup({ heading, children }: { heading: string; children: 
     </View>
   )
 }
+
+const PILL_MAX_FONT_SCALE = 1.5
 
 const $chipWrap: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",

@@ -121,7 +121,13 @@ export function AppUtilityMenu({
                 <View style={themed($dot)} />
               </View>
             ) : (
-              <Text text="More" weight="bold" size="xs" />
+              <Text
+                text="More"
+                weight="bold"
+                size="xs"
+                numberOfLines={1}
+                maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+              />
             )}
             {updateReady ? <View testID="utility-update-dot" style={themed($updateDot)} /> : null}
           </Pressable>
@@ -139,7 +145,12 @@ export function AppUtilityMenu({
             style={themed([$item, $settingsItem])}
             onPress={() => choose(onSettings)}
           >
-            <Text text="Settings" weight="medium" />
+            <Text
+              text="Settings"
+              weight="medium"
+              numberOfLines={1}
+              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+            />
             {updateReady ? <View style={themed($inlineUpdateDot)} /> : null}
           </Pressable>
           <Pressable
@@ -148,13 +159,20 @@ export function AppUtilityMenu({
             style={themed($item)}
             onPress={() => choose(onAccount)}
           >
-            <Text text={accountLabel} weight="medium" />
+            <Text
+              text={accountLabel}
+              weight="medium"
+              numberOfLines={1}
+              maxFontSizeMultiplier={MENU_MAX_FONT_SCALE}
+            />
           </Pressable>
         </Animated.View>
       </Animated.View>
     </Animated.View>
   )
 }
+
+const MENU_MAX_FONT_SCALE = 1.5
 
 const $slot: ViewStyle = { width: 92, height: 44, zIndex: 80 }
 const $compactSlot: ViewStyle = { width: 44, height: 44, zIndex: 80 }

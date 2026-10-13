@@ -4,6 +4,7 @@ import {
   TextStyle,
   TouchableOpacity,
   TouchableOpacityProps,
+  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native"
@@ -123,6 +124,8 @@ export function Header(props: HeaderProps) {
   } = props
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
+  const { fontScale } = useWindowDimensions()
+  const centered = titleMode === "center" && fontScale <= CENTERED_TITLE_MAX_FONT_SCALE
 
   const titleContent = titleTx ? translate(titleTx, titleTxOptions) : title
 
@@ -145,8 +148,7 @@ export function Header(props: HeaderProps) {
             style={[
               titleAccessory ? $titleWrapperAccessoryPointerEvents : $titleWrapperPointerEvents,
               !!titleAccessory && themed($titleWrapperRow),
-              titleMode === "center" && themed($titleWrapperCenter),
-              titleMode === "flex" && $titleWrapperFlex,
+              centered ? themed($titleWrapperCenter) : $titleWrapperFlex,
               $titleContainerStyleOverride,
             ]}
           >
@@ -154,6 +156,8 @@ export function Header(props: HeaderProps) {
               weight="medium"
               size="md"
               text={titleContent}
+              numberOfLines={1}
+              maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
               style={[$title, $titleStyleOverride]}
             />
             {titleAccessory}
@@ -194,7 +198,14 @@ function HeaderAction(props: HeaderActionProps) {
         accessibilityState={{ disabled: !onPress }}
         activeOpacity={0.8}
       >
-        <Text weight="medium" size="md" text={content} style={themed($actionText)} />
+        <Text
+          weight="medium"
+          size="md"
+          text={content}
+          numberOfLines={1}
+          maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
+          style={themed($actionText)}
+        />
       </TouchableOpacity>
     )
   }
@@ -214,6 +225,9 @@ function HeaderAction(props: HeaderActionProps) {
 
   return <View style={[$actionFillerContainer, { backgroundColor }]} />
 }
+
+const HEADER_MAX_FONT_SCALE = 1.5
+const CENTERED_TITLE_MAX_FONT_SCALE = 1.3
 
 const $wrapper: ViewStyle = {
   height: 56,
@@ -281,4 +295,5 @@ const $titleWrapperCenter: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 const $titleWrapperFlex: ViewStyle = {
   justifyContent: "center",
   flexGrow: 1,
+  flexShrink: 1,
 }
