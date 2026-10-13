@@ -13,6 +13,7 @@ import {
   type DemoGameSetup,
 } from "./board"
 import { center, HINT_PRESS_MS, seatAxis, showTapHint } from "./hint"
+import { createPokemonDemo, SAMPLE_PRIZES } from "./pokemon"
 
 const NAMES = ["Maya", "Devon", "Priya", "Jonas", "Sam", "Alex"] as const
 const SAMPLE_LIFE = [32, 27, 40, 18, 35, 23] as const
@@ -24,6 +25,22 @@ const SAMPLE_COMMANDER_DAMAGE = [3, 3] as const
 
 function startingLife(system: PlaySystemId) {
   return defaultStartingLife(system, system === "mtg" ? "commander" : undefined)
+}
+
+// Totals mid-game, so the board looks played. Yu-Gi-Oh! starts every seat at 8000.
+function sampleValues(system: PlaySystemId, count: number): readonly number[] {
+  if (system === "mtg") return SAMPLE_LIFE.slice(0, count)
+  if (system === "pokemon") return SAMPLE_PRIZES.slice(0, count)
+  return []
+}
+
+// The Pokémon step's two-player table.
+const POKEMON_TOUR_SETUP: DemoGameSetup = {
+  system: "pokemon",
+  startingLife: startingLife("pokemon"),
+  names: NAMES.slice(0, 2),
+  values: SAMPLE_PRIZES.slice(0, 2),
+  layout: "auto",
 }
 
 function commanderSetup(count: number): DemoGameSetup {
@@ -83,7 +100,7 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     if (!count) return
     game.reset({
       names: NAMES.slice(0, count),
-      values: SAMPLE_LIFE.slice(0, count),
+      values: sampleValues(game.setup.system, count),
       layout: "auto",
     })
   })
@@ -99,7 +116,12 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     picker.addEventListener("click", (event) => {
       const value = picked(event)
       const id = PLAY_SYSTEM_IDS.find((system) => system === value)
-      if (id) game.reset({ system: id, startingLife: startingLife(id), values: [] })
+      if (id)
+        game.reset({
+          system: id,
+          startingLife: startingLife(id),
+          values: sampleValues(id, game.setup.names.length),
+        })
     })
   })
   game.subscribe((event) => event.type === "reset" && syncPickers())
@@ -111,17 +133,29 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
     damage: SAMPLE_COMMANDER_DAMAGE,
     reducedMotion: prefersReducedMotion,
   })
-  let showingCommander = false
-  const commanderStep = query<HTMLElement>(".steps [data-step='commander']")
-  query<HTMLElement>("[data-commander-replay]", commanderStep).addEventListener("click", () => {
-    if (showingCommander) commander.start()
-    else commanderStep.scrollIntoView({ block: "start", behavior: "instant" })
+  // The Pokémon step plays a turn on a fresh two-player table each time it comes on screen.
+  const pokemon = createPokemonDemo(board, game, {
+    setup: POKEMON_TOUR_SETUP,
+    reducedMotion: prefersReducedMotion,
   })
+  let showing = ""
+  const replay = (step: string, demo: { start: () => void }) => {
+    const copy = query<HTMLElement>(`.steps [data-step='${step}']`)
+    query<HTMLElement>("[data-replay]", copy).addEventListener("click", () => {
+      if (showing === step) demo.start()
+      else copy.scrollIntoView({ block: "start", behavior: "instant" })
+    })
+  }
+  replay("commander", commander)
+  replay("pokemon", pokemon)
   return (step: string) => {
-    const wantsCommander = step === "commander"
-    if (wantsCommander === showingCommander) return
-    showingCommander = wantsCommander
-    if (!wantsCommander) return commander.stop()
+    const next = step === "commander" || step === "pokemon" ? step : ""
+    if (next === showing) return
+    if (showing === "commander") commander.stop()
+    if (showing === "pokemon") pokemon.stop()
+    showing = next
+    if (next === "pokemon") return pokemon.start()
+    if (next !== "commander") return
     commander.start()
     if (game.setup.system === "mtg") return
     game.reset({
@@ -324,6 +358,7 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   const showing = () =>
     (stage.dataset.scene === "intro" || stage.dataset.scene === "features") &&
     stage.dataset.step !== "commander" &&
+    stage.dataset.step !== "pokemon" &&
     !stage.classList.contains("full")
   const tap = () => {
     if (!showing()) return
@@ -333,18 +368,18 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
       .sort((a, b) => center(b).y - center(a).y)[0]
     if (!facing) return
     const seat = Number(facing.dataset.player)
-    const hit = board.querySelector<HTMLElement>(
-      `.hit[data-seat='${seat}'][data-dir='${direction}']`,
-    )
+    const selector = `.hit[data-seat='${seat}'][data-dir='${direction}']`
     const glyph = board.querySelector<HTMLElement>(`[data-glyph='${seat}:${direction}']`)
-    if (!hit || !glyph) return
-    const change = direction
+    if (!board.querySelector(selector) || !glyph) return
     direction = direction === 1 ? -1 : 1
+    // Clicks the control itself, so a Pokémon seat counts damage on whichever Pokémon it shows.
+    // Pokémon seats redraw on each change, so the control is found again at the press.
     const press = () => {
       if (!showing()) return
-      hit.classList.add("pressed")
-      window.setTimeout(() => hit.classList.remove("pressed"), PRESS_MS)
-      game.change(seat, change)
+      board.querySelector<HTMLElement>(selector)?.click()
+      const hit = board.querySelector<HTMLElement>(selector)
+      hit?.classList.add("pressed")
+      window.setTimeout(() => hit?.classList.remove("pressed"), PRESS_MS)
     }
     if (prefersReducedMotion.matches) return press()
     showTapHint(glyph)
@@ -352,7 +387,7 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   }
   const timer = window.setInterval(tap, DEMO_TAP_MS)
   stage.addEventListener("click", (event) => {
-    if (!event.isTrusted || !(event.target as Element).closest(".hit")) return
+    if (!event.isTrusted || !(event.target as Element).closest(".hit, [data-pk]")) return
     window.clearInterval(timer)
     window.clearTimeout(pending)
   })

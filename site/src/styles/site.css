@@ -280,6 +280,399 @@ figure {
   height: 1.1em;
 }
 
+/* Pokémon seats, mirroring the app's PokemonSeatCard: the bench on the inner edge, the shown
+   Pokémon's HP in the middle, and the mark and prize cards along the outer edge. --w and --h
+   are the seat content's own width and height, whichever way it turns. */
+
+.pk-seat .seat-in {
+  --w: 100cqw;
+  --h: 100cqh;
+}
+
+.pk-seat[data-rotation="90"] .seat-in,
+.pk-seat[data-rotation="-90"] .seat-in {
+  --w: 100cqh;
+  --h: 100cqw;
+}
+
+.pk {
+  --u: min(var(--w), var(--h));
+  --pad: calc(var(--u) * 0.045);
+  --small: clamp(6px, calc(var(--u) * 0.042), 13px);
+  position: absolute;
+  display: flex;
+  inset: 0;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: calc(var(--u) * 0.02);
+  color: #fff;
+}
+
+.pk button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pk button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.pk-bench {
+  display: flex;
+  height: min(calc(var(--h) * 0.19), calc(var(--w) * 0.16));
+  flex: none;
+  gap: calc(var(--u) * 0.018);
+}
+
+.pk[data-clear="top"] :is(.pk-bench, .pk-sheet-head) {
+  margin-top: var(--clear);
+}
+
+.pk[data-clear="left"] :is(.pk-bench, .pk-sheet-head) {
+  margin-left: var(--clear);
+}
+
+.pk[data-clear="right"] :is(.pk-bench, .pk-sheet-head) {
+  margin-right: var(--clear);
+}
+
+.pk-chip,
+.pk-slot {
+  position: relative;
+  min-width: 0;
+  max-width: calc(var(--w) * 0.3);
+  flex: 1;
+  overflow: hidden;
+  border-radius: calc(var(--u) * 0.035);
+}
+
+.pk-slot {
+  border: 1.5px dashed rgb(255 255 255 / 30%);
+}
+
+.pk .pk-add {
+  display: grid;
+  border: 1.5px dashed rgb(255 255 255 / 45%);
+  color: rgb(255 255 255 / 80%);
+  font-size: calc(var(--u) * 0.07);
+  place-items: center;
+}
+
+.pk .pk-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: calc(var(--u) * 0.014) calc(var(--u) * 0.024);
+  border: 1px solid rgb(255 255 255 / 30%);
+  text-align: left;
+}
+
+.pk .pk-chip[aria-pressed="true"] {
+  border: 2px solid #fff;
+}
+
+.pk-chip-name {
+  overflow: hidden;
+  width: 100%;
+  flex: none;
+  line-height: 1.2;
+  font-size: clamp(5px, calc(var(--u) * 0.032), 11px);
+  opacity: 0.85;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pk-chip b {
+  font-size: calc(var(--u) * 0.07);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.pk-chip-pips {
+  position: absolute;
+  right: 7%;
+  bottom: 16%;
+  display: flex;
+  gap: 2px;
+}
+
+.pk-chip-pips i {
+  width: max(3px, calc(var(--u) * 0.016));
+  aspect-ratio: 5 / 7;
+  border-radius: 1px;
+  background: #fff;
+  opacity: 0.8;
+}
+
+.pk-chip-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #fff;
+  opacity: 0.85;
+}
+
+.pk-hero {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+}
+
+.pk-hero .glyph {
+  font-size: calc(var(--u) * 0.11);
+}
+
+.pk-readout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  max-width: 74%;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.pk-hp {
+  font-size: min(calc(var(--h) * 0.3), calc(var(--w) * 0.24));
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 0.9;
+}
+
+.pk-caption {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2em 0.6em;
+  font-size: var(--small);
+  white-space: nowrap;
+}
+
+.pk-caption b {
+  font-weight: 500;
+}
+
+.pk-caption em,
+.pk-caption span {
+  opacity: 0.75;
+}
+
+.pk-caption em {
+  font-size: 0.85em;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pk .pk-switch {
+  padding: 0.3em 0.7em;
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  font-weight: 700;
+  pointer-events: auto;
+}
+
+.pk-drain {
+  position: relative;
+  overflow: hidden;
+  width: 60%;
+  height: 2px;
+  margin-top: 4px;
+  background: rgb(255 255 255 / 20%);
+}
+
+.pk-drain::after {
+  position: absolute;
+  inset: 0;
+  animation: pk-drain 3s linear forwards;
+  background: #fff;
+  content: "";
+  transform-origin: left;
+}
+
+@keyframes pk-drain {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.pk .pk-place {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: calc(var(--u) * 0.02) calc(var(--w) * 0.08);
+  gap: 0.2em;
+  border: 2px dashed rgb(255 255 255 / 55%);
+  border-radius: calc(var(--u) * 0.06);
+  font-size: calc(var(--u) * 0.07);
+  font-weight: 500;
+}
+
+.pk-place small {
+  font-size: 0.5em;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.pk-foot {
+  display: flex;
+  height: calc(var(--u) * 0.12);
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 calc(var(--u) * 0.02);
+}
+
+.pk .who {
+  position: static;
+  min-width: 0;
+}
+
+.pk .pk-prizes {
+  height: 100%;
+  padding: 0 2px;
+  border-radius: 6px;
+}
+
+.pk-pips {
+  display: grid;
+  height: 100%;
+  gap: 2px;
+  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(2, auto);
+}
+
+.pk-pips i {
+  height: 100%;
+  aspect-ratio: 4 / 5;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.pk-pips i.gone {
+  border: 1.5px solid rgb(255 255 255 / 45%);
+  background: none;
+}
+
+.pk-bar {
+  position: absolute;
+  z-index: 3;
+  right: var(--pad);
+  bottom: calc(var(--pad) + var(--u) * 0.14);
+  left: var(--pad);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.7em 0.8em;
+  gap: 0.5em 0.8em;
+  border-radius: 12px;
+  background: rgb(0 0 0 / 62%);
+  font-size: var(--small);
+}
+
+.pk-bar > span:first-child {
+  min-width: 0;
+  flex: 1 1 10em;
+}
+
+.pk-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+}
+
+.pk .pk-bar button {
+  padding: 0.5em 0.9em;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 16%);
+  font-weight: 500;
+}
+
+.pk .pk-bar .ghost {
+  border: 1.5px solid rgb(255 255 255 / 40%);
+  background: none;
+}
+
+.pk .pk-toast [data-pk="undo"] {
+  background: #fff;
+  color: #000;
+  font-weight: 700;
+}
+
+.pk-bar small {
+  opacity: 0.75;
+}
+
+.pk-sheet {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  inset: 0;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: 0.5em;
+  background: color-mix(in srgb, var(--seat) 70%, #000);
+  font-size: var(--small);
+}
+
+.pk-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.2em;
+}
+
+.pk-sheet-head button {
+  opacity: 0.8;
+}
+
+.pk-sheet-label {
+  opacity: 0.7;
+}
+
+.pk-sheet-list {
+  display: grid;
+  min-height: 0;
+  gap: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9em), 1fr));
+  overflow-y: auto;
+}
+
+.pk .pk-sheet-list button {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.7em 0.8em;
+  gap: 0.6em;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 12%);
+}
+
+.pk-sheet-list em {
+  font-style: normal;
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-drain::after {
+    animation: none;
+  }
+}
+
 /* Commander damage, mirroring the app's CommanderStrip and assign mode. Sizes follow the
    seat, as the app's compact cards do, capped at the app's own sizes. */
 
