@@ -115,7 +115,8 @@ export function SegmentedControl({
             disabled={disabled}
             style={[
               $segment,
-              wrapped && [$wrappedSegment, { flexBasis: `${100 / columns}%` }],
+              // why: on Android, percentage flexBasis collapsed wrapped segments to empty slivers at large font scales.
+              wrapped ? { width: Math.floor(trackWidth / columns) } : $fill,
               selected && { backgroundColor: accent, borderRadius: CHOICE_RADIUS - TRACK_INSET },
             ]}
             onPress={() => select(segment.id)}
@@ -147,9 +148,8 @@ const $thumbShape: ThemedStyle<ViewStyle> = () => ({
   borderRadius: CHOICE_RADIUS - TRACK_INSET,
 })
 const $wrappedTrack: ViewStyle = { flexWrap: "wrap" }
-const $wrappedSegment: ViewStyle = { flexGrow: 0 }
+const $fill: ViewStyle = { flex: 1 }
 const $segment: ViewStyle = {
-  flex: 1,
   minHeight: 46,
   alignItems: "center",
   justifyContent: "center",
