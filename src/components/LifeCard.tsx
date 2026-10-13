@@ -38,10 +38,10 @@ import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOv
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
-  BOTTOM_INSET_IS_HOME_INDICATOR,
   COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
   CUTOUT_HALF_WIDTH,
+  CUTOUTS_SIT_MID_EDGE,
   getLifeFontSizeThatFits,
   getLifeLineHeight,
   getLifeTargetTextSpace,
@@ -811,11 +811,10 @@ export function seatIdentityPlacement({
   const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
   const inset = insets?.[bottomEdge] ?? 0
   const contentHeight = sideways ? width : height
-  // why: a mid-edge notch truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
+  // why: a cutout that may reach the corner truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
   const roomAboveCutout = gap + inset + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
   const underCutout = spansScreenEdge && inset > 0
-  const homeIndicator = BOTTOM_INSET_IS_HOME_INDICATOR && bottomEdge === "bottom"
-  const cutoutAtMiddle = underCutout && roomAboveCutout && !homeIndicator
+  const cutoutAtMiddle = underCutout && roomAboveCutout && !CUTOUTS_SIT_MID_EDGE
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
   const bottom = cutoutAtMiddle
     ? gap + inset

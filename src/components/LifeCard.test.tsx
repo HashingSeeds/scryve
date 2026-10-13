@@ -487,32 +487,19 @@ describe("LifeCard", () => {
     ).toEqual({ left: 16, bottom: 63, maxWidth: 390 / 2 - 16 - 16 })
   })
 
-  it("rises past a notch only when the card has room above it for the mark", () => {
-    const place = (height: number) =>
+  it("tucks both seats into the screen corners beside the notch and the home indicator", () => {
+    const place = (rotation: 0 | 180, top: boolean) =>
       seatIdentityPlacement({
-        rotation: 180,
-        cardSize: { width: 390, height },
-        gap: 12,
-        insets: { top: 59, bottom: 0, left: 0, right: 0 },
-        screenEdges: { top: true, left: true, right: true, bottom: false },
-        markHeight: 48,
-      }).position
-    expect(place(400).bottom).toBe(12 + 59)
-    expect(place(150).bottom).toBeLessThan(12 + 59)
-    expect(place(150).maxWidth).toBeLessThanOrEqual(390 / 2 - 64)
-  })
-
-  it("tucks into the screen corners beside the home indicator, short of its middle", () => {
-    expect(
-      seatIdentityPlacement({
-        rotation: 0,
+        rotation,
         cardSize: { width: 390, height: 400 },
         gap: 16,
-        insets: { top: 0, bottom: 34, left: 0, right: 0 },
-        screenEdges: { top: false, bottom: true, left: true, right: true },
+        insets: { top: top ? 47 : 0, bottom: top ? 0 : 34, left: 0, right: 0 },
+        screenEdges: { top, bottom: !top, left: true, right: true },
         markHeight: 64,
-      }).position,
-    ).toEqual({ left: 16, bottom: 24, maxWidth: 390 / 2 - 16 - 16 - 64 })
+      }).position
+    const tucked = { left: 16, bottom: 24, maxWidth: 390 / 2 - 16 - 16 - 81 }
+    expect(place(0, false)).toEqual(tucked)
+    expect(place(180, true)).toEqual(tucked)
   })
 
   it("swaps the identity layer's sides before turning a sideways card", () => {

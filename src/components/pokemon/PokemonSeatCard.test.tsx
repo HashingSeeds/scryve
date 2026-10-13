@@ -116,7 +116,7 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
   })
 
-  it("tucks the bottom row into the screen corners beside the home indicator, but rises past a notch", () => {
+  it("tucks the bottom row into the screen corners beside the home indicator and the notch", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const identityBottom = (seat: number) => {
       fireEvent(screen.getByTestId(`pokemon-card-seat-${seat + 1}`), "layout", {
@@ -151,8 +151,8 @@ describe("PokemonSeatCard", () => {
       </>,
     )
 
-    expect(identityBottom(0)).toEqual({ bottom: 24, maxWidth: 390 / 2 - 16 * 2 - 64 })
-    expect(identityBottom(1)).toEqual({ bottom: 16 + 59, maxWidth: undefined })
+    expect(identityBottom(0)).toEqual({ bottom: 24, maxWidth: 390 / 2 - 16 * 2 - 81 })
+    expect(identityBottom(1)).toEqual({ bottom: 24, maxWidth: 390 / 2 - 16 * 2 - 81 })
   })
 
   it("drops its controls from touch and screen readers while dice sit on the seat", () => {

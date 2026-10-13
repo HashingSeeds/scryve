@@ -19,6 +19,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
   benchMenuClearance,
+  CONTENT_EDGES,
   contentInsetsFor,
   heroFontSize,
   knockoutMessage,
@@ -41,9 +42,9 @@ import { COMPACT_DICE_CHIP_HEIGHT, DICE_CHIP_HEIGHT, DiceChips } from "../DiceCh
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
-  BOTTOM_INSET_IS_HOME_INDICATOR,
   cornerOffset,
   CUTOUT_HALF_WIDTH,
+  CUTOUTS_SIT_MID_EDGE,
   getLifeLineHeight,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
@@ -152,19 +153,25 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
   const identityInset = identityMetrics.edge - padding
-  const besideHomeIndicator =
-    BOTTOM_INSET_IS_HOME_INDICATOR &&
-    contentRotation === 0 &&
+  const boardEdges = CONTENT_EDGES[contentRotation]
+  const besideCutout =
+    CUTOUTS_SIT_MID_EDGE &&
     insets.bottom > 0 &&
-    !!screenEdges?.left &&
-    !!screenEdges.right
-  const bottomRowLift = besideHomeIndicator
-    ? cornerOffset(identityMetrics.edge, "bottom", "left", insets, screenEdges) -
+    !!screenEdges?.[boardEdges.left] &&
+    !!screenEdges[boardEdges.right]
+  const bottomRowLift = besideCutout
+    ? cornerOffset(
+        identityMetrics.edge,
+        boardEdges.bottom,
+        boardEdges.left,
+        contentInsets,
+        screenEdges,
+      ) -
       padding -
       insets.bottom
     : identityInset
   const identityMaxWidth =
-    besideHomeIndicator && layer.width > 0
+    besideCutout && layer.width > 0
       ? Math.max(layer.width / 2 - insets.left - identityMetrics.edge * 2 - CUTOUT_HALF_WIDTH, 0)
       : undefined
   const [sheet, setSheet] = useState<Sheet | null>(null)
