@@ -27,6 +27,7 @@ import {
 } from "@/components/PlayerGrid"
 import { PlayerLayoutPicker } from "@/components/PlayerLayoutPicker"
 import { DrawMark, PlayerMark } from "@/components/PlayerMark"
+import { ResultLiveRegion } from "@/components/ResultAnnouncer"
 import { Screen } from "@/components/Screen"
 import { Text, type TextProps } from "@/components/Text"
 import { ConvexQueryBoundary } from "@/features/async/ConvexQueryBoundary"
@@ -65,6 +66,7 @@ import {
 } from "@/features/game/playSystems"
 import type { TableRuntime } from "@/features/game/tableRuntime"
 import type { GamePlayer, PlayerId } from "@/features/game/types"
+import { useDice } from "@/features/game/useDice"
 import { useMenuButtonStyle } from "@/features/game/useMenuButtonStyle"
 import { useSeatColors } from "@/features/game/useSeatColors"
 import { useAppTheme } from "@/theme/context"
@@ -83,7 +85,6 @@ type ConnectedBoardScreenProps = {
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
-  onSetup?: () => void
   onBack?: () => void
   onHistory?: () => void
   onDecks?: () => void
@@ -232,7 +233,6 @@ type ConnectedBoardReadyProps = {
   publicId: string
   initialInviteOpen?: boolean
   onBack?: () => void
-  onSetup?: () => void
   onHistory?: () => void
   onDecks?: () => void
   onSettings?: () => void
@@ -305,7 +305,6 @@ function ConnectedBoardRuntime({
   onGameEnded,
   onRematch,
   onGameAbandoned,
-  onSetup,
   onBack,
   onHistory,
   onDecks,
@@ -319,7 +318,6 @@ function ConnectedBoardRuntime({
   onGameEnded?: (publicId: string) => void
   onRematch?: (rematchPublicId: string) => void
   onGameAbandoned?: () => void
-  onSetup?: () => void
   onBack?: () => void
   onHistory?: () => void
   onDecks?: () => void
@@ -463,7 +461,6 @@ function ConnectedBoardRuntime({
             publicId={publicId}
             initialInviteOpen={initialInviteOpen}
             onBack={onBack}
-            onSetup={onSetup}
             onHistory={onHistory}
             onDecks={onDecks}
             onSettings={onSettings}
@@ -486,7 +483,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
   publicId,
   initialInviteOpen,
   onBack,
-  onSetup,
   onHistory,
   onDecks,
   onSettings,
@@ -595,6 +591,19 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       ...game.players.filter((player) => controlled.has(player.playerId)).map(toBoardSeat),
     ],
     [controlled, game.players],
+  )
+  // why: dice stay on this device; other seats never see these rolls.
+  const dice = useDice(players, publicId)
+  const diceTools = useMemo(
+    () =>
+      dice.tools.map((tool) => ({
+        ...tool,
+        onPress: () => {
+          setMenuOpen(false)
+          tool.onPress()
+        },
+      })),
+    [dice.tools],
   )
   const layoutVariant =
     layoutSelection?.playerCount === players.length
@@ -714,6 +723,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           setLayoutPickerOpen(true)
         },
       },
+      { kind: "dice", label: "Dice", tools: diceTools },
       {
         kind: "players",
         label: "Players",
@@ -721,15 +731,6 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           captureMenuDialogOrigin(event)
           setMenuOpen(false)
           setPlayerActionsOpen(true)
-        },
-      },
-      {
-        kind: "setup",
-        label: "Setup",
-        disabled: !onSetup,
-        onPress: () => {
-          setMenuOpen(false)
-          onSetup?.()
         },
       },
       {
@@ -759,19 +760,23 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
       canEnd,
       captureMenuDialogOrigin,
       controls,
+      diceTools,
       finishBlocker,
       layoutOptions.length,
       onHistory,
-      onSetup,
     ],
   )
   const seatColors = useSeatColors(players)
+  const diceOpen = dice.open
+  const closeDice = dice.close
   const exitAction = useMemo(
     () =>
-      armedCommander || inspectedPlayerId
-        ? { label: "Exit commander damage", onPress: exitCommanderDamage }
-        : undefined,
-    [armedCommander, inspectedPlayerId, exitCommanderDamage],
+      diceOpen
+        ? { label: "Close dice", onPress: closeDice }
+        : armedCommander || inspectedPlayerId
+          ? { label: "Exit commander damage", onPress: exitCommanderDamage }
+          : undefined,
+    [armedCommander, closeDice, diceOpen, inspectedPlayerId, exitCommanderDamage],
   )
 
   const inviteDialogOpen = invitation !== undefined && inviteOpen
@@ -858,6 +863,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
                   }
                 : undefined
             }
+            dice={dice.grid}
             onChange={controls.changeLife}
           />
         )}
@@ -872,6 +878,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
             syncStatusText && syncSignal.kind !== "live"
               ? { text: syncStatusText, tone: syncSignal.kind, onPress: openSyncStatus }
               : undefined,
+          heldAction: diceOpen ? "dice" : undefined,
           onToggle: toggleMenu,
           onClose: closeMenu,
         }}
@@ -887,6 +894,7 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
           ) : null
         }
       />
+      <ResultLiveRegion testID="dice-announcer" message={dice.webMessage} />
 
       {inviteDialogOpen && invitation ? (
         <DialogCard
