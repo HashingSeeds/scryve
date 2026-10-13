@@ -36,7 +36,7 @@ The app version lives in `package.json`. EAS keeps the iOS build number and Andr
 Production builds settle the version first (`scripts/release-native.cjs`). The `v<version>` tag marks the commit that built that version:
 
 - Building from the tagged commit reuses the version, so iOS and Android, or a retried build, match.
-- Building from a newer commit of main's tip bumps the patch, commits `chore(release): v<version> [skip ci]` to main, tags it, and pushes both. The skip keeps the bump from redeploying Convex and republishing beta.
+- Building from a newer commit of main's tip bumps the patch. `main` only takes pull requests, so the script opens `chore(release): v<version> [skip ci]` from `release/v<version>`, squash-merges it, tags the merge commit, and pushes the tag. The skip keeps the bump from redeploying Convex and republishing beta. If main moves during the merge, it stops before tagging; run it again to build the new tip.
 - A version with no tag yet is used as is. For a minor or major release, merge `pnpm version minor --no-git-tag-version` (or `major`) to main before building.
 
 Builds need a clean tree. The fingerprint skips the version (`ExpoConfigVersions` in `fingerprint.config.js`), so a bump alone does not change the runtime or cut installs off from OTA updates.
