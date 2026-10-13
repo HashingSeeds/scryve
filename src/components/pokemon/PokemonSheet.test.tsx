@@ -1,7 +1,10 @@
+import { AccessibilityInfo } from "react-native"
+import * as Haptics from "expo-haptics"
 import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { ThemeProvider } from "@/theme/context"
+import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { PokemonSheet, type PokemonSheetProps } from "./PokemonSheet"
 
@@ -176,6 +179,26 @@ describe("PokemonSheet", () => {
     expect(screen.getByTestId("pokemon-prizes-3-seat-1").props.accessibilityState).toMatchObject({
       checked: true,
     })
+  })
+
+  it("ticks a haptic for each keypad press once Reduce Motion is known to be off", async () => {
+    jest.mocked(Haptics.selectionAsync).mockClear()
+    render(sheet())
+    fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
+    fireEvent.press(screen.getByTestId("pokemon-key-a-seat-1"))
+    expect(Haptics.selectionAsync).not.toHaveBeenCalled()
+
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false)
+    resetReducedMotionCacheForTests()
+    screen.unmount()
+    render(sheet())
+    fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
+    await flush()
+    for (const key of ["a", "shift", "delete"])
+      fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(3)
+    jest.restoreAllMocks()
+    resetReducedMotionCacheForTests()
   })
 
   it("types punctuation from the keypad's number layer", () => {

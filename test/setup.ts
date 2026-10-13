@@ -93,6 +93,7 @@ jest.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
   impactAsync: jest.fn(() => Promise.resolve()),
   notificationAsync: jest.fn(() => Promise.resolve()),
+  selectionAsync: jest.fn(() => Promise.resolve()),
 }))
 
 let mockCryptoUuidSequence = 0
