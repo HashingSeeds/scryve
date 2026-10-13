@@ -93,10 +93,12 @@ function mergeBump(tag, base) {
       "",
     )
   } catch (error) {
-    git("reset", "--quiet", "--keep", base)
     throw new Error(`Could not merge the ${tag} bump. Close any open ${branch} PR and run again.`, {
       cause: error,
     })
+  } finally {
+    // why: the squash commit replaces the local bump, so a failure below still leaves a rerunnable checkout.
+    git("reset", "--quiet", "--keep", base)
   }
   git("fetch", "--quiet", "origin", "main")
   const merged = git("rev-parse", MAIN)
