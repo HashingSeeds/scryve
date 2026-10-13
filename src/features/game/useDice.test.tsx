@@ -62,10 +62,6 @@ function Table({ gameId = "game-1" }: { gameId?: string }) {
               seatNumber={index + 1}
               playerName={player.name}
               foreground="#FFFFFF"
-              contentRotation={0}
-              cardSize={{ width: 200, height: 300 }}
-              top={8}
-              left={8}
               chips={seat.chips}
               onClear={seat.onClearChip}
             />

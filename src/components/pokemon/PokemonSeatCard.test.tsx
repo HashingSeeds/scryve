@@ -6,7 +6,6 @@ import { applyLocalTableAction, createLocalGame, localTableRules } from "@/featu
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 
-import { DICE_CHIP_HEIGHT } from "../DiceChips"
 import { PokemonSeatCard, type PokemonSeatCardProps } from "./PokemonSeatCard"
 import { EMPTY_TABLE, pokemonBoardOf } from "../../../convex/lib/table"
 
@@ -88,30 +87,24 @@ function board(table: Harness, seat = 0) {
 }
 
 describe("PokemonSeatCard", () => {
-  it("keeps the bench controls clear of a settled dice chip", () => {
+  it("keeps the bench in place when a dice chip settles on the name row", () => {
     const table = pokemonTable(["Ada", "Grace"])
-    const onClearChip = jest.fn()
-    render(
-      <Seat
-        harness={table}
-        seat={0}
-        dice={{
-          chips: [{ kind: "roll", roll: { tool: "coin", value: "Heads" } }],
-          onPress: jest.fn(),
-          onClearChip,
-        }}
-      />,
-    )
-    fireEvent(screen.getByTestId("pokemon-card-seat-1"), "layout", {
-      nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 420 } },
-    })
+    const dice = {
+      chips: [{ kind: "roll", roll: { tool: "coin", value: "Heads" } }] as const,
+      onPress: jest.fn(),
+      onClearChip: jest.fn(),
+    }
+    const { rerender } = render(<Seat harness={table} seat={0} />)
+    const layout = { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 420 } } }
+    fireEvent(screen.getByTestId("pokemon-card-seat-1"), "layout", layout)
+    const paddingTop = () =>
+      StyleSheet.flatten(screen.getByTestId("pokemon-layer-seat-1").props.style).paddingTop
+    const before = paddingTop()
+
+    rerender(<Seat harness={table} seat={0} dice={dice} />)
 
     expect(screen.getByTestId("dice-chip-1-coin")).toHaveTextContent("Heads")
-    const layer = screen.getByTestId("pokemon-layer-seat-1")
-    const chipRow = StyleSheet.flatten(screen.getByTestId("dice-chips-seat-1").props.style)
-    const chipBottom = (chipRow.top as number) + DICE_CHIP_HEIGHT
-    expect(StyleSheet.flatten(layer.props.style).paddingTop).toBeGreaterThanOrEqual(chipBottom)
-
+    expect(paddingTop()).toBe(before)
     fireEvent.press(screen.getByTestId("pokemon-bench-add-seat-1"))
     expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
   })

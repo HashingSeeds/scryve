@@ -33,8 +33,8 @@ import {
   type CommanderDamageCardMode,
 } from "./CommanderDamageCardControls"
 import { CommanderStrip } from "./CommanderStrip"
-import { chipRowOrigin, CounterChips, type SeatTable } from "./CounterChips"
-import { DICE_CHIP_HEIGHT, COMPACT_DICE_CHIP_HEIGHT, DiceChips } from "./DiceChips"
+import { CounterChips, type SeatTable } from "./CounterChips"
+import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
@@ -598,7 +598,7 @@ export const LifeCard = memo(function LifeCard({
       ) : null}
       {!commanderCardMode &&
       !tableSheetOpen &&
-      !diceCovers &&
+      !dice?.view &&
       !(commanderDamage && !localCommander && commanderOverviewOpen) ? (
         <View
           testID={`life-corner-layer-seat-${seatNumber}`}
@@ -609,47 +609,69 @@ export const LifeCard = memo(function LifeCard({
             { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
-          {commanderDamage?.inspection ? (
-            <BoardPressable
-              testID={`commander-mark-seat-${seatNumber}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Assign commander damage from ${identity}${
-                staleSince !== undefined ? ", out of date" : ""
-              }`}
-              accessibilityState={{ disabled: !!disabled }}
-              disabled={disabled}
-              hitSlop={8}
-              onPress={beginCommanderAssignment}
-              style={({ pressed }) => [
-                $cornerIdentity,
-                identityCorner.position,
-                pressed && { opacity: 0.72 },
-              ]}
+          <View
+            testID={`life-identity-row-seat-${seatNumber}`}
+            pointerEvents="box-none"
+            style={[
+              $cornerRow,
+              {
+                gap: identityMetrics.gap,
+                left: identityCorner.position.left,
+                bottom: identityCorner.position.bottom,
+                maxWidth: identityCorner.rowMaxWidth,
+              },
+            ]}
+          >
+            <View
+              testID={`life-identity-seat-${seatNumber}`}
+              pointerEvents="box-none"
+              accessibilityElementsHidden={diceCovers}
+              importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
+              style={[$cornerIdentity, { maxWidth: identityCorner.position.maxWidth }]}
             >
-              {seatIdentity}
-            </BoardPressable>
-          ) : commanderDamage ? (
-            <BoardPressable
-              testID={`commander-mark-seat-${seatNumber}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Show commander damage for ${identity}`}
-              accessibilityHint="Expands the commander damage grid"
-              accessibilityState={{ expanded: false }}
-              hitSlop={12}
-              onPress={openCommanderOverview}
-              style={({ pressed }) => [
-                $cornerIdentity,
-                identityCorner.position,
-                pressed && { opacity: 0.72 },
-              ]}
-            >
-              {seatIdentity}
-            </BoardPressable>
-          ) : (
-            <View pointerEvents="none" style={[$cornerIdentity, identityCorner.position]}>
-              {seatIdentity}
+              {commanderDamage?.inspection ? (
+                <BoardPressable
+                  testID={`commander-mark-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Assign commander damage from ${identity}${
+                    staleSince !== undefined ? ", out of date" : ""
+                  }`}
+                  accessibilityState={{ disabled: !!disabled }}
+                  disabled={disabled}
+                  hitSlop={8}
+                  onPress={beginCommanderAssignment}
+                  style={({ pressed }) => pressed && { opacity: 0.72 }}
+                >
+                  {seatIdentity}
+                </BoardPressable>
+              ) : commanderDamage ? (
+                <BoardPressable
+                  testID={`commander-mark-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show commander damage for ${identity}`}
+                  accessibilityHint="Expands the commander damage grid"
+                  accessibilityState={{ expanded: false }}
+                  hitSlop={12}
+                  onPress={openCommanderOverview}
+                  style={({ pressed }) => pressed && { opacity: 0.72 }}
+                >
+                  {seatIdentity}
+                </BoardPressable>
+              ) : (
+                <View pointerEvents="none">{seatIdentity}</View>
+              )}
             </View>
-          )}
+            {diceChips?.length && dice?.onClearChip && !dice.view && !editorOpen ? (
+              <DiceChips
+                seatNumber={seatNumber}
+                playerName={displayName}
+                foreground={foreground}
+                compact={compact}
+                chips={diceChips}
+                onClear={dice.onClearChip}
+              />
+            ) : null}
+          </View>
         </View>
       ) : null}
       {claims?.length ? (
@@ -682,30 +704,7 @@ export const LifeCard = memo(function LifeCard({
           contentInsets={contentInsets}
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
-          clearanceAbove={
-            diceChips?.length
-              ? (compact ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
-              : 0
-          }
           onSheetOpenChange={setTableSheetOpen}
-        />
-      ) : null}
-      {diceChips?.length &&
-      dice?.onClearChip &&
-      !dice.view &&
-      !commanderCardMode &&
-      !claimShown &&
-      !editorOpen ? (
-        <DiceChips
-          seatNumber={seatNumber}
-          playerName={displayName}
-          foreground={foreground}
-          compact={compact}
-          contentRotation={contentRotation}
-          cardSize={cardSize}
-          {...chipRowOrigin({ compact, contentRotation, contentInsets, menuEdgeCenter, spacing })}
-          chips={diceChips}
-          onClear={dice.onClearChip}
         />
       ) : null}
       {editorOpen ? (
@@ -767,7 +766,8 @@ const $cornerLayer: ThemedStyle<ViewStyle> = () => ({
   zIndex: 10,
 })
 
-const $cornerIdentity: ViewStyle = { position: "absolute" }
+const $cornerRow: ViewStyle = { position: "absolute", flexDirection: "row", alignItems: "center" }
+const $cornerIdentity: ViewStyle = { flexShrink: 1, minWidth: 0 }
 
 const CONTENT_LEFT_EDGE = {
   0: "left",
@@ -835,14 +835,17 @@ export function seatIdentityPlacement({
         bottom: undefined,
       }
     : undefined
+  const tucked = underCutout && !cutoutAtMiddle
   const position: ViewStyle = {
     left,
     bottom,
     maxWidth: run
-      ? Math.max(run / 2 - left - gap - (underCutout && !cutoutAtMiddle ? CUTOUT_HALF_WIDTH : 0), 0)
+      ? Math.max(run / 2 - left - gap - (tucked ? CUTOUT_HALF_WIDTH : 0), 0)
       : undefined,
   }
-  return { layer, position }
+  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout.
+  const rowMaxWidth = run && !tucked ? Math.max(run - left * 2, 0) : position.maxWidth
+  return { layer, position, rowMaxWidth }
 }
 
 const $commanderOverview: ThemedStyle<ViewStyle> = ({ spacing }) => ({

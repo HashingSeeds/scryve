@@ -37,7 +37,7 @@ import {
   type PokemonInPlay,
 } from "../../../convex/lib/table"
 import { BoardPressable } from "../BoardPressable"
-import { COMPACT_DICE_CHIP_HEIGHT, DICE_CHIP_HEIGHT, DiceChips } from "../DiceChips"
+import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
@@ -139,9 +139,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const cramped = Boolean(compact) || (layer.height > 0 && layer.height < CRAMPED_CONTENT_HEIGHT)
   const padding = cramped ? spacing.xxs : spacing.xs
   const benchHeight = cramped ? COMPACT_BENCH_HEIGHT : BENCH_HEIGHT
-  const chipClearance = diceChips?.length
-    ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
-    : 0
   const identityMetrics = seatIdentityMetrics(cramped)
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
@@ -336,7 +333,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.top -
       insets.bottom -
       clearance.top -
-      chipClearance -
       benchHeight -
       prizeRowHeight -
       bottomRowLift -
@@ -392,7 +388,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           StyleSheet.absoluteFill,
           rotatedLayerStyle(contentRotation, cardSize.width, cardSize.height),
           {
-            paddingTop: padding + insets.top + clearance.top + chipClearance,
+            paddingTop: padding + insets.top + clearance.top,
             paddingBottom: padding + insets.bottom,
             paddingLeft: padding + insets.left,
             paddingRight: padding + insets.right,
@@ -542,6 +538,16 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             staleSince={staleSince}
             style={[$identity, { marginLeft: bottomRowLift }]}
           />
+          {diceChips?.length && dice?.onClearChip && !dice.view && !sheetMode ? (
+            <DiceChips
+              seatNumber={seatNumber}
+              playerName={playerName}
+              foreground={ink}
+              compact={cramped}
+              chips={diceChips}
+              onClear={dice.onClearChip}
+            />
+          ) : null}
           <BoardPressable
             testID={`pokemon-prizes-seat-${seatNumber}`}
             accessibilityRole={controlsLive ? "button" : undefined}
@@ -674,20 +680,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           contentRotation={contentRotation}
           compact={cramped}
           dice={dice}
-        />
-      ) : null}
-      {diceChips?.length && dice?.onClearChip && !dice.view && !sheetMode ? (
-        <DiceChips
-          seatNumber={seatNumber}
-          playerName={playerName}
-          foreground={ink}
-          compact={cramped}
-          contentRotation={contentRotation}
-          cardSize={cardSize}
-          top={padding + insets.top + clearance.top}
-          left={padding + insets.left + clearance.left}
-          chips={diceChips}
-          onClear={dice.onClearChip}
         />
       ) : null}
       {sheetMode && canEdit ? (
@@ -1076,7 +1068,7 @@ const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
-const $identity: ViewStyle = { flex: 1, minWidth: 0 }
+const $identity: ViewStyle = { flexShrink: 1, minWidth: 0 }
 const $drainTrack: ViewStyle = {
   alignSelf: "stretch",
   height: 2,
@@ -1179,10 +1171,11 @@ const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $glyph: ThemedStyle<TextStyle> = () => ({ fontSize: 44, lineHeight: 50, opacity: 0.6 })
 const $compactGlyph: ThemedStyle<TextStyle> = () => ({ fontSize: 30, lineHeight: 34, opacity: 0.6 })
-const $bottomRow: ThemedStyle<ViewStyle> = () => ({
+const $bottomRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "flex-start",
+  gap: spacing.xs,
 })
 const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
@@ -1192,6 +1185,7 @@ const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xxs,
   borderRadius: 12,
   maxWidth: "100%",
+  marginLeft: "auto",
 })
 const $bar: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",

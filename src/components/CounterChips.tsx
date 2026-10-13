@@ -139,7 +139,6 @@ export interface CounterChipsProps {
   contentInsets?: LifeCardContentInsets
   menuEdgeCenter?: LifeCardMenuEdge
   cardSize: { width: number; height: number }
-  clearanceAbove?: number
   onSheetOpenChange?: (open: boolean) => void
 }
 
@@ -176,7 +175,6 @@ export const CounterChips = memo(function CounterChips({
   contentInsets,
   menuEdgeCenter,
   cardSize,
-  clearanceAbove = 0,
   onSheetOpenChange,
 }: CounterChipsProps) {
   const {
@@ -223,9 +221,13 @@ export const CounterChips = memo(function CounterChips({
   if (cardSize.width === 0 || cardSize.height === 0) return null
   const frame = contentFrame(contentRotation, cardSize)
   const glyphSize = compact ? 13 : 15
-  const origin = chipRowOrigin({ compact, contentRotation, contentInsets, menuEdgeCenter, spacing })
-  const { menuClearance } = origin
-  const top = origin.top + clearanceAbove
+  const { top, menuClearance } = chipRowOrigin({
+    compact,
+    contentRotation,
+    contentInsets,
+    menuEdgeCenter,
+    spacing,
+  })
 
   return (
     <>
