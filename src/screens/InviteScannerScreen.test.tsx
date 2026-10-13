@@ -97,12 +97,21 @@ describe("InviteScannerScreen", () => {
     expect(screen.queryByTestId("invite-camera")).toBeNull()
   })
 
-  it("surfaces native scanner launch errors and allows retry", async () => {
-    mockLaunchScanner.mockRejectedValueOnce(new Error("Native scanner unavailable"))
-    scanner()
+  it("explains a native scanner launch error in plain words and allows retry", async () => {
+    mockLaunchScanner.mockRejectedValueOnce(
+      new Error(
+        "Call to function 'ExpoCamera.launchScanner' has been rejected. Caused by: CameraScannerUnavailableException",
+      ),
+    )
+    const { onCancel } = scanner()
     await waitFor(() => {
-      expect(screen.getByRole("alert").props.children).toContain("Native scanner unavailable")
+      expect(screen.getByRole("alert").props.children).toContain(
+        "The QR scanner couldn't open on this device.",
+      )
     })
+    expect(screen.queryByText(/Exception/)).toBeNull()
+    fireEvent.press(screen.getByText("Cancel and enter code"))
+    expect(onCancel).toHaveBeenCalledTimes(1)
     fireEvent.press(screen.getByText("Open QR scanner"))
     await waitFor(() => expect(mockLaunchScanner).toHaveBeenCalledTimes(2))
   })
