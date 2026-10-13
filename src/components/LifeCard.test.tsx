@@ -435,7 +435,7 @@ describe("LifeCard", () => {
       flexDirection: "row",
       gap: 8,
     })
-    const art = MARK_ART_BOUNDS.circle
+    const art = MARK_ART_BOUNDS.heart
     expect(
       StyleSheet.flatten(
         view.getByTestId("player-mark-seat-1", { includeHiddenElements: true }).props.style,
