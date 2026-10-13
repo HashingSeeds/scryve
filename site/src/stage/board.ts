@@ -6,7 +6,7 @@ import {
   getPlayerGridRows,
 } from "@/components/playerGridGeometry"
 import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
-import { playSystemRules, type PlaySystemId } from "@/features/game/playSystems"
+import { playSystemRules, playTableRules, type PlaySystemId } from "@/features/game/playSystems"
 import { accessibleForeground } from "@/utils/colorContrast"
 
 import {
@@ -14,7 +14,24 @@ import {
   PLAYER_MARK_SHAPES,
   type PlayerMarkShape,
 } from "../../../convex/lib/appearance"
+import {
+  applyTableAction,
+  EMPTY_TABLE,
+  findPokemon,
+  pokemonBoardOf,
+  type TableAction,
+} from "../../../convex/lib/table"
 import { HINT_PRESS_MS, showTapHint } from "./hint"
+import {
+  createPokemonSeats,
+  demoId,
+  menuSpotAt,
+  playerIdOf,
+  sampleTable,
+  seatOf,
+  type MenuSpot,
+  type PokemonTableEvent,
+} from "./pokemon"
 
 // The game menu button, ported from the app's dark keystoneIIFlat shape
 // (src/components/GameMenuButtonShape.tsx) and three-bar glyph (GameRadialMenu.tsx),
@@ -71,7 +88,10 @@ export function markSvg(shape: PlayerMarkShape, fill = "currentColor"): string {
   return `<svg viewBox="5.2 5.2 33.6 33.6" fill="${fill}" aria-hidden="true">${APP_MARK_SHAPES[shape]}</svg>`
 }
 
-type GameEvent = { type: "change"; seat: number; delta: number } | { type: "reset" }
+type GameEvent =
+  | { type: "change"; seat: number; delta: number }
+  | ({ type: "table" } & PokemonTableEvent)
+  | { type: "reset" }
 
 export interface DemoGameSetup {
   system: PlaySystemId
@@ -90,9 +110,13 @@ export function createDemoGame(initial: DemoGameSetup) {
   const history: { seat: number; delta: number }[] = []
   let setup = initial
   let life = startingValues(setup)
+  let table = startingTable(setup)
 
   function startingValues(next: DemoGameSetup) {
     return next.names.map((_, seat) => next.values?.[seat] ?? next.startingLife)
+  }
+  function startingTable(next: DemoGameSetup) {
+    return next.system === "pokemon" ? sampleTable(next.names.length) : EMPTY_TABLE
   }
 
   function emit(event: GameEvent) {
@@ -105,6 +129,9 @@ export function createDemoGame(initial: DemoGameSetup) {
     },
     get life(): readonly number[] {
       return life
+    },
+    get table() {
+      return table
     },
     subscribe(listener: (event: GameEvent) => void) {
       listeners.add(listener)
@@ -125,16 +152,50 @@ export function createDemoGame(initial: DemoGameSetup) {
       life = life.map((value, index) => (index === last.seat ? value - last.delta : value))
       emit({ type: "change", seat: last.seat, delta: -last.delta })
     },
+    // Runs a table action through the app's reducer, so Pokémon damage, knockouts, and the
+    // prizes they take work as they do in the app. False when the table rejects the action.
+    act(action: TableAction) {
+      const seat = seatOf(action.playerId)
+      const damaged = action.kind === "pokemon.damaged" ? action.pokemonId : undefined
+      const before = findPokemon(pokemonBoardOf(table, action.playerId), damaged ?? "")?.pokemon
+      const operationId = demoId("operation")
+      const change = applyTableAction(table, action, {
+        rules: playTableRules(setup.system),
+        operationId,
+        lifeOf: (playerId) => life[seatOf(playerId)],
+      })
+      if (!change || change.table === table) return false
+      table = change.table
+      const board = pokemonBoardOf(table, action.playerId)
+      const knockout =
+        board.lastKnockout?.operationId === operationId ? board.lastKnockout : undefined
+      const after = findPokemon(board, damaged ?? "")?.pokemon
+      emit({
+        type: "table",
+        seat,
+        ...(before && after
+          ? { damage: { pokemonId: after.id, delta: after.damage - before.damage } }
+          : {}),
+        ...(knockout ? { knockout } : {}),
+      })
+      for (const { playerId, delta } of change.life) {
+        const taker = seatOf(playerId)
+        life = life.map((value, index) => (index === taker ? Math.max(0, value + delta) : value))
+        emit({ type: "change", seat: taker, delta })
+      }
+      return true
+    },
     reset(next: Partial<DemoGameSetup> = {}) {
       setup = { ...setup, ...next }
       life = startingValues(setup)
+      table = startingTable(setup)
       history.length = 0
       emit({ type: "reset" })
     },
   }
 }
 
-type SeatPlacement = { seat: number; rotation: number; flex?: number }
+type SeatPlacement = { seat: number; rotation: number; rowLength: number; menu?: MenuSpot }
 
 // Seats follow the app's portrait grid exactly.
 function phoneRows(game: DemoGame) {
@@ -163,6 +224,8 @@ function phoneRows(game: DemoGame) {
                 columnIndex,
                 playerIndex: seat,
               }),
+              rowLength: row.length,
+              menu: menuSpotAt(rows, layout, rowIndex, columnIndex),
             },
       ),
     })),
@@ -461,29 +524,51 @@ export function createCommanderDemo(
   }
 }
 
-function seatHtml(game: DemoGame, placement: SeatPlacement, interactive: boolean) {
-  const { seat, rotation } = placement
+function seatName(game: DemoGame, seat: number) {
+  return game.setup.names[seat] ?? `Player ${seat + 1}`
+}
+
+function seatInnerHtml(game: DemoGame, seat: number, interactive: boolean) {
   const value = game.life[seat] ?? 0
-  const name = game.setup.names[seat] ?? `Player ${seat + 1}`
+  const name = seatName(game, seat)
   const controls = interactive
     ? `<button class="hit minus" data-seat="${seat}" data-dir="-1" aria-label="${name}, minus"></button><button class="hit plus" data-seat="${seat}" data-dir="1" aria-label="${name}, plus"></button>`
     : ""
-  return `<div class="seat" data-player="${seat}" data-rotation="${rotation}" style="--seat:${seatColor(seat)}">
-    <div class="seat-in">
-      <span class="glyph minus" data-glyph="${seat}:-1">−</span>
+  return `<span class="glyph minus" data-glyph="${seat}:-1">−</span>
       <span class="center"><span class="life" data-life="${seat}" data-digits="${String(value).length}">${value}</span></span>
       <span class="glyph plus" data-glyph="${seat}:1">+</span>
       <span class="who">${markSvg(seatShape(seat), "#fff")}<span>${name}</span></span>
-      ${controls}
-    </div>
-  </div>`
+      ${controls}`
 }
 
 export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true } = {}) {
   const recent = new Map<number, { total: number; timer: number }>()
+  const placements = new Map<number, SeatPlacement>()
+  const pokemon = createPokemonSeats(game, (seat) => renderSeat(seat))
+  const isPokemon = () => game.setup.system === "pokemon"
+
+  function pokemonHtml(placement: SeatPlacement) {
+    return pokemon.html({
+      ...placement,
+      name: seatName(game, placement.seat),
+      mark: markSvg(seatShape(placement.seat), "#fff"),
+    })
+  }
+
+  function seatHtml(placement: SeatPlacement) {
+    const { seat, rotation } = placement
+    const inner = isPokemon() ? pokemonHtml(placement) : seatInnerHtml(game, seat, interactive)
+    return `<div class="seat${isPokemon() ? " pk-seat" : ""}" data-player="${seat}" data-rotation="${rotation}" style="--seat:${seatColor(seat)}"${interactive ? "" : " inert"}>
+    <div class="seat-in">${inner}</div>
+  </div>`
+  }
 
   function render() {
     const { rows, menu } = phoneRows(game)
+    placements.clear()
+    rows.forEach((row) =>
+      row.seats.forEach((placement) => placement && placements.set(placement.seat, placement)),
+    )
     el.classList.add("board")
     el.innerHTML =
       rows
@@ -491,14 +576,29 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
           (row) =>
             `<div class="board-row" style="flex:${row.flex}">${row.seats
               .map((placement) =>
-                placement
-                  ? seatHtml(game, placement, interactive)
-                  : '<div class="seat empty"></div>',
+                placement ? seatHtml(placement) : '<div class="seat empty"></div>',
               )
               .join("")}</div>`,
         )
         .join("") +
       `<span class="pentagon" style="left:${menu.x * 100}%;top:${menu.y * 100}%" aria-hidden="true">${pentagonSvg()}</span>`
+  }
+
+  // Redraws one Pokémon seat, keeping keyboard focus on the same control.
+  function renderSeat(seat: number) {
+    const placement = placements.get(seat)
+    const inner = el.querySelector<HTMLElement>(`.seat[data-player="${seat}"] .seat-in`)
+    if (!placement || !inner || !isPokemon()) return
+    const focused = inner.contains(document.activeElement)
+      ? (document.activeElement as HTMLElement).dataset
+      : undefined
+    inner.innerHTML = pokemonHtml(placement)
+    if (!focused?.pk) return
+    const id = focused.id ? `[data-id="${focused.id}"]` : ""
+    const dir = focused.dir ? `[data-dir="${focused.dir}"]` : ""
+    inner
+      .querySelector<HTMLElement>(`[data-pk="${focused.pk}"]${id}${dir}`)
+      ?.focus({ preventScroll: true })
   }
 
   // Like the app's LifeControls: the running change replaces the glyph on its side.
@@ -517,6 +617,7 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
   }
 
   function showChange(seat: number, delta: number) {
+    if (isPokemon()) return renderSeat(seat)
     const life = el.querySelector<HTMLElement>(`[data-life="${seat}"]`)
     if (!life) return
     const value = String(game.life[seat] ?? 0)
@@ -536,14 +637,19 @@ export function mountBoard(el: HTMLElement, game: DemoGame, { interactive = true
   }
 
   el.addEventListener("click", (event) => {
-    const hit = (event.target as Element).closest<HTMLElement>(".hit")
+    const target = event.target as Element
+    const control = target.closest<HTMLElement>("[data-pk]")
+    if (control) return pokemon.click(control)
+    const hit = target.closest<HTMLElement>(".hit")
     if (!hit) return
     game.change(Number(hit.dataset.seat), hit.dataset.dir === "1" ? 1 : -1)
   })
   game.subscribe((event) => {
     if (event.type === "change") return showChange(event.seat, event.delta)
+    if (event.type === "table") return pokemon.onTable(event)
     recent.forEach(({ timer }) => window.clearTimeout(timer))
     recent.clear()
+    pokemon.reset()
     render()
   })
   render()
