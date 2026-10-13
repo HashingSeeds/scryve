@@ -117,6 +117,7 @@ export function CurrentGameScreen({
   const loserSeat = runtime.game.firstChooserSeat
   const loser = loserSeat === undefined ? undefined : runtime.game.players[loserSeat]
   const { ask: diceAsk, flip: diceFlip, rollOff: diceRollOff } = dice
+  const playerCount = runtime.game.players.length
   const badge = useMemo<GameMenuBadge | undefined>(() => {
     if (playBegun || firstPlayerUsed) return undefined
     const offer = (run: () => void) => () => {
@@ -130,7 +131,8 @@ export function CurrentGameScreen({
         accessibilityLabel: `${loser.name} lost the last game. Choose who goes first`,
         onPress: offer(() => diceAsk(loser.id, "loss")),
       }
-    if (system === "pokemon")
+    // why: official Pokémon rules only cover two players; larger tables roll off like other games.
+    if (system === "pokemon" && playerCount === 2)
       return {
         color: colors.gameMenu.actions.dice,
         glyph: { tool: "coin" },
@@ -153,6 +155,7 @@ export function CurrentGameScreen({
     loserSeat,
     markFirstPlayerUsed,
     playBegun,
+    playerCount,
     system,
   ])
   const diceTools = useMemo(
@@ -186,7 +189,6 @@ export function CurrentGameScreen({
       event?.nativeEvent ? { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY } : undefined,
     )
   }, [])
-  const playerCount = runtime.game.players.length
   const layoutVariant = runtime.game.layout ?? "auto"
   const layoutOptions = getPlayerGridLayoutOptions(playerCount)
 
