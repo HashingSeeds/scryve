@@ -38,8 +38,10 @@ import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOv
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
 import {
+  BOTTOM_INSET_IS_HOME_INDICATOR,
   COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
+  CUTOUT_HALF_WIDTH,
   getLifeFontSizeThatFits,
   getLifeLineHeight,
   getLifeTargetTextSpace,
@@ -779,9 +781,6 @@ const CONTENT_RIGHT_EDGE = {
   [-90]: "top",
 } as const
 
-// why: insets give a notch's depth but not its width; a tucked name stops short of a Dynamic Island sized cutout.
-const CUTOUT_HALF_WIDTH = 64
-
 const CONTENT_BOTTOM_EDGE = {
   0: "bottom",
   180: "top",
@@ -812,10 +811,11 @@ export function seatIdentityPlacement({
   const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
   const inset = insets?.[bottomEdge] ?? 0
   const contentHeight = sideways ? width : height
-  // why: a mid-edge notch or home indicator truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
+  // why: a mid-edge notch truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
   const roomAboveCutout = gap + inset + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
   const underCutout = spansScreenEdge && inset > 0
-  const cutoutAtMiddle = underCutout && roomAboveCutout
+  const homeIndicator = BOTTOM_INSET_IS_HOME_INDICATOR && bottomEdge === "bottom"
+  const cutoutAtMiddle = underCutout && roomAboveCutout && !homeIndicator
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
   const bottom = cutoutAtMiddle
     ? gap + inset

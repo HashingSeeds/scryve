@@ -502,6 +502,19 @@ describe("LifeCard", () => {
     expect(place(150).maxWidth).toBeLessThanOrEqual(390 / 2 - 64)
   })
 
+  it("tucks into the screen corners beside the home indicator, short of its middle", () => {
+    expect(
+      seatIdentityPlacement({
+        rotation: 0,
+        cardSize: { width: 390, height: 400 },
+        gap: 16,
+        insets: { top: 0, bottom: 34, left: 0, right: 0 },
+        screenEdges: { top: false, bottom: true, left: true, right: true },
+        markHeight: 64,
+      }).position,
+    ).toEqual({ left: 16, bottom: 24, maxWidth: 390 / 2 - 16 - 16 - 64 })
+  })
+
   it("swaps the identity layer's sides before turning a sideways card", () => {
     const view = render(
       <ThemeProvider initialContext="light">

@@ -116,6 +116,45 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
   })
 
+  it("tucks the bottom row into the screen corners beside the home indicator, but rises past a notch", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const identityBottom = (seat: number) => {
+      fireEvent(screen.getByTestId(`pokemon-card-seat-${seat + 1}`), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 420 } },
+      })
+      const layer = StyleSheet.flatten(
+        screen.getByTestId(`pokemon-layer-seat-${seat + 1}`).props.style,
+      )
+      const row = StyleSheet.flatten(
+        screen.getByTestId(`pokemon-bottom-row-seat-${seat + 1}`).props.style,
+      )
+      const identity = StyleSheet.flatten(
+        screen.getByTestId(`seat-identity-seat-${seat + 1}`).props.style,
+      )
+      return { bottom: layer.paddingBottom + row.marginBottom, maxWidth: identity.maxWidth }
+    }
+    render(
+      <>
+        <Seat
+          harness={table}
+          seat={0}
+          contentInsets={{ top: 59, bottom: 34, left: 0, right: 0 }}
+          screenEdges={{ top: false, bottom: true, left: true, right: true }}
+        />
+        <Seat
+          harness={table}
+          seat={1}
+          contentRotation={180}
+          contentInsets={{ top: 59, bottom: 34, left: 0, right: 0 }}
+          screenEdges={{ top: true, bottom: false, left: true, right: true }}
+        />
+      </>,
+    )
+
+    expect(identityBottom(0)).toEqual({ bottom: 24, maxWidth: 390 / 2 - 16 * 2 - 64 })
+    expect(identityBottom(1)).toEqual({ bottom: 16 + 59, maxWidth: undefined })
+  })
+
   it("drops its controls from touch and screen readers while dice sit on the seat", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const onPress = jest.fn()

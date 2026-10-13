@@ -41,11 +41,15 @@ import { COMPACT_DICE_CHIP_HEIGHT, DICE_CHIP_HEIGHT, DiceChips } from "../DiceCh
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
+  BOTTOM_INSET_IS_HOME_INDICATOR,
+  cornerOffset,
+  CUTOUT_HALF_WIDTH,
   getLifeLineHeight,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
+  type LifeCardScreenEdges,
 } from "../playerCardTypes"
 import { SeatIdentity, seatIdentityMetrics, seatMarkArt } from "../SeatIdentity"
 import { Text } from "../Text"
@@ -60,6 +64,7 @@ export interface PokemonSeatCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  screenEdges?: LifeCardScreenEdges
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   disabled?: boolean
@@ -104,6 +109,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   dice,
   contentRotation = 0,
   contentInsets,
+  screenEdges,
   menuCorner,
   menuEdgeCenter,
   disabled,
@@ -145,7 +151,22 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const identityMetrics = seatIdentityMetrics(cramped)
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
-  const bottomRowLift = identityMetrics.edge - padding
+  const identityInset = identityMetrics.edge - padding
+  const besideHomeIndicator =
+    BOTTOM_INSET_IS_HOME_INDICATOR &&
+    contentRotation === 0 &&
+    insets.bottom > 0 &&
+    !!screenEdges?.left &&
+    !!screenEdges.right
+  const bottomRowLift = besideHomeIndicator
+    ? cornerOffset(identityMetrics.edge, "bottom", "left", insets, screenEdges) -
+      padding -
+      insets.bottom
+    : identityInset
+  const identityMaxWidth =
+    besideHomeIndicator && layer.width > 0
+      ? Math.max(layer.width / 2 - insets.left - identityMetrics.edge * 2 - CUTOUT_HALF_WIDTH, 0)
+      : undefined
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)
@@ -531,7 +552,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         )}
 
         {/* why: prizes are the score; the pips sit two by three like the cards do, so the count reads at a glance without a number. */}
-        <View style={[themed($bottomRow), { height: prizeRowHeight, marginBottom: bottomRowLift }]}>
+        <View
+          testID={`pokemon-bottom-row-seat-${seatNumber}`}
+          style={[themed($bottomRow), { height: prizeRowHeight, marginBottom: bottomRowLift }]}
+        >
           <SeatIdentity
             seatNumber={seatNumber}
             playerName={displayName}
@@ -540,7 +564,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             compact={cramped}
             spinning={ownership === "owned"}
             staleSince={staleSince}
-            style={[$identity, { marginLeft: bottomRowLift }]}
+            style={[$identity, { marginLeft: identityInset, maxWidth: identityMaxWidth }]}
           />
           <BoardPressable
             testID={`pokemon-prizes-seat-${seatNumber}`}
@@ -1185,6 +1209,7 @@ const $bottomRow: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  marginLeft: "auto",
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,

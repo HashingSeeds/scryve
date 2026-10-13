@@ -335,6 +335,7 @@ export function PlayerGrid({
                       compact={layout.compact}
                       contentRotation={contentRotation}
                       contentInsets={contentInsets}
+                      screenEdges={TUCKS_INTO_SCREEN_CORNERS ? screenEdges : undefined}
                       menuCorner={menuCorner}
                       menuEdgeCenter={fallbackMenu?.edgeCenter}
                       disabled={disabled || playerDisabled}

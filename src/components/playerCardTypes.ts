@@ -42,6 +42,10 @@ export const COMPACT_LIFE_FONT_SIZE = 84
 
 export const SCREEN_CORNER_CLEARANCE = 24
 export const TUCKS_INTO_SCREEN_CORNERS = Platform.OS !== "web"
+// why: an iOS bottom inset is the thin home indicator bar, so corners beside it only clear the rounded display; an Android one can be a full-width button bar.
+export const BOTTOM_INSET_IS_HOME_INDICATOR = Platform.OS === "ios"
+// why: insets give a cutout's depth but not its width; a tucked name stops short of a Dynamic Island or home indicator sized cutout.
+export const CUTOUT_HALF_WIDTH = 64
 
 export function cornerOffset(
   gap: number,
