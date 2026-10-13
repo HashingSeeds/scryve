@@ -506,6 +506,13 @@ export function sanitizeGameResult(
   return winnerPlayerIds.length > 0 ? { kind: "win", winnerPlayerIds } : undefined
 }
 
+const LIFE_FLOORED_AT_ZERO: ReadonlySet<PlaySystemId> = new Set(["ygo"])
+
+function flooredLifeDelta(game: LocalGame, life: number, delta: LifeDelta): number {
+  if (!game.system || !LIFE_FLOORED_AT_ZERO.has(game.system)) return delta
+  return Math.max(delta, Math.min(0, -life))
+}
+
 export function commandToEvent(
   game: LocalGame,
   command: GameCommand,
@@ -521,10 +528,11 @@ export function commandToEvent(
   }
 
   if (command.type === "life.change") {
-    if (!isLifeDelta(command.delta) || !game.players.some(({ id }) => id === command.playerId)) {
-      return null
-    }
-    return { ...base, type: "life.changed", playerId: command.playerId, delta: command.delta }
+    const player = game.players.find(({ id }) => id === command.playerId)
+    if (!isLifeDelta(command.delta) || !player) return null
+    const delta = flooredLifeDelta(game, player.life, command.delta)
+    if (!isLifeDelta(delta)) return null
+    return { ...base, type: "life.changed", playerId: command.playerId, delta }
   }
   if (command.type === "commanderDamage.assign") {
     const { fromPlayerId, toPlayerId } = command

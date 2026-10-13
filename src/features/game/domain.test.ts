@@ -276,6 +276,30 @@ describe("local game domain", () => {
     expect(ended.result).toBeUndefined()
   })
 
+  it("stops Yu-Gi-Oh! Life Points at 0 and marks that player out", () => {
+    const context = makeContext()
+    let game = createLocalGame({
+      gameId: asGameId("ygo"),
+      now: 1,
+      system: "ygo",
+      startingLife: 8000,
+      players: [
+        { name: "Alice", color: "#000" },
+        { name: "Bob", color: "#000" },
+      ],
+    })
+    const [alice, bob] = game.players.map(({ id }) => id)
+    game = applyGameCommand(game, { type: "life.change", playerId: alice, delta: -8500 }, context)
+    expect(game.players[0].life).toBe(0)
+    expect(game.events.at(-1)).toMatchObject({ type: "life.changed", delta: -8000 })
+    expect(
+      commandToEvent(game, { type: "life.change", playerId: alice, delta: -1000 }, context),
+    ).toBeNull()
+    expect(lastPlayerStanding(game)).toBe(bob)
+    game = applyGameCommand(game, { type: "life.undo" }, context)
+    expect(game.players[0].life).toBe(8000)
+  })
+
   it("freezes life changes after finish or abandon", () => {
     const context = makeContext()
     for (const command of [{ type: "game.finish" }, { type: "game.abandon" }] as const) {
