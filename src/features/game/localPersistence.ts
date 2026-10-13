@@ -25,7 +25,6 @@ import {
   defaultStartingLife,
   isPlaySystemId,
   playSystemFormats,
-  playSystemId,
   playSystemRules,
   type PlaySystemId,
 } from "./playSystems"
@@ -58,11 +57,14 @@ export const LOCAL_KEYS = {
   active: "count.local.active.v1",
   layouts: "count.local.layouts.v1",
   historyIndex: "count.local.history.index.v1",
+  noSystemHistoryRepaired: "count.local.history.noSystemRepaired.v1",
   meSeat: "count.local.meSeat.v1",
   pendingMatchEnd: "count.local.matchEnd.v1",
   activeEvents: (index: number) => `count.local.active.events.v1.${index}`,
   historyDetail: (gameId: string) => `count.local.history.detail.v1.${gameId}`,
 } as const
+
+const NO_SYSTEM_RELEASED_AT = Date.parse("2026-09-04T16:15:49Z")
 
 export type ThemePreference = "system" | "light" | "dark"
 export type LaunchDestination = "play" | "decks"
@@ -661,7 +663,7 @@ export class LocalGameRepository {
       schemaVersion: 1,
       id: game.id,
       status: game.status,
-      system: playSystemId(game.system),
+      ...(game.system ? { system: game.system } : {}),
       ...(game.format ? { format: game.format } : {}),
       startingLife: game.startingLife,
       players: game.players,
@@ -872,9 +874,28 @@ export class LocalGameRepository {
   loadHistory(): LocalGameSummary[] {
     const raw = parseJson(this.storage.getString(LOCAL_KEYS.historyIndex))
     if (!Array.isArray(raw)) return []
-    return withinHistoryCap(
+    const games = withinHistoryCap(
       raw.map(parseSummary).filter((value): value is LocalGameSummary => value !== null),
     )
+    return this.storage.getString(LOCAL_KEYS.noSystemHistoryRepaired)
+      ? games
+      : this.repairNoSystemHistory(games)
+  }
+
+  /** why: older index entries say "mtg" for No system games and only the detail knows otherwise. Games from before No system existed have system-less details too, and those are Magic. */
+  private repairNoSystemHistory(games: LocalGameSummary[]): LocalGameSummary[] {
+    const repaired = games.map((game) => {
+      if (game.system !== "mtg" || game.createdAt < NO_SYSTEM_RELEASED_AT) return game
+      const detail = parseJson(this.storage.getString(LOCAL_KEYS.historyDetail(game.id)))
+      if (!isRecord(detail) || !isRecord(detail.game) || isPlaySystemId(detail.game.system))
+        return game
+      const { system: _system, ...noSystem } = game
+      return noSystem
+    })
+    if (repaired.some((game, index) => game !== games[index]))
+      this.storage.set(LOCAL_KEYS.historyIndex, JSON.stringify(repaired))
+    this.storage.set(LOCAL_KEYS.noSystemHistoryRepaired, "1")
+    return repaired
   }
 
   loadHistoryDetail(gameId: string): { game: LocalGame; eventsTruncated: boolean } | null {

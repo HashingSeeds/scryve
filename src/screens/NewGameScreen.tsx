@@ -198,7 +198,7 @@ export function NewGameScreen({
   const [appearanceSeat, setAppearanceSeat] = useState<number>()
   const [appearanceDraft, setAppearanceDraft] = useState<PlayerAppearance>()
   const [appearanceOrigin, setAppearanceOrigin] = useState<DialogOrigin>()
-  const initialSystem = initialGame?.system ?? defaults.defaultSystem
+  const initialSystem = initialGame ? initialGame.system : defaults.defaultSystem
   const [system, setSystem] = useState<PlaySystemId | undefined>(initialSystem)
   const [format, setFormat] = useState<string | undefined>(
     () =>
