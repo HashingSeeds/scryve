@@ -21,7 +21,7 @@ import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
 import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
 import { UpdateReadyToastWithForegroundChecks } from "@/features/updates/UpdateReadyToast"
 import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
-import { ThemeProvider } from "@/theme/context"
+import { ThemeProvider, useAppTheme } from "@/theme/context"
 import { initAnalytics } from "@/utils/analytics"
 import { reportCrash } from "@/utils/crashReporting"
 import { initObservability, navigationTracing } from "@/utils/observability"
@@ -78,26 +78,32 @@ function Root() {
             <LegalConsentGate onResolved={resolveConsent}>
               <AccountDeletionSessionGuard />
               <LocalGameClaimPrompt />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen
-                  name="index"
-                  options={{ statusBarHidden: true, gestureEnabled: false }}
-                />
-                <Stack.Screen
-                  name="game/current"
-                  options={{ statusBarHidden: true, gestureEnabled: false }}
-                />
-                <Stack.Screen
-                  name="connected/game/[gameId]"
-                  options={{ statusBarHidden: true, gestureEnabled: false }}
-                />
-              </Stack>
+              <AppStack />
               <UpdateReadyToastWithForegroundChecks />
             </LegalConsentGate>
           </KeyboardProvider>
         </SafeAreaProvider>
       </CloudProviders>
     </ThemeProvider>
+  )
+}
+
+const BOARD_OPTIONS = { statusBarHidden: true, gestureEnabled: false }
+
+function AppStack() {
+  const { themeContext } = useAppTheme()
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        // why: once a board sets statusBarHidden, react-native-screens styles every screen's bar itself, white unless told otherwise.
+        statusBarStyle: themeContext === "dark" ? "light" : "dark",
+      }}
+    >
+      <Stack.Screen name="index" options={BOARD_OPTIONS} />
+      <Stack.Screen name="game/current" options={BOARD_OPTIONS} />
+      <Stack.Screen name="connected/game/[gameId]" options={BOARD_OPTIONS} />
+    </Stack>
   )
 }
 
