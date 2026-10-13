@@ -545,13 +545,15 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
               { marginLeft: bottomRowLift },
               diceChips?.length
                 ? {
-                    maxWidth:
+                    maxWidth: Math.max(
                       layer.width / 2 -
-                      padding -
-                      insets.left -
-                      bottomRowLift -
-                      diceChipWidth / 2 -
-                      spacing.xs,
+                        padding -
+                        insets.left -
+                        bottomRowLift -
+                        diceChipWidth / 2 -
+                        spacing.xs,
+                      0,
+                    ),
                   }
                 : null,
             ]}
