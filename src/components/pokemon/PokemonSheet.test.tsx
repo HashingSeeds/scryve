@@ -1,3 +1,4 @@
+import * as Haptics from "expo-haptics"
 import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
@@ -176,6 +177,15 @@ describe("PokemonSheet", () => {
     expect(screen.getByTestId("pokemon-prizes-3-seat-1").props.accessibilityState).toMatchObject({
       checked: true,
     })
+  })
+
+  it("ticks a haptic for each keypad press", () => {
+    jest.mocked(Haptics.selectionAsync).mockClear()
+    render(sheet())
+    fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
+    for (const key of ["a", "shift", "delete"])
+      fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(3)
   })
 
   it("types punctuation from the keypad's number layer", () => {

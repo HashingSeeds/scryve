@@ -1,7 +1,9 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
+import * as Haptics from "expo-haptics"
 
+import { localGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
 
@@ -43,6 +45,7 @@ export function PokemonKeypad({
   onDone: () => void
 }) {
   const { themed } = useAppTheme()
+  const { hapticsEnabled } = useMemo(() => localGameRepository.loadSettings(), [])
   const [digitsChosen, setDigitsChosen] = useState(false)
   const digits = digitsOnly || digitsChosen
   const [shift, setShift] = useState<boolean>()
@@ -132,7 +135,11 @@ export function PokemonKeypad({
               accessibilityRole="button"
               accessibilityLabel={key.accessibilityLabel}
               accessibilityState={key.active === undefined ? undefined : { selected: key.active }}
-              onPress={key.onPress}
+              onPress={() => {
+                // why: a selection tick is the closest match to the system keyboard's key feedback.
+                if (hapticsEnabled) void Haptics.selectionAsync().catch(() => undefined)
+                key.onPress()
+              }}
               style={({ pressed: down }) => [
                 keyStyle,
                 key.wide && !digits && $wide,
