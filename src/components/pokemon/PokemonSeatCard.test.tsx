@@ -116,7 +116,7 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
   })
 
-  it("tucks the bottom row into the screen corners beside the home indicator and the notch", () => {
+  it("tucks the bottom row into the screen corners, capping the name only beside the notch", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const identityBottom = (seat: number) => {
       fireEvent(screen.getByTestId(`pokemon-card-seat-${seat + 1}`), "layout", {
@@ -151,7 +151,7 @@ describe("PokemonSeatCard", () => {
       </>,
     )
 
-    expect(identityBottom(0)).toEqual({ bottom: 24, maxWidth: 390 / 2 - 16 * 2 - 81 })
+    expect(identityBottom(0)).toEqual({ bottom: 24, maxWidth: undefined })
     expect(identityBottom(1)).toEqual({ bottom: 24, maxWidth: 390 / 2 - 16 * 2 - 81 })
   })
 

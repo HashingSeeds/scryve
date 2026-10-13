@@ -171,7 +171,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.bottom
     : identityInset
   const identityMaxWidth =
-    besideCutout && layer.width > 0
+    besideCutout && boardEdges.bottom !== "bottom" && layer.width > 0
       ? Math.max(layer.width / 2 - insets.left - identityMetrics.edge * 2 - CUTOUT_HALF_WIDTH, 0)
       : undefined
   const [sheet, setSheet] = useState<Sheet | null>(null)

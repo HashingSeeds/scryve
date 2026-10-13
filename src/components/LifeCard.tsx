@@ -815,6 +815,9 @@ export function seatIdentityPlacement({
   const roomAboveCutout = gap + inset + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
   const underCutout = spansScreenEdge && inset > 0
   const cutoutAtMiddle = underCutout && roomAboveCutout && !CUTOUTS_SIT_MID_EDGE
+  // why: the home indicator bar sits about 13 pt up, below a name tucked at the corner clearance.
+  const nameCapped =
+    underCutout && !cutoutAtMiddle && !(CUTOUTS_SIT_MID_EDGE && bottomEdge === "bottom")
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
   const bottom = cutoutAtMiddle
     ? gap + inset
@@ -834,7 +837,7 @@ export function seatIdentityPlacement({
     left,
     bottom,
     maxWidth: run
-      ? Math.max(run / 2 - left - gap - (underCutout && !cutoutAtMiddle ? CUTOUT_HALF_WIDTH : 0), 0)
+      ? Math.max(run / 2 - left - gap - (nameCapped ? CUTOUT_HALF_WIDTH : 0), 0)
       : undefined,
   }
   return { layer, position }
