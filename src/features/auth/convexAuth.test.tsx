@@ -72,6 +72,29 @@ describe("createConvexAuthHook", () => {
     expect(reportCrash).toHaveBeenCalledWith(tokenError, ErrorType.HANDLED)
   })
 
+  it.each([
+    [
+      "offline",
+      Object.assign(new Error("Network request failed while offline"), { code: "clerk_offline" }),
+    ],
+    [
+      "unreachable",
+      new Error(
+        'Clerk: Network error at "https://clerk.example/v1/client" - TypeError: Network request failed. Please try again.',
+      ),
+    ],
+    ["failing to fetch", new TypeError("Failed to fetch")],
+  ])("returns null without reporting a crash when Clerk is %s", async (_, networkError) => {
+    const getToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
+    getToken.mockRejectedValue(networkError)
+    const useConvexAuth = createConvexAuthHook(() => clerkAuth(getToken), 0)
+    const { result } = renderHook(useConvexAuth)
+
+    await expect(result.current.fetchAccessToken({ forceRefreshToken: true })).resolves.toBeNull()
+
+    expect(reportCrash).not.toHaveBeenCalled()
+  })
+
   it("keeps the last committed Clerk session after a discarded render", async () => {
     const committedGetToken = jest.fn<Promise<string | null>, [options?: TokenOptions]>()
     committedGetToken.mockResolvedValue("committed-token")
