@@ -25,7 +25,7 @@ If a beta update crashes during launch, expo-updates falls back to the previous 
 
 1. Build preview binaries: `eas build --profile preview` and `eas build --profile preview:device`.
 2. Run the Maestro smoke suite and a manual device pass on iOS and Android. This checks behavior, not the production identity or runtime.
-3. Build production binaries from main's tip: `pnpm release:native` builds both platforms on EAS and submits them to TestFlight and Play internal testing. For local builds, run `pnpm build:ios:prod` and `pnpm build:android:prod` from the same commit, then `eas submit`. Play receives Android as a draft on the internal track; start that release in Play Console so testers get it.
+3. Build production binaries from main's tip: `pnpm release:native` builds both platforms on EAS and submits them to TestFlight and Play internal testing. For local builds, run `pnpm ios:production` and `pnpm android:production` from the same commit, then `eas submit`. Play receives Android as a draft on the internal track; start that release in Play Console so testers get it.
 4. Confirm the runtime and production channel in Settings on those exact binaries, then repeat the manual smoke pass.
 5. Promote those exact builds to the stores after acceptance. Start public store releases with a staged rollout. The runtime version comes from the native fingerprint; any native change automatically requires a new binary before updates flow again.
 

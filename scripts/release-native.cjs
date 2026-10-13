@@ -136,4 +136,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { bumpPatch, planVersion }
+module.exports = { bumpPatch, planVersion, settleVersion }

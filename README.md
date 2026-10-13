@@ -88,21 +88,22 @@ pnpm test --runInBand
 
 ## Builds
 
-Builds run locally through [EAS](https://docs.expo.dev/build/introduction/). Shortcuts in `package.json`:
+Builds run locally through [EAS](https://docs.expo.dev/build/introduction/). Each target in `package.json` is `<platform>:<profile>`:
 
 ```bash
-pnpm run build:ios:sim      # iOS simulator, development profile
-pnpm run build:ios:dev      # iOS device, development profile
-pnpm run build:ios:preview  # iOS device, preview profile
-pnpm run build:ios:prod     # iOS, production profile
+pnpm ios:development:sim   # iOS simulator, development profile
+pnpm ios:development       # iOS device, development profile
+pnpm ios:preview           # iOS device, preview profile
+pnpm ios:production        # iOS, production profile
 ```
 
-Each has an Android equivalent (`build:android:sim`, `build:android:dev`, `build:android:preview`, `build:android:prod`).
+Android has `android:development`, `android:preview`, and `android:production`.
 
-Builds land in `build/` (for example `build/ios-dev.ipa`). Each one has a matching `upload:` script that sends that file to EAS with project metadata through `eas-local`, a fork of eas-cli that must be on your PATH:
+A bare target builds into `build/` (for example `build/ios-preview.ipa`). `--upload` sends that file to EAS with project metadata through `eas-local`, a fork of eas-cli that must be on your PATH. `--ship` builds, then uploads. `--build-path <path>` points either step at another file:
 
 ```bash
-pnpm run build:ios:dev && pnpm run upload:ios:dev
+pnpm ios:preview --ship
+pnpm android:production --upload --build-path ~/Downloads/app.aab
 ```
 
 ## Running Maestro end-to-end tests
