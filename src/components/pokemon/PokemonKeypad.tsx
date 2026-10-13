@@ -17,6 +17,7 @@ type Key = {
   label: string
   accessibilityLabel: string
   wide?: boolean
+  glyph?: boolean
   active?: boolean
   onPress: () => void
 }
@@ -68,10 +69,17 @@ export function PokemonKeypad({
     label: "⇧",
     accessibilityLabel: "Shift",
     wide: true,
+    glyph: true,
     active: upper,
     onPress: () => setShift(!upper),
   }
-  const del: Key = { label: "⌫", accessibilityLabel: "Delete", wide: true, onPress: onDelete }
+  const del: Key = {
+    label: "⌫",
+    accessibilityLabel: "Delete",
+    wide: true,
+    glyph: true,
+    onPress: onDelete,
+  }
   const done: Key = {
     label: "Done",
     accessibilityLabel: "Hide keypad",
@@ -133,7 +141,7 @@ export function PokemonKeypad({
             >
               <Text
                 text={key.label}
-                size={key.wide && !digits ? "xxs" : "xs"}
+                size={key.glyph ? (compact ? "lg" : "xl") : key.wide && !digits ? "xxs" : "xs"}
                 weight="medium"
                 style={[inkStyle, $label]}
               />
