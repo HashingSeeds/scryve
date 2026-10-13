@@ -176,6 +176,7 @@ export const LifeCard = memo(function LifeCard({
   const cardPadding = compact ? spacing.xxs : spacing.xs
   const safeContentStyle = lifeCardContentInsetStyle(contentInsets)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
+  const [diceChipWidth, setDiceChipWidth] = useState(0)
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
   const [overviewVisible, setOverviewVisible] = useState(commanderOverviewOpen)
@@ -349,6 +350,7 @@ export const LifeCard = memo(function LifeCard({
     insets: contentInsets,
     screenEdges,
     markHeight: identityMetrics.mark,
+    middleClearance: diceChips?.length ? diceChipWidth / 2 : 0,
   })
   const seatIdentity = (
     <SeatIdentity
@@ -705,6 +707,7 @@ export const LifeCard = memo(function LifeCard({
           }}
           chips={diceChips}
           onClear={dice.onClearChip}
+          onWidthChange={setDiceChipWidth}
         />
       ) : null}
       {editorOpen ? (
@@ -800,11 +803,13 @@ export function seatIdentityPlacement({
   insets,
   screenEdges,
   markHeight,
+  middleClearance = 0,
 }: {
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   gap: number
   markHeight: number
+  middleClearance?: number
   insets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
 }) {
@@ -838,7 +843,13 @@ export function seatIdentityPlacement({
     left,
     bottom,
     maxWidth: run
-      ? Math.max(run / 2 - left - gap - (underCutout && !cutoutAtMiddle ? CUTOUT_HALF_WIDTH : 0), 0)
+      ? Math.max(
+          run / 2 -
+            left -
+            gap -
+            Math.max(underCutout && !cutoutAtMiddle ? CUTOUT_HALF_WIDTH : 0, middleClearance),
+          0,
+        )
       : undefined,
   }
   // why: the middle of the edge is where a notch or home indicator sits, so anything centered on the name row rises past it even when the name tucks under.

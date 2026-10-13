@@ -136,6 +136,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
+  const [diceChipWidth, setDiceChipWidth] = useState(0)
   const layer = sideways
     ? { width: cardSize.height, height: cardSize.width }
     : { width: cardSize.width, height: cardSize.height }
@@ -539,7 +540,21 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             compact={cramped}
             spinning={ownership === "owned"}
             staleSince={staleSince}
-            style={[$identity, { marginLeft: bottomRowLift }]}
+            style={[
+              $identity,
+              { marginLeft: bottomRowLift },
+              diceChips?.length
+                ? {
+                    maxWidth:
+                      layer.width / 2 -
+                      padding -
+                      insets.left -
+                      bottomRowLift -
+                      diceChipWidth / 2 -
+                      spacing.xs,
+                  }
+                : null,
+            ]}
           />
           <BoardPressable
             testID={`pokemon-prizes-seat-${seatNumber}`}
@@ -686,6 +701,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           nameRow={{ bottom: padding + insets.bottom + bottomRowLift, height: prizeRowHeight }}
           chips={diceChips}
           onClear={dice.onClearChip}
+          onWidthChange={setDiceChipWidth}
         />
       ) : null}
       {sheetMode && canEdit ? (

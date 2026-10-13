@@ -27,6 +27,7 @@ export interface DiceChipsProps {
   nameRow: { bottom: number; height: number }
   chips: readonly DiceSeatChip[]
   onClear: (chip: DiceSeatChip) => void
+  onWidthChange?: (width: number) => void
 }
 
 export function DiceChips({
@@ -39,6 +40,7 @@ export function DiceChips({
   nameRow,
   chips,
   onClear,
+  onWidthChange,
 }: DiceChipsProps) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
@@ -53,51 +55,61 @@ export function DiceChips({
       <View
         testID={`dice-chips-seat-${seatNumber}`}
         pointerEvents="box-none"
-        style={[themed($row), nameRow]}
+        style={[$row, nameRow]}
       >
-        {chips.map((chip) => {
-          const key = chip.kind === "first" ? "first" : chip.roll.tool
-          const label =
-            chip.kind === "first"
-              ? `${playerName} goes first`
-              : `${playerName}, ${chip.roll.tool === "coin" ? "Coin" : "d20"}, ${chip.roll.value}`
-          return (
-            <Animated.View key={key} entering={entering}>
-              <BoardPressable
-                testID={`dice-chip-${seatNumber}-${key}`}
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                accessibilityHint="Clears this result"
-                hitSlop={{ top: 6, bottom: 6 }}
-                onPress={() => onClear(chip)}
-                style={({ pressed }) => [
-                  themed(compact ? $compactChip : $chip),
-                  { borderColor: foreground },
-                  pressed && $pressed,
-                ]}
-              >
-                {chip.kind === "first" ? (
-                  <Text
-                    text="1st"
-                    weight="bold"
-                    maxFontSizeMultiplier={1.2}
-                    style={[themed(compact ? $compactValue : $value), { color: foreground }]}
-                  />
-                ) : (
-                  <>
-                    <DiceGlyph tool={chip.roll.tool} size={compact ? 13 : 15} color={foreground} />
+        <View
+          pointerEvents="box-none"
+          style={themed($chips)}
+          onLayout={(event) => onWidthChange?.(event.nativeEvent.layout.width)}
+        >
+          {chips.map((chip) => {
+            const key = chip.kind === "first" ? "first" : chip.roll.tool
+            const label =
+              chip.kind === "first"
+                ? `${playerName} goes first`
+                : `${playerName}, ${chip.roll.tool === "coin" ? "Coin" : "d20"}, ${chip.roll.value}`
+            return (
+              <Animated.View key={key} entering={entering}>
+                <BoardPressable
+                  testID={`dice-chip-${seatNumber}-${key}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityHint="Clears this result"
+                  hitSlop={{ top: 6, bottom: 6 }}
+                  onPress={() => onClear(chip)}
+                  style={({ pressed }) => [
+                    themed(compact ? $compactChip : $chip),
+                    { borderColor: foreground },
+                    pressed && $pressed,
+                  ]}
+                >
+                  {chip.kind === "first" ? (
                     <Text
-                      text={String(chip.roll.value)}
+                      text="1st"
                       weight="bold"
                       maxFontSizeMultiplier={1.2}
                       style={[themed(compact ? $compactValue : $value), { color: foreground }]}
                     />
-                  </>
-                )}
-              </BoardPressable>
-            </Animated.View>
-          )
-        })}
+                  ) : (
+                    <>
+                      <DiceGlyph
+                        tool={chip.roll.tool}
+                        size={compact ? 13 : 15}
+                        color={foreground}
+                      />
+                      <Text
+                        text={String(chip.roll.value)}
+                        weight="bold"
+                        maxFontSizeMultiplier={1.2}
+                        style={[themed(compact ? $compactValue : $value), { color: foreground }]}
+                      />
+                    </>
+                  )}
+                </BoardPressable>
+              </Animated.View>
+            )
+          })}
+        </View>
       </View>
     </View>
   )
@@ -105,13 +117,17 @@ export function DiceChips({
 
 // why: above the counter chips (10) and the Pokémon bar (15), beside where a bloom lands.
 const $layer: ViewStyle = { zIndex: 16 }
-const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $row: ViewStyle = {
   position: "absolute",
   left: 0,
   right: 0,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
+}
+const $chips: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flexDirection: "row",
+  alignItems: "center",
   gap: spacing.xxxs,
 })
 const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({

@@ -487,6 +487,18 @@ describe("LifeCard", () => {
     ).toEqual({ left: 16, bottom: 63, maxWidth: 390 / 2 - 16 - 16 })
   })
 
+  it("ends the name before a dice chip centered on its row", () => {
+    expect(
+      seatIdentityPlacement({
+        rotation: 0,
+        cardSize: { width: 158, height: 300 },
+        gap: 12,
+        markHeight: 48,
+        middleClearance: 30,
+      }).position.maxWidth,
+    ).toBe(158 / 2 - 12 - 12 - 30)
+  })
+
   it("rises past a notch only when the card has room above it for the mark", () => {
     const place = (height: number) =>
       seatIdentityPlacement({
