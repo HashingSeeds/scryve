@@ -108,7 +108,8 @@ export function Toggle<T>(props: ToggleProps<T>) {
     <Wrapper
       activeOpacity={1}
       accessibilityRole={accessibilityRole}
-      accessibilityState={{ checked: value, disabled }}
+      aria-checked={!!value}
+      aria-disabled={!!disabled}
       {...WrapperProps}
       style={$containerStyles}
       onPress={handlePress}

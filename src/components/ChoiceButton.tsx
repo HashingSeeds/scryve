@@ -46,6 +46,8 @@ export function ChoiceButton(props: ChoiceButtonProps) {
   return (
     <Button
       {...rest}
+      // why: RN's types omit aria-pressed, but react-native-web needs it; it ignores accessibilityState, so web screen readers can't tell which choice is on.
+      {...{ "aria-pressed": selected }}
       accessibilityState={{ ...accessibilityState, selected }}
       style={[
         themed($choice),
