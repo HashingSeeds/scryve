@@ -17,7 +17,6 @@ type Key = {
   label: string
   accessibilityLabel: string
   wide?: boolean
-  /** why: ⇧ and ⌫ draw small at text size, so they need a larger size to read as keys. */
   glyph?: boolean
   active?: boolean
   onPress: () => void
