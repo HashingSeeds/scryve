@@ -25,7 +25,8 @@ export interface DiceChipsProps {
   contentRotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   top: number
-  left: number
+  /** Omit to center the row across the card. */
+  left?: number
   chips: readonly DiceSeatChip[]
   onClear: (chip: DiceSeatChip) => void
 }
@@ -55,7 +56,7 @@ export function DiceChips({
       <View
         testID={`dice-chips-seat-${seatNumber}`}
         pointerEvents="box-none"
-        style={[themed($row), { top, left }]}
+        style={[themed($row), left === undefined ? { top, left: 0, right: 0 } : { top, left }]}
       >
         {chips.map((chip) => {
           const key = chip.kind === "first" ? "first" : chip.roll.tool
@@ -111,6 +112,7 @@ const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
   flexDirection: "row",
   alignItems: "center",
+  justifyContent: "center",
   gap: spacing.xxxs,
 })
 const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({
