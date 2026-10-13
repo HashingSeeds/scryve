@@ -116,11 +116,11 @@ describe("PokemonSeatCard", () => {
     expect(screen.getByTestId("pokemon-sheet-seat-1")).toBeTruthy()
   })
 
-  it("tucks the bottom row into the screen corners beside the home indicator and the notch", () => {
-    const table = pokemonTable(["Ada", "Grace"])
+  it("tucks the bottom row into the screen corners, capping the name only beside a Dynamic Island", () => {
+    const table = pokemonTable(["Ada", "Grace", "Lin"])
     const identityBottom = (seat: number) => {
       fireEvent(screen.getByTestId(`pokemon-card-seat-${seat + 1}`), "layout", {
-        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 420 } },
+        nativeEvent: { layout: { x: 0, y: 0, width: 402, height: 420 } },
       })
       const layer = StyleSheet.flatten(
         screen.getByTestId(`pokemon-layer-seat-${seat + 1}`).props.style,
@@ -138,14 +138,21 @@ describe("PokemonSeatCard", () => {
         <Seat
           harness={table}
           seat={0}
-          contentInsets={{ top: 59, bottom: 34, left: 0, right: 0 }}
+          contentInsets={{ top: 0, bottom: 34, left: 0, right: 0 }}
           screenEdges={{ top: false, bottom: true, left: true, right: true }}
         />
         <Seat
           harness={table}
           seat={1}
           contentRotation={180}
-          contentInsets={{ top: 59, bottom: 34, left: 0, right: 0 }}
+          contentInsets={{ top: 47, bottom: 0, left: 0, right: 0 }}
+          screenEdges={{ top: true, bottom: false, left: true, right: true }}
+        />
+        <Seat
+          harness={table}
+          seat={2}
+          contentRotation={180}
+          contentInsets={{ top: 62, bottom: 0, left: 0, right: 0 }}
           screenEdges={{ top: true, bottom: false, left: true, right: true }}
         />
       </>,
@@ -153,6 +160,7 @@ describe("PokemonSeatCard", () => {
 
     expect(identityBottom(0)).toEqual({ bottom: 24, maxWidth: undefined })
     expect(identityBottom(1)).toEqual({ bottom: 24, maxWidth: undefined })
+    expect(identityBottom(2)).toEqual({ bottom: 24, maxWidth: 402 / 2 - 16 * 2 - 64 })
   })
 
   it("drops its controls from touch and screen readers while dice sit on the seat", () => {

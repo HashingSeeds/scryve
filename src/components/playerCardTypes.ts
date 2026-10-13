@@ -44,6 +44,10 @@ export const SCREEN_CORNER_CLEARANCE = 24
 export const TUCKS_INTO_SCREEN_CORNERS = Platform.OS !== "web"
 // why: iOS cutouts (notch, Dynamic Island, home indicator) sit mid-edge, so corners beside them only clear the rounded display; Android hole-punch cameras and button bars can reach a corner.
 export const CUTOUTS_SIT_MID_EDGE = Platform.OS === "ios"
+// why: insets give a cutout's depth but not its width; a tucked name stops short of a Dynamic Island sized cutout.
+export const CUTOUT_HALF_WIDTH = 64
+// why: a name tucked below a notch (47 to 50 pt insets) clears it, but a Dynamic Island hangs lower and reaches the name's row.
+export const DYNAMIC_ISLAND_MIN_INSET = 59
 
 export function cornerOffset(
   gap: number,
