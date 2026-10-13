@@ -12,7 +12,6 @@ function isStale({ branch, branchExists, prStates }) {
   return prStates.length > 0 && !prStates.includes("open")
 }
 
-/** why: `pnpm preview:up` names previews `<slug>-<hash>`, which is not a branch, so the sweep deleted every one of them. */
 function branchForPreview(identifier, branches) {
   return branches.find((branch) => previewName(branch) === identifier) ?? identifier
 }
