@@ -18,20 +18,49 @@ type Fallback = {
   expiresAt: number
 }
 const fallbacks = new Map<string, Fallback>()
+type Lookup = { key: string; run: () => Promise<void> }
 const scheduledLookups = new Set<string>()
-const pendingLookups: Array<() => Promise<void>> = []
+const pendingLookups: Lookup[] = []
+const mountedCards = new Map<string, number>()
 let runningLookups = 0
 let scryfallPausedUntil = 0
+let lookupSpacingMs = 0
+let nextLookupAt = 0
+let drainTimer: ReturnType<typeof setTimeout> | undefined
 
 function drainLookups() {
+  if (drainTimer) return
   while (runningLookups < 2 && pendingLookups.length) {
+    if (!mountedCards.get(pendingLookups[0].key)) {
+      const { key } = pendingLookups.shift()!
+      scheduledLookups.delete(key)
+      fallbacks.delete(key)
+      continue
+    }
+    const wait = nextLookupAt - Date.now()
+    if (wait > 0) {
+      drainTimer = setTimeout(() => {
+        drainTimer = undefined
+        drainLookups()
+      }, wait)
+      return
+    }
+    nextLookupAt = Date.now() + lookupSpacingMs
     const lookup = pendingLookups.shift()!
     runningLookups += 1
-    void lookup().finally(() => {
+    void lookup.run().finally(() => {
       runningLookups -= 1
       drainLookups()
     })
   }
+  if (!runningLookups && !pendingLookups.length) lookupSpacingMs = nextLookupAt = 0
+}
+
+/** why: image lookups share the per-caller budget with card search, so a big deck paces at half the server's refill rate and leaves the rest for search. */
+function deferLookup(lookup: Lookup, retryAfterMs: number) {
+  lookupSpacingMs = Math.max(lookupSpacingMs, 2 * retryAfterMs)
+  nextLookupAt = Math.max(nextLookupAt, Date.now() + retryAfterMs)
+  pendingLookups.unshift(lookup)
 }
 
 const listeners = new Set<() => void>()
@@ -116,42 +145,59 @@ export function CardImage({
       })
       if (!game || !cardId || !client) return
       scheduledLookups.add(key)
-      const timeout = setTimeout(() => {
-        publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() + 30_000 })
-      }, 15_000)
-      pendingLookups.push(async () => {
-        try {
-          if (Date.now() < scryfallPausedUntil) {
-            publishPaused(key, failed)
-            return
-          }
-          const urls = await client.action(api.cards.imageFallbacks, {
-            game,
-            cardId,
-            deviceId: new LocalGameRepository().getDeviceId(),
-          })
-          publish(key, {
-            urls: urls.filter((url) => !failed.has(url)),
-            failed,
-            loading: false,
-            expiresAt: Date.now() + 5 * 60_000,
-          })
-        } catch (cause) {
-          if (convexErrorCode(cause) === "scryfall_rate_limited") {
-            scryfallPausedUntil = Date.now() + convexErrorRetryAfterMs(cause, 30_000)
-            publishPaused(key, failed)
-          } else {
+      const lookup: Lookup = {
+        key,
+        run: async () => {
+          let deferred = false
+          const timeout = setTimeout(() => {
             publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() + 30_000 })
+          }, 15_000)
+          try {
+            if (Date.now() < scryfallPausedUntil) {
+              publishPaused(key, failed)
+              return
+            }
+            const urls = await client.action(api.cards.imageFallbacks, {
+              game,
+              cardId,
+              deviceId: new LocalGameRepository().getDeviceId(),
+            })
+            publish(key, {
+              urls: urls.filter((url) => !failed.has(url)),
+              failed,
+              loading: false,
+              expiresAt: Date.now() + 5 * 60_000,
+            })
+          } catch (cause) {
+            const code = convexErrorCode(cause)
+            if (code === "rate_limited") {
+              deferred = true
+              deferLookup(lookup, convexErrorRetryAfterMs(cause, 1_000))
+            } else if (code === "scryfall_rate_limited") {
+              scryfallPausedUntil = Date.now() + convexErrorRetryAfterMs(cause, 30_000)
+              publishPaused(key, failed)
+            } else {
+              publish(key, { urls: [], failed, loading: false, expiresAt: Date.now() + 30_000 })
+            }
+          } finally {
+            clearTimeout(timeout)
+            if (!deferred) scheduledLookups.delete(key)
           }
-        } finally {
-          clearTimeout(timeout)
-          scheduledLookups.delete(key)
-        }
-      })
+        },
+      }
+      pendingLookups.push(lookup)
       drainLookups()
     },
     [key, game, cardId, client],
   )
+  useEffect(() => {
+    mountedCards.set(key, (mountedCards.get(key) ?? 0) + 1)
+    return () => {
+      const remaining = (mountedCards.get(key) ?? 1) - 1
+      if (remaining) mountedCards.set(key, remaining)
+      else mountedCards.delete(key)
+    }
+  }, [key])
   useEffect(() => {
     if (!source && !active) recover()
   }, [source, active, recover])
