@@ -487,7 +487,7 @@ describe("LifeCard", () => {
     ).toEqual({ left: 16, bottom: 63, maxWidth: 390 / 2 - 16 - 16 })
   })
 
-  it("tucks both seats into the screen corners, capping the name only beside the notch", () => {
+  it("tucks both seats into the screen corners beside the notch and the home indicator", () => {
     const place = (rotation: 0 | 180, top: boolean) =>
       seatIdentityPlacement({
         rotation,
@@ -497,8 +497,9 @@ describe("LifeCard", () => {
         screenEdges: { top, bottom: !top, left: true, right: true },
         markHeight: 64,
       }).position
-    expect(place(0, false)).toEqual({ left: 16, bottom: 24, maxWidth: 390 / 2 - 16 - 16 })
-    expect(place(180, true)).toEqual({ left: 16, bottom: 24, maxWidth: 390 / 2 - 16 - 16 - 81 })
+    const tucked = { left: 16, bottom: 24, maxWidth: 390 / 2 - 16 - 16 }
+    expect(place(0, false)).toEqual(tucked)
+    expect(place(180, true)).toEqual(tucked)
   })
 
   it("swaps the identity layer's sides before turning a sideways card", () => {

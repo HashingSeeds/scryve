@@ -40,7 +40,6 @@ import { LifeEditor } from "./LifeEditor"
 import {
   COMPACT_LIFE_FONT_SIZE,
   COMPACT_LIFE_TARGET_SIZE,
-  CUTOUT_HALF_WIDTH,
   CUTOUTS_SIT_MID_EDGE,
   getLifeFontSizeThatFits,
   getLifeLineHeight,
@@ -781,6 +780,9 @@ const CONTENT_RIGHT_EDGE = {
   [-90]: "top",
 } as const
 
+// why: insets give a notch's depth but not its width; a tucked name stops short of a Dynamic Island sized cutout.
+const CUTOUT_HALF_WIDTH = 64
+
 const CONTENT_BOTTOM_EDGE = {
   0: "bottom",
   180: "top",
@@ -813,11 +815,8 @@ export function seatIdentityPlacement({
   const contentHeight = sideways ? width : height
   // why: a cutout that may reach the corner truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
   const roomAboveCutout = gap + inset + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
-  const underCutout = spansScreenEdge && inset > 0
-  const cutoutAtMiddle = underCutout && roomAboveCutout && !CUTOUTS_SIT_MID_EDGE
-  // why: the home indicator bar sits about 13 pt up, below a name tucked at the corner clearance.
-  const nameCapped =
-    underCutout && !cutoutAtMiddle && !(CUTOUTS_SIT_MID_EDGE && bottomEdge === "bottom")
+  const underCutout = spansScreenEdge && inset > 0 && !CUTOUTS_SIT_MID_EDGE
+  const cutoutAtMiddle = underCutout && roomAboveCutout
   const left = cornerOffset(gap, leftEdge, bottomEdge, insets, screenEdges)
   const bottom = cutoutAtMiddle
     ? gap + inset
@@ -837,7 +836,7 @@ export function seatIdentityPlacement({
     left,
     bottom,
     maxWidth: run
-      ? Math.max(run / 2 - left - gap - (nameCapped ? CUTOUT_HALF_WIDTH : 0), 0)
+      ? Math.max(run / 2 - left - gap - (underCutout && !cutoutAtMiddle ? CUTOUT_HALF_WIDTH : 0), 0)
       : undefined,
   }
   return { layer, position }

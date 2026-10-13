@@ -43,7 +43,6 @@ import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatO
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
   cornerOffset,
-  CUTOUT_HALF_WIDTH,
   CUTOUTS_SIT_MID_EDGE,
   getLifeLineHeight,
   type LifeCardContentInsets,
@@ -170,10 +169,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       padding -
       insets.bottom
     : identityInset
-  const identityMaxWidth =
-    besideCutout && boardEdges.bottom !== "bottom" && layer.width > 0
-      ? Math.max(layer.width / 2 - insets.left - identityMetrics.edge * 2 - CUTOUT_HALF_WIDTH, 0)
-      : undefined
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)
@@ -571,7 +566,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             compact={cramped}
             spinning={ownership === "owned"}
             staleSince={staleSince}
-            style={[$identity, { marginLeft: identityInset, maxWidth: identityMaxWidth }]}
+            style={[$identity, { marginLeft: identityInset }]}
           />
           <BoardPressable
             testID={`pokemon-prizes-seat-${seatNumber}`}
@@ -1216,7 +1211,6 @@ const $bottomRow: ThemedStyle<ViewStyle> = () => ({
   justifyContent: "flex-start",
 })
 const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  marginLeft: "auto",
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.xs,
