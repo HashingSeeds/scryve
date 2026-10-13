@@ -176,7 +176,6 @@ export const LifeCard = memo(function LifeCard({
   const cardPadding = compact ? spacing.xxs : spacing.xs
   const safeContentStyle = lifeCardContentInsetStyle(contentInsets)
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
-  const [diceChipWidth, setDiceChipWidth] = useState(0)
   const [legacyOverviewOpen, setCommanderOverviewOpen] = useState(false)
   const commanderOverviewOpen = commanderDamage?.inspection?.open ?? legacyOverviewOpen
   const [overviewVisible, setOverviewVisible] = useState(commanderOverviewOpen)
@@ -350,7 +349,6 @@ export const LifeCard = memo(function LifeCard({
     insets: contentInsets,
     screenEdges,
     markHeight: identityMetrics.mark,
-    middleClearance: diceChips?.length ? diceChipWidth / 2 : 0,
   })
   const seatIdentity = (
     <SeatIdentity
@@ -614,7 +612,7 @@ export const LifeCard = memo(function LifeCard({
       ) : null}
       {!commanderCardMode &&
       !tableSheetOpen &&
-      !diceCovers &&
+      !dice?.view &&
       !(commanderDamage && !localCommander && commanderOverviewOpen) ? (
         <View
           testID={`life-corner-layer-seat-${seatNumber}`}
@@ -625,47 +623,69 @@ export const LifeCard = memo(function LifeCard({
             { transform: [{ rotate: `${contentRotation}deg` }] },
           ]}
         >
-          {commanderDamage?.inspection ? (
-            <BoardPressable
-              testID={`commander-mark-seat-${seatNumber}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Assign commander damage from ${identity}${
-                staleSince !== undefined ? ", out of date" : ""
-              }`}
-              accessibilityState={{ disabled: !!disabled }}
-              disabled={disabled}
-              hitSlop={8}
-              onPress={beginCommanderAssignment}
-              style={({ pressed }) => [
-                $cornerIdentity,
-                identityCorner.position,
-                pressed && { opacity: 0.72 },
-              ]}
+          <View
+            testID={`life-identity-row-seat-${seatNumber}`}
+            pointerEvents="box-none"
+            style={[
+              $cornerRow,
+              {
+                gap: identityMetrics.gap,
+                left: identityCorner.position.left,
+                bottom: identityCorner.position.bottom,
+                maxWidth: identityCorner.rowMaxWidth,
+              },
+            ]}
+          >
+            <View
+              testID={`life-identity-seat-${seatNumber}`}
+              pointerEvents="box-none"
+              accessibilityElementsHidden={diceCovers}
+              importantForAccessibility={diceCovers ? "no-hide-descendants" : "auto"}
+              style={[$cornerIdentity, { maxWidth: identityCorner.position.maxWidth }]}
             >
-              {seatIdentity}
-            </BoardPressable>
-          ) : commanderDamage ? (
-            <BoardPressable
-              testID={`commander-mark-seat-${seatNumber}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Show commander damage for ${identity}`}
-              accessibilityHint="Expands the commander damage grid"
-              accessibilityState={{ expanded: false }}
-              hitSlop={12}
-              onPress={openCommanderOverview}
-              style={({ pressed }) => [
-                $cornerIdentity,
-                identityCorner.position,
-                pressed && { opacity: 0.72 },
-              ]}
-            >
-              {seatIdentity}
-            </BoardPressable>
-          ) : (
-            <View pointerEvents="none" style={[$cornerIdentity, identityCorner.position]}>
-              {seatIdentity}
+              {commanderDamage?.inspection ? (
+                <BoardPressable
+                  testID={`commander-mark-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Assign commander damage from ${identity}${
+                    staleSince !== undefined ? ", out of date" : ""
+                  }`}
+                  accessibilityState={{ disabled: !!disabled }}
+                  disabled={disabled}
+                  hitSlop={8}
+                  onPress={beginCommanderAssignment}
+                  style={({ pressed }) => pressed && { opacity: 0.72 }}
+                >
+                  {seatIdentity}
+                </BoardPressable>
+              ) : commanderDamage ? (
+                <BoardPressable
+                  testID={`commander-mark-seat-${seatNumber}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show commander damage for ${identity}`}
+                  accessibilityHint="Expands the commander damage grid"
+                  accessibilityState={{ expanded: false }}
+                  hitSlop={12}
+                  onPress={openCommanderOverview}
+                  style={({ pressed }) => pressed && { opacity: 0.72 }}
+                >
+                  {seatIdentity}
+                </BoardPressable>
+              ) : (
+                <View pointerEvents="none">{seatIdentity}</View>
+              )}
             </View>
-          )}
+            {diceChips?.length && dice?.onClearChip && !dice.view && !editorOpen ? (
+              <DiceChips
+                seatNumber={seatNumber}
+                playerName={displayName}
+                foreground={foreground}
+                compact={compact}
+                chips={diceChips}
+                onClear={dice.onClearChip}
+              />
+            ) : null}
+          </View>
         </View>
       ) : null}
       {seatTable &&
@@ -686,28 +706,6 @@ export const LifeCard = memo(function LifeCard({
           menuEdgeCenter={menuEdgeCenter}
           cardSize={cardSize}
           onSheetOpenChange={setTableSheetOpen}
-        />
-      ) : null}
-      {diceChips?.length &&
-      dice?.onClearChip &&
-      !dice.view &&
-      !commanderCardMode &&
-      !localOverviewVisible &&
-      !editorOpen ? (
-        <DiceChips
-          seatNumber={seatNumber}
-          playerName={displayName}
-          foreground={foreground}
-          compact={compact}
-          contentRotation={contentRotation}
-          cardSize={cardSize}
-          nameRow={{
-            bottom: identityCorner.middleBottom,
-            height: seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).height,
-          }}
-          chips={diceChips}
-          onClear={dice.onClearChip}
-          onWidthChange={setDiceChipWidth}
         />
       ) : null}
       {editorOpen ? (
@@ -769,7 +767,8 @@ const $cornerLayer: ThemedStyle<ViewStyle> = () => ({
   zIndex: 10,
 })
 
-const $cornerIdentity: ViewStyle = { position: "absolute" }
+const $cornerRow: ViewStyle = { position: "absolute", flexDirection: "row", alignItems: "center" }
+const $cornerIdentity: ViewStyle = { flexShrink: 1, minWidth: 0 }
 
 const CONTENT_LEFT_EDGE = {
   0: "left",
@@ -803,13 +802,11 @@ export function seatIdentityPlacement({
   insets,
   screenEdges,
   markHeight,
-  middleClearance = 0,
 }: {
   rotation: LifeCardContentRotation
   cardSize: { width: number; height: number }
   gap: number
   markHeight: number
-  middleClearance?: number
   insets?: LifeCardContentInsets
   screenEdges?: LifeCardScreenEdges
 }) {
@@ -839,22 +836,17 @@ export function seatIdentityPlacement({
         bottom: undefined,
       }
     : undefined
+  const tucked = underCutout && !cutoutAtMiddle
   const position: ViewStyle = {
     left,
     bottom,
     maxWidth: run
-      ? Math.max(
-          run / 2 -
-            left -
-            gap -
-            Math.max(underCutout && !cutoutAtMiddle ? CUTOUT_HALF_WIDTH : 0, middleClearance),
-          0,
-        )
+      ? Math.max(run / 2 - left - gap - (tucked ? CUTOUT_HALF_WIDTH : 0), 0)
       : undefined,
   }
-  // why: the middle of the edge is where a notch or home indicator sits, so anything centered on the name row rises past it even when the name tucks under.
-  const middleBottom = underCutout ? gap + inset : bottom
-  return { layer, position, middleBottom }
+  // why: dice chips trail the name past the half-run line, except beside a tucked name, where they would reach the cutout.
+  const rowMaxWidth = run && !tucked ? Math.max(run - left * 2, 0) : position.maxWidth
+  return { layer, position, rowMaxWidth }
 }
 
 const $commanderOverview: ThemedStyle<ViewStyle> = ({ spacing }) => ({

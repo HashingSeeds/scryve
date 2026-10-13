@@ -8,9 +8,7 @@ import type { ThemedStyle } from "@/theme/types"
 import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
-import { contentFrame } from "./CounterChips"
 import { DiceGlyph } from "./DiceGlyph"
-import type { LifeCardContentRotation } from "./playerCardTypes"
 import { Text } from "./Text"
 
 export const DICE_CHIP_HEIGHT = 36
@@ -22,12 +20,8 @@ export interface DiceChipsProps {
   playerName: string
   foreground: string
   compact?: boolean
-  contentRotation: LifeCardContentRotation
-  cardSize: { width: number; height: number }
-  nameRow: { bottom: number; height: number }
   chips: readonly DiceSeatChip[]
   onClear: (chip: DiceSeatChip) => void
-  onWidthChange?: (width: number) => void
 }
 
 export function DiceChips({
@@ -35,99 +29,70 @@ export function DiceChips({
   playerName,
   foreground,
   compact,
-  contentRotation,
-  cardSize,
-  nameRow,
   chips,
   onClear,
-  onWidthChange,
 }: DiceChipsProps) {
   const { themed } = useAppTheme()
   const reducedMotion = useReducedMotion()
-  if (cardSize.width === 0 || cardSize.height === 0 || chips.length === 0) return null
+  if (chips.length === 0) return null
   // why: Reanimated reads the system setting only at startup, so an animation already gated on the live preference must not consult it again.
   const entering =
     reducedMotion === false
       ? ZoomIn.duration(CHIP_POP_MS).reduceMotion(ReduceMotion.Never)
       : undefined
   return (
-    <View pointerEvents="box-none" style={[contentFrame(contentRotation, cardSize), $layer]}>
-      <View
-        testID={`dice-chips-seat-${seatNumber}`}
-        pointerEvents="box-none"
-        style={[$row, nameRow]}
-      >
-        <View
-          pointerEvents="box-none"
-          style={themed($chips)}
-          onLayout={(event) => onWidthChange?.(event.nativeEvent.layout.width)}
-        >
-          {chips.map((chip) => {
-            const key = chip.kind === "first" ? "first" : chip.roll.tool
-            const label =
-              chip.kind === "first"
-                ? `${playerName} goes first`
-                : `${playerName}, ${chip.roll.tool === "coin" ? "Coin" : "d20"}, ${chip.roll.value}`
-            return (
-              <Animated.View key={key} entering={entering}>
-                <BoardPressable
-                  testID={`dice-chip-${seatNumber}-${key}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={label}
-                  accessibilityHint="Clears this result"
-                  hitSlop={{ top: 6, bottom: 6 }}
-                  onPress={() => onClear(chip)}
-                  style={({ pressed }) => [
-                    themed(compact ? $compactChip : $chip),
-                    { borderColor: foreground },
-                    pressed && $pressed,
-                  ]}
-                >
-                  {chip.kind === "first" ? (
-                    <Text
-                      text="1st"
-                      weight="bold"
-                      maxFontSizeMultiplier={1.2}
-                      style={[themed(compact ? $compactValue : $value), { color: foreground }]}
-                    />
-                  ) : (
-                    <>
-                      <DiceGlyph
-                        tool={chip.roll.tool}
-                        size={compact ? 13 : 15}
-                        color={foreground}
-                      />
-                      <Text
-                        text={String(chip.roll.value)}
-                        weight="bold"
-                        maxFontSizeMultiplier={1.2}
-                        style={[themed(compact ? $compactValue : $value), { color: foreground }]}
-                      />
-                    </>
-                  )}
-                </BoardPressable>
-              </Animated.View>
-            )
-          })}
-        </View>
-      </View>
+    <View testID={`dice-chips-seat-${seatNumber}`} pointerEvents="box-none" style={themed($row)}>
+      {chips.map((chip) => {
+        const key = chip.kind === "first" ? "first" : chip.roll.tool
+        const label =
+          chip.kind === "first"
+            ? `${playerName} goes first`
+            : `${playerName}, ${chip.roll.tool === "coin" ? "Coin" : "d20"}, ${chip.roll.value}`
+        return (
+          <Animated.View key={key} entering={entering}>
+            <BoardPressable
+              testID={`dice-chip-${seatNumber}-${key}`}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityHint="Clears this result"
+              hitSlop={{ top: 6, bottom: 6 }}
+              onPress={() => onClear(chip)}
+              style={({ pressed }) => [
+                themed(compact ? $compactChip : $chip),
+                { borderColor: foreground },
+                pressed && $pressed,
+              ]}
+            >
+              {chip.kind === "first" ? (
+                <Text
+                  text="1st"
+                  weight="bold"
+                  maxFontSizeMultiplier={1.2}
+                  style={[themed(compact ? $compactValue : $value), { color: foreground }]}
+                />
+              ) : (
+                <>
+                  <DiceGlyph tool={chip.roll.tool} size={compact ? 13 : 15} color={foreground} />
+                  <Text
+                    text={String(chip.roll.value)}
+                    weight="bold"
+                    maxFontSizeMultiplier={1.2}
+                    style={[themed(compact ? $compactValue : $value), { color: foreground }]}
+                  />
+                </>
+              )}
+            </BoardPressable>
+          </Animated.View>
+        )
+      })}
     </View>
   )
 }
 
-// why: above the counter chips (10) and the Pokémon bar (15), beside where a bloom lands.
-const $layer: ViewStyle = { zIndex: 16 }
-const $row: ViewStyle = {
-  position: "absolute",
-  left: 0,
-  right: 0,
+const $row: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
-  justifyContent: "center",
-}
-const $chips: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexDirection: "row",
-  alignItems: "center",
+  flexShrink: 0,
   gap: spacing.xxxs,
 })
 const $chip: ThemedStyle<ViewStyle> = ({ spacing }) => ({

@@ -487,18 +487,6 @@ describe("LifeCard", () => {
     ).toEqual({ left: 16, bottom: 63, maxWidth: 390 / 2 - 16 - 16 })
   })
 
-  it("ends the name before a dice chip centered on its row", () => {
-    expect(
-      seatIdentityPlacement({
-        rotation: 0,
-        cardSize: { width: 158, height: 300 },
-        gap: 12,
-        markHeight: 48,
-        middleClearance: 30,
-      }).position.maxWidth,
-    ).toBe(158 / 2 - 12 - 12 - 30)
-  })
-
   it("rises past a notch only when the card has room above it for the mark", () => {
     const place = (height: number) =>
       seatIdentityPlacement({
@@ -572,14 +560,13 @@ describe("LifeCard", () => {
       left: -70,
       top: 70,
     })
-    const corner = view.getByTestId("commander-mark-seat-1")
-    expect(StyleSheet.flatten(corner.props.style)).toMatchObject({
-      left: 16,
-      bottom: 16,
+    const corner = view.getByTestId("life-identity-row-seat-1")
+    expect(StyleSheet.flatten(corner.props.style)).toMatchObject({ left: 16, bottom: 16 })
+    expect(StyleSheet.flatten(view.getByTestId("life-identity-seat-1").props.style)).toMatchObject({
       maxWidth: 340 / 2 - 16 - 16,
     })
     expect(corner).toHaveTextContent("Ada")
-    fireEvent.press(corner)
+    fireEvent.press(view.getByTestId("commander-mark-seat-1"))
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
@@ -612,9 +599,12 @@ describe("LifeCard", () => {
       nativeEvent: { layout: { width: 420, height: 193 } },
     })
 
-    expect(StyleSheet.flatten(view.getByTestId("commander-mark-seat-1").props.style)).toMatchObject(
-      { left: 12, bottom: 24, maxWidth: 193 / 2 - 12 - 12 },
-    )
+    expect(
+      StyleSheet.flatten(view.getByTestId("life-identity-row-seat-1").props.style),
+    ).toMatchObject({ left: 12, bottom: 24 })
+    expect(StyleSheet.flatten(view.getByTestId("life-identity-seat-1").props.style)).toMatchObject({
+      maxWidth: 193 / 2 - 12 - 12,
+    })
   })
 
   it("hides the commander grid behind the player mark", () => {

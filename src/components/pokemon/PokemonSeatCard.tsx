@@ -136,7 +136,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const diceCovers = diceCoversSeat(dice)
   const diceChips = dice?.chips
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 })
-  const [diceChipWidth, setDiceChipWidth] = useState(0)
   const layer = sideways
     ? { width: cardSize.height, height: cardSize.width }
     : { width: cardSize.width, height: cardSize.height }
@@ -540,24 +539,18 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             compact={cramped}
             spinning={ownership === "owned"}
             staleSince={staleSince}
-            style={[
-              $identity,
-              { marginLeft: bottomRowLift },
-              diceChips?.length
-                ? {
-                    maxWidth: Math.max(
-                      layer.width / 2 -
-                        padding -
-                        insets.left -
-                        bottomRowLift -
-                        diceChipWidth / 2 -
-                        spacing.xs,
-                      0,
-                    ),
-                  }
-                : null,
-            ]}
+            style={[$identity, { marginLeft: bottomRowLift }]}
           />
+          {diceChips?.length && dice?.onClearChip && !dice.view && !sheetMode ? (
+            <DiceChips
+              seatNumber={seatNumber}
+              playerName={playerName}
+              foreground={ink}
+              compact={cramped}
+              chips={diceChips}
+              onClear={dice.onClearChip}
+            />
+          ) : null}
           <BoardPressable
             testID={`pokemon-prizes-seat-${seatNumber}`}
             accessibilityRole={controlsLive ? "button" : undefined}
@@ -690,20 +683,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           contentRotation={contentRotation}
           compact={cramped}
           dice={dice}
-        />
-      ) : null}
-      {diceChips?.length && dice?.onClearChip && !dice.view && !sheetMode ? (
-        <DiceChips
-          seatNumber={seatNumber}
-          playerName={playerName}
-          foreground={ink}
-          compact={cramped}
-          contentRotation={contentRotation}
-          cardSize={cardSize}
-          nameRow={{ bottom: padding + insets.bottom + bottomRowLift, height: prizeRowHeight }}
-          chips={diceChips}
-          onClear={dice.onClearChip}
-          onWidthChange={setDiceChipWidth}
         />
       ) : null}
       {sheetMode && canEdit ? (
@@ -1093,7 +1072,7 @@ const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
 const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
-const $identity: ViewStyle = { flex: 1, minWidth: 0 }
+const $identity: ViewStyle = { flexShrink: 1, minWidth: 0 }
 const $drainTrack: ViewStyle = {
   alignSelf: "stretch",
   height: 2,
@@ -1196,10 +1175,11 @@ const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
 })
 const $glyph: ThemedStyle<TextStyle> = () => ({ fontSize: 44, lineHeight: 50, opacity: 0.6 })
 const $compactGlyph: ThemedStyle<TextStyle> = () => ({ fontSize: 30, lineHeight: 34, opacity: 0.6 })
-const $bottomRow: ThemedStyle<ViewStyle> = () => ({
+const $bottomRow: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "flex-start",
+  gap: spacing.xs,
 })
 const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   flexDirection: "row",
@@ -1209,6 +1189,7 @@ const $prizes: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   paddingVertical: spacing.xxs,
   borderRadius: 12,
   maxWidth: "100%",
+  marginLeft: "auto",
 })
 const $bar: ThemedStyle<ViewStyle> = ({ spacing }) => ({
   position: "absolute",
