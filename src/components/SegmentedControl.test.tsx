@@ -63,17 +63,17 @@ describe("SegmentedControl", () => {
   it("splits into rows instead of truncating labels that outgrow one row", () => {
     const { view } = renderControl("mtg")
     const layout = layoutOf(view)
-    const basis = () => StyleSheet.flatten(view.getByTestId("system-mtg").props.style).flexBasis
+    const width = () => StyleSheet.flatten(view.getByTestId("system-mtg").props.style).width
 
     layout("system", 308)
     layout("system-ruler", 90)
-    expect(basis()).toBeUndefined()
+    expect(width()).toBeUndefined()
 
     layout("system-ruler", 120)
-    expect(basis()).toBe("50%")
+    expect(width()).toBe(150)
 
     layout("system-ruler", 200)
-    expect(basis()).toBe("100%")
+    expect(width()).toBe(300)
   })
 
   it("falls back to two columns before one, whatever the segment count", () => {
@@ -82,7 +82,7 @@ describe("SegmentedControl", () => {
     const layout = layoutOf(view)
     layout("system", 308)
     layout("system-ruler", 120)
-    expect(StyleSheet.flatten(view.getByTestId("system-a").props.style).flexBasis).toBe("50%")
+    expect(StyleSheet.flatten(view.getByTestId("system-a").props.style).width).toBe(150)
   })
 })
 
