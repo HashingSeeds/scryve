@@ -23,6 +23,7 @@ import {
   resetConnectedHarness,
   themed,
 } from "../../test/support/connectedHarness"
+import { CLAIM_ARM_MS } from "../components/CommanderClaimBanner"
 
 jest.mock("@/utils/useStoreReview", () => ({ useStoreReview: jest.fn() }))
 jest.mock("expo-router", () => ({ useFocusEffect: jest.fn() }))
@@ -248,7 +249,7 @@ describe("ConnectedBoardScreen", () => {
     expect(screen.getByTestId("commander-mark-seat-1").props.accessibilityState.disabled).toBe(true)
   })
 
-  it("lets the defending seat confirm a claim from the bubble under its board", () => {
+  it("lets the defending seat confirm and decline a claim from its banner", () => {
     const claim = {
       claimId: "claim-1",
       operationId: "commander-claim-0001",
@@ -265,13 +266,19 @@ describe("ConnectedBoardScreen", () => {
         commanderDamage: { totals: [], pendingClaims: [claim], eliminatedPlayerIds: [] },
       },
     }
+    jest.useFakeTimers()
     render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    fireEvent(screen.getByTestId("life-card-seat-2"), "layout", {
+      nativeEvent: { layout: { width: 360, height: 280, x: 0, y: 0 } },
+    })
+    act(() => jest.advanceTimersByTime(CLAIM_ARM_MS))
 
     fireEvent.press(screen.getByTestId("commander-confirm-seat-2-claim-1"))
     expect(mockResolveCommanderDamageClaim).toHaveBeenCalledWith(claim, true)
 
     fireEvent.press(screen.getByTestId("commander-decline-seat-2-claim-1"))
     expect(mockResolveCommanderDamageClaim).toHaveBeenCalledWith(claim, false)
+    jest.useRealTimers()
   })
 
   it("shows pending, connection, and retained failure state accessibly", () => {
