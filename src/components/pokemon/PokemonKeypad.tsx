@@ -6,6 +6,7 @@ import * as Haptics from "expo-haptics"
 import { localGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "../BoardPressable"
 import { overlayTint } from "../LifeControls"
@@ -46,6 +47,7 @@ export function PokemonKeypad({
 }) {
   const { themed } = useAppTheme()
   const { hapticsEnabled } = useMemo(() => localGameRepository.loadSettings(), [])
+  const reduceMotion = useReducedMotion()
   const [digitsChosen, setDigitsChosen] = useState(false)
   const digits = digitsOnly || digitsChosen
   const [shift, setShift] = useState<boolean>()
@@ -137,7 +139,8 @@ export function PokemonKeypad({
               accessibilityState={key.active === undefined ? undefined : { selected: key.active }}
               onPress={() => {
                 // why: a selection tick is the closest match to the system keyboard's key feedback.
-                if (hapticsEnabled) void Haptics.selectionAsync().catch(() => undefined)
+                if (hapticsEnabled && reduceMotion === false)
+                  void Haptics.selectionAsync().catch(() => undefined)
                 key.onPress()
               }}
               style={({ pressed: down }) => [
