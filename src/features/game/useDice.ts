@@ -41,7 +41,7 @@ type State = {
 
 const CLOSED: Omit<State, "gameId"> = { mode: false, dice: EMPTY_DICE }
 
-export function useDice(players: readonly GamePlayer[], gameId: string) {
+export function useDice(players: readonly Pick<GamePlayer, "id" | "name">[], gameId: string) {
   const [stored, setStored] = useState<State>()
   const state = stored?.gameId === gameId ? stored : { gameId, ...CLOSED }
   const { dice } = state
