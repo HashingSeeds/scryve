@@ -138,6 +138,12 @@ export interface ConnectedSummaryDocument {
   }[]
 }
 
+const UNUSUAL_ENDING_COPY = new Map([
+  ["host_abandoned", "Abandoned by the host"],
+  ["stale_inactivity", "Ended after inactivity"],
+  ["account_deleted", "Ended when the host deleted their account"],
+])
+
 export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSummaryModel {
   const system = summary.system === NO_PLAY_SYSTEM ? undefined : playSystemId(summary.system)
   return {
@@ -150,7 +156,7 @@ export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSu
       ? playFormatLabel(system, summary.format || summary.ruleset)
       : counterValueLabel(system, summary.startingLife),
     changeCount: summary.eventCount,
-    terminalReason: summary.terminalReason,
+    terminalReason: UNUSUAL_ENDING_COPY.get(summary.terminalReason ?? ""),
     players: summary.players.map((player) => ({
       id: player.playerId,
       seat: player.seat,

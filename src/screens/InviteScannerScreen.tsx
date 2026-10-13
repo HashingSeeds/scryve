@@ -90,11 +90,10 @@ export function InviteScannerScreen({
         isPinchToZoomEnabled: true,
       })
     } catch (cause) {
-      if (!accepted.current && !wasScannerCancellation(cause)) {
-        const message =
-          cause instanceof Error ? cause.message : "The native scanner could not open."
-        setError(`QR scanner could not open: ${message}`)
-      }
+      if (!accepted.current && !wasScannerCancellation(cause))
+        setError(
+          "The QR scanner couldn't open on this device. Try again or enter the code instead.",
+        )
     } finally {
       setOpeningScanner(false)
     }

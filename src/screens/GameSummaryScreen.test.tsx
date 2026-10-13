@@ -270,6 +270,15 @@ describe("game summary", () => {
     expect(screen.getByText("2 players · Commander · 48 life changes")).toBeTruthy()
   })
 
+  it.each([
+    ["host_finished", undefined],
+    ["host_abandoned", "Abandoned by the host"],
+    ["stale_inactivity", "Ended after inactivity"],
+    ["some_future_reason", undefined],
+  ])("describes a %s ending in words, never as its code", (terminalReason, copy) => {
+    expect(connectedSummaryModel(connectedSummary({ terminalReason })).terminalReason).toBe(copy)
+  })
+
   it("keeps a no-system connected summary on generic starting-life copy", () => {
     const model = connectedSummaryModel(
       connectedSummary({ system: "none", format: "none", ruleset: "none" }),
