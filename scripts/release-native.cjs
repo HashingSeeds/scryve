@@ -14,6 +14,9 @@ const git = (...args) =>
     stdio: ["ignore", "pipe", "inherit"],
   }).trim()
 
+const gh = (...args) =>
+  execFileSync("gh", args, { cwd: root, stdio: ["ignore", "ignore", "inherit"] })
+
 function bumpPatch(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
   if (!match) throw new Error(`package.json version ${version} is not major.minor.patch`)
@@ -55,32 +58,71 @@ function writeVersion(version) {
   fs.writeFileSync(packageJsonPath, next)
 }
 
+// why: main only takes pull requests, so the bump lands as a self-merged PR before the tag.
+function mergeBump(tag, base) {
+  const branch = `release/${tag}`
+  const title = `chore(release): ${tag} [skip ci]`
+  writeVersion(tag.slice(1))
+  git("commit", "--quiet", "-m", title, "--", "package.json")
+  const bump = git("rev-parse", "HEAD")
+  try {
+    git("push", "--quiet", "--force", "origin", `HEAD:refs/heads/${branch}`)
+    gh(
+      "pr",
+      "create",
+      "--base",
+      "main",
+      "--head",
+      branch,
+      "--title",
+      title,
+      "--body",
+      `Bumps the app version to ${tag} for a native build.`,
+    )
+    gh(
+      "pr",
+      "merge",
+      branch,
+      "--squash",
+      "--delete-branch",
+      "--match-head-commit",
+      bump,
+      "--subject",
+      title,
+      "--body",
+      "",
+    )
+  } catch (error) {
+    git("reset", "--quiet", "--keep", base)
+    throw new Error(`Could not merge the ${tag} bump. Close any open ${branch} PR and run again.`, {
+      cause: error,
+    })
+  }
+  git("fetch", "--quiet", "origin", "main")
+  const merged = git("rev-parse", MAIN)
+  git("reset", "--quiet", "--keep", merged)
+  if (git("rev-parse", `${merged}^`) !== base)
+    throw new Error(`main moved while merging ${tag}. Run again to build main's new tip.`)
+  return merged
+}
+
 function settleVersion() {
   if (git("status", "--porcelain")) throw new Error("Commit or stash your changes first.")
   // why: origin owns release tags; a stale local tag would otherwise make every fetch fail.
   git("fetch", "--quiet", "--force", "--tags", "origin", "main")
 
-  const head = git("rev-parse", "HEAD")
+  let head = git("rev-parse", "HEAD")
   const current = readVersion()
   const plan = planVersion({ version: current, taggedCommit: tagCommit(`v${current}`), head })
   const tag = `v${plan.version}`
 
   if (plan.action === "reuse") {
-    const onMain = isAncestor(head, MAIN)
-    try {
-      if (onMain) git("push", "--quiet", "origin", `refs/tags/${tag}`)
-      else git("push", "--quiet", "--atomic", "origin", "HEAD:refs/heads/main", `refs/tags/${tag}`)
-    } catch (error) {
+    if (!isAncestor(head, MAIN))
       throw new Error(
-        `Could not publish ${tag}. If main moved, run \`git tag -d ${tag}\`, reset to ${MAIN}, and run again.`,
-        { cause: error },
+        `${tag} marks a commit that is not on ${MAIN}. Check out ${MAIN} and run again.`,
       )
-    }
-    console.log(
-      onMain
-        ? `Reusing ${tag}, which this commit already built.`
-        : `Published ${tag} and reused it.`,
-    )
+    git("push", "--quiet", "origin", `refs/tags/${tag}`)
+    console.log(`Reusing ${tag}, which this commit already built.`)
     return plan.version
   }
 
@@ -89,23 +131,16 @@ function settleVersion() {
 
   if (plan.action === "bump") {
     if (tagCommit(tag)) throw new Error(`${tag} already exists. Set package.json past it on main.`)
-    writeVersion(plan.version)
-    git("commit", "--quiet", "-m", `chore(release): ${tag} [skip ci]`, "--", "package.json")
+    head = mergeBump(tag, head)
   }
-  git("tag", "-a", tag, "-m", tag)
+  git("tag", "-a", tag, "-m", tag, head)
 
   try {
-    git("push", "--quiet", "--atomic", "origin", "HEAD:refs/heads/main", `refs/tags/${tag}`)
+    git("push", "--quiet", "origin", `refs/tags/${tag}`)
   } catch (error) {
-    // why: a local tag or bump commit left behind would make the rerun after pulling reuse it.
+    // why: a local tag left behind would make the rerun reuse a version origin never saw.
     git("tag", "-d", tag)
-    if (plan.action === "bump") git("reset", "--quiet", "--keep", "HEAD~1")
-    throw new Error(
-      `Could not push ${tag}. If main moved, pull and run again; git says why above.`,
-      {
-        cause: error,
-      },
-    )
+    throw new Error(`Could not push ${tag}; git says why above.`, { cause: error })
   }
   console.log(plan.action === "bump" ? `Bumped to ${tag}.` : `Tagged ${tag}.`)
   return plan.version
