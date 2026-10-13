@@ -102,8 +102,8 @@ function summarize(times) {
 const kilobytes = (bytes) => `${Math.round(bytes / 1000).toLocaleString("en-US")} KB`
 
 function delta(head, base) {
-  if (base === undefined) return "added"
-  if (head === undefined) return "removed"
+  if (base === undefined) return `added, ${kilobytes(head)}`
+  if (head === undefined) return `removed, ${kilobytes(base)}`
   const kb = Math.round((head - base) / 1000)
   return kb === 0 ? "no change" : `${kb > 0 ? "+" : "-"}${Math.abs(kb).toLocaleString("en-US")} KB`
 }

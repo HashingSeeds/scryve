@@ -56,7 +56,7 @@ test("renderComparison lists changed libraries and the cold start shift", () => 
     build({ "libmmkv.so": 350_000, "libhermes.so": 1_200_000, "libNitroModules.so": 400_000 }, 880),
   )
   assert.match(table, /\| Native libs, arm64-v8a \| 1,500 KB \| 1,950 KB \| \+450 KB \|/)
-  assert.match(table, /\| arm64-v8a \| libNitroModules\.so \| added \|/)
+  assert.match(table, /\| arm64-v8a \| libNitroModules\.so \| added, 400 KB \|/)
   assert.match(table, /\| arm64-v8a \| libmmkv\.so \| \+50 KB \|/)
   assert.doesNotMatch(table, /libhermes/)
   assert.match(table, /\| Cold start to interactive, median \| 900 ms \| 880 ms \| -20 ms \|/)
