@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type ComponentRef } from "react"
+import { useEffect, useRef, useState, type ComponentRef } from "react"
 import type { TextStyle, View as ViewRef, ViewStyle } from "react-native"
 import {
   AccessibilityInfo,
@@ -32,8 +32,7 @@ import {
   type PokemonInPlay,
   type PokemonSlot,
 } from "../../../convex/lib/table"
-import { useBoardKeyboardLift } from "../BoardKeyboardLift"
-import { BoardPressable, TurnedBoardContext } from "../BoardPressable"
+import { BoardPressable } from "../BoardPressable"
 import { mixColorsInLinearLight } from "../GameMenuButtonShape"
 import { overlayTint } from "../LifeControls"
 import type { LifeCardContentInsets, LifeCardContentRotation } from "../playerCardTypes"
@@ -45,8 +44,6 @@ export type PokemonSheetMode =
 
 export interface PokemonSheetProps {
   seatNumber: number
-  /** why: only a seat on the screen's bottom edge sits under the keyboard, so only its sheet lifts the board. */
-  liftsBoard?: boolean
   deck?: SeatDeck
   color: string
   rotation: LifeCardContentRotation
@@ -75,7 +72,6 @@ const DAMAGE_STEPS = [-3, -1, 1, 3, 5, 10] as const
 
 export function PokemonSheet({
   seatNumber,
-  liftsBoard = false,
   deck: seatDeck,
   color,
   rotation,
@@ -95,10 +91,8 @@ export function PokemonSheet({
   onClose,
 }: PokemonSheetProps) {
   const { themed } = useAppTheme()
-  const liftSeat = useBoardKeyboardLift(liftsBoard)
-  // why: the system keyboard rises from the window's bottom edge, so it only reads right side up for a seat facing that edge. Web keeps the browser's keyboard.
-  const turned = useContext(TurnedBoardContext)
-  const onKeypad = Platform.OS !== "web" && (rotation !== 0 || turned)
+  // why: the system keyboard only reads right side up for a seat facing the window's bottom edge, so every native seat types on the same in-seat keypad. Web keeps the browser's keyboard.
+  const onKeypad = Platform.OS !== "web"
   const [typingInto, setTypingInto] = useState<Field>()
   const sheetColor = mixColorsInLinearLight(color, "#000000", 0.82)
   const ink = accessibleForeground(sheetColor)
@@ -174,7 +168,6 @@ export function PokemonSheet({
 
   function focusField(field: Field) {
     if (onKeypad) setTypingInto(field)
-    else liftSeat()
   }
 
   function fieldValue(field: Field) {
