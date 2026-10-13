@@ -25,6 +25,7 @@ import { structurallyEqual } from "@/utils/structurallyEqual"
 import { motionDuration, useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "./BoardPressable"
+import { CommanderClaimBanner, type CommanderClaim } from "./CommanderClaimBanner"
 import { CommanderDamageBoard, type CommanderDamageBoardProps } from "./CommanderDamageBoard"
 import {
   CommanderDamageCardControls,
@@ -74,17 +75,7 @@ export type LifeCardCommanderDamage = Omit<
   stagedAgainstOwner?: number
   onStage?: (step: number) => void
   armBar?: { stagedTargets: number; onSend: () => void; onCancel: () => void }
-  /**
-   * Claims awaiting this seat's decision, shown as bubbles under the board so the
-   * life total stays visible while the defender decides.
-   */
-  pendingClaims?: readonly {
-    claimId: string
-    attackerName: string
-    delta: number
-    onConfirm: () => void
-    onDecline: () => void
-  }[]
+  pendingClaims?: readonly CommanderClaim[]
 }
 
 export interface LifeCardProps {
@@ -308,19 +299,9 @@ export const LifeCard = memo(function LifeCard({
         : ownership === "disabled"
           ? "Controls unavailable"
           : undefined
-  const pendingClaim = commanderDamage?.pendingClaims?.[0]
   const armedCommanderId = commanderDamage?.armedPlayerId
-  const commanderCardMode: CommanderDamageCardMode | undefined = pendingClaim
-    ? {
-        kind: "claim",
-        claimId: pendingClaim.claimId,
-        attackerName: pendingClaim.attackerName,
-        damage: Math.abs(pendingClaim.delta),
-        additionalClaims: (commanderDamage?.pendingClaims?.length ?? 1) - 1,
-        onConfirm: pendingClaim.onConfirm,
-        onDecline: pendingClaim.onDecline,
-      }
-    : commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
+  const commanderCardMode: CommanderDamageCardMode | undefined =
+    commanderDamage && armedCommanderId === commanderDamage.ownerPlayerId
       ? {
           kind: "source",
           playerName: displayName,
@@ -341,6 +322,15 @@ export const LifeCard = memo(function LifeCard({
             onChange: (step) => commanderDamage.onStage?.(step),
           }
         : undefined
+  const lifeControlsShown =
+    !commanderCardMode &&
+    !commanderOverviewOpen &&
+    !localOverviewVisible &&
+    !tableSheetOpen &&
+    !diceCovers &&
+    ownership !== "unowned"
+  const claims = lifeControlsShown && !editorOpen ? commanderDamage?.pendingClaims : undefined
+  const claimShown = !!claims?.length
   const identityMetrics = seatIdentityMetrics(compact)
   const identityCorner = seatIdentityPlacement({
     rotation: contentRotation,
@@ -558,11 +548,7 @@ export const LifeCard = memo(function LifeCard({
           mode={commanderCardMode}
           life={localCommander ? life : undefined}
         />
-      ) : !commanderOverviewOpen &&
-        !localOverviewVisible &&
-        !tableSheetOpen &&
-        !diceCovers &&
-        ownership !== "unowned" ? (
+      ) : lifeControlsShown ? (
         <LifeControls
           playerName={displayName}
           seatNumber={seatNumber}
@@ -688,7 +674,20 @@ export const LifeCard = memo(function LifeCard({
           </View>
         </View>
       ) : null}
+      {claims?.length ? (
+        <CommanderClaimBanner
+          seatNumber={seatNumber}
+          claims={claims}
+          contentRotation={contentRotation}
+          contentInsets={contentInsets}
+          menuEdgeCenter={menuEdgeCenter}
+          cardSize={cardSize}
+          compact={compact}
+          disabled={disabled}
+        />
+      ) : null}
       {seatTable &&
+      !claimShown &&
       !diceCovers &&
       !commanderCardMode &&
       !commanderOverviewOpen &&

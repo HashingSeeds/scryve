@@ -2211,13 +2211,16 @@ describe("hosted player appearances", () => {
         .query("gamePlayers")
         .withIndex("by_game", (q) => q.eq("gameId", game._id))
         .take(7)
-      await ctx.db.patch(players[1]._id, { color: players[0].color.toLowerCase(), shape: "circle" })
+      await ctx.db.patch(players[1]._id, {
+        color: players[0].color.toLowerCase(),
+        shape: players[0].shape,
+      })
     })
     await host.mutation(api.games.startGame, { publicId: created.publicId })
     const projection = await host.query(api.games.lobbyProjection, { publicId: created.publicId })
     expect(projection.players[0]).toMatchObject({
       color: "#7C3AED",
-      shape: "circle",
+      shape: "heart",
       currentLife: 40,
     })
     expect(projection.players[1].color).not.toBe(projection.players[0].color)

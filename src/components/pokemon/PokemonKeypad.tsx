@@ -1,9 +1,12 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
+import * as Haptics from "expo-haptics"
 
+import { localGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
 import type { ThemedStyle } from "@/theme/types"
+import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import { BoardPressable } from "../BoardPressable"
 import { overlayTint } from "../LifeControls"
@@ -17,6 +20,7 @@ type Key = {
   label: string
   accessibilityLabel: string
   wide?: boolean
+  glyph?: boolean
   active?: boolean
   onPress: () => void
 }
@@ -42,6 +46,8 @@ export function PokemonKeypad({
   onDone: () => void
 }) {
   const { themed } = useAppTheme()
+  const { hapticsEnabled } = useMemo(() => localGameRepository.loadSettings(), [])
+  const reduceMotion = useReducedMotion()
   const [digitsChosen, setDigitsChosen] = useState(false)
   const digits = digitsOnly || digitsChosen
   const [shift, setShift] = useState<boolean>()
@@ -68,10 +74,17 @@ export function PokemonKeypad({
     label: "⇧",
     accessibilityLabel: "Shift",
     wide: true,
+    glyph: true,
     active: upper,
     onPress: () => setShift(!upper),
   }
-  const del: Key = { label: "⌫", accessibilityLabel: "Delete", wide: true, onPress: onDelete }
+  const del: Key = {
+    label: "⌫",
+    accessibilityLabel: "Delete",
+    wide: true,
+    glyph: true,
+    onPress: onDelete,
+  }
   const done: Key = {
     label: "Done",
     accessibilityLabel: "Hide keypad",
@@ -124,7 +137,12 @@ export function PokemonKeypad({
               accessibilityRole="button"
               accessibilityLabel={key.accessibilityLabel}
               accessibilityState={key.active === undefined ? undefined : { selected: key.active }}
-              onPress={key.onPress}
+              onPress={() => {
+                // why: a selection tick is the closest match to the system keyboard's key feedback.
+                if (hapticsEnabled && reduceMotion === false)
+                  void Haptics.selectionAsync().catch(() => undefined)
+                key.onPress()
+              }}
               style={({ pressed: down }) => [
                 keyStyle,
                 key.wide && !digits && $wide,
@@ -133,7 +151,7 @@ export function PokemonKeypad({
             >
               <Text
                 text={key.label}
-                size={key.wide && !digits ? "xxs" : "xs"}
+                size={key.glyph ? (compact ? "lg" : "xl") : key.wide && !digits ? "xxs" : "xs"}
                 weight="medium"
                 style={[inkStyle, $label]}
               />

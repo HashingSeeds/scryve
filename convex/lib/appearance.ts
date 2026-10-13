@@ -1,10 +1,16 @@
 export const CONNECTED_PLAYER_MARK_SHAPES = [
-  "circle",
+  "heart",
   "triangle",
   "square",
   "diamond",
   "star",
   "hexagon",
+] as const
+
+/** why: installed clients from before heart replaced circle still offer circle in hosted lobbies, and saved games still hold it, so the server keeps accepting it. */
+export const ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES = [
+  ...CONNECTED_PLAYER_MARK_SHAPES,
+  "circle",
 ] as const
 
 export const PLAYER_MARK_SHAPES = [
@@ -19,7 +25,7 @@ export const PLAYER_MARK_SHAPES = [
 ] as const
 
 export type PlayerMarkShape =
-  (typeof PLAYER_MARK_SHAPES)[number] | (typeof CONNECTED_PLAYER_MARK_SHAPES)[number]
+  (typeof PLAYER_MARK_SHAPES)[number] | (typeof ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)[number]
 
 export const PLAYER_COLOR_CHOICES = [
   "#B85636",

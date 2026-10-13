@@ -1,7 +1,10 @@
+import { AccessibilityInfo } from "react-native"
+import * as Haptics from "expo-haptics"
 import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { ThemeProvider } from "@/theme/context"
+import { resetReducedMotionCacheForTests } from "@/utils/useReducedMotion"
 
 import { PokemonSheet, type PokemonSheetProps } from "./PokemonSheet"
 
@@ -141,11 +144,11 @@ describe("PokemonSheet", () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it("types on the in-seat keypad when the seat faces away from the system keyboard", async () => {
+  it("types on the in-seat keypad instead of the system keyboard", async () => {
     mockAction.mockImplementation((_reference: unknown, args: { query?: string }) =>
       Promise.resolve(args.query ? [hit] : card),
     )
-    render(sheet({ rotation: 180 }))
+    render(sheet())
     const search = screen.getByTestId("pokemon-search-seat-1")
     expect(search.props.showSoftInputOnFocus).toBe(false)
 
@@ -168,7 +171,7 @@ describe("PokemonSheet", () => {
   })
 
   it("capitalizes only the first keypad letter, so a typed Mega ex is worth three prizes", () => {
-    render(sheet({ rotation: 180 }))
+    render(sheet())
     fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
     for (const key of [..."mega", "space", ..."ab", "space", ..."ex"])
       fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
@@ -178,8 +181,28 @@ describe("PokemonSheet", () => {
     })
   })
 
+  it("ticks a haptic for each keypad press once Reduce Motion is known to be off", async () => {
+    jest.mocked(Haptics.selectionAsync).mockClear()
+    render(sheet())
+    fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
+    fireEvent.press(screen.getByTestId("pokemon-key-a-seat-1"))
+    expect(Haptics.selectionAsync).not.toHaveBeenCalled()
+
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false)
+    resetReducedMotionCacheForTests()
+    screen.unmount()
+    render(sheet())
+    fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
+    await flush()
+    for (const key of ["a", "shift", "delete"])
+      fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(3)
+    jest.restoreAllMocks()
+    resetReducedMotionCacheForTests()
+  })
+
   it("types punctuation from the keypad's number layer", () => {
-    render(sheet({ rotation: 180 }))
+    render(sheet())
     fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
     for (const key of ["h", "o", "numbers", "-", "letters", "shift", "o", "h"])
       fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
@@ -188,18 +211,10 @@ describe("PokemonSheet", () => {
 
   it("moves focus to the search field when Look up opens it", () => {
     const pokemon = { id: "active-001", name: "Pikachu", hp: 60, prizes: 1, damage: 0 }
-    render(sheet({ rotation: 180, mode: { kind: "edit", pokemon, slot: "active" } }))
+    render(sheet({ mode: { kind: "edit", pokemon, slot: "active" } }))
     fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
     fireEvent.press(screen.getByTestId("pokemon-lookup-seat-1"))
     expect(screen.getByTestId("pokemon-search-seat-1").props.autoFocus).toBe(true)
-  })
-
-  it("keeps the system keyboard for a seat facing the bottom edge", () => {
-    render(sheet({ rotation: 0 }))
-    const search = screen.getByTestId("pokemon-search-seat-1")
-    expect(search.props.showSoftInputOnFocus).toBe(true)
-    fireEvent(search, "focus")
-    expect(screen.queryByTestId("pokemon-keypad-seat-1")).toBeNull()
   })
 
   it("lists the seat's own deck Pokémon before typing, and places one with a tap", async () => {

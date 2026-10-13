@@ -323,6 +323,14 @@ describe("CurrentGameScreen", () => {
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
   })
 
+  it("rolls off for first when Pokémon has more than two players", () => {
+    const view = renderGame(game(3, "pokemon"))
+    layoutSeats(view, "pokemon-card-seat")
+    expect(view.getByTestId("first-player-badge").props.accessibilityLabel).toBe(
+      "Roll for who goes first",
+    )
+  })
+
   it("hands a rematch's first choice to the player who lost", () => {
     const view = renderGame()
     fireEvent.press(view.getByTestId("life-seat-1-1"))

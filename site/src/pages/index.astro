@@ -58,7 +58,7 @@ const plans = [
 
 <Base
   title="Scryve: life counter and deck tracker for Magic, Yu-Gi-Oh!, and Pokémon"
-  description="A fast life counter for 2 to 6 players with commander damage, connected games across phones, and deck tracking. Works offline. Play in your browser or on iPhone and Android."
+  description="A fast life counter for 2 to 6 players with commander damage, Pokémon HP and prizes, connected games across phones, and deck tracking. Works offline. Play in your browser or on iPhone and Android."
 >
   <header class="header">
     <a class="brand" href="/"><img src={appIcon} alt="" width="30" height="30" />Scryve</a>
@@ -123,13 +123,20 @@ const plans = [
             <div class="step-copy">
               <h2>Commander damage, per opponent.</h2>
               <p>Every seat tracks damage from each commander at the table. At 21 from one commander, that player is out.</p>
-              <button class="demo-replay" type="button" data-commander-replay>Replay demo</button>
+              <button class="demo-replay" type="button" data-replay>Replay demo</button>
+            </div>
+          </div>
+          <div class="step" data-step="pokemon">
+            <div class="step-copy">
+              <h2>Pokémon, down to the bench.</h2>
+              <p>The big number is your Active's HP. Tap a bench Pokémon to damage it. A knockout sends the prizes across the table. Pick your deck and its Pokémon place in one tap.</p>
+              <button class="demo-replay" type="button" data-replay>Replay demo</button>
             </div>
           </div>
           <div class="step" id="next" data-step="next">
             <div class="step-copy">
               <h2>Next up: Lorcana.</h2>
-              <p>Life, Life Points, and prize cards are in, with each game's formats. Lore counts up to 20, so it's the first game where the board counts the other way. After that, your vote decides.</p>
+              <p>Life, Life Points, and Pokémon HP and prizes are in, with each game's formats. Lore counts up to 20, so it's the first game where the board counts the other way. After that, your vote decides.</p>
               <ul class="next-list">
                 <li><b>Lorcana</b><span>Lore, 0 to 20</span><em>Next</em></li>
                 <li><b>Star Wars Unlimited</b><span>Base damage, usually to 30, up to six players</span><em>Vote</em></li>

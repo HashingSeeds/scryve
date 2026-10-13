@@ -7,7 +7,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { internalMutation, mutation, query } from "./_generated/server"
 import {
   appearanceIsTaken,
-  CONNECTED_PLAYER_MARK_SHAPES,
+  ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
   isPlayerMarkShape,
   resolveAppearance,
   resolvePlayerAppearances,
@@ -684,7 +684,7 @@ export const createLobby = mutation({
     assertManualCodeCandidates(args.manualCodeCandidates)
     assertAllowedColor(args.hostColor)
     if (args.hostShape !== undefined)
-      assertAllowedShape(args.hostShape, CONNECTED_PLAYER_MARK_SHAPES)
+      assertAllowedShape(args.hostShape, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const ruleset = assertRuleset(args.ruleset)
     const format = noSystem
@@ -736,7 +736,7 @@ export const createLobby = mutation({
         },
         taken: [],
         seat: 1,
-        shapes: CONNECTED_PLAYER_MARK_SHAPES,
+        shapes: ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
       }).shape,
       currentLife: args.startingLife,
       eventCount: 0,
@@ -845,7 +845,8 @@ export const claimSeat = mutation({
     const clerkUserId = String(user.clerkUserId)
     await consumeJoinAttempt(ctx, clerkUserId)
     if (args.color !== undefined) assertAllowedColor(args.color)
-    if (args.shape !== undefined) assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
+    if (args.shape !== undefined)
+      assertAllowedShape(args.shape, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)
     if (args.deviceId) assertDeviceId(args.deviceId)
     const game = await joinableInviteGame(ctx, args)
     if (!game) {
@@ -903,7 +904,7 @@ export const claimSeat = mutation({
       },
       taken: takenAppearances(players),
       seat,
-      shapes: CONNECTED_PLAYER_MARK_SHAPES,
+      shapes: ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
     })
     await ctx.db.insert("gamePlayers", {
       gameId: game._id,
@@ -1109,7 +1110,10 @@ export const publishLocalGame = mutation({
     })
     const mapping: { localId: string; playerId: Id<"gamePlayers">; seat: number }[] = []
     const playerIdsBySeat = new Map<number, Id<"gamePlayers">>()
-    for (const player of resolvePlayerAppearances(args.players, CONNECTED_PLAYER_MARK_SHAPES)) {
+    for (const player of resolvePlayerAppearances(
+      args.players,
+      ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+    )) {
       const isHost = player.localId === args.hostLocalId
       const playerId = await ctx.db.insert("gamePlayers", {
         gameId,
@@ -1281,7 +1285,10 @@ export const publishFinishedLocalGame = mutation({
       eventSequence: args.eventCount,
     })
     const playerIdsByLocalId = new Map<string, Id<"gamePlayers">>()
-    for (const player of resolvePlayerAppearances(args.players, CONNECTED_PLAYER_MARK_SHAPES)) {
+    for (const player of resolvePlayerAppearances(
+      args.players,
+      ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES,
+    )) {
       const playerId = await ctx.db.insert("gamePlayers", {
         gameId,
         seat: player.seat,
@@ -1652,7 +1659,7 @@ export const setMyAppearance = mutation({
   },
   handler: async (ctx, args) => {
     assertAllowedColor(args.color)
-    assertAllowedShape(args.shape, CONNECTED_PLAYER_MARK_SHAPES)
+    assertAllowedShape(args.shape, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)
     const game = await gameByPublicId(ctx, args.publicId)
     if (game.status !== "lobby") throw new Error("Appearance can only change in a lobby")
     const { user, player } = await requireSeatOwner(ctx, game._id, args.seat)
@@ -1731,7 +1738,7 @@ export const startGame = mutation({
     }
     const now = Date.now()
     await ctx.db.patch(game._id, { status: "active", startedAt: now, updatedAt: now })
-    for (const player of resolvePlayerAppearances(players, CONNECTED_PLAYER_MARK_SHAPES)) {
+    for (const player of resolvePlayerAppearances(players, ACCEPTED_CONNECTED_PLAYER_MARK_SHAPES)) {
       const invalidSinceSelection =
         player.deckVersionId !== undefined &&
         !(await deckSelectionIsPlayable(ctx, player.deckVersionId, game))

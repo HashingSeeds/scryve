@@ -9,6 +9,7 @@ import { darkTheme } from "@/theme/theme"
 import { accessibleForeground, contrastRatio, relativeLuminance } from "@/utils/colorContrast"
 import * as reducedMotion from "@/utils/useReducedMotion"
 
+import { CLAIM_ARM_MS } from "./CommanderClaimBanner"
 import { commanderBoardSeats } from "./commanderDamageLayout"
 import { LifeCard, seatIdentityPlacement } from "./LifeCard"
 import { lifeControlTestId } from "./LifeControls"
@@ -435,7 +436,7 @@ describe("LifeCard", () => {
       flexDirection: "row",
       gap: 8,
     })
-    const art = MARK_ART_BOUNDS.circle
+    const art = MARK_ART_BOUNDS.heart
     expect(
       StyleSheet.flatten(
         view.getByTestId("player-mark-seat-1", { includeHiddenElements: true }).props.style,
@@ -727,15 +728,20 @@ describe("LifeCard", () => {
     expect(onPressSword).toHaveBeenCalledTimes(1)
   })
 
-  it("turns the defender's card into a claim decision", () => {
-    const onConfirm = jest.fn()
-    const onDecline = jest.fn()
-    const view = render(
+  describe("pending commander damage claims", () => {
+    const claim = (claimId: string, attackerName: string) => ({
+      claimId,
+      attackerName,
+      delta: 4,
+      onConfirm: jest.fn(),
+      onDecline: jest.fn(),
+    })
+    const claimCard = (claims: ReturnType<typeof claim>[], onChange = jest.fn()) => (
       <ThemeProvider initialContext="light">
         <LifeCard
           playerName="Ada"
           seatNumber={1}
-          life={20}
+          life={40}
           color="#41476E"
           commanderDamage={{
             ownerPlayerId: commanderIds[0],
@@ -743,61 +749,59 @@ describe("LifeCard", () => {
             rows: commanderSeats.rows,
             columns: commanderSeats.columns,
             incoming: {},
-            pendingClaims: [
-              {
-                claimId: "claim-1",
-                attackerName: "Grace",
-                delta: 4,
-                onConfirm,
-                onDecline,
-              },
-            ],
+            pendingClaims: claims,
           }}
-          onChange={jest.fn()}
+          onChange={onChange}
         />
-      </ThemeProvider>,
+      </ThemeProvider>
     )
+    const renderClaims = (claims: ReturnType<typeof claim>[], onChange = jest.fn()) => {
+      const view = render(claimCard(claims, onChange))
+      fireEvent(view.getByTestId("life-card-seat-1"), "layout", {
+        nativeEvent: { layout: { width: 360, height: 280, x: 0, y: 0 } },
+      })
+      return view
+    }
 
-    expect(view.getByText("Grace dealt 4")).toBeTruthy()
-    fireEvent.press(view.getByTestId("commander-confirm-seat-1-claim-1"))
-    fireEvent.press(view.getByTestId("commander-decline-seat-1-claim-1"))
-    expect(onConfirm).toHaveBeenCalledTimes(1)
-    expect(onDecline).toHaveBeenCalledTimes(1)
-  })
+    it("queues claims in a banner while the seat's own life controls keep working", () => {
+      const onChange = jest.fn()
+      const first = claim("claim-1", "Grace")
+      const view = renderClaims([first, claim("claim-2", "Linus")], onChange)
 
-  it("keeps claim text readable on the dark overlay for light seat colors", () => {
-    const view = render(
-      <ThemeProvider initialContext="light">
-        <LifeCard
-          playerName="Ada"
-          seatNumber={1}
-          life={20}
-          color="#F5F0E6"
-          commanderDamage={{
-            ownerPlayerId: commanderIds[0],
-            seats: commanderSeats.seats,
-            rows: commanderSeats.rows,
-            columns: commanderSeats.columns,
-            incoming: {},
-            pendingClaims: [
-              {
-                claimId: "claim-1",
-                attackerName: "Grace",
-                delta: 4,
-                onConfirm: jest.fn(),
-                onDecline: jest.fn(),
-              },
-            ],
-          }}
-          onChange={jest.fn()}
-        />
-      </ThemeProvider>,
-    )
+      expect(view.getByText("Grace dealt 4")).toBeTruthy()
+      expect(view.getByText("1 more")).toBeTruthy()
+      fireEvent.press(view.getByTestId(lifeControlTestId(1, -1)))
+      fireEvent.press(view.getByTestId(lifeControlTestId(1, 1)))
+      expect(onChange.mock.calls).toEqual([[-1], [1]])
 
-    const headline = StyleSheet.flatten(view.getByText("Grace dealt 4").props.style)
-    const caption = StyleSheet.flatten(view.getByText("Confirm commander damage").props.style)
-    expect(headline.color).toBe("#FFFFFF")
-    expect(caption.color).toBe("#FFFFFF")
+      act(() => jest.advanceTimersByTime(CLAIM_ARM_MS))
+      fireEvent.press(view.getByTestId("commander-decline-seat-1-claim-1"))
+      fireEvent.press(view.getByTestId("commander-confirm-seat-1-claim-1"))
+      expect(first.onDecline).toHaveBeenCalledTimes(1)
+      expect(first.onConfirm).toHaveBeenCalledTimes(1)
+    })
+
+    it("ignores taps on a claim until it has been on show for a beat", () => {
+      const first = claim("claim-1", "Grace")
+      const next = claim("claim-2", "Linus")
+      const view = renderClaims([first, next])
+
+      const confirm = () => view.getByTestId("commander-confirm-seat-1-claim-1")
+      expect(confirm().props.accessibilityState.disabled).toBe(true)
+      fireEvent.press(confirm())
+      expect(first.onConfirm).not.toHaveBeenCalled()
+      act(() => jest.advanceTimersByTime(CLAIM_ARM_MS))
+      expect(confirm().props.accessibilityState.disabled).toBe(false)
+      fireEvent.press(confirm())
+      expect(first.onConfirm).toHaveBeenCalledTimes(1)
+
+      view.rerender(claimCard([next]))
+      fireEvent.press(view.getByTestId("commander-confirm-seat-1-claim-2"))
+      expect(next.onConfirm).not.toHaveBeenCalled()
+      act(() => jest.advanceTimersByTime(CLAIM_ARM_MS))
+      fireEvent.press(view.getByTestId("commander-confirm-seat-1-claim-2"))
+      expect(next.onConfirm).toHaveBeenCalledTimes(1)
+    })
   })
 
   it("closes the life editor on Android Back", () => {

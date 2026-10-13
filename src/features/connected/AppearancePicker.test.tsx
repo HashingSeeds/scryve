@@ -28,7 +28,7 @@ describe("AppearancePicker", () => {
     fireEvent.press(view.getByTestId("appearance-shape-square"))
     expect(onChange).toHaveBeenCalledTimes(2)
   })
-  it("offers heart locally while preserving the compatible hosted catalog", () => {
+  it("offers heart instead of circle locally and in hosted lobbies", () => {
     const onChange = jest.fn()
     const view = render(
       <ThemeProvider initialContext="dark">
@@ -48,7 +48,7 @@ describe("AppearancePicker", () => {
       </ThemeProvider>,
     )
     expect(view.getAllByRole("radio")).toHaveLength(14)
-    expect(view.getByTestId("appearance-shape-circle")).toBeEnabled()
-    expect(view.queryByTestId("appearance-shape-heart")).toBeNull()
+    expect(view.queryByTestId("appearance-shape-circle")).toBeNull()
+    expect(view.getByTestId("appearance-shape-heart")).toBeEnabled()
   })
 })

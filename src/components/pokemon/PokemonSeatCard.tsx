@@ -60,8 +60,6 @@ export interface PokemonSeatCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
-  /** why: a seat on the screen's bottom edge is the one the keyboard covers, so its sheet lifts the board. */
-  touchesBottomEdge?: boolean
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   disabled?: boolean
@@ -80,7 +78,7 @@ const FOCUS_MS = 3_000
 const STANDARD_PRIZES = 6
 const BENCH_HEIGHT = 56
 const COMPACT_BENCH_HEIGHT = 44
-const PRIZE_PIP_ASPECT = 13 / 17
+const PRIZE_PIP_ASPECT = 4 / 5
 const HERO_CAPTION_HEIGHT = 44
 const COMPACT_HERO_CAPTION_HEIGHT = 24
 const CRAMPED_CONTENT_HEIGHT = 260
@@ -106,7 +104,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   dice,
   contentRotation = 0,
   contentInsets,
-  touchesBottomEdge,
   menuCorner,
   menuEdgeCenter,
   disabled,
@@ -344,7 +341,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     fontScale: 1,
   })
   const prizePips = Math.max(STANDARD_PRIZES, prizes)
-  const pipGap = cramped ? 2 : 3
+  const pipGap = cramped ? 1.5 : 2
   const pipHeight = (prizeRowHeight - pipGap * 2) / 3
   const pip = { width: pipHeight * PRIZE_PIP_ASPECT, height: pipHeight, gap: pipGap }
   const tint = (alpha: number) => overlayTint(ink, alpha)
@@ -688,7 +685,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       {sheetMode && canEdit ? (
         <PokemonSheet
           seatNumber={seatNumber}
-          liftsBoard={touchesBottomEdge}
           deck={deck}
           color={color}
           rotation={contentRotation}
