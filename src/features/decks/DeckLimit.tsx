@@ -50,7 +50,12 @@ function DeckCountLabel({ access }: { access?: CloudAccess }) {
       hitSlop={12}
       onPress={() => void billing.presentPaywall()}
     >
-      <Text size="md" style={themed($count)} text={`${capacity.used}/${capacity.limit}`} />
+      <Text
+        size="md"
+        maxFontSizeMultiplier={1.5}
+        style={themed($count)}
+        text={`${capacity.used}/${capacity.limit}`}
+      />
     </TouchableOpacity>
   )
 }

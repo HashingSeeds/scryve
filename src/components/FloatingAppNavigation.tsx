@@ -53,7 +53,13 @@ export function FloatingAppNavigation({
         style={themed($destination)}
         onPress={onDestination}
       >
-        <Text text={destinationLabel} weight="bold" size="xs" />
+        <Text
+          text={destinationLabel}
+          weight="bold"
+          size="xs"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.5}
+        />
       </Pressable>
     </View>
   )

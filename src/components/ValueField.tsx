@@ -79,7 +79,13 @@ export function ValueField({
           ]}
         />
       </Animated.View>
-      <Text pointerEvents="none" text={label} style={themed($caption)} />
+      <Text
+        pointerEvents="none"
+        text={label}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.5}
+        style={themed($caption)}
+      />
       <View style={themed($zones)}>
         {ZONES.map(({ direction, glyph, word }) => {
           const atBound = disabled || (direction < 0 ? value <= min : value >= max)
@@ -160,14 +166,19 @@ const $zones: ThemedStyle<ViewStyle> = () => ({
   ...StyleSheet.absoluteFill,
   flexDirection: "row",
 })
-const $zone: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+const $zone: ThemedStyle<ViewStyle> = () => ({
   flex: 1,
   justifyContent: "center",
-  paddingHorizontal: spacing.md,
 })
 const $dimmed: ViewStyle = { opacity: 0.5 }
-const $zoneLeft: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-start" })
-const $zoneRight: ThemedStyle<ViewStyle> = () => ({ alignItems: "flex-end" })
+const $zoneLeft: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "flex-start",
+  paddingStart: spacing.md,
+})
+const $zoneRight: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  alignItems: "flex-end",
+  paddingEnd: spacing.md,
+})
 const $glyph: ThemedStyle<TextStyle> = ({ colors }) => ({
   color: colors.text,
   fontSize: 40,
