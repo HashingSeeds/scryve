@@ -339,6 +339,45 @@ describe("LocalGameRepository", () => {
     expect(repository.loadHistoryDetail(finished.id)?.game.status).toBe("finished")
   })
 
+  it("archives a No system game without a system so History does not file it as Magic", () => {
+    const repository = new LocalGameRepository(new MemoryStorage())
+    const finished = applyGameCommand(
+      makeGame(),
+      { type: "game.finish" },
+      defaultCommandContext(asDeviceId("device")),
+    )
+    repository.archiveGame(finished)
+    expect(repository.loadHistory()[0].system).toBeUndefined()
+  })
+
+  it("repairs No system games an earlier build archived as Magic, keeping pre-No-system Magic games", () => {
+    const storage = new MemoryStorage()
+    const context = defaultCommandContext(asDeviceId("device"))
+    const afterNoSystem = Date.parse("2026-10-01T00:00:00Z")
+    const noSystem = applyGameCommand(makeGame(afterNoSystem), { type: "game.finish" }, context)
+    const magic = applyGameCommand(
+      { ...makeGame(afterNoSystem + 1), system: "mtg", format: "commander" },
+      { type: "game.finish" },
+      context,
+    )
+    const legacyMagic = applyGameCommand(makeGame(1), { type: "game.finish" }, context)
+    for (const game of [noSystem, magic, legacyMagic])
+      new LocalGameRepository(storage).archiveGame(game)
+    const index = JSON.parse(storage.getString(LOCAL_KEYS.historyIndex)!)
+    storage.set(
+      LOCAL_KEYS.historyIndex,
+      JSON.stringify(index.map((game: object) => ({ ...game, system: "mtg" }))),
+    )
+    storage.delete(LOCAL_KEYS.noSystemHistoryRepaired)
+
+    const history = new LocalGameRepository(storage).loadHistory()
+
+    expect(history.find(({ id }) => id === noSystem.id)?.system).toBeUndefined()
+    expect(history.find(({ id }) => id === magic.id)?.system).toBe("mtg")
+    expect(history.find(({ id }) => id === legacyMagic.id)?.system).toBe("mtg")
+    expect(JSON.parse(storage.getString(LOCAL_KEYS.historyIndex)!)).toEqual(history)
+  })
+
   it("keeps the recorded winner on the archived summary and its detail", () => {
     const storage = new MemoryStorage()
     const repository = new LocalGameRepository(storage)

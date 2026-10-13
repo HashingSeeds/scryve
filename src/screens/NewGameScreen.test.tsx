@@ -424,6 +424,23 @@ describe("NewGameScreen", () => {
     })
   })
 
+  it("keeps a No system board's setup instead of the saved system default", () => {
+    const initialGame = createLocalGame({
+      players: [
+        { name: "Ada", color: "#FF0000" },
+        { name: "Grace", color: "#0000FF" },
+      ],
+      startingLife: 40,
+    })
+    const view = setup({
+      initialGame,
+      defaults: { ...DEFAULT_LOCAL_SETTINGS, defaultSystem: "mtg", defaultFormat: "commander" },
+    })
+
+    expect(view.getByTestId("play-system-none").props.accessibilityState.selected).toBe(true)
+    expect(view.getByLabelText("Life, 40")).toBeTruthy()
+  })
+
   it("starts Pokémon at six Prize cards", () => {
     const onStartLocal = jest.fn()
     const view = setup({ onStartLocal })
