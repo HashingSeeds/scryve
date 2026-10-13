@@ -248,3 +248,87 @@ it("retries a paused lookup after the Scryfall pause expires", async () => {
     jest.useRealTimers()
   }
 })
+
+it("drops rate-limited lookups once their cards leave the screen", async () => {
+  jest.useFakeTimers()
+  try {
+    act(() => {
+      jest.advanceTimersByTime(60_001)
+    })
+    mockFallbacks.mockRejectedValueOnce(
+      new ConvexError({ code: "rate_limited", message: "Slow down.", retryAfterMs: 1_000 }),
+    )
+    const view = render(cards("left-behind"))
+    await act(async () => {})
+    expect(mockFallbacks).toHaveBeenCalledTimes(1)
+    view.unmount()
+    await act(async () => {
+      jest.advanceTimersByTime(5_000)
+    })
+    expect(mockFallbacks).toHaveBeenCalledTimes(1)
+    mockFallbacks.mockResolvedValue(["back"])
+    const reopened = render(
+      <>
+        {cards("left-behind")}
+        {cards("next-deck")}
+      </>,
+    )
+    await act(async () => {})
+    expect(mockFallbacks).toHaveBeenCalledTimes(3)
+    expect(reopened.getAllByTestId("thumb")[0].props.source).toEqual([{ uri: "back" }])
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+it("spaces a deck's lookups by the server's retry hint after a rate limit", async () => {
+  jest.useFakeTimers()
+  try {
+    act(() => {
+      jest.advanceTimersByTime(60_001)
+    })
+    const started: number[] = []
+    mockFallbacks.mockImplementation((args) => {
+      started.push(Date.now())
+      if (started.length === 2)
+        return Promise.reject(
+          new ConvexError({ code: "rate_limited", message: "Slow down.", retryAfterMs: 1_000 }),
+        )
+      return Promise.resolve([`image-${(args as { cardId: string }).cardId}`])
+    })
+    const view = render(
+      <ThemeProvider initialContext="dark">
+        {Array.from({ length: 4 }, (_, index) => (
+          <CardImage
+            key={index}
+            game="mtg"
+            cardId={`deck-${index}`}
+            style={style}
+            accessibilityLabel={`Card ${index}`}
+            testID={`deck-${index}`}
+          />
+        ))}
+      </ThemeProvider>,
+    )
+    await act(async () => {})
+    expect(started).toHaveLength(2)
+    await act(async () => {
+      jest.advanceTimersByTime(999)
+    })
+    expect(started).toHaveLength(2)
+    for (let step = 0; step < 5; step += 1)
+      await act(async () => {
+        jest.advanceTimersByTime(1_000)
+      })
+    expect(started).toHaveLength(5)
+    expect(started.slice(2).map((at, index) => at - started[index + 1])).toEqual([
+      1_000, 2_000, 2_000,
+    ])
+    for (let index = 0; index < 4; index += 1)
+      expect(view.getByTestId(`deck-${index}`).props.source).toEqual([
+        { uri: `image-deck-${index}` },
+      ])
+  } finally {
+    jest.useRealTimers()
+  }
+})
