@@ -261,6 +261,7 @@ export function PokemonSheet({
   const showSearch = lookupOpen && searchable
   const wanted = query.trim().toLowerCase()
   const deckHits = lookupOpen ? deck.filter(({ name }) => name.toLowerCase().includes(wanted)) : []
+  const showResults = deckHits.length > 0 || (showSearch && catalog.searching)
   const inDeck = new Set(deckHits.map(({ cardId }) => cardId))
   const results = [
     ...deckHits.map(({ cardId, name, copies }) => ({
@@ -340,45 +341,51 @@ export function PokemonSheet({
             />
           ) : null}
 
+          {showResults ? (
+            <ScrollView
+              testID={`pokemon-results-seat-${seatNumber}`}
+              keyboardShouldPersistTaps="handled"
+              style={$results}
+              contentContainerStyle={themed($resultsContent)}
+            >
+              {catalog.busy ? <ActivityIndicator color={ink} /> : null}
+              {catalog.error ? <Text text={catalog.error} size="xxs" style={inkStyle} /> : null}
+              {hits && results.length === 0 ? (
+                <Text text="No cards found" size="xxs" style={[inkStyle, $dim]} />
+              ) : null}
+              {results.slice(0, MAX_RESULTS).map(({ detail, ...hit }) => {
+                return (
+                  <BoardPressable
+                    key={hit.cardId}
+                    testID={`pokemon-result-${hit.cardId}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${hit.name}${detail ? `, ${detail}` : ""}`}
+                    accessibilityState={{ busy: picking === hit.cardId }}
+                    disabled={picking !== undefined}
+                    onPress={() => void pickHit(hit)}
+                    style={({ pressed }) => [
+                      themed($result),
+                      button,
+                      pressed && $pressed,
+                      picking === hit.cardId && $dim,
+                    ]}
+                  >
+                    <Text text={hit.name} size="xs" numberOfLines={1} style={[$grow, inkStyle]} />
+                    {detail ? (
+                      <Text text={detail} size="xxs" numberOfLines={1} style={[inkStyle, $dim]} />
+                    ) : null}
+                  </BoardPressable>
+                )
+              })}
+            </ScrollView>
+          ) : null}
+
           <ScrollView
             testID={`pokemon-sheet-body-seat-${seatNumber}`}
             keyboardShouldPersistTaps="handled"
-            style={$body}
+            style={[$body, showResults && $bodyUnderResults]}
             contentContainerStyle={themed(compact ? $compactBodyContent : $bodyContent)}
           >
-            {deckHits.length > 0 || (showSearch && catalog.searching) ? (
-              <View testID={`pokemon-results-seat-${seatNumber}`} style={themed($resultsContent)}>
-                {catalog.busy ? <ActivityIndicator color={ink} /> : null}
-                {catalog.error ? <Text text={catalog.error} size="xxs" style={inkStyle} /> : null}
-                {hits && results.length === 0 ? (
-                  <Text text="No cards found" size="xxs" style={[inkStyle, $dim]} />
-                ) : null}
-                {results.slice(0, MAX_RESULTS).map(({ detail, ...hit }) => {
-                  return (
-                    <BoardPressable
-                      key={hit.cardId}
-                      testID={`pokemon-result-${hit.cardId}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${hit.name}${detail ? `, ${detail}` : ""}`}
-                      accessibilityState={{ busy: picking === hit.cardId }}
-                      disabled={picking !== undefined}
-                      onPress={() => void pickHit(hit)}
-                      style={({ pressed }) => [
-                        themed($result),
-                        button,
-                        pressed && $pressed,
-                        picking === hit.cardId && $dim,
-                      ]}
-                    >
-                      <Text text={hit.name} size="xs" numberOfLines={1} style={[$grow, inkStyle]} />
-                      {detail ? (
-                        <Text text={detail} size="xxs" numberOfLines={1} style={[inkStyle, $dim]} />
-                      ) : null}
-                    </BoardPressable>
-                  )
-                })}
-              </View>
-            ) : null}
             {pickError ? <Text text={pickError} size="xxs" style={inkStyle} /> : null}
 
             <View style={themed($row)}>
@@ -582,6 +589,9 @@ export function PokemonSheet({
 
 const $grow: ViewStyle = { flex: 1, minWidth: 0 }
 const $body: ViewStyle = { flex: 1 }
+const $results: ViewStyle = { flexGrow: 0, flexShrink: 1, maxHeight: "50%" }
+// why: a sideways seat is short, and without a floor the results squeeze the Name and HP row to a sliver.
+const $bodyUnderResults: ViewStyle = { minHeight: 56 }
 const $beside: ViewStyle = { flexDirection: "row" }
 const $keypadBeside: ViewStyle = { flex: 2, justifyContent: "flex-end" }
 const $dim: TextStyle = { opacity: 0.75 }

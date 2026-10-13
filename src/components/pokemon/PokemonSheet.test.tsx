@@ -1,6 +1,6 @@
 import { AccessibilityInfo } from "react-native"
 import * as Haptics from "expo-haptics"
-import { act, fireEvent, render, screen } from "@testing-library/react-native"
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native"
 
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { ThemeProvider } from "@/theme/context"
@@ -246,6 +246,26 @@ describe("PokemonSheet", () => {
       hp: 330,
       prizes: 2,
     })
+  })
+
+  it("scrolls results on their own so the Name, HP and Prizes form stays outside them", async () => {
+    mockQuery.mockResolvedValue({
+      revision: 1,
+      cards: [{ name: "Pikachu", cardId: "sv01-063", category: "Pokemon", quantity: 4 }],
+    })
+    render(sheet({ deck: { ownerId: "owner-1", versionId: "version-1" } }))
+    await flush()
+
+    const results = screen.getByTestId("pokemon-results-seat-1")
+    expect(within(results).getByTestId("pokemon-result-sv01-063")).toBeTruthy()
+    for (const field of [
+      "pokemon-name-input-seat-1",
+      "pokemon-prizes-1-seat-1",
+      "pokemon-place-seat-1",
+    ]) {
+      expect(screen.getByTestId(field)).toBeTruthy()
+      expect(within(results).queryByTestId(field)).toBeNull()
+    }
   })
 
   it("lists a cached deck offline, and a tap fills the name so only HP is left", async () => {
