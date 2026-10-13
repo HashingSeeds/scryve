@@ -37,7 +37,7 @@ import {
   type PokemonInPlay,
 } from "../../../convex/lib/table"
 import { BoardPressable } from "../BoardPressable"
-import { COMPACT_DICE_CHIP_HEIGHT, DICE_CHIP_HEIGHT, DiceChips } from "../DiceChips"
+import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
@@ -142,9 +142,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const cramped = Boolean(compact) || (layer.height > 0 && layer.height < CRAMPED_CONTENT_HEIGHT)
   const padding = cramped ? spacing.xxs : spacing.xs
   const benchHeight = cramped ? COMPACT_BENCH_HEIGHT : BENCH_HEIGHT
-  const chipClearance = diceChips?.length
-    ? (cramped ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) + spacing.xxxs
-    : 0
   const identityMetrics = seatIdentityMetrics(cramped)
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
@@ -339,7 +336,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
       insets.top -
       insets.bottom -
       clearance.top -
-      chipClearance -
       benchHeight -
       prizeRowHeight -
       bottomRowLift -
@@ -395,7 +391,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           StyleSheet.absoluteFill,
           rotatedLayerStyle(contentRotation, cardSize.width, cardSize.height),
           {
-            paddingTop: padding + insets.top + clearance.top + chipClearance,
+            paddingTop: padding + insets.top + clearance.top,
             paddingBottom: padding + insets.bottom,
             paddingLeft: padding + insets.left,
             paddingRight: padding + insets.right,
@@ -687,8 +683,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           compact={cramped}
           contentRotation={contentRotation}
           cardSize={cardSize}
-          top={padding + insets.top + clearance.top}
-          left={padding + insets.left + clearance.left}
+          nameRow={{ bottom: padding + insets.bottom + bottomRowLift, height: prizeRowHeight }}
           chips={diceChips}
           onClear={dice.onClearChip}
         />

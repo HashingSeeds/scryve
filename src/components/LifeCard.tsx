@@ -33,7 +33,7 @@ import {
 } from "./CommanderDamageCardControls"
 import { CommanderStrip } from "./CommanderStrip"
 import { CounterChips, type SeatTable } from "./CounterChips"
-import { DICE_CHIP_HEIGHT, COMPACT_DICE_CHIP_HEIGHT, DiceChips } from "./DiceChips"
+import { DiceChips } from "./DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "./DiceSeatOverlay"
 import { LifeControls, useRecentDelta } from "./LifeControls"
 import { LifeEditor } from "./LifeEditor"
@@ -248,15 +248,6 @@ export const LifeCard = memo(function LifeCard({
       { scale: 1 + (32 / resolvedLifeFontSize - 1) * overviewProgress.value },
     ],
   }))
-  const contentHeight = Math.abs(contentRotation) === 90 ? cardSize.width : cardSize.height
-  // why: tucked under the life total, a result chip stays clear of the menu and the counter row; a short card pins it to the bottom edge instead.
-  const diceChipTop = Math.min(
-    contentHeight / 2 + getLifeLineHeight(resolvedLifeFontSize) / 2,
-    contentHeight -
-      (compact ? COMPACT_DICE_CHIP_HEIGHT : DICE_CHIP_HEIGHT) -
-      cardPadding -
-      (contentInsets?.[CONTENT_BOTTOM_EDGE[contentRotation]] ?? 0),
-  )
   const overviewCloseStyle = useAnimatedStyle(() => ({ opacity: overviewProgress.value }))
   const boardStyle = useAnimatedStyle(() => ({
     opacity: boardBounds ? 1 : 0,
@@ -708,7 +699,10 @@ export const LifeCard = memo(function LifeCard({
           compact={compact}
           contentRotation={contentRotation}
           cardSize={cardSize}
-          top={diceChipTop}
+          nameRow={{
+            bottom: identityCorner.middleBottom,
+            height: seatMarkArt(shape ?? shapeForSeat(seatNumber), compact).height,
+          }}
           chips={diceChips}
           onClear={dice.onClearChip}
         />
@@ -847,7 +841,9 @@ export function seatIdentityPlacement({
       ? Math.max(run / 2 - left - gap - (underCutout && !cutoutAtMiddle ? CUTOUT_HALF_WIDTH : 0), 0)
       : undefined,
   }
-  return { layer, position }
+  // why: the middle of the edge is where a notch or home indicator sits, so anything centered on the name row rises past it even when the name tucks under.
+  const middleBottom = underCutout ? gap + inset : bottom
+  return { layer, position, middleBottom }
 }
 
 const $commanderOverview: ThemedStyle<ViewStyle> = ({ spacing }) => ({
