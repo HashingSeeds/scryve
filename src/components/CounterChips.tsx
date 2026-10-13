@@ -106,7 +106,7 @@ export function contentFrame(
   }
 }
 
-function contentInset(
+export function contentInset(
   rotation: LifeCardContentRotation,
   insets: LifeCardContentInsets | undefined,
   edge: LifeCardEdge,

@@ -41,17 +41,7 @@ type AssignmentSource = {
   onCancel?: () => void
 }
 
-type PendingClaim = {
-  kind: "claim"
-  claimId: string
-  attackerName: string
-  damage: number
-  additionalClaims: number
-  onConfirm: () => void
-  onDecline: () => void
-}
-
-export type CommanderDamageCardMode = AssignmentTarget | AssignmentSource | PendingClaim
+export type CommanderDamageCardMode = AssignmentTarget | AssignmentSource
 
 export interface CommanderDamageCardControlsProps {
   seatNumber: number
@@ -87,10 +77,7 @@ export function CommanderDamageCardControls({
     opacity: progress.value,
     transform: [{ scale: 0.98 + progress.value * 0.02 }],
   }))
-  const controlForeground =
-    mode.kind === "target" || (life !== undefined && mode.kind === "claim")
-      ? foreground
-      : theme.colors.board.text
+  const controlForeground = mode.kind === "target" ? foreground : theme.colors.board.text
 
   return (
     <Animated.View
@@ -139,28 +126,6 @@ export function CommanderDamageCardControls({
               onPress={() => mode.onChange(1)}
             />
           </View>
-        ) : mode.kind === "claim" ? (
-          <View style={[themed($zones), zonesRotationStyle(contentRotation)]}>
-            <CommanderAction
-              testID={`commander-decline-seat-${seatNumber}-${mode.claimId}`}
-              label={`Decline ${mode.damage} commander damage from ${mode.attackerName}`}
-              text="Decline"
-              foreground={controlForeground}
-              rotationStyle={rotationStyle}
-              compact={compact}
-              onPress={mode.onDecline}
-            />
-            <CommanderAction
-              testID={`commander-confirm-seat-${seatNumber}-${mode.claimId}`}
-              label={`Confirm ${mode.damage} commander damage from ${mode.attackerName}`}
-              text="Confirm"
-              foreground={controlForeground}
-              rotationStyle={rotationStyle}
-              compact={compact}
-              emphasized
-              onPress={mode.onConfirm}
-            />
-          </View>
         ) : (
           <View style={[themed($zones), zonesRotationStyle(contentRotation)]}>
             {mode.onCancel ? (
@@ -191,7 +156,7 @@ export function CommanderDamageCardControls({
         )}
       </View>
 
-      {mode.kind !== "source" ? (
+      {mode.kind === "target" ? (
         <View
           pointerEvents="none"
           accessible={life !== undefined}
@@ -201,77 +166,54 @@ export function CommanderDamageCardControls({
           accessibilityLiveRegion={life !== undefined ? "polite" : undefined}
           style={[themed($summary), rotationStyle]}
         >
-          {mode.kind === "target" ? (
-            <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
-              {life === undefined ? (
-                <Text
-                  text="↓"
-                  weight="bold"
-                  maxFontSizeMultiplier={1.2}
-                  style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
-                />
-              ) : null}
-              <View style={themed($incomingTotal)}>
-                {life !== undefined && mode.attacker ? (
-                  <View
-                    testID={`commander-attacker-seat-${seatNumber}`}
-                    style={[
-                      themed(compact ? $compactAttackerChip : $attackerChip),
-                      {
-                        backgroundColor: mode.attacker.color,
-                        borderColor: overlayTint(foreground, 0.6),
-                      },
-                    ]}
-                  >
-                    <PlayerMark
-                      seatNumber={mode.attacker.seatNumber}
-                      shape={mode.attacker.shape}
-                      color={accessibleForeground(mode.attacker.color)}
-                      insetSwordColor={mode.attacker.color}
-                      size={compact ? 22 : 30}
-                    />
-                  </View>
-                ) : null}
-                <Text
-                  testID={`commander-total-seat-${seatNumber}`}
-                  text={String(mode.total)}
-                  weight="bold"
-                  maxFontSizeMultiplier={1.2}
-                  style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
-                />
-              </View>
-              {life !== undefined ? (
-                <Text
-                  testID={`commander-life-seat-${seatNumber}`}
-                  text={`${life} life`}
-                  maxFontSizeMultiplier={1.2}
-                  style={[themed($localLife), { color: foreground }]}
-                  numberOfLines={1}
-                />
-              ) : null}
-            </View>
-          ) : mode.kind === "claim" ? (
-            <>
+          <View style={life === undefined ? themed($incomingTotal) : themed($localTotal)}>
+            {life === undefined ? (
               <Text
-                text={`${mode.attackerName} dealt ${mode.damage}`}
+                text="↓"
                 weight="bold"
-                numberOfLines={1}
                 maxFontSizeMultiplier={1.2}
-                style={[themed($headline), { color: controlForeground }]}
+                style={[themed(compact ? $compactIncoming : $incoming), { color: foreground }]}
               />
+            ) : null}
+            <View style={themed($incomingTotal)}>
+              {life !== undefined && mode.attacker ? (
+                <View
+                  testID={`commander-attacker-seat-${seatNumber}`}
+                  style={[
+                    themed(compact ? $compactAttackerChip : $attackerChip),
+                    {
+                      backgroundColor: mode.attacker.color,
+                      borderColor: overlayTint(foreground, 0.6),
+                    },
+                  ]}
+                >
+                  <PlayerMark
+                    seatNumber={mode.attacker.seatNumber}
+                    shape={mode.attacker.shape}
+                    color={accessibleForeground(mode.attacker.color)}
+                    insetSwordColor={mode.attacker.color}
+                    size={compact ? 22 : 30}
+                  />
+                </View>
+              ) : null}
               <Text
-                text={
-                  mode.additionalClaims > 0
-                    ? `Confirm commander damage · ${mode.additionalClaims} more pending`
-                    : "Confirm commander damage"
-                }
-                size="xxs"
-                numberOfLines={1}
+                testID={`commander-total-seat-${seatNumber}`}
+                text={String(mode.total)}
+                weight="bold"
                 maxFontSizeMultiplier={1.2}
-                style={[themed($caption), { color: controlForeground }]}
+                style={[themed(compact ? $compactTotal : $total), { color: foreground }]}
               />
-            </>
-          ) : null}
+            </View>
+            {life !== undefined ? (
+              <Text
+                testID={`commander-life-seat-${seatNumber}`}
+                text={`${life} life`}
+                maxFontSizeMultiplier={1.2}
+                style={[themed($localLife), { color: foreground }]}
+                numberOfLines={1}
+              />
+            ) : null}
+          </View>
         </View>
       ) : null}
     </Animated.View>
@@ -354,7 +296,6 @@ function zonesRotationStyle(rotation: LifeCardContentRotation): ViewStyle {
 
 function modeAccessibilityLabel(mode: CommanderDamageCardMode) {
   if (mode.kind === "target") return `${mode.total} commander damage from ${mode.attackerName}`
-  if (mode.kind === "claim") return `${mode.attackerName} claims ${mode.damage} commander damage`
   return `Assigning commander damage from ${mode.playerName}`
 }
 
@@ -420,12 +361,6 @@ const $compactIncoming: ThemedStyle<TextStyle> = () => ({
 const $glyph: ThemedStyle<TextStyle> = () => ({ fontSize: 64, lineHeight: 70 })
 const $compactGlyph: ThemedStyle<TextStyle> = () => ({ fontSize: 46, lineHeight: 52 })
 const $actionLabel: ThemedStyle<TextStyle> = () => ({ fontSize: 16, lineHeight: 20 })
-const $headline: ThemedStyle<TextStyle> = () => ({
-  fontSize: 16,
-  lineHeight: 20,
-  textAlign: "center",
-})
-const $caption: ThemedStyle<TextStyle> = () => ({ opacity: 0.78, textAlign: "center" })
 
 const $localOverlay: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.transparent,
