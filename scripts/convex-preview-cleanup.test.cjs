@@ -1,7 +1,8 @@
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
 
-const { isStale } = require("./convex-preview-cleanup.cjs")
+const { branchForPreview, isStale } = require("./convex-preview-cleanup.cjs")
+const { previewName } = require("./preview.cjs")
 
 test("a preview is stale once its branch is deleted", () => {
   assert.equal(isStale({ branch: "fix/x", branchExists: false, prStates: ["closed"] }), true)
@@ -23,4 +24,10 @@ test("a pushed branch without a PR keeps its preview", () => {
 test("previews named after main or production are always stale", () => {
   assert.equal(isStale({ branch: "main", branchExists: true, prStates: [] }), true)
   assert.equal(isStale({ branch: "production", branchExists: true, prStates: [] }), true)
+})
+
+test("a preview from pnpm preview:up maps back to its branch", () => {
+  const branches = ["main", "qa/full-pass"]
+  assert.equal(branchForPreview(previewName("qa/full-pass"), branches), "qa/full-pass")
+  assert.equal(branchForPreview("feat/app-rubik", branches), "feat/app-rubik")
 })
