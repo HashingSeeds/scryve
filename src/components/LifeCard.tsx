@@ -509,6 +509,7 @@ export const LifeCard = memo(function LifeCard({
           </View>
           {!localCommander ? (
             <View
+              key={contentRotation}
               pointerEvents="box-none"
               style={[
                 themed($cornerLayer),
@@ -600,7 +601,9 @@ export const LifeCard = memo(function LifeCard({
       !tableSheetOpen &&
       !dice?.view &&
       !(commanderDamage && !localCommander && commanderOverviewOpen) ? (
+        // why: switching an old game to another layout turns a mounted seat from sideways to upright, and the reused layer hid the identity on iOS; a fresh layer per rotation does not.
         <View
+          key={contentRotation}
           testID={`life-corner-layer-seat-${seatNumber}`}
           pointerEvents="box-none"
           style={[
