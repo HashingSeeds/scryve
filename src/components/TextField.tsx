@@ -7,6 +7,7 @@ import {
   TextInputProps,
   TextStyle,
   TouchableOpacity,
+  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native"
@@ -78,6 +79,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     ...TextInputProps
   } = props
   const input = useRef<TextInput>(null)
+  const { fontScale } = useWindowDimensions()
 
   const {
     themed,
@@ -108,6 +110,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     $inputStyle,
     disabled && { color: colors.textDim },
     isRTL && { textAlign: "right" as TextStyle["textAlign"] },
+    fontScale > 1 && $scaledInputStyle,
     TextInputProps.multiline && { height: "auto" },
     $inputStyleOverride,
   ]
@@ -215,6 +218,8 @@ const $inputStyle: ThemedStyle<TextStyle> = ({ colors, typography, spacing }) =>
   marginVertical: spacing.xs,
   marginHorizontal: spacing.sm,
 })
+
+const $scaledInputStyle: TextStyle = { height: "auto", minHeight: 24 }
 
 const $helperStyle: ThemedStyle<TextStyle> = ({ spacing }) => ({
   marginTop: spacing.xs,
