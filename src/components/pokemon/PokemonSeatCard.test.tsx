@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react"
-import { AccessibilityInfo, StyleSheet } from "react-native"
+import { AccessibilityInfo, Dimensions, StyleSheet } from "react-native"
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native"
 
 import { applyLocalTableAction, createLocalGame, localTableRules } from "@/features/game/domain"
@@ -458,6 +458,60 @@ describe("PokemonSeatCard", () => {
     const rows = [...new Set(pips.map(rowOf))]
 
     expect(rows.map((row) => pips.filter((pip) => rowOf(pip) === row).length)).toEqual([2, 2, 2])
+  })
+
+  it("raises a full-width top seat's bottom row until its name meets the cutout", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const row = () => {
+      const layer = StyleSheet.flatten(screen.getByTestId("pokemon-layer-seat-1").props.style)
+      const style = StyleSheet.flatten(screen.getByTestId("pokemon-bottom-row-seat-1").props.style)
+      const fromEdge = Number(layer.paddingBottom) + Number(style.marginBottom)
+      return { fromEdge, middle: fromEdge + Number(style.height) / 2 }
+    }
+    const top = {
+      contentRotation: 180,
+      contentInsets: { top: 47, right: 0, bottom: 0, left: 0 },
+    } as const
+    const view = render(<Seat harness={table} seat={0} {...top} />)
+    expect(row().fromEdge).toBe(47)
+
+    view.rerender(
+      <Seat
+        harness={table}
+        seat={0}
+        {...top}
+        screenEdges={{ top: true, right: true, bottom: false, left: true }}
+      />,
+    )
+    const nameLine = 26 * Math.min(Dimensions.get("window").fontScale, 1.3)
+    expect(row().middle).toBe(47 - 11 + nameLine / 2)
+
+    view.rerender(
+      <Seat
+        harness={table}
+        seat={0}
+        {...top}
+        staleSince={0}
+        screenEdges={{ top: true, right: true, bottom: false, left: true }}
+      />,
+    )
+    expect(row().fromEdge).toBe(47)
+
+    const dice = {
+      chips: [{ kind: "roll", roll: { tool: "coin", value: "Heads" } }] as const,
+      onPress: jest.fn(),
+      onClearChip: jest.fn(),
+    }
+    view.rerender(
+      <Seat
+        harness={table}
+        seat={0}
+        {...top}
+        dice={dice}
+        screenEdges={{ top: true, right: true, bottom: false, left: true }}
+      />,
+    )
+    expect(row().fromEdge).toBe(47)
   })
 
   it("stops taking prizes at 0 and putting them back at 6", () => {

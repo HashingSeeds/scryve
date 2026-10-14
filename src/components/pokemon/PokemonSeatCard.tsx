@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react"
 import type { LayoutChangeEvent, StyleProp, TextStyle, ViewStyle } from "react-native"
-import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native"
+import { AccessibilityInfo, Platform, StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, {
   cancelAnimation,
   Easing,
@@ -42,11 +42,13 @@ import { DiceChips } from "../DiceChips"
 import { diceCoversSeat, DiceSeatOverlay, type LifeCardDice } from "../DiceSeatOverlay"
 import { overlayTint, useRecentDelta } from "../LifeControls"
 import {
+  cornerOffset,
   getLifeLineHeight,
   type LifeCardContentInsets,
   type LifeCardContentRotation,
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
+  type LifeCardScreenEdges,
 } from "../playerCardTypes"
 import {
   SeatIdentity,
@@ -66,6 +68,7 @@ export interface PokemonSeatCardProps {
   compact?: boolean
   contentRotation?: LifeCardContentRotation
   contentInsets?: LifeCardContentInsets
+  screenEdges?: LifeCardScreenEdges
   menuCorner?: LifeCardMenuCorner
   menuEdgeCenter?: LifeCardMenuEdge
   disabled?: boolean
@@ -83,6 +86,9 @@ const KNOCKOUT_TOAST_MS = 6_000
 const FOCUS_MS = 3_000
 const STANDARD_PRIZES = 6
 const BENCH_HEIGHT = 56
+const CUTOUT_ENDS_ABOVE_INSET = 11
+const NAME_LINE_HEIGHT = 26
+const NAME_MAX_FONT_SCALE = 1.3
 const COMPACT_BENCH_HEIGHT = 44
 const PRIZE_PIP_ASPECT = 4 / 5
 const HERO_CAPTION_HEIGHT = 44
@@ -110,6 +116,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   dice,
   contentRotation = 0,
   contentInsets,
+  screenEdges,
   menuCorner,
   menuEdgeCenter,
   disabled,
@@ -125,6 +132,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     themed,
     theme: { spacing },
   } = useAppTheme()
+  const { fontScale } = useWindowDimensions()
   const ink = accessibleForeground(color)
   const board = pokemonBoardOf(table.table, playerId)
   const rules = table.tableRules.pokemon ?? { benchSize: 5, damageStep: 10 }
@@ -150,12 +158,24 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
     Math.max(identityMetrics.edge, menu - inset) - padding
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
-  const bottomRowLift =
-    seatIdentityBottomGap(
-      identityMetrics.edge,
-      insets.bottom,
-      CONTENT_EDGES[contentRotation].bottom,
-    ) - padding
+  const edges = CONTENT_EDGES[contentRotation]
+  // why: boards hide the status bar, and a camera cutout ends at least 11pt above its inset, so a full-width seat's row rises until its name line meets that line: the mark and prizes sit in the corners beside the cutout. Dice chips and the stale line are taller than the name, so the row stays put while they show.
+  const besideCutout =
+    edges.bottom !== "bottom" &&
+    insets.bottom > 0 &&
+    !!screenEdges?.[edges.left] &&
+    !!screenEdges[edges.right] &&
+    !diceChips?.length &&
+    staleSince === undefined
+  const nameLine = NAME_LINE_HEIGHT * Math.min(fontScale, NAME_MAX_FONT_SCALE)
+  const bottomRowLift = besideCutout
+    ? Math.max(
+        cornerOffset(identityMetrics.edge, edges.bottom, edges.left, contentInsets, screenEdges),
+        insets.bottom - CUTOUT_ENDS_ABOVE_INSET + nameLine / 2 - prizeRowHeight / 2,
+      ) -
+      insets.bottom -
+      padding
+    : seatIdentityBottomGap(identityMetrics.edge, insets.bottom, edges.bottom) - padding
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)
