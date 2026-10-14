@@ -5,6 +5,7 @@ import * as Updates from "expo-updates"
 
 import { LAUNCH_MARK, LAUNCH_MARK_SIZE } from "@/features/launch/LaunchFallback"
 import { loadString, saveString } from "@/utils/storage"
+import { knownReducedMotion } from "@/utils/useReducedMotion"
 
 const FOREGROUND_CHECK_INTERVAL_MS = 60 * 60 * 1000
 const NOTICED_UPDATE_KEY = "count.local.update.noticed.v1"
@@ -196,10 +197,7 @@ export function useRestarting() {
   return useSyncExternalStore(subscribeRestarting, restartingSnapshot, restartingSnapshot)
 }
 
-/**
- * why: RestartCurtain fades to the launch mark first, and the reload screen (white by default)
- * shows that same mark, so the curtain, reload screen, and LaunchFallback read as one image.
- */
+// why: expo-updates' reload screen defaults to white, which flashes between the black app and LaunchFallback.
 export function restartToUpdate() {
   if (restarting) return
   setRestarting(true)
@@ -209,10 +207,11 @@ export function restartToUpdate() {
         backgroundColor: "#000000",
         image: {
           url: Image.resolveAssetSource(LAUNCH_MARK).uri,
+          // why: the docs say pixels, but native sizes this in points (iOS) and dp (Android).
           width: LAUNCH_MARK_SIZE,
           height: LAUNCH_MARK_SIZE,
         },
-        fade: true,
+        fade: knownReducedMotion() === false,
       },
     }).catch(() => setRestarting(false))
   }, RESTART_FADE_MS)
