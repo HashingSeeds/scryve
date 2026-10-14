@@ -6,7 +6,7 @@ import { router } from "expo-router"
 import * as Sentry from "@sentry/react-native"
 import Head from "expo-router/head"
 
-import { APPLE_STANDARD_EULA_URL } from "@/content/legalLinks"
+import { openAppleStandardEula } from "@/content/legalLinks"
 import {
   SupportScreen,
   type SupportFeedback,
@@ -87,7 +87,7 @@ export default function SupportRoute() {
         onOpenPrivacy={() => router.push("/privacy")}
         onOpenTerms={() => router.push("/terms")}
         onOpenLicenseAgreement={
-          Platform.OS === "ios" ? () => void Linking.openURL(APPLE_STANDARD_EULA_URL) : undefined
+          Platform.OS === "ios" ? () => void openAppleStandardEula() : undefined
         }
         onOpenCookiePolicy={() => router.push("/cookie-policy")}
         appVersion={Application.nativeApplicationVersion ?? Constants.expoConfig?.version}
