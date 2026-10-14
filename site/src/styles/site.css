@@ -549,23 +549,23 @@ figure {
   border-radius: 6px;
 }
 
+/* Two by three like the app's prize grid, sized from the row so every seat draws whole cards. */
 .pk-pips {
+  --gap: max(1px, calc(var(--u) * 0.008));
+  --pip: calc((var(--u) * 0.12 - var(--gap) * 2) / 3);
   display: grid;
-  height: 100%;
-  gap: 2px;
-  grid-auto-rows: 1fr;
-  grid-template-columns: repeat(2, auto);
+  gap: var(--gap);
+  grid-auto-rows: var(--pip);
+  grid-template-columns: repeat(2, calc(var(--pip) * 0.8));
 }
 
 .pk-pips i {
-  height: 100%;
-  aspect-ratio: 4 / 5;
-  border-radius: 2px;
+  border-radius: max(1px, calc(var(--pip) * 0.16));
   background: #fff;
 }
 
 .pk-pips i.gone {
-  border: 1.5px solid rgb(255 255 255 / 45%);
+  border: max(1px, calc(var(--pip) * 0.12)) solid rgb(255 255 255 / 45%);
   background: none;
 }
 
