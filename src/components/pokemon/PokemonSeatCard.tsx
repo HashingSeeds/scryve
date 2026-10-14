@@ -517,6 +517,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             <Text
               text={canEdit ? "Place Active" : "No Active"}
               size={cramped ? "md" : "lg"}
+              maxFontSizeMultiplier={1.5}
               weight="medium"
               style={{ color: ink }}
             />
