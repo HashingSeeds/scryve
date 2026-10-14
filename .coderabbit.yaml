@@ -11,6 +11,9 @@ reviews:
   allow_author_approval: false
   request_changes_workflow: true
   auto_review:
+    # why: the allowance is about one review an hour, shared by every agent since all PRs open as
+    # Matthew, and opening a PR spent one even when the land skill only needed a Codex review.
+    enabled: false
     # why: every push spent a review, and agent fix rounds used up the per-account limit; ask with
     # `@coderabbitai full review` once a PR's fixes are pushed.
     auto_incremental_review: false
