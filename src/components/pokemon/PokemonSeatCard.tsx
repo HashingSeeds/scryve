@@ -146,7 +146,6 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const padding = cramped ? spacing.xxs : spacing.xs
   const benchHeight = cramped ? COMPACT_BENCH_HEIGHT : BENCH_HEIGHT
   const identityMetrics = seatIdentityMetrics(cramped)
-  // why: the bench ends on the same line as the seat mark and prize pips, or past the menu where it sits over this corner.
   const benchSide = (inset: number, menu: number) =>
     Math.max(identityMetrics.edge, menu - inset) - padding
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.

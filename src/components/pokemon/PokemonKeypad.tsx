@@ -174,7 +174,6 @@ const DELETE_PATHS = [
   "M11.5 9 L17 15 M17 9 L11.5 15",
 ]
 
-/** why: only the outline (the first path) fills, so a filled shift reads as caps on like the system keyboard. */
 function KeyIcon({
   paths,
   color,
