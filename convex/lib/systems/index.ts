@@ -51,3 +51,10 @@ export function hasCommandZone(system: unknown, format: string | undefined): boo
     false
   )
 }
+
+const LIFE_FLOORED_AT_ZERO: ReadonlySet<unknown> = new Set<SystemId>(["ygo"])
+
+export function flooredLifeDelta(system: unknown, life: number, delta: number): number {
+  if (!LIFE_FLOORED_AT_ZERO.has(system)) return delta
+  return Math.max(delta, Math.min(0, -life))
+}

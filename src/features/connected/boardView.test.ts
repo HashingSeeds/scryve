@@ -1,6 +1,6 @@
 import { structurallyEqual } from "@/utils/structurallyEqual"
 
-import { connectedBoardView, connectedLives } from "./boardView"
+import { connectedBoardView, connectedLastStanding, connectedLives } from "./boardView"
 import type { ConnectedDisplayProjection } from "./model"
 
 function projection(
@@ -51,5 +51,12 @@ describe("connectedBoardView", () => {
     expect(
       connectedBoardView(projection([40, 31], { status: "finished" })).finalEventSequence,
     ).toBe(71)
+  })
+})
+
+describe("connectedLastStanding", () => {
+  it("names the only seat left once the other hits 0", () => {
+    expect(connectedLastStanding(projection([0, 8000], { system: "ygo" }))).toBe("player-2")
+    expect(connectedLastStanding(projection([100, 8000], { system: "ygo" }))).toBeUndefined()
   })
 })

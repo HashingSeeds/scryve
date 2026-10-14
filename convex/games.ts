@@ -47,7 +47,7 @@ import {
   UNTOUCHED_REMATCH_LIFETIME_MS,
 } from "./lib/policy"
 import { recordGameResults } from "./lib/results"
-import { tableRules } from "./lib/systems"
+import { flooredLifeDelta, tableRules } from "./lib/systems"
 import {
   applyTableAction as reduceTableAction,
   canonicalJson,
@@ -1638,7 +1638,7 @@ async function statusForOperation(
     (operation.kind === "life.changed"
       ? event.kind === "life.changed" &&
         event.playerId === operation.playerId &&
-        event.delta === operation.delta
+        requestedLifeDelta(event) === operation.delta
       : operation.kind === "table.action"
         ? event.kind === operation.action.kind &&
           event.playerId === operation.action.playerId &&
@@ -1818,6 +1818,11 @@ export const rotateInvite = mutation({
   },
 })
 
+/** why: a floored change stores the delta the client sent in `actionIdentity`; matching on the stored delta would turn its retries and status checks into conflicts. */
+function requestedLifeDelta(event: Doc<"gameEvents">) {
+  return event.actionIdentity === undefined ? event.delta : Number(event.actionIdentity)
+}
+
 export const changeLife = mutation({
   args: {
     publicId: v.string(),
@@ -1860,7 +1865,7 @@ export const changeLife = mutation({
       if (
         duplicate.playerId !== target._id ||
         duplicate.actorUserId !== user._id ||
-        duplicate.delta !== args.delta ||
+        requestedLifeDelta(duplicate) !== args.delta ||
         duplicate.deviceId !== args.deviceId ||
         duplicate.clientCreatedAt !== args.clientCreatedAt
       )
@@ -1877,13 +1882,19 @@ export const changeLife = mutation({
     if (game.status !== "active") throw gameWriteError("game_not_active", "Game is not active")
 
     const now = Date.now()
-    const currentLife = target.currentLife + args.delta
+    const delta = flooredLifeDelta(
+      game.system ?? game.game ?? DEFAULT_DECK_GAME,
+      target.currentLife,
+      args.delta,
+    )
+    const currentLife = target.currentLife + delta
     const eventId = await ctx.db.insert("gameEvents", {
       gameId: game._id,
       playerId: target._id,
       operationId: args.operationId,
       kind: "life.changed",
-      delta: args.delta,
+      ...(delta === 0 ? {} : { delta }),
+      ...(delta === args.delta ? {} : { actionIdentity: String(args.delta) }),
       actorUserId: user._id,
       deviceId: args.deviceId,
       clientCreatedAt: args.clientCreatedAt,

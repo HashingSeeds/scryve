@@ -546,6 +546,27 @@ describe("ConnectedBoardScreen", () => {
     await waitFor(() => expect(screen.queryByTestId("connected-finish-confirmation")).toBeNull())
   })
 
+  it("preselects the last seat standing as the winner", async () => {
+    const { projection } = connectedHarness.runtime
+    connectedHarness.runtime = {
+      ...connectedHarness.runtime,
+      projection: {
+        ...projection,
+        isHost: true,
+        players: projection.players.map((player) =>
+          player.playerId === "player-2" ? { ...player, currentLife: 0 } : player,
+        ),
+      },
+    }
+    render(themed(<ConnectedBoardScreen publicId="game-public" />))
+    openConnectedFinish()
+    fireEvent.press(screen.getByTestId("confirm-connected-finish-button"))
+
+    await waitFor(() =>
+      expect(mockFinish).toHaveBeenCalledWith({ kind: "win", winnerPlayerIds: ["player-1"] }),
+    )
+  })
+
   it("navigates to the connected summary after finishing with a result", async () => {
     jest.useFakeTimers()
     try {

@@ -41,6 +41,7 @@ import {
 } from "@/features/connected/boardSyncSignal"
 import {
   connectedBoardView,
+  connectedLastStanding,
   connectedLives,
   type ConnectedBoardSeat,
   type ConnectedBoardView,
@@ -751,8 +752,16 @@ const ConnectedBoardReady = memo(function ConnectedBoardReady({
         onPress: (event) => {
           captureMenuDialogOrigin(event)
           setMenuOpen(false)
-          if (finishBlockerFor(controls.current())) setStatusOpen(true)
-          else setConfirmingFinish(true)
+          const runtime = controls.current()
+          if (finishBlockerFor(runtime)) {
+            setStatusOpen(true)
+            return
+          }
+          const standing =
+            runtime.status === "ready" ? connectedLastStanding(runtime.projection) : undefined
+          setDrawSelected(false)
+          setWinnerPlayerIds(standing ? [standing] : [])
+          setConfirmingFinish(true)
         },
       },
     ],

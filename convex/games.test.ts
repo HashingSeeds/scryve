@@ -15,7 +15,11 @@ async function synced(t: ConvexTestHarness, subject: string, name: string) {
 
 async function lobby(
   t: ConvexTestHarness,
-  options: { deckRequired?: boolean; playerCount?: number } = {},
+  options: {
+    deckRequired?: boolean
+    playerCount?: number
+    system?: { system: string; ruleset: string; startingLife: number }
+  } = {},
 ) {
   const host = await synced(t, "host-subject", "Host")
   const created = await host.mutation(api.games.createLobby, {
@@ -23,6 +27,7 @@ async function lobby(
     playerCount: options.playerCount ?? 2,
     startingLife: 40,
     ruleset: "commander",
+    ...options.system,
     ...(options.deckRequired === undefined ? {} : { deckRequired: options.deckRequired }),
     inviteToken: token,
     manualCodeCandidates: ["ABC234", "DEF567"],
@@ -520,8 +525,11 @@ describe("Convex connected-game authorization", () => {
   })
 })
 
-async function activeGame(t: ConvexTestHarness) {
-  const { host, created } = await lobby(t)
+async function activeGame(
+  t: ConvexTestHarness,
+  system?: NonNullable<Parameters<typeof lobby>[1]>["system"],
+) {
+  const { host, created } = await lobby(t, { system })
   const joiner = await synced(t, "active-joiner", "Joiner")
   await joiner.mutation(api.games.claimSeat, {
     token,
@@ -839,6 +847,41 @@ describe("Convex realtime life writes", () => {
         clientCreatedAt: first.clientCreatedAt + 1,
       }),
     ).rejects.toThrow("reused with different data")
+  })
+
+  it("stops Yu-Gi-Oh! Life Points at 0 and records only the change that applied", async () => {
+    const t = makeConvexTest()
+    const game = await activeGame(t, { system: "ygo", ruleset: "advanced", startingLife: 8000 })
+    const lethal = lifeArgs(game.publicId, game.hostPlayerId, "operation-ygo-lethal-01", -8500)
+    const overkill = lifeArgs(game.publicId, game.hostPlayerId, "operation-ygo-overkill-1", -1000)
+    await expect(game.host.mutation(api.games.changeLife, lethal)).resolves.toMatchObject({
+      currentLife: 0,
+    })
+    await expect(game.host.mutation(api.games.changeLife, overkill)).resolves.toMatchObject({
+      currentLife: 0,
+    })
+    await expect(game.host.mutation(api.games.changeLife, lethal)).resolves.toMatchObject({
+      deduplicated: true,
+    })
+    await expect(
+      game.host.mutation(api.games.changeLife, { ...overkill, delta: -900 }),
+    ).rejects.toThrow("reused with different data")
+    const { publicId: _publicId, ...overkillOperation } = overkill
+    await expect(
+      game.host.query(api.games.connectedOperationStatus, {
+        publicId: game.publicId,
+        operation: { kind: "life.changed", ...overkillOperation },
+      }),
+    ).resolves.toMatchObject({ status: "acknowledged" })
+    const events = await t.run((ctx) => ctx.db.query("gameEvents").collect())
+    expect(events.map((event) => event.delta)).toEqual([-8000, undefined])
+
+    await game.host.mutation(
+      api.games.changeLife,
+      lifeArgs(game.publicId, game.hostPlayerId, "operation-ygo-recover-1", 500),
+    )
+    const projection = await game.host.query(api.games.lobbyProjection, { publicId: game.publicId })
+    expect(projection.players[0].currentLife).toBe(500)
   })
 
   it("recovers the head operation without reading recent IDs in the modern projection", async () => {
