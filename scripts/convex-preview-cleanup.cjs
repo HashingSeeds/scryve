@@ -1,3 +1,5 @@
+const { previewName } = require("./preview.cjs")
+
 const CONVEX_API = "https://api.convex.dev/v1"
 const GITHUB_API = "https://api.github.com"
 
@@ -10,6 +12,10 @@ function isStale({ branch, branchExists, prStates }) {
   return prStates.length > 0 && !prStates.includes("open")
 }
 
+function branchForPreview(identifier, branches) {
+  return branches.find((branch) => previewName(branch) === identifier) ?? identifier
+}
+
 async function request(url, token, init = {}) {
   const response = await fetch(url, {
     ...init,
@@ -20,6 +26,19 @@ async function request(url, token, init = {}) {
       `${init.method ?? "GET"} ${url} failed: ${response.status} ${await response.text()}`,
     )
   return response
+}
+
+async function listBranches(repo, token) {
+  const branches = []
+  for (let page = 1; ; page++) {
+    const response = await request(
+      `${GITHUB_API}/repos/${repo}/branches?per_page=100&page=${page}`,
+      token,
+    )
+    const batch = await response.json()
+    branches.push(...batch.map(({ name }) => name))
+    if (batch.length < 100) return branches
+  }
 }
 
 async function main() {
@@ -37,15 +56,13 @@ async function main() {
     convexToken,
   )
   const previews = await listing.json()
+  const branches = await listBranches(repo, githubToken)
 
-  for (const {
-    name,
-    deploymentType,
-    projectId: owningProject,
-    previewIdentifier: branch,
-  } of previews) {
+  for (const { name, deploymentType, projectId: owningProject, previewIdentifier } of previews) {
     /** why: the token can delete prod and staging too, so never trust the listing filter alone. */
-    if (deploymentType !== "preview" || String(owningProject) !== projectId || !branch) continue
+    if (deploymentType !== "preview" || String(owningProject) !== projectId || !previewIdentifier)
+      continue
+    const branch = branchForPreview(previewIdentifier, branches)
     const encoded = encodeURIComponent(branch)
     const branchResponse = await request(
       `${GITHUB_API}/repos/${repo}/branches/${encoded}`,
@@ -78,4 +95,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { isStale }
+module.exports = { branchForPreview, isStale }
