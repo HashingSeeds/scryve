@@ -497,8 +497,8 @@ describe("LifeCard", () => {
         screenEdges: { top: true, left: true, right: true, bottom: false },
         markHeight: 48,
       }).position
-    expect(place(400).bottom).toBe(6 + 59)
-    expect(place(150).bottom).toBeLessThan(6 + 59)
+    expect(place(400).bottom).toBe(59)
+    expect(place(150).bottom).toBeLessThan(59)
     expect(place(150).maxWidth).toBeLessThanOrEqual(390 / 2 - 64)
   })
 

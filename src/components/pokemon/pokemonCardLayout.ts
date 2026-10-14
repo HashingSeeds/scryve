@@ -11,7 +11,7 @@ import {
   type LifeCardMenuEdge,
 } from "../playerCardTypes"
 
-const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
+export const CONTENT_EDGES: Record<LifeCardContentRotation, Record<LifeCardEdge, LifeCardEdge>> = {
   0: { top: "top", right: "right", bottom: "bottom", left: "left" },
   90: { top: "right", right: "bottom", bottom: "left", left: "top" },
   [-90]: { top: "left", right: "top", bottom: "right", left: "bottom" },

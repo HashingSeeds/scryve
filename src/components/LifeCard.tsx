@@ -817,7 +817,7 @@ export function seatIdentityPlacement({
   const spansScreenEdge = !!screenEdges?.[leftEdge] && !!screenEdges[CONTENT_RIGHT_EDGE[rotation]]
   const inset = insets?.[bottomEdge] ?? 0
   const contentHeight = sideways ? width : height
-  const raised = seatIdentityBottomGap(gap, inset) + inset
+  const raised = seatIdentityBottomGap(gap, inset, bottomEdge) + inset
   // why: a mid-edge notch or home indicator truncates the name, so the pair rises past it; on a short card that lands the mark on the − and + glyphs, so it tucks instead.
   const roomAboveCutout = raised + markHeight <= contentHeight / 2 - LIFE_GLYPH_LINE_HEIGHT / 2
   const underCutout = spansScreenEdge && inset > 0

@@ -3,6 +3,7 @@ import { View } from "react-native"
 
 import { useElapsedSince } from "@/utils/useElapsedSince"
 
+import type { LifeCardEdge } from "./playerCardTypes"
 import { MARK_ART_BOUNDS, MARK_VIEW_BOX, PlayerMark } from "./PlayerMark"
 import { Text, type TextProps } from "./Text"
 import { shapeForSeat, type PlayerMarkShape } from "../../convex/lib/appearance"
@@ -19,8 +20,10 @@ export function seatIdentityMetrics(compact?: boolean) {
   return compact ? SEAT_IDENTITY.compact : SEAT_IDENTITY.regular
 }
 
-export function seatIdentityBottomGap(edge: number, inset: number) {
-  return inset > 0 ? edge / 2 : edge
+// why: the home indicator draws inside its inset, so the pair keeps half its gap above it; a camera cutout's inset already ends clear of the cutout, so the pair sits right on it.
+export function seatIdentityBottomGap(edge: number, inset: number, screenEdge: LifeCardEdge) {
+  if (inset === 0) return edge
+  return screenEdge === "bottom" ? edge / 2 : 0
 }
 
 export function seatMarkArt(shape: PlayerMarkShape, compact?: boolean) {

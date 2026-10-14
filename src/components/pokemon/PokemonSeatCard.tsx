@@ -19,6 +19,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
   benchMenuClearance,
+  CONTENT_EDGES,
   contentInsetsFor,
   heroFontSize,
   knockoutMessage,
@@ -150,7 +151,12 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const identityMetrics = seatIdentityMetrics(cramped)
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
-  const bottomRowLift = seatIdentityBottomGap(identityMetrics.edge, insets.bottom) - padding
+  const bottomRowLift =
+    seatIdentityBottomGap(
+      identityMetrics.edge,
+      insets.bottom,
+      CONTENT_EDGES[contentRotation].bottom,
+    ) - padding
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)

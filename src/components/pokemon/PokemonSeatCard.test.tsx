@@ -119,7 +119,7 @@ describe("PokemonSeatCard", () => {
   it.each([
     { rotation: 0, insets: { top: 0, bottom: 0, left: 0, right: 0 }, offset: 16 },
     { rotation: 0, insets: { top: 0, bottom: 34, left: 0, right: 0 }, offset: 34 + 8 },
-    { rotation: 180, insets: { top: 59, bottom: 0, left: 0, right: 0 }, offset: 59 + 8 },
+    { rotation: 180, insets: { top: 59, bottom: 0, left: 0, right: 0 }, offset: 59 },
   ] as const)(
     "sits the bottom row $offset from a $rotation degree seat's bottom",
     ({ rotation, insets, offset }) => {
