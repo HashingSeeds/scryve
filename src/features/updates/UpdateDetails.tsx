@@ -1,5 +1,5 @@
 import type { TextStyle, ViewStyle } from "react-native"
-import { Pressable, View } from "react-native"
+import { Pressable, ScrollView } from "react-native"
 
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Text } from "@/components/Text"
@@ -45,14 +45,17 @@ export function UpdateDetailsDialog({
       confirmTestID="update-restart-button"
       notice={
         notes.length > 0 ? (
-          <View testID="update-release-notes" style={themed($notes)}>
+          <ScrollView testID="update-release-notes" contentContainerStyle={themed($notes)}>
             {notes.map((note) => (
               <Text key={note} size="sm" text={`• ${note}`} />
             ))}
-          </View>
+          </ScrollView>
         ) : null
       }
-      onConfirm={restartToUpdate}
+      onConfirm={() => {
+        onClose()
+        restartToUpdate()
+      }}
       onClose={onClose}
     />
   )

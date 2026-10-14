@@ -1,8 +1,9 @@
-import { useEffect } from "react"
-import { AppState, Platform } from "react-native"
+import { useEffect, useSyncExternalStore } from "react"
+import { AppState, Image, Platform } from "react-native"
 import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 
+import { LAUNCH_MARK, LAUNCH_MARK_SIZE } from "@/features/launch/LaunchFallback"
 import { loadString, saveString } from "@/utils/storage"
 
 const FOREGROUND_CHECK_INTERVAL_MS = 60 * 60 * 1000
@@ -172,8 +173,49 @@ export async function backToPreview() {
   }
 }
 
+export const RESTART_FADE_MS = 200
+
+let restarting = false
+const restartListeners = new Set<() => void>()
+
+function setRestarting(next: boolean) {
+  restarting = next
+  restartListeners.forEach((listener) => listener())
+}
+
+function subscribeRestarting(listener: () => void) {
+  restartListeners.add(listener)
+  return () => {
+    restartListeners.delete(listener)
+  }
+}
+
+const restartingSnapshot = () => restarting
+
+export function useRestarting() {
+  return useSyncExternalStore(subscribeRestarting, restartingSnapshot, restartingSnapshot)
+}
+
+/**
+ * why: RestartCurtain fades to the launch mark first, and the reload screen (white by default)
+ * shows that same mark, so the curtain, reload screen, and LaunchFallback read as one image.
+ */
 export function restartToUpdate() {
-  Updates.reloadAsync().catch(() => undefined)
+  if (restarting) return
+  setRestarting(true)
+  setTimeout(() => {
+    Updates.reloadAsync({
+      reloadScreenOptions: {
+        backgroundColor: "#000000",
+        image: {
+          url: Image.resolveAssetSource(LAUNCH_MARK).uri,
+          width: LAUNCH_MARK_SIZE,
+          height: LAUNCH_MARK_SIZE,
+        },
+        fade: true,
+      },
+    }).catch(() => setRestarting(false))
+  }, RESTART_FADE_MS)
 }
 
 export function wasUpdateNoticed(updateId: string) {

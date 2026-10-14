@@ -3,13 +3,13 @@ import { ActivityIndicator, Image, View } from "react-native"
 // eslint-disable-next-line no-restricted-imports
 import { Text as NativeText } from "react-native"
 
-const launchMark = require("../../../assets/images/app-icon-android-adaptive-foreground.png")
+export const LAUNCH_MARK: number = require("../../../assets/images/app-icon-android-adaptive-foreground.png")
 
 export function LaunchFallback() {
   return (
     <View testID="launch-fallback" style={$screen}>
       <Image
-        source={launchMark}
+        source={LAUNCH_MARK}
         resizeMode="contain"
         style={$mark}
         accessibilityIgnoresInvertColors
@@ -28,7 +28,8 @@ const $screen: ViewStyle = {
   justifyContent: "center",
   backgroundColor: "#000000",
 }
-const $mark: ImageStyle = { width: 300, height: 300 }
+export const LAUNCH_MARK_SIZE = 300
+const $mark: ImageStyle = { width: LAUNCH_MARK_SIZE, height: LAUNCH_MARK_SIZE }
 const $status: ViewStyle = {
   position: "absolute",
   bottom: 48,

@@ -1,6 +1,7 @@
 import * as Updates from "expo-updates"
+import { renderHook, waitFor } from "@testing-library/react-native"
 
-import { newReleaseNotes, openPrPreview } from "./appUpdate"
+import { newReleaseNotes, openPrPreview, restartToUpdate, useRestarting } from "./appUpdate"
 
 const mockUpdates = { channel: "preview", available: false }
 jest.mock("expo-updates", () => ({
@@ -67,5 +68,16 @@ describe("openPrPreview", () => {
   it("never overrides the channel for anything but a PR channel", async () => {
     await expect(openPrPreview("production")).resolves.toBe("missing")
     expect(override).not.toHaveBeenCalled()
+  })
+})
+
+describe("restartToUpdate", () => {
+  it("lifts the curtain when the reload fails so the app is not left black", async () => {
+    jest.mocked(Updates.reloadAsync).mockRejectedValueOnce(new Error("no runtime"))
+    const { result } = renderHook(useRestarting)
+    restartToUpdate()
+    await waitFor(() => expect(result.current).toBe(true))
+    await waitFor(() => expect(result.current).toBe(false))
+    expect(Updates.reloadAsync).toHaveBeenCalledTimes(1)
   })
 })
