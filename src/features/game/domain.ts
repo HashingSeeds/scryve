@@ -34,6 +34,7 @@ import {
   shapeForSeat,
 } from "../../../convex/lib/appearance"
 import { MAX_GAMES_PER_MATCH, winsNeeded, type MatchBestOf } from "../../../convex/lib/matchResults"
+import { flooredLifeDelta } from "../../../convex/lib/systems"
 import {
   applyTableAction,
   EMPTY_TABLE,
@@ -506,13 +507,6 @@ export function sanitizeGameResult(
   return winnerPlayerIds.length > 0 ? { kind: "win", winnerPlayerIds } : undefined
 }
 
-const LIFE_FLOORED_AT_ZERO: ReadonlySet<PlaySystemId> = new Set(["ygo"])
-
-function flooredLifeDelta(game: LocalGame, life: number, delta: LifeDelta): number {
-  if (!game.system || !LIFE_FLOORED_AT_ZERO.has(game.system)) return delta
-  return Math.max(delta, Math.min(0, -life))
-}
-
 export function commandToEvent(
   game: LocalGame,
   command: GameCommand,
@@ -530,7 +524,7 @@ export function commandToEvent(
   if (command.type === "life.change") {
     const player = game.players.find(({ id }) => id === command.playerId)
     if (!isLifeDelta(command.delta) || !player) return null
-    const delta = flooredLifeDelta(game, player.life, command.delta)
+    const delta = flooredLifeDelta(game.system, player.life, command.delta)
     if (!isLifeDelta(delta)) return null
     return { ...base, type: "life.changed", playerId: command.playerId, delta }
   }

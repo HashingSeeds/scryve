@@ -360,6 +360,20 @@ describe("outbox sync controller", () => {
     expect(repository.loadOutbox("game-public")).toEqual([])
   })
 
+  it("queues only the Life Points a Yu-Gi-Oh! seat has left, and nothing once it is at 0", () => {
+    const { controller } = harness()
+    controller.onRemoteProjection({ ...projection(0, 8000), system: "ygo" })
+
+    controller.changeLife("player-1", -8500)
+    controller.changeLife("player-1", -100)
+
+    const snapshot = controller.getSnapshot()
+    expect(
+      snapshot.pending.map(({ event }) => event.type === "life.changed" && event.delta),
+    ).toEqual([-8000])
+    expect(snapshot.projection?.players[0].currentLife).toBe(0)
+  })
+
   it("queues nothing when any staged commander damage sits outside the supported range", () => {
     const { controller, repository } = harness()
     controller.setEnvironment(ONLINE)

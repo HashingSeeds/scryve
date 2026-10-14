@@ -4,6 +4,8 @@ import type { ConnectedGameStatus } from "@/features/connected/model"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
 import { ThemeProvider } from "@/theme/context"
 
+import type { TableState } from "../../convex/lib/table"
+
 type ActiveConnectedGame = {
   publicId: string
   status: "lobby" | "active"
@@ -90,6 +92,7 @@ export type MockConnectedRuntime = TableRuntime & {
     recentOperationIds: string[]
     commanderDamage?: LobbyProjection["commanderDamage"]
     invitation?: { token: string; manualCode: string; expiresAt: number }
+    table: TableState
     players: RuntimePlayer[]
   }
   pending: Array<{ event: RuntimeActionEvent; queuedAt?: number }>
@@ -161,6 +164,7 @@ function defaultRuntime(): MockConnectedRuntime {
       eventSequence: 0,
       serverUpdatedAt: 1,
       recentOperationIds: [],
+      table: { designations: {}, players: {} },
       players: [
         {
           playerId: "player-1",

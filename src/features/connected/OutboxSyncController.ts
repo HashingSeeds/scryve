@@ -5,6 +5,7 @@ import {
   asPlayerId,
   createClientId,
   isCommanderDamageDelta,
+  isLifeDelta,
   MAX_COMMANDER_DAMAGE,
 } from "@/features/game/domain"
 import { playTableRules } from "@/features/game/playSystems"
@@ -32,6 +33,7 @@ import type {
 import { toConnectedProjection } from "./model"
 import type { ConnectedGameRepository } from "./persistence"
 import { mergeConfirmedProjection, oldestFirst, overlayPendingDeltas } from "./reconciliation"
+import { flooredLifeDelta } from "../../../convex/lib/systems"
 import type { TableAction } from "../../../convex/lib/table"
 
 const DEFAULT_PROJECTION_BARRIER_TIMEOUT_MS = 5_000
@@ -243,7 +245,14 @@ export class OutboxSyncController {
     this.resolveProjectionWaiter()
   }
 
-  changeLife = (playerId: string, delta: LifeDelta): void => {
+  changeLife = (playerId: string, requested: LifeDelta): void => {
+    const projection = this.displayProjection()
+    const life = projection?.players.find((player) => player.playerId === playerId)?.currentLife
+    const delta =
+      projection && life !== undefined
+        ? flooredLifeDelta(projection.system, life, requested)
+        : requested
+    if (!isLifeDelta(delta)) return
     const now = this.now()
     const action: PendingLifeAction = {
       schemaVersion: 1,
