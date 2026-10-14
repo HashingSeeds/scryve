@@ -1,6 +1,6 @@
 import { AccessibilityInfo } from "react-native"
 import * as Haptics from "expo-haptics"
-import { act, fireEvent, render, screen, within } from "@testing-library/react-native"
+import { act, fireEvent, render, screen } from "@testing-library/react-native"
 
 import { DeckVersionCacheRepository } from "@/features/decks/deckVersionsCache"
 import { ThemeProvider } from "@/theme/context"
@@ -61,6 +61,7 @@ function sheet(props: Partial<PokemonSheetProps> = {}) {
 }
 
 const flush = () => act(() => Promise.resolve())
+const typeItIn = () => fireEvent.press(screen.getByTestId("pokemon-type-in-seat-1"))
 
 describe("PokemonSheet", () => {
   beforeEach(() => {
@@ -161,6 +162,7 @@ describe("PokemonSheet", () => {
     await flush()
     expect(screen.getByTestId("pokemon-result-sv03-125")).toBeTruthy()
 
+    typeItIn()
     const hp = screen.getByTestId("pokemon-hp-input-seat-1")
     expect(hp.props.inputMode).toBe("none")
     fireEvent(hp, "focus")
@@ -172,6 +174,7 @@ describe("PokemonSheet", () => {
 
   it("capitalizes only the first keypad letter, so a typed Mega ex is worth three prizes", () => {
     render(sheet())
+    typeItIn()
     fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
     for (const key of [..."mega", "space", ..."ab", "space", ..."ex"])
       fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
@@ -184,6 +187,7 @@ describe("PokemonSheet", () => {
   it("ticks a haptic for each keypad press once Reduce Motion is known to be off", async () => {
     jest.mocked(Haptics.selectionAsync).mockClear()
     render(sheet())
+    typeItIn()
     fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
     fireEvent.press(screen.getByTestId("pokemon-key-a-seat-1"))
     expect(Haptics.selectionAsync).not.toHaveBeenCalled()
@@ -192,6 +196,7 @@ describe("PokemonSheet", () => {
     resetReducedMotionCacheForTests()
     screen.unmount()
     render(sheet())
+    typeItIn()
     fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
     await flush()
     for (const key of ["a", "shift", "delete"])
@@ -203,6 +208,7 @@ describe("PokemonSheet", () => {
 
   it("types punctuation from the keypad's number layer", () => {
     render(sheet())
+    typeItIn()
     fireEvent(screen.getByTestId("pokemon-name-input-seat-1"), "focus")
     for (const key of ["h", "o", "numbers", "-", "letters", "shift", "o", "h"])
       fireEvent.press(screen.getByTestId(`pokemon-key-${key}-seat-1`))
@@ -248,7 +254,7 @@ describe("PokemonSheet", () => {
     })
   })
 
-  it("scrolls results on their own so the Name, HP and Prizes form stays outside them", async () => {
+  it("hides the typed form while searching, and Type it in carries the query into Name", async () => {
     mockQuery.mockResolvedValue({
       revision: 1,
       cards: [{ name: "Pikachu", cardId: "sv01-063", category: "Pokemon", quantity: 4 }],
@@ -256,16 +262,34 @@ describe("PokemonSheet", () => {
     render(sheet({ deck: { ownerId: "owner-1", versionId: "version-1" } }))
     await flush()
 
-    const results = screen.getByTestId("pokemon-results-seat-1")
-    expect(within(results).getByTestId("pokemon-result-sv01-063")).toBeTruthy()
-    for (const field of [
-      "pokemon-name-input-seat-1",
-      "pokemon-prizes-1-seat-1",
-      "pokemon-place-seat-1",
-    ]) {
-      expect(screen.getByTestId(field)).toBeTruthy()
-      expect(within(results).queryByTestId(field)).toBeNull()
-    }
+    expect(screen.getByTestId("pokemon-result-sv01-063")).toBeTruthy()
+    for (const field of ["pokemon-name-input-seat-1", "pokemon-hp-input-seat-1"])
+      expect(screen.queryByTestId(field)).toBeNull()
+
+    fireEvent.changeText(screen.getByTestId("pokemon-search-seat-1"), "Pikachu ex")
+    typeItIn()
+    expect(screen.queryByTestId("pokemon-search-seat-1")).toBeNull()
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Pikachu ex")
+    expect(screen.getByTestId("pokemon-prizes-2-seat-1").props.accessibilityState).toMatchObject({
+      checked: true,
+    })
+  })
+
+  it("keeps a half-typed Pokémon on screen when the connection comes back", () => {
+    mockOnline = false
+    const view = render(sheet())
+    fireEvent.changeText(screen.getByTestId("pokemon-name-input-seat-1"), "Pikachu")
+
+    mockOnline = true
+    view.rerender(sheet())
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Pikachu")
+  })
+
+  it("trims a long search to the name limit when typing it in", () => {
+    render(sheet())
+    fireEvent.changeText(screen.getByTestId("pokemon-search-seat-1"), "a".repeat(120))
+    typeItIn()
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toHaveLength(100)
   })
 
   it("lists a cached deck offline, and a tap fills the name so only HP is left", async () => {

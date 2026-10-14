@@ -227,6 +227,12 @@ export function PokemonSheet({
     }
   }
 
+  function typeItIn() {
+    if (query.trim()) setName(query.trim().slice(0, FIELD_LENGTH.name))
+    setLookupOpen(false)
+    setQuery("")
+  }
+
   function place(next: PokemonCard) {
     if (onPlace(next)) return
     setPickError("Could not place it. Try again.")
@@ -279,7 +285,74 @@ export function PokemonSheet({
   const sideways = Math.abs(rotation) === 90
   const keypadBeside =
     (sideways ? cardHeight : cardWidth) > (sideways ? cardWidth : cardHeight) * KEYPAD_BESIDE_RATIO
+  // why: a search pick places in one tap, so placing only shows the typed form when search can't help, and a reconnect must not hide a half-typed Pokémon behind search.
+  const drafting =
+    draft.name !== "" || draft.hp !== "" || typingInto === "name" || typingInto === "hp"
+  const showForm = Boolean(editing) || !showSearch || drafting
+  const narrowForm = keypadBeside && keypadField !== undefined
   const stepLabel = (step: number) => `${step > 0 ? "+" : "−"}${Math.abs(step * damageStep)}`
+
+  // why: beside the keypad, HP and Look up would squeeze Name to a sliver. This follows the seat shape, not the open keypad, so focusing HP never moves (and remounts) it.
+  const hpAndLookup = (
+    <>
+      <TextField
+        testID={`pokemon-hp-input-seat-${seatNumber}`}
+        accessibilityLabel="HP"
+        placeholder="HP"
+        value={draft.hp}
+        selection={caretAtEnd(draft.hp)}
+        // why: React Native lets inputMode decide showSoftInputOnFocus, so "numeric" alone would raise the system pad.
+        inputMode={onKeypad ? "none" : "numeric"}
+        keyboardType="number-pad"
+        maxLength={3}
+        showSoftInputOnFocus={!onKeypad}
+        onFocus={() => focusField("hp")}
+        onBlur={() => setTypingInto(undefined)}
+        onChangeText={setHp}
+        containerStyle={$hpField}
+        inputWrapperStyle={themed($fieldWrapper)}
+        style={$hpInput}
+      />
+      {!showSearch && searchable ? (
+        <BoardPressable
+          testID={`pokemon-lookup-seat-${seatNumber}`}
+          accessibilityRole="button"
+          accessibilityLabel="Look up in the card catalog"
+          onPress={() => {
+            setQuery(draft.name)
+            setLookupOpen(true)
+          }}
+          style={({ pressed }) => [
+            themed($ghost),
+            { borderColor: overlayTint(ink, 0.35) },
+            pressed && button,
+          ]}
+        >
+          <Text text="Look up" size="xxs" weight="medium" style={inkStyle} />
+        </BoardPressable>
+      ) : null}
+    </>
+  )
+  const prizesLabel = <Text text="Prizes" size="xxs" style={[inkStyle, $dim]} />
+  const placeButton =
+    mode.kind === "place" ? (
+      <BoardPressable
+        testID={`pokemon-place-seat-${seatNumber}`}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        accessibilityState={{ disabled: !card }}
+        disabled={!card}
+        onPress={() => card && place(card)}
+        style={[
+          themed($primary),
+          !narrowForm && $grow,
+          { backgroundColor: ink },
+          !card && $disabled,
+        ]}
+      >
+        <Text text="Place" size="xs" weight="bold" style={onInk} />
+      </BoardPressable>
+    ) : null
 
   return (
     <View
@@ -388,115 +461,90 @@ export function PokemonSheet({
           >
             {pickError ? <Text text={pickError} size="xxs" style={inkStyle} /> : null}
 
-            <View style={themed($row)}>
-              <TextField
-                testID={`pokemon-name-input-seat-${seatNumber}`}
-                accessibilityLabel="Pokémon name"
-                placeholder="Name"
-                value={draft.name}
-                selection={caretAtEnd(draft.name)}
-                autoCorrect={false}
-                maxLength={100}
-                showSoftInputOnFocus={!onKeypad}
-                onChangeText={setName}
-                onFocus={() => focusField("name")}
-                onBlur={() => setTypingInto(undefined)}
-                containerStyle={$grow}
-                inputWrapperStyle={themed($fieldWrapper)}
-              />
-              <TextField
-                testID={`pokemon-hp-input-seat-${seatNumber}`}
-                accessibilityLabel="HP"
-                placeholder="HP"
-                value={draft.hp}
-                selection={caretAtEnd(draft.hp)}
-                // why: React Native lets inputMode decide showSoftInputOnFocus, so "numeric" alone would raise the system pad.
-                inputMode={onKeypad ? "none" : "numeric"}
-                keyboardType="number-pad"
-                maxLength={3}
-                showSoftInputOnFocus={!onKeypad}
-                onFocus={() => focusField("hp")}
-                onBlur={() => setTypingInto(undefined)}
-                onChangeText={setHp}
-                containerStyle={$hpField}
-                inputWrapperStyle={themed($fieldWrapper)}
-                style={$hpInput}
-              />
-              {!showSearch && searchable ? (
-                <BoardPressable
-                  testID={`pokemon-lookup-seat-${seatNumber}`}
-                  accessibilityRole="button"
-                  accessibilityLabel="Look up in the card catalog"
-                  onPress={() => {
-                    setQuery(draft.name)
-                    setLookupOpen(true)
-                  }}
-                  style={({ pressed }) => [
-                    themed($ghost),
-                    { borderColor: overlayTint(ink, 0.35) },
-                    pressed && button,
-                  ]}
-                >
-                  <Text text="Look up" size="xxs" weight="medium" style={inkStyle} />
-                </BoardPressable>
-              ) : null}
-            </View>
-            {editError ? (
-              <Text
-                testID={`pokemon-edit-error-seat-${seatNumber}`}
-                accessibilityRole="alert"
-                text={editError}
-                size="xxs"
-                style={inkStyle}
-              />
-            ) : null}
-            {!catalog.available ? (
-              <Text
-                text="Catalog offline. Type the name and HP."
-                size="xxs"
-                style={[inkStyle, $dim]}
-              />
-            ) : null}
+            {showForm ? (
+              <>
+                <View style={themed($row)}>
+                  <TextField
+                    testID={`pokemon-name-input-seat-${seatNumber}`}
+                    accessibilityLabel="Pokémon name"
+                    placeholder="Name"
+                    value={draft.name}
+                    selection={caretAtEnd(draft.name)}
+                    autoCorrect={false}
+                    maxLength={100}
+                    showSoftInputOnFocus={!onKeypad}
+                    onChangeText={setName}
+                    onFocus={() => focusField("name")}
+                    onBlur={() => setTypingInto(undefined)}
+                    containerStyle={$grow}
+                    inputWrapperStyle={themed($fieldWrapper)}
+                  />
+                  {keypadBeside ? null : hpAndLookup}
+                </View>
+                {keypadBeside ? <View style={themed($row)}>{hpAndLookup}</View> : null}
+                {editError ? (
+                  <Text
+                    testID={`pokemon-edit-error-seat-${seatNumber}`}
+                    accessibilityRole="alert"
+                    text={editError}
+                    size="xxs"
+                    style={inkStyle}
+                  />
+                ) : null}
+                {!catalog.available ? (
+                  <Text
+                    text="Catalog offline. Type the name and HP."
+                    size="xxs"
+                    style={[inkStyle, $dim]}
+                  />
+                ) : null}
 
-            <View style={themed($row)}>
-              <Text text="Prizes" size="xxs" style={[inkStyle, $dim]} />
-              {PRIZE_CHOICES.map((count) => {
-                const selected = draft.prizes === count
-                return (
-                  <BoardPressable
-                    key={count}
-                    testID={`pokemon-prizes-${count}-seat-${seatNumber}`}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    accessibilityLabel={`Worth ${count} ${count === 1 ? "prize" : "prizes"}`}
-                    onPress={() =>
-                      setDraft((current) => ({ ...current, prizes: count, prizesChosen: true }))
-                    }
-                    style={[themed($prizeChoice), button, selected && { backgroundColor: ink }]}
-                  >
-                    <Text
-                      text={String(count)}
-                      size="xs"
-                      weight="bold"
-                      style={selected ? onInk : inkStyle}
-                    />
-                  </BoardPressable>
-                )
-              })}
-              {mode.kind === "place" ? (
-                <BoardPressable
-                  testID={`pokemon-place-seat-${seatNumber}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={title}
-                  accessibilityState={{ disabled: !card }}
-                  disabled={!card}
-                  onPress={() => card && place(card)}
-                  style={[themed($primary), $grow, { backgroundColor: ink }, !card && $disabled]}
-                >
-                  <Text text="Place" size="xs" weight="bold" style={onInk} />
-                </BoardPressable>
-              ) : null}
-            </View>
+                {/* why: beside the keypad the form is a third of the seat, too narrow for the label, three choices and Place in one row. */}
+                {narrowForm ? prizesLabel : null}
+                <View style={themed($row)}>
+                  {narrowForm ? null : prizesLabel}
+                  {PRIZE_CHOICES.map((count) => {
+                    const selected = draft.prizes === count
+                    return (
+                      <BoardPressable
+                        key={count}
+                        testID={`pokemon-prizes-${count}-seat-${seatNumber}`}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: selected }}
+                        accessibilityLabel={`Worth ${count} ${count === 1 ? "prize" : "prizes"}`}
+                        onPress={() =>
+                          setDraft((current) => ({ ...current, prizes: count, prizesChosen: true }))
+                        }
+                        style={[themed($prizeChoice), button, selected && { backgroundColor: ink }]}
+                      >
+                        <Text
+                          text={String(count)}
+                          size="xs"
+                          weight="bold"
+                          style={selected ? onInk : inkStyle}
+                        />
+                      </BoardPressable>
+                    )
+                  })}
+                  {narrowForm ? null : placeButton}
+                </View>
+                {narrowForm ? placeButton : null}
+              </>
+            ) : (
+              <BoardPressable
+                testID={`pokemon-type-in-seat-${seatNumber}`}
+                accessibilityRole="button"
+                accessibilityLabel="Not listed? Type the name and HP"
+                onPress={typeItIn}
+                style={({ pressed }) => [
+                  themed($ghost),
+                  { borderColor: overlayTint(ink, 0.35) },
+                  pressed && button,
+                ]}
+              >
+                <Text text="Not listed? Type it in" size="xxs" weight="medium" style={inkStyle} />
+              </BoardPressable>
+            )}
 
             {editing ? (
               <>
@@ -590,14 +638,14 @@ export function PokemonSheet({
 const $grow: ViewStyle = { flex: 1, minWidth: 0 }
 const $body: ViewStyle = { flex: 1 }
 const $results: ViewStyle = { flexGrow: 0, flexShrink: 1, maxHeight: "50%" }
-// why: a sideways seat is short, and without a floor the results squeeze the Name and HP row to a sliver.
+// why: a sideways seat is short, and without a floor the results squeeze the body to a sliver.
 const $bodyUnderResults: ViewStyle = { minHeight: 56 }
 const $beside: ViewStyle = { flexDirection: "row" }
 const $keypadBeside: ViewStyle = { flex: 2, justifyContent: "flex-end" }
 const $dim: TextStyle = { opacity: 0.75 }
 const $pressed: ViewStyle = { opacity: 0.7 }
 const $disabled: ViewStyle = { opacity: 0.4 }
-const $hpField: ViewStyle = { width: 84 }
+const $hpField: ViewStyle = { width: 60 }
 // why: an input keeps its intrinsic width inside the row unless told it may shrink, which hid the typed HP.
 const $hpInput: TextStyle = { textAlign: "center", minWidth: 0 }
 
