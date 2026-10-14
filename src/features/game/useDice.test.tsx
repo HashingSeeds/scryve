@@ -198,7 +198,7 @@ describe("useDice", () => {
     expect(view.getByTestId("dice-seat-1")).toHaveTextContent("d205")
     expect(announce).toHaveBeenLastCalledWith("Grace rolled 20, goes first")
 
-    act(() => jest.advanceTimersByTime(4300))
+    act(() => jest.advanceTimersByTime(1800))
     expect(view.queryByTestId("dice-seat-2")).toBeNull()
     expect(view.getByTestId("dice-chip-2-first")).toHaveTextContent("1st")
     expect(view.queryByTestId("dice-chip-1-first")).toBeNull()

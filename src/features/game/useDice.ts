@@ -30,7 +30,7 @@ import {
 } from "./dice"
 import type { GamePlayer, PlayerId } from "./types"
 
-const BLOOM_MS = { d20: 5000, coin: 4500, first: 5000 } as const
+const BLOOM_MS = { d20: 5000, coin: 4500, first: 2500 } as const
 const FIRST_HOLD = "first"
 
 type State = {
