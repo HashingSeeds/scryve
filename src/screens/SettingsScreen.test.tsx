@@ -122,7 +122,7 @@ describe("SettingsScreen", () => {
     )
   })
 
-  it("shows download progress, then release notes and restart for a waiting update", () => {
+  it("shows download progress, then release notes and restart for a waiting update", async () => {
     Object.assign(mockUpdatesHook, { isDownloading: true, downloadProgress: 0.42 })
     const renderSettings = () => (
       <ThemeProvider initialContext="dark">
@@ -149,7 +149,7 @@ describe("SettingsScreen", () => {
     fireEvent.press(view.getByLabelText("What's in this update"))
     expect(view.getByText("\u2022 Faster sync")).toBeTruthy()
     fireEvent.press(view.getByTestId("update-restart-button"))
-    expect(Updates.reloadAsync).toHaveBeenCalled()
+    await waitFor(() => expect(Updates.reloadAsync).toHaveBeenCalled())
   })
 
   it("distinguishes bundled launches from development and missing metadata", () => {

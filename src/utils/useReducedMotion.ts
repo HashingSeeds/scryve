@@ -6,6 +6,10 @@ export type ReducedMotionPreference = boolean | null
 // Unknown is fail-safe: suppress optional motion/haptics until the OS preference resolves.
 let lastKnownPreference: ReducedMotionPreference = null
 
+export function knownReducedMotion(): ReducedMotionPreference {
+  return lastKnownPreference
+}
+
 export function resetReducedMotionCacheForTests() {
   lastKnownPreference = null
 }

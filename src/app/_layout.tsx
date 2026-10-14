@@ -19,6 +19,7 @@ import { LocalGameClaimPrompt } from "@/features/game/LocalGameClaimPrompt"
 import { LaunchFallback } from "@/features/launch/LaunchFallback"
 import { useLaunchReadiness } from "@/features/launch/useLaunchReadiness"
 import { LegalConsentGate } from "@/features/legal/LegalConsentGate"
+import { RestartCurtain } from "@/features/updates/RestartCurtain"
 import { UpdateReadyToastWithForegroundChecks } from "@/features/updates/UpdateReadyToast"
 import { RootErrorFallback } from "@/screens/ErrorScreen/RootErrorFallback"
 import { ThemeProvider, useAppTheme } from "@/theme/context"
@@ -80,6 +81,7 @@ function Root() {
               <LocalGameClaimPrompt />
               <AppStack />
               <UpdateReadyToastWithForegroundChecks />
+              <RestartCurtain />
             </LegalConsentGate>
           </KeyboardProvider>
         </SafeAreaProvider>
