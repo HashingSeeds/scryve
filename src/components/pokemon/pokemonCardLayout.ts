@@ -31,6 +31,7 @@ export function contentInsetsFor(
   }
 }
 
+// why: measured from the seat edge, this clears the larger 80pt menu pentagon at its widest point with an 8pt gap.
 export const MENU_CLEARANCE = 44
 
 export type BenchClearance = { top: number; left: number; right: number }

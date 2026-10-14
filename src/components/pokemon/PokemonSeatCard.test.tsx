@@ -128,6 +128,42 @@ describe("PokemonSeatCard", () => {
     },
   )
 
+  it.each([
+    { menuCorner: undefined, insets: undefined, left: 16, right: 16 },
+    { menuCorner: "topLeft", insets: undefined, left: 44, right: 16 },
+    {
+      menuCorner: "topRight",
+      insets: { top: 0, bottom: 0, left: 47, right: 0 },
+      left: 63,
+      right: 44,
+    },
+  ] as const)(
+    "ends the bench $left and $right from the seat edges, on the mark line or past the menu",
+    ({ menuCorner, insets, left, right }) => {
+      const table = pokemonTable(["Ada", "Grace"])
+      render(<Seat harness={table} seat={0} menuCorner={menuCorner} contentInsets={insets} />)
+      fireEvent(screen.getByTestId("pokemon-card-seat-1"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 422 } },
+      })
+
+      const layer = StyleSheet.flatten(screen.getByTestId("pokemon-layer-seat-1").props.style)
+      const bench = StyleSheet.flatten(screen.getByTestId("pokemon-bench-seat-1").props.style)
+      expect((layer.paddingLeft as number) + (bench.marginLeft as number)).toBe(left)
+      expect((layer.paddingRight as number) + (bench.marginRight as number)).toBe(right)
+    },
+  )
+
+  it("drops the bench below a menu centered on the seat's top edge", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    render(<Seat harness={table} seat={0} menuEdgeCenter="top" />)
+    fireEvent(screen.getByTestId("pokemon-card-seat-1"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 422 } },
+    })
+
+    const layer = StyleSheet.flatten(screen.getByTestId("pokemon-layer-seat-1").props.style)
+    expect(layer.paddingTop).toBe(44)
+  })
+
   it("drops its controls from touch and screen readers while dice sit on the seat", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const onPress = jest.fn()
