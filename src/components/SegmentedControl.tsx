@@ -111,7 +111,7 @@ export function SegmentedControl({
             key={segment.id}
             testID={testID ? `${testID}-${segment.id}` : undefined}
             accessibilityRole="tab"
-            accessibilityState={{ selected, disabled }}
+            aria-selected={selected}
             disabled={disabled}
             style={[
               $segment,
