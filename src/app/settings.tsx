@@ -1,7 +1,7 @@
-import { Linking, Platform } from "react-native"
+import { Platform } from "react-native"
 import { router } from "expo-router"
 
-import { APPLE_STANDARD_EULA_URL } from "@/content/legalLinks"
+import { openAppleStandardEula } from "@/content/legalLinks"
 import { useAuthAccess } from "@/features/auth/AuthContext"
 import { BlockedPlayersSection } from "@/features/connected/BlockedPlayersSection"
 import { localGameRepository } from "@/features/game/localPersistence"
@@ -21,7 +21,7 @@ export default function SettingsRoute() {
       onOpenPrivacy={() => router.push("/privacy")}
       onOpenTerms={() => router.push("/terms")}
       onOpenLicenseAgreement={
-        Platform.OS === "ios" ? () => void Linking.openURL(APPLE_STANDARD_EULA_URL) : undefined
+        Platform.OS === "ios" ? () => void openAppleStandardEula() : undefined
       }
       onOpenCookiePolicy={() => router.push("/cookie-policy")}
       onOpenGameContentNotices={() => router.push("/game-content-notices")}
