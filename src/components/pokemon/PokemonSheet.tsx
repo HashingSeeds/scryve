@@ -228,7 +228,7 @@ export function PokemonSheet({
   }
 
   function typeItIn() {
-    if (query.trim()) setName(query.trim())
+    if (query.trim()) setName(query.trim().slice(0, FIELD_LENGTH.name))
     setLookupOpen(false)
     setQuery("")
   }
@@ -285,8 +285,10 @@ export function PokemonSheet({
   const sideways = Math.abs(rotation) === 90
   const keypadBeside =
     (sideways ? cardHeight : cardWidth) > (sideways ? cardWidth : cardHeight) * KEYPAD_BESIDE_RATIO
-  // why: a search pick places in one tap, so placing only shows the typed form when search can't help.
-  const showForm = Boolean(editing) || !showSearch
+  // why: a search pick places in one tap, so placing only shows the typed form when search can't help, and a reconnect must not hide a half-typed Pokémon behind search.
+  const drafting =
+    draft.name !== "" || draft.hp !== "" || typingInto === "name" || typingInto === "hp"
+  const showForm = Boolean(editing) || !showSearch || drafting
   const narrowForm = keypadBeside && keypadField !== undefined
   const stepLabel = (step: number) => `${step > 0 ? "+" : "−"}${Math.abs(step * damageStep)}`
 

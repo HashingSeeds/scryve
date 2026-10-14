@@ -275,6 +275,23 @@ describe("PokemonSheet", () => {
     })
   })
 
+  it("keeps a half-typed Pokémon on screen when the connection comes back", () => {
+    mockOnline = false
+    const view = render(sheet())
+    fireEvent.changeText(screen.getByTestId("pokemon-name-input-seat-1"), "Pikachu")
+
+    mockOnline = true
+    view.rerender(sheet())
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toBe("Pikachu")
+  })
+
+  it("trims a long search to the name limit when typing it in", () => {
+    render(sheet())
+    fireEvent.changeText(screen.getByTestId("pokemon-search-seat-1"), "a".repeat(120))
+    typeItIn()
+    expect(screen.getByTestId("pokemon-name-input-seat-1").props.value).toHaveLength(100)
+  })
+
   it("lists a cached deck offline, and a tap fills the name so only HP is left", async () => {
     mockOnline = false
     mockQuery.mockRejectedValue(new Error("offline"))
