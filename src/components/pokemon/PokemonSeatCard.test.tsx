@@ -131,7 +131,12 @@ describe("PokemonSeatCard", () => {
   it.each([
     { menuCorner: undefined, insets: undefined, left: 16, right: 16 },
     { menuCorner: "topLeft", insets: undefined, left: 44, right: 16 },
-    { menuCorner: "topRight", insets: { top: 0, bottom: 0, left: 47, right: 0 }, left: 63, right: 44 },
+    {
+      menuCorner: "topRight",
+      insets: { top: 0, bottom: 0, left: 47, right: 0 },
+      left: 63,
+      right: 44,
+    },
   ] as const)(
     "ends the bench $left and $right from the seat edges, on the mark line or past the menu",
     ({ menuCorner, insets, left, right }) => {
