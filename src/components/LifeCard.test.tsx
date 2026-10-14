@@ -498,9 +498,25 @@ describe("LifeCard", () => {
         screenEdges: { top: true, left: true, right: true, bottom: false },
         markHeight: 48,
       }).position
-    expect(place(400).bottom).toBe(12 + 59)
-    expect(place(150).bottom).toBeLessThan(12 + 59)
+    expect(place(400).bottom).toBe(59)
+    expect(place(150).bottom).toBeLessThan(59)
     expect(place(150).maxWidth).toBeLessThanOrEqual(390 / 2 - 64)
+  })
+
+  it.each([
+    { inset: 34, bottom: 34 + 8 },
+    { inset: 0, bottom: 16 },
+  ])("sits the pair $bottom above a bottom seat with a $inset inset", ({ inset, bottom }) => {
+    expect(
+      seatIdentityPlacement({
+        rotation: 0,
+        cardSize: { width: 390, height: 422 },
+        gap: 16,
+        insets: { top: 0, bottom: inset, left: 0, right: 0 },
+        screenEdges: { top: false, left: true, right: true, bottom: true },
+        markHeight: 64,
+      }).position.bottom,
+    ).toBe(bottom)
   })
 
   it("swaps the identity layer's sides before turning a sideways card", () => {

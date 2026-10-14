@@ -19,6 +19,7 @@ import { useReducedMotion } from "@/utils/useReducedMotion"
 
 import {
   benchMenuClearance,
+  CONTENT_EDGES,
   contentInsetsFor,
   heroFontSize,
   knockoutMessage,
@@ -47,7 +48,12 @@ import {
   type LifeCardMenuCorner,
   type LifeCardMenuEdge,
 } from "../playerCardTypes"
-import { SeatIdentity, seatIdentityMetrics, seatMarkArt } from "../SeatIdentity"
+import {
+  SeatIdentity,
+  seatIdentityBottomGap,
+  seatIdentityMetrics,
+  seatMarkArt,
+} from "../SeatIdentity"
 import { Text } from "../Text"
 
 export interface PokemonSeatCardProps {
@@ -142,7 +148,12 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const identityMetrics = seatIdentityMetrics(cramped)
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
-  const bottomRowLift = identityMetrics.edge - padding
+  const bottomRowLift =
+    seatIdentityBottomGap(
+      identityMetrics.edge,
+      insets.bottom,
+      CONTENT_EDGES[contentRotation].bottom,
+    ) - padding
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
   const [focusHeld, setFocusHeld] = useState(false)
@@ -528,7 +539,10 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
         )}
 
         {/* why: prizes are the score; the pips sit two by three like the cards do, so the count reads at a glance without a number. */}
-        <View style={[themed($bottomRow), { height: prizeRowHeight, marginBottom: bottomRowLift }]}>
+        <View
+          testID={`pokemon-bottom-row-seat-${seatNumber}`}
+          style={[themed($bottomRow), { height: prizeRowHeight, marginBottom: bottomRowLift }]}
+        >
           <SeatIdentity
             seatNumber={seatNumber}
             playerName={displayName}
@@ -537,7 +551,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             compact={cramped}
             spinning={ownership === "owned"}
             staleSince={staleSince}
-            style={[$identity, { marginLeft: bottomRowLift }]}
+            style={[$identity, { marginLeft: identityMetrics.edge - padding }]}
           />
           {diceChips?.length && dice?.onClearChip && !dice.view && !sheetMode ? (
             <DiceChips
