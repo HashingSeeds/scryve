@@ -146,6 +146,9 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
   const padding = cramped ? spacing.xxs : spacing.xs
   const benchHeight = cramped ? COMPACT_BENCH_HEIGHT : BENCH_HEIGHT
   const identityMetrics = seatIdentityMetrics(cramped)
+  // why: the bench ends on the same line as the seat mark and prize pips, or past the menu where it sits over this corner.
+  const benchSide = (inset: number, menu: number) =>
+    Math.max(identityMetrics.edge, menu - inset) - padding
   // why: the prize grid stands as tall as the drawn mark across from it and shares its bottom edge, so the bottom row reads as one band.
   const prizeRowHeight = seatMarkArt(shape ?? shapeForSeat(seatNumber), cramped).height
   const bottomRowLift =
@@ -399,7 +402,7 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           StyleSheet.absoluteFill,
           rotatedLayerStyle(contentRotation, cardSize.width, cardSize.height),
           {
-            paddingTop: padding + insets.top + clearance.top,
+            paddingTop: Math.max(padding + insets.top, clearance.top),
             paddingBottom: padding + insets.bottom,
             paddingLeft: padding + insets.left,
             paddingRight: padding + insets.right,
@@ -412,7 +415,11 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
           accessibilityLabel={`${identity}, bench, ${board.bench.length} of ${rules.benchSize}`}
           style={[
             themed($bench),
-            { height: benchHeight, marginLeft: clearance.left, marginRight: clearance.right },
+            {
+              height: benchHeight,
+              marginLeft: benchSide(insets.left, clearance.left),
+              marginRight: benchSide(insets.right, clearance.right),
+            },
           ]}
         >
           {Array.from({ length: Math.max(rules.benchSize, board.bench.length) }, (_, index) => {

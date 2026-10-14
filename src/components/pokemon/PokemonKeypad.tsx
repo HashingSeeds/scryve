@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react"
+import { type ReactElement, useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 import * as Haptics from "expo-haptics"
+import Svg, { Path } from "react-native-svg"
 
 import { localGameRepository } from "@/features/game/localPersistence"
 import { useAppTheme } from "@/theme/context"
@@ -18,9 +19,9 @@ const SYMBOLS = ["-", "'", ".", ":", "é", "&", "♀", "♂"] as const
 
 type Key = {
   label: string
+  icon?: ReactElement
   accessibilityLabel: string
   wide?: boolean
-  glyph?: boolean
   active?: boolean
   onPress: () => void
 }
@@ -58,6 +59,8 @@ export function PokemonKeypad({
   ]
   const pressed = { backgroundColor: overlayTint(ink, 0.36) }
   const inkStyle = { color: ink }
+  // why: ⇧ and ⌫ render at very different sizes in the iOS and Android system fonts, so the glyph keys draw their own icons.
+  const iconSize = compact ? 18 : 22
 
   const typed = (char: string): Key => {
     const text = upper ? char : char.toLowerCase()
@@ -72,9 +75,9 @@ export function PokemonKeypad({
   }
   const shiftKey: Key = {
     label: "⇧",
+    icon: <KeyIcon paths={SHIFT_PATHS} color={ink} size={iconSize} filled={upper} />,
     accessibilityLabel: "Shift",
     wide: true,
-    glyph: true,
     active: upper,
     onPress: () => setShift(!upper),
   }
@@ -82,7 +85,7 @@ export function PokemonKeypad({
     label: "⌫",
     accessibilityLabel: "Delete",
     wide: true,
-    glyph: true,
+    icon: <KeyIcon paths={DELETE_PATHS} color={ink} size={iconSize} />,
     onPress: onDelete,
   }
   const done: Key = {
@@ -149,17 +152,54 @@ export function PokemonKeypad({
                 (down || key.active) && pressed,
               ]}
             >
-              <Text
-                text={key.label}
-                size={key.glyph ? (compact ? "lg" : "xl") : key.wide && !digits ? "xxs" : "xs"}
-                weight="medium"
-                style={[inkStyle, $label]}
-              />
+              {key.icon ?? (
+                <Text
+                  text={key.label}
+                  size={key.wide && !digits ? "xxs" : "xs"}
+                  weight="medium"
+                  style={[inkStyle, $label]}
+                />
+              )}
             </BoardPressable>
           ))}
         </View>
       ))}
     </View>
+  )
+}
+
+const SHIFT_PATHS = ["M12 3.5 L20.5 12 H15.5 V19.5 H8.5 V12 H3.5 Z"]
+const DELETE_PATHS = [
+  "M9 5 H19.5 Q21.5 5 21.5 7 V17 Q21.5 19 19.5 19 H9 L2.5 12 Z",
+  "M11.5 9 L17 15 M17 9 L11.5 15",
+]
+
+/** why: only the outline (the first path) fills, so a filled shift reads as caps on like the system keyboard. */
+function KeyIcon({
+  paths,
+  color,
+  size,
+  filled = false,
+}: {
+  paths: readonly string[]
+  color: string
+  size: number
+  filled?: boolean
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {paths.map((d, index) => (
+        <Path
+          key={d}
+          d={d}
+          fill={filled && index === 0 ? color : "none"}
+          stroke={color}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ))}
+    </Svg>
   )
 }
 
