@@ -590,23 +590,30 @@ export const PokemonSeatCard = memo(function PokemonSeatCard({
             onLongPress={putPrizeBack}
             style={({ pressed }) => [themed($prizes), pressed && { backgroundColor: tint(0.14) }]}
           >
+            {/* why: a two-wide flexWrap grid can wrap after every pip when Yoga's float sums overshoot its width, standing the cards in one line. */}
             <View
-              style={[$prizeGrid, { width: pip.width * 2 + pip.gap, gap: pip.gap }]}
+              style={{ gap: pip.gap }}
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
             >
-              {Array.from({ length: prizePips }, (_, index) => (
-                <View
-                  key={index}
-                  testID={`pokemon-prize-pip-${index}-seat-${seatNumber}`}
-                  style={[
-                    $prizePip,
-                    { width: pip.width, height: pip.height },
-                    index < prizes
-                      ? { backgroundColor: ink }
-                      : [$prizePipGone, { borderColor: tint(0.45) }],
-                  ]}
-                />
+              {Array.from({ length: Math.ceil(prizePips / 2) }, (_, row) => (
+                <View key={row} style={[$prizeRow, { gap: pip.gap }]}>
+                  {[row * 2, row * 2 + 1]
+                    .filter((index) => index < prizePips)
+                    .map((index) => (
+                      <View
+                        key={index}
+                        testID={`pokemon-prize-pip-${index}-seat-${seatNumber}`}
+                        style={[
+                          $prizePip,
+                          { width: pip.width, height: pip.height },
+                          index < prizes
+                            ? { backgroundColor: ink }
+                            : [$prizePipGone, { borderColor: tint(0.45) }],
+                        ]}
+                      />
+                    ))}
+                </View>
               ))}
             </View>
           </BoardPressable>
@@ -1088,7 +1095,7 @@ const $chipPip: ViewStyle = { width: 5, height: 7, borderRadius: 1, opacity: 0.8
 const $chipBar: ViewStyle = { position: "absolute", left: 0, bottom: 0, height: 3, opacity: 0.85 }
 const $prizePip: ViewStyle = { borderRadius: 2 }
 const $prizePipGone: ViewStyle = { borderWidth: 1.5 }
-const $prizeGrid: ViewStyle = { flexDirection: "row", flexWrap: "wrap" }
+const $prizeRow: ViewStyle = { flexDirection: "row" }
 const $identity: ViewStyle = { flexShrink: 1, minWidth: 0 }
 const $drainTrack: ViewStyle = {
   alignSelf: "stretch",

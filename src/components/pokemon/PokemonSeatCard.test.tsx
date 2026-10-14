@@ -425,6 +425,21 @@ describe("PokemonSeatCard", () => {
     expect(screen.queryByText("+1")).toBeNull()
   })
 
+  it("stands the prize cards in rows of two", () => {
+    render(<Seat harness={pokemonTable(["Ada", "Grace"])} seat={0} prizes={6} />)
+    const pips = screen.getAllByTestId(/^pokemon-prize-pip-\d-seat-1$/, {
+      includeHiddenElements: true,
+    })
+    const rowOf = (pip: (typeof pips)[number]) => {
+      let node = pip.parent
+      while (node && typeof node.type !== "string") node = node.parent
+      return node
+    }
+    const rows = [...new Set(pips.map(rowOf))]
+
+    expect(rows.map((row) => pips.filter((pip) => rowOf(pip) === row).length)).toEqual([2, 2, 2])
+  })
+
   it("stops taking prizes at 0 and putting them back at 6", () => {
     const table = pokemonTable(["Ada", "Grace"])
     const onChangePrizes = jest.fn()
