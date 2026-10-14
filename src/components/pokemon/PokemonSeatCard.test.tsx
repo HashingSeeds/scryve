@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react"
 import { AccessibilityInfo, StyleSheet } from "react-native"
-import { act, fireEvent, render, screen } from "@testing-library/react-native"
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native"
 
 import { applyLocalTableAction, createLocalGame, localTableRules } from "@/features/game/domain"
 import { createTableActions, type TableRuntime } from "@/features/game/tableRuntime"
@@ -190,6 +190,26 @@ describe("PokemonSeatCard", () => {
 
     fireEvent.press(screen.getByTestId("pokemon-damage-seat-1--10"))
     expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("320")
+  })
+
+  it("lowers HP from the − side and raises it from the + side", () => {
+    const table = pokemonTable(["Ada", "Grace"])
+    const me = table.game().players[0].id
+    const active = table.actions.placePokemon(me, "active", {
+      name: "Charizard ex",
+      hp: 330,
+      prizes: 2,
+    })!
+    table.actions.adjustPokemonDamage(me, active, 50)
+    render(<Seat harness={table} seat={0} />)
+
+    const hero = within(screen.getByTestId("pokemon-hero-seat-1"))
+    fireEvent.press(hero.getByText("−"))
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("270")
+    expect(hero.getByText("-10")).toBeTruthy()
+
+    fireEvent.press(hero.getByText("+"))
+    expect(screen.getByTestId("pokemon-hp-seat-1")).toHaveTextContent("280")
   })
 
   it("knocks out on lethal damage, scores the opponent's prizes, and Undo puts it all back", () => {

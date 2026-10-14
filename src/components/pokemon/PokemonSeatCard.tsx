@@ -796,16 +796,15 @@ function PokemonHero({
     { direction: -1, glyph: "−", align: "flex-start" as const },
     { direction: 1, glyph: "+", align: "flex-end" as const },
   ]
+  const recentHp = -recentDelta
   return (
     <View testID={`pokemon-hero-seat-${seatNumber}`} style={themed($hero)}>
       {interactive ? (
         <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, themed($zones)]}>
           {zones.map(({ direction, glyph, align }) => {
-            const delta = direction * step
+            const delta = -direction * step
             const feedback =
-              direction * recentDelta > 0
-                ? `${recentDelta > 0 ? "+" : "-"}${Math.abs(recentDelta)}`
-                : glyph
+              direction * recentHp > 0 ? `${recentHp > 0 ? "+" : "-"}${Math.abs(recentHp)}` : glyph
             return (
               <BoardPressable
                 key={delta}
