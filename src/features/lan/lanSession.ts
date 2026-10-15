@@ -11,7 +11,7 @@ import {
   mergeHostGame,
   parseGuestMessage,
   parseHostMessage,
-  setLanConnected,
+  releaseLanSeat,
   setLanLife,
   startLanGame,
   type LanGame,
@@ -151,7 +151,7 @@ class LanSession {
         this.accepted.delete(peer)
         if (!peerId || this.peers.get(peerId) !== peer) return
         this.peers.delete(peerId)
-        if (this.state.game) this.publish(setLanConnected(this.state.game, peerId, false))
+        if (this.state.game) this.publish(releaseLanSeat(this.state.game, peerId))
       },
     }
   }

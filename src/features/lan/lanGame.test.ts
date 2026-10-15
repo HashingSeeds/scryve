@@ -3,6 +3,7 @@ import {
   joinLanGame,
   lanProjection,
   mergeHostGame,
+  releaseLanSeat,
   setLanLife,
   startLanGame,
   type LanGame,
@@ -72,5 +73,17 @@ describe("LAN game", () => {
 
     expect(lifeOf(setLanLife(restarted, "guest", stale), "guest")).toBe(40)
     expect(lifeOf(mergeHostGame(restarted, "guest", stale), "guest")).toBe(40)
+  })
+
+  it("frees a lobby seat when its guest leaves but holds an active one for reconnect", () => {
+    const lobbyGame = joined(joined(lobby(), "left"), "stays")
+
+    expect(
+      releaseLanSeat(lobbyGame, "left").seats.map(({ playerId, seat }) => [playerId, seat]),
+    ).toEqual([
+      ["host", 1],
+      ["stays", 2],
+    ])
+    expect(releaseLanSeat(startLanGame(lobbyGame, 20), "left").seats).toHaveLength(3)
   })
 })
