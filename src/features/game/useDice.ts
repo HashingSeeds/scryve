@@ -22,6 +22,7 @@ import {
   settleFirst,
   settleResult,
   startRollOff,
+  systemDie,
   toolLabel,
   type ChoiceReason,
   type DiceSeatChip,
@@ -30,7 +31,7 @@ import {
 } from "./dice"
 import type { GamePlayer, PlayerId } from "./types"
 
-const BLOOM_MS = { d20: 5000, coin: 4500, first: 2500 } as const
+const BLOOM_MS = { d6: 5000, d20: 5000, coin: 4500, first: 2500 } as const
 const FIRST_HOLD = "first"
 
 type State = {
@@ -41,7 +42,12 @@ type State = {
 
 const CLOSED: Omit<State, "gameId"> = { mode: false, dice: EMPTY_DICE }
 
-export function useDice(players: readonly Pick<GamePlayer, "id" | "name">[], gameId: string) {
+export function useDice(
+  players: readonly Pick<GamePlayer, "id" | "name">[],
+  gameId: string,
+  system: unknown,
+) {
+  const die = systemDie(system)
   const [stored, setStored] = useState<State>()
   const state = stored?.gameId === gameId ? stored : { gameId, ...CLOSED }
   const { dice } = state
@@ -114,7 +120,7 @@ export function useDice(players: readonly Pick<GamePlayer, "id" | "name">[], gam
   }
 
   const rollOff = stable("rollOff", () => {
-    const next = startRollOff(dice, seatIds())
+    const next = startRollOff(dice, seatIds(), die)
     const message = rollOffAnnouncement(next.first, players)
     if (message) announce(message)
     set(holdFirst(next))
@@ -184,19 +190,20 @@ export function useDice(players: readonly Pick<GamePlayer, "id" | "name">[], gam
         onPress: () => arm("coin"),
       },
       {
-        key: "d20",
-        label: "d20",
-        accessibilityLabel: armed === "d20" ? "d20 armed, tap a seat" : "Roll a d20 for a seat",
-        selected: armed === "d20",
-        dimmed: armed !== null && armed !== "d20",
-        onPress: () => arm("d20"),
+        key: die,
+        label: die,
+        accessibilityLabel: armed === die ? `${die} armed, tap a seat` : `Roll a ${die} for a seat`,
+        selected: armed === die,
+        dimmed: armed !== null && armed !== die,
+        onPress: () => arm(die),
       },
     ],
-    [arm, armed],
+    [arm, armed, die],
   )
 
   return {
     open: state.mode,
+    die,
     close,
     tools,
     webMessage,

@@ -15,7 +15,7 @@ describe("DiceSeatOverlay", () => {
     jest.useFakeTimers()
     const motion = jest.spyOn(reducedMotion, "useReducedMotion").mockReturnValue(false)
     const dice = {
-      view: { kind: "rolloff", value: 9, attempt: 1, status: "won" } as const,
+      view: { kind: "rolloff", die: "d20", value: 9, attempt: 1, status: "won" } as const,
       onPress: jest.fn(),
     }
     const seat = () => (

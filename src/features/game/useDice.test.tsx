@@ -17,8 +17,8 @@ const players: GamePlayer[] = [
   { id: asPlayerId("p3"), name: "Katherine", color: "#7B5A91", life: 20, seat: 2 },
 ]
 
-function Table({ gameId = "game-1" }: { gameId?: string }) {
-  const dice = useDice(players, gameId)
+function Table({ gameId = "game-1", system = "mtg" }: { gameId?: string; system?: string }) {
+  const dice = useDice(players, gameId, system)
   const { grid } = dice
   return (
     <>
@@ -72,10 +72,10 @@ function Table({ gameId = "game-1" }: { gameId?: string }) {
   )
 }
 
-function renderTable() {
+function renderTable(system?: string) {
   const view = render(
     <ThemeProvider initialContext="dark">
-      <Table />
+      <Table system={system} />
     </ThemeProvider>,
   )
   return Object.assign(view, {
@@ -112,6 +112,17 @@ describe("useDice", () => {
 
     fireEvent.press(view.getByTestId("dice-d20"))
     expect(view.getByTestId("dice-d20").props.accessibilityState.selected).toBe(false)
+  })
+
+  it("offers Yu-Gi-Oh! a d6 instead of a d20", () => {
+    jest.spyOn(Math, "random").mockReturnValue(0.5)
+    const view = renderTable("ygo")
+    expect(view.queryByTestId("dice-d20")).toBeNull()
+
+    fireEvent.press(view.getByTestId("dice-d6"))
+    fireEvent.press(view.getByTestId("dice-seat-2"))
+    expect(view.getByTestId("dice-chip-2-d6")).toHaveTextContent("4")
+    expect(view.getByTestId("dice-seat-2").props.accessibilityLabel).toBe("Roll a d6 for Grace")
   })
 
   it("shrinks a roll into a chip after a beat, which the next roll replaces and close clears", () => {
