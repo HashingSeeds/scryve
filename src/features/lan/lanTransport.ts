@@ -1,5 +1,8 @@
+import { Buffer } from "buffer"
 import TcpSocket from "react-native-tcp-socket"
 import Zeroconf, { type Service } from "react-native-zeroconf"
+
+import { createLineReader } from "./lineReader"
 
 // why: iOS only browses Bonjour types listed in NSBonjourServices, so renaming this needs app.config.ts too.
 export const LAN_SERVICE_TYPE = "scryve"
@@ -56,21 +59,6 @@ export const resolveLanService = (name: string) =>
     timeout: RESOLVE_TIMEOUT_SECONDS,
   })
 
-// why: TCP has no message boundaries; one chunk can hold half a message or several.
-export function createLineReader(onLine: (line: string) => void) {
-  let buffer = ""
-  return (chunk: string) => {
-    buffer += chunk
-    let newline = buffer.indexOf("\n")
-    while (newline !== -1) {
-      const line = buffer.slice(0, newline)
-      buffer = buffer.slice(newline + 1)
-      if (line) onLine(line)
-      newline = buffer.indexOf("\n")
-    }
-  }
-}
-
 function wrapSocket<In, Out>(
   socket: Socket,
   parse: (line: string) => In | null,
@@ -99,10 +87,9 @@ function wrapSocket<In, Out>(
     if (Date.now() - lastHeard > SILENCE_LIMIT_MS) shutdown()
     else socket.write("\n")
   }, HEARTBEAT_MS)
-  socket.setEncoding("utf8")
   socket.on("data", (data) => {
     lastHeard = Date.now()
-    read(String(data))
+    read(typeof data === "string" ? Buffer.from(data) : data)
   })
   socket.on("error", shutdown)
   socket.on("close", shutdown)

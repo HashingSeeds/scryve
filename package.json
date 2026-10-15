@@ -74,6 +74,7 @@
     "@expo/metro-runtime": "~57.0.16",
     "@legendapp/state": "3.0.0-beta.48",
     "@sentry/react-native": "^7.11.0",
+    "buffer": "5.7.1",
     "convex": "1.42.3",
     "expo": "57.0.28",
     "expo-application": "~57.0.3",
