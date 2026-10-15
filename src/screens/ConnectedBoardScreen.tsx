@@ -57,6 +57,7 @@ import {
 import { useConnectedGame, type ConnectedGameRuntime } from "@/features/connected/useConnectedGame"
 import { asPlayerId, MAX_COMMANDER_DAMAGE } from "@/features/game/domain"
 import { GameBoardStage } from "@/features/game/GameBoardStage"
+import { LifeLogContext, type LifeLogSource } from "@/features/game/LifeLog"
 import type { PlayerGridLayoutVariant } from "@/features/game/playerLayouts"
 import {
   counterChangeLabel,
@@ -358,6 +359,11 @@ function ConnectedBoardRuntime({
   const lives = useStructurallyStable(
     runtime.status === "ready" ? connectedLives(runtime.projection) : NO_LIVES,
   )
+  const { pending } = runtime
+  const lifeLog = useMemo(
+    (): LifeLogSource => ({ kind: "connected", publicId, pending }),
+    [publicId, pending],
+  )
   const tableState = useStructurallyStable(runtime.table)
   const {
     tableRules,
@@ -458,22 +464,24 @@ function ConnectedBoardRuntime({
     <ConnectedLivesContext.Provider value={lives}>
       <ConnectedTableContext.Provider value={table}>
         <ConnectedUnsentContext.Provider value={runtime.pending.length}>
-          <ConnectedBoardReady
-            publicId={publicId}
-            initialInviteOpen={initialInviteOpen}
-            onBack={onBack}
-            onHistory={onHistory}
-            onDecks={onDecks}
-            onSettings={onSettings}
-            onAccount={onAccount}
-            accountLabel={accountLabel}
-            onGameEnded={onGameEnded}
-            onRematch={onRematch}
-            onGameAbandoned={onGameAbandoned}
-            view={view}
-            controls={controls}
-            ownerId={ownerId}
-          />
+          <LifeLogContext.Provider value={lifeLog}>
+            <ConnectedBoardReady
+              publicId={publicId}
+              initialInviteOpen={initialInviteOpen}
+              onBack={onBack}
+              onHistory={onHistory}
+              onDecks={onDecks}
+              onSettings={onSettings}
+              onAccount={onAccount}
+              accountLabel={accountLabel}
+              onGameEnded={onGameEnded}
+              onRematch={onRematch}
+              onGameAbandoned={onGameAbandoned}
+              view={view}
+              controls={controls}
+              ownerId={ownerId}
+            />
+          </LifeLogContext.Provider>
         </ConnectedUnsentContext.Provider>
       </ConnectedTableContext.Provider>
     </ConnectedLivesContext.Provider>

@@ -85,6 +85,7 @@ export type LifeCardCommanderDamage = Omit<
 }
 
 export interface LifeCardProps {
+  playerId?: string
   playerName: string
   seatNumber: number
   shape?: PlayerMarkShape
@@ -113,6 +114,7 @@ export interface LifeCardProps {
 
 /** why: the board re-renders on every sync step and server update; a seat only needs to when its own props change. PlayerGrid rebuilds plain props (insets, styles, commander data) each render, so they compare by content, and it keeps every callback's identity stable. */
 export const LifeCard = memo(function LifeCard({
+  playerId,
   playerName,
   seatNumber,
   shape,
@@ -750,6 +752,7 @@ export const LifeCard = memo(function LifeCard({
       ) : null}
       {editorOpen && calculator ? (
         <LifeCalculator
+          playerId={playerId}
           seatNumber={seatNumber}
           playerName={displayName}
           life={life}
