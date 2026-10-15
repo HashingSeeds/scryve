@@ -44,12 +44,17 @@ describe("system definitions", () => {
     expect(counterStanding(prizes, 1)).toBeGreaterThan(counterStanding(prizes, 3))
   })
 
-  it("offers commander tax only where a command zone exists, and a Pokémon board only in Pokémon", () => {
+  it("offers experience and commander tax only where a command zone exists, and a Pokémon board only in Pokémon", () => {
     const counterIds = (system: string, format: string) =>
       tableRules(system, format).counters.map(({ id }) => id)
-    expect(counterIds("mtg", "commander")).toEqual(["poison", "commanderTax"])
-    expect(counterIds("mtg", "brawl")).toEqual(["poison", "commanderTax"])
-    expect(counterIds("mtg", "modern")).toEqual(["poison"])
+    expect(counterIds("mtg", "commander")).toEqual([
+      "poison",
+      "energy",
+      "experience",
+      "commanderTax",
+    ])
+    expect(counterIds("mtg", "brawl")).toEqual(["poison", "energy", "experience", "commanderTax"])
+    expect(counterIds("mtg", "modern")).toEqual(["poison", "energy"])
     expect(tableRules("mtg", "modern").designations.map(({ id }) => id)).toEqual([
       "monarch",
       "initiative",
