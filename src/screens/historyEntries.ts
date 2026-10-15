@@ -5,7 +5,7 @@ import {
   playFormatLabel,
   isPlaySystemId,
   PLAY_SYSTEM_IDS,
-  playSystemId,
+  storedPlaySystem,
   playSystemRules,
   type PlaySystemId,
 } from "@/features/game/playSystems"
@@ -106,7 +106,7 @@ export function manualHistoryEntry(match: {
   outcome?: "win" | "loss" | "draw" | "unknown"
   seats: readonly ManualMatchSeat[]
 }): HistoryEntry {
-  const system = match.system === undefined ? undefined : playSystemId(match.system)
+  const system = match.system === undefined ? undefined : storedPlaySystem(match.system)
   const winnerNames = match.seats
     .filter((seat) => seat.outcome === "win")
     .map((seat) => seat.displayName)
@@ -271,7 +271,7 @@ export function connectedHistoryEntry(game: {
     deckNameAtFinish?: string
   }[]
 }): HistoryEntry {
-  const system = game.system === NO_PLAY_SYSTEM ? undefined : playSystemId(game.system)
+  const system = storedPlaySystem(game.system)
   const source = game.source ?? "connected"
   return {
     key: `${source}:${game.publicId}`,

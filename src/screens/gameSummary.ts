@@ -2,10 +2,9 @@ import type { NextPageState, RemoteValue } from "@/features/async/remoteState"
 import {
   counterChangeLabel,
   counterValueLabel,
-  NO_PLAY_SYSTEM,
   isPlaySystemId,
   playFormatLabel,
-  playSystemId,
+  storedPlaySystem,
   type PlaySystemId,
 } from "@/features/game/playSystems"
 import type {
@@ -145,7 +144,7 @@ const UNUSUAL_ENDING_COPY = new Map([
 ])
 
 export function connectedSummaryModel(summary: ConnectedSummaryDocument): GameSummaryModel {
-  const system = summary.system === NO_PLAY_SYSTEM ? undefined : playSystemId(summary.system)
+  const system = storedPlaySystem(summary.system)
   return {
     source: "connected",
     status: summary.terminalStatus === "abandoned" ? "abandoned" : "finished",

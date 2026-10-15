@@ -71,6 +71,12 @@ export function playSystemId(value: unknown): PlaySystemId {
   return isPlaySystemId(value) ? value : "mtg"
 }
 
+/** why: games saved before `system` existed are Magic, but a system this build doesn't know must show as No system rather than pass for Magic. */
+export function storedPlaySystem(value: unknown): PlaySystemId | undefined {
+  if (value === undefined) return "mtg"
+  return isPlaySystemId(value) ? value : undefined
+}
+
 export function playSystemRules(value?: unknown) {
   return isPlaySystemId(value) ? PLAY_SYSTEMS[value] : GENERIC_PLAY_RULES
 }

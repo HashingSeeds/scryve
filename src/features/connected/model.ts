@@ -1,4 +1,4 @@
-import { NO_PLAY_SYSTEM, playSystemId, type PlaySystemId } from "@/features/game/playSystems"
+import { storedPlaySystem, type PlaySystemId } from "@/features/game/playSystems"
 import type {
   ActorId,
   DeviceId,
@@ -288,7 +288,7 @@ export function toConnectedProjection(value: unknown): ConnectedProjection | nul
     }
   }
   const table = parseTableState(value.table)
-  const system = value.system === NO_PLAY_SYSTEM ? undefined : playSystemId(value.system)
+  const system = storedPlaySystem(value.system)
   return {
     schemaVersion: 1,
     publicId: value.publicId,
