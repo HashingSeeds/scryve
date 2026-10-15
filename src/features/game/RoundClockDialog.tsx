@@ -11,6 +11,7 @@ import { playSystemRules, type PlaySystemId } from "./playSystems"
 import {
   addRoundBonusTurns,
   adjustRoundClock,
+  areRoundTurnsDone,
   callRoundTime,
   pauseRoundClock,
   resumeRoundClock,
@@ -87,7 +88,7 @@ export function RoundClockDialog({
               testID="round-clock-next"
               text="Next turn"
               preset="reversed"
-              disabled={view.turn > view.turns}
+              disabled={areRoundTurnsDone(view)}
               style={themed($dialogButton)}
               onPress={() => onChange((current) => stepRoundTurn(current, system, 1))}
             />

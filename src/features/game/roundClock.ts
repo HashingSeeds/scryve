@@ -90,10 +90,15 @@ export function formatRemaining(ms: number) {
 
 export type RoundTimeView = Extract<RoundClockView, { kind: "time" }>
 
+/** why: Pokémon's overtime cap ends the procedure even when turns remain. */
+export function areRoundTurnsDone(view: RoundTimeView) {
+  return view.turn > view.turns || view.overtimeMs === 0
+}
+
 export function roundTurnText(view: RoundTimeView) {
   if (view.turns === 0) return ""
+  if (areRoundTurnsDone(view)) return "Turns done"
   if (view.turn === 0) return "Finish turn"
-  if (view.turn > view.turns) return "Turns done"
   return `Turn ${view.turn} of ${view.turns}`
 }
 
@@ -101,7 +106,7 @@ export function roundClockText(view: RoundClockView) {
   if (view.kind === "elapsed") return formatElapsed(view.ms)
   if (view.kind === "remaining") return formatRemaining(view.ms)
   const turn = roundTurnText(view)
-  return turn && view.overtimeMs !== undefined && view.turn <= view.turns
+  return turn && view.overtimeMs !== undefined && !areRoundTurnsDone(view)
     ? `${turn} · ${formatRemaining(view.overtimeMs)}`
     : turn
 }

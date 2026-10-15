@@ -59,6 +59,7 @@ describe("round clock", () => {
     expect(roundClockText(roundClockView(clock, "pokemon", 32 * MINUTE))).toBe(
       "Turn 1 of 3 · 13:00",
     )
+    expect(roundClockText(roundClockView(clock, "pokemon", 45 * MINUTE))).toBe("Turns done")
   })
 
   it("ends a Yu-Gi-Oh! match at time with no extra turns", () => {
