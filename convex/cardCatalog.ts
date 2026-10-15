@@ -11,7 +11,7 @@ import {
   type CatalogCard,
   type NormalizedCard,
 } from "./lib/games/cards"
-import { assertGameSystem, requireReleasedCapability } from "./lib/integrations"
+import { assertGameSystem, integration, requireReleasedCapability } from "./lib/integrations"
 
 const MAX_CARD_PRINTINGS = 100
 
@@ -163,12 +163,8 @@ export const searchCached = internalQuery({
 export const lookupCached = internalQuery({
   args: { game: v.string(), cardId: v.string() },
   handler: async (ctx, args) => {
-    const integrationNamespace =
-      args.game === "ygo"
-        ? "ygoprodeck-card"
-        : args.game === "pokemon"
-          ? "tcgdex-card"
-          : "scryfall-oracle"
+    const integrationNamespace = integration(args.game)?.identityNamespace
+    if (!integrationNamespace) return null
     const logical = await ctx.db
       .query("gameCards")
       .withIndex("by_game_and_identity_namespace_and_card_id", (query) =>

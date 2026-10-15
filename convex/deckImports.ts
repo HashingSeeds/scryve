@@ -15,15 +15,16 @@ import {
   type CatalogCard,
   type NormalizedCard,
 } from "./lib/games/cards"
+import { CARD_CATALOGS } from "./lib/games/catalogs"
 import {
   limitlessDeckLink,
   limitlessPlayerDecklist,
   type LimitlessDeckEntry,
 } from "./lib/games/limitless"
-import { pokemonCardByReference, searchPokemon } from "./lib/games/pokemon"
-import { cardsByYgoIds, searchYgo, ygoSection } from "./lib/games/yugioh"
+import { pokemonCardByReference } from "./lib/games/pokemon"
+import { cardsByYgoIds, ygoSection } from "./lib/games/yugioh"
 import { parseYgoprodeckDeckPage, ygoprodeckDeckLink } from "./lib/games/yugiohDecks"
-import { assertGameSystem, type GameSystemId } from "./lib/integrations"
+import { assertGameSystem, integrationFor, type GameSystemId } from "./lib/integrations"
 import { MAX_DECK_CARDS } from "./lib/policy"
 import {
   type CardReference,
@@ -426,12 +427,9 @@ async function resolveGenericEntries(
       continue
     }
 
-    const result =
-      game === "ygo"
-        ? await searchYgo(ctx, entry.name, includeImages)
-        : pokemonReference
-          ? await pokemonCardByReference(ctx, entry.name, pokemonReference, includeImages)
-          : await searchPokemon(ctx, entry.name, includeImages)
+    const result = pokemonReference
+      ? await pokemonCardByReference(ctx, entry.name, pokemonReference, includeImages)
+      : await CARD_CATALOGS[game].search(ctx, entry.name, includeImages)
     const resolved = result.cards.find(
       (candidate) => normalizeCardName(candidate.name) === normalizeCardName(entry.name),
     )
@@ -1203,7 +1201,7 @@ async function resolveGenericDeck(
   game: Exclude<GameSystemId, "mtg">,
   entries: GenericParsedEntry[],
 ): Promise<{ cards: GenericDeckCard[]; unresolved: string[] }> {
-  const provider = game === "ygo" ? "ygoprodeck" : "tcgdex"
+  const provider = integrationFor(game).capabilities.deckImport.provider
   const startedAt = Date.now()
   try {
     const resolved = await resolveGenericEntries(ctx, game, entries)
