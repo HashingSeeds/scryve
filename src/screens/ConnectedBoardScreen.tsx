@@ -219,7 +219,7 @@ export function ConnectedBoardScreen(props: ConnectedBoardScreenProps) {
         )
       }}
     >
-      <ConnectedBoardRuntime key={runtimeKey} {...props} ownerId={ownerId} />
+      <ConvexConnectedBoard key={runtimeKey} {...props} ownerId={ownerId} />
     </ConvexQueryBoundary>
   )
 }
@@ -300,20 +300,7 @@ function finishBlockerFor(runtime: ConnectedGameRuntime): FinishBlocker | undefi
 
 const NO_LIVES: Readonly<Record<string, number>> = {}
 
-function ConnectedBoardRuntime({
-  publicId,
-  initialInviteOpen,
-  onGameEnded,
-  onRematch,
-  onGameAbandoned,
-  onBack,
-  onHistory,
-  onDecks,
-  onSettings,
-  onAccount,
-  accountLabel,
-  ownerId,
-}: {
+interface ConnectedBoardRuntimeProps {
   publicId: string
   initialInviteOpen?: boolean
   onGameEnded?: (publicId: string) => void
@@ -326,9 +313,29 @@ function ConnectedBoardRuntime({
   onAccount?: () => void
   accountLabel?: "Account" | "Sign in"
   ownerId: string
-}) {
+}
+
+function ConvexConnectedBoard(props: ConnectedBoardRuntimeProps) {
+  const runtime = useConnectedGame(props.publicId, props.ownerId)
+  return <ConnectedBoardWithRuntime {...props} runtime={runtime} />
+}
+
+export function ConnectedBoardWithRuntime({
+  publicId,
+  initialInviteOpen,
+  onGameEnded,
+  onRematch,
+  onGameAbandoned,
+  onBack,
+  onHistory,
+  onDecks,
+  onSettings,
+  onAccount,
+  accountLabel,
+  ownerId,
+  runtime,
+}: ConnectedBoardRuntimeProps & { runtime: ConnectedGameRuntime }) {
   useKeepAwake("count-connected-game", { suppressDeactivateWarnings: true })
-  const runtime = useConnectedGame(publicId, ownerId)
   const { signal: syncSignal, offlineSince } = useBoardSyncSignal({
     connectionStatus: runtime.connectionStatus,
     unsent: runtime.pending.length,

@@ -17,6 +17,8 @@ const DEV_SEED_LINK =
 const PR_PREVIEW_LINK =
   /^(?:(?:scryve|count)-preview:\/\/(?:\/?preview\/|expo-development-client\/\?url=https:\/\/u\.expo\.dev\/[0-9a-f-]+\?channel-name=)|\/preview\/)(pr-[0-9]+)$/
 
+const DEV_LAN_LINK = /^(?:(?:scryve|count)-dev:\/\/\/?|\/)lan(\?[A-Za-z0-9=&]+)?$/
+
 function devSeedPath(path: string): string | null {
   const match = DEV_SEED_LINK.exec(path)
   return match ? `/dev/seed/${match[1]}${match[2] ?? ""}` : null
@@ -31,6 +33,8 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   if (preview) return `/preview/${preview}`
   const seed = __DEV__ ? devSeedPath(path) : null
   if (seed) return seed
+  const lan = __DEV__ ? DEV_LAN_LINK.exec(path) : null
+  if (lan) return `/lan${lan[1] ?? ""}`
   // Warm intents may preserve only a deliberately small absolute in-app route grammar.
   return !initial && isSafeInternalPath(path) ? path : "/"
 }

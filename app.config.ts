@@ -120,6 +120,12 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
       ...config.ios,
       bundleIdentifier: getUniqueIdentifier(),
       associatedDomains: inviteUrl ? [`applinks:${inviteUrl.host}`] : [],
+      infoPlist: {
+        ...config.ios?.infoPlist,
+        NSLocalNetworkUsageDescription:
+          "Scryve uses your local network to find and join games on nearby devices.",
+        NSBonjourServices: ["_scryve._tcp"],
+      },
       // This privacyManifests is to get you started.
       // See Expo's guide on apple privacy manifests here:
       // https://docs.expo.dev/guides/apple-privacy/
@@ -138,6 +144,10 @@ export default ({ config }: ConfigContext): Partial<ExpoConfig> => {
     android: {
       ...config.android,
       package: getUniqueIdentifier(),
+      permissions: [
+        ...(config.android?.permissions ?? []),
+        "android.permission.ACCESS_LOCAL_NETWORK",
+      ],
       intentFilters: inviteUrl
         ? [
             {
