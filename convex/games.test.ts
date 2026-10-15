@@ -1461,7 +1461,6 @@ describe("connected commander damage claims", () => {
       api.games.submitCommanderDamage,
       commanderArgs(game.publicId, game.hostPlayerId, game.joinerPlayerId, operationId, 7),
     )
-    // why: the host speaks for an unclaimed seat, which is the only way one actor can write both events.
     await t.run((ctx) =>
       ctx.db.patch(game.joinerPlayerId, { userId: undefined, deviceId: undefined }),
     )
