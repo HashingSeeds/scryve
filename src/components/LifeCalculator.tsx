@@ -211,6 +211,7 @@ export function LifeCalculator({
         <LifeTrail
           steps={steps}
           beside={beside}
+          showTotal={entry !== ""}
           seatNumber={seatNumber}
           playerName={playerName}
           ink={ink}
@@ -315,10 +316,11 @@ function signed(delta: number) {
   return `${delta < 0 ? "−" : "+"}${Math.abs(delta)}`
 }
 
-// why: the newest total is the big number above, so the trail ends on the change that reached it.
+// why: the newest total is the big number above, so the trail ends on the change that reached it until a typed amount takes that number's place.
 function LifeTrail({
   steps,
   beside,
+  showTotal,
   seatNumber,
   playerName,
   ink,
@@ -327,6 +329,7 @@ function LifeTrail({
 }: {
   steps: readonly LifeLogStep[]
   beside: boolean
+  showTotal: boolean
   seatNumber: number
   playerName: string
   ink: string
@@ -337,6 +340,7 @@ function LifeTrail({
   const charWidth =
     TRAIL_CHAR_WIDTH * Math.min(useWindowDimensions().fontScale, TRAIL_MAX_FONT_SCALE)
   if (steps.length < 2) return null
+  const total = String(steps[steps.length - 1].life)
   const label = steps
     .map(({ delta, life }) => (delta === undefined ? `${life}` : `${signed(delta)} to ${life}`))
     .join(", ")
@@ -356,7 +360,8 @@ function LifeTrail({
       .reduce(
         (sum, { delta, from }) =>
           sum + (`${from}`.length + signed(delta).length) * charWidth + TRAIL_GAP * 2,
-        count < changes.length ? charWidth + TRAIL_GAP : 0,
+        (count < changes.length ? charWidth + TRAIL_GAP : 0) +
+          (showTotal ? total.length * charWidth : 0),
       ) <= width
   let count = Math.min(cap, changes.length)
   // why: a seat too narrow for even one change shows none rather than wrapping into the keypad.
@@ -398,6 +403,14 @@ function LifeTrail({
               />
             </Fragment>
           ))}
+          {showTotal ? (
+            <Text
+              text={total}
+              size="xxs"
+              maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
+              style={[$trailText, { color: ink }]}
+            />
+          ) : null}
         </>
       ) : null}
     </View>
