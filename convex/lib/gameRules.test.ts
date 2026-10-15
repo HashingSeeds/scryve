@@ -31,8 +31,15 @@ describe("game rules", () => {
     }
 
     expect(isSameLifeChange({ ...request }, request)).toBe(true)
-    expect(isSameLifeChange({ ...request, delta: -4 }, request)).toBe(false)
-    expect(isSameLifeChange({ ...request, clientCreatedAt: undefined }, request)).toBe(false)
+    for (const nearMiss of [
+      { playerId: "other seat" },
+      { actorUserId: "someone else" },
+      { delta: -4 },
+      { deviceId: "laptop" },
+      { clientCreatedAt: 11 },
+      { clientCreatedAt: undefined },
+    ])
+      expect(isSameLifeChange({ ...request, ...nearMiss }, request)).toBe(false)
   })
 
   it("floors life at zero only for systems that stop there", () => {

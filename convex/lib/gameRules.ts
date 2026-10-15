@@ -27,7 +27,6 @@ export interface SeatActor {
   isHost: boolean
 }
 
-// why: one predicate for every seat write; copies of it drifted is how a seat ends up writable by the wrong device.
 export const controlsSeat = (seat: SeatOwner, actor: SeatActor) =>
   (seat.userId === undefined ? actor.isHost : seat.userId === actor.userId) &&
   (seat.deviceId === undefined || seat.deviceId === actor.deviceId)
@@ -40,7 +39,6 @@ export interface LifeChangeRequest {
   clientCreatedAt: number
 }
 
-// why: a retry must repeat its request exactly; accepting a near match would apply someone else's change under a reused id.
 export const isSameLifeChange = (
   recorded: Partial<LifeChangeRequest>,
   request: LifeChangeRequest,
@@ -79,7 +77,6 @@ export function commanderClaimOutcome(claim: {
     : "pending"
 }
 
-// why: commander damage moves life one for one and never floors it, so a confirm outside 0..99 is refused rather than clamped.
 export function confirmCommanderClaim(state: { total: number; life: number; delta: number }) {
   const total = state.total + state.delta
   if (total < 0 || total > MAX_COMMANDER_DAMAGE) return null
