@@ -1,6 +1,7 @@
 import {
   SYSTEM_IDS,
   SYSTEMS,
+  type CounterDefinition,
   type FormatDefinition,
   type SystemDefinition,
   type SystemId,
@@ -50,6 +51,27 @@ export function hasCommandZone(system: unknown, format: string | undefined): boo
     formatDefinition(system, format)?.sections.some((section) => section.id === "commander") ??
     false
   )
+}
+
+/** why: a race counts toward its goal from the default value, so Prize cards lead by falling to 0 while lore leads by climbing to 20. */
+export function lowerLeads({ goal, defaultValue }: CounterDefinition) {
+  return goal.kind === "race" && goal.to < defaultValue
+}
+
+/** why: one ordering for every goal, where a higher standing always leads. */
+export function counterStanding(counter: CounterDefinition, value: number) {
+  return lowerLeads(counter) ? -value : value
+}
+
+export function isCounterOut(
+  counter: CounterDefinition,
+  value: number,
+  others: readonly number[],
+): boolean {
+  const { goal } = counter
+  if (goal.kind === "survive") return value <= 0
+  const finish = counterStanding(counter, goal.to)
+  return others.some((other) => counterStanding(counter, other) >= finish)
 }
 
 const LIFE_FLOORED_AT_ZERO: ReadonlySet<unknown> = new Set<SystemId>(["ygo"])

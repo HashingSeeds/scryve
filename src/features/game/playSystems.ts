@@ -2,6 +2,7 @@ import { deckFormatLabel, deckFormats } from "../../../convex/lib/deckGames"
 import {
   formatDefinition,
   isSystemId,
+  lowerLeads,
   NO_TABLE,
   SYSTEM_IDS,
   SYSTEMS,
@@ -50,7 +51,7 @@ const GENERIC_COUNTER: CounterRules = {
   scrubStep: 1,
   scrubSteps: 20,
   longPressStep: undefined,
-  direction: "open",
+  goal: { kind: "survive" },
   maxStartingValue: 999,
 }
 
@@ -129,7 +130,7 @@ export function counterDeltaFromStartLabel(
   startingValue: number,
 ): string {
   const delta = current - startingValue
-  if (playSystemRules(value).counter.direction === "down") {
+  if (lowerLeads(playSystemRules(value).counter)) {
     const taken = startingValue - current
     return taken === 0 ? "none taken" : `${taken} taken`
   }
