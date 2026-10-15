@@ -6,23 +6,27 @@ Flows are argent YAML in the app repo's `.argent/flows`, replayed with
 run that same flow by hand from the app repo while authoring it.
 
 Flows run with no LLM, so every step must be deterministic. goldie handles the
-capture setup. Screenshot scenes start independently. Preview segments form
-one continuous session: reset only before the first segment and preserve app
-data and navigation between later segments. Check the installed version's
-capture behavior before relying on a reset; launching alone does not clear data.
+surrounding machinery for you: before any flow it pins the status bar and
+reinstalls the app with cleared data, so every run starts from the same empty
+state. A simulator that is already booted keeps running; it is only shut down
+and rebooted when its keyboard and locale preferences still need pinning.
 
 ## Step vocabulary
 
 **Rule: `executionPrerequisite` and a leading `launch:` step are mutually
 exclusive.** A flow that starts with `launch:` launches and controls its own
 starting state, so `flow-execute` rejects any `executionPrerequisite` on it.
-Only give a flow `executionPrerequisite` when its first step is NOT `launch:`
-— i.e. it assumes a state a prior flow/segment left behind (preview segments
-after the first one are the normal case). Every screenshot scene flow and a
-preview's first segment starts with `launch:` and therefore must NOT have
-`executionPrerequisite`.
+Only give a flow `executionPrerequisite` when its first step is NOT `launch:`,
+meaning it assumes a state that goldie or a prior segment left behind. Every
+screenshot scene flow starts with `launch:` and has no
+`executionPrerequisite`. Every preview segment, the first one included, is
+the opposite: no `launch:` step, and an `executionPrerequisite` stating where
+it picks up (see "Preview segment flows" below).
 
 ```yaml
+executionPrerequisite: >-        # top-level, preview segments mostly: the state
+  App on the composer with a title typed.   # this flow assumes when it starts
+
 steps:
   - echo: Why the next step looks the way it does   # comment, printed on replay
   - launch: com.example.app                          # launch by bundle id
@@ -59,9 +63,10 @@ steps:
 - **Never hardcode a simulator udid.** `argent flow run --device` injects it.
 - **`await visible` before acting on anything that appears.** Then
   `await idle` before the capture moment, so animations finish.
-- Establish screenshot state explicitly. Create fixture content through the
-  app's normal flows. For later preview segments, reuse the previous segment's
-  state instead of resetting or reseeding.
+- **The app starts with cleared data.** If a scene needs content on screen
+  (a populated list, a created item), the flow must create it, or the app must
+  seed demo data on first launch. Check how the app behaves on a fresh install
+  before assuming content exists.
 - **Mine the flows already in `.argent/flows`.** Selectors and coordinates that
   already replay there are proven; copy them instead of rediscovering, or point
   a scene straight at an existing flow when one reaches the screen.
@@ -89,6 +94,20 @@ own recording. So the first segment starts from a fresh launch already settled
 on the home screen, and every later segment continues exactly where the
 previous one ended. State the assumption in `executionPrerequisite` so the
 chain is auditable.
+
+No segment starts with `launch:`, the first one included. `launch:` restarts
+the app, so inside a recording it films the app closing, the home screen and
+a cold start. Open the first segment with an `await` on the home screen
+instead:
+
+```yaml
+executionPrerequisite: >-
+  App freshly restarted by goldie, settled on the home screen.
+steps:
+  - await: { visible: { text: All issues } }
+  - wait: 1200
+  - tap: { text: New issue }
+```
 
 Pacing rules:
 
