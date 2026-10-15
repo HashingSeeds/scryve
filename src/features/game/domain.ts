@@ -8,6 +8,7 @@ import {
   playTableRules,
   type PlaySystemId,
 } from "./playSystems"
+import { isRoundClockSetup, startRoundClock, type RoundClockSetup } from "./roundClock"
 import type {
   ActorId,
   CommanderDamageAssignedEvent,
@@ -128,6 +129,7 @@ export function createLocalGame(input: {
   gameId?: GameId
   account?: { ownerId: string; meSeat?: number; deckVersionId?: string; deckName?: string }
   match?: { bestOf: MatchBestOf }
+  clock?: RoundClockSetup
 }): LocalGame {
   const system = isPlaySystemId(input.system) ? input.system : undefined
   const format = system ? playSystemFormat(system, input.format) : undefined
@@ -173,6 +175,7 @@ export function createLocalGame(input: {
     updatedAt: now,
     ...(input.account ? { account: localGameAccount(players, input.account) } : {}),
     ...(input.match ? { match: newMatch(input.match.bestOf, players.length, now) } : {}),
+    ...(isRoundClockSetup(input.clock) ? { clock: startRoundClock(input.clock, now) } : {}),
   }
 }
 
@@ -246,6 +249,7 @@ export function createNextMatchGame(game: LocalGame, now?: number): LocalGame {
       gameNumber: game.match.gameNumber + 1,
       ...matchScoreAfter(game),
     },
+    ...(game.clock ? { clock: game.clock } : {}),
   }
 }
 
@@ -256,7 +260,11 @@ export function isMatchInProgress(game: LocalGame) {
 export function restartMatchGame(game: LocalGame, now?: number): LocalGame {
   if (!game.match) throw new Error("This game is not part of a match.")
   return withFirstChooser(
-    { ...createRematchBoard(game, now), match: game.match },
+    {
+      ...createRematchBoard(game, now),
+      match: game.match,
+      ...(game.clock ? { clock: game.clock } : {}),
+    },
     game.firstChooserSeat,
   )
 }
@@ -306,6 +314,7 @@ function createRematchBoard(game: LocalGame, now?: number): LocalGame {
     now,
     ...(game.account ? { account: { ...game.account, meSeat: meSeatOf(game) } } : {}),
     ...(game.match ? { match: { bestOf: game.match.bestOf } } : {}),
+    ...(game.clock ? { clock: game.clock.setup } : {}),
   })
 }
 

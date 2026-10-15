@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as Haptics from "expo-haptics"
 
 import { captureGame, type GameEndSource } from "@/utils/analytics"
@@ -20,6 +20,7 @@ import {
 } from "./domain"
 import { localGameRepository, type LocalGameRepository } from "./localPersistence"
 import type { PlayerGridLayoutVariant } from "./playerLayouts"
+import type { RoundClock } from "./roundClock"
 import { createTableActions, type TableRuntime } from "./tableRuntime"
 import type {
   GameCommand,
@@ -91,6 +92,27 @@ export function useLocalGame(
       const current = gameRef.current
       if (current.layout === layout) return
       const next = { ...current, layout, updatedAt: Date.now() }
+      repository.saveActiveGame(next)
+      gameRef.current = next
+      setGame(next)
+    },
+    [repository],
+  )
+
+  // why: a round clock runs before the first tap, so an unsaved timed board would restart its clock when the route rebuilds it.
+  const timedBoardId = game.clock && game.status === "active" ? game.id : undefined
+  useEffect(() => {
+    if (timedBoardId) repository.saveActiveGame(gameRef.current)
+  }, [repository, timedBoardId])
+
+  // why: clock changes are rare taps (pause, adjust, next turn), so saving each one stays off the per-tick path.
+  const changeClock = useCallback(
+    (update: (clock: RoundClock) => RoundClock | undefined) => {
+      const current = gameRef.current
+      if (current.status !== "active" || !current.clock) return
+      const { clock: _previous, ...rest } = current
+      const clock = update(current.clock)
+      const next: LocalGame = { ...rest, ...(clock ? { clock } : {}), updatedAt: Date.now() }
       repository.saveActiveGame(next)
       gameRef.current = next
       setGame(next)
@@ -204,6 +226,7 @@ export function useLocalGame(
     changeLife,
     assignCommanderDamage,
     changeLayout,
+    changeClock,
     undo: () => dispatch({ type: "life.undo" }),
     finish: (result?: LocalGameResult, endSource?: GameEndSource) =>
       dispatch({ type: "game.finish", result }, endSource),
