@@ -55,6 +55,8 @@ class LanSession {
   private server?: LanHost
   private serverClosed = false
   private peers = new Map<string, LanConnection<LanHostMessage>>()
+  // why: a socket that hasn't sent its join yet isn't in peers, but still has to close when the host leaves.
+  private accepted = new Set<LanConnection<LanHostMessage>>()
   private connection?: LanConnection<LanGuestMessage>
   private ownLife?: LanLife
   private reconnectTimer?: ReturnType<typeof setTimeout>
@@ -125,10 +127,12 @@ class LanSession {
 
   private acceptPeer(peer: LanConnection<LanHostMessage>) {
     let peerId: string | undefined
+    const session = this.session
+    this.accepted.add(peer)
     return {
       onMessage: (message: LanGuestMessage) => {
         const game = this.state.game
-        if (!game) return
+        if (!game || session !== this.session) return
         if (message.type === "join") {
           const joined = joinLanGame(game, message)
           if ("rejected" in joined) {
@@ -144,6 +148,7 @@ class LanSession {
         if (peerId) this.publish(setLanLife(game, peerId, message))
       },
       onClose: () => {
+        this.accepted.delete(peer)
         if (!peerId || this.peers.get(peerId) !== peer) return
         this.peers.delete(peerId)
         if (this.state.game) this.publish(setLanConnected(this.state.game, peerId, false))
@@ -248,9 +253,10 @@ class LanSession {
     if (role === "host" && game && game.status !== "abandoned")
       this.publish({ ...game, status: "abandoned" })
     const server = this.server
-    const peers = [...this.peers.values()]
+    const peers = [...this.accepted]
     this.server = undefined
     this.peers.clear()
+    this.accepted.clear()
     this.connection?.close()
     this.connection = undefined
     this.ownLife = undefined

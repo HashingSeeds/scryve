@@ -76,17 +76,25 @@ function wrapSocket<In, Out>(
 ): LanConnection<Out> {
   let lastHeard = Date.now()
   let closed = false
+  // why: tcp-socket throws on writes after destroy, and its close event can arrive well after, so shut down at once.
+  const shutdown = () => {
+    if (closed) return
+    closed = true
+    clearInterval(heartbeat)
+    socket.destroy()
+    handlers.onClose()
+  }
   const read = createLineReader((line) => {
     try {
       const message = parse(line)
       if (message) handlers.onMessage(message)
     } catch {
-      socket.destroy()
+      shutdown()
     }
   })
   // why: empty lines double as heartbeats, which the line reader already skips.
   const heartbeat = setInterval(() => {
-    if (Date.now() - lastHeard > SILENCE_LIMIT_MS) socket.destroy()
+    if (Date.now() - lastHeard > SILENCE_LIMIT_MS) shutdown()
     else socket.write("\n")
   }, HEARTBEAT_MS)
   socket.setEncoding("utf8")
@@ -94,16 +102,13 @@ function wrapSocket<In, Out>(
     lastHeard = Date.now()
     read(String(data))
   })
-  socket.on("error", () => socket.destroy())
-  socket.on("close", () => {
-    clearInterval(heartbeat)
-    if (closed) return
-    closed = true
-    handlers.onClose()
-  })
+  socket.on("error", shutdown)
+  socket.on("close", shutdown)
   return {
-    send: (message) => socket.write(`${JSON.stringify(message)}\n`),
-    close: () => socket.destroy(),
+    send: (message) => {
+      if (!closed) socket.write(`${JSON.stringify(message)}\n`)
+    },
+    close: shutdown,
   }
 }
 
