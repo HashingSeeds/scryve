@@ -1092,6 +1092,22 @@ figure {
   cursor: pointer;
 }
 
+/* The details step swaps its heading and copy with the demo it shows. */
+.demo-copy:not([hidden]) {
+  display: contents;
+}
+
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.demo-controls .demo-replay {
+  align-self: auto;
+}
+
 .step-copy {
   position: sticky;
   top: var(--step-anchor);

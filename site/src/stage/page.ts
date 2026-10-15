@@ -34,7 +34,10 @@ function sampleValues(system: PlaySystemId, count: number): readonly number[] {
   return []
 }
 
-// The Pokémon step's two-player table.
+const DEMOS = ["commander", "pokemon"] as const
+type Demo = (typeof DEMOS)[number]
+
+// The Pokémon demo's two-player table.
 const POKEMON_TOUR_SETUP: DemoGameSetup = {
   system: "pokemon",
   startingLife: startingLife("pokemon"),
@@ -127,42 +130,68 @@ function setUpFeatures(stage: HTMLElement, game: DemoGame) {
   game.subscribe((event) => event.type === "reset" && syncPickers())
   syncPickers()
 
-  // The commander damage demo plays while that step is on screen. Commander damage is a
-  // Magic format, so the step moves another system to Magic; the demo then plays on reset.
-  const commander = createCommanderDemo(board, game, {
-    damage: SAMPLE_COMMANDER_DAMAGE,
-    reducedMotion: prefersReducedMotion,
-  })
-  // The Pokémon step plays a turn on a fresh two-player table each time it comes on screen.
-  const pokemon = createPokemonDemo(board, game, {
-    setup: POKEMON_TOUR_SETUP,
-    reducedMotion: prefersReducedMotion,
-  })
-  let showing = ""
-  const replay = (step: string, demo: { start: () => void }) => {
-    const copy = query<HTMLElement>(`.steps [data-step='${step}']`)
-    query<HTMLElement>("[data-replay]", copy).addEventListener("click", () => {
-      if (showing === step) demo.start()
-      else copy.scrollIntoView({ block: "start", behavior: "instant" })
-    })
+  // The details step plays one demo at a time on the shared game: Commander damage, or a
+  // Pokémon turn on a fresh two-player table. It opens on the visitor's own game when that game
+  // has a demo, and the step's picker switches between them. It borrows the visitor's table and
+  // gives it back when the step leaves the screen.
+  const demos: Record<Demo, { start: () => void; stop: () => void }> = {
+    commander: createCommanderDemo(board, game, {
+      damage: SAMPLE_COMMANDER_DAMAGE,
+      reducedMotion: prefersReducedMotion,
+    }),
+    pokemon: createPokemonDemo(board, game, {
+      setup: POKEMON_TOUR_SETUP,
+      reducedMotion: prefersReducedMotion,
+    }),
   }
-  replay("commander", commander)
-  replay("pokemon", pokemon)
-  return (step: string) => {
-    const next = step === "commander" || step === "pokemon" ? step : ""
-    if (next === showing) return
-    if (showing === "commander") commander.stop()
-    if (showing === "pokemon") pokemon.stop()
-    showing = next
-    if (next === "pokemon") return pokemon.start()
-    if (next !== "commander") return
-    commander.start()
-    if (game.setup.system === "mtg") return
-    game.reset({
-      system: "mtg",
-      startingLife: startingLife("mtg"),
-      values: SAMPLE_LIFE.slice(0, game.setup.names.length),
+  const step = query<HTMLElement>(".steps [data-step='details']")
+  const demoPicker = query<HTMLElement>("[data-pick='demo']", step)
+  let showing: Demo | undefined
+  // A demo picked before the step comes on screen plays when it does.
+  let requested: Demo | undefined
+  let borrowed: ReturnType<DemoGame["snapshot"]> | undefined
+
+  function show(demo: Demo) {
+    if (showing) demos[showing].stop()
+    showing = demo
+    press(demoPicker, demo)
+    step.querySelectorAll<HTMLElement>("[data-demo-copy]").forEach((copy) => {
+      copy.hidden = copy.dataset.demoCopy !== demo
     })
+    demos[demo].start()
+    if (demo === "commander" && game.setup.system !== "mtg")
+      game.reset({
+        system: "mtg",
+        startingLife: startingLife("mtg"),
+        values: SAMPLE_LIFE.slice(0, game.setup.names.length),
+      })
+  }
+  const scrollToStep = () => step.scrollIntoView({ block: "start", behavior: "instant" })
+
+  demoPicker.addEventListener("click", (event) => {
+    const demo = DEMOS.find((value) => value === picked(event))
+    if (!demo) return
+    if (borrowed) return show(demo)
+    requested = demo
+    scrollToStep()
+  })
+  query<HTMLElement>("[data-replay]", step).addEventListener("click", () => {
+    if (borrowed && showing) show(showing)
+    else scrollToStep()
+  })
+
+  return (next: string) => {
+    if ((next === "details") === Boolean(borrowed)) return
+    if (next === "details") {
+      borrowed = game.snapshot()
+      const demo = requested ?? (game.setup.system === "pokemon" ? "pokemon" : "commander")
+      requested = undefined
+      return show(demo)
+    }
+    if (showing) demos[showing].stop()
+    showing = undefined
+    if (borrowed) game.restore(borrowed)
+    borrowed = undefined
   }
 }
 
@@ -357,8 +386,7 @@ function setUpDemoTaps(stage: HTMLElement, game: DemoGame) {
   // Full screen is for the visitor's own taps.
   const showing = () =>
     (stage.dataset.scene === "intro" || stage.dataset.scene === "features") &&
-    stage.dataset.step !== "commander" &&
-    stage.dataset.step !== "pokemon" &&
+    stage.dataset.step !== "details" &&
     !stage.classList.contains("full")
   const tap = () => {
     if (!showing()) return

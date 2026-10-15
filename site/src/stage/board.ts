@@ -210,6 +210,15 @@ export function createDemoGame(initial: DemoGameSetup) {
       history.length = 0
       emit({ type: "reset" })
     },
+    // The whole game as it stands, for `restore` to put back after a demo borrows the board.
+    snapshot() {
+      return { setup, life, table }
+    },
+    restore(saved: { setup: typeof setup; life: typeof life; table: typeof table }) {
+      ;({ setup, life, table } = saved)
+      history.length = 0
+      emit({ type: "reset" })
+    },
   }
 }
 
