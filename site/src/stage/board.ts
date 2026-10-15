@@ -44,16 +44,34 @@ const PENTAGON_FACE = { top: "#46434E", bottom: "#26242C" } as const
 const PENTAGON_GLYPH = "#FFFFFF"
 const PENTAGON_GLYPH_PX_PER_UNIT = 0.8
 
-function regularPolygonPoints(radius: number): string {
+// The app's softened corners (buildSoftCorners): each corner is a quadratic curve that starts and
+// ends `cornerRadius` along its two sides, so the pentagon is rounded, not pointy.
+const PENTAGON_CORNER_RADIUS = 9
+const FACE_CORNER_RADIUS = PENTAGON_CORNER_RADIUS * 0.9
+
+function softPentagonPath(radius: number, cornerRadius: number): string {
   const center = PENTAGON_VIEWBOX / 2
-  return Array.from({ length: 5 }, (_, corner) => {
+  const tips = Array.from({ length: 5 }, (_, corner) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * corner) / 5
-    return `${(center + radius * Math.cos(angle)).toFixed(2)},${(center + radius * Math.sin(angle)).toFixed(2)}`
-  }).join(" ")
+    return { x: center + radius * Math.cos(angle), y: center + radius * Math.sin(angle) }
+  })
+  const share = Math.min(cornerRadius / (2 * radius * Math.sin(Math.PI / 5)), 0.45)
+  type Point = (typeof tips)[number]
+  const towards = (from: Point, to: Point) => ({
+    x: from.x + (to.x - from.x) * share,
+    y: from.y + (to.y - from.y) * share,
+  })
+  const point = ({ x, y }: Point) => `${x.toFixed(2)},${y.toFixed(2)}`
+  const corners = tips.map((tip, corner) => {
+    const enter = towards(tip, tips[(corner + 4) % 5] ?? tip)
+    const exit = towards(tip, tips[(corner + 1) % 5] ?? tip)
+    return `${corner === 0 ? "M" : "L"}${point(enter)} Q${point(tip)} ${point(exit)}`
+  })
+  return `${corners.join(" ")} Z`
 }
 
-const PENTAGON_POINTS = regularPolygonPoints(PENTAGON_RADIUS)
-const PENTAGON_FACE_POINTS = regularPolygonPoints(PENTAGON_RADIUS - PENTAGON_STROKE_WIDTH / 2)
+const PENTAGON_PATH = softPentagonPath(PENTAGON_RADIUS, PENTAGON_CORNER_RADIUS)
+const FACE_PATH = softPentagonPath(PENTAGON_RADIUS - PENTAGON_STROKE_WIDTH / 2, FACE_CORNER_RADIUS)
 
 // The app's glyph is 16x2px bars spaced 5px apart; convert to viewBox units.
 const GLYPH_BARS = [-5, 0, 5]
@@ -69,7 +87,7 @@ let pentagonCount = 0
 
 function pentagonSvg(): string {
   const gradient = `pentagon-fill-${pentagonCount++}`
-  return `<svg viewBox="0 0 ${PENTAGON_VIEWBOX} ${PENTAGON_VIEWBOX}" aria-hidden="true"><defs><linearGradient id="${gradient}" x1="0.15" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="${PENTAGON_FACE.top}"/><stop offset="1" stop-color="${PENTAGON_FACE.bottom}"/></linearGradient></defs><polygon points="${PENTAGON_POINTS}" fill="url(#${gradient})" stroke="${PENTAGON_BORDER}" stroke-width="${PENTAGON_STROKE_WIDTH}" stroke-linejoin="round"/><polygon points="${PENTAGON_FACE_POINTS}" fill="none" stroke="${PENTAGON_BORDER}" stroke-opacity="0.22" stroke-width="1.4" stroke-linejoin="round"/>${GLYPH_BARS}</svg>`
+  return `<svg viewBox="0 0 ${PENTAGON_VIEWBOX} ${PENTAGON_VIEWBOX}" aria-hidden="true"><defs><linearGradient id="${gradient}" x1="0.15" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="${PENTAGON_FACE.top}"/><stop offset="1" stop-color="${PENTAGON_FACE.bottom}"/></linearGradient></defs><path d="${PENTAGON_PATH}" fill="url(#${gradient})" stroke="${PENTAGON_BORDER}" stroke-width="${PENTAGON_STROKE_WIDTH}" stroke-linejoin="round"/><path d="${FACE_PATH}" fill="none" stroke="${PENTAGON_BORDER}" stroke-opacity="0.22" stroke-width="1.4" stroke-linejoin="round"/>${GLYPH_BARS}</svg>`
 }
 
 // Matches the app (LifeCard DELTA_VISIBLE_MS): how long the running change shows in a glyph.
