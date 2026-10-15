@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import type { LayoutChangeEvent, TextStyle, ViewStyle } from "react-native"
-import { StyleSheet, View } from "react-native"
+import { StyleSheet, useWindowDimensions, View } from "react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import Svg, { Circle, Rect } from "react-native-svg"
 
@@ -36,9 +36,14 @@ const BESIDE_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0", "�
 const MAX_DIGITS = String(MAX_LIFE_DELTA).length
 // why: below this height a column squeezes the keys too small to hit, so the keypad moves beside the number.
 const COLUMN_MIN_HEIGHT = 300
-// why: wide enough for a six-digit change at the log's text size, so the log shows as many recent steps as fit.
-const LOG_STEP_WIDTH = 52
-const LOG_GAP = 6
+// why: the trail stays a glance at recent play, sized to the seat, rather than a ticker across a wide sheet.
+const TRAIL_STEPS = { beside: 2, column: 3, wide: 5 }
+const TRAIL_WIDE = 520
+const TRAIL_GAP = 7
+// why: a generous per-character width at the trail's text size, so six-digit totals drop older steps instead of overflowing.
+const TRAIL_CHAR_WIDTH = 8
+// why: large system text still grows the trail, but only so far, so the fit estimate holds and the keypad keeps its room.
+const TRAIL_MAX_FONT_SCALE = 1.3
 const FADE_MS = 160
 
 type Props = {
@@ -200,6 +205,23 @@ export function LifeCalculator({
       {action("gain", beside ? "+" : "+ Gain", `Add ${amount} to ${playerName}`, amount, gain)}
     </View>
   )
+  const trail = playerId ? (
+    <LifeLog playerId={playerId} life={life}>
+      {(steps) => (
+        <LifeTrail
+          steps={steps}
+          beside={beside}
+          showTotal={entry !== ""}
+          seatNumber={seatNumber}
+          playerName={playerName}
+          ink={ink}
+          // why: the theme red reads at about 2:1 on a darkened seat, so it leans toward the ink to stay legible.
+          damage={mixColorsInLinearLight(theme.colors.error, ink, 0.3)}
+          gain={theme.colors.success}
+        />
+      )}
+    </LifeLog>
+  ) : null
   const readout = (
     <View style={beside ? undefined : $centered}>
       <Text
@@ -219,6 +241,7 @@ export function LifeCalculator({
         numberOfLines={beside ? 2 : 1}
         style={[inkText, $hint, !beside && $centeredText]}
       />
+      {trail}
     </View>
   )
 
@@ -270,20 +293,6 @@ export function LifeCalculator({
           </BoardPressable>
         </View>
       </View>
-      {playerId ? (
-        <LifeLog playerId={playerId} life={life}>
-          {(steps) => (
-            <LifeLogRow
-              steps={steps}
-              seatNumber={seatNumber}
-              playerName={playerName}
-              ink={ink}
-              damage={theme.colors.error}
-              gain={theme.colors.success}
-            />
-          )}
-        </LifeLog>
-      ) : null}
       {beside ? (
         <View style={$besideBody}>
           <View style={$besideReadout}>
@@ -307,8 +316,11 @@ function signed(delta: number) {
   return `${delta < 0 ? "−" : "+"}${Math.abs(delta)}`
 }
 
-function LifeLogRow({
+// why: the newest total is the big number above, so the trail ends on the change that reached it until a typed amount takes that number's place.
+function LifeTrail({
   steps,
+  beside,
+  showTotal,
   seatNumber,
   playerName,
   ink,
@@ -316,6 +328,8 @@ function LifeLogRow({
   gain,
 }: {
   steps: readonly LifeLogStep[]
+  beside: boolean
+  showTotal: boolean
   seatNumber: number
   playerName: string
   ink: string
@@ -323,12 +337,46 @@ function LifeLogRow({
   gain: string
 }) {
   const [width, setWidth] = useState(0)
+  const charWidth =
+    TRAIL_CHAR_WIDTH * Math.min(useWindowDimensions().fontScale, TRAIL_MAX_FONT_SCALE)
   if (steps.length < 2) return null
-  const fits = Math.max(1, Math.floor((width + LOG_GAP) / (LOG_STEP_WIDTH + LOG_GAP)))
-  const shown = steps.slice(-fits)
+  const total = String(steps[steps.length - 1].life)
   const label = steps
     .map(({ delta, life }) => (delta === undefined ? `${life}` : `${signed(delta)} to ${life}`))
     .join(", ")
+  const cap = beside
+    ? TRAIL_STEPS.beside
+    : width >= TRAIL_WIDE
+      ? TRAIL_STEPS.wide
+      : TRAIL_STEPS.column
+  const changes = steps.slice(1).map(({ id, delta = 0 }, index) => ({
+    id,
+    delta,
+    from: steps[index].life,
+  }))
+  const fits = (count: number) =>
+    changes
+      .slice(changes.length - count)
+      .reduce(
+        (sum, { delta, from }) =>
+          sum + (`${from}`.length + signed(delta).length) * charWidth + TRAIL_GAP * 2,
+        (count < changes.length ? charWidth + TRAIL_GAP : 0) +
+          (showTotal ? total.length * charWidth : 0),
+      ) <= width
+  let count = Math.min(cap, changes.length)
+  // why: a seat too narrow for even one change shows none rather than wrapping into the keypad.
+  while (count > 0 && !fits(count)) count--
+  const shown = changes.slice(changes.length - count)
+  const item = (text: string, style: TextStyle, weight?: "bold") => (
+    <Text
+      text={text}
+      size="xxs"
+      weight={weight}
+      numberOfLines={1}
+      maxFontSizeMultiplier={TRAIL_MAX_FONT_SCALE}
+      style={[{ color: ink }, style]}
+    />
+  )
 
   return (
     <View
@@ -336,29 +384,16 @@ function LifeLogRow({
       accessible
       accessibilityLabel={`${playerName}'s life log: ${label}`}
       onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
-      style={$log}
+      style={[$trail, !beside && $trailCentered]}
     >
-      {width > 0
-        ? shown.map(({ id, delta, life }) => (
-            <View key={id} style={$logStep}>
-              {delta === undefined ? null : (
-                <Text
-                  text={signed(delta)}
-                  size="xxs"
-                  weight="bold"
-                  numberOfLines={1}
-                  style={[$logText, { color: delta < 0 ? damage : gain }]}
-                />
-              )}
-              <Text
-                text={String(life)}
-                size="xxs"
-                numberOfLines={1}
-                style={[$logText, { color: ink }]}
-              />
-            </View>
-          ))
-        : null}
+      {count > 0 && count < changes.length ? item("…", $trailTotal) : null}
+      {shown.map(({ id, delta, from }) => (
+        <Fragment key={id}>
+          {item(String(from), $trailTotal)}
+          {item(signed(delta), { ...$trailText, color: delta < 0 ? damage : gain }, "bold")}
+        </Fragment>
+      ))}
+      {showTotal && width > 0 ? item(total, $trailText) : null}
     </View>
   )
 }
@@ -400,12 +435,16 @@ const $action: ViewStyle = {
   paddingHorizontal: 4,
 }
 const $hint: TextStyle = { opacity: 0.72 }
-const $log: ViewStyle = { flexDirection: "row", justifyContent: "flex-end", gap: LOG_GAP }
-const $logStep: ViewStyle = {
-  width: LOG_STEP_WIDTH,
-  alignItems: "flex-end",
-  justifyContent: "flex-end",
+// why: if a glyph runs wider than the fit estimate, the trail clips at the seat edge instead of wrapping into the keypad.
+const $trail: ViewStyle = {
+  alignSelf: "stretch",
+  flexDirection: "row",
+  gap: TRAIL_GAP,
+  marginTop: 2,
+  overflow: "hidden",
 }
-const $logText: TextStyle = { fontVariant: ["tabular-nums"], lineHeight: 15 }
+const $trailCentered: ViewStyle = { justifyContent: "center" }
+const $trailText: TextStyle = { flexShrink: 0, fontVariant: ["tabular-nums"] }
+const $trailTotal: TextStyle = { ...$trailText, opacity: 0.6 }
 const $pressed: ViewStyle = { opacity: 0.75 }
 const $disabled: ViewStyle = { opacity: 0.35 }
